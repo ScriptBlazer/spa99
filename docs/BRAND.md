@@ -64,7 +64,37 @@ Derived tints (designer may add, mark as derived): e.g. a slightly lighter cream
 
 ## 7. Motion
 
-Smooth and restrained. Built with CSS and one small shared script (IntersectionObserver), no animation library.
+Two modes, one feeling (slow, soft, never bouncy):
+
+- **Immersive** (7A): the marketing pages (Home, The spa, Memberships, Gold Card, Book, Visit us). Scroll-told scenes with GSAP. Full spec: `docs/design/IMMERSIVE.md`.
+- **Restrained** (7B): everything that collects information or is a tool: the journey, register interest, sign in, password reset, account, the Gold application, error pages and Control. CSS and the one shared reveal script, no animation library.
+
+Shared everywhere:
+- **Easing:** `cubic-bezier(0.22, 1, 0.36, 1)` (`--ease-soft`; in GSAP `CustomEase` named `soft`). Scroll-scrubbed motion uses linear easing, because the scroll is the easing.
+- Only `transform` and `opacity` animate (plus SVG stroke drawing on the swan). Never `width`, `height`, `top`, `left`, animated `clip-path` or filters.
+- No bounce, no rotation, no blur transitions, no sideways travel of text, no sound.
+- Hover motion only under `(hover: hover) and (pointer: fine)`.
+
+### 7A. Immersive (marketing pages)
+
+- **Every section is one screen** (`100svh`), complete on its own at 375×667 and 1440×800. Longer only when the scene is deliberately pinned and something changes for the whole pin.
+- **Scroll drives the story.** Pinned scenes scrub image settle (scale 1.12 → 1), cross-fades between rooms, windows and doors (counter-scaled masks), and word-by-word light on one statement per page. Scrub smoothing 0.8 desktop, 0.5 phone. Gentle snapping to scene labels on desktop only.
+- **Headings rise line by line** from a mask (1.1s, 0.08s between lines), once. Body and actions fade up after them (0.9s, 16px).
+- **The swan draws itself** (stroke, then the gold fill) on the Gold Card, Book and the Home Gold scene. Nowhere else.
+- **Numbers count** only when they are small whole numbers that matter (visits a month, days ahead): 1.2s, once. Prices never animate.
+- **Pointer light**: a soft gold glow follows the pointer on dark scenes, desktop with a fine pointer only.
+- **Hero**: a looping muted video (6-10s, warm water, steam or light), or a living still (a 48s scale cycle and drifting steam) until the video exists. Always with a Pause control. Video loads after the page, never on Save-Data.
+- **Text on photographs and video** is allowed on marketing scenes, always inside the solid part of the legibility veil (`--color-veil`), never above the lower 30% (or left 18% on desktop).
+- **Header** overlays the first dark scene, turns solid after 64px, hides on scroll down and returns on scroll up.
+- **Page changes** cross-fade (View Transitions, opacity only, 240ms out, 480ms in); the header stays put.
+- **Smooth scrolling** (Lenis) only on desktop with a fine pointer, never on touch.
+- **Loops** slower than one cycle per 15s, paused when off screen or the tab is hidden.
+- **Budget:** at most 75 KB gzip of motion JS on marketing pages, 60fps on a mid phone, LCP ≤ 2.5s (the hero poster).
+- **Reduced motion** (and no JS): the static layout. Every scene a normal one-screen section, everything visible, final numbers, filled swans, poster instead of video, no pins, scrub, Lenis, glow, page transitions or steam; header always solid.
+
+### 7B. Restrained (forms, journey, account, Gold application, errors, Control)
+
+Smooth and restrained. Built with CSS and one small shared script (IntersectionObserver), no animation library. These pages never load GSAP.
 
 **Easing:** always `cubic-bezier(0.22, 1, 0.36, 1)` (`--ease-soft`). Opacity 0 → 1.
 
@@ -90,6 +120,10 @@ Smooth and restrained. Built with CSS and one small shared script (IntersectionO
 **Reduced motion** (`prefers-reduced-motion: reduce`): everything is visible immediately, with no movement or sequencing.
 
 **Journey screens:** the next part fades and rises in the same way; a choice is acknowledged instantly (no animation delay on the selected state).
+
+**On marketing pages**, the parts that are really small forms (the journey entry tiles on Home) follow 7B inside their immersive scene: they arrive as one group, selection is instant, no stagger. Interaction feedback (buttons scale 1.01 / 0.99) is the same in both modes.
+
+**Visual consistency:** forms and journey use the same type scale, colours, header and page transition as the marketing pages, so moving from a scene into the journey feels like the same building, just quieter.
 
 ## 8. CSS tokens
 
@@ -213,5 +247,7 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   }
 }
 ```
+
+**Proposed additions for the immersive pages (derived, not yet in `tokens.css`):** `--color-veil`, `--color-header-solid`, `--color-glow`, `--scene-h`, `--scene-pad-top`, `--duration-line`, `--stagger-line`, `--duration-page`. Values and contrast in `docs/design/IMMERSIVE.md` section 12. The frontend adds them to `tokens.css` when building the scenes.
 
 The designer refines these per task. Frontend uses only tokens, never raw values. Breakpoints are constants (CSS variables can't be used in media queries): `48em` (tablet) and `64em` (desktop).

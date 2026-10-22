@@ -1,5 +1,7 @@
 # Spa 99: Phase 1 design brief
 
+> **Superseded in part (22 Oct 2026):** layout and motion for the marketing pages (sections 1 "What makes it feel expensive", 5.1 to 5.6 and 9) are replaced by `docs/design/IMMERSIVE.md`. Everything else here stands: palette, type, tokens, components, copy, the journey, forms, account, Gold application and Control.
+
 For the frontend agent. Read with `docs/BRAND.md` (which wins on any conflict) and the feature docs. This is direction, layout, copy tone and tokens, not code. Every value below maps to a token in `common/static/common/css/tokens.css`; never write raw colours, sizes or timings in components.
 
 Copy in this brief is sample copy. All of it lives in `content` and is edited in Control. Samples never use exclamation marks or em dashes.
