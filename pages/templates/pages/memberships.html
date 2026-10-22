@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load static content_tags pages_tags %}
-{# Memberships (docs/design/MEMBERSHIPS-PAGE.md). Espresso page like Home. SWITCHES: page colour = body_class "on-dark" below (use "on-light" and review the selected-state colours); preselect = the `highlight` plan in plans/services (selected_plan_slug), or clear it by passing selected_slug="" from the view. #}
+{# Memberships (docs/design/MEMBERSHIPS-PAGE.md). Cream page (Moishe, 2026-10-22), selected column flips to espresso, Continue bar is espresso (on-dark). SWITCHES: page colour = body_class "on-light" below ("on-dark" needs the old selected state back); preselect = the `highlight` plan in plans/services (selected_plan_slug), or clear it by passing selected_slug="" from the view. #}
 {% block html_attrs %} data-page="marketing"{% endblock %}
-{% block body_class %}page-mem on-dark{% endblock %}
+{% block body_class %}page-mem on-light{% endblock %}
 {% block header_mode %}solid{% endblock %}
 {% block main %}
 {% page_content "memberships" as m %}
@@ -42,7 +42,7 @@
       {% endfor %}
     </fieldset>
 
-    <div class="continue-bar">
+    <div class="continue-bar on-dark">
       <div class="continue-summary">
         <p class="continue-name" data-summary-name></p>
         <p class="continue-price"><span class="num" data-summary-price></span> <span class="continue-inc num" data-summary-inc></span></p>

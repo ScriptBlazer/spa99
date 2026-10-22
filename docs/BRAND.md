@@ -240,6 +240,11 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --color-thread-light: rgb(187 136 85 / 0.6); /* derived: the thread (caramel) on cream */
   --frame-gap: var(--space-6);                 /* derived: minimum espresso between two frames */
   --bleed: calc(var(--page-margin) + max(0px, (100vw - var(--container-max)) / 2)); /* derived: content edge to screen edge, for edge-bleed frames */
+  /* Memberships page (docs/design/MEMBERSHIPS-PAGE.md, cream page). Derived. */
+  --color-pill-line: rgb(245 242 216 / 0.28);  /* derived: pill border inside the selected (espresso) tier column; decoration, the text is cream. Unselected pills use --color-control-line */
+  --tier-media-h: 7rem;                        /* derived: picture box in a tier column (desktop); phone uses a square --tier-media-s */
+  --tier-media-s: 5.5rem;                      /* derived */
+  --bar-h: 4.5rem;                             /* derived: Continue bar; 4rem from 64em */
 }
 
 @media (min-width: 48em) {
