@@ -48,10 +48,12 @@ Phase 1 is built so every later part plugs in without rewrites (see section 5).
 | Layer | Choice |
 |---|---|
 | Backend | Django (always) |
-| Frontend | Django templates + small vanilla JS modules, shared JS in `common/static` |
+| Frontend | Django 5.2 LTS templates + HTMX + small vanilla JS modules, shared JS in `common/static` |
+| Background jobs | Database-backed task queue + scheduler (no Redis) |
+| Admin | Spa 99 Control on `control.spa99.uk` |
 | Database | SQLite locally at `.private/db.sqlite3`. Managed PostgreSQL on live via `DATABASE_URL` |
 | Live hosting | AWS instance, Docker + Caddy (HTTPS). Managed PostgreSQL |
-| Media | S3 bucket on live (`django-storages`); private folder `media/` locally |
+| Media | S3 (`django-storages`), `dev/` and `prod/` folders. Falls back to local storage if S3 settings are missing |
 | Static | WhiteNoise `CompressedManifestStaticFilesStorage` |
 | Email | Amazon SES sends (provisional). Reply-To `hello@spa99.uk` (Microsoft 365 shared mailbox) |
 | Payments | Stripe (Phase 2) |
@@ -172,4 +174,12 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-22 | Anonymous journey answers are kept indefinitely (statistics). Personal data still follows GDPR export/delete. |
 | 2026-10-22 | Live hosting: AWS instance (Docker + Caddy), uploaded media in an S3 bucket, managed PostgreSQL. |
 | 2026-10-22 | A welcome email is sent after email verification. |
+| 2026-10-22 | Hardware direction (not final): Suprema face terminals at entrance and band station, Gantner software/hardware for RFID wristbands, doors and lockers; auto vestibule (first door closing opens the second), exit by wristband into a collector; wristband payments maybe later. Audio probably WiiM; screens probably iiyama ProLite LH7564UHS-B1AG; lights and audio controlled from admin later. Nothing built for these yet, but the structure must allow them cleanly. |
+| 2026-10-22 | Django 5.2 LTS, Python 3.13. Fresh project following BML RULES.md (not bml-starter). |
+| 2026-10-22 | Frontend: Django templates + HTMX + small vanilla JS. Design guided by the taste skills (design-taste-frontend etc.), applied without React/Tailwind. |
+| 2026-10-22 | Background jobs: database-backed queue (works on SQLite and Postgres, no Redis). |
+| 2026-10-22 | Spa 99 Control lives on its own subdomain: control.spa99.uk. |
+| 2026-10-22 | Media: S3 with `dev/` and `prod/` folders. If S3 settings are missing, save locally and never crash. Site images uploaded in Control go to S3 (never inside the container). |
+| 2026-10-22 | Architecture for later: device brands behind adapters in `integrations/` (with fakes for dev/tests); an on-site bridge service syncs access lists from AWS and talks to devices so the door works offline; every on-site action stored as an event; one JSON API for site, bridge, screens and apps. |
+| 2026-10-22 | S3 bucket `spa99-media` in the BML AWS account, region London (eu-west-2). Private, versioning on, SSE-S3. Bucket policy denies everyone except root, `user/moishe.berkowitz`, `user/spa99-dev` (local dev, dev/ only) and `role/spa99-server` (EC2). CloudFront exception to add when site images are served. |
 | 2026-10-22 | GitHub: private repo on Moishe's personal account (Moishe is not a BML org owner; other devs are). Transfer to BML org later if wanted; transfer keeps history. |
