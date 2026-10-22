@@ -196,3 +196,4 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-22 | `users.User` has a UUID primary key and a separate 8-character unambiguous `public_id` for guest invites (ACC-05). Emails stored lowercase with a case-insensitive unique constraint. |
 | 2026-10-22 | Tests run on `config.settings.test` (dev settings plus in-memory media, plain static storage, synchronous jobs). `manage.py test` selects it automatically. |
 | 2026-10-22 | User holds person data only; no status field. Interest and membership are separate records. |
+| 2026-10-22 | Motion spec adopted (BRAND.md section 7): soft easing, hero 0.8s, scroll reveals 1s at 15% visible, 12px rise (8px phone), hover 1.01 / press 0.99. Plain CSS + one small script. Impeccable and the Superpowers plugin not installed; two Superpowers habits (root-cause debugging, verify before done) written into the agents instead. |

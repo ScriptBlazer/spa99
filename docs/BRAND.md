@@ -64,8 +64,32 @@ Derived tints (designer may add, mark as derived): e.g. a slightly lighter cream
 
 ## 7. Motion
 
-- Slow, soft: fades and gentle rises, 400 to 800ms, ease-out.
-- Respect `prefers-reduced-motion`: no movement, instant changes.
+Smooth and restrained. Built with CSS and one small shared script (IntersectionObserver), no animation library.
+
+**Easing:** always `cubic-bezier(0.22, 1, 0.36, 1)` (`--ease-soft`). Opacity 0 → 1.
+
+**Entrances**
+| Group | Trigger | Duration | Delay | Movement |
+|---|---|---|---|---|
+| Hero | On load | 0.8s | none | Rise 12px (8px on phone) |
+| Section groups (heading + copy + actions together) | 15% of the group visible (0 if taller than the screen) | 1s | 0.1s after entering view | Rise 12px (8px on phone) |
+| Card collections | Same as sections | 1s | 0.1s | Rise 12px (8px on phone) |
+| Standalone images | Same as sections | 1s | 0.1s | Scale 0.98 → 1, no travel |
+
+- Each group reveals once (no replay) and on its own, never scheduled from page load. Never reveal the whole page as one group.
+- Animate a container or its groups, never both.
+- Stagger only 2–4 sibling cards or visuals that show steps or progression: 0.1s apart in reading order. On phone, no stagger. Never stagger long lists, words, or copy with its actions.
+- Not animated: navigation, sticky controls, backgrounds, dividers, long article text, footer legal/utility links.
+- No blur, rotation, sideways travel, bounce or exit animations.
+
+**Interaction feedback** (separate from entrances)
+- Buttons and clickable cards without their own feedback: scale 1.01 on hover, 0.99 on press, 0.25s, same easing.
+- If scale is already used on that element, use opacity 0.9 on hover and 0.8 on press instead.
+- Inline links and non-interactive elements don't scale. Scaled elements must never clip.
+
+**Reduced motion** (`prefers-reduced-motion: reduce`): everything is visible immediately, with no movement or sequencing.
+
+**Journey screens:** the next part fades and rises in the same way; a choice is acknowledged instantly (no animation delay on the selected state).
 
 ## 8. CSS tokens (starting set)
 
