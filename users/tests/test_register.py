@@ -272,7 +272,7 @@ class PersonDataTests(TestCase):
 
         data = services.export_user_data(user)
         self.assertEqual(data["interest"]["plan"], "Tier 2")
-        self.assertEqual(data["journey_sessions"][0]["answers"][0]["options"], ["Once a week"])
+        self.assertEqual(data["journey_sessions"][0]["answers"][0]["options"], ["Weekly"])
         self.assertEqual([a["email"] for a in data["gold_applications"]], ["hugo@example.com"])
         self.assertTrue(any(e["template"] == "verify" for e in data["emails"]))
         self.assertIn("men_only_accepted_at", data["profile"])

@@ -85,7 +85,7 @@ class SubmitTests(TestCase):
         positions = [body.index(h) for h in ("1. PERSONAL DETAILS", "2. PROPERTY PROFILE", "3. WHAT THE SITE COLLECTED")]
         self.assertEqual(positions, sorted(positions))
         for expected in ("dan@example.com", "Owner / investor", "Potential: High (12 points)", "Owner or investor (+5)",
-                         "Evening (6-10pm), Late night (10pm-3am)", "Cold plunge, Gym", "Often with someone",
+                         "Evening (6 to 10pm), Late night (10pm to 3am)", "Cold plunge, Gym", "Often with someone",
                          "Suggested membership: Tier 3", f"/gold/{application.pk}/", "Open in Control", application.reference):
             self.assertIn(expected, body)
         html = barry.alternatives[0][0]
