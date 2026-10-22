@@ -30,7 +30,7 @@ Pins that remain on the site: **The spa S2 room walk** (including the dry sauna 
 1. **Images bleed off their side of the screen.** An image placed on the right runs off the right edge of the viewport (no margin on that side) and gets a slight radius on its **left corners only** (`--radius-md` on top-left and bottom-left, 0 on the right). An image on the left mirrors it: runs off the left edge, radius on its right corners only. This replaces rule 1's "square-cornered frame" and rule 2's "one bleed per scene": **every** photo on Home is an edge-bleed frame unless it is a small detail inset (insets keep a slight radius on all four corners). No plain square boxed images. Alternate sides scene to scene so the page swings left and right.
 2. **Phone:** the same idea. The image runs off one side (alternating), full width minus the margin on the other side, radius on the inner corners only.
 3. **Small text, but don't overdo it.** Small captions, labels and facts make it feel luxury, but at most 2-3 small lines per scene, neatly aligned to the grid. Never clutter corners just to fill them.
-4. Capacity line and the cold image wait for Moishe's answer: capacity hidden unless its content row is filled; "Then cold." uses `door-white` until he confirms the wooden tub (renders 09/10) is the cold plunge.
+4. Capacity is not shown on Home (Moishe, 2026-10-22). "Then cold." uses `cold-tub` (renders 09/10): Moishe confirmed the wooden tub is the cold plunge.
 
 ## 2. The system: how bright renders live on espresso
 
