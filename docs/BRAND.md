@@ -91,9 +91,13 @@ Smooth and restrained. Built with CSS and one small shared script (IntersectionO
 
 **Journey screens:** the next part fades and rises in the same way; a choice is acknowledged instantly (no animation delay on the selected state).
 
-## 8. CSS tokens (starting set)
+## 8. CSS tokens
+
+Kept in sync with `common/static/common/css/tokens.css`. Brand values are the four colours, the two fonts and the type/space scale. Everything commented "derived" was added by the designer (Phase 1 design brief, `docs/design/BRIEF.md` section 11, which lists every contrast ratio). Nothing in the starting set was changed or removed.
 
 ```css
+/* Brand tokens (docs/BRAND.md section 8). Components use these, never raw values.
+   Anything marked "Derived" is not a brand colour/value; see docs/design/BRIEF.md section 11 for contrast. */
 :root {
   /* Colour */
   --color-cream: #F5F2D8;
@@ -107,22 +111,46 @@ Smooth and restrained. Built with CSS and one small shared script (IntersectionO
   --color-text-inverse: var(--color-cream);
   --color-accent: var(--color-gold);       /* on dark only for text */
   --color-line: var(--color-caramel);
-  /* Derived, not brand colours */
-  --color-danger: #8B1E1E;                 /* destructive actions */
-  --color-overlay: rgb(73 46 33 / 0.6);    /* espresso at 60%, behind modals */
+  /* Derived (not brand colours): a deep red for destructive actions, a translucent espresso behind modals. */
+  --color-danger: #8B1E1E;                 /* 8.07 on cream; not for text on espresso */
+  --color-overlay: rgb(73 46 33 / 0.6);
+
+  /* Derived surfaces and text (design brief) */
+  --color-cream-raised: #FBF9EC;           /* espresso text 11.71 */
+  --color-espresso-raised: #553729;        /* cream 9.45, gold 5.32, caramel 3.44 */
+  --color-text-muted: #745F4F;             /* 5.32 on cream, 5.69 on cream-raised */
+  --color-text-muted-inverse: #C5BBA5;     /* 6.50 on espresso, 5.61 on espresso-raised */
+  --color-control-line: #8E7C6A;           /* field/tile borders: 3.54 cream, 3.79 cream-raised, 3.09 espresso; not on espresso-raised */
+  --color-hairline: rgb(73 46 33 / 0.14);  /* decoration only */
+  --color-hairline-inverse: rgb(245 242 216 / 0.14); /* decoration only */
+  --color-danger-inverse: #F4B09E;         /* error text on espresso, 6.81 */
+  --color-focus: var(--color-espresso);
+  --color-focus-inverse: var(--color-gold);
+  --color-pattern: rgb(229 172 110 / 0.08); /* swan pattern on espresso */
+  /* Derived chart colours for Control (light background, >= 3:1 on cream-raised) */
+  --color-chart-1: var(--color-espresso);  /* 11.71 */
+  --color-chart-2: #A0703F;                /* caramel deep, 4.07 */
+  --color-chart-3: #745F4F;                /* 5.69, always with a hatch pattern */
 
   /* Type */
   --font-display: "Signika", system-ui, sans-serif;
   --font-body: "Figtree", system-ui, sans-serif;
   --tracking-display: -0.025em;
   --tracking-body: -0.01em;
+  --tracking-label: 0.08em;                /* derived: small uppercase labels only */
 
   --text-sm: 0.875rem;
   --text-base: 1rem;
+  --text-body: 1rem;                       /* derived: may become 1.0625rem at desktop */
   --text-lg: 1.25rem;
   --text-xl: clamp(1.5rem, 2vw + 1rem, 2.25rem);
   --text-2xl: clamp(2.25rem, 4vw + 1rem, 4rem);
   --text-hero: clamp(3rem, 8vw + 1rem, 8rem);
+
+  --leading-display: 1;
+  --leading-tight: 1.1;
+  --leading-snug: 1.4;
+  --leading-body: 1.6;
 
   /* Space */
   --space-1: 0.25rem;
@@ -134,19 +162,56 @@ Smooth and restrained. Built with CSS and one small shared script (IntersectionO
   --space-7: 6rem;
   --space-8: 10rem;
 
+  /* Layout (derived) */
+  --container-max: 90rem;                  /* 1440px including margins */
+  --page-margin: clamp(1.25rem, 4.4vw, 4rem);
+  --gutter: clamp(1.25rem, 2.2vw, 2rem);
+  --measure: 34rem;
+  --measure-display: 14ch;
+  --section-y: clamp(6rem, 11vw, 10rem);
+  --header-h: 4rem;
+  --control-h: 3.25rem;                    /* 52px buttons and fields */
+  --control-h-compact: 2.5rem;             /* 40px, Control only */
+  --tile-min-h: 4rem;
+
   /* Shape */
-  --radius-sm: 6px;
-  --radius-md: 12px;
+  --radius-sm: 6px;                        /* controls */
+  --radius-md: 12px;                       /* surfaces; photography is always square */
+  --shadow-raised: 0 24px 60px -24px rgb(73 46 33 / 0.35); /* derived: modal only */
 
   /* Motion */
   --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
   --duration-slow: 700ms;
   --duration-base: 400ms;
+  /* BRAND section 7 timings (derived names, values from the spec) */
+  --duration-hero: 800ms;
+  --duration-reveal: 1000ms;
+  --delay-reveal: 100ms;
+  --stagger: 100ms;
+  --duration-press: 250ms;
+  --rise: 8px;
+}
+
+@media (min-width: 48em) {
+  :root { --rise: 12px; }
+}
+
+@media (min-width: 64em) {
+  :root { --header-h: 4.5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --duration-slow: 0ms; --duration-base: 0ms; }
+  :root {
+    --duration-slow: 0ms;
+    --duration-base: 0ms;
+    --duration-hero: 0ms;
+    --duration-reveal: 0ms;
+    --delay-reveal: 0ms;
+    --stagger: 0ms;
+    --duration-press: 0ms;
+    --rise: 0px;
+  }
 }
 ```
 
-The designer refines these per task. Frontend uses only tokens, never raw values.
+The designer refines these per task. Frontend uses only tokens, never raw values. Breakpoints are constants (CSS variables can't be used in media queries): `48em` (tablet) and `64em` (desktop).
