@@ -1,0 +1,204 @@
+"""Public account views: sign-up (register interest), verification, password reset, login, account page.
+Logic is in services.py. The templates are bare placeholders for the frontend to replace; keep the context
+names and form field names.
+"""
+from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import views as auth_views
+from django.contrib.auth.decorators import login_not_required
+from django.core.exceptions import ValidationError
+from django.http import JsonResponse
+from django.shortcuts import redirect, render
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
+
+from common.audit import client_ip
+from common.ratelimit import hit, rate_limited_json
+from common.validators import normalise_email
+from journey import services as journey_services
+from plans.models import SiteSettings
+
+from . import services, tokens
+from .forms import ForgotPasswordForm, ResetPasswordForm, SignUpForm
+from .models import User
+
+PENDING_EMAIL_KEY = "pending_verification_email"
+HONEYPOT_FIELD = "website"
+BACKEND = "django.contrib.auth.backends.ModelBackend"
+
+
+def _message(request, title, text, status=200):
+    return render(request, "users/message.html", {"title": title, "text": text}, status=status)
+
+
+def _throttled(request, scope, limit, window):
+    """True (and the caller should stop) when this IP has done too much."""
+    return not hit(scope, client_ip(request) or "unknown", limit, window)
+
+
+# ---------- login ----------
+
+class LoginView(auth_views.LoginView):
+    """Public sign-in (Django marks LoginView as login_not_required). Limited to 10 attempts per 5 minutes per IP."""
+
+    template_name = "users/login.html"
+    redirect_authenticated_user = True
+
+    def post(self, request, *args, **kwargs):
+        if _throttled(request, "login", 10, 300):
+            return render(request, self.template_name, {"form": self.get_form_class()(request), "throttled": True}, status=429)
+        return super().post(request, *args, **kwargs)
+
+
+# ---------- register interest ----------
+
+@login_not_required  # PUBLIC: anyone can register interest
+@require_http_methods(["GET", "POST"])
+def register(request):
+    if request.user.is_authenticated:
+        return redirect("account")
+    if not SiteSettings.load().register_interest_open:
+        return _message(request, "Not open yet", "Registration is not open yet.", status=403)
+    session = journey_services.session_from_cookies(request.COOKIES)
+    plan_slug = request.GET.get("plan") or (session.suggested_plan.slug if session and session.suggested_plan_id else "")
+    plans = services.interest_plans()
+    if request.method == "POST":
+        if _throttled(request, "register", 20, 3600):
+            return _message(request, "Please wait", "Too many attempts. Please try again later.", status=429)
+        form = SignUpForm(request.POST)
+        if request.POST.get(HONEYPOT_FIELD):  # a bot: look like success, create nothing
+            return redirect("register_sent")
+        if form.is_valid():
+            try:
+                result = services.register_interest(form.cleaned_data, journey_session=session)
+            except services.SignUpError as error:
+                for field, texts in error.errors.items():
+                    for text in texts:
+                        form.add_error(field if field in form.fields else None, text)
+            except services.RegistrationClosed:
+                return _message(request, "Not open yet", "Registration is not open yet.", status=403)
+            else:
+                request.session[PENDING_EMAIL_KEY] = result.user.email
+                return redirect("register_sent")
+        status = 400
+    else:
+        form, status = SignUpForm(initial={"plan": plan_slug}), 200
+    return render(request, "users/register.html", {"form": form, "plans": plans, "selected_plan": plan_slug}, status=status)
+
+
+@login_not_required  # PUBLIC: the 'check your email' screen after sign-up
+@require_GET
+def register_sent(request):
+    return render(request, "users/register_sent.html", {"email": request.session.get(PENDING_EMAIL_KEY, "")})
+
+
+@login_not_required  # PUBLIC on purpose: live 'already registered' check; answers yes/no only, rate limited
+@require_GET
+@rate_limited_json("check-email", 30, 60)
+def check_email(request):
+    try:
+        email = normalise_email(request.GET.get("email", ""))
+    except ValidationError:
+        return JsonResponse({"registered": False})  # the format message comes from the field check
+    return JsonResponse({"registered": services.email_is_registered(email)})
+
+
+# ---------- verification ----------
+
+@login_not_required  # PUBLIC: the link in the verification email (signed, expires, single use)
+@require_GET
+def verify_email(request, token):
+    status, user = services.verify_email(token)
+    if status == tokens.VERIFIED:
+        login(request, user, backend=BACKEND)
+        messages.success(request, "Your email is confirmed.")
+        return redirect("account")
+    if status == tokens.ALREADY:
+        return _message(request, "Already confirmed", "This email is already confirmed. You can sign in.")
+    if status == tokens.EXPIRED:
+        return _message(request, "Link expired", "This link has expired. Sign in and ask for a new one.", status=410)
+    return _message(request, "Link not valid", "This link is not valid.", status=400)
+
+
+@login_not_required  # PUBLIC: asks for a new link; same answer whoever asks, rate limited
+@require_POST
+def resend_verification(request):
+    if _throttled(request, "resend-verify", 5, 3600):
+        return _message(request, "Please wait", "Too many requests. Please try again later.", status=429)
+    email = request.user.email if request.user.is_authenticated else request.session.get(PENDING_EMAIL_KEY, "")
+    user = User.objects.filter(email__iexact=email).first() if email else None
+    services.resend_verification(user)
+    return _message(request, "Check your email", "If the address needs confirming, a new link is on its way.")
+
+
+# ---------- password reset ----------
+
+@login_not_required  # PUBLIC: forgot password; the answer never says whether the email exists
+@require_http_methods(["GET", "POST"])
+def forgot_password(request):
+    if request.method == "POST":
+        if _throttled(request, "forgot", 5, 3600):
+            return _message(request, "Please wait", "Too many requests. Please try again later.", status=429)
+        form = ForgotPasswordForm(request.POST)
+        if form.is_valid():
+            services.request_password_reset(form.cleaned_data["email"])
+            return _message(request, "Check your email", "If that address has an account, a reset link is on its way.")
+    else:
+        form = ForgotPasswordForm()
+    return render(request, "users/forgot.html", {"form": form})
+
+
+@login_not_required  # PUBLIC: the link in the reset email (token, 1 hour, single use)
+@require_http_methods(["GET", "POST"])
+def reset_password(request, uidb64, token):
+    if tokens.read_reset_token(uidb64, token) is None:
+        return _message(request, "Link not valid", "This link has expired or was already used.", status=400)
+    form = ResetPasswordForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            services.reset_password(uidb64, token, form.cleaned_data["password"])
+        except ValidationError as error:
+            form.add_error("password", error)
+        else:
+            return _message(request, "Password changed", "Your password has been changed. You can sign in.")
+    return render(request, "users/reset.html", {"form": form}, status=400 if request.method == "POST" else 200)
+
+
+# ---------- account (signed in; the default login lock applies) ----------
+
+@require_http_methods(["GET"])
+def account(request):
+    interest = getattr(request.user, "interest", None)
+    return render(request, "users/account.html", {
+        "interest": interest, "plans": services.interest_plans(), "verified": bool(request.user.email_verified_at),
+    })
+
+
+@require_POST
+def account_interest(request):
+    plan = services.interest_plans().filter(slug=request.POST.get("plan", "")).first()
+    if plan is None:
+        messages.error(request, "Choose one of the memberships.")
+    else:
+        services.set_interest(request.user, plan)
+        messages.success(request, "Your interest is updated.")
+    return redirect("account")
+
+
+@require_GET
+def account_export(request):
+    """Download everything we hold about the signed-in person (UK GDPR)."""
+    response = JsonResponse(services.export_user_data(request.user), json_dumps_params={"indent": 2})
+    response["Content-Disposition"] = 'attachment; filename="spa99-my-data.json"'
+    return response
+
+
+@require_POST
+def account_delete(request):
+    """Delete the signed-in person's data after they re-enter their password."""
+    user = request.user
+    if authenticate(request, username=user.email, password=request.POST.get("password", "")) is None:
+        messages.error(request, "That password is not right.")
+        return redirect("account")
+    logout(request)
+    services.delete_user_data(user)
+    return _message(request, "Account deleted", "Your account and data have been deleted.")

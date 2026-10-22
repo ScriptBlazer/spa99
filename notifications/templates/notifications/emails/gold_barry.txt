@@ -1,0 +1,10 @@
+{% autoescape off %}{% if is_repeat %}REPEAT APPLICATION: this person has applied before ({{ repeat_reference }}).
+
+{% endif %}Gold Card application: {{ name }}
+{{ potential_label }} potential
+{% for section in sections %}
+{{ forloop.counter }}. {{ section.title|upper }}
+{% for label, value in section.rows %}{{ label }}: {{ value }}
+{% endfor %}{% endfor %}
+Open in Control: {{ control_url }}
+{% endautoescape %}

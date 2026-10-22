@@ -73,16 +73,24 @@ Which answers count as property, and the thresholds, are editable in Control.
 
 | Model | Holds |
 |---|---|
-| `JourneySession` | Anonymous UUID (first-party cookie), started/last seen, device type, referrer, UTM, current step, completed flag, linked `User` or `GoldApplication` once known, suggested plan, Gold potential |
-| `Question` | Key, text, type (single, multi, scale, short text), screen, order, active, version |
-| `Option` | Question, label, value, order, active, plan points, Gold points |
-| `Answer` | Session, question, selected options / text, answered at, skipped flag. Changing an answer updates it and keeps history |
-| `SuggestionRule` | Constraint rules and tie-break, editable |
+| `JourneySession` | Anonymous UUID id plus a secret cookie `key`, last seen, visit count, device type, bot flag, referrer, UTM, current and furthest step, completed flag, linked `User` once known, suggested plan, suggestion detail (points, reasons), Gold potential + score. A Gold application points back at the session (`session.gold_applications`) |
+| `Question` | Key, text, help, type (single, multi, scale, text), screen, order, active, `condition` (show only if another answer matches), version |
+| `Option` | Question, label, value, order, active, `plan_points` (JSON per plan slug), `gold_points`, `weight` (numeric meaning for statistics, e.g. visits a week), `reason` (text shown when this answer supports the suggestion) |
+| `Answer` | Session, question, selected options / text, skipped flag, answered at. One current answer per session + question (unique); changing it updates the row and `django-simple-history` keeps the old ones (options included) |
+| `SuggestionRule` | `exclude` (plans, or every daytime-only plan, when conditions match), `add_points`, `tie_break` (preferred plan order). Editable |
 
-- Each tap posts to a small JSON endpoint (`POST /journey/answer/`), CSRF protected, rate limited. Debounced for text.
+- Conditions: `{"question": "industry", "any_of": ["property"]}`; a list means all must match. A question is shown when its condition holds given the answers to the questions before it; answers to hidden questions stay saved but are ignored.
+- Endpoints (JSON, public, CSRF protected, rate limited per IP, honeypot field `website`; the CSRF cookie is set by `GET /journey/state/`, send it back as `X-CSRFToken`):
+  - `GET /journey/state/?ref=&utm_source=...` session, screens, questions (with `visible`, `options`, saved `answer`) and `current_step`. Creates the session and sets the cookie `spa99_journey` (first party, HttpOnly, SameSite=Lax, 1 year). The page passes `document.referrer` as `ref` and any UTM values.
+  - `POST /journey/answer/` `{"question", "options": [...], "text", "skipped"}` or `{"answers": [...]}` in one go (cookie-blocked browsers post at the end). Saving the same answer twice changes nothing. 400 `{"error"}` for anything invalid.
+  - `POST /journey/step/` `{"step": 2}` or `{"direction": "next" | "back"}`; remembered so a refresh resumes.
+  - `GET /journey/result/` suggested plan with three reasons, the other plans (`not_a_fit` when excluded), Gold nudge (`presentation`: `panel` High, `line` Medium, `none` Low). Marks the journey completed.
+  - `POST /journey/restart/` "Start again": new session, old one kept for the statistics.
 - Questions or options retired in Control are hidden, never deleted, so old answers stay readable.
-- On sign-up or Gold application, the session is linked to that record.
+- On sign-up the session is linked to the new `User`; on a Gold application the application points at the session.
 - No personal data is asked before sign-up except optional industry/role.
+- Added to the draft flow: a conditional `property_size` question on screen 4 (1-9, 10-49, 50-199, 200+) so a property person can reach High potential from the journey ("property link with scale"). Hide it in Control if not wanted.
+- Seed: `python manage.py seed_phase1` loads these questions, options, points and rules (create-only, never overwrites edits).
 
 ## Statistics fed (see `admin.md`)
 

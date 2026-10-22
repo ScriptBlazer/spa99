@@ -11,6 +11,7 @@ urlpatterns = [
     path("", views.control_index, name="control_index"),
     path("health/", health),  # public: monitoring
     path("", include("users.urls")),
+    path("insights/", include("insights.urls")),  # statistics JSON, staff roles only
     # Hidden Django admin: superuser fallback only. Path is set by ADMIN_PATH.
     path(settings.ADMIN_PATH, admin.site.urls),
 ]

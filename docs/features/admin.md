@@ -34,7 +34,18 @@ Every change is recorded (who, when, before and after) via `django-simple-histor
 | Manager | Everything except Team and Gold status |
 | Viewer | Read-only: dashboard, people, Gold |
 
-Roles are Django Groups. Checks on every view.
+Roles are Django Groups. Checks on every view. `python manage.py setup_roles [--dry-run]` creates or refreshes `Owner`, `Manager`, `Viewer` (idempotent). Proposed permissions, to approve: Owner has every permission on the project apps plus groups; Manager has everything on the project apps except groups/permissions, with People (`users.User`) and Gold applications view-only at model level (Control does the field-level edits, since Django cannot split "Team" from "People" on the same model); Viewer has `view_` on people, interest, Gold applications, journey sessions and answers. Every model is also registered in the hidden Django admin (superuser fallback).
+
+## Data as built (Phase 1 backend)
+
+| App | Models |
+|---|---|
+| `plans` | `Plan` (slug, kind monthly / free_by_application / one_off, price ex VAT, visits per month (empty = unlimited), hours daytime / any, booking window days, upcoming limit, cancel hours, guests per month, no-show result, `perks` list of key / label / value, short description, highlight, order, visible), `SiteSettings` (singleton: VAT rate, capacity 25, slot length 120, slot step 30, booking notice 10, opening date, stage switches, wording, contact email, Gold alert to / cc, privacy version), `OpeningRule` (periods daytime 5:00-18:00 and evening 18:00-3:00, daily closure 3:00-5:00, Shabbos / Yom Tov offsets 120 before and 60 after; Hebcal times arrive in Phase 3), `Closure` (one-offs), `Facility` (image goes to default storage, S3 on live) |
+| `content` | `Page`, `Section` (key, heading, body, image, CTA, order, visible) |
+| `journey`, `gold`, `users` | see their feature docs |
+| `notifications` | `EmailLog` (to, cc, subject, template, status, error, sent at) |
+
+All of them have history except `EmailLog` and `LoginEvent`, and are registered in the hidden Django admin.
 
 ## Statistics (Insights)
 
@@ -51,7 +62,7 @@ Filters: date range, source, completed vs not.
 | Sources | Heard via, referrer, UTM |
 | Trend | Registrations and Gold applications per day/week |
 
-All figures are live queries on saved answers (no third-party analytics). Charts in the brand palette, readable in light backgrounds, accessible.
+All figures are live queries on saved answers (no third-party analytics). Built in `insights/services.py` (one function per card, bots excluded) and served as JSON by `GET /insights/summary/?from=YYYY-MM-DD&to=YYYY-MM-DD&source=&completed=yes|no` on the Control host (Owner, Manager, Viewer or superuser; anonymous is sent to login, others get 403). Frequency weights for "expected visits per week" are `Option.weight` on the frequency options. Charts in the brand palette, readable in light backgrounds, accessible.
 
 ## Later sections (planned, not built)
 

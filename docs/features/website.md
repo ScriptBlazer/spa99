@@ -8,6 +8,10 @@ A stunning, visuals-led site that feels like walking into the spa: lots of space
 
 All copy and images come from `content` (editable in Control). Plan details come from `plans`.
 
+## Reading content in templates
+
+`{% load content_tags %}{% page_content "home" as home %}` then `{{ home.hero.heading }}`, `.body`, `.image`, `.cta_label`, `.cta_url`. Unknown sections are empty, never an error. Plans: `plans.services.plan_display(plan)` / `visible_plans()` (price ex VAT and inc VAT, facts, perks). Facilities: `plans.services.visible_facilities()`. `site_settings` (stage switches, wording, contact email) is in every template context. Seed copy keys: `python manage.py seed_phase1`.
+
 ## Pages
 
 | Page | Content |

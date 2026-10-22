@@ -30,6 +30,7 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     marketing_consent_at = models.DateTimeField(null=True, blank=True)
     privacy_accepted_version = models.CharField(max_length=20, blank=True)
     privacy_accepted_at = models.DateTimeField(null=True, blank=True)
+    men_only_accepted_at = models.DateTimeField(null=True, blank=True, help_text="Accepted the men-only policy (ACC-09).")
 
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -78,3 +79,28 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
 
     def get_short_name(self):
         return self.first_name
+
+
+class InterestRegistration(BaseModel):
+    """A person's registered interest in a plan (Phase 1). Separate from the User (person data only) and from
+    the memberships Phase 2 will add. One per person: changing interest updates it and history keeps the old plan."""
+
+    JOURNEY = "journey"
+    DIRECT = "direct"
+    SOURCE_CHOICES = [(JOURNEY, "After the guided journey"), (DIRECT, "Directly")]
+
+    user = models.OneToOneField("users.User", on_delete=models.CASCADE, related_name="interest")
+    plan = models.ForeignKey("plans.Plan", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=DIRECT)
+    journey_session = models.ForeignKey(
+        "journey.JourneySession", null=True, blank=True, on_delete=models.SET_NULL, related_name="registrations"
+    )
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["-created_at"])]
+
+    def __str__(self):
+        return f"{self.user_id} interested in {self.plan_id}"

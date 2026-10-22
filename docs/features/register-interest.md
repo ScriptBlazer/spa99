@@ -50,11 +50,29 @@ Shown right under the field, calm wording, no red shouting until he leaves the f
 
 | Model | Holds |
 |---|---|
-| `users.User` (custom) | UUID, email (unique, login), first/last name, mobile (unique when set), DOB, email verified at, marketing consent + timestamp, privacy accepted version + timestamp, public account ID, status (interest / member later) |
-| `users.InterestRegistration` | User, plan of interest, source (journey/direct), linked journey session, created at |
+| `users.User` (custom) | UUID, email (unique, login), first/last name, mobile (E.164, unique when set), DOB, `email_verified_at`, marketing consent + timestamp, privacy accepted version + timestamp, `men_only_accepted_at`, public account ID. No status field |
+| `users.InterestRegistration` | One per person (`user.interest`): plan of interest, source (journey / direct), linked journey session, created at. Changing interest updates it; history keeps the old plan |
 
 - One account per email; mobile unique when present (ACC-10).
 - Later phases attach `Membership`, `PaymentMethod`, face identity and bookings to the same `User` without changing it.
+- Services (`users/services.py`): `register_interest`, `email_is_registered`, `verify_email`, `resend_verification`, `request_password_reset`, `reset_password`, `set_interest`, `export_user_data`, `delete_user_data`. The form is `users.forms.SignUpForm` (rules from `common/validators.py`; `data-validate="required name|email|mobile|password|dob"` switch on the JS mirror).
+- A second click within 2 minutes (same email and password, still unverified) returns the same account and sends nothing new.
+- Stage switch `register_interest_open` (Site settings) closes sign-up; the wording ("Register interest" / "Join") is `site_settings.wording`.
+- Gold applications made earlier with the same email are linked to the new account.
+- GDPR delete removes the account, interest (and its history), Gold applications and email-log rows for the address, and login events. Journey sessions are kept for the statistics but anonymised (unlinked, cookie value replaced, referrer and typed text cleared, also in history).
+
+## Routes (public site; templates are unstyled placeholders for the frontend to replace)
+
+| Route | Purpose |
+|---|---|
+| `GET/POST /register/` | Sign-up form (`?plan=tier-2` preselects; falls back to the journey's suggestion). Honeypot field `website` |
+| `GET /register/sent/` | "Check your email" |
+| `GET /register/check-email/?email=` | `{"registered": true/false}` only, rate limited |
+| `GET /verify/<token>/` | Verify (24h, single use) and sign in; a replay says "already confirmed" and signs nobody in |
+| `POST /verify/resend/` | New link (signed-in user or the address just registered); same answer for everyone, rate limited |
+| `GET/POST /forgot-password/`, `/reset/<uid>/<token>/` | Password reset (1h, single use) |
+| `/login/`, `/logout/` | Public sign-in (10 attempts / 5 min / IP), also on Control |
+| `GET /account/`, `POST /account/interest/`, `GET /account/export/`, `POST /account/delete/` | Account page, change interest, download my data, delete my account (asks for the password) |
 
 ## Emails
 

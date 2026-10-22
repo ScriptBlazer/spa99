@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ site_name }}{% endblock %}</title>
+</head>
+<body style="margin:0;padding:0;background:#F5F2D8;color:#492E21;font-family:Figtree,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F5F2D8;">
+  <tr><td align="center" style="padding:24px 12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+      <tr><td style="background:#492E21;color:#E5AC6E;padding:20px 24px;font-family:Signika,Helvetica,Arial,sans-serif;font-size:22px;letter-spacing:-0.02em;">
+        {{ site_name }} <span style="color:#F5F2D8;font-size:14px;">&nbsp;{{ tagline }}</span>
+      </td></tr>
+      <tr><td style="background:#FFFFFF;padding:24px;">
+        {% block content %}{% endblock %}
+      </td></tr>
+      <tr><td style="padding:16px 24px;font-size:13px;color:#492E21;">
+        {{ site_name }}, {{ address }}.<br>
+        Questions? Reply to this email or write to <a href="mailto:{{ contact_email }}" style="color:#492E21;">{{ contact_email }}</a>.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>
