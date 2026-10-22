@@ -9,6 +9,7 @@ from django.contrib.auth.decorators import login_not_required
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import NoReverseMatch, reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from common.audit import client_ip
@@ -37,15 +38,30 @@ def _throttled(request, scope, limit, window):
 
 # ---------- login ----------
 
+def _login_layout(request):
+    """The sign-in template is shared by the public site and Spa 99 Control. Control has no public pages, so it
+    gets the bare layout (the site header links would not resolve there)."""
+    try:
+        reverse("home")
+    except NoReverseMatch:
+        return {"layout": "base_bare.html", "control": True}
+    return {"layout": "base.html", "control": False}
+
 class LoginView(auth_views.LoginView):
     """Public sign-in (Django marks LoginView as login_not_required). Limited to 10 attempts per 5 minutes per IP."""
 
     template_name = "users/login.html"
     redirect_authenticated_user = True
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(_login_layout(self.request))
+        return context
+
     def post(self, request, *args, **kwargs):
         if _throttled(request, "login", 10, 300):
-            return render(request, self.template_name, {"form": self.get_form_class()(request), "throttled": True}, status=429)
+            context = {"form": self.get_form_class()(request), "throttled": True, **_login_layout(request)}
+            return render(request, self.template_name, context, status=429)
         return super().post(request, *args, **kwargs)
 
 
@@ -82,7 +98,8 @@ def register(request):
         status = 400
     else:
         form, status = SignUpForm(initial={"plan": plan_slug}), 200
-    return render(request, "users/register.html", {"form": form, "plans": plans, "selected_plan": plan_slug}, status=status)
+    context = {"form": form, "plans": plans, "selected_plan": plan_slug, "from_journey": bool(session and session.completed)}
+    return render(request, "users/register.html", context, status=status)
 
 
 @login_not_required  # PUBLIC: the 'check your email' screen after sign-up

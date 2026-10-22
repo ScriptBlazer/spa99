@@ -1,20 +1,20 @@
-{# PLACEHOLDER template: unstyled, only here so the view works. The frontend replaces it. Keep the context names. #}
-<!doctype html>
-<html lang="en-GB">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Check your email | Spa 99</title>
-{% include "common/_assets.html" %}
-</head>
-<body>
-<main>
-  <h1>Check your email</h1>
-  <p>We have sent a confirmation link{% if email %} to {{ email }}{% endif %}. It works for 24 hours.</p>
-  <form method="post" action="{% url 'resend_verification' %}">{% csrf_token %}
-    <button type="submit" data-working-text="Sending...">Send it again</button>
-  </form>
-  {% include "common/_modal.html" %}
-</main>
-</body>
-</html>
+{% extends "base.html" %}
+{% load static content_tags %}
+{% block head_title %}{% include "common/_head.html" with title="Check your email | Spa 99" %}{% endblock %}
+{% block main %}
+{% page_content "register" as r %}
+<section class="section on-light auth">
+  <div class="container auth-inner" data-reveal="hero">
+    <h1>{{ r.sent.heading }}</h1>
+    <p class="lead">{% if email %}We've sent a link to <strong>{{ email }}</strong>. {% else %}We've sent you a link. {% endif %}{{ r.sent.body }}</p>
+    <div class="actions">
+      <form method="post" action="{% url 'resend_verification' %}" data-resend>{% csrf_token %}
+        <button type="submit" class="btn-quiet" data-working-text="Sending">Send it again</button>
+      </form>
+      <a class="btn-quiet" href="{% url 'register' %}">Wrong address? Change it</a>
+    </div>
+    <p class="small muted" role="status" aria-live="polite" data-resend-status></p>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/forms.js' %}"></script>{% endblock %}

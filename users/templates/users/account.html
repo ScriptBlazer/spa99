@@ -1,36 +1,85 @@
-{# PLACEHOLDER template: unstyled, only here so the view works. The frontend replaces it. Keep the context names. #}
-<!doctype html>
-<html lang="en-GB">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Your account | Spa 99</title>
-{% include "common/_assets.html" %}
-</head>
-<body>
-<main>
-  <h1>Your account</h1>
+{% extends "base.html" %}
+{% load static content_tags pages_tags %}
+{% block head_title %}{% include "common/_head.html" with title="Your account | Spa 99" %}{% endblock %}
+{% block messages %}
+<div class="container account-wrap">
   {% include "common/_messages.html" %}
-  <p>{{ request.user.get_full_name }} | {{ request.user.email }} | Account ID {{ request.user.public_id_display }}</p>
   {% if not verified %}
-  <form method="post" action="{% url 'resend_verification' %}">{% csrf_token %}
-    <p>Please confirm your email. <button type="submit">Send the link again</button></p>
-  </form>
+  <div class="message message-info" role="status">
+    <span>Please confirm your email. We sent a link to {{ request.user.email }}.</span>
+    <form method="post" action="{% url 'resend_verification' %}" data-resend>{% csrf_token %}<button type="submit" class="message-close" data-working-text="Sending">Send it again</button></form>
+  </div>
   {% endif %}
-  <h2>Your interest</h2>
-  <p>{% if interest and interest.plan %}You are registered for {{ interest.plan.name }} interest.{% else %}No membership chosen yet.{% endif %}</p>
-  <form method="post" action="{% url 'account_interest' %}">{% csrf_token %}
-    {% for plan in plans %}<label><input type="radio" name="plan" value="{{ plan.slug }}"{% if interest.plan_id == plan.pk %} checked{% endif %}> {{ plan.name }}</label>{% endfor %}
-    <button type="submit">Update</button>
-  </form>
-  <h2>Your data</h2>
-  <p><a href="{% url 'account_export' %}">Download my data</a></p>
-  <form method="post" action="{% url 'account_delete' %}">{% csrf_token %}
-    <label>Password <input type="password" name="password" autocomplete="current-password"></label>
-    <button type="submit">Delete my account</button>
-  </form>
-  <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
-  {% include "common/_modal.html" %}
-</main>
-</body>
-</html>
+</div>
+{% endblock %}
+{% block main %}
+{% page_content "account" as a %}
+{% interest_cards as cards %}
+<section class="section on-light account">
+  <div class="container account-wrap stack-account">
+    <h1>{% account_greeting %}</h1>
+
+    <div class="panel panel--line interest" data-interest>
+      {% if interest and interest.plan %}
+      <p class="lead">You're registered for {{ interest.plan.name }}.</p>
+      {% for card in cards %}{% if card.slug == interest.plan.slug %}<p class="muted num">&pound;{{ card.price_whole }} a month, ex VAT (&pound;{{ card.price_inc }} inc VAT)</p>{% endif %}{% endfor %}
+      {% else %}
+      <p class="lead">No membership chosen yet.</p>
+      {% endif %}
+      <button type="button" class="btn-quiet" data-interest-change aria-expanded="false" aria-controls="interest-form">Change</button>
+      <form id="interest-form" method="post" action="{% url 'account_interest' %}" hidden class="interest-form">
+        {% csrf_token %}
+        <div class="segmented segmented--wrap" role="radiogroup" aria-label="Membership you are interested in">
+          {% for card in cards %}<label class="seg"><input type="radio" name="plan" value="{{ card.slug }}"{% if interest.plan.slug == card.slug %} checked{% endif %}><span>{{ card.name }}</span></label>{% endfor %}
+        </div>
+        <div class="actions"><button type="submit" class="btn btn-primary" data-working-text="Saving">Save</button></div>
+      </form>
+    </div>
+
+    <div class="soon-cards">
+      <div class="soon-card"><h2>Visits</h2><p>{{ a.opening_soon.heading }}</p></div>
+      <div class="soon-card"><h2>Bookings</h2><p>{{ a.opening_soon.heading }}</p></div>
+      <div class="soon-card"><h2>Membership</h2><p>{{ a.opening_soon.heading }}</p></div>
+    </div>
+
+    <div class="account-id panel panel--line">
+      <p class="small muted">Your account ID</p>
+      <p class="id-code num" id="account-id" data-account-id>{{ request.user.public_id_display }}</p>
+      <button type="button" class="btn-quiet" data-copy="#account-id" data-copied-label="Copied">Copy</button>
+      <p class="small muted">{{ a.id_note.body }}</p>
+    </div>
+
+    <div class="details">
+      <h2>Details</h2>
+      <dl class="detail-rows">
+        <div><dt class="muted">Name</dt><dd>{{ request.user.get_full_name }}</dd></div>
+        <div><dt class="muted">Email</dt><dd>{{ request.user.email }}</dd></div>
+        <div><dt class="muted">Mobile</dt><dd>{{ request.user.mobile|default:"Not given" }}</dd></div>
+      </dl>
+      <p class="small muted">To change these details, write to <a href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a>.</p>
+    </div>
+
+    <div class="privacy-actions">
+      <h2>Privacy</h2>
+      <div class="actions">
+        <a class="btn-quiet" href="{% url 'account_export' %}">Download my data</a>
+        <button type="button" class="btn-quiet" data-delete-open aria-expanded="false" aria-controls="delete-form">Delete my account</button>
+      </div>
+      <form id="delete-form" method="post" action="{% url 'account_delete' %}" hidden class="delete-form form-stack-sm">
+        {% csrf_token %}
+        <div class="field">
+          <label for="delete-password">Your password</label>
+          <input id="delete-password" name="password" type="password" autocomplete="current-password" required>
+          <p class="feedback" data-hint-static>We ask for it to make sure this is you.</p>
+        </div>
+        <button type="submit" class="btn btn-danger" data-confirm data-confirm-title="Delete your account?"
+          data-confirm-message="This removes your details and your interest. It can't be undone."
+          data-confirm-label="Delete" data-confirm-cancel="Keep my account" data-confirm-danger>Delete my account</button>
+      </form>
+    </div>
+
+    <form method="post" action="{% url 'logout' %}" class="signout">{% csrf_token %}<button type="submit" class="btn-quiet">Sign out</button></form>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/account.js' %}"></script>{% endblock %}

@@ -1,17 +1,11 @@
-{# PLACEHOLDER template: unstyled, only here so the view works. The frontend replaces it. Keep the context names. #}
-<!doctype html>
-<html lang="en-GB">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ title }} | Spa 99</title>
-{% include "common/_assets.html" %}
-</head>
-<body>
-<main>
-  <h1>{{ title }}</h1>
-  <p>{{ text }}</p>
-  <p><a href="/login/">Sign in</a> | <a href="/">Home</a></p>
-</main>
-</body>
-</html>
+{% extends "base.html" %}
+{% block head_title %}{% include "common/_head.html" with title=title|add:" | Spa 99" %}{% endblock %}
+{% block main %}
+<section class="section on-light auth">
+  <div class="container auth-inner" data-reveal="hero">
+    <h1>{{ title }}</h1>
+    <p class="lead">{{ text }}</p>
+    <div class="actions"><a class="btn btn-primary btn-block-phone" href="{% url 'login' %}">Sign in</a><a class="btn-quiet" href="{% url 'home' %}">Back to home</a></div>
+  </div>
+</section>
+{% endblock %}

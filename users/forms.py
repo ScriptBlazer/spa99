@@ -43,9 +43,11 @@ class SignUpForm(forms.Form):
     men_only_accepted = forms.BooleanField(
         label="I understand Spa 99 is a men-only spa",
         error_messages={"required": "Please confirm you understand the men-only policy."},
+        widget=forms.CheckboxInput(attrs=_attrs("required", **{"data-required-message": "Please confirm you understand the men-only policy."})),
     )
     privacy_accepted = forms.BooleanField(
-        label="I have read the privacy notice", error_messages={"required": "Please accept the privacy notice."}
+        label="I have read the privacy notice", error_messages={"required": "Please accept the privacy notice."},
+        widget=forms.CheckboxInput(attrs=_attrs("required", **{"data-required-message": "Please accept the privacy notice."})),
     )
     marketing_opt_in = forms.BooleanField(label="Send me news from Spa 99", required=False)
     plan = forms.CharField(required=False, max_length=60, widget=forms.HiddenInput)

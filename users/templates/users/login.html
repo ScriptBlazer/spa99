@@ -1,28 +1,41 @@
-{# PLACEHOLDER template: unstyled, the frontend replaces it. Keep the field names. #}
-<!doctype html>
-<html lang="en-GB">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sign in | Spa 99</title>
-{% include "common/_assets.html" %}
-</head>
-<body>
-<main>
-  <h1>Sign in</h1>
-  {% include "common/_messages.html" %}
-  {% if throttled %}<p class="field-error" role="alert">Too many attempts. Please wait a few minutes.</p>{% endif %}
-  <form method="post" data-live-validate>
-    {% csrf_token %}
-    <input type="hidden" name="next" value="{{ next }}">
-    {% if form.non_field_errors %}<p class="field-error" role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
-    {% include "common/_field.html" with field=form.username %}
-    {% include "common/_field.html" with field=form.password %}
-    <button type="submit" data-working-text="Signing in…">Sign in</button>
-  </form>
-  {% url 'forgot_password' as forgot_url %}{# only exists on the public site, not on Control #}
-  {% if forgot_url %}<p><a href="{{ forgot_url }}">Forgot your password?</a></p>{% endif %}
-  {% include "common/_modal.html" %}
-</main>
-</body>
-</html>
+{% extends layout %}
+{% load static %}
+{% block head_title %}{% include "common/_head.html" with title="Sign in | Spa 99" %}{% endblock %}
+{% block main %}
+{% if control %}
+<section class="control-login on-dark">
+  <div class="control-login-box">
+    {% include "common/_mark.html" %}
+    <h1>Spa 99 Control</h1>
+    {% if throttled %}<p class="form-error" role="alert">Too many attempts. Please wait a few minutes.</p>{% endif %}
+    <form method="post" data-live-validate class="form-stack-sm" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      {% if form.non_field_errors %}<p class="form-error" role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+      {% include "common/_field.html" with field=form.username %}
+      {% include "common/_field.html" with field=form.password %}
+      <button type="submit" class="btn btn-primary btn-block" data-working-text="Signing in">Sign in</button>
+    </form>
+  </div>
+</section>
+{% else %}
+<section class="section on-light auth">
+  <div class="container auth-inner" data-reveal="hero">
+    <h1>Welcome back.</h1>
+    {% if throttled %}<p class="form-error" role="alert">Too many attempts. Please wait a few minutes.</p>{% endif %}
+    <form method="post" data-live-validate class="form-stack-sm" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      {% if form.non_field_errors %}<p class="form-error" role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+      {% include "common/_field.html" with field=form.username %}
+      {% include "common/_field.html" with field=form.password toggle=True %}
+      <button type="submit" class="btn btn-primary btn-block" data-working-text="One moment">Sign in</button>
+    </form>
+    {% url 'forgot_password' as forgot_url %}
+    <p class="auth-links">{% if forgot_url %}<a class="btn-quiet" href="{{ forgot_url }}">Forgotten your password?</a>{% endif %}</p>
+    <p class="muted">New here? <a href="{% url 'register' %}">Register interest</a></p>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+{% block scripts %}{% if not control %}<script type="module" src="{% static 'common/js/forms.js' %}"></script>{% endif %}{% endblock %}
