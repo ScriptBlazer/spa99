@@ -200,13 +200,13 @@
   </div>
 </section>
 
-{# R6. The Gold Card: compact. The swan draws itself as you scroll (scrubbed, no pin). #}
+{# R6b. The Gold Card: about 85% of a screen. A 3D card (docs/design/GOLD-CARD-3D.md): the swan draws itself on its face as you scroll (scrubbed, no pin). #}
 <section class="scene gold-scene on-dark" data-scene="gold" data-glow aria-labelledby="gold-title">
   <div class="thread thread--half" aria-hidden="true"></div>
   <div class="scene-stage">
     <div class="glow" aria-hidden="true"></div>
     <div class="container grid gold-grid">
-      <div class="gold-swan">{% include "common/_mark_draw.html" %}</div>
+      {% include "common/_gold_card.html" with variant="home" %}
       <div class="gold-text">
         <h2 id="gold-title" class="statement" data-rise>{{ home.gold_teaser.heading }}</h2>
         <p data-fade>{{ home.gold_teaser.body }}</p>

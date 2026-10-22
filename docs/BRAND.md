@@ -245,6 +245,20 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --tier-media-h: 7rem;                        /* derived: picture box in a tier column (desktop); phone uses a square --tier-media-s */
   --tier-media-s: 5.5rem;                      /* derived */
   --bar-h: 4.5rem;                             /* derived: Continue bar; 4rem from 64em */
+  /* The Gold Card (docs/design/GOLD-CARD-3D.md 7.3). Derived, decoration only: the metal of one object. Brand gold is hue 31 degrees; nothing here goes brass (45+). */
+  --color-gold-metal: #D9A46C;                 /* derived: card base metal (hue 31) */
+  --color-gold-light: #F3D2A2;                 /* derived: polished highlight, the drawn line (hue 36) */
+  --color-gold-shade: #A9763F;                 /* derived: card edge and gradient ends (hue 31) */
+  --color-gold-deep: #5A3A26;                  /* derived: the back of the card (hue 23) */
+  --color-led: #FFE8C8;                        /* derived: warm LED white, the key and rim light of the 3D studio */
+  --gc-w: min(86vw, 24rem);                    /* derived: card width (phone); desktop below */
+  --gc-tilt-max: 6deg;                         /* derived: pointer tilt cap */
+  /* The spa page (docs/design/SPA-PAGE.md 7.3). Derived. */
+  --chip-h: 2.75rem;                           /* derived: a link chip, 44px tap target */
+  --pill-h: 2rem;                              /* derived: a static pill */
+  --frame-h-feature: min(68svh, 34rem);        /* derived: max height of a feature frame, desktop */
+  --tile-w-phone: 72vw;                        /* derived: a tile in the phone scroll row */
+  --ratio-tile: 3 / 4;                         /* derived */
 }
 
 @media (min-width: 48em) {
@@ -252,7 +266,7 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
 }
 
 @media (min-width: 64em) {
-  :root { --header-h: 4.5rem; }
+  :root { --header-h: 4.5rem; --gc-w: min(40rem, 44vw); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -7,49 +7,18 @@
 .entry-status { margin-top: var(--space-2); }
 
 
-/* ---------- the spa ---------- */
-.spa-intro { padding-block: var(--space-7) var(--section-y); }
-.spa-intro-grid { row-gap: var(--space-6); align-items: end; }
-.spa-intro-text, .spa-intro-image { grid-column: 1 / -1; }
-.spa-intro-text .lead { margin-top: var(--space-4); }
-@media (min-width: 64em) {
-  .spa-intro-text { grid-column: 1 / span 6; align-self: center; }
-  .spa-intro-image { grid-column: 7 / span 6; }
-}
-.rooms-grid { row-gap: var(--space-7); }
-.rooms-index { display: none; }
-.rooms-list, .rooms-index { grid-column: 1 / -1; }
-.facility { margin-bottom: var(--space-7); }
-.facility:last-child { margin-bottom: 0; }
-.facility-frame { aspect-ratio: 4 / 5; margin-inline: calc(var(--page-margin) * -1); }
-.facility h2 { margin-top: var(--space-4); }
-.facility p { margin-top: var(--space-2); }
-@media (min-width: 48em) { .facility-frame { aspect-ratio: 3 / 2; margin-inline: 0; } }
-@media (min-width: 64em) {
-  .rooms-index { display: block; grid-column: 1 / span 3; position: sticky; top: calc(var(--header-h) + var(--space-5)); align-self: start; }
-  .rooms-list { grid-column: 5 / span 8; }
-  .rooms-index ul { display: grid; gap: var(--space-3); }
-  .rooms-index a { color: var(--color-text-muted); text-decoration: none; }
-  .rooms-index a[aria-current="true"] { color: var(--color-text); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.25em; }
-  .facility { margin-bottom: var(--space-8); }
-}
+/* ---------- Gold Card steps (the spa page has its own rules in scenes.css) ---------- */
 .steps { display: grid; gap: var(--space-6); }
 .step-word { margin: 0 0 var(--space-3); }
 @media (min-width: 48em) { .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--gutter); } }
 .visit-steps { padding-bottom: 0; }
-.steps-image { margin-top: var(--space-7); }
-.steps-hours { padding-block: var(--space-5) var(--space-6); }
-.spa-next .actions { margin-top: var(--space-5); }
 
 /* ---------- Gold Card: espresso from top to bottom ---------- */
-.gold-hero { padding-block: var(--space-6) var(--section-y); }
 .gold-hero-grid { row-gap: var(--space-6); align-items: center; }
-.gold-hero-text, .gold-hero-image { grid-column: 1 / -1; }
+.gold-hero-text { grid-column: 1 / -1; }
 .gold-hero-text .lead { margin-top: var(--space-4); }
-.gold-hero-image .frame { max-height: 80svh; }
 @media (min-width: 64em) {
   .gold-hero-text { grid-column: 1 / span 6; }
-  .gold-hero-image { grid-column: 7 / span 6; }
 }
 .gold-who { padding-top: 0; }
 .roles { margin-top: var(--space-5); }

@@ -213,27 +213,87 @@ html.lenis, html.lenis body { height: auto; }
   .plan-cost span { display: block; }
 }
 
-/* ---------- R6 Gold: compact (content height) and rich ---------- */
+/* ---------- R6b Gold: the 3D card (docs/design/GOLD-CARD-3D.md). About 85% of a screen at 1440; card on one half, words on the other ---------- */
 .gold-scene { background: var(--color-bg-inverse); overflow: clip; min-height: 0; }
-.gold-scene .scene-stage { min-height: 0; justify-content: flex-start; padding-block: var(--space-5); }
-.gold-grid { row-gap: var(--space-4); align-items: center; }
-.gold-swan { grid-column: 1 / -1; display: grid; place-items: center; order: -1; }
-.gold-swan .mark { height: clamp(8rem, 22svh, 11rem); width: auto; color: var(--color-gold); }
+.gold-scene .scene-stage { min-height: 0; justify-content: center; padding-block: var(--space-5); }
+.gold-grid { row-gap: var(--space-5); align-items: center; }
+.gold-grid > .gold-card { grid-column: 1 / -1; justify-self: center; order: -1; }
 .gold-text { grid-column: 1 / -1; }
 .gold-text .statement { font-size: var(--text-2xl); }
 .gold-text p { margin-top: var(--space-2); }
 .gold-text .btn-quiet { margin-top: var(--space-2); }
 .pills { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
-.pill { display: inline-flex; align-items: center; min-height: 2rem; padding: 0.2rem 0.8rem; border: 1px solid var(--color-gold); border-radius: var(--radius-md);
+.pill { display: inline-flex; align-items: center; min-height: var(--pill-h); padding: 0.2rem 0.8rem; border: 1px solid var(--color-gold); border-radius: var(--radius-md);
   font-size: var(--text-sm); line-height: 1.3; color: var(--color-text-inverse); }
 .mark-draw .mark-line { display: none; }
 .mark-draw .mark-fill { fill: var(--color-gold); }
 .mark-draw .mark-line path { fill: none; stroke: var(--color-gold); stroke-width: 1.25; vector-effect: non-scaling-stroke; }
 @media (min-width: 64em) {
-  .gold-text { grid-column: 1 / span 6; grid-row: 1; align-self: center; }
-  .gold-swan { grid-column: 8 / span 4; grid-row: 1; order: 0; align-self: center; }
-  .gold-swan .mark { height: clamp(12rem, 34svh, 16rem); }
+  .gold-scene { min-height: 85svh; }
+  .gold-scene .scene-stage { min-height: 85svh; padding-block: var(--space-6); }
+  .gold-text { grid-column: 1 / span 5; grid-row: 1; align-self: center; }
+  .gold-grid > .gold-card { grid-column: 7 / -1; grid-row: 1; order: 0; }
 }
+
+/* ---------- The Gold Card object. Mount = the card's own box (85.6 : 54); the canvas and the still are 1 / 0.72 of its width, centred, so rotation never clips.
+   Three tiers from one markup: the canvas (gold-card-3d.js), this CSS 3D card (html.motion), the still (static layout). ---------- */
+.gold-card { position: relative; width: var(--gc-w); aspect-ratio: 85.6 / 54; --gc-t: calc(var(--gc-w) * 0.0047); --gc-r: calc(var(--gc-w) * 0.0371); pointer-events: none; user-select: none; }
+.gc-defs { position: absolute; }
+.gc-s-hi { stop-color: color-mix(in srgb, var(--color-gold-light) 55%, var(--color-cream)); }
+.gc-s-light { stop-color: var(--color-gold-light); }
+.gc-s-metal { stop-color: var(--color-gold-metal); }
+.gc-s-shade { stop-color: var(--color-gold-shade); }
+.gc-stage, .gc-pool, .gc-gl { display: none; }
+.gc-still, .gc-gl { position: absolute; left: 50%; top: 50%; width: calc(100% / 0.72); aspect-ratio: 4 / 3; transform: translate(-50%, -50%); }
+.gc-still .photo, .gc-still picture { display: block; width: 100%; height: auto; }
+.gc-still .photo-placeholder { aspect-ratio: 4 / 3; }
+
+html.motion .gc-still { display: none; }
+html.motion .gc-stage, html.motion .gc-pool { display: block; }
+html.motion .gc-stage { position: absolute; inset: 0; perspective: calc(var(--gc-w) * 2.96); perspective-origin: 50% 45%; }
+.gc-float, .gc-card { position: absolute; inset: 0; transform-style: preserve-3d; }
+.gc-card { transform: rotateX(8deg) rotateY(-25deg); }
+.gc-front, .gc-back { position: absolute; inset: 0; border-radius: var(--gc-r); overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.gc-front { transform: translateZ(var(--gc-t)); }
+.gc-back { transform: rotateY(180deg) translateZ(var(--gc-t)); background: var(--color-gold-deep) url("../img/swan-pattern.svg"); background-size: calc(var(--gc-w) * 0.1168) auto; display: grid; place-items: end center; }
+.gc-back::after { content: ""; position: absolute; inset: 0; background: linear-gradient(118deg, var(--color-gold-deep), transparent 55%, var(--color-gold-deep)); opacity: 0.6; }
+.gc-back-line { position: relative; z-index: 1; margin-bottom: calc(var(--gc-w) * 0.07); font-size: calc(var(--gc-w) * 0.021); letter-spacing: 0.2em; text-transform: uppercase; font-weight: 500; color: var(--color-gold-shade); }
+.gc-side { position: absolute; background: linear-gradient(to bottom, var(--color-gold-shade), var(--color-gold-light) 50%, var(--color-gold-shade)); }
+.gc-side--l, .gc-side--r { top: var(--gc-r); bottom: var(--gc-r); width: calc(var(--gc-t) * 2); }
+.gc-side--l { left: 0; transform: translateX(-50%) rotateY(90deg); }
+.gc-side--r { right: 0; transform: translateX(50%) rotateY(90deg); }
+.gc-side--t, .gc-side--b { left: var(--gc-r); right: var(--gc-r); height: calc(var(--gc-t) * 2); background: linear-gradient(to right, var(--color-gold-shade), var(--color-gold-light) 50%, var(--color-gold-shade)); }
+.gc-side--t { top: 0; transform: translateY(-50%) rotateX(90deg); }
+.gc-side--b { bottom: 0; transform: translateY(50%) rotateX(90deg); }
+.gc-metal { position: absolute; inset: 0;
+  background: repeating-linear-gradient(0deg, color-mix(in srgb, var(--color-cream) 3%, transparent) 0 1px, transparent 1px 3px),
+              linear-gradient(118deg, var(--color-gold-shade) 0%, var(--color-gold-metal) 28%, var(--color-gold-light) 48%, var(--color-gold-metal) 66%, var(--color-gold-shade) 100%); }
+.gc-swan { position: absolute; left: 50%; top: 14.8%; height: 59.3%; aspect-ratio: 330 / 484; transform: translateX(-50%); }
+.gc-swan svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.gc-swan .mark-fill { fill: url(#gc-polish); }
+.gc-swan .mark-line path { stroke: var(--color-gold-light); stroke-width: 1.5; }
+.gc-swan-shadow { position: absolute; inset: 0; transform: translate(1.2px, 1.8px); color: var(--color-espresso); opacity: 0; }
+.gc-text { position: absolute; bottom: calc(var(--gc-w) * 0.07); font-family: var(--font-display); font-weight: 600; line-height: 1; color: color-mix(in srgb, var(--color-espresso) 45%, transparent); text-shadow: 0 1px 0 color-mix(in srgb, var(--color-gold-light) 45%, transparent); }
+.gc-text--l { left: calc(var(--gc-w) * 0.07); font-size: calc(var(--gc-w) * 0.04); letter-spacing: 0.06em; }
+.gc-text--r { right: calc(var(--gc-w) * 0.07); font-family: var(--font-body); font-weight: 500; font-size: calc(var(--gc-w) * 0.0245); letter-spacing: 0.24em; margin-right: -0.24em; }
+.gc-shade { position: absolute; inset: 0; background: var(--color-espresso); opacity: 0.55; }
+.gc-sheen { position: absolute; top: 0; bottom: 0; left: 30%; width: 40%; transform: translateX(-130%) skewX(-14deg);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-cream) 34%, transparent) 50%, transparent); }
+.gc-pool { position: absolute; left: 15%; width: 70%; top: 100%; height: 18%; margin-top: 4%; background: radial-gradient(closest-side, var(--color-glow), transparent); }
+html.motion .gc-card, html.motion .gc-sheen { will-change: transform; }
+
+/* the canvas layer (gold-card-3d.js): only present once three.js is ready; the CSS card stays under it until it has faded in */
+.gold-card.has-gl .gc-gl { display: block; }
+.gc-gl canvas { display: block; width: 100%; height: 100%; opacity: 0; }
+.gold-card.is-gl .gc-stage { visibility: hidden; }
+
+/* Gold Card page hero (G1): words left, the card right; phone: card on top */
+.gold-hero-grid > .gold-card { grid-column: 1 / -1; justify-self: center; order: -1; --gc-w: min(82vw, 24rem); }
+@media (min-width: 64em) { .gold-hero-grid > .gold-card { grid-column: 7 / -1; order: 0; --gc-w: min(42rem, 46vw); } }
+.gold-hero { position: relative; overflow-x: clip; min-height: var(--scene-h); display: flex; align-items: center; padding-block: calc(var(--header-h) + var(--space-5)) var(--space-6); }
+.gold-hero > .container { position: relative; z-index: 2; }
+html.motion .gold-hero .glow { z-index: 1; }
+html.motion .gold-hero [data-rise] { opacity: 0; }
 
 /* ---------- R7 opening: a compact band ---------- */
 .opening-scene { min-height: 0; border-top: 1px solid var(--color-hairline-inverse); }
@@ -328,14 +388,6 @@ html.motion .frame-media, html.motion .window-media, html.motion .hero-window, h
    Static layout first (no JS, reduced motion), the motion layout under html.motion at the end of this block.
    ===================================================================================================== */
 
-/* Scoped tokens: proposed for tokens.css (docs/design/SPA-PAGE.md 7.3). */
-.page-spa {
-  --chip-h: 2.75rem;                    /* a link chip: 44px tap target */
-  --pill-h: 2rem;                       /* a static pill (the value .pill already uses) */
-  --frame-h-feature: min(68svh, 34rem); /* max height of a feature frame, desktop */
-  --tile-w-phone: 72vw;                 /* a tile in the phone scroll row */
-  --ratio-tile: 3 / 4;
-}
 .page-spa main { overflow-x: clip; }
 
 /* ---------- chips: links to the rooms ---------- */
