@@ -1,73 +1,11 @@
 /* Page layouts. Mobile first, two breakpoints: 48em (tablet) and 64em (desktop). Tokens only. */
 
-/* ---------- home: hero ---------- */
-.hero { display: grid; }
-.hero-text { display: flex; flex-direction: column; padding: var(--space-6) var(--page-margin) var(--space-5); min-height: calc(100svh - var(--header-h)); }
-.hero-text .actions { margin-top: auto; padding-top: var(--space-5); }
-.hero-text .lead { max-width: 24rem; }
-.hero-image { position: relative; aspect-ratio: 4 / 5; overflow: hidden; background: var(--color-espresso-raised); }
-.hero-image picture { position: absolute; inset: 0; }
-.hero-photo { object-position: 38% 45%; }
-@media (min-width: 64em) {
-  .hero { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); min-height: calc(100svh - var(--header-h)); }
-  .hero-text {
-    justify-content: flex-end; min-height: 0; padding: var(--space-7) var(--gutter) var(--space-6) max(var(--page-margin), calc((100vw - var(--container-max)) / 2 + var(--page-margin)));
-  }
-  .hero-text .actions { margin-top: var(--space-5); padding-top: 0; }
-  .hero-image { aspect-ratio: auto; }
-  .hero-photo { object-position: 40% 50%; }
-}
-
-/* ---------- home: statement, scenes ---------- */
-.statement-section { padding-bottom: var(--space-7); }
-.statement-copy { grid-column: 1 / -1; }
-.statement-copy p { margin-top: var(--space-5); }
-@media (min-width: 64em) { .statement-copy { grid-column: 2 / span 8; } }
-.scenes { padding-bottom: var(--section-y); }
-.scene-frame { aspect-ratio: 4 / 5; }
-@media (min-width: 48em) { .scene-frame { aspect-ratio: 16 / 9; } }
-.scene-wide figcaption { padding-inline: var(--page-margin); margin-top: var(--space-3); }
-.scene-wide figcaption.container { padding-inline: var(--page-margin); }
-.scene-pair { display: grid; gap: var(--space-6); margin-top: var(--space-6); padding-inline: 0; }
-.scene-pair figcaption { padding-inline: var(--page-margin); }
-@media (min-width: 64em) {
-  .scene-pair { grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gutter); margin-top: var(--space-7); padding-inline: var(--page-margin); }
-  .scene-pair figcaption { padding-inline: 0; }
-  .scene-a { grid-column: 1 / span 7; }
-  .scene-a .frame { aspect-ratio: 3 / 2; }
-  .scene-b { grid-column: 9 / span 4; margin-top: var(--space-7); }
-}
-.scenes-link { margin-top: var(--space-6); }
-
 /* ---------- home: journey entry ---------- */
-.entry { background-image: url("../img/swan-pattern.svg"); }
 .entry-inner > p { margin-top: var(--space-3); }
 .entry-question { margin-top: var(--space-5); max-width: 40rem; }
 .entry-question legend { margin-bottom: var(--space-3); }
 .entry-status { margin-top: var(--space-2); }
 
-/* ---------- home: memberships briefly ---------- */
-.teaser { padding-top: var(--space-7); }
-.teaser-list { max-width: 52rem; margin-top: var(--space-5); }
-.teaser-list li { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-4); padding-block: var(--space-4); border-top: 1px solid var(--s-hair); }
-.teaser-name strong { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); }
-.teaser-price { text-align: right; font-family: var(--font-display); font-size: var(--text-xl); letter-spacing: var(--tracking-display); }
-.teaser-price .small { font-family: var(--font-body); letter-spacing: var(--tracking-body); }
-.teaser-inc { display: block; }
-.teaser-single { margin-top: var(--space-3); }
-.teaser .actions { margin-top: var(--space-4); }
-
-/* ---------- home: Gold teaser, opening ---------- */
-.gold-teaser { padding-block: var(--section-y) var(--space-7); }
-.gold-teaser-grid { row-gap: var(--space-5); align-items: center; }
-.gold-teaser-image, .gold-teaser-text { grid-column: 1 / -1; }
-@media (min-width: 64em) {
-  .gold-teaser-image { grid-column: 1 / span 5; }
-  .gold-teaser-text { grid-column: 7 / span 6; }
-}
-.opening { padding-bottom: 0; }
-.opening-date { font-weight: 400; color: var(--color-gold); }
-.opening .lead { margin-top: var(--space-3); }
 
 /* ---------- the spa ---------- */
 .spa-intro { padding-block: var(--space-7) var(--section-y); }

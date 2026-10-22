@@ -92,6 +92,16 @@
   --stagger: 100ms;
   --duration-press: 250ms;
   --rise: 8px;
+
+  /* Immersive marketing pages (docs/design/IMMERSIVE.md section 12). Derived, not brand colours. */
+  --color-veil: rgb(73 46 33 / 0.82);          /* solid part of the legibility veil; cream on it >= 6.5:1 over the brightest render */
+  --color-header-solid: rgb(73 46 33 / 0.88);  /* fixed header after scroll, with blur */
+  --color-glow: rgb(229 172 110 / 0.16);       /* pointer light centre, decoration only */
+  --scene-h: 100svh;
+  --scene-pad-top: calc(var(--header-h) + var(--space-5));
+  --duration-line: 1100ms;
+  --stagger-line: 80ms;
+  --duration-page: 480ms;
 }
 
 @media (min-width: 48em) {

@@ -49,8 +49,10 @@ body:has(dialog[open]) { overflow: hidden; }
   text-decoration: none; white-space: nowrap; touch-action: manipulation; user-select: none; -webkit-user-select: none;
   transition: transform var(--duration-press) var(--ease-soft), opacity var(--duration-press) var(--ease-soft);
 }
-.btn:active { transform: scale(0.99); }
-@media (hover: hover) and (pointer: fine) { .btn:hover { transform: scale(1.01); } .btn:active { transform: scale(0.99); } }
+@media (prefers-reduced-motion: no-preference) {
+  .btn:active { transform: scale(0.99); }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) { .btn:hover { transform: scale(1.01); } .btn:active { transform: scale(0.99); } }
 .btn-primary { background: var(--s-accent); color: var(--s-on-accent); }
 .btn-secondary { border-color: var(--s-text); color: var(--s-text); }
 .btn-danger { background: var(--color-danger); color: var(--color-cream); }
@@ -81,8 +83,10 @@ body:has(dialog[open]) { overflow: hidden; }
   cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; text-align: left;
   transition: transform var(--duration-press) var(--ease-soft);
 }
-.tile:active { transform: scale(0.99); }
-@media (hover: hover) and (pointer: fine) { .tile:hover { transform: scale(1.01); } .tile:active { transform: scale(0.99); } }
+@media (prefers-reduced-motion: no-preference) {
+  .tile:active { transform: scale(0.99); }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) { .tile:hover { transform: scale(1.01); } .tile:active { transform: scale(0.99); } }
 .tile input { position: absolute; opacity: 0; pointer-events: none; }
 .tile-body { display: grid; gap: var(--space-1); align-content: center; padding-right: 1.75rem; min-width: 0; }
 .tile-label { font-weight: 500; line-height: 1.3; }

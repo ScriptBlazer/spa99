@@ -224,6 +224,16 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --stagger: 100ms;
   --duration-press: 250ms;
   --rise: 8px;
+
+  /* Immersive marketing pages (docs/design/IMMERSIVE.md section 12). Derived, not brand colours. */
+  --color-veil: rgb(73 46 33 / 0.82);          /* derived: solid part of the legibility veil; cream on it >= 6.5:1 over the brightest render */
+  --color-header-solid: rgb(73 46 33 / 0.88);  /* derived: fixed header after scroll, with blur */
+  --color-glow: rgb(229 172 110 / 0.16);       /* derived: pointer light centre, decoration only */
+  --scene-h: 100svh;                           /* derived */
+  --scene-pad-top: calc(var(--header-h) + var(--space-5)); /* derived: clears the fixed header */
+  --duration-line: 1100ms;                     /* derived: line rise */
+  --stagger-line: 80ms;                        /* derived: between lines of one heading */
+  --duration-page: 480ms;                      /* derived: page transition in (out is 240ms) */
 }
 
 @media (min-width: 48em) {
@@ -248,6 +258,6 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
 }
 ```
 
-**Proposed additions for the immersive pages (derived, not yet in `tokens.css`):** `--color-veil`, `--color-header-solid`, `--color-glow`, `--scene-h`, `--scene-pad-top`, `--duration-line`, `--stagger-line`, `--duration-page`. Values and contrast in `docs/design/IMMERSIVE.md` section 12. The frontend adds them to `tokens.css` when building the scenes.
+**Immersive tokens** (`--color-veil`, `--color-header-solid`, `--color-glow`, `--scene-h`, `--scene-pad-top`, `--duration-line`, `--stagger-line`, `--duration-page`) are derived and now live in `tokens.css`. Values and contrast: `docs/design/IMMERSIVE.md` section 12.
 
 The designer refines these per task. Frontend uses only tokens, never raw values. Breakpoints are constants (CSS variables can't be used in media queries): `48em` (tablet) and `64em` (desktop).

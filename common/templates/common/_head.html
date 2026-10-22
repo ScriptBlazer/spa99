@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#492E21">
 <meta name="color-scheme" content="light">
-<script>document.documentElement.classList.add("js");setTimeout(function(){if(!document.documentElement.dataset.reveal)document.documentElement.classList.add("no-reveal")},4000)</script>
+<script>var d=document.documentElement;d.classList.add("js");if(d.dataset.page==="marketing"&&!matchMedia("(prefers-reduced-motion: reduce)").matches){d.classList.add("motion");setTimeout(function(){if(!d.dataset.scenes)d.classList.remove("motion")},4000)}setTimeout(function(){if(!d.dataset.reveal)d.classList.add("no-reveal")},4000)</script>
 <title>{{ title }}</title>
 {% if description %}<meta name="description" content="{{ description }}">{% endif %}
 <meta property="og:site_name" content="Spa 99">
