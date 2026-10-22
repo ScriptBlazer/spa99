@@ -11,7 +11,7 @@ from .models import Page, Section
 # page key: (title, meta description, [(section key, heading, body, cta label, cta url)])
 PAGES = {
     "home": ("Home", "Spa 99. A private spa for men in North London. Beyond Luxury. Opening {opening}.", [
-        ("hero", "Beyond Luxury.", "A private spa for men in North London. Opening {opening}.", "Explore your membership", "/journey/"),
+        ("hero", "Beyond Luxury.", "A private spa for men in North London. Opening {opening}.", "Tailor your membership", "/journey/"),
         ("hero_link", "", "", "See the spa", "/the-spa/"),
         ("hero_caption", "Reception.", "A large fish tank to wait beside, before the rest of the spa.", "", ""),
         ("statement", "Heat, cold, quiet, and time that is yours.",
@@ -25,18 +25,27 @@ PAGES = {
         ("facts_hours_count_label", "", "hours a day", "", ""),
         ("facts_capacity_label", "", "", "", ""),  # fill in Control (for example "guests at most, at any time") to show the capacity fact
         ("lounge_caption", "The lounge.", "", "", ""),
-        ("journey_entry", "Which membership suits you?", "A few taps. Under two minutes.", "Explore your membership", "/journey/"),
+        ("journey_entry", "Which membership suits you?", "A few taps. Under two minutes.", "Tailor your membership", "/journey/"),
         ("memberships_teaser", "Three memberships. One single visit.", "", "Compare memberships", "/memberships/"),
         ("gold_teaser", "The Gold Card.", "For people in property. Free, by application.", "About the Gold Card", "/gold-card/"),
         ("opening", "{opening}.", "99 Vale Road, London N4.", "Register interest", "/register/"),
     ]),
     "spa": ("The spa", "Sauna, cold plunge, relaxing zone, gym and massage at 99 Vale Road.", [
-        ("intro", "The spa.", "Eight spaces, one quiet visit.", "", ""),
+        ("intro", "The spa.", "{rooms} spaces, one quiet visit.", "", ""),
+        ("facts_rooms", "", "rooms, one visit", "", ""),
+        ("facts_hours", "", "every day", "", ""),
+        ("facts_men", "Men only", "18 and over", "", ""),
+        ("tiles_intro", "Steam, cold, water.", "Between rounds of heat.", "", ""),
         ("how_it_works", "How a visit works", "", "", ""),
         ("step_1", "Book.", "Choose a time that suits you.", "", ""),
+        ("step_1_pills", "", "", "", ""),
+        ("booking_pending", "", "Booking opens with membership", "", ""),
         ("step_2", "Arrive.", "A towel, robe and slippers are waiting.", "", ""),
+        ("step_2_pills", "", "Towel, robe and slippers\nYour own locker\nPhones stay in the locker", "", ""),
         ("step_3", "Stay.", "As long as you like, until closing.", "", ""),
-        ("next", "Find the right way to visit.", "", "Explore your membership", "/journey/"),
+        ("step_3_pills", "", "Every room is part of the visit", "", ""),
+        ("next", "Find the right way to visit.", "", "Tailor your membership", "/journey/"),
+        ("next_from", "", "Memberships from {price} a month, {price_inc} inc VAT.", "", ""),
         ("next_link", "", "", "See memberships", "/memberships/"),
     ]),
     "memberships": ("Memberships", "Spa 99 memberships and single visits, with prices ex VAT and inc VAT.", [
@@ -69,7 +78,7 @@ PAGES = {
         ("sent", "Thank you.", "Your application is with us. We'll be in touch personally.", "Back to home", "/"),
         ("closed", "Applications are not open yet.", "Please check back soon.", "Back to home", "/"),
     ]),
-    "journey": ("Explore your membership", "A few taps to find the right Spa 99 membership.", [
+    "journey": ("Tailor your membership", "A few taps to find the right Spa 99 membership.", [
         ("screen_1", "Your time.", "When you'd come, and how often.", "", ""),
         ("screen_2", "What draws you.", "The parts of the spa you'd use.", "", ""),
         ("screen_3", "Company.", "Some come alone. Some bring a friend.", "", ""),

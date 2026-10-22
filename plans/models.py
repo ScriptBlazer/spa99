@@ -2,6 +2,7 @@
 Nothing in this file is a rule: values come from rows (see docs/SPA99_RULES.md "Rules will change")."""
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from simple_history.models import HistoricalRecords
@@ -246,6 +247,32 @@ class Facility(BaseModel):
     description = models.TextField(blank=True)
     image = models.FileField(upload_to=facility_image_path, blank=True)  # default storage: S3 on live
     image_alt = models.CharField(max_length=200, blank=True, help_text="Describes the picture for people who cannot see it. Empty = the name.")
+    FEATURE = "feature"
+    TILE = "tile"
+    COMPANION = "companion"
+    DISPLAY_CHOICES = [
+        (FEATURE, "Feature (large picture, own section)"),
+        (TILE, "Tile (small portrait, in a row)"),
+        (COMPANION, "Companion (small, beside the feature before it)"),
+    ]
+    FACTS_MAX = 4
+    FACT_MAX_LENGTH = 32
+
+    display = models.CharField(
+        max_length=10, choices=DISPLAY_CHOICES, default=TILE,
+        help_text="How the room is shown on The spa page. The page adjusts if a room is hidden or moved.")
+    image_name = models.CharField(
+        max_length=40, blank=True,
+        help_text="Name of a built render (content image manifest). Used when no picture is uploaded; empty = the brand tile.")
+    image_focus = models.CharField(
+        max_length=20, blank=True, default="50% 50%", help_text='Which part of the picture stays in view when cropped, e.g. "40% 60%".')
+    detail_image = models.FileField(
+        upload_to=facility_image_path, blank=True, help_text="Optional small second picture for a feature room. Wins over the render name.")
+    detail_image_name = models.CharField(max_length=40, blank=True, help_text="Built render for the small picture, when none is uploaded.")
+    detail_alt = models.CharField(max_length=200, blank=True, help_text="Describes the small picture. Empty = decorative.")
+    facts = models.JSONField(
+        default=list, blank=True,
+        help_text='Short facts shown as small pills, e.g. ["Loungers", "Low light"]. Up to 4 of 32 characters. Leave empty to show none.')
     order = models.PositiveSmallIntegerField(default=0)
     visible = models.BooleanField(default=True)
 
@@ -254,6 +281,24 @@ class Facility(BaseModel):
     class Meta:
         ordering = ["order", "name"]
         verbose_name_plural = "facilities"
+
+    def clean(self):
+        from content import images  # local: keeps this module free of the content app at import time
+
+        errors = {}
+        facts = self.facts if self.facts is not None else []
+        if not isinstance(facts, list) or not all(isinstance(f, str) for f in facts):
+            errors["facts"] = "Facts must be a list of short texts."
+        elif len(facts) > self.FACTS_MAX:
+            errors["facts"] = f"At most {self.FACTS_MAX} facts."
+        elif any(not f.strip() or len(f) > self.FACT_MAX_LENGTH for f in facts):
+            errors["facts"] = f"Each fact must be 1 to {self.FACT_MAX_LENGTH} characters."
+        for field in ("image_name", "detail_image_name"):
+            name = getattr(self, field)
+            if name and not images.has_image(name):
+                errors[field] = "No built render with this name."
+        if errors:
+            raise ValidationError(errors)
 
     def __str__(self):
         return self.name

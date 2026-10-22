@@ -8,6 +8,10 @@ written by hand:
 - the Shabbos / Yom Tov hours line is written onto the opening rule
 - (memberships page, 2026-10-22) plans with no tagline / render get the starting ones, perks with no `pill` get the
   starting one, and the "Not sure?" row gets the new wording only if it still has the exact old wording
+- (The spa page, 2026-10-22) facilities get display, image name, focus and soft facts into empty slots only (the
+  display is set only on a row that has no facts and no image name yet, so a later edit is never undone); missing
+  `spa` copy rows are created; the exact old wording "Eight spaces, one quiet visit.", "Explore your membership" (spa
+  closing button) and the massage line "by appointment" (OPS-06) are replaced
 
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 from collections import Counter
@@ -15,6 +19,7 @@ from collections import Counter
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from content import seed as content_seed
 from content.models import Page, Section
 from plans import seed as plans_seed
 from plans.models import Facility, OpeningRule, Plan
@@ -93,6 +98,57 @@ def backfill():
             not_sure.cta_label = "Tailor your membership"
         not_sure.save()
         changed["content.Section (memberships: Not sure?)"] += 1
+
+    changed.update(_spa_page())
+    return changed
+
+
+OLD_MASSAGE_LINE = "A quiet room for a massage, by appointment."
+OLD_SPA_INTRO = "Eight spaces, one quiet visit."
+
+
+def _spa_page():
+    """The spa page data: facility fields, missing copy rows and three exact-wording fixes. Fills empty only."""
+    changed = Counter()
+    for facility in Facility.objects.all():
+        seed = plans_seed.FACILITY_SPA_PAGE.get(facility.slug)
+        touched = False
+        if seed is not None:
+            if not facility.facts and not facility.image_name:  # not backfilled or edited yet
+                if facility.display != seed["display"]:
+                    facility.display, touched = seed["display"], True
+            if seed["image_name"] and not facility.image_name:
+                facility.image_name, touched = seed["image_name"], True
+            if seed["image_focus"] != "50% 50%" and facility.image_focus in ("", "50% 50%"):
+                facility.image_focus, touched = seed["image_focus"], True
+            if not facility.facts:
+                facility.facts, touched = list(seed["facts"]), True
+        if facility.short_line == OLD_MASSAGE_LINE:
+            facility.short_line, touched = "A quiet room for massage, part of your visit.", True
+        if touched:
+            facility.save()
+            changed["plans.Facility (the spa page fields)"] += 1
+
+    page = Page.objects.filter(key="spa").first()
+    if page is not None:
+        _, _, sections = content_seed.PAGES["spa"]
+        for order, (key, heading, body, cta_label, cta_url) in enumerate(sections, start=1):
+            _, made = Section.objects.get_or_create(page=page, key=key, defaults={
+                "heading": heading, "body": body, "cta_label": cta_label, "cta_url": cta_url, "order": order})
+            if made:
+                changed["content.Section (spa page rows)"] += 1
+        fixed = 0
+        for section in Section.objects.filter(page=page):  # saved one by one so the change is in the history
+            if section.key == "intro" and section.body == OLD_SPA_INTRO:
+                section.body = "{rooms} spaces, one quiet visit."
+            elif section.key == "next" and section.cta_label == "Explore your membership":
+                section.cta_label = "Tailor your membership"
+            else:
+                continue
+            section.save()
+            fixed += 1
+        if fixed:
+            changed["content.Section (spa page wording)"] += fixed
     return changed
 
 

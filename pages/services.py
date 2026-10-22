@@ -1,14 +1,15 @@
 """Glue between the data apps (plans, content, journey) and the page templates. Nothing here is a rule:
 every number and word comes from rows edited in Control."""
+from decimal import Decimal
+
 from django.utils import timezone
+
+from content import services as content
 
 from content import images
 from plans import services as plan_services
-from plans.models import OpeningRule, Plan, SiteSettings
+from plans.models import Facility, OpeningRule, Plan, SiteSettings
 
-# Facility slug -> optimised render name (content/static/content/img). The new renders are not here yet:
-# those facilities show a placeholder until a file is uploaded on the Facility in Control.
-FACILITY_IMAGES = {"dry-sauna": "dry-sauna", "relaxing-zone": "relaxing-zone", "gym": "gym"}
 # Home "What's inside" preview: the render shown for a room (IMMERSIVE-R2 section 3, R3). Rooms not listed keep the current picture.
 HOME_PREVIEW_IMAGES = {"dry-sauna": "dry-sauna", "showers": "showers", "relaxing-zone": "relax-loungers", "gym": "gym", "kitchenette": "lounge"}
 
@@ -219,18 +220,110 @@ def gold_groups():
 # ---------- facilities ----------
 
 def facility_cards():
-    """Facilities in visiting order with the render to show (an uploaded image wins, then the optimised render)."""
+    """Visible facilities in order, as plain dicts. Picture order: uploaded `image`, then `image_name` (a built render,
+    only given when it exists), then the brand tile. The same for the small `detail_image`."""
     return [
         {
             "slug": f.slug,
             "name": f.name,
             "line": f.short_line,
+            "description": f.description,
+            "display": f.display,
+            "facts": [x for x in (f.facts or []) if isinstance(x, str) and x.strip()][: Facility.FACTS_MAX],
             "image": f.image,
-            "image_name": FACILITY_IMAGES.get(f.slug, ""),
+            "image_name": f.image_name if images.has_image(f.image_name) else "",
+            "focus": f.image_focus or "50% 50%",
             "alt": f.image_alt or f.name,
+            "detail_image": f.detail_image,
+            "detail_image_name": f.detail_image_name if images.has_image(f.detail_image_name) else "",
+            "detail_alt": f.detail_alt,
         }
         for f in plan_services.visible_facilities()
     ]
+
+
+def _tile_rows(tiles):
+    """Split tiles into balanced rows of at most 4 (5 gives 3 + 2, 6 gives 3 + 3)."""
+    rows = -(-len(tiles) // 4)
+    size, extra = divmod(len(tiles), rows)
+    out, start = [], 0
+    for n in range(rows):
+        end = start + size + (1 if n < extra else 0)
+        out.append(tiles[start:end])
+        start = end
+    return out
+
+
+def spa_sections(cards):
+    """Group facility cards into the layouts of The spa page (docs/design/SPA-PAGE.md 3.1).
+    Returns a list of {"kind": "feature", "side": "left"|"right", "feature": card, "companion": card|None}
+    and {"kind": "tiles", "tiles": [cards]}. A feature takes the companion straight after it; any other companion
+    is shown as a tile. Runs of tiles become rows of 2 to 4 (a single tile stays alone). The first feature is on
+    the left (the opening frame is on the right) and sides alternate. Hiding or moving rooms never breaks this."""
+    sections, tiles, features = [], [], 0
+
+    def flush():
+        if tiles:
+            sections.extend({"kind": "tiles", "tiles": row} for row in _tile_rows(list(tiles)))
+            tiles.clear()
+
+    index = 0
+    while index < len(cards):
+        card = cards[index]
+        index += 1
+        if card["display"] != Facility.FEATURE:
+            tiles.append(card)  # tiles, and companions with no feature before them
+            continue
+        flush()
+        companion = None
+        if index < len(cards) and cards[index]["display"] == Facility.COMPANION:
+            companion, index = cards[index], index + 1
+        sections.append({"kind": "feature", "side": "left" if features % 2 == 0 else "right",
+                         "feature": card, "companion": companion})
+        features += 1
+    flush()
+    return sections
+
+
+def visit_pills(copy=None):
+    """Pills for the three steps of 'How a visit works': {"book": [...], "arrive": [...], "stay": [...]}.
+    Numbers come from the visible monthly plans and the opening rules; words come from the `spa` content rows
+    (step_N_pills, one pill per line; booking_pending while booking is not open)."""
+    copy = copy if copy is not None else content.page_content("spa")
+
+    def lines(key):
+        return [line.strip() for line in copy[key].body.splitlines() if line.strip()]
+
+    plans = [p for p in plan_services.visible_plans() if p.kind == Plan.MONTHLY]
+    book = []
+    windows = sorted({p.booking_window_days for p in plans})
+    if windows:
+        low, high = windows[0], windows[-1]
+        book.append(f"Book {low} to {high} days ahead" if low != high else
+                    "Book a day ahead" if low == 1 else f"Book up to {low} days ahead")
+    cancels = {p.cancel_hours for p in plans}
+    if len(cancels) == 1:
+        book.append(f"Cancel up to {cancels.pop()} hours before")
+    if not SiteSettings.load().booking_open and copy["booking_pending"].body:
+        book.append(copy["booking_pending"].body)
+    stay = []
+    facts = hours_facts()
+    if facts:
+        stay.append(f"Open {facts['range']}")
+    if closure_title():
+        stay.append(f"Closed for {closure_title()}")
+    return {"book": book + lines("step_1_pills"), "arrive": lines("step_2_pills"), "stay": stay + lines("step_3_pills")}
+
+
+def next_from_line(copy=None):
+    """'Memberships from £X a month, £Y inc VAT.' from the next_from row and the lowest visible monthly plan.
+    Empty when there is no row or no plan."""
+    copy = copy if copy is not None else content.page_content("spa")
+    cards = [c for c in purchasable_plans() if c["kind"] == Plan.MONTHLY]
+    if not copy["next_from"].body or not cards:
+        return ""
+    cheapest = min(cards, key=lambda c: Decimal(c["price_ex_vat"]))
+    return copy["next_from"].body.replace("{price}", f"£{cheapest['price_whole']}").replace("{price_inc}", f"£{cheapest['price_inc']}")
 
 
 def room_index():

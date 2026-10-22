@@ -85,13 +85,31 @@ FACILITIES = [
      "Rain showers behind walnut slatted screens"),
     ("relaxing-zone", "Relaxing zone", "Loungers, low light and nothing to do.", "Low light and comfortable seating.",
      "Relaxing zone with loungers, travertine and the swan on the wall"),
-    ("massage-room", "Massage room", "A quiet room for a massage, by appointment.", "A private room for massage.",
+    ("massage-room", "Massage room", "A quiet room for massage, part of your visit.", "A private room for massage.",
      "Massage room with a walnut table"),
     ("gym", "Gym", "Free weights and machines, never crowded.", "A calm, well equipped gym.",
      "Gym with free weights and a swan panel on the wall"),
     ("kitchenette", "Kitchenette", "Tea, coffee and somewhere to sit after.", "A place to make a drink and stay a while.",
      "Kitchenette and lounge corner"),
 ]
+
+# The spa page (docs/design/SPA-PAGE.md 3.2): slug -> display, image_name, image_focus, detail_image_name, facts.
+# Temperatures and times are PLACEHOLDERS (Moishe, 2026-10-22: "make up for now, connect real data later").
+# Typical values only; replace with the real ones in Control once confirmed.
+FACILITY_SPA_PAGE = {
+    "dry-sauna": {"display": "feature", "image_name": "dry-sauna", "image_focus": "50% 55%",
+                  "facts": ["80–90°C", "Dry heat", "10–15 minutes", "Sit on a towel"]},
+    "wet-sauna": {"display": "tile", "image_name": "", "image_focus": "50% 50%", "facts": ["About 45°C", "Soft steam", "10–15 minutes"]},
+    "cold-plunge": {"display": "tile", "image_name": "cold-tub", "image_focus": "100% 62%", "facts": ["8–10°C", "1–3 minutes", "After the heat"]},
+    "showers": {"display": "tile", "image_name": "showers-mosaic", "image_focus": "35% 55%", "facts": ["Rain showers", "Between rounds"]},
+    "relaxing-zone": {"display": "feature", "image_name": "relaxing-zone", "image_focus": "55% 60%",
+                      "facts": ["Loungers", "Low light", "Quiet"]},
+    "massage-room": {"display": "companion", "image_name": "", "image_focus": "50% 50%", "facts": ["Part of your visit"]},
+    "gym": {"display": "feature", "image_name": "gym", "image_focus": "40% 55%",
+            "facts": ["Free weights", "Machines", "Part of your visit"]},
+    "kitchenette": {"display": "companion", "image_name": "lounge", "image_focus": "55% 60%",
+                    "facts": ["Tea and coffee", "Somewhere to sit"]},
+}
 
 
 def run(ensure):
@@ -104,4 +122,5 @@ def run(ensure):
     for order, (slug, name, line, description, alt) in enumerate(FACILITIES, start=1):
         ensure(Facility, {"slug": slug}, {
             "name": name, "short_line": line, "description": description, "image_alt": alt, "order": order,
+            **FACILITY_SPA_PAGE.get(slug, {}),
         })

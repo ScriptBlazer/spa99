@@ -49,6 +49,6 @@ class ClosureAdmin(SimpleHistoryAdmin):
 
 @admin.register(Facility)
 class FacilityAdmin(SimpleHistoryAdmin):
-    list_display = ("name", "slug", "order", "visible")
-    list_editable = ("order", "visible")
+    list_display = ("name", "slug", "display", "order", "visible")
+    list_editable = ("display", "order", "visible")
     prepopulated_fields = {"slug": ("name",)}

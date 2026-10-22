@@ -77,6 +77,7 @@ Facts marked **(confirm)** are proposed, typical for a spa of this kind, not mea
 | kitchenette | companion | `lounge` | `55% 60%` | | "Tea and coffee", "Somewhere to sit" |
 
 Notes for the seed and Moishe:
+- **As built (2026-10-22):** the seed holds only soft facts. No temperatures or times are seeded (Moishe has not confirmed them), so "80 to 90°C", "About 45°C", "10 to 15 minutes" and "1 to 3 minutes" are left out; the values are in `plans/seed.py` `FACILITY_SPA_PAGE` and can be added in Control once confirmed. The massage line is fixed to "A quiet room for massage, part of your visit." (OPS-06), the intro uses `{rooms}`, and the spa button reads "Tailor your membership".
 - "Part of your visit" comes from OPS-06 (gym and massage room are part of the same visit, no separate booking or charge). The seeded massage `short_line` says "by appointment", which contradicts OPS-06. Proposed line: "A quiet room for massage, part of your visit." Flag to Moishe; do not change silently.
 - The spa intro body "Eight spaces, one quiet visit." hard-codes a number that goes wrong when a room is hidden. Proposed: "Every room, one quiet visit." (change through `replace_copy`, dry run first).
 - `spa.next.cta_label` is still "Explore your membership" in `content/seed.py`; it must read "Tailor your membership" (decision 2026-10-22). Update the seed and run `replace_copy` on existing databases.

@@ -54,7 +54,7 @@ All copy and images come from `content` (editable in Control). Plan details come
 
 **Scripts** (`common/static/common/js/`, ES modules, no libraries). `app.js` loads the shared modules (`buttons`, `modal`, `messages`, `validate`, `reveal`, `nav`); page modules are loaded by their own templates: `home-entry`, `spa-index`, `compare`, `journey`, `gold-apply`, `register`, `account`, `forms`. `api.js` and `choices.js` are shared helpers. The journey and Gold application are drawn by script from the JSON endpoints; there is no HTMX.
 
-**Images.** `python scripts/build_images.py "<originals folder>"` writes WebP and JPEG sets to `content/static/content/img/` and `content/image_manifest.json`. `{% photo "name" alt="..." sizes="..." override=section.image %}` renders a `<picture>`; an uploaded `Section.image` or `Facility.image` always wins, and a name without files (the new renders N1 to N6) shows a calm placeholder. Map of facility to render: `pages/services.py` (`FACILITY_IMAGES`).
+**Images.** `python scripts/build_images.py "<originals folder>"` writes WebP and JPEG sets to `content/static/content/img/` and `content/image_manifest.json`. `{% photo "name" alt="..." sizes="..." override=section.image %}` renders a `<picture>`; an uploaded `Section.image` or `Facility.image` always wins, and a name without files (the new renders N1 to N6) shows a calm placeholder. The render for a facility is the `image_name` field on the Facility (checked against the manifest in Control).
 
 **Copy.** Every heading and line comes from `content` sections (keys use underscores, see `content/seed.py`); multi-line lists (Gold roles, address) are one line per row. Plan rows, the compare table, the booking lines on Book and the Gold perk groups come from the `plans` rows.
 
@@ -75,3 +75,17 @@ Card keys added: `tagline` (row, else Daytime / Any time / Unlimited), `pills` (
 Content rows on page `memberships`: `continue` (body + cta_label), `recommended_label` (heading), `single_note` (body), `not_sure` (heading "Not sure?", cta_label), `price_note`.
 
 Services: `plans.services.plan_pills(plan)`, `hours_ranges()`, `pages.services.selected_plan_slug(request, cards)`. Existing databases: run `seed_phase1` (creates the new rows) then `backfill_site_data --dry-run` and `backfill_site_data` (taglines, renders, Leil Shishi pill, "Not sure?" wording). Plan `render` is checked against the image manifest in the admin form.
+
+## The spa page data (backend, 2026-10-22)
+
+Spec: `docs/design/SPA-PAGE.md`. Context of `pages.views.spa`:
+
+- `facilities`: flat list of cards (all visible rooms, in order) for the chips. Card keys: `slug, name, line, description, display` (feature / tile / companion), `facts` (list of up to 4 texts), `image` (uploaded FieldFile, wins), `image_name` (built render, "" unless it exists in the manifest; else the brand tile), `focus` (CSS object-position), `alt`, `detail_image` (FieldFile), `detail_image_name` ("" unless it exists), `detail_alt` ("" = decorative).
+- `sections`: from `spa_sections(cards)`. Items are `{"kind": "feature", "side": "left"|"right", "feature": card, "companion": card|None}` or `{"kind": "tiles", "tiles": [card, ...]}` (rows of 1 to 4; 5 gives 3 + 2). First feature is left (the opening frame is right), then alternate. A companion with no feature straight before it, or a second one, is a tile. Hiding or reordering a room only changes this list.
+- `room_count` (int, visible rooms), `hours` (`opening_hours()` rows), `hours_facts` (`{"range": "5am to 3am", "hours": 22}` or None).
+- `visit_pills`: `{"book": [...], "arrive": [...], "stay": [...]}` from `visit_pills()`. Book: window from visible monthly plans ("Book 1 to 7 days ahead"), cancel hours only when all plans agree, then the `booking_pending` row while booking is closed, then `step_1_pills`. Arrive: `step_2_pills`. Stay: "Open 5am to 3am", "Closed for Shabbos and Yom Tov", then `step_3_pills`.
+- `next_from`: the `next_from` row with `{price}` and `{price_inc}` filled from the lowest visible monthly plan (with the pound sign), "" if none.
+
+Content rows on page `spa`: `intro` (body uses `{rooms}`, replaced with the visible room count in words: "Eight spaces, one quiet visit."), `facts_rooms`, `facts_hours`, `facts_men`, `tiles_intro`, `how_it_works`, `step_1..3`, `step_1_pills`, `step_2_pills`, `step_3_pills` (one pill per line), `booking_pending`, `next` (button "Tailor your membership"), `next_from`, `next_link`. Read them with `{% page_content "spa" as spa %}`.
+
+Facility fields (Control): `display, image_name, image_focus, detail_image, detail_image_name, detail_alt, facts`. Control rejects image names that are not in the manifest and facts that are not up to 4 texts of 32 characters or fewer. Seed values are in `plans/seed.py` (`FACILITY_SPA_PAGE`); existing databases get them with `backfill_site_data` (empty slots only).

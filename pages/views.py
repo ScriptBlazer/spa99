@@ -54,7 +54,11 @@ def home(request):
 @login_not_required  # PUBLIC marketing page
 @require_GET
 def spa(request):
-    return _page(request, "pages/spa.html", "spa", facilities=services.facility_cards(), hours=services.opening_hours())
+    cards = services.facility_cards()
+    copy = content.page_content("spa")
+    return _page(request, "pages/spa.html", "spa", facilities=cards, sections=services.spa_sections(cards),
+                 room_count=len(cards), visit_pills=services.visit_pills(copy), next_from=services.next_from_line(copy),
+                 hours=services.opening_hours(), hours_facts=services.hours_facts())
 
 
 @login_not_required  # PUBLIC marketing page
