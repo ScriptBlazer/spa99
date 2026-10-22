@@ -6,6 +6,18 @@ Hero video concepts and prompts: `docs/design/HERO-VIDEO.md`.
 
 ---
 
+## 0. Revision 2026-10-22 (Moishe's review of Home): text in the middle, one size smaller
+
+Moishe: with every heading and button at the bottom of each screen, the sections still feel too big and odd. This revision wins over every "bottom left" placement below (H1, H2, S1, S2, G1, V2 and the sauna walk caption).
+
+- **Placement:** the text group (heading, line, actions) sits **vertically centred, left aligned**, at the optical centre (centre of the area under the header, nudged up by `--space-4`). Never pinned to the bottom. Actions sit directly under the line (`--space-5` gap), never pushed to the screen edge.
+- **Desktop:** text in cols 1-6. **Phone:** full width inside `--page-margin`, same vertical centring.
+- **Type one step down on marketing scenes:** `--text-hero` becomes `clamp(2.75rem, 5vw + 1rem, 6rem)` (44px phone, about 88px at 1440), `--text-2xl` becomes `clamp(2rem, 2.5vw + 1rem, 3rem)` (32px phone, 48px desktop). Leads stay `--text-lg`.
+- **Veil follows the text:** desktop uses `.veil--left` with the solid part widened to cover cols 1-6 (solid to about 45%, clear by about 75%). Phone uses a centred band veil (solid behind the text block, fading out above and below) plus a light overall veil. Measure cream on the veil over the brightest pixels under the text: at least 4.5:1 for body text, 3:1 for headings. If an image fails, darken the veil, never move the text back down.
+- **Progress lines and small controls** (ritual hairline, phone room hairline, hero Pause) stay at the bottom; they are not text groups.
+- **Window end state (H1):** unchanged, words left and the window right, now vertically centred together.
+- BRAND 7A "never above the lower 30%" is replaced by "always on the solid part of the veil".
+
 ## 1. Concept
 
 **One visit, told in scenes.** Each page is a short film you scroll through: the street goes dark, water moves, a door opens, you walk room to room, and the light settles. Every screen holds one idea and is complete on its own; the motion between screens is what makes it feel alive.

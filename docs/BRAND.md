@@ -84,7 +84,7 @@ Shared everywhere:
 - **Numbers count** only when they are small whole numbers that matter (visits a month, days ahead): 1.2s, once. Prices never animate.
 - **Pointer light**: a soft gold glow follows the pointer on dark scenes, desktop with a fine pointer only.
 - **Hero**: a looping muted video (6-10s, warm water, steam or light), or a living still (a 48s scale cycle and drifting steam) until the video exists. Always with a Pause control. Video loads after the page, never on Save-Data.
-- **Text on photographs and video** is allowed on marketing scenes, always inside the solid part of the legibility veil (`--color-veil`), never above the lower 30% (or left 18% on desktop).
+- **Text on photographs and video** is allowed on marketing scenes, always on the solid part of the legibility veil (`--color-veil`). Text groups sit vertically centred and left aligned, not at the bottom of the screen (IMMERSIVE section 0).
 - **Header** overlays the first dark scene, turns solid after 64px, hides on scroll down and returns on scroll up.
 - **Page changes** cross-fade (View Transitions, opacity only, 240ms out, 480ms in); the header stays put.
 - **Smooth scrolling** (Lenis) only on desktop with a fine pointer, never on touch.
