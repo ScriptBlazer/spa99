@@ -3,7 +3,7 @@
 {% block head_title %}{% include "common/_head.html" with title="Choose a new password | Spa 99" %}{% endblock %}
 {% block main %}
 <section class="section on-light auth">
-  <div class="container auth-inner" data-reveal="hero">
+  <div class="container auth-inner">
     <h1>Choose a new password.</h1>
     <form method="post" data-live-validate class="form-stack-sm" novalidate>{% csrf_token %}
       {% include "common/_field.html" with field=form.password toggle=True meter=True hint="At least 10 characters." %}

@@ -97,6 +97,8 @@ main:focus { outline: none; }
 /* ---------- photography: square corners, always ---------- */
 .photo { width: 100%; height: 100%; object-fit: cover; border-radius: 0; background: var(--color-espresso-raised); }
 picture { width: 100%; height: 100%; }
+/* The wide relaxing-zone render keeps the swan wall in view when it is cropped to portrait or 3:2. */
+img[src*="relaxing-zone"] { object-position: 72% 50%; }
 .photo-placeholder {
   display: grid; place-items: center; min-height: 100%;
   background-color: var(--color-espresso-raised);

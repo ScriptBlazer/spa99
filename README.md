@@ -26,7 +26,7 @@ storage it used, plus a warning for every key from `.env.example` that is missin
 python manage.py runserver
 ```
 
-- Public site: <http://localhost:8000>. Data endpoints and account routes exist now: `/journey/...`, `/gold/...`, `/register/`, `/login/`, `/account/` (unstyled placeholder templates), plus `/health/`. Page views arrive with the website feature.
+- Public site: <http://localhost:8000>: home, `/the-spa/`, `/memberships/`, `/gold-card/`, `/book/`, `/visit/`, `/privacy/`, `/terms/`, the guided journey at `/journey/`, the Gold application at `/gold-card/apply/`, `/register/`, `/login/`, `/account/`, plus the data endpoints `/journey/...`, `/gold/...` and `/health/`. Run `python manage.py seed_phase1` first so the pages have their copy.
 - Emails print in the terminal running `runserver` / `qcluster` (console backend). Queued emails need `python manage.py qcluster` running.
 - Spa 99 Control: <http://control.localhost:8000> (`*.localhost` resolves to your Mac automatically; sign in with a staff user)
 - Hidden Django admin (superuser fallback): `http://control.localhost:8000/<ADMIN_PATH>` , default `/backstage-7d3f9a/`. Change `ADMIN_PATH`.

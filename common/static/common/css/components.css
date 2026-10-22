@@ -131,6 +131,7 @@ body:has(dialog[open]) { overflow: hidden; }
 .field { display: grid; gap: var(--space-2); }
 .field > label, .field-label { font-size: var(--text-sm); font-weight: 500; }
 .optional { color: var(--s-muted); font-weight: 400; }
+.field input::placeholder, .field textarea::placeholder, .input::placeholder { color: var(--s-muted); opacity: 1; }
 .field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .field select, .field textarea, .input {
   width: 100%; min-height: var(--control-h); padding: 0 var(--space-3); background: var(--s-field); color: var(--s-text);
   border: 1px solid var(--s-line); border-radius: var(--radius-sm); font-size: max(1rem, var(--text-base)); appearance: none; -webkit-appearance: none;
@@ -180,7 +181,7 @@ body:has(dialog[open]) { overflow: hidden; }
 
 /* ---------- messages (one component for Django messages and scripts) ---------- */
 .messages { list-style: none; margin: 0; padding: 0; }
-.messages:not(:empty) { padding-top: var(--space-4); }
+.messages:has(.message) { padding-top: var(--space-4); }
 .message {
   position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
   padding: var(--space-3) var(--space-4); margin-bottom: var(--space-2); border-radius: var(--radius-md);

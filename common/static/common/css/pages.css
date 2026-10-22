@@ -5,7 +5,8 @@
 .hero-text { display: flex; flex-direction: column; padding: var(--space-6) var(--page-margin) var(--space-5); min-height: calc(100svh - var(--header-h)); }
 .hero-text .actions { margin-top: auto; padding-top: var(--space-5); }
 .hero-text .lead { max-width: 24rem; }
-.hero-image { aspect-ratio: 4 / 5; overflow: hidden; background: var(--color-espresso-raised); }
+.hero-image { position: relative; aspect-ratio: 4 / 5; overflow: hidden; background: var(--color-espresso-raised); }
+.hero-image picture { position: absolute; inset: 0; }
 .hero-photo { object-position: 38% 45%; }
 @media (min-width: 64em) {
   .hero { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); min-height: calc(100svh - var(--header-h)); }
@@ -162,6 +163,7 @@
 
 /* ---------- visit us ---------- */
 .visit-address { padding-bottom: var(--space-7); }
+.visit-lines { margin-top: var(--space-5); }
 .visit-lines span { display: block; }
 .visit-email { margin-top: var(--space-5); }
 .big-link { font-family: var(--font-display); font-size: var(--text-xl); letter-spacing: var(--tracking-display); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.25em; }
@@ -212,7 +214,6 @@
 
 /* ---------- account ---------- */
 .account-wrap > * { max-width: 48rem; }
-.account-wrap .messages:not(:empty) { padding-top: var(--space-4); }
 .account { padding-top: var(--space-6); }
 .stack-account > * + * { margin-top: var(--space-6); }
 .interest .lead { margin-bottom: var(--space-2); }

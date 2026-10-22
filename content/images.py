@@ -44,12 +44,12 @@ def src(name, width=None, ext="webp"):
 
 
 def placeholder(alt="", css_class=""):
-    """A finished-looking block for a render that does not exist yet: espresso, swan pattern and mark."""
+    """A finished-looking block for a render that does not exist yet: espresso with the swan mark."""
     from django.template.loader import render_to_string
 
     mark = render_to_string("common/_mark.html")
-    label = format_html(' role="img" aria-label="{}"', alt) if alt else ' aria-hidden="true"'
-    return format_html('<div class="photo photo-placeholder {}"{}>{}</div>', css_class, label, mark_safe(mark))
+    # Decorative: there is no picture to describe yet, and the heading beside it names the room.
+    return format_html('<div class="photo photo-placeholder {}" aria-hidden="true">{}</div>', css_class, mark_safe(mark))
 
 
 def picture(name, alt="", sizes="100vw", eager=False, override=None, css_class=""):

@@ -45,3 +45,19 @@ All copy and images come from `content` (editable in Control). Plan details come
 - Changing copy or a plan in Control updates the page.
 - Lighthouse: performance and accessibility 90+ on mobile.
 - Looks right at 375px and 1440px.
+
+## As built (Phase 1 frontend)
+
+**Routes** (app `pages`, plus `users` and the data endpoints): `/` home, `/the-spa/`, `/memberships/`, `/gold-card/`, `/gold-card/apply/` (and `/property/`, `/visits/`, `/you/`, `/sent/`), `/book/`, `/visit/`, `/privacy/`, `/terms/`, `/journey/` (and `/your-time/`, `/what-draws-you/`, `/company/`, `/about-you/`, `/your-membership/`), `/register/`, `/login/`, `/account/`, `/robots.txt`, `/sitemap.xml`. The result screen is `/journey/your-membership/` because `/journey/result/` is the JSON endpoint.
+
+**Layout and styles.** `common/templates/base.html` (site header and footer), `base_reduced.html` (journey, Gold application, errors: lockup and "Leave"), `base_bare.html` (Control sign in). One stylesheet entry `common/css/app.css` imports `tokens`, `fonts`, `base`, `components`, `pages`, `journey`. Only brand tokens; `fonts.css` adds size-adjusted fallbacks to `--font-display` and `--font-body`. Fonts, marks, the icon sprite and the swan pattern are in `common/static/common/`.
+
+**Scripts** (`common/static/common/js/`, ES modules, no libraries). `app.js` loads the shared modules (`buttons`, `modal`, `messages`, `validate`, `reveal`, `nav`); page modules are loaded by their own templates: `home-entry`, `spa-index`, `compare`, `journey`, `gold-apply`, `register`, `account`, `forms`. `api.js` and `choices.js` are shared helpers. The journey and Gold application are drawn by script from the JSON endpoints; there is no HTMX.
+
+**Images.** `python scripts/build_images.py "<originals folder>"` writes WebP and JPEG sets to `content/static/content/img/` and `content/image_manifest.json`. `{% photo "name" alt="..." sizes="..." override=section.image %}` renders a `<picture>`; an uploaded `Section.image` or `Facility.image` always wins, and a name without files (the new renders N1 to N6) shows a calm placeholder. Map of facility to render: `pages/services.py` (`FACILITY_IMAGES`).
+
+**Copy.** Every heading and line comes from `content` sections (keys use underscores, see `content/seed.py`); multi-line lists (Gold roles, address) are one line per row. Plan rows, the compare table, the booking lines on Book and the Gold perk groups come from the `plans` rows.
+
+**Decisions taken for the open questions (to confirm):** hero is render 08 cropped to remove the candle; merch is held; the "change tier whenever you need to" line is removed; Visit us shows the address, the contact email and opening hours only (no map, no arrival line).
+
+**Not in Phase 1 because the backend does not support it:** editing name, email or mobile on the account page (the page says to write to the contact email), "Single visit" in the interest picker (interest is monthly plans only), the portfolio-value toggle on the Gold application (size is unit ranges only). Cookies blocked: the journey needs the first-party cookie to save.

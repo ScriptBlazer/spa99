@@ -4,7 +4,7 @@
 {% block main %}
 {% page_content "register" as r %}
 <section class="section on-light auth">
-  <div class="container auth-inner" data-reveal="hero">
+  <div class="container auth-inner">
     <h1>{{ r.sent.heading }}</h1>
     <p class="lead">{% if email %}We've sent a link to <strong>{{ email }}</strong>. {% else %}We've sent you a link. {% endif %}{{ r.sent.body }}</p>
     <div class="actions">
