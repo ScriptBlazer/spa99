@@ -33,8 +33,8 @@
         <a class="btn btn-primary btn-block-phone" href="{% url 'journey' %}">{{ home.hero.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
         {% if home.hero_link.cta_label %}<a class="btn-quiet" href="{% url 'spa' %}">{{ home.hero_link.cta_label }}</a>{% endif %}
       </div>
-      <button class="hero-pause btn-quiet" type="button" aria-pressed="false" data-fade data-hero-pause>Pause</button>
     </div>
+    <button class="hero-pause btn-quiet" type="button" aria-pressed="false" data-hero-pause>Pause</button>
   </div>
   <div class="hero-statement">
     <div class="container grid">

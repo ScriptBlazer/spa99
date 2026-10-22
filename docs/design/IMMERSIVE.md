@@ -132,7 +132,7 @@ Total scroll at desktop: about 9.5 screens, of which 4.4 are pinned scenes.
 
 ### H1. Arrival (hero) - pinned, `+=90%` desktop, `+=70%` phone
 
-**On screen (first paint):** full-bleed hero media under the header (overlay header). Bottom left over the legibility veil: "Beyond Luxury." in `--text-hero` (Signika 400 cream, BRIEF 3), lead "A private spa for men in North London. Opening January 2027.", primary gold "Find your membership" with arrow, quiet "See the spa". A small quiet "Pause" control bottom right (section 3.1).
+**On screen (first paint):** full-bleed hero media under the header (overlay header). Vertically centred, left aligned, over the legibility veil (section 0): "Beyond Luxury." in `--text-hero` (Signika 400 cream, BRIEF 3), lead "A private spa for men in North London. Opening January 2027.", primary gold "Find your membership" with arrow, quiet "See the spa". A small quiet "Pause" control bottom right (section 3.1).
 
 **Media:** `<video>` slot with poster (markup in 3.1). Until a video exists, the living still: render **08** (`hero`) with slow settle and a steam layer (3.2). On desktop with a capable GPU and no video, the living still is the WebGL water pass instead (section 14.1); phones keep the CSS living still.
 
@@ -142,7 +142,7 @@ Total scroll at desktop: about 9.5 screens, of which 4.4 are pinned scenes.
 | Progress | What moves |
 |---|---|
 | 0 → 0.3 | Headline, lead and actions: `opacity 1 → 0`, `y 0 → -32`. Veil eases off (`opacity 1 → 0.4`) |
-| 0 → 0.75 | **Window**: media shrinks into the target window. Desktop: cols 8-12, top `--scene-pad-top`, bottom `--space-6` (a portrait window flush with the right margin). Phone: full width minus `--page-margin`, top 46% of the stage |
+| 0 → 0.75 | **Window**: media shrinks into the target window. Desktop: cols 8-12, centred vertically with the words, inset `--space-4` top and bottom of the stage area (a portrait window flush with the right margin). Phone: full width minus `--page-margin`, 40svh tall, window and statement centred together as a pair |
 | 0 → 0.75 | Media inner zoom `1.0 → 1.08` so the water feels closer as the frame closes in |
 | 0.35 → 1 | Statement "Heat, cold, quiet, and time that is yours." Word light. Desktop: cols 1-6, vertically centred, `--text-2xl`. Phone: under the window, `--text-xl` |
 | 0.8 → 1 | Statement paragraph ("Two saunas, a cold plunge...") Fade up under it (desktop only; phone drops the paragraph to keep one screen) |

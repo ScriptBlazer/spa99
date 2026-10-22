@@ -178,7 +178,7 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --text-body: 1rem;                       /* derived: may become 1.0625rem at desktop */
   --text-lg: 1.25rem;
   --text-xl: clamp(1.5rem, 2vw + 1rem, 2.25rem);
-  --text-2xl: clamp(2.25rem, 4vw + 1rem, 4rem);
+  --text-2xl: clamp(2.25rem, 4vw + 1rem, 4rem);      /* journey, forms, account, legal. Marketing pages override, see below */
   --text-hero: clamp(3rem, 8vw + 1rem, 8rem);
 
   --leading-display: 1;
@@ -258,6 +258,8 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
 }
 ```
 
-**Immersive tokens** (`--color-veil`, `--color-header-solid`, `--color-glow`, `--scene-h`, `--scene-pad-top`, `--duration-line`, `--stagger-line`, `--duration-page`) are derived and now live in `tokens.css`. Values and contrast: `docs/design/IMMERSIVE.md` section 12.
+**Marketing type scale** (one step down, IMMERSIVE section 0): under `html[data-page="marketing"]` in `tokens.css`, `--text-2xl: clamp(2rem, 2.5vw + 1rem, 3rem)` (32px phone, 48px desktop) and `--text-hero: clamp(2.75rem, 5vw + 1rem, 6rem)` (44px phone, about 88px at 1440). The journey, forms, account and legal pages keep the larger scale above.
+
+**Immersive tokens** (`--color-veil`, `--color-header-solid`, `--color-glow`, `--scene-h`, `--scene-pad-top`, `--scene-centre-top`, `--scene-centre-bottom`, `--color-veil-soft`, `--duration-line`, `--stagger-line`, `--duration-page`) are derived and now live in `tokens.css`. Values and contrast: `docs/design/IMMERSIVE.md` section 12.
 
 The designer refines these per task. Frontend uses only tokens, never raw values. Breakpoints are constants (CSS variables can't be used in media queries): `48em` (tablet) and `64em` (desktop).

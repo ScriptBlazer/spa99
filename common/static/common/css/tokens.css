@@ -99,9 +99,20 @@
   --color-glow: rgb(229 172 110 / 0.16);       /* pointer light centre, decoration only */
   --scene-h: 100svh;
   --scene-pad-top: calc(var(--header-h) + var(--space-5));
+  /* Text groups sit at the optical centre: centre of the area under the header, nudged up by --space-4 (IMMERSIVE section 0). */
+  --scene-centre-top: var(--header-h);
+  --scene-centre-bottom: calc(var(--space-4) * 2);
+  --color-veil-soft: rgb(73 46 33 / 0.4);      /* light overall veil under the phone band veil */
   --duration-line: 1100ms;
   --stagger-line: 80ms;
   --duration-page: 480ms;
+}
+
+/* Marketing pages are one type step smaller (IMMERSIVE section 0). Scoped here because the same tokens set the headings of the journey,
+   forms, account and legal pages, which keep the larger scale. */
+html[data-page="marketing"] {
+  --text-2xl: clamp(2rem, 2.5vw + 1rem, 3rem);
+  --text-hero: clamp(2.75rem, 5vw + 1rem, 6rem);
 }
 
 @media (min-width: 48em) {

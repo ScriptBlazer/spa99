@@ -196,7 +196,7 @@ SCENES.hero = (el, { desktop }) => {
   gsap.fromTo(el.querySelectorAll('.hero-copy [data-fade]'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.9, delay: 0.5 });
 
   // on scroll
-  tl.to(q('[data-hero-copy]'), { autoAlpha: 0, y: -32, duration: 0.3 }, 0)
+  tl.to([q('[data-hero-copy]'), q('[data-hero-pause]')], { autoAlpha: 0, y: -32, duration: 0.3 }, 0)
     .to(q('.hero-stage .veil'), { opacity: 0.4, duration: 0.3 }, 0)
     .to(q('.hero-stage .veil'), { opacity: 0, duration: 0.45 }, 0.3)
     .fromTo(q('.hero-zoom'), { scale: 1 }, { scale: 1.08, duration: 0.75 }, 0);

@@ -40,16 +40,22 @@ html.lenis, html.lenis body { height: auto; }
 .scene { position: relative; min-height: var(--scene-h); }
 .scene-stage {
   position: relative; min-height: var(--scene-h); display: flex; flex-direction: column; justify-content: center;
-  padding: var(--scene-pad-top) 0 calc(var(--space-5) + env(safe-area-inset-bottom));
+  padding: var(--scene-centre-top) 0 calc(var(--scene-centre-bottom) + env(safe-area-inset-bottom));
 }
-@media (min-width: 64em) { .scene-stage { padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom)); } }
 
 /* full-bleed media, the veil (8.12), pointer glow (8.9) */
 .scene-media, .window, .window-media { position: absolute; inset: 0; overflow: hidden; }
 .scene-media picture, .scene-media .photo, .window-media picture, .window-media .photo { position: absolute; inset: 0; width: 100%; height: 100%; }
 .scene-media .photo, .window-media .photo { object-fit: cover; }
 .veil { position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(to top, var(--color-veil) 0%, var(--color-veil) 22%, rgb(73 46 33 / 0) 62%); }
+  /* phone: a light overall veil plus a band that is solid behind the centred text block and fades out above and below */
+  background:
+    linear-gradient(to bottom, rgb(73 46 33 / 0) 4%, var(--color-veil) 24%, var(--color-veil) 76%, rgb(73 46 33 / 0) 96%),
+    linear-gradient(var(--color-veil-soft), var(--color-veil-soft)); }
+/* desktop: the text is in cols 1-6, so the veil is solid to about 45% and clear by about 75% */
+@media (min-width: 64em) {
+  .veil { background: linear-gradient(to right, var(--color-veil) 0%, var(--color-veil) 45%, rgb(73 46 33 / 0) 75%); }
+}
 .glow { display: none; }
 .line-mask { padding-bottom: 0.14em; margin-bottom: -0.14em; }   /* descenders stay inside the line-rise mask */
 
@@ -58,7 +64,7 @@ html.lenis, html.lenis body { height: auto; }
 
 /* ---------- H1 arrival ---------- */
 .hero-scene { background: var(--color-bg-inverse); }
-.hero-stage { display: flex; flex-direction: column; justify-content: flex-end; padding: var(--scene-pad-top) 0 calc(var(--space-6) + env(safe-area-inset-bottom)); overflow: hidden; }
+.hero-stage { display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
 .hero-zoom, .hero-still-wrap { position: absolute; inset: 0; }
 .hero-still { object-position: 38% 45%; }
 @media (min-width: 64em) { .hero-still { object-position: 50% 38%; } }
@@ -71,7 +77,8 @@ html.lenis, html.lenis body { height: auto; }
 .hero-title { max-width: 7ch; }
 .hero-copy .lead { max-width: 24rem; margin-top: var(--space-4); }
 .hero-copy .actions { margin-top: var(--space-5); }
-@media (min-width: 48em) { .hero-title { max-width: none; } }
+@media (min-width: 64em) { .hero-copy > * { max-width: 50%; } .hero-copy .lead { max-width: 24rem; } }
+@media (min-width: 48em) and (max-width: 63.99em) { .hero-title { max-width: none; } }
 
 /* static: the statement is its own scene after the hero */
 .hero-statement { padding: var(--space-6) 0 calc(var(--space-5) + env(safe-area-inset-bottom)); min-height: var(--scene-h); display: grid; align-content: center; }
@@ -92,9 +99,10 @@ html.lenis, html.lenis body { height: auto; }
 /* ---------- H2 ritual ---------- */
 .ritual { background: var(--color-bg-inverse); }
 .ritual-items { display: block; }
-.scene-item { position: relative; min-height: var(--scene-h); display: flex; align-items: flex-end; overflow: hidden; }
+.scene-item { position: relative; min-height: var(--scene-h); display: flex; align-items: center; overflow: hidden; }
 .scene-item .scene-media .photo { object-position: var(--focus, 50% 50%); }
-.scene-copy { position: relative; z-index: 2; width: 100%; max-width: var(--container-max); margin-inline: auto; padding: 0 var(--page-margin) calc(var(--space-6) + env(safe-area-inset-bottom)); }
+.scene-copy { position: relative; z-index: 2; width: 100%; max-width: var(--container-max); margin-inline: auto; padding: var(--scene-centre-top) var(--page-margin) calc(var(--scene-centre-bottom) + env(safe-area-inset-bottom)); }
+@media (min-width: 64em) { .scene-copy > * { max-width: 50%; } }
 .scene-caption { font-family: var(--font-display); font-weight: 500; font-size: var(--text-2xl); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
 .scene-copy .btn-quiet { margin-top: var(--space-3); }
 .ritual-progress { display: none; }
@@ -142,9 +150,8 @@ html.lenis, html.lenis body { height: auto; }
 .mark-draw .mark-fill { fill: var(--color-gold); }
 .mark-draw .mark-line path { fill: none; stroke: var(--color-gold); stroke-width: 1.25; vector-effect: non-scaling-stroke; }
 @media (min-width: 64em) {
-  .gold-scene .grid { align-items: end; }
-  .gold-text { grid-column: 1 / span 5; align-self: end; }
-  .gold-swan { grid-column: 7 / span 5; order: 0; align-self: center; }
+  .gold-text { grid-column: 1 / span 5; grid-row: 1; align-self: center; }
+  .gold-swan { grid-column: 7 / span 5; grid-row: 1; order: 0; align-self: center; }
   .gold-swan .mark { height: 46svh; }
 }
 
@@ -168,7 +175,7 @@ html.motion .scene--pin > .scene-stage { position: absolute; inset: 0; min-heigh
 html.motion .hero-stage { position: absolute; inset: 0; min-height: 0; }
 html.motion .hero-zoom { animation: hero-in 1400ms var(--ease-soft) both; }
 @keyframes hero-in { from { opacity: 0; } }
-html.motion .hero-pause { display: inline-flex; position: absolute; right: var(--page-margin); bottom: 0; min-width: 2.75rem; justify-content: center; }
+html.motion .hero-pause { display: inline-flex; position: absolute; z-index: 2; right: var(--page-margin); bottom: calc(var(--space-4) + env(safe-area-inset-bottom)); min-width: 2.75rem; justify-content: center; }
 html.motion .hero-steam {
   display: block; position: absolute; inset: 0 -8%; background: var(--steam) center / cover no-repeat; mix-blend-mode: screen;
   opacity: 0.18; pointer-events: none;
@@ -178,9 +185,9 @@ html.motion .hero-statement {
   position: absolute; inset: 0; z-index: 2; min-height: 0; display: block; padding: 0; pointer-events: none;
 }
 html.motion .hero-statement .grid {
-  position: absolute; inset: 0; margin-inline: auto; align-items: start; row-gap: 0;
-  padding: calc(var(--header-h) + var(--space-3)) var(--page-margin) var(--space-5);
-  grid-template-rows: calc(46svh - var(--header-h) - var(--space-3)) auto;
+  position: absolute; inset: 0; margin-inline: auto; align-items: start; align-content: center; row-gap: 0;
+  padding: var(--scene-centre-top) var(--page-margin) calc(var(--scene-centre-bottom) + env(safe-area-inset-bottom));
+  grid-template-rows: 40svh auto;
 }
 html.motion .hero-statement .hero-window-target { display: block; grid-column: 1 / -1; grid-row: 1; align-self: stretch; visibility: hidden; }
 html.motion .hero-statement .statement-copy { grid-column: 1 / -1; grid-row: 2; margin-top: var(--space-4); opacity: 0; }
@@ -188,8 +195,8 @@ html.motion .statement-still { display: none; }
 html.motion .statement-copy .statement { font-size: var(--text-xl); }
 @media (max-width: 63.99em) { html.motion .statement-copy p { display: none; } }
 @media (min-width: 64em) {
-  html.motion .hero-statement .grid { align-items: stretch; padding: var(--scene-pad-top) var(--page-margin) var(--space-6); grid-template-rows: minmax(0, 1fr); }
-  html.motion .hero-statement .hero-window-target { grid-column: 8 / -1; }
+  html.motion .hero-statement .grid { align-items: stretch; align-content: stretch; grid-template-rows: minmax(0, 1fr); }
+  html.motion .hero-statement .hero-window-target { grid-column: 8 / -1; align-self: center; height: calc(100% - var(--space-4) * 2); }
   html.motion .hero-statement .statement-copy { grid-column: 1 / span 6; grid-row: 1; align-self: center; margin-top: 0; }
   html.motion .statement-copy .statement { font-size: var(--text-2xl); }
 }
@@ -211,7 +218,6 @@ html.motion .ritual-progress {
 }
 html.motion .ritual-progress i { display: block; height: 1px; background: var(--color-hairline-inverse); }
 html.motion .ritual-progress b { display: block; height: 1px; background: var(--color-gold); transform: scaleX(0); transform-origin: left; }
-html.motion .ritual .scene-copy { padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom)); }
 @media (min-width: 64em) {
   html.motion .ritual-progress { left: auto; width: 22rem; right: var(--page-margin); bottom: var(--space-6); }
 }
