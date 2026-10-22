@@ -1,0 +1,20 @@
+{% load static %}<!doctype html>
+<html lang="en-GB">
+<head>
+{% with title=meta.title|default:"Spa 99" description=meta.meta_description %}
+{% block head_title %}{% include "common/_head.html" with title=title|add:" | Spa 99" description=description %}{% endblock %}
+{% endwith %}
+{% block head_extra %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<a class="skip-link" href="#main">Skip to content</a>
+{% block header %}{% include "common/_header.html" %}{% endblock %}
+<main id="main" tabindex="-1">
+  {% block messages %}<div class="container">{% include "common/_messages.html" %}</div>{% endblock %}
+  {% block main %}{% endblock %}
+</main>
+{% block footer %}{% include "common/_footer.html" %}{% endblock %}
+{% include "common/_modal.html" %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

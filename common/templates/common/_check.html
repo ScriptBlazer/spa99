@@ -1,0 +1,8 @@
+{# A checkbox row. Usage: {% include "common/_check.html" with field=form.men_only_accepted %} then pass `label_html` for custom text #}
+<div class="field">
+  <label class="check">
+    {{ field }}
+    <span>{% if label_html %}{{ label_html }}{% else %}{{ field.label }}{% endif %}</span>
+  </label>
+  <p class="feedback" data-error-for="{{ field.html_name }}" id="error-{{ field.html_name }}" aria-live="polite" data-state="{% if field.errors %}error{% else %}hint{% endif %}">{% if field.errors %}{{ field.errors|join:" " }}{% endif %}</p>
+</div>

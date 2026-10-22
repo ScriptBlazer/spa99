@@ -5,7 +5,7 @@
         data-level="{% if level == 'success' or level == 'info' %}success{% else %}error{% endif %}"
         role="{% if level == 'success' or level == 'info' %}status{% else %}alert{% endif %}">
       <span>{{ message }}</span>
-      <button type="button" class="message-close" data-message-close aria-label="Close message">&times;</button>
+      <button type="button" class="message-close" data-message-close>Dismiss</button>
     </li>
     {% endwith %}
   {% endfor %}

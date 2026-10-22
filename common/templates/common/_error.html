@@ -1,0 +1,9 @@
+{# The block on every error page: swan mark, heading, one line, back to home. No illustrations, no jokes. #}
+<section class="error-page on-dark">
+  <div class="soon error-block" data-reveal="hero">
+    {% include "common/_mark.html" %}
+    <h1 class="statement">{{ heading }}</h1>
+    <p class="muted">{{ line }}</p>
+    <div class="actions"><a class="btn btn-primary" href="/">Back to home</a></div>
+  </div>
+</section>

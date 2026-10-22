@@ -16,6 +16,8 @@ export function confirmModal({ title, message, confirmLabel = 'Confirm', cancelL
   const confirmButton = dialog.querySelector('[data-modal-confirm]');
   const cancelButton = dialog.querySelector('[data-modal-cancel]');
   confirmButton.textContent = confirmLabel;
+  confirmButton.classList.toggle('btn-danger', danger);
+  confirmButton.classList.toggle('btn-primary', !danger);
   cancelButton.textContent = cancelLabel;
   confirmButton.classList.toggle('is-danger', danger);
 
@@ -33,7 +35,7 @@ export function confirmModal({ title, message, confirmLabel = 'Confirm', cancelL
     cancelButton.addEventListener('click', onCancel);
     dialog.addEventListener('cancel', onCancel); // Escape key
     dialog.showModal();
-    cancelButton.focus(); // safe default for dangerous actions
+    dialog.querySelector('[data-modal-title]').focus(); // focus starts on the heading; Escape closes; focus returns to the trigger
   });
 }
 
@@ -46,6 +48,7 @@ export function initConfirm(root = document) {
       title: trigger.dataset.confirmTitle,
       message: trigger.dataset.confirmMessage,
       confirmLabel: trigger.dataset.confirmLabel || 'Confirm',
+      cancelLabel: trigger.dataset.confirmCancel || 'Cancel',
       danger: trigger.hasAttribute('data-confirm-danger'),
     });
     if (!accepted) return;
