@@ -73,4 +73,5 @@ jobs:
           tags: ${{ env.PUSH_ENABLED == 'true' && format('{0}/{1}:{2}', vars.REGISTRY, vars.IMAGE_NAME, github.ref_name) || format('spa99:{0}', github.ref_name) }}
       - name: Note when nothing was pushed
         if: env.PUSH_ENABLED != 'true'
-        run: echo "Image built but not pushed: no registry configured (set REGISTRY and IMAGE_NAME repo variables)."
+        run: |
+          echo "Image built but not pushed, no registry configured (set REGISTRY and IMAGE_NAME repo variables)."
