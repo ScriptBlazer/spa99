@@ -19,6 +19,11 @@ PAGES = {
         ("scene_cold", "", "Then cold.", "", ""),
         ("scene_rest", "", "Then nothing at all.", "", ""),
         ("scenes_link", "", "", "See the spa", "/the-spa/"),
+        ("inside", "What's inside.", "", "", ""),
+        ("facts_hours_label", "", "Open every day", "", ""),
+        ("facts_hours_count_label", "", "hours a day", "", ""),
+        ("facts_capacity_label", "", "", "", ""),  # fill in Control (for example "guests at most, at any time") to show the capacity fact
+        ("lounge_caption", "The lounge.", "", "", ""),
         ("journey_entry", "Which membership suits you?", "A few taps. Under two minutes.", "Find your membership", "/journey/"),
         ("memberships_teaser", "Three memberships. One single visit.", "", "Compare memberships", "/memberships/"),
         ("gold_teaser", "The Gold Card.", "For people in property. Free, by application.", "About the Gold Card", "/gold-card/"),

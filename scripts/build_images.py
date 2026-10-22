@@ -12,7 +12,7 @@ import json
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "content" / "static" / "content" / "img"
@@ -21,7 +21,8 @@ WIDTHS = [480, 800, 1600, 2400]
 QUALITY = 78
 JPEG_MAX = 1600
 
-# name: (original file, crop or None)
+# name: (original file, crop or None) or (original file, crop or None, grade). grade=True warms the architect renders so they sit
+# on espresso (docs/design/IMMERSIVE-R2.md 5.3): colour x0.85, brightness x0.94, channels R x1.00, G x0.98, B x0.93.
 SOURCES = {
     # 08 backlit travertine water wall. Crop the right edge: it holds the lounger with the candle.
     "hero": ("untitled_Gemini 3 Portrait_2026-08-25_12-21-20.png", (0, 0.03, 0.89, 0.80)),
@@ -31,7 +32,22 @@ SOURCES = {
     "door-gold": ("untitled_Gemini 3 Square 2K_2026-08-25_12-16-03.png", None),  # 09
     "door-white": ("untitled_Gemini 3 Square 2K_2026-08-25_12-16-09.png", None),  # 10
     "lockers": ("untitled_Gemini 3 Square 2K_2026-08-25_13-32-08.png", None),  # 20
+    # Architect renders (docs/design/IMMERSIVE-R2.md 5.2), graded.
+    "arrival": ("WhatsApp Image 2026-08-26 at 19.03.34 (3).jpeg", (0.08, 0, 1, 1), True),  # 16 water wall under the gold cove
+    "lounge": ("WhatsApp Image 2026-08-26 at 19.03.34 (2).jpeg", None, True),  # 15
+    "relax-loungers": ("WhatsApp Image 2026-08-20 at 10.23.31 (4).jpeg", None, True),  # 08
+    "showers": ("WhatsApp Image 2026-08-20 at 10.23.31 (5).jpeg", (0, 0, 0.84, 1), True),  # 09
+    "cold-tub": ("WhatsApp Image 2026-08-20 at 10.23.31 (5).jpeg", (0.52, 0.28, 1, 1), True),  # 09, interim cold, small use only
+    "reception": ("WhatsApp Image 2026-08-26 at 19.03.33 (2).jpeg", (0.40, 0, 1, 1), True),  # 13, until the lettering is cleaned
+    "corridor": ("WhatsApp Image 2026-08-26 at 19.03.34 (5).jpeg", None, True),  # 17
+    "showers-mosaic": ("Showers.jpeg", (0, 0, 0.80, 1), True),  # 04
 }
+
+
+def grade(image):
+    image = ImageEnhance.Brightness(ImageEnhance.Color(image).enhance(0.85)).enhance(0.94)
+    r, g, b = image.split()
+    return Image.merge("RGB", (r, g.point(lambda v: round(v * 0.98)), b.point(lambda v: round(v * 0.93))))
 
 
 def main(folder):
@@ -39,8 +55,10 @@ def main(folder):
     for old in [*OUT.glob('*.webp'), *OUT.glob('*.jpg')]:  # start clean so removed sizes do not linger
         old.unlink()
     manifest = {}
-    for name, (filename, crop) in SOURCES.items():
+    for name, (filename, crop, *rest) in SOURCES.items():
         image = Image.open(Path(folder) / filename).convert("RGB")
+        if rest and rest[0]:
+            image = grade(image)
         if crop:
             w, h = image.size
             image = image.crop((round(crop[0] * w), round(crop[1] * h), round(crop[2] * w), round(crop[3] * h)))

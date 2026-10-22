@@ -1,6 +1,6 @@
-/* Immersive marketing scenes (docs/design/IMMERSIVE.md). Tokens only.
+/* Immersive marketing scenes (docs/design/IMMERSIVE.md, Home: docs/design/IMMERSIVE-R2.md). Tokens only.
    Two layouts from one markup: the STATIC layout is the default (no JS, reduced motion, GSAP failed): normal flow,
-   everything visible, each scene one screen. The MOTION layout is everything under html.motion (scenes.js pins and scrubs).
+   everything visible, the same composition. The MOTION layout is everything under html.motion (scenes.js scrubs; no pins on Home).
    Only transform and opacity are animated by scenes.js. */
 
 /* ---------- page transitions (2.4): lights dimming between rooms, opacity only ---------- */
@@ -30,7 +30,7 @@ html.motion body[data-header="overlay"] .site-header:not(.is-solid)::before { op
 html[data-page="marketing"] main > .container:first-child { position: fixed; z-index: 50; top: var(--header-h); left: 0; right: 0; pointer-events: none; }
 html[data-page="marketing"] main > .container:first-child .message { pointer-events: auto; }
 
-/* ---------- Lenis (desktop fine pointer only) ---------- */
+/* ---------- Lenis (off by default: html[data-smooth="on"] turns it back on) ---------- */
 html.lenis, html.lenis body { height: auto; }
 .lenis:not(.lenis-autoToggle).lenis-stopped { overflow: clip; }
 .lenis.lenis-smooth { scroll-behavior: auto !important; }
@@ -43,77 +43,134 @@ html.lenis, html.lenis body { height: auto; }
   padding: var(--scene-centre-top) 0 calc(var(--scene-centre-bottom) + env(safe-area-inset-bottom));
 }
 
-/* full-bleed media, the veil (8.12), pointer glow (8.9) */
-.scene-media, .window, .window-media { position: absolute; inset: 0; overflow: hidden; }
-.scene-media picture, .scene-media .photo, .window-media picture, .window-media .photo { position: absolute; inset: 0; width: 100%; height: 100%; }
-.scene-media .photo, .window-media .photo { object-fit: cover; }
-.veil { position: absolute; inset: 0; pointer-events: none;
-  /* phone: a light overall veil plus a band that is solid behind the centred text block and fades out above and below */
-  background:
-    linear-gradient(to bottom, rgb(73 46 33 / 0) 4%, var(--color-veil) 24%, var(--color-veil) 76%, rgb(73 46 33 / 0) 96%),
-    linear-gradient(var(--color-veil-soft), var(--color-veil-soft)); }
-/* desktop: the text is in cols 1-6, so the veil is solid to about 45% and clear by about 75% */
-@media (min-width: 64em) {
-  .veil { background: linear-gradient(to right, var(--color-veil) 0%, var(--color-veil) 45%, rgb(73 46 33 / 0) 75%); }
-}
+/* The page never scrolls sideways: bleed frames run to the screen edge (and under a classic scrollbar). clip keeps sticky working. */
+.page-home main { overflow-x: clip; }
+
+/* ---------- frames (R2 section 2): photography lives in frames on espresso, running off one side of the screen ---------- */
+.frame { isolation: isolate; }
+.frame-media { position: absolute; inset: 0; }
+.frame-media picture, .frame-media .photo, .hero-still-wrap { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.frame-media .photo { object-fit: cover; object-position: var(--focus, 50% 50%); }
+.frame-tint { position: absolute; inset: 0; background: var(--color-frame-tint); pointer-events: none; }   /* motion: espresso at opacity 0.14, see below */
+.frame-veil { display: none; }
+.frame--right { margin-right: calc(var(--bleed) * -1); border-radius: var(--radius-md) 0 0 var(--radius-md); }   /* runs off the right edge */
+.frame--left { margin-left: calc(var(--bleed) * -1); border-radius: 0 var(--radius-md) var(--radius-md) 0; }    /* runs off the left edge */
+.frame--inset { border-radius: var(--radius-md); }                                                              /* small detail inset */
+.frame--lag .frame-media { inset: -6% 0; }                                                                      /* room for the scroll lag */
+
+/* a caption under a frame: gold hairline, room name, one quiet line. Outside the moving element, so text never moves */
+.frame-caption { margin-top: var(--space-4); }
+.frame-caption h3 { font-family: var(--font-display); font-weight: 500; font-size: var(--text-lg); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--color-text-inverse); }
+.frame-caption h3::before { content: ""; display: block; width: 1.5rem; height: 1px; margin-bottom: var(--space-2); background: var(--color-gold); }
+.frame-caption p { margin-top: var(--space-1); color: var(--color-text-muted-inverse); }
+.frame-caption .btn-quiet { margin-top: var(--space-3); }
+
 .glow { display: none; }
+.thread { display: none; }
 .line-mask { padding-bottom: 0.14em; margin-bottom: -0.14em; }   /* descenders stay inside the line-rise mask */
 
-/* a quiet text button over photography */
+/* a quiet text button on dark scenes */
 .on-dark .btn-quiet { color: var(--color-text-inverse); }
 
-/* ---------- H1 arrival ---------- */
-.hero-scene { background: var(--color-bg-inverse); }
-.hero-stage { display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
-.hero-zoom, .hero-still-wrap { position: absolute; inset: 0; }
-.hero-still { object-position: 38% 45%; }
-@media (min-width: 64em) { .hero-still { object-position: 50% 38%; } }
+/* ---------- R1 arrival ---------- */
+.hero-scene { display: flex; flex-direction: column; padding-top: var(--header-h); background: var(--color-bg-inverse); overflow: clip; }
+.hero-grid { flex: 1; grid-template-rows: auto 1fr; row-gap: 0; }
+.hero-frame { grid-column: 1 / -1; grid-row: 1; margin-left: 0; }
+.hero-frame .frame { height: clamp(12.5rem, 36svh, 30rem); }
+.hero-still { object-position: 46% 62%; }
 .hero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1200ms var(--ease-soft); }
 .hero-video.is-playing { opacity: 1; }
-.hero-zoom.has-video .hero-still-wrap { opacity: 0; transition: opacity 1200ms var(--ease-soft); }
-.hero-steam, .hero-pause { display: none; }
-.hero-stage .veil::after { content: ""; position: absolute; inset: 0 0 auto 0; height: calc(var(--header-h) * 1.8); background: linear-gradient(to bottom, var(--color-veil), rgb(73 46 33 / 0)); }
-.hero-copy { position: relative; z-index: 2; width: 100%; max-width: var(--container-max); margin-inline: auto; padding-inline: var(--page-margin); }
+.frame-media.has-video .hero-still-wrap { opacity: 0; transition: opacity 1200ms var(--ease-soft); }
+.hero-pause { display: none; }
+.hero-copy { position: relative; z-index: 2; grid-column: 1 / -1; grid-row: 2; align-self: center; padding-block: var(--space-4); }
 .hero-title { max-width: 7ch; }
-.hero-copy .lead { max-width: 24rem; margin-top: var(--space-4); }
-.hero-copy .actions { margin-top: var(--space-5); }
-@media (min-width: 64em) { .hero-copy > * { max-width: 50%; } .hero-copy .lead { max-width: 24rem; } }
+.hero-copy .lead { max-width: 24rem; margin-top: var(--space-3); }
+.hero-copy .actions { margin-top: var(--space-4); }
 @media (min-width: 48em) and (max-width: 63.99em) { .hero-title { max-width: none; } }
-
-/* static: the statement is its own scene after the hero */
-.hero-statement { padding: var(--space-6) 0 calc(var(--space-5) + env(safe-area-inset-bottom)); min-height: var(--scene-h); display: grid; align-content: center; }
-.hero-statement .grid { row-gap: var(--space-5); }
-.statement-copy { grid-column: 1 / -1; }
-.statement-copy .statement { font-size: var(--text-xl); }
-.statement-copy p { margin-top: var(--space-4); }
-.statement-still { position: relative; grid-column: 1 / -1; overflow: hidden; aspect-ratio: 4 / 5; min-height: 40svh; max-height: 52svh; width: 100%; background: var(--color-espresso-raised); }
-.statement-still picture, .statement-still .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 38% 45%; }
-.hero-window-target { display: none; }
 @media (min-width: 64em) {
-  .hero-statement .grid { align-items: center; }
-  .statement-copy { grid-column: 1 / span 6; }
-  .statement-copy .statement { font-size: var(--text-2xl); }
-  .statement-still { grid-column: 8 / -1; aspect-ratio: 4 / 5; max-height: 72svh; justify-self: stretch; min-height: 0; }
+  .hero-scene { padding-top: calc(var(--header-h) + var(--space-5)); padding-bottom: var(--space-6); }
+  .hero-grid { grid-template-rows: minmax(26rem, 1fr); }
+  .hero-frame { grid-column: 5 / -1; }
+  .hero-frame .frame { height: 100%; }
+  .hero-still { object-position: 42% 60%; }
+  .hero-copy { grid-column: 1 / span 6; grid-row: 1; padding-block: 0; }
+  .hero-copy .lead { margin-top: var(--space-4); }
+  .hero-copy .actions { margin-top: var(--space-5); }
+  .frame--veil .frame-veil { display: block; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(to right, var(--color-veil) 0%, var(--color-veil) 18%, rgb(73 46 33 / 0) 34%); }   /* type that crosses the frame edge sits on this */
 }
 
-/* ---------- H2 ritual ---------- */
+/* ---------- R2 the ritual ---------- */
 .ritual { background: var(--color-bg-inverse); }
-.ritual-items { display: block; }
-.scene-item { position: relative; min-height: var(--scene-h); display: flex; align-items: center; overflow: hidden; }
-.scene-item .scene-media .photo { object-position: var(--focus, 50% 50%); }
-.scene-copy { position: relative; z-index: 2; width: 100%; max-width: var(--container-max); margin-inline: auto; padding: var(--scene-centre-top) var(--page-margin) calc(var(--scene-centre-bottom) + env(safe-area-inset-bottom)); }
-@media (min-width: 64em) { .scene-copy > * { max-width: 50%; } }
-.scene-caption { font-family: var(--font-display); font-weight: 500; font-size: var(--text-2xl); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
-.scene-copy .btn-quiet { margin-top: var(--space-3); }
-.ritual-progress { display: none; }
+.ritual .scene-stage { padding-block: calc(var(--header-h) + var(--space-3)) var(--space-6); }
+.ritual-grid { row-gap: var(--space-5); }
+.ritual-head, .ritual-item { grid-column: 1 / -1; }
+.ritual-heat .frame { aspect-ratio: 1; }
+.ritual-cold .frame { width: 72%; margin-left: auto; aspect-ratio: 4 / 5; }
+.ritual-cold .frame-caption { width: 72%; margin-left: auto; }
+.ritual-rest .frame { aspect-ratio: 3 / 2; }
+@media (min-width: 64em) {
+  .ritual .scene-stage { padding-block: var(--header-h) calc(var(--space-4) * 2); }
+  .ritual-grid { align-items: start; row-gap: var(--space-5); }
+  .ritual-head { grid-column: 1 / span 7; }
+  .ritual-heat { grid-column: 1 / span 3; grid-row: 2; }
+  .ritual-cold { grid-column: 5 / span 3; grid-row: 2; margin-top: var(--space-6); }
+  .ritual-rest { grid-column: 9 / -1; grid-row: 2; }
+  .ritual-heat .frame { aspect-ratio: auto; height: min(24rem, 44svh); }
+  .ritual-cold .frame, .ritual-cold .frame-caption { width: auto; margin-left: 0; }
+  .ritual-cold .frame { aspect-ratio: auto; height: min(22rem, 42svh); }
+  .ritual-rest .frame { aspect-ratio: auto; height: min(20rem, 38svh); }
+}
 
-/* ---------- H3 entry ---------- */
+/* ---------- R3 what's inside ---------- */
+.inside-grid { row-gap: var(--space-5); }
+.inside-main, .inside-index { grid-column: 1 / -1; }
+.inside-frame { aspect-ratio: 3 / 2; margin-top: var(--space-4); }
+.preview-pic { position: absolute; inset: 0; opacity: 0; transition: opacity 400ms var(--ease-soft); }
+.preview-pic.is-active { opacity: 1; }
+.preview-pic[data-preview-pic="showers"] .photo { object-position: 30% 55%; }
+.preview-pic[data-preview-pic="relaxing-zone"] .photo { object-position: 60% 62%; }
+.preview-pic[data-preview-pic="kitchenette"] .photo { object-position: 55% 60%; }
+.preview-pic[data-preview-pic="dry-sauna"] .photo { object-position: 50% 45%; }
+.facts { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
+.facts li { display: grid; grid-template-columns: 8.5rem 1fr; align-items: baseline; gap: var(--space-3); }
+.fact-value { font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--color-text-inverse); }
+.fact-label { color: var(--color-text-muted-inverse); }
+.room-group { border-top: 1px solid var(--color-gold); }
+.room-group + .room-group { border-top: 0; }
+.room { display: block; padding-block: 0.4rem; text-decoration: none; }
+.room-name { display: block; font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--color-text-inverse); }
+.room-line { display: block; margin-top: var(--space-1); color: var(--color-text-muted-inverse); }
+@media (hover: hover) and (pointer: fine) {
+  .room-name { transition: color 250ms var(--ease-soft); }
+  .room:hover .room-name, .room:focus-visible .room-name { color: var(--color-gold); }
+}
+@media (prefers-reduced-motion: reduce) { .preview-pic, .room-name { transition: none; } }
+@media (min-width: 64em) {
+  .inside-grid { align-items: center; }
+  .inside-main { grid-column: 1 / span 5; }
+  .inside-index { grid-column: 7 / -1; display: grid; gap: var(--space-5); }
+  .inside-frame { aspect-ratio: 4 / 3; max-height: 54svh; }
+  .facts { display: flex; gap: var(--space-5); }
+  .facts li { grid-template-columns: none; gap: var(--space-1); }
+  .room-group + .room-group { border-top: 1px solid var(--color-gold); }
+}
+
+/* ---------- R4 entry ---------- */
 .entry-scene { overflow: clip; }
 .entry-pattern { position: absolute; left: 0; right: 0; top: -10%; height: 120%; background-image: url("../img/swan-pattern.svg"); pointer-events: none; }
 .entry-scene .scene-stage { z-index: 1; }
 .entry-scene [data-entry-body] { margin-top: var(--space-3); }
+.entry-inner { grid-column: 1 / -1; }
+.entry-visual { display: none; }
+@media (min-width: 64em) {
+  .entry-grid { align-items: center; }
+  .entry-inner { grid-column: 1 / span 6; }
+  .entry-visual { display: block; grid-column: 8 / -1; }
+  .entry-visual .frame { height: min(72svh, 36rem); }
+}
 
-/* ---------- H4 memberships, briefly ---------- */
+/* ---------- R5 memberships, briefly ---------- */
 .plans-scene .grid { row-gap: var(--space-5); }
 .plans-head, .plans-list { grid-column: 1 / -1; }
 .plans-head .actions { margin-top: var(--space-4); }
@@ -137,7 +194,7 @@ html.lenis, html.lenis body { height: auto; }
   .plan-cost span { display: block; }
 }
 
-/* ---------- H5 Gold ---------- */
+/* ---------- R6 Gold ---------- */
 .gold-scene { background: var(--color-bg-inverse); overflow: clip; }
 .gold-scene .grid { row-gap: var(--space-5); align-items: center; }
 .gold-swan { grid-column: 1 / -1; display: grid; place-items: center; order: -1; }
@@ -155,7 +212,8 @@ html.lenis, html.lenis body { height: auto; }
   .gold-swan .mark { height: 46svh; }
 }
 
-/* ---------- H6 opening ---------- */
+/* ---------- R7 opening: a closing band, not a full screen ---------- */
+.opening-scene, .opening-scene .scene-stage { min-height: 70svh; }
 .opening-scene .scene-stage { justify-content: center; }
 .opening-date { color: var(--color-gold); font-weight: 400; font-size: var(--text-hero); line-height: var(--leading-display); }
 .opening-scene .lead { margin-top: var(--space-4); }
@@ -164,43 +222,23 @@ html.lenis, html.lenis body { height: auto; }
    MOTION LAYOUT. Everything below only applies with html.motion (JS ran, no reduced-motion preference).
    ===================================================================================================== */
 html.motion [data-rise], html.motion [data-words] { opacity: 0; }
-html.motion [data-fade], html.motion [data-fade-row] { opacity: 0; }
-html.motion .scene-failed [data-rise], html.motion .scene-failed [data-words], html.motion .scene-failed [data-fade], html.motion .scene-failed [data-fade-row] { opacity: 1; }
+html.motion [data-fade], html.motion [data-fade-row], html.motion [data-caption] { opacity: 0; }
+html.motion .scene-failed [data-rise], html.motion .scene-failed [data-words], html.motion .scene-failed [data-fade], html.motion .scene-failed [data-fade-row], html.motion .scene-failed [data-caption] { opacity: 1; }
 
-/* pinned scenes: exactly one screen tall, the extra scroll length is ScrollTrigger's pin spacing */
+/* pinned scenes (kept for The spa room walk; Home has none): exactly one screen tall, the extra scroll length is ScrollTrigger's pin spacing */
 html.motion .scene--pin { height: var(--scene-h); min-height: 0; overflow: hidden; }
 html.motion .scene--pin > .scene-stage { position: absolute; inset: 0; min-height: 0; }
 
-/* H1 */
-html.motion .hero-stage { position: absolute; inset: 0; min-height: 0; }
-html.motion .hero-zoom { animation: hero-in 1400ms var(--ease-soft) both; }
-@keyframes hero-in { from { opacity: 0; } }
-html.motion .hero-pause { display: inline-flex; position: absolute; z-index: 2; right: var(--page-margin); bottom: calc(var(--space-4) + env(safe-area-inset-bottom)); min-width: 2.75rem; justify-content: center; }
-html.motion .hero-steam {
-  display: block; position: absolute; inset: 0 -8%; background: var(--steam) center / cover no-repeat; mix-blend-mode: screen;
-  opacity: 0.18; pointer-events: none;
-}
-@media (min-width: 64em) { html.motion .hero-steam { opacity: 0.28; } }
-html.motion .hero-statement {
-  position: absolute; inset: 0; z-index: 2; min-height: 0; display: block; padding: 0; pointer-events: none;
-}
-html.motion .hero-statement .grid {
-  position: absolute; inset: 0; margin-inline: auto; align-items: start; align-content: center; row-gap: 0;
-  padding: var(--scene-centre-top) var(--page-margin) calc(var(--scene-centre-bottom) + env(safe-area-inset-bottom));
-  grid-template-rows: 40svh auto;
-}
-html.motion .hero-statement .hero-window-target { display: block; grid-column: 1 / -1; grid-row: 1; align-self: stretch; visibility: hidden; }
-html.motion .hero-statement .statement-copy { grid-column: 1 / -1; grid-row: 2; margin-top: var(--space-4); opacity: 0; }
-html.motion .statement-still { display: none; }
-html.motion .statement-copy .statement { font-size: var(--text-xl); }
-@media (max-width: 63.99em) { html.motion .statement-copy p { display: none; } }
-@media (min-width: 64em) {
-  html.motion .hero-statement .grid { align-items: stretch; align-content: stretch; grid-template-rows: minmax(0, 1fr); }
-  html.motion .hero-statement .hero-window-target { grid-column: 8 / -1; align-self: center; height: calc(100% - var(--space-4) * 2); }
-  html.motion .hero-statement .statement-copy { grid-column: 1 / span 6; grid-row: 1; align-self: center; margin-top: 0; }
-  html.motion .statement-copy .statement { font-size: var(--text-2xl); }
-}
-html.motion .hero-stage .glow, html.motion .gold-scene .glow { z-index: 1; }
+/* the lights come up as you arrive: the tint is espresso at 0.14 at rest, 0.3 before the image settles */
+html.motion .frame-tint { background: var(--color-espresso); opacity: 0.14; }
+
+/* R1: the frame fades in from espresso while the picture settles (CSS, so the first image never waits for scripts) */
+html.motion .hero-scene .frame { animation: frame-in 1200ms var(--ease-soft) backwards; }
+html.motion .hero-scene .frame-media { animation: media-in 1600ms var(--ease-soft) backwards; }
+@keyframes frame-in { from { opacity: 0; } }
+@keyframes media-in { from { transform: scale(1.04); } }
+html.motion .hero-pause { display: inline-flex; position: absolute; z-index: 2; right: var(--page-margin); bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); min-width: 2.75rem; justify-content: center; }
+html.motion .hero-scene .glow, html.motion .gold-scene .glow { z-index: 1; }
 
 @media (hover: hover) and (pointer: fine) {
   html.motion .glow {
@@ -209,30 +247,24 @@ html.motion .hero-stage .glow, html.motion .gold-scene .glow { z-index: 1; }
   }
 }
 
-/* H2 */
-html.motion .ritual-items { position: absolute; inset: 0; }
-html.motion .scene-item { position: absolute; inset: 0; min-height: 0; }
-html.motion .ritual-progress {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); position: absolute; z-index: 3;
-  left: var(--page-margin); right: var(--page-margin); bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
-}
-html.motion .ritual-progress i { display: block; height: 1px; background: var(--color-hairline-inverse); }
-html.motion .ritual-progress b { display: block; height: 1px; background: var(--color-gold); transform: scaleX(0); transform-origin: left; }
+/* the thread (desktop only): a hairline in the left margin that draws down the page, scene by scene */
 @media (min-width: 64em) {
-  html.motion .ritual-progress { left: auto; width: 22rem; right: var(--page-margin); bottom: var(--space-6); }
+  html.motion .thread {
+    display: block; position: absolute; z-index: 0; top: 0; bottom: 0; width: 1px; background: var(--color-thread);
+    left: calc(max(0px, (100vw - var(--container-max)) / 2) + var(--page-margin) / 2);
+    transform: scaleY(0); transform-origin: 50% 0; pointer-events: none;
+  }
+  html.motion .plans-scene .thread { background: var(--color-thread-light); }
+  html.motion .hero-scene .thread { top: 60%; }
+  html.motion .thread--half { bottom: 50%; }
 }
 
-/* H3, H5 */
-html.motion .scene--pin.gold-scene > .scene-stage { justify-content: center; }
+/* H5 */
 html.motion .mark-draw .mark-fill { opacity: 0; }
 html.motion .mark-draw .mark-line { display: block; }
 
 /* will-change only where it moves, and only under motion */
-html.motion .hero-zoom, html.motion .scene-item .scene-media { will-change: transform; }
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-zoom { animation: none; }
-}
+html.motion .frame-media, html.motion [data-depth] { will-change: transform; }
 
 /* Phone fit (375x667): the two form-like scenes use a tighter header clearance so each stays one screen. */
 @media (max-width: 47.99em) {

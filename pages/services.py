@@ -9,6 +9,8 @@ from plans.models import OpeningRule, Plan, SiteSettings
 # Facility slug -> optimised render name (content/static/content/img). The new renders are not here yet:
 # those facilities show a placeholder until a file is uploaded on the Facility in Control.
 FACILITY_IMAGES = {"dry-sauna": "dry-sauna", "relaxing-zone": "relaxing-zone", "gym": "gym"}
+# Home "What's inside" preview: the render shown for a room (IMMERSIVE-R2 section 3, R3). Rooms not listed keep the current picture.
+HOME_PREVIEW_IMAGES = {"dry-sauna": "dry-sauna", "showers": "showers", "relaxing-zone": "relax-loungers", "gym": "gym", "kitchenette": "lounge"}
 
 
 def split_label(label):
@@ -51,6 +53,16 @@ def hours_summary():
     if len(periods) >= 2:
         return f"Open {periods[0][0]} to {periods[-1][1]}"
     return f"Open {periods[0][0]} to {periods[0][1]}" if periods else ""
+
+
+def hours_facts():
+    """The two numbers Home shows, from the open periods: {'range': '5am to 3am', 'hours': 22}. None when no period is set."""
+    periods = [r for r in OpeningRule.objects.filter(active=True, kind=OpeningRule.PERIOD) if r.start_time and r.end_time]
+    if not periods:
+        return None
+    minutes = sum(((r.end_time.hour * 60 + r.end_time.minute) - (r.start_time.hour * 60 + r.start_time.minute)) % 1440 or 1440
+                  for r in periods)
+    return {"range": f"{_clock(periods[0].start_time)} to {_clock(periods[-1].end_time)}", "hours": round(minutes / 60)}
 
 
 # ---------- greeting ----------
@@ -182,6 +194,15 @@ def facility_cards():
             "image_name": FACILITY_IMAGES.get(f.slug, ""),
             "alt": f.image_alt or f.name,
         }
+        for f in plan_services.visible_facilities()
+    ]
+
+
+def room_index():
+    """All visible rooms for Home: name, one line, anchor slug, and the render to preview (an uploaded image wins)."""
+    return [
+        {"slug": f.slug, "name": f.name, "line": f.short_line, "image": f.image if f.image else None,
+         "preview": HOME_PREVIEW_IMAGES.get(f.slug, "") if images.has_image(HOME_PREVIEW_IMAGES.get(f.slug, "")) else ""}
         for f in plan_services.visible_facilities()
     ]
 

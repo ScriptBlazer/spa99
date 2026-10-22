@@ -66,6 +66,26 @@ class PageTests(TestCase):
         self.assertIn("&pound;399", html)
         self.assertIn("&pound;478.80 inc VAT", html)
 
+    def test_home_whats_inside_uses_data_and_hides_the_capacity_line_until_filled(self):
+        from content.models import Section
+
+        html = self.client.get("/").content.decode()
+        self.assertIn("5am to 3am", html)
+        self.assertIn(">22<", html)  # hours a day from the open periods
+        for name in ["Dry sauna", "Kitchenette"]:
+            self.assertIn(name, html)
+        self.assertIn('href="/the-spa/#showers"', html)
+        self.assertNotIn("guests at most", html)
+        Section.objects.filter(page__key="home", key="facts_capacity_label").update(body="guests at most, at any time")
+        html = self.client.get("/").content.decode()
+        self.assertIn("guests at most, at any time", html)
+        self.assertIn(">25<", html)
+
+    def test_home_preloads_the_arrival_render_and_runs_no_smooth_scroll(self):
+        html = self.client.get("/").content.decode()
+        self.assertRegex(html, r'rel="preload"[^>]*fetchpriority="high"[^>]*arrival-')
+        self.assertIn('data-smooth="off"', html)
+
     def test_memberships_show_ex_and_inc_vat_and_hide_hidden_plans(self):
         html = self.client.get("/memberships/").content.decode()
         for needle in ["Tier 1", "Tier 2", "Tier 3", "Single visit", "Recommended", "&pound;299", "&pound;358.80 inc VAT", "Prices exclude VAT at 20%"]:

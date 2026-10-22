@@ -106,6 +106,13 @@
   --duration-line: 1100ms;
   --stagger-line: 80ms;
   --duration-page: 480ms;
+  /* Home round 2 (docs/design/IMMERSIVE-R2.md section 7). Derived, decoration only. */
+  --color-frame-tint: rgb(73 46 33 / 0.14);    /* resting tint inside every frame on dark scenes */
+  --color-thread: rgb(229 172 110 / 0.45);     /* the thread (gold) on espresso */
+  --color-thread-light: rgb(187 136 85 / 0.6); /* the thread (caramel) on cream */
+  --frame-gap: var(--space-6);                 /* minimum espresso between two frames */
+  /* Distance from the content edge to the screen edge: how far an edge-bleed frame runs out (also past the 1440 container). */
+  --bleed: calc(var(--page-margin) + max(0px, (100vw - var(--container-max)) / 2));
 }
 
 /* Marketing pages are one type step smaller (IMMERSIVE section 0). Scoped here because the same tokens set the headings of the journey,

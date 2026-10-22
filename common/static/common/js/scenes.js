@@ -8,8 +8,10 @@
  *    page (part 2: spa, memberships, gold, book, visit), add a function to SCENES below and the data-scene to the markup.
  *    A scene that throws is marked .scene-failed and shows its static content.
  *  - Only transform and opacity animate (plus SVG stroke drawing). Scroll-driven tweens use ease "none" (the scroll is the easing).
- *  - Markup hooks: data-rise (line rise), data-fade (fade up), data-fade-row (fade up as a group), data-words (word light),
- *    data-count (small whole numbers), data-glow (pointer light), .scene-item / data-label (pinned sequences).
+ *  - Home (docs/design/IMMERSIVE-R2.md) has no pins: frames settle (1.06 to 1), drift at different speeds (data-depth), a thread draws
+ *    down the margin. pinnedScene() stays for The spa room walk.
+ *  - Markup hooks: data-rise (line rise), data-fade (fade up), data-fade-row (fade up as a group), data-caption (fade up, one each),
+ *    data-count (small whole numbers), data-glow (pointer light), data-frame (settle), data-depth (drift).
  */
 const { gsap, ScrollTrigger, SplitText, DrawSVGPlugin, CustomEase } = window;
 const root = document.documentElement;
@@ -40,18 +42,39 @@ function splitLines(el) {
   return SplitText.create(el, { type: 'lines', mask: 'lines', linesClass: 'line' });
 }
 
-/** Word light: words go from 0.15 to 1 opacity across a span of the pinned timeline. */
-function wordLight(el, tl, at, span) {
-  gsap.set(el, { opacity: 1 });
-  const split = SplitText.create(el, { type: 'words' });
-  tl.fromTo(split.words, { opacity: 0.15 }, { opacity: 1, ease: 'none', stagger: span / split.words.length, duration: span / 4 }, at);
-}
-
 /** Fade up (opacity 0 to 1, 16px, 0.9s) once when `trigger` enters. */
 function fadeUp(targets, { trigger, start = 'top 80%', delay = 0, stagger = 0 } = {}) {
   const items = gsap.utils.toArray(targets);
   if (!items.length) return;
   gsap.fromTo(items, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.9, delay, stagger, scrollTrigger: { trigger: trigger || items[0], start, once: true } });
+}
+
+/** Settle: the picture arrives (scale 1.06 to 1) and the lights come up (tint 0.3 to 0.14), from the frame entering to its centre. */
+function settle(frame, scrub) {
+  const media = frame.querySelector('.frame-media'), tint = frame.querySelector('.frame-tint');
+  gsap.timeline({ defaults: { ease: 'none' }, scrollTrigger: { trigger: frame, start: 'top bottom', end: 'center center', scrub } })
+    .fromTo(media, { scale: 1.06 }, { scale: 1 }, 0)
+    .fromTo(tint, { opacity: 0.3 }, { opacity: 0.14 }, 0);
+}
+
+/** Depth: a frame drifts against the page at its own speed (data-depth, percent of its height). Never on text. */
+function depth(el, scrub) {
+  const amount = parseFloat(el.dataset.depth);
+  gsap.fromTo(el, { yPercent: amount }, { yPercent: -amount, ease: 'none', scrollTrigger: { trigger: el.closest('.scene'), start: 'top bottom', end: 'bottom top', scrub } });
+}
+
+/** Thread (desktop): the hairline in the left margin draws down as the scene passes. */
+function thread(scene, scrub, { start = 'top 60%', end = 'bottom 60%' } = {}) {
+  const line = scene.querySelector('.thread');
+  if (line) gsap.fromTo(line, { scaleY: 0 }, { scaleY: 1, ease: 'none', transformOrigin: '50% 0', scrollTrigger: { trigger: scene, start, end, scrub } });
+}
+
+/** What every Home scene shares: its frames settle and drift, the thread draws (desktop). */
+function frames(el, { desktop }) {
+  const scrub = desktop ? 0.4 : 0.3;
+  el.querySelectorAll('[data-frame]').forEach((f) => settle(f, scrub));
+  el.querySelectorAll('[data-depth]').forEach((f) => depth(f, scrub));
+  if (desktop) thread(el, scrub);
 }
 
 /** A pinned scene whose timeline is scrubbed. The section is pinned; .scene-stage fills it (CSS). */
@@ -64,35 +87,6 @@ function pinnedScene(el, { segments, perSegment = 1, snap = false, scrub = 0.8 }
       snap: snap ? { snapTo: 'labelsDirectional', duration: { min: 0.3, max: 0.8 }, delay: 0.08, ease: 'power1.inOut' } : false,
     },
   });
-}
-
-/** Window (8.6): the full-bleed frame shrinks into `target`, the media inside is counter-scaled so it is a pure crop (transforms only).
- *  `focus` keeps that point of the media centred in the shrinking frame. */
-function windowTo(frame, media, target, tl, at, span, focus = { x: 0.5, y: 0.5 }) {
-  const p = { v: 0 };
-  const setF = gsap.quickSetter(frame, 'css'), setM = gsap.quickSetter(media, 'css');
-  let m;
-  const measure = () => {
-    gsap.set([frame, media], { clearProps: 'transform' });
-    const a = frame.getBoundingClientRect(), b = target.getBoundingClientRect();
-    m = { sx: b.width / a.width, sy: b.height / a.height, x: b.left - a.left, y: b.top - a.top, w: a.width, h: a.height };
-  };
-  const apply = () => {
-    if (!m) return;
-    const v = p.v, sx = 1 + (m.sx - 1) * v, sy = 1 + (m.sy - 1) * v;
-    const fx = 0.5 + (focus.x - 0.5) * v, fy = 0.5 + (focus.y - 0.5) * v;
-    const tx = Math.min(0, Math.max(m.w * sx - m.w, (m.w * sx) / 2 - fx * m.w));
-    const ty = Math.min(0, Math.max(m.h * sy - m.h, (m.h * sy) / 2 - fy * m.h));
-    setF({ x: m.x * v, y: m.y * v, scaleX: sx, scaleY: sy, transformOrigin: '0 0' });
-    setM({ x: tx / sx, y: ty / sy, scaleX: 1 / sx, scaleY: 1 / sy, transformOrigin: '0 0' });
-  };
-  const onInit = () => measure();
-  const onRefresh = () => apply();
-  ScrollTrigger.addEventListener('refreshInit', onInit);
-  ScrollTrigger.addEventListener('refresh', onRefresh);
-  cleanups.push(() => { ScrollTrigger.removeEventListener('refreshInit', onInit); ScrollTrigger.removeEventListener('refresh', onRefresh); });
-  measure();
-  tl.to(p, { v: 1, duration: span, ease: 'none', onUpdate: apply }, at);
 }
 
 /** Draw (8.7): outline paths draw (DrawSVG), the gold fill fades in, the outline fades out. T is the total length in timeline units. */
@@ -185,32 +179,23 @@ function startLenis() {
 
 /* ---------- scenes ---------- */
 
-/** H1 Arrival: load reveal, then the window shrinks, the statement lights word by word. Living still until a video exists (8.11). */
+/** R1 Arrival: the frame fades in (CSS), the heading rises, the picture lags the page as the hero leaves. Living still until a video exists. */
 SCENES.hero = (el, { desktop }) => {
   const q = (s) => el.querySelector(s);
-  const tl = pinnedScene(el, { segments: 2, perSegment: desktop ? 0.9 : 0.7, scrub: desktop ? 0.8 : 0.5 });
-  tl.to({}, { duration: 1 }, 0);
-
-  // on load
+  const scrub = desktop ? 0.4 : 0.3;
   lineRise(q('.hero-title'), { trigger: false, delay: 0.2 });
   gsap.fromTo(el.querySelectorAll('.hero-copy [data-fade]'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.9, delay: 0.5 });
 
-  // on scroll
-  tl.to([q('[data-hero-copy]'), q('[data-hero-pause]')], { autoAlpha: 0, y: -32, duration: 0.3 }, 0)
-    .to(q('.hero-stage .veil'), { opacity: 0.4, duration: 0.3 }, 0)
-    .to(q('.hero-stage .veil'), { opacity: 0, duration: 0.45 }, 0.3)
-    .fromTo(q('.hero-zoom'), { scale: 1 }, { scale: 1.08, duration: 0.75 }, 0);
-  windowTo(q('.window'), q('.window-media'), q('[data-window-target]'), tl, 0, 0.75, { x: 0.62, y: 0.5 });
-  const statement = q('[data-statement]');
-  tl.fromTo(statement, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.05 }, 0.35);
-  wordLight(q('[data-words]'), tl, 0.35, 0.5);
-  if (desktop) tl.fromTo(statement.querySelector('[data-fade]'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.2 }, 0.8);
+  // leaving: the picture lags inside its frame, the tint deepens. Text does not move.
+  const media = q('.frame-media');
+  const leave = { trigger: el, start: 'top top', end: 'bottom top', scrub };
+  gsap.fromTo(media, { yPercent: 0 }, { yPercent: 6, ease: 'none', scrollTrigger: leave });
+  gsap.fromTo(q('.frame-tint'), { opacity: 0.14 }, { opacity: 0.35, ease: 'none', scrollTrigger: leave });
+  if (desktop) thread(el, scrub, { start: 'top top' });
 
-  // the living still and the steam loop (one cycle per 48s and 60s), the optional video, and the Pause control
-  const loops = [];
-  const wrap = q('.hero-still-wrap'), steam = q('.hero-steam'), zoom = q('.hero-zoom');
-  loops.push(gsap.to(wrap, { scale: 1.06, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' }));
-  if (steam) loops.push(gsap.fromTo(steam, { xPercent: -6 }, { xPercent: 6, duration: 30, yoyo: true, repeat: -1, ease: 'sine.inOut' }));
+  // the living still (one cycle per 48s), the optional video, and the Pause control
+  const still = q('.hero-still-wrap');
+  const loops = [gsap.to(still, { scale: 1.03, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' })];
   const video = q('.hero-video');
   const button = q('[data-hero-pause]');
   let userPaused = sessionStorage.getItem('spa99-hero-paused') === '1', inView = true, playing = false;
@@ -224,14 +209,14 @@ SCENES.hero = (el, { desktop }) => {
   label();
   document.addEventListener('visibilitychange', sync);
   cleanups.push(() => document.removeEventListener('visibilitychange', sync));
-  ScrollTrigger.create({ start: 0, end: () => tl.scrollTrigger.end, onToggle: (self) => { inView = self.isActive; sync(); } });
+  ScrollTrigger.create({ trigger: el, start: 'top bottom', end: 'bottom top', onToggle: (self) => { inView = self.isActive; sync(); } });
   sync();
 
   const loadVideo = () => {
     if (!video?.dataset.sources || navigator.connection?.saveData) return;
     const pick = JSON.parse(video.dataset.sources).find((s) => matchMedia(s.media).matches && video.canPlayType(s.type));
     if (!pick) return;
-    video.addEventListener('playing', () => { playing = true; video.classList.add('is-playing'); zoom.classList.add('has-video'); sync(); }, { once: true });
+    video.addEventListener('playing', () => { playing = true; video.classList.add('is-playing'); media.classList.add('has-video'); sync(); }, { once: true });
     video.src = pick.src;
     video.play().catch(() => {});
   };
@@ -239,60 +224,52 @@ SCENES.hero = (el, { desktop }) => {
   if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle, { once: true });
 };
 
-/** H2 The ritual: heat, cold, rest. Cross-fade, settle, caption swap and a three-segment hairline, all on one pinned timeline. */
+/** R2 The ritual: heading rises; three rooms settle and drift at their own speeds; captions follow as a progression. No pin, no snap. */
 SCENES.ritual = (el, { desktop }) => {
-  const items = gsap.utils.toArray('.scene-item', el);
-  const bars = gsap.utils.toArray('.ritual-progress b', el);
-  const tl = pinnedScene(el, { segments: items.length, perSegment: 1, scrub: desktop ? 0.8 : 0.5, snap: desktop });
-  gsap.set(items.slice(1), { autoAlpha: 0 });
-  items.forEach((item, i) => {
-    const last = i === items.length - 1;
-    const split = splitLines(item.querySelector('.scene-caption'));
-    tl.addLabel(item.dataset.label, i);
-    if (i > 0) tl.to(item, { autoAlpha: 1, duration: 0.35 }, i - 0.35).set(items[i - 1], { autoAlpha: 0 }, i);
-    tl.fromTo(item.querySelector('.scene-media'), { scale: 1.12 }, { scale: 1, duration: 1 }, Math.max(0, i - 0.35));
-    if (bars[i]) tl.fromTo(bars[i], { scaleX: 0 }, { scaleX: 1, duration: 1 }, Math.max(0, i - 0.35));
-    if (i === 0) {
-      gsap.from(split.lines, { yPercent: 105, stagger: 0.08, scrollTrigger: { trigger: el, start: 'top 70%', once: true } });
-    } else {
-      tl.fromTo(split.lines, { yPercent: 105 }, { yPercent: 0, duration: 0.3 }, i - 0.3);
-    }
-    if (!last) tl.to(split.lines, { yPercent: -105, duration: 0.2 }, i + 0.45);
-    const link = item.querySelector('.btn-quiet');
-    if (link) tl.fromTo(link, { opacity: 0 }, { opacity: 1, duration: 0.35 }, i - 0.35);
-  });
-  tl.to({}, { duration: 0.35 });
-  const onLoad = () => ScrollTrigger.refresh();
-  if (document.readyState !== 'complete') window.addEventListener('load', onLoad, { once: true });
+  lineRise(el.querySelector('[data-rise]'));
+  frames(el, { desktop });
+  el.querySelectorAll('[data-caption]').forEach((c, i) => fadeUp(c, { trigger: c, start: 'top 88%', delay: desktop ? i * 0.1 : 0 }));
 };
 
-/** H3 Find your membership: heading rises, the group follows, the swan pattern drifts like steam. */
-SCENES.entry = (el) => {
+/** R3 What's inside: heading, the preview frame, facts that count once, the room index as one group. */
+SCENES.inside = (el, { desktop }) => {
+  lineRise(el.querySelector('[data-rise]'));
+  frames(el, { desktop });
+  fadeUp(el.querySelectorAll('[data-fade-row]'), { trigger: el.querySelector('.inside-index'), start: 'top 85%' });
+  el.querySelectorAll('[data-count]').forEach(count);
+};
+
+/** R4 Find your membership: heading rises, the group follows, the lounge settles and drifts, the swan pattern drifts like steam. */
+SCENES.entry = (el, { desktop }) => {
   const h = el.querySelector('[data-rise]');
   lineRise(h);
   fadeUp(el.querySelector('[data-fade]'), { trigger: h, start: 'top 70%' });
+  frames(el, { desktop });
+  el.querySelectorAll('[data-caption]').forEach((c) => fadeUp(c, { trigger: c, start: 'top 88%' }));
   gsap.to(el.querySelector('[data-pattern]'), { yPercent: -8, ease: 'none', scrollTrigger: { trigger: el, start: 'top bottom', end: 'bottom top', scrub: true } });
 };
 
-/** H4 Memberships, briefly: heading, rows as a progression (stagger on desktop), small numbers count. */
+/** R5 Memberships, briefly: heading, rows as one group, small numbers count; the thread continues in caramel. */
 SCENES.plans = (el, { desktop }) => {
   lineRise(el.querySelector('[data-rise]'));
   fadeUp(el.querySelectorAll('.plans-head [data-fade]'), { trigger: el.querySelector('.plans-head') });
   fadeUp(el.querySelectorAll('[data-fade-row]'), { trigger: el.querySelector('.plans-list'), start: 'top 85%', stagger: desktop ? 0.1 : 0 });
   el.querySelectorAll('[data-count]').forEach(count);
+  if (desktop) thread(el, 0.4);
 };
 
-/** H5 The Gold Card: the swan draws itself across the pin, then the words. */
+/** R6 The Gold Card: the thread arrives at the centre line and the swan draws itself once (2.4s), then the words. Not pinned. */
 SCENES.gold = (el, { desktop }) => {
-  const tl = pinnedScene(el, { segments: 2, perSegment: desktop ? 0.6 : 0.4, scrub: desktop ? 0.8 : 0.5 });
-  tl.to({}, { duration: 1 }, 0);
-  drawSwan(el.querySelector('.mark-draw'), tl, 0, 0.9);
+  if (desktop) thread(el, 0.4, { start: 'top 90%', end: 'top 55%' });
+  const tl = gsap.timeline({ paused: true });
+  drawSwan(el.querySelector('.mark-draw'), tl, 0, 2.4, 'soft');
   const split = splitLines(el.querySelector('[data-rise]'));
-  tl.fromTo(split.lines, { yPercent: 105 }, { yPercent: 0, duration: 0.25 }, 0.5)
-    .fromTo(el.querySelectorAll('[data-fade]'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.2 }, 0.7);
+  tl.fromTo(split.lines, { yPercent: 105 }, { yPercent: 0, duration: 1.1, stagger: 0.08 }, 0.6)
+    .fromTo(el.querySelectorAll('[data-fade]'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.9 }, 1.2);
+  ScrollTrigger.create({ trigger: el, start: 'top 55%', once: true, onEnter: () => tl.play() });
 };
 
-/** H6 Opening: the quiet end of the visit. */
+/** R7 Opening: the quiet end of the visit. */
 SCENES.opening = (el) => {
   const h = el.querySelector('[data-rise]');
   lineRise(h);

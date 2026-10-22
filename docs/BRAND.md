@@ -77,17 +77,17 @@ Shared everywhere:
 
 ### 7A. Immersive (marketing pages)
 
-- **Every section is one screen** (`100svh`), complete on its own at 375×667 and 1440×800. Longer only when the scene is deliberately pinned and something changes for the whole pin.
-- **Scroll drives the story.** Pinned scenes scrub image settle (scale 1.12 → 1), cross-fades between rooms, windows and doors (counter-scaled masks), and word-by-word light on one statement per page. Scrub smoothing 0.8 desktop, 0.5 phone. Gentle snapping to scene labels on desktop only.
+- **Every section fits one screen on desktop** (`100svh`), complete on its own at 1440×800. On phone, a scene read in normal scroll (no pin) may run to two screens; nothing inside it may depend on a pin.
+- **Scroll drives the story, with no pins on Home:** image settle (scale 1.06 → 1), depth between image layers, the thread. Pins only where a whole sequence changes in place (The spa room walk). Scrub 0.4 desktop, 0.3 phone. No snapping on Home.
 - **Headings rise line by line** from a mask (1.1s, 0.08s between lines), once. Body and actions fade up after them (0.9s, 16px).
-- **The swan draws itself** (stroke, then the gold fill) on the Gold Card, Book and the Home Gold scene. Nowhere else.
+- **The swan draws itself** (stroke, then the gold fill) on the Gold Card, Book and the Home Gold scene. Nowhere else. On Home the draw is time-based on enter (2.4s), not scrubbed.
 - **Numbers count** only when they are small whole numbers that matter (visits a month, days ahead): 1.2s, once. Prices never animate.
 - **Pointer light**: a soft gold glow follows the pointer on dark scenes, desktop with a fine pointer only.
 - **Hero**: a looping muted video (6-10s, warm water, steam or light), or a living still (a 48s scale cycle and drifting steam) until the video exists. Always with a Pause control. Video loads after the page, never on Save-Data.
 - **Text on photographs and video** is allowed on marketing scenes, always on the solid part of the legibility veil (`--color-veil`). Text groups sit vertically centred and left aligned, not at the bottom of the screen (IMMERSIVE section 0).
 - **Header** overlays the first dark scene, turns solid after 64px, hides on scroll down and returns on scroll up.
 - **Page changes** cross-fade (View Transitions, opacity only, 240ms out, 480ms in); the header stays put.
-- **Smooth scrolling** (Lenis) only on desktop with a fine pointer, never on touch.
+- **Smooth scrolling is off** (flag `data-smooth` on `<html>`, code kept for later).
 - **Loops** slower than one cycle per 15s, paused when off screen or the tab is hidden.
 - **Budget:** at most 75 KB gzip of motion JS on marketing pages, 60fps on a mid phone, LCP ≤ 2.5s (the hero poster).
 - **Reduced motion** (and no JS): the static layout. Every scene a normal one-screen section, everything visible, final numbers, filled swans, poster instead of video, no pins, scrub, Lenis, glow, page transitions or steam; header always solid.
@@ -234,6 +234,12 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --duration-line: 1100ms;                     /* derived: line rise */
   --stagger-line: 80ms;                        /* derived: between lines of one heading */
   --duration-page: 480ms;                      /* derived: page transition in (out is 240ms) */
+  /* Home round 2 (docs/design/IMMERSIVE-R2.md section 7). Derived, decoration only. */
+  --color-frame-tint: rgb(73 46 33 / 0.14);    /* derived: resting tint inside every frame on dark scenes */
+  --color-thread: rgb(229 172 110 / 0.45);     /* derived: the thread (gold) on espresso */
+  --color-thread-light: rgb(187 136 85 / 0.6); /* derived: the thread (caramel) on cream */
+  --frame-gap: var(--space-6);                 /* derived: minimum espresso between two frames */
+  --bleed: calc(var(--page-margin) + max(0px, (100vw - var(--container-max)) / 2)); /* derived: content edge to screen edge, for edge-bleed frames */
 }
 
 @media (min-width: 48em) {
@@ -260,6 +266,6 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
 
 **Marketing type scale** (one step down, IMMERSIVE section 0): under `html[data-page="marketing"]` in `tokens.css`, `--text-2xl: clamp(2rem, 2.5vw + 1rem, 3rem)` (32px phone, 48px desktop) and `--text-hero: clamp(2.75rem, 5vw + 1rem, 6rem)` (44px phone, about 88px at 1440). The journey, forms, account and legal pages keep the larger scale above.
 
-**Immersive tokens** (`--color-veil`, `--color-header-solid`, `--color-glow`, `--scene-h`, `--scene-pad-top`, `--scene-centre-top`, `--scene-centre-bottom`, `--color-veil-soft`, `--duration-line`, `--stagger-line`, `--duration-page`) are derived and now live in `tokens.css`. Values and contrast: `docs/design/IMMERSIVE.md` section 12.
+**Immersive tokens** (`--color-veil`, `--color-header-solid`, `--color-glow`, `--scene-h`, `--scene-pad-top`, `--scene-centre-top`, `--scene-centre-bottom`, `--color-veil-soft`, `--duration-line`, `--stagger-line`, `--duration-page`, `--color-frame-tint`, `--color-thread`, `--color-thread-light`, `--frame-gap`, `--bleed`) are derived and now live in `tokens.css`. Values and contrast: `docs/design/IMMERSIVE.md` section 12.
 
 The designer refines these per task. Frontend uses only tokens, never raw values. Breakpoints are constants (CSS variables can't be used in media queries): `48em` (tablet) and `64em` (desktop).
