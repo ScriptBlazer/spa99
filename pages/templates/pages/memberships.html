@@ -1,65 +1,70 @@
 {% extends "base.html" %}
 {% load static content_tags pages_tags %}
-{# Memberships (docs/design/MEMBERSHIPS-PAGE.md). Cream page (Moishe, 2026-10-22), selected column flips to espresso, Continue bar is espresso (on-dark). SWITCHES: page colour = body_class "on-light" below ("on-dark" needs the old selected state back); preselect = the `highlight` plan in plans/services (selected_plan_slug), or clear it by passing selected_slug="" from the view. #}
+{# Memberships round 2 (docs/design/MEMBERSHIPS-R2.md): slim key cards, tag column with the choice and Continue. Cream page (Moishe, 2026-10-22), selected card is espresso with a gold hairline. Sheen = the .tier-sheen span (delete it, or `.tier-sheen{display:none}`, to remove). SWITCHES: preselect = the `highlight` plan in plans/services (selected_plan_slug), or clear it by passing selected_slug="" from the view. #}
 {% block html_attrs %} data-page="marketing"{% endblock %}
 {% block body_class %}page-mem on-light{% endblock %}
 {% block header_mode %}solid{% endblock %}
 {% block main %}
 {% page_content "memberships" as m %}
 
-<section class="mem-intro" aria-labelledby="m-title">
-  <div class="container mem-intro-inner">
-    <div class="mem-intro-text">
+<form class="mem-stage" method="get" action="{% url 'register' %}" data-mem-form data-empty-text="Choose a membership">
+  <div class="container mem-grid">
+    <div class="mem-top">
       <h1 id="m-title" class="mem-title line-mask"><span class="mem-title-line">{{ m.intro.heading }}</span></h1>
       <p class="lead mem-fade">{{ m.intro.body }}</p>
+      <p class="mem-fade mem-notsure"><a class="btn-quiet" href="{% url 'journey' %}">{{ m.not_sure.heading }} {{ m.not_sure.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a></p>
     </div>
-    <p class="mem-fade mem-notsure"><a class="btn-quiet" href="{% url 'journey' %}">{{ m.not_sure.heading }} {{ m.not_sure.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a></p>
-  </div>
-</section>
 
-<div class="container">
-  <form class="tier-form" method="get" action="{% url 'register' %}" data-mem-form data-empty-text="Choose a membership" data-reveal>
-    <fieldset class="tiers">
+    <fieldset class="tiers" data-reveal>
       <legend class="sr-only">Choose your membership</legend>
       {% for t in tiers %}
       <label class="tier">
-        <input type="radio" name="plan" value="{{ t.slug }}"{% if t.slug == selected_slug %} checked{% endif %} aria-labelledby="tn-{{ t.slug }}" aria-describedby="tp-{{ t.slug }} tf-{{ t.slug }}" data-name="{{ t.name }}" data-price="&pound;{{ t.price_whole }} {{ t.period }}, ex VAT" data-inc="&pound;{{ t.price_inc }} inc VAT">
-        <span class="tier-media">{% photo t.render alt=t.image_alt sizes="(min-width: 64em) 30vw, 6rem" override=t.image %}</span>
-        <span class="tier-top">
-          <span class="tier-head"><span class="tier-mark" aria-hidden="true"></span><span class="tier-name" id="tn-{{ t.slug }}">{{ t.name }}</span></span>
-          {% if t.highlight %}<span class="label tier-rec">{{ m.recommended_label.heading }}</span>{% endif %}
+        <span class="tier-shadow" aria-hidden="true"></span>
+        <input type="radio" name="plan" value="{{ t.slug }}"{% if t.slug == selected_slug %} checked{% endif %} aria-labelledby="tn-{{ t.slug }}" aria-describedby="tf-{{ t.slug }} tp-{{ t.slug }}" data-name="{{ t.name }}" data-price="&pound;{{ t.price_whole }} {{ t.period }}, ex VAT" data-inc="&pound;{{ t.price_inc }} inc VAT">
+        <span class="tier-media">{% photo t.render alt=t.image_alt sizes="(min-width: 64em) 22vw, (min-width: 48em) 30rem, 92vw" override=t.image %}</span>
+        <span class="tier-head">
+          <span class="tier-name" id="tn-{{ t.slug }}">{{ t.name }}</span>
+          <span class="tier-head-end">{% if t.highlight %}<span class="tier-rec">{{ m.recommended_label.heading }}</span>{% endif %}<span class="tier-mark" aria-hidden="true"></span></span>
           <span class="tier-tagline">{{ t.tagline }}</span>
         </span>
+        <span class="tier-num-row" id="tf-{{ t.slug }}">
+          {# Signika has no infinity glyph (checked 2026-10-22), so Tier 3 says "All" in the numeral style. #}
+          <span class="tier-num">{% if t.visits_count %}<span class="num" data-count>{{ t.visits_count }}</span>{% else %}All{% endif %}</span>
+          <span class="tier-num-side">{% if t.visits_count %}visit{{ t.visits_count|pluralize }}<br>a month{% else %}visits<br>you like{% endif %}</span>
+        </span>
+        <ul class="tier-list" role="list">{% for p in t.pills %}<li>{{ p }}</li>{% endfor %}</ul>
         <span class="tier-price-group" id="tp-{{ t.slug }}">
           <span class="tier-price num">&pound;{{ t.price_whole }}</span> <span class="tier-per">{{ t.period }}, ex VAT</span>
           <span class="tier-inc num">&pound;{{ t.price_inc }} inc VAT</span>
         </span>
-        <span class="tier-facts" id="tf-{{ t.slug }}">
-          <span class="tier-visits">{% if t.visits_count %}<span class="num" data-count>{{ t.visits_count }}</span> visit{{ t.visits_count|pluralize }} a month{% else %}Unlimited visits{% endif %}</span>
-          <span class="pills">{% for p in t.pills %}<span class="pill pill--quiet">{{ p }}</span>{% endfor %}</span>
-        </span>
+        <span class="tier-sheen" aria-hidden="true"></span>
       </label>
       {% endfor %}
     </fieldset>
 
-    <div class="continue-bar on-dark">
+    <div class="mem-choice">
       <div class="continue-summary">
+        <p class="continue-label">Your choice</p>
         <p class="continue-name" data-summary-name></p>
-        <p class="continue-price"><span class="num" data-summary-price></span> <span class="continue-inc num" data-summary-inc></span></p>
+        <p class="continue-price num" data-summary-price></p>
+        <p class="continue-inc num" data-summary-inc></p>
       </div>
-      <p class="continue-note">{{ m.continue.body }}</p>
       <button type="submit" class="btn btn-primary" data-continue>{{ m.continue.cta_label|default:"Continue" }}</button>
+      <p class="continue-note">{{ m.continue.body }}</p>
     </div>
-  </form>
+  </div>
+</form>
 
+<div class="container">
   <div class="mem-also">
     {% if single %}
     <div class="plan-aside" data-reveal>
       <span class="plan-aside-media">{% photo single.render alt=single.image_alt sizes="4.5rem" override=single.image %}</span>
       <div class="plan-aside-body">
         <h2>{{ single.name }}</h2>
-        <p class="small num">&pound;{{ single.price_whole }} {{ single.period }}, ex VAT <span class="muted">&middot; &pound;{{ single.price_inc }} inc VAT</span></p>
-        <p class="plan-aside-meta">{% if single.pills %}<span class="pill pill--quiet">{{ single.pills.0 }}</span>{% endif %}<span class="small muted">{{ m.single_note.body }}</span></p>
+        <p class="small num">&pound;{{ single.price_whole }} {{ single.period }}, ex VAT </p>
+        <p class="small muted num">&pound;{{ single.price_inc }} inc VAT</p>
+        <p class="plan-aside-meta">{% if single.pills %}<span class="small">{{ single.pills.0 }}</span>{% endif %}<span class="small muted">{{ m.single_note.body }}</span></p>
       </div>
     </div>
     {% endif %}

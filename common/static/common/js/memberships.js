@@ -1,4 +1,4 @@
-/* Memberships: keeps the Continue bar, the compare table and the phone picker in step with the radio group,
+/* Memberships: keeps the choice tag, the compare table and the phone picker in step with the radio group,
    and counts the visits up once. The form itself is a plain GET and works without this file. */
 
 const form = document.querySelector('[data-mem-form]');
@@ -21,7 +21,9 @@ if (form) {
     const view = on && picker.find((p) => p.dataset.slug === on.value);
     if (view && table) { view.checked = true; table.dataset.active = view.value; }
   };
-  radios.forEach((r) => r.addEventListener('change', sync));
+  const tiers = form.querySelector('.tiers');
+  // After the first change a new choice plays its sheen at once (the arrival pass is delayed in CSS).
+  radios.forEach((r) => r.addEventListener('change', () => { tiers?.classList.add('is-settled'); sync(); }));
   window.addEventListener('pageshow', sync); // back/forward restores the checked radio
   sync();
 
