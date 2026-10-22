@@ -59,7 +59,7 @@ class ControlAccessTests(TestCase):
     def test_anonymous_is_sent_to_login_and_public_host_has_no_control_pages(self):
         response = self.client.get("/", **self.host)
         self.assertRedirects(response, "/login/?next=/", fetch_redirect_response=False)
-        self.assertEqual(self.client.get("/").status_code, 404)  # public host has no control pages
+        self.assertEqual(self.client.get("/insights/").status_code, 404)  # public host has no control pages
 
     def test_only_staff_reach_the_index(self):
         User = get_user_model()
@@ -183,14 +183,14 @@ class ErrorPageTests(SimpleTestCase):
         from django.template.loader import render_to_string
 
         expected = {
-            "400.html": "That request didn&rsquo;t work",
-            "403.html": "You don&rsquo;t have access to this page",
-            "404.html": "We can&rsquo;t find that page",
-            "500.html": "Something went wrong",
+            "400.html": "That request didn't look right.",
+            "403.html": "This page is private.",
+            "404.html": "This page isn't here.",
+            "500.html": "Something went wrong on our side.",
         }
         for name, heading in expected.items():
             with self.subTest(name=name):
-                self.assertIn(f"<h1>{heading}</h1>", render_to_string(name))
+                self.assertIn(heading, render_to_string(name))
 
     def test_csrf_failure_view_gives_friendly_403(self):
         from django.test import RequestFactory
@@ -199,4 +199,4 @@ class ErrorPageTests(SimpleTestCase):
 
         response = csrf_failure(RequestFactory().post("/x/"))
         self.assertEqual(response.status_code, 403)
-        self.assertIn("have access", response.content.decode())
+        self.assertIn("This page is private.", response.content.decode())

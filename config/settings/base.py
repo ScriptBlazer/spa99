@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "gold",
     "notifications",
     "insights",
+    "pages",
 ]
 
 MIDDLEWARE = [

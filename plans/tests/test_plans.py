@@ -59,5 +59,5 @@ class SeedTests(TestCase):
         seed_all()
         for key in ["home", "spa", "memberships", "gold", "journey", "book", "register", "account", "visit", "privacy", "terms"]:
             self.assertTrue(page_content(key), key)
-        self.assertEqual(page_content("home")["hero"].heading, "Beyond Luxury")
+        self.assertEqual(page_content("home")["hero"].heading, "Beyond Luxury.")
         self.assertEqual(page_content("home")["nope"].heading, "")  # unknown section: empty, no error

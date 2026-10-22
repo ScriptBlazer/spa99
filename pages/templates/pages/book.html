@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load content_tags pages_tags %}
+{% block main %}
+{% page_content "book" as b %}
+<section class="on-dark book-hero" aria-labelledby="book-title">
+  <div class="book-pattern container">
+    <div class="soon" data-reveal="hero">
+      {% include "common/_mark.html" %}
+      <h1 id="book-title" class="statement">{{ b.placeholder.heading }}</h1>
+      <p class="muted">{{ b.placeholder.body }}</p>
+      <p class="soon-month">{{ b.opening_month.heading }}</p>
+      <div class="actions soon-actions">
+        {% if request.user.is_authenticated %}<a class="btn btn-primary" href="{% url 'account' %}">Your account</a>
+        {% else %}<a class="btn btn-primary" href="{% url 'register' %}">{{ b.placeholder.cta_label }}</a>{% endif %}
+        <a class="btn-quiet" href="{% url 'spa' %}">See the spa</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% if booking_lines %}
+<section class="section on-light book-how" aria-labelledby="book-how-title">
+  <div class="container" data-reveal>
+    <h2 id="book-how-title">{{ b.how.heading }}</h2>
+    <ul class="book-lines">{% for line in booking_lines %}<li>{{ line }}</li>{% endfor %}</ul>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

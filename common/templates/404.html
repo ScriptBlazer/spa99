@@ -1,21 +1,4 @@
-<!doctype html>
-<html lang="en-GB">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Page not found | Spa 99</title>
-<style>
-  :root { --color-cream: #F5F2D8; --color-gold: #E5AC6E; --color-caramel: #BB8855; --color-espresso: #492E21; }
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center; text-align: center; background: var(--color-cream); color: var(--color-espresso); font-family: "Figtree", system-ui, sans-serif; }
-  h1 { font-family: "Signika", system-ui, sans-serif; letter-spacing: -0.025em; font-size: clamp(2.25rem, 4vw + 1rem, 4rem); margin: 0 0 1rem; }
-  a.button { display: inline-block; margin-top: 1.5rem; padding: 0.75rem 1.5rem; background: var(--color-espresso); color: var(--color-cream); border-radius: 6px; text-decoration: none; }
-</style>
-</head>
-<body>
-<main>
-  <h1>We can&rsquo;t find that page</h1>
-  <p>The page may have moved, or the link may be wrong.</p>
-  <a class="button" href="/">Back to home</a>
-</main>
-</body>
-</html>
+{% extends "base_reduced.html" %}
+{% block head_title %}{% include "common/_head.html" with title="This page isn't here. | Spa 99" %}{% endblock %}
+{% block messages %}{% endblock %}
+{% block main %}{% include "common/_error.html" with heading="This page isn't here." line="It may have moved. Everything else is where you left it." %}{% endblock %}

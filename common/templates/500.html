@@ -1,21 +1,24 @@
-<!doctype html>
+{% load static %}<!doctype html>
+{# Standalone on purpose: no database, no request, nothing that can fail while the server is already failing. #}
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#492E21">
 <title>Something went wrong | Spa 99</title>
-<style>
-  :root { --color-cream: #F5F2D8; --color-gold: #E5AC6E; --color-caramel: #BB8855; --color-espresso: #492E21; }
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center; text-align: center; background: var(--color-cream); color: var(--color-espresso); font-family: "Figtree", system-ui, sans-serif; }
-  h1 { font-family: "Signika", system-ui, sans-serif; letter-spacing: -0.025em; font-size: clamp(2.25rem, 4vw + 1rem, 4rem); margin: 0 0 1rem; }
-  a.button { display: inline-block; margin-top: 1.5rem; padding: 0.75rem 1.5rem; background: var(--color-espresso); color: var(--color-cream); border-radius: 6px; text-decoration: none; }
-</style>
+<link rel="stylesheet" href="{% static 'common/css/app.css' %}">
 </head>
-<body>
-<main>
-  <h1>Something went wrong</h1>
-  <p>It is our fault, not yours. We have been told and will fix it. Please try again in a few minutes.</p>
-  <a class="button" href="/">Back to home</a>
+<body class="on-dark">
+<header class="site-header on-dark"><div class="container header-bar"><a class="brand" href="/" aria-label="Spa 99, home">{% include "common/_logo.html" %}</a></div></header>
+<main id="main">
+  <section class="error-page on-dark">
+    <div class="soon error-block">
+      {% include "common/_mark.html" %}
+      <h1 class="statement">Something went wrong on our side.</h1>
+      <p class="muted">Please try again in a moment.</p>
+      <div class="actions"><a class="btn btn-primary" href="/">Back to home</a></div>
+    </div>
+  </section>
 </main>
 </body>
 </html>

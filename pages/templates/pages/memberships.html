@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load static content_tags pages_tags %}
+{% block main %}
+{% page_content "memberships" as m %}
+<section class="on-light plans-intro" aria-labelledby="m-title">
+  <div class="container" data-reveal="hero">
+    <h1 id="m-title">{{ m.intro.heading }}</h1>
+    <p class="lead">{{ m.intro.body }}</p>
+  </div>
+</section>
+
+<section class="on-light plans" aria-label="Memberships">
+  <div class="container">
+    {% for card in cards %}{% if not card.is_single %}{% include "pages/_plan_row.html" with card=card register_label=m.register_label.cta_label %}{% endif %}{% endfor %}
+    {% for card in cards %}{% if card.is_single %}{% include "pages/_plan_row.html" with card=card register_label=m.register_label.cta_label %}{% endif %}{% endfor %}
+  </div>
+</section>
+
+<section class="on-light not-sure">
+  <div class="container">
+    <div class="panel not-sure-band" data-reveal>
+      <h2>{{ m.not_sure.heading }}</h2>
+      <div class="actions"><a class="btn btn-primary btn-block-phone" href="{% url 'journey' %}">{{ m.not_sure.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a></div>
+    </div>
+  </div>
+</section>
+
+<section class="on-light compare-section">
+  <div class="container">
+    <details class="compare" data-reveal>
+      <summary><span class="compare-summary">{{ m.compare.heading }}</span></summary>
+      <div class="compare-body" data-compare>
+        <div class="segmented segmented--wrap compare-picker" role="radiogroup" aria-label="Choose a membership to compare">
+          {% for card in cards %}<label class="seg"><input type="radio" name="compare" value="{{ forloop.counter0 }}"{% if forloop.first %} checked{% endif %}><span>{{ card.name }}</span></label>{% endfor %}
+        </div>
+        <table class="compare-table" data-active="0">
+          <caption class="sr-only">Compare memberships</caption>
+          <thead><tr><th scope="col"><span class="sr-only">Feature</span></th>{% for card in cards %}<th scope="col" data-col="{{ forloop.counter0 }}"{% if card.highlight %} class="is-featured"{% endif %}>{{ card.name }}</th>{% endfor %}</tr></thead>
+          <tbody>
+            {% for row in table %}<tr><th scope="row">{{ row.label }}</th>{% for cell in row.cells %}<td data-col="{{ forloop.counter0 }}" class="num{% if cell.featured %} is-featured{% endif %}">{{ cell.text }}</td>{% endfor %}</tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="on-light gold-line">
+  <div class="container">
+    <p>{{ m.gold_line.body }} <a href="{% url 'gold_card' %}">{{ m.gold_line.cta_label }}</a></p>
+  </div>
+</section>
+
+<section class="on-light vat-note">
+  <div class="container"><p class="small muted">Prices exclude VAT at {{ vat_rate }}%. {{ m.price_note.body }}</p></div>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/compare.js' %}"></script>{% endblock %}

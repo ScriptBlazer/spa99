@@ -66,13 +66,14 @@ OPENING_RULES = [
 ]
 
 FACILITIES = [
-    ("wet-sauna", "Wet sauna", "Steam to loosen the day.", "A quiet steam room with warm wood and soft light."),
-    ("dry-sauna", "Dry sauna", "Dry heat, slow and deep.", "A traditional dry sauna in warm timber."),
-    ("shower-cold-plunge", "Shower and cold plunge", "Rinse, then reset.", "Showers and a cold plunge to finish a round of heat."),
-    ("relaxing-zone", "Relaxing zone", "Somewhere to simply be.", "Low light and comfortable seating, away from everything."),
-    ("gym", "Gym", "Everything you need, nothing you do not.", "A calm, well equipped gym for a proper session."),
-    ("massage-room", "Massage room", "Time on the table.", "A private room for massage."),
-    ("kitchenette", "Kitchenette", "Time to unwind.", "A place to make a drink and stay a while."),
+    ("dry-sauna", "Dry sauna", "Cedar and dry heat. Stay as long as it feels right.", "A dry sauna in warm timber."),
+    ("wet-sauna", "Wet sauna", "Soft steam and warm stone benches.", "A quiet steam room clad in travertine."),
+    ("cold-plunge", "Cold plunge", "Still, cold water. A minute is enough.", "A cold plunge to finish a round of heat."),
+    ("showers", "Showers", "Rain showers, good towels, everything you need.", "Open rain showers."),
+    ("relaxing-zone", "Relaxing zone", "Loungers, low light and nothing to do.", "Low light and comfortable seating."),
+    ("massage-room", "Massage room", "A quiet room for a massage, by appointment.", "A private room for massage."),
+    ("gym", "Gym", "Free weights and machines, never crowded.", "A calm, well equipped gym."),
+    ("kitchenette", "Kitchenette", "Tea, coffee and somewhere to sit after.", "A place to make a drink and stay a while."),
 ]
 
 

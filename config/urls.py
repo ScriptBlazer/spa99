@@ -1,4 +1,4 @@
-"""Public site (spa99.uk). Page views arrive with the website feature; these are the data endpoints and account routes."""
+"""Public site (spa99.uk): the website pages, the data endpoints (journey, Gold) and the account routes."""
 from django.urls import include, path
 
 from common.views import health
@@ -9,4 +9,5 @@ urlpatterns = [
     path("gold/", include("gold.urls")),
     path("", include("users.urls")),  # login, logout
     path("", include("users.urls_public")),  # register interest, verify, reset, account
+    path("", include("pages.urls")),  # the website pages, the journey and Gold application screens
 ]

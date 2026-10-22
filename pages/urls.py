@@ -1,0 +1,20 @@
+from django.urls import path
+
+from . import views
+
+urlpatterns = [
+    path("", views.home, name="home"),
+    path("the-spa/", views.spa, name="spa"),
+    path("memberships/", views.memberships, name="memberships"),
+    path("gold-card/", views.gold_card, name="gold_card"),
+    path("gold-card/apply/", views.gold_apply, name="gold_apply"),
+    path("gold-card/apply/<slug:slug>/", views.gold_apply, name="gold_apply_step"),
+    path("book/", views.book, name="book"),
+    path("visit/", views.visit, name="visit"),
+    path("privacy/", views.privacy, name="privacy"),
+    path("terms/", views.terms, name="terms"),
+    path("journey/", views.journey, name="journey"),
+    path("journey/<slug:slug>/", views.journey, name="journey_page"),
+    path("robots.txt", views.robots, name="robots"),
+    path("sitemap.xml", views.sitemap, name="sitemap"),
+]

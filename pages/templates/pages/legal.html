@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load content_tags %}
+{% block main %}
+{% page_content page_key as doc %}
+<section class="section on-light legal">
+  <div class="container legal-inner">
+    <h1>{{ doc.body.heading|default:meta.title }}</h1>
+    <p class="legal-note panel panel--line"><strong>Draft.</strong> The full text is to be supplied before launch.</p>
+    <div class="legal-body">
+      {% for line in doc.body.body|lines %}<p>{{ line }}</p>{% endfor %}
+      {% if page_key == "privacy" %}
+      <h2>What we collect</h2><p>To be supplied.</p>
+      <h2>How we use it</h2><p>To be supplied.</p>
+      <h2>Your rights</h2><p>To be supplied.</p>
+      {% else %}
+      <h2>Membership</h2><p>To be supplied.</p>
+      <h2>Using the spa</h2><p>To be supplied.</p>
+      {% endif %}
+      <h2>Contact</h2><p>Write to <a href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a>.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

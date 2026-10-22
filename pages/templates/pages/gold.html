@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load static content_tags pages_tags %}
+{% block main %}
+{% page_content "gold" as g %}
+<div class="on-dark gold-world">
+<section class="gold-hero" aria-labelledby="gold-title">
+  <div class="container grid gold-hero-grid">
+    <div class="gold-hero-text" data-reveal="hero">
+      <h1 id="gold-title" class="statement">{{ g.hero.heading }}</h1>
+      <p class="lead">{{ g.hero.body }}</p>
+      <div class="actions"><a class="btn btn-primary btn-block-phone" href="{% url 'gold_apply' %}">{{ g.hero.cta_label }}</a></div>
+    </div>
+    <div class="gold-hero-image" data-reveal="hero-image"><div class="frame frame-4x5">{% photo "gold-card" alt="Gold membership card on a walnut surface" sizes="(min-width: 64em) 45vw, 100vw" eager=True override=g.hero.image %}</div></div>
+  </div>
+</section>
+
+<section class="section gold-who" aria-labelledby="who-title">
+  <div class="container" data-reveal>
+    <h2 id="who-title" class="statement">{{ g.who.heading }}</h2>
+    <ul class="roles">{% for role in g.who.body|lines %}<li>{{ role }}</li>{% endfor %}</ul>
+    <p class="muted who-note">{{ g.who_note.body }}</p>
+  </div>
+</section>
+
+{% if groups %}
+<section class="section gold-holds" aria-labelledby="holds-title">
+  <div class="container">
+    <h2 id="holds-title" class="sr-only">{{ g.holds.heading }}</h2>
+    <div class="perk-groups">
+      {% for title, items in groups %}
+      <div class="perk-group" data-reveal>
+        <h3>{{ title }}</h3>
+        <ul>{% for item in items %}<li>{{ item }}</li>{% endfor %}</ul>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="section gold-how" aria-labelledby="how-title">
+  <div class="container">
+    <h2 id="how-title" class="sr-only">{{ g.how.heading }}</h2>
+    <ol class="steps" data-reveal="stagger">
+      <li><p class="statement step-word">{{ g.step_1.heading }}</p><p>{{ g.step_1.body }}</p></li>
+      <li><p class="statement step-word">{{ g.step_2.heading }}</p><p>{{ g.step_2.body }}</p></li>
+      <li><p class="statement step-word">{{ g.step_3.heading }}</p><p>{{ g.step_3.body }}</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="gold-apply" aria-labelledby="apply-title">
+  <div class="container">
+    <div class="gold-panel" data-reveal>
+      {% include "common/_mark.html" %}
+      <h2 id="apply-title">{{ g.apply.heading }}</h2>
+      <p>{{ g.apply.body }}</p>
+      <a class="btn btn-primary btn-block-phone" href="{% url 'gold_apply' %}">{{ g.apply.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
+    </div>
+  </div>
+</section>
+</div>
+{% endblock %}

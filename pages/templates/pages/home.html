@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% load static content_tags pages_tags %}
+{% block head_title %}{% include "common/_head.html" with title="Spa 99 | Beyond Luxury" description=meta.meta_description %}{% endblock %}
+{% block head_extra %}
+<link rel="preload" as="image" type="image/webp" fetchpriority="high" imagesrcset="{% photo_srcset "hero" %}" imagesizes="(min-width: 64em) 42vw, 100vw">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"DaySpa","name":"Spa 99","description":"A private spa for men in North London.","url":"{{ request.scheme }}://{{ request.get_host }}/","email":"{{ site_settings.contact_email }}","address":{"@type":"PostalAddress","streetAddress":"99 Vale Road","addressLocality":"London","postalCode":"N4 1PR","addressCountry":"GB"}}</script>
+{% endblock %}
+{% block main %}
+{% page_content "home" as home %}
+
+<section class="hero on-dark" aria-labelledby="hero-title">
+  <div class="hero-text" data-reveal="hero">
+    <h1 class="display" id="hero-title">{{ home.hero.heading }}</h1>
+    <p class="lead">{{ home.hero.body }}</p>
+    <div class="actions">
+      <a class="btn btn-primary btn-block-phone" href="{% url 'journey' %}">{{ home.hero.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
+      {% if home.hero_link.cta_label %}<a class="btn-quiet" href="{% url 'spa' %}">{{ home.hero_link.cta_label }}</a>{% endif %}
+    </div>
+  </div>
+  <div class="hero-image" data-reveal="hero-image">
+    {% photo "hero" alt="Backlit travertine water wall with the swan carved into the stone" sizes="(min-width: 64em) 42vw, 100vw" eager=True override=home.hero.image css_class="hero-photo" %}
+  </div>
+</section>
+
+<section class="section on-light statement-section" aria-labelledby="statement-title">
+  <div class="container grid">
+    <div class="statement-copy" data-reveal>
+      <h2 class="statement" id="statement-title">{{ home.statement.heading }}</h2>
+      <p>{{ home.statement.body }}</p>
+    </div>
+  </div>
+</section>
+
+<section class="scenes on-light" aria-label="The spa in three scenes">
+  <div class="scene scene-wide" data-reveal="image">
+    <figure>
+      <div class="frame scene-frame">{% photo "dry-sauna" alt="Dry sauna with cedar benches and a glass door etched with the swan" sizes="100vw" %}</div>
+      <figcaption class="container">{{ home.scene_heat.body }}</figcaption>
+    </figure>
+  </div>
+  <div class="container scene-pair" data-reveal="stagger">
+    <figure class="scene-a">
+      <div class="frame frame-4x5">{% photo "cold-plunge" alt="Cold plunge pool set into a travertine floor" sizes="(min-width: 64em) 55vw, 100vw" %}</div>
+      <figcaption>{{ home.scene_cold.body }}</figcaption>
+    </figure>
+    <figure class="scene-b">
+      <div class="frame frame-4x5 frame-b">{% photo "relaxing-zone" alt="Relaxing zone with loungers, travertine and the swan on the wall" sizes="(min-width: 64em) 33vw, 100vw" %}</div>
+      <figcaption>{{ home.scene_rest.body }}</figcaption>
+    </figure>
+  </div>
+  {% if home.scenes_link.cta_label %}
+  <div class="container scenes-link"><a class="btn-quiet" href="{% url 'spa' %}">{{ home.scenes_link.cta_label }}</a></div>
+  {% endif %}
+</section>
+
+<section class="section on-dark entry" aria-labelledby="entry-title" data-home-entry>
+  <div class="container entry-inner" data-reveal>
+    <h2 id="entry-title">{{ home.journey_entry.heading }}</h2>
+    <p class="muted">{{ home.journey_entry.body }}</p>
+    {% if time_question %}
+    <fieldset class="entry-question" data-entry-tiles>
+      <legend class="lead">{{ time_question.text }}</legend>
+      <div class="tiles tiles--2 tiles-entry">
+        {% for option in time_question.options %}
+        <button type="button" class="tile tile-multi" data-entry-option="{{ option.value }}">
+          <span class="tile-body"><span class="tile-label">{{ option.label }}</span>{% if option.sub %}<span class="tile-sub">{{ option.sub }}</span>{% endif %}</span>
+          <span class="tile-mark" aria-hidden="true"></span>
+        </button>
+        {% endfor %}
+      </div>
+      <p class="feedback entry-status" role="status" aria-live="polite" data-entry-status></p>
+    </fieldset>
+    {% endif %}
+    <div class="actions"><a class="btn btn-primary btn-block-phone" href="{% url 'journey' %}">{{ home.journey_entry.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a></div>
+  </div>
+</section>
+
+<section class="section on-light teaser" aria-labelledby="teaser-title">
+  <div class="container teaser-inner" data-reveal>
+    <h2 id="teaser-title" class="statement">{{ home.memberships_teaser.heading }}</h2>
+    <ul class="teaser-list">
+      {% for plan in plan_cards %}
+      <li>
+        <span class="teaser-name"><strong>{{ plan.name }}</strong><span class="muted"> {{ plan.character }}</span></span>
+        <span class="teaser-price num">&pound;{{ plan.price_whole }} <span class="small muted">a month, ex VAT</span><span class="small muted teaser-inc">&pound;{{ plan.price_inc }} inc VAT</span></span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% if single %}<p class="small muted teaser-single">Single visit &pound;{{ single.price_whole }} ex VAT (&pound;{{ single.price_inc }} inc VAT).</p>{% endif %}
+    <div class="actions"><a class="btn-quiet" href="{% url 'memberships' %}">{{ home.memberships_teaser.cta_label }}</a></div>
+  </div>
+</section>
+
+<section class="gold-teaser on-dark" aria-labelledby="gold-title">
+  <div class="container grid gold-teaser-grid">
+    <div class="gold-teaser-image" data-reveal="image"><div class="frame frame-4x5">{% photo "gold-card" alt="Gold membership card on a walnut surface" sizes="(min-width: 64em) 40vw, 100vw" override=home.gold_teaser.image %}</div></div>
+    <div class="gold-teaser-text" data-reveal>
+      <h2 id="gold-title" class="statement">{{ home.gold_teaser.heading }}</h2>
+      <p>{{ home.gold_teaser.body }}</p>
+      <div class="actions"><a class="btn-quiet" href="{% url 'gold_card' %}">{{ home.gold_teaser.cta_label }}</a></div>
+    </div>
+  </div>
+</section>
+
+<section class="opening on-dark" aria-labelledby="opening-title">
+  <div class="container" data-reveal>
+    <h2 id="opening-title" class="statement opening-date">{{ home.opening.heading }}</h2>
+    <p class="lead">{{ home.opening.body }}</p>
+    <div class="actions"><a class="btn btn-primary btn-block-phone" href="{% url 'register' %}">{{ home.opening.cta_label }}</a></div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/home-entry.js' %}"></script>{% endblock %}

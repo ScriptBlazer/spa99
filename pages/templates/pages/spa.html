@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load static content_tags pages_tags %}
+{% block main %}
+{% page_content "spa" as spa %}
+
+<section class="on-dark spa-intro" aria-labelledby="spa-title">
+  <div class="container grid spa-intro-grid">
+    <div class="spa-intro-text" data-reveal="hero">
+      <h1 id="spa-title" class="statement">{{ spa.intro.heading }}</h1>
+      <p class="lead">{{ spa.intro.body }}</p>
+    </div>
+    <div class="spa-intro-image" data-reveal="image"><div class="frame frame-1x1">{% photo "door-gold" alt="Frosted glass door etched with a gold swan" sizes="(min-width: 64em) 50vw, 100vw" eager=True override=spa.intro.image %}</div></div>
+  </div>
+</section>
+
+<section class="section on-light rooms" aria-label="The rooms">
+  <div class="container grid rooms-grid">
+    <nav class="rooms-index" aria-label="The rooms" data-spa-index>
+      <ul>
+        {% for f in facilities %}<li><a href="#{{ f.slug }}" data-index-link="{{ f.slug }}">{{ f.name }}</a></li>{% endfor %}
+      </ul>
+    </nav>
+    <div class="rooms-list">
+      {% for f in facilities %}
+      <article class="facility" id="{{ f.slug }}" data-reveal data-facility>
+        <div class="frame facility-frame">{% photo f.image_name|default:f.slug alt=f.alt sizes="(min-width: 64em) 62vw, 100vw" override=f.image %}</div>
+        <h2>{{ f.name }}</h2>
+        {% if f.line %}<p class="muted">{{ f.line }}</p>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section on-dark visit-steps" aria-labelledby="how-title">
+  <div class="container">
+    <h2 class="sr-only" id="how-title">{{ spa.how_it_works.heading }}</h2>
+    <ol class="steps" data-reveal="stagger">
+      <li><p class="statement step-word">{{ spa.step_1.heading }}</p><p>{{ spa.step_1.body }}</p></li>
+      <li><p class="statement step-word">{{ spa.step_2.heading }}</p><p>{{ spa.step_2.body }}</p></li>
+      <li><p class="statement step-word">{{ spa.step_3.heading }}</p><p>{{ spa.step_3.body }}</p></li>
+    </ol>
+  </div>
+  <div class="steps-image" data-reveal="image"><div class="frame frame-21x9">{% photo "lockers" alt="Wooden lockers with the swan on each door, and a bench" sizes="100vw" %}</div></div>
+  {% if hours %}
+  <div class="container steps-hours"><dl class="hours small">{% for label, text in hours %}<dt>{{ label }}</dt><dd>{{ text }}</dd>{% endfor %}</dl></div>
+  {% endif %}
+</section>
+
+<section class="section on-light spa-next" aria-labelledby="next-title">
+  <div class="container" data-reveal>
+    <h2 id="next-title" class="statement">{{ spa.next.heading }}</h2>
+    <div class="actions">
+      <a class="btn btn-primary btn-block-phone" href="{% url 'journey' %}">{{ spa.next.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
+      <a class="btn btn-secondary btn-block-phone" href="{% url 'memberships' %}">{{ spa.next_link.cta_label }}</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/spa-index.js' %}"></script>{% endblock %}
