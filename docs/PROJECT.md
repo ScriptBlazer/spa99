@@ -64,6 +64,11 @@ Phase 1 is built so every later part plugs in without rewrites (see section 5).
 **Deviations from BML `RULES.md`** (Moishe's instruction for this project):
 - Local dev uses SQLite, no Docker or Postgres on the Mac. CI tests against Postgres.
 - Main doc is `docs/PROJECT.md` (BML calls it `OVERVIEW.md`).
+- No `DEPLOY.md` and no in-repo `RULES.md`: the BML originals live in OneDrive `Developer/Structure`. Deploy notes are in `README.md`.
+- No `docker-compose.dev.yml`: nothing runs in Docker locally.
+- Generic `REGISTRY` / `IMAGE_NAME` / `IMAGE` instead of `DOCKERHUB_*`, so the registry can be chosen later (open question 7).
+- `config/settings/test.py` added (dev settings with in-memory media, plain static storage, sync jobs, no `.env` files).
+- `LoginEvent` is append-only and has no `HistoricalRecords` (intentional: it is itself the log).
 
 ## 5. How the code is split
 
@@ -144,6 +149,7 @@ How to run it locally: see `README.md` ("Local development" lives there: venv, r
 | 2 | SES confirmed, or Microsoft 365 sending? | Before email build |
 | 5 | Welcome email wording | Before email build |
 | 6 | Legal: privacy notice, terms, men-only policy wording | Before launch |
+| 7 | Container registry: AWS ECR (recommended) vs Docker Hub | Before first deploy |
 
 ## 11. Decisions log
 
@@ -189,3 +195,4 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-22 | Control host routing: requests for `CONTROL_DOMAIN` use `config.urls_control`, others `config.urls`. Locked by default with Django's `LoginRequiredMiddleware`; public views use `@login_not_required` with a comment. |
 | 2026-10-22 | `users.User` has a UUID primary key and a separate 8-character unambiguous `public_id` for guest invites (ACC-05). Emails stored lowercase with a case-insensitive unique constraint. |
 | 2026-10-22 | Tests run on `config.settings.test` (dev settings plus in-memory media, plain static storage, synchronous jobs). `manage.py test` selects it automatically. |
+| 2026-10-22 | User holds person data only; no status field. Interest and membership are separate records. |

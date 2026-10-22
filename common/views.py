@@ -3,6 +3,7 @@ import logging
 from django.contrib.auth.decorators import login_not_required
 from django.db import connection
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 
 logger = logging.getLogger("spa99.health")
@@ -20,3 +21,8 @@ def health(request):
         logger.exception("Health check: database did not answer")
         return JsonResponse({"status": "error"}, status=503)
     return JsonResponse({"status": "ok"})
+
+
+def csrf_failure(request, reason=""):
+    """Friendly page when a form's security token is missing or expired (e.g. a stale tab)."""
+    return render(request, "403.html", status=403)

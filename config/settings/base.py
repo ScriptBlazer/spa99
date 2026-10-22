@@ -19,8 +19,11 @@ DEBUG = False  # dev.py switches it on
 
 DOMAIN = ENV.get("DOMAIN", "spa99.uk")
 CONTROL_HOST = ENV.get("CONTROL_DOMAIN", "control.localhost")  # prod: control.spa99.uk
-ADMIN_PATH = ENV.get("ADMIN_PATH", "backstage-7d3f9a/").strip("/") + "/"  # hidden Django admin
-ALLOWED_HOSTS = ENV.list("ALLOWED_HOSTS", ["localhost", "127.0.0.1", ".localhost"])
+DEFAULT_ADMIN_PATH = "backstage-7d3f9a/"  # committed, so public: dev only. prod.py refuses it.
+ADMIN_PATH = ENV.get("ADMIN_PATH", DEFAULT_ADMIN_PATH).strip("/") + "/"  # hidden Django admin
+# ALLOWED_HOSTS in the environment ADDS to these defaults (prod.py adds DOMAIN and CONTROL_DOMAIN too).
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".localhost"] + ENV.list("ALLOWED_HOSTS", [])
+CSRF_FAILURE_VIEW = "common.views.csrf_failure"
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -106,9 +109,20 @@ MEDIA_STORAGE, MEDIA_DESCRIPTION = build_media_storage(
     local_media_dir=PRIVATE_DIR.subdir("media"),
     require_credentials=True,
 )
+
+
+def finish_media_description(storage, description):
+    """Adds a note when media is local only because the private folder could not be written to."""
+    is_local = storage["BACKEND"].endswith("FileSystemStorage")
+    if is_local and not PRIVATE_DIR.using_fallback and not str(storage["OPTIONS"]["location"]).startswith(str(PRIVATE_DIR.path)):
+        description += " (private folder not writable, fell back to .private/)"
+    return description, is_local
+
+
+MEDIA_DESCRIPTION, MEDIA_IS_LOCAL = finish_media_description(MEDIA_STORAGE, MEDIA_DESCRIPTION)
 STORAGES = {
     "default": MEDIA_STORAGE,
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    "staticfiles": {"BACKEND": "common.storage.SpaStaticFilesStorage"},
 }
 
 # Background jobs: django-q2 with the ORM broker (database queue, no Redis).
@@ -146,5 +160,6 @@ def build_startup_report(settings_module):
         "private_dir": "fallback .private/" if PRIVATE_DIR.using_fallback else "private folder",
         "database": describe_database(DATABASES),
         "media": MEDIA_DESCRIPTION,
+        "media_is_local": MEDIA_IS_LOCAL,
         "missing_keys": ENV.missing_example_keys(),
     }

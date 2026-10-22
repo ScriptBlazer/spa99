@@ -176,3 +176,27 @@ class BackgroundTaskTests(TestCase):
     def test_example_task_runs_synchronously_in_tests(self):
         enqueue("common.tasks.heartbeat")
         self.assertEqual(Success.objects.filter(func="common.tasks.heartbeat").count(), 1)
+
+
+class ErrorPageTests(SimpleTestCase):
+    def test_error_pages_render_with_correct_headings(self):
+        from django.template.loader import render_to_string
+
+        expected = {
+            "400.html": "That request didn&rsquo;t work",
+            "403.html": "You don&rsquo;t have access to this page",
+            "404.html": "We can&rsquo;t find that page",
+            "500.html": "Something went wrong",
+        }
+        for name, heading in expected.items():
+            with self.subTest(name=name):
+                self.assertIn(f"<h1>{heading}</h1>", render_to_string(name))
+
+    def test_csrf_failure_view_gives_friendly_403(self):
+        from django.test import RequestFactory
+
+        from common.views import csrf_failure
+
+        response = csrf_failure(RequestFactory().post("/x/"))
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("have access", response.content.decode())

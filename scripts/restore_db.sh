@@ -41,6 +41,12 @@ if [ -f "$DB_FILE" ]; then
     SAFETY="$DB_FILE.before-restore-$(date +%Y-%m-%d_%H-%M-%S)"
     cp -- "$DB_FILE" "$SAFETY"
     echo "Safety copy: $SAFETY"
+    # Keep only the newest 5 safety copies.
+    COUNT=0
+    while IFS= read -r OLD; do
+        COUNT=$((COUNT + 1))
+        if [ "$COUNT" -gt 5 ]; then rm -f -- "$OLD"; echo "Removed old safety copy: $OLD"; fi
+    done < <(ls -1t "$DB_FILE".before-restore-* 2>/dev/null || true)
 fi
 rm -f -- "$DB_FILE-wal" "$DB_FILE-shm"
 cp -- "$SELECTED" "$DB_FILE"

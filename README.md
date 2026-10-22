@@ -64,9 +64,10 @@ Private folder (default `/Users/moishe/Library/CloudStorage/OneDrive-Personal/BM
 | `CONTROL_DOMAIN` | Control domain (prod `control.spa99.uk`; local default `control.localhost`) |
 | `DATABASE_URL` | Managed PostgreSQL on live (required in prod, `sslmode=require` added). Unset locally = SQLite |
 | `DEBUG` | Dev only. Prod forces it off |
-| `ALLOWED_HOSTS` | Optional extra hosts, comma separated |
-| `ADMIN_PATH` | URL path of the hidden Django admin on the Control domain |
-| `SPA99_PRIVATE_DIR` | Private folder location override |
+| `ALLOWED_HOSTS` | Optional extra hosts, comma separated (added to the defaults) |
+| `ADMIN_PATH` | URL path of the hidden Django admin on the Control domain. Required in prod and must not be the default |
+| `SPA99_PRIVATE_DIR` | Private folder location override (also read from the project `.env` by the backup scripts) |
+| `SPA99_DB_FILE` | Scripts only (env var, not in `.env`): SQLite file that `backup_db.sh` / `restore_db.sh` use. Default `.private/db.sqlite3` |
 | `AWS_STORAGE_BUCKET_NAME` | S3 media bucket (`spa99-media`). Empty = local file storage, never a crash |
 | `AWS_S3_REGION_NAME` | Bucket region (`eu-west-2`) |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Local dev keys, allowed into `dev/` only. Never on the server (it uses its instance role) |
@@ -81,7 +82,7 @@ Without S3 settings, files go to `$SPA99_PRIVATE_DIR/media` or `.private/media`.
 
 ```bash
 scripts/backup_db.sh      # consistent copy to db-backups/ named db-YYYY-MM-DD_HH-MM-SS.sqlite3, keeps the newest 30
-scripts/restore_db.sh     # lists backups, you pick one and type RESTORE; the current DB is kept as a safety copy
+scripts/restore_db.sh     # lists backups, you pick one and type RESTORE; the current DB is kept as a safety copy (newest 5 kept)
 ```
 
 Live uses managed PostgreSQL: take an RDS snapshot before every deploy and backfill.

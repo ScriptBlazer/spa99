@@ -50,8 +50,16 @@ export function initConfirm(root = document) {
     });
     if (!accepted) return;
     trigger.dataset.confirmed = 'true';
-    if (trigger.form) trigger.form.requestSubmit(trigger);
-    else if (trigger.href) window.location.assign(trigger.href);
-    else setWorking(trigger);
+    try {
+      if (trigger.form) trigger.form.requestSubmit(trigger);
+      else if (trigger.href) window.location.assign(trigger.href);
+      else setWorking(trigger);
+    } finally {
+      delete trigger.dataset.confirmed; // used once: the next click always asks again
+    }
+  });
+  // Back button (bfcache) can restore the page as it was: make sure nothing stays pre-confirmed.
+  window.addEventListener('pageshow', () => {
+    root.querySelectorAll?.('[data-confirmed]').forEach((el) => delete el.dataset.confirmed);
   });
 }

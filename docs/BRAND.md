@@ -83,6 +83,9 @@ Derived tints (designer may add, mark as derived): e.g. a slightly lighter cream
   --color-text-inverse: var(--color-cream);
   --color-accent: var(--color-gold);       /* on dark only for text */
   --color-line: var(--color-caramel);
+  /* Derived, not brand colours */
+  --color-danger: #8B1E1E;                 /* destructive actions */
+  --color-overlay: rgb(73 46 33 / 0.6);    /* espresso at 60%, behind modals */
 
   /* Type */
   --font-display: "Signika", system-ui, sans-serif;

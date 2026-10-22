@@ -12,11 +12,8 @@ from .managers import UserManager
 
 class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     """A person. Person data only: memberships, bookings, bands, lockers etc. live in their own apps
-    and point at this model (see SPA99_RULES "Keep these apart in the data model")."""
-
-    INTEREST = "interest"
-    MEMBER = "member"
-    STATUS_CHOICES = [(INTEREST, "Registered interest"), (MEMBER, "Member")]
+    and point at this model (see SPA99_RULES "Keep these apart in the data model"). No status field:
+    interest is an InterestRegistration record and membership comes from the memberships app."""
 
     email = models.EmailField("email address", unique=True)
     public_id = models.CharField(
@@ -34,7 +31,6 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     privacy_accepted_version = models.CharField(max_length=20, blank=True)
     privacy_accepted_at = models.DateTimeField(null=True, blank=True)
 
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=INTEREST, db_index=True)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
@@ -60,7 +56,8 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
 
     def save(self, *args, **kwargs):
         self.email = (self.email or "").strip().lower()
-        self.mobile = self.mobile or None  # unique + null: blank must be NULL, not ""
+        # Always stored as E.164 so uniqueness holds across formats; blank must be NULL (unique), not "".
+        self.mobile = normalise_uk_mobile(self.mobile) if self.mobile else None
         if not self.public_id:
             self.public_id = self._new_public_id()
         super().save(*args, **kwargs)

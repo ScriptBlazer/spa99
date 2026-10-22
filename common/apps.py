@@ -39,5 +39,10 @@ class CommonConfig(AppConfig):
             report["database"],
             report["media"],
         )
+        if report.get("media_is_local") and report["settings"].endswith("prod"):
+            logger.warning(
+                "PRODUCTION MEDIA IS ON LOCAL DISK, NOT S3: uploaded files will be lost when the container is "
+                "replaced. Set AWS_STORAGE_BUCKET_NAME."
+            )
         for key in report["missing_keys"]:
             logger.warning("%s is missing from the environment / .env (see .env.example)", key)

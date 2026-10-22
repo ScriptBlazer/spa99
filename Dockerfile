@@ -14,7 +14,7 @@ COPY . .
 # Non-root user. .private/ is the writable fallback folder the settings loader may create.
 RUN useradd --create-home --uid 1000 app \
     && mkdir -p /app/.private /app/staticfiles \
-    && chown -R app:app /app
+    && chown -R app:app /app/.private /app/staticfiles
 USER app
 
 # Hashed static files are built into the image. The values below exist only so settings load at build time;

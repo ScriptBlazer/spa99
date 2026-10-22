@@ -4,6 +4,12 @@
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFAULT_PRIVATE_DIR="/Users/moishe/Library/CloudStorage/OneDrive-Personal/BML/Spa 99/Software Files"
+
+# Same order as the app: real environment, then the project .env, then the default.
+if [ -z "${SPA99_PRIVATE_DIR:-}" ] && [ -f "$PROJECT_DIR/.env" ]; then
+    FROM_ENV_FILE="$(grep -E '^SPA99_PRIVATE_DIR=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- | sed -e 's/^["'"'"']//' -e 's/["'"'"']$//' || true)"
+    SPA99_PRIVATE_DIR="${FROM_ENV_FILE:-}"
+fi
 PRIVATE_DIR="${SPA99_PRIVATE_DIR:-$DEFAULT_PRIVATE_DIR}"
 
 # Use the private folder only if it exists and we can write to it; otherwise the git-ignored .private/.

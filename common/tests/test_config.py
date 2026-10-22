@@ -8,7 +8,7 @@ from unittest import mock
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase
 
-from common.envloader import Env, PrivateDir, example_keys, load_env
+from common.envloader import Env, PrivateDir, example_keys, load_env, pick_settings_module
 from common.settings_helpers import build_databases, build_media_storage, describe_database
 
 
@@ -49,6 +49,14 @@ class EnvLoaderTests(SimpleTestCase):
         env = load_env(self.base, environ={"SPA99_PRIVATE_DIR": str(self.tmp / "nope")})
         self.assertEqual(env.missing_example_keys(), ["NEEDED"])
         self.assertEqual(example_keys(self.base / ".env.example"), ["NEEDED", "ALSO"])
+
+    def test_settings_module_is_read_from_env_files_and_environment_wins(self):
+        write(self.base / ".env", "DJANGO_SETTINGS_MODULE=config.settings.prod\n")
+        nope = {"SPA99_PRIVATE_DIR": str(self.tmp / "nope")}
+        self.assertEqual(pick_settings_module(self.base, "config.settings.dev", nope), "config.settings.prod")
+        override = {**nope, "DJANGO_SETTINGS_MODULE": "x.y"}
+        self.assertEqual(pick_settings_module(self.base, "config.settings.dev", override), "x.y")
+        self.assertEqual(pick_settings_module(self.tmp, "config.settings.dev", nope), "config.settings.dev")
 
     def test_empty_values_count_as_unset(self):
         env = Env([("environment", {"X": ""}), ("project .env", {"X": "real"})], None)
@@ -96,6 +104,7 @@ class ProdSettingsTests(SimpleTestCase):
     GOOD = {
         "SECRET_KEY": "k8s-Zq3!xv9Lm2Pw7Tn5Rb4Hc6Jd1Fg0Ya8Ue3Oi5Kp7Ws9Qx2Mz4Vb6Nc1Ld",
         "DATABASE_URL": "postgres://u:p@db.example.com:5432/spa99",
+        "ADMIN_PATH": "my-own-hidden-door-91x/",
     }
 
     def import_prod(self, environ):
@@ -132,3 +141,29 @@ class ProdSettingsTests(SimpleTestCase):
     def test_refuses_missing_database_url(self):
         with self.assertRaises(ImproperlyConfigured):
             self.import_prod({"SECRET_KEY": self.GOOD["SECRET_KEY"]})
+
+    def test_refuses_missing_or_default_admin_path(self):
+        for admin_path in (None, "backstage-7d3f9a/", "/backstage-7d3f9a"):
+            environ = {**self.GOOD}
+            environ.pop("ADMIN_PATH")
+            if admin_path:
+                environ["ADMIN_PATH"] = admin_path
+            with self.subTest(admin_path=admin_path), self.assertRaises(ImproperlyConfigured):
+                self.import_prod(environ)
+
+    def test_allowed_hosts_env_adds_to_defaults(self):
+        settings = self.import_prod({**self.GOOD, "ALLOWED_HOSTS": "extra.example.com"})
+        for host in ("spa99.uk", "control.spa99.uk", "localhost", "127.0.0.1", "extra.example.com"):
+            self.assertIn(host, settings.ALLOWED_HOSTS)
+
+    def test_local_media_in_prod_is_flagged(self):
+        self.assertTrue(self.import_prod(self.GOOD).STARTUP_REPORT["media_is_local"])
+
+
+class CorruptEnvFileTests(SimpleTestCase):
+    def test_unreadable_env_file_is_ignored_with_a_warning(self):
+        tmp = Path(tempfile.mkdtemp())
+        (tmp / ".env").write_bytes(b"\xff\xfe\x00bad=\x80\n")
+        with self.assertLogs("spa99.startup", "WARNING"):
+            env = load_env(tmp, environ={"SPA99_PRIVATE_DIR": str(tmp / "nope")})
+        self.assertIsNone(env.get("bad"))

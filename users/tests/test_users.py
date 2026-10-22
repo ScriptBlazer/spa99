@@ -13,7 +13,7 @@ class UserModelTests(TestCase):
     def test_create_user_normalises_email_and_sets_defaults(self):
         user = User.objects.create_user("  Person@Example.COM ", "a-long-password-1")
         self.assertEqual(user.email, "person@example.com")
-        self.assertEqual((user.status, user.is_staff, user.is_superuser, user.is_active), ("interest", False, False, True))
+        self.assertEqual((user.is_staff, user.is_superuser, user.is_active), (False, False, True))
         self.assertTrue(user.check_password("a-long-password-1"))
         self.assertEqual(authenticate(username="PERSON@example.com", password="a-long-password-1"), user)
 
@@ -50,6 +50,17 @@ class UserModelTests(TestCase):
         with self.assertRaises(IntegrityError), transaction.atomic():
             User.objects.create_user("d@example.com", mobile="+447912345678")
 
+    def test_save_stores_mobile_as_e164_so_uniqueness_holds_across_formats(self):
+        user = User.objects.create_user("g@example.com", mobile="07912 345678")
+        self.assertEqual(User.objects.get(pk=user.pk).mobile, "+447912345678")
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            User.objects.create_user("h2@example.com", mobile="+44 7912 345678")
+        with self.assertRaises(ValidationError):
+            User.objects.create_user("i@example.com", mobile="not a number")
+
+    def test_user_has_no_status_field(self):
+        self.assertNotIn("status", [f.name for f in User._meta.get_fields()])
+
     def test_clean_normalises_mobile_and_rejects_bad_ones(self):
         user = User(email="e@example.com", mobile="07912 345679")
         user.clean()
@@ -71,12 +82,17 @@ class PersonDataTests(TestCase):
         user = User.objects.create_user("gone@example.com", "a-long-password-1", first_name="Gus")
         LoginEvent.objects.create(event=LoginEvent.LOGIN, user=user, attempted_email=user.email, ip_address="203.0.113.1")
         LoginEvent.objects.create(event=LoginEvent.FAILED, attempted_email="GONE@example.com")
+        LoginEvent.objects.create(event=LoginEvent.FAILED, attempted_email="someone-else@example.com")
+        user.first_name = "Gustav"
+        user.save()
         data = export_user_data(user)
-        self.assertEqual(data["profile"]["first_name"], "Gus")
-        self.assertEqual(len(data["login_events"]), 1)
+        self.assertEqual(data["profile"]["first_name"], "Gustav")
+        self.assertEqual(len(data["login_events"]), 2)  # by user and by attempted email; not someone else's
+        self.assertEqual([h["first_name"] for h in data["history"]], ["Gus", "Gustav"])
+        self.assertNotIn("password", data["history"][0])
 
         result = delete_user_data(user)
         self.assertFalse(User.objects.filter(email="gone@example.com").exists())
-        self.assertEqual(LoginEvent.objects.count(), 0)
+        self.assertEqual(LoginEvent.objects.count(), 1)  # only the unrelated one remains
         self.assertEqual(User.history.filter(email="gone@example.com").count(), 0)
         self.assertEqual(result["login_events"], 2)

@@ -11,6 +11,7 @@ Load order, earlier wins:
 If the private folder is missing or unreadable we fall back to git-ignored
 `.private/` in the project. Nothing here may crash locally or in CI.
 """
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -44,7 +45,9 @@ def _read_env_file(path):
         if not path.is_file():
             return {}
         return {key: value for key, value in dotenv_values(path).items() if value not in (None, "")}
-    except OSError:
+    except (OSError, UnicodeDecodeError, ValueError) as error:
+        # A corrupt .env must never crash the app; say so and carry on without it.
+        logging.getLogger("spa99.startup").warning("Could not read %s (%s); ignoring it.", path, type(error).__name__)
         return {}
 
 
@@ -143,8 +146,18 @@ def example_keys(example_path):
 def load_env(base_dir, environ=None):
     base_dir = Path(base_dir)
     environ = os.environ if environ is None else environ
+    if environ.get("SPA99_SKIP_ENV_FILES"):  # tests: environment variables and .private/ only
+        fallback = base_dir / ".private"
+        fallback.mkdir(parents=True, exist_ok=True)
+        return Env([("environment", environ)], PrivateDir(fallback, True, True, fallback), base_dir / ".env.example")
     project_env = _read_env_file(base_dir / ".env")
     private = resolve_private_dir(base_dir, environ, project_env)
     private_env = {} if private.using_fallback else _read_env_file(private.path / "env" / ".env")
     sources = [("environment", environ), ("private .env", private_env), ("project .env", project_env)]
     return Env(sources, private, base_dir / ".env.example")
+
+
+def pick_settings_module(base_dir, default, environ=None):
+    """DJANGO_SETTINGS_MODULE using the same load order as everything else; `default` if none sets it.
+    Used by manage.py, wsgi.py and asgi.py before Django starts."""
+    return load_env(base_dir, environ).get("DJANGO_SETTINGS_MODULE") or default

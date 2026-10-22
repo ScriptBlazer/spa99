@@ -2,7 +2,7 @@
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F401,F403
-from .base import DEV_SECRET_KEY, DOMAIN, ENV, PRIVATE_DIR, SECRET_KEY, build_startup_report
+from .base import ADMIN_PATH, DEFAULT_ADMIN_PATH, DEV_SECRET_KEY, DOMAIN, ENV, finish_media_description, PRIVATE_DIR, SECRET_KEY, build_startup_report
 from common.settings_helpers import build_databases, build_media_storage, describe_database
 
 _weak_secret_markers = ("insecure", "change-me", "changeme", "dummy")
@@ -11,9 +11,13 @@ if not SECRET_KEY or SECRET_KEY == DEV_SECRET_KEY or any(m in SECRET_KEY.lower()
 if not ENV.get("DATABASE_URL"):
     raise ImproperlyConfigured("DATABASE_URL must be set in production (managed PostgreSQL).")
 
+if not ENV.get("ADMIN_PATH") or ADMIN_PATH.strip("/") == DEFAULT_ADMIN_PATH.strip("/"):
+    raise ImproperlyConfigured("ADMIN_PATH must be set to your own non-default value in production.")
+
 DEBUG = False
 CONTROL_HOST = ENV.get("CONTROL_DOMAIN", "control.spa99.uk")
-ALLOWED_HOSTS = ENV.list("ALLOWED_HOSTS", [DOMAIN, CONTROL_HOST, "localhost", "127.0.0.1"])  # localhost: health check
+# ALLOWED_HOSTS in the environment ADDS to these. localhost / 127.0.0.1: the container health check.
+ALLOWED_HOSTS = [DOMAIN, CONTROL_HOST, "localhost", "127.0.0.1"] + ENV.list("ALLOWED_HOSTS", [])
 
 DATABASES = build_databases(ENV.get("DATABASE_URL"), None, require_ssl=True)
 
@@ -22,7 +26,8 @@ MEDIA_STORAGE, MEDIA_DESCRIPTION = build_media_storage(
     ENV, location_prefix="prod/", local_media_dir=PRIVATE_DIR.subdir("media"), require_credentials=False
 )
 STORAGES = {**STORAGES, "default": MEDIA_STORAGE}  # noqa: F405
-if MEDIA_STORAGE["BACKEND"].endswith("FileSystemStorage"):
+MEDIA_DESCRIPTION, MEDIA_IS_LOCAL = finish_media_description(MEDIA_STORAGE, MEDIA_DESCRIPTION)
+if MEDIA_IS_LOCAL:
     MEDIA_DESCRIPTION += " (WARNING: S3 not configured, files are lost when the container is replaced)"
 
 # HTTPS behind Caddy (RULES.md section 9). HSTS stays off until the site has run on HTTPS without problems.
@@ -44,3 +49,4 @@ if _sentry_dsn:
 STARTUP_REPORT = build_startup_report("config.settings.prod")
 STARTUP_REPORT["database"] = describe_database(DATABASES)
 STARTUP_REPORT["media"] = MEDIA_DESCRIPTION
+STARTUP_REPORT["media_is_local"] = MEDIA_IS_LOCAL

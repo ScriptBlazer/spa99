@@ -47,7 +47,7 @@ export function normaliseUkMobile(value) {
   else if (digits.startsWith('0')) digits = digits.slice(1);
   else return null;
   digits = digits.replace(/^0/, ''); // +44 (0)7123...
-  return /^7[1-9]\d{8}$/.test(digits) ? `+44${digits}` : null;
+  return /^7([1-57-9]\d{8}|624\d{6})$/.test(digits) ? `+44${digits}` : null;
 }
 
 export function validateMobile(value) {
@@ -153,9 +153,11 @@ export function attachValidation(form, { remote = {} } = {}) {
     event.preventDefault();
     if (await validateAll()) {
       form.dataset.validated = 'true';
-      form.requestSubmit(event.submitter || undefined);
+      try { form.requestSubmit(event.submitter || undefined); } finally { delete form.dataset.validated; }
     }
   });
+  // Back button (bfcache): a restored form must validate again.
+  window.addEventListener('pageshow', () => { delete form.dataset.validated; });
 
   return { validateAll };
 }
