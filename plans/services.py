@@ -1,7 +1,7 @@
 """Plan display data and price helpers. Other apps read plans through here."""
 from decimal import ROUND_HALF_UP, Decimal
 
-from .models import Facility, Plan, SiteSettings
+from .models import Facility, OpeningRule, Plan, SiteSettings
 
 PENNY = Decimal("0.01")
 
@@ -64,7 +64,54 @@ def price_line(plan, price_inc):
     return f"£{trim_price(plan.price_ex_vat)} {period}, ex VAT (£{price_inc} inc VAT)"
 
 
-def plan_display(plan, vat_rate=None):
+def clock(value):
+    """time(18, 0) -> '6pm', time(5, 30) -> '5:30am'."""
+    hour = value.hour % 12 or 12
+    minutes = f":{value.minute:02d}" if value.minute else ""
+    return f"{hour}{minutes}{'am' if value.hour < 12 else 'pm'}"
+
+
+def _open_periods():
+    return [r for r in OpeningRule.objects.filter(active=True, kind=OpeningRule.PERIOD) if r.start_time and r.end_time]
+
+
+def hours_ranges():
+    """{'daytime': '5am to 6pm', 'full': '5am to 3am'} from the open periods ('' when none is set).
+    Daytime is the period with key 'daytime'; full runs from the first period's start to the last one's end."""
+    periods = _open_periods()
+    day = next((r for r in periods if r.key == "daytime"), None) or (periods[0] if periods else None)
+    return {
+        "daytime": f"{clock(day.start_time)} to {clock(day.end_time)}" if day else "",
+        "full": f"{clock(periods[0].start_time)} to {clock(periods[-1].end_time)}" if periods else "",
+    }
+
+
+def plan_pills(plan, ranges=None):
+    """The ordered chips for a tier on the memberships page: hours, booking window, bookings at a time, guests,
+    then any perk with a `pill` text. All words come from the row and the opening rules."""
+    ranges = ranges if ranges is not None else hours_ranges()
+    pills = []
+    if plan.is_daytime_only:
+        pills.append(f"Daytime, {ranges['daytime']}" if ranges["daytime"] else "Daytime")
+    else:
+        pills.append(f"Day and evening, {ranges['full']}" if ranges["full"] else "Day and evening")
+    pills.append(f"Book up to {_count(plan.booking_window_days, 'day')} ahead")
+    pills.append(f"{_count(plan.upcoming_limit, 'booking')} at a time")
+    if plan.guests_per_month:
+        pills.append(f"{_count(plan.guests_per_month, 'guest')} a month")
+    pills.extend(perk["pill"] for perk in plan.perks or [] if perk.get("pill"))
+    return pills
+
+
+def plan_image_url(plan):
+    """Uploaded picture URL, else '' (the render name is separate: the page resolves it through the image manifest)."""
+    try:
+        return plan.image.url if plan.image else ""
+    except ValueError:
+        return ""
+
+
+def plan_display(plan, vat_rate=None, ranges=None):
     """Everything a template or JSON response needs to show one plan."""
     if vat_rate is None:
         vat_rate = SiteSettings.load().vat_rate
@@ -89,6 +136,12 @@ def plan_display(plan, vat_rate=None):
         "highlight": plan.highlight,
         "interest_allowed": plan.interest_allowed,
         "facts": plan_facts(plan),
+        "tagline": plan.tagline,
+        "pills": plan_pills(plan, ranges),
+        "visits_count": plan.visits_per_month,
+        "image_url": plan_image_url(plan),
+        "render": plan.render,
+        "image_alt": plan.image_alt,
     }
 
 

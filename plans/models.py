@@ -9,6 +9,10 @@ from simple_history.models import HistoricalRecords
 from common.models import BaseModel
 
 
+def plan_image_path(instance, filename):
+    return f"plans/{instance.slug}/{filename}"
+
+
 class Plan(BaseModel):
     """One purchasable or applied-for plan: Tier 1/2/3, Gold Card or the single visit. Plans are rows, not code."""
 
@@ -41,9 +45,18 @@ class Plan(BaseModel):
     perks = models.JSONField(
         default=list, blank=True,
         help_text='List of {"key": "merch", "label": "Merch", "value": "Buy", "phrase": "Each merch release"}. '
-                  'Flexible: add any perk. "phrase" is the short line on the Gold Card page (empty = the label).',
+                  'Flexible: add any perk. "phrase" is the short line on the Gold Card page (empty = the label). '
+                  '"pill" is the short chip on the memberships page (empty = no chip).',
     )
     short_description = models.CharField(max_length=200, blank=True)
+    tagline = models.CharField(
+        max_length=80, blank=True, help_text="One calm line under the name. Empty = Daytime / Any time / Unlimited.")
+    image = models.FileField(
+        upload_to=plan_image_path, blank=True, help_text="Picture on the memberships page. Wins over the render.")  # default storage: S3 on live
+    render = models.CharField(
+        max_length=40, blank=True,
+        help_text="Name of a built render (content image manifest), used when no picture is uploaded.")
+    image_alt = models.CharField(max_length=200, blank=True, help_text="Describes the picture. Empty = decorative.")
     highlight = models.BooleanField(default=False, help_text="Shown as the recommended plan (Tier 2).")
     order = models.PositiveSmallIntegerField(default=0)
     visible = models.BooleanField("visible on site", default=True)

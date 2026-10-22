@@ -21,11 +21,7 @@ def split_label(label):
 
 # ---------- hours ----------
 
-def _clock(value):
-    """time(18, 0) -> '6pm', time(5, 30) -> '5:30am'."""
-    hour = value.hour % 12 or 12
-    minutes = f":{value.minute:02d}" if value.minute else ""
-    return f"{hour}{minutes}{'am' if value.hour < 12 else 'pm'}"
+_clock = plan_services.clock
 
 
 def opening_hours():
@@ -113,10 +109,12 @@ def plan_lines(plan):
     return lines
 
 
-def plan_card(plan, vat_rate=None):
-    display = plan_services.plan_display(plan, vat_rate)
+def plan_card(plan, vat_rate=None, ranges=None):
+    display = plan_services.plan_display(plan, vat_rate, ranges)
     return {
         **display,
+        "tagline": plan.tagline or character(plan),
+        "image": plan.image,  # FieldFile: wins over `render`, which is a manifest image name
         "character": character(plan),
         "lines": plan_lines(plan),
         "is_single": plan.kind == Plan.ONE_OFF,
@@ -128,8 +126,8 @@ def plan_card(plan, vat_rate=None):
 
 def purchasable_plans():
     """Tier 1, 2, 3 and the single visit as cards (Gold is by application, shown elsewhere)."""
-    vat = SiteSettings.load().vat_rate
-    return [plan_card(p, vat) for p in plan_services.visible_plans() if p.kind in (Plan.MONTHLY, Plan.ONE_OFF)]
+    vat, ranges = SiteSettings.load().vat_rate, plan_services.hours_ranges()
+    return [plan_card(p, vat, ranges) for p in plan_services.visible_plans() if p.kind in (Plan.MONTHLY, Plan.ONE_OFF)]
 
 
 def compare_table(cards):
@@ -143,7 +141,7 @@ def compare_table(cards):
             return "1"
         return "Unlimited" if c["visits_per_month"] is None else str(c["visits_per_month"])
 
-    return [
+    rows = [
         row("Price, ex VAT", lambda c: f"£{c['price_ex_vat']}"),
         row("Price, inc VAT", lambda c: f"£{c['price_inc']}"),
         row("Visits a month", visits),
@@ -153,6 +151,37 @@ def compare_table(cards):
         row("Guests a month", lambda c: str(c["guests_per_month"])),
         row("Cancel up to", lambda c: f"{c['cancel_hours']} hours before"),
     ]
+    # One row per perk any shown plan has (Merch, Leil Shishi, ...), in order of first appearance; "No" when a plan lacks it.
+    labels = {}
+    for c in cards:
+        for perk in c["perks"] or []:
+            labels.setdefault(perk.get("key"), perk.get("label") or perk.get("key"))
+
+    def perk_value(key):
+        return lambda c: next((p.get("value") or "Yes" for p in c["perks"] or [] if p.get("key") == key), "No")
+
+    rows += [row(label, perk_value(key)) for key, label in labels.items()]
+    for r in rows:  # `slug` per cell so the page can mark the selected column
+        for cell, c in zip(r["cells"], cards):
+            cell["slug"] = c["slug"]
+    return rows
+
+
+def selected_plan_slug(request, cards):
+    """Which tier starts selected on the memberships page: a valid ?plan= first, then the signed-in person's
+    interest, then the highlighted plan, else ''. Only plans a person can register interest in count."""
+    allowed = [c["slug"] for c in cards if c["interest_allowed"]]
+    asked = request.GET.get("plan", "")
+    if asked in allowed:
+        return asked
+    user = getattr(request, "user", None)
+    if user is not None and user.is_authenticated:
+        from users.models import InterestRegistration  # local: users imports plans
+
+        interest = InterestRegistration.objects.filter(user=user).select_related("plan").first()
+        if interest and interest.plan and interest.plan.slug in allowed:
+            return interest.plan.slug
+    return next((c["slug"] for c in cards if c["interest_allowed"] and c["highlight"]), "")
 
 
 def booking_lines(cards):

@@ -62,6 +62,8 @@ def spa(request):
 def memberships(request):
     cards = services.purchasable_plans()
     return _page(request, "pages/memberships.html", "memberships", cards=cards, table=services.compare_table(cards),
+                 tiers=[c for c in cards if c["interest_allowed"]], single=next((c for c in cards if c["is_single"]), None),
+                 selected_slug=services.selected_plan_slug(request, cards),
                  vat_rate=SiteSettings.load().vat_rate.normalize())
 
 

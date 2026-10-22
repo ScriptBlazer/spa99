@@ -12,6 +12,7 @@ PLANS = [
         "cancel_hours": 10, "guests_per_month": 0, "no_show_result": "Visit lost",
         "perks": [{"key": "merch", "label": "Merch", "value": "Buy"}],
         "short_description": "Daytime visits, six a month.", "order": 1,
+        "tagline": "For the daytime regular.", "render": "relax-loungers",
     },
     {
         "slug": "tier-2", "name": "Tier 2", "kind": Plan.MONTHLY, "price_ex_vat": Decimal("399.00"),
@@ -19,9 +20,10 @@ PLANS = [
         "cancel_hours": 10, "guests_per_month": 0, "no_show_result": "Visit lost",
         "perks": [
             {"key": "merch", "label": "Merch", "value": "Buy"},
-            {"key": "leil_shishi", "label": "Leil Shishi", "value": "Option, £45 + VAT a place"},
+            {"key": "leil_shishi", "label": "Leil Shishi", "value": "Option, £45 + VAT a place", "pill": "Leil Shishi option"},
         ],
         "short_description": "Day or evening, eight visits a month.", "highlight": True, "order": 2,
+        "tagline": "Your evenings, too.", "render": "dry-sauna",
     },
     {
         "slug": "tier-3", "name": "Tier 3", "kind": Plan.MONTHLY, "price_ex_vat": Decimal("499.00"),
@@ -29,9 +31,10 @@ PLANS = [
         "cancel_hours": 5, "guests_per_month": 1, "no_show_result": "Booking window drops to today + 1",
         "perks": [
             {"key": "merch", "label": "Merch", "value": "Buy"},
-            {"key": "leil_shishi", "label": "Leil Shishi", "value": "Option, £45 + VAT a place"},
+            {"key": "leil_shishi", "label": "Leil Shishi", "value": "Option, £45 + VAT a place", "pill": "Leil Shishi option"},
         ],
         "short_description": "Unlimited visits, a week ahead, one guest a month.", "order": 3,
+        "tagline": "Whenever you like.", "render": "gym",
     },
     {
         "slug": "gold", "name": "Gold Card", "kind": Plan.FREE_BY_APPLICATION, "price_ex_vat": Decimal("0.00"),
@@ -51,6 +54,7 @@ PLANS = [
         "cancel_hours": 10, "guests_per_month": 0, "no_show_result": "Visit used, no refund, no credit",
         "perks": [{"key": "merch", "label": "Merch", "value": "Buy"}],
         "short_description": "One daytime visit, no membership.", "order": 5,
+        "render": "door-gold",
     },
 ]
 

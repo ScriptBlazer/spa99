@@ -41,11 +41,14 @@ PAGES = {
     ]),
     "memberships": ("Memberships", "Spa 99 memberships and single visits, with prices ex VAT and inc VAT.", [
         ("intro", "Memberships.", "Choose when you come and how often.", "", ""),
-        ("not_sure", "Not sure? Find yours.", "", "Explore your membership", "/journey/"),
+        ("not_sure", "Not sure?", "", "Tailor your membership", "/journey/"),
         ("compare", "Compare everything", "", "", ""),
         ("gold_line", "", "There is also the Gold Card, for people in property.", "About the Gold Card", "/gold-card/"),
         ("price_note", "", "Prices including VAT are shown under each price.", "", ""),
         ("register_label", "", "", "Register interest", "/register/"),
+        ("continue", "", "Register your interest. Nothing to pay now.", "Continue", ""),
+        ("recommended_label", "Recommended", "", "", ""),
+        ("single_note", "", "Single visits open with booking.", "", ""),
     ]),
     "gold": ("Gold Card", "The Spa 99 Gold Card: free, by application, for people in property.", [
         ("hero", "The Gold Card.", "For people who own, build and manage property. Free, by application.", "Apply", "/gold-card/apply/"),

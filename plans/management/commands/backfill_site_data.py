@@ -6,6 +6,8 @@ written by hand:
 - facilities with no picture description get the starting one
 - Gold perks with no short phrase get the starting one
 - the Shabbos / Yom Tov hours line is written onto the opening rule
+- (memberships page, 2026-10-22) plans with no tagline / render get the starting ones, perks with no `pill` get the
+  starting one, and the "Not sure?" row gets the new wording only if it still has the exact old wording
 
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 from collections import Counter
@@ -64,6 +66,33 @@ def backfill():
         rule.public_note = plans_seed.SHABBOS_NOTE
         rule.save()
         changed["plans.OpeningRule (Shabbos line)"] += 1
+
+    for data in plans_seed.PLANS:  # memberships page: tagline, render, perk chips (only into empty slots)
+        plan = Plan.objects.filter(slug=data["slug"]).first()
+        if plan is None:
+            continue
+        touched = False
+        for field in ("tagline", "render"):
+            if data.get(field) and not getattr(plan, field):
+                setattr(plan, field, data[field])
+                touched = True
+        pills = {p["key"]: p["pill"] for p in data["perks"] if p.get("pill")}
+        perks = [dict(p) for p in plan.perks or []]
+        for perk in perks:
+            if not perk.get("pill") and perk.get("key") in pills:
+                perk["pill"], touched = pills[perk["key"]], True
+        if touched:
+            plan.perks = perks
+            plan.save()
+            changed["plans.Plan (memberships page: tagline, render, pills)"] += 1
+
+    not_sure = Section.objects.filter(page__key="memberships", key="not_sure", heading="Not sure? Find yours.").first()
+    if not_sure is not None:
+        not_sure.heading = "Not sure?"
+        if not_sure.cta_label == "Explore your membership":
+            not_sure.cta_label = "Tailor your membership"
+        not_sure.save()
+        changed["content.Section (memberships: Not sure?)"] += 1
     return changed
 
 
