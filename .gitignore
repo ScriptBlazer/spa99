@@ -21,3 +21,7 @@ media/
 .DS_Store
 .idea/
 .vscode/
+
+# Tooling
+.coverage
+htmlcov/

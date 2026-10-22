@@ -1,0 +1,6 @@
+{# One form field with its label and error slot. Usage: {% include "common/_field.html" with field=form.email %} #}
+<div class="field">
+  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+  {{ field }}
+  <p class="field-error" data-error-for="{{ field.html_name }}" id="error-{{ field.html_name }}" role="alert"{% if not field.errors %} hidden{% endif %}>{{ field.errors|join:" " }}</p>
+</div>

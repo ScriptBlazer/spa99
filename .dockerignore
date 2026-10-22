@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+.private
+.env
+*.sqlite3
+__pycache__
+*.pyc
+staticfiles
+media
+docs
+scripts
+.claude
+.coverage
+htmlcov
+README.md

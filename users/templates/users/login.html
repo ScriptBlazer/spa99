@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in | Spa 99</title>
+{% include "common/_assets.html" %}
+</head>
+<body>
+<main>
+  <h1>Sign in</h1>
+  {% include "common/_messages.html" %}
+  <form method="post" data-live-validate>
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    {% if form.non_field_errors %}<p class="field-error" role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+    {% include "common/_field.html" with field=form.username %}
+    {% include "common/_field.html" with field=form.password %}
+    <button type="submit" data-working-text="Signing in…">Sign in</button>
+  </form>
+  {% include "common/_modal.html" %}
+</main>
+</body>
+</html>
