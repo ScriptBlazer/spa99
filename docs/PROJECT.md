@@ -108,6 +108,8 @@ One Django project, apps by area. Apps only talk to each other through their `se
 
 ## 7. Private files and settings
 
+How to run it locally: see `README.md` ("Local development" lives there: venv, runserver, worker, tests, backup/restore, env keys).
+
 - Code: `"/Users/moishe/Documents/My Apps/spa99-software"`
 - Private folder (`SPA99_PRIVATE_DIR`): `"/Users/moishe/Library/CloudStorage/OneDrive-Personal/BML/Spa 99/Software Files"`
   - `env/.env` (secrets), `db-backups/`, `media/`. Only important things. Always quote the path.
@@ -183,3 +185,7 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-22 | Architecture for later: device brands behind adapters in `integrations/` (with fakes for dev/tests); an on-site bridge service syncs access lists from AWS and talks to devices so the door works offline; every on-site action stored as an event; one JSON API for site, bridge, screens and apps. |
 | 2026-10-22 | S3 bucket `spa99-media` in the BML AWS account, region London (eu-west-2). Private, versioning on, SSE-S3. Bucket policy denies everyone except root, `user/moishe.berkowitz`, `user/spa99-dev` (local dev, dev/ only) and `role/spa99-server` (EC2). CloudFront exception to add when site images are served. |
 | 2026-10-22 | GitHub: private repo on Moishe's personal account (Moishe is not a BML org owner; other devs are). Transfer to BML org later if wanted; transfer keeps history. |
+| 2026-10-22 | Background jobs: django-q2 (ORM broker) for queue and scheduler; recurring jobs registered by `manage.py register_schedules`, run by a `worker` compose service. |
+| 2026-10-22 | Control host routing: requests for `CONTROL_DOMAIN` use `config.urls_control`, others `config.urls`. Locked by default with Django's `LoginRequiredMiddleware`; public views use `@login_not_required` with a comment. |
+| 2026-10-22 | `users.User` has a UUID primary key and a separate 8-character unambiguous `public_id` for guest invites (ACC-05). Emails stored lowercase with a case-insensitive unique constraint. |
+| 2026-10-22 | Tests run on `config.settings.test` (dev settings plus in-memory media, plain static storage, synchronous jobs). `manage.py test` selects it automatically. |

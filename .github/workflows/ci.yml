@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: spa99
+          POSTGRES_PASSWORD: spa99
+          POSTGRES_DB: spa99
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U spa99"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://spa99:spa99@localhost:5432/spa99
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      SPA99_PRIVATE_DIR: /nonexistent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - name: No missing migrations
+        run: python manage.py makemigrations --check --dry-run
+      - name: Deploy checks (prod settings, dummy values; HSTS is off on purpose)
+        run: python manage.py check --deploy --settings=config.settings.prod
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          SECRET_KEY: ci-only-Pq7Wm2Xz9Lk4Rt6Vb8Nc1Hd3Jf5Gs0Ya2Ue4Oi6Kp8Wq1Zx3Mv5Bn7Lc9Td
+      - name: Tests
+        run: python manage.py test
+
+  build:
+    # Only for version tags (1.2.3) and only after the tests pass.
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    env:
+      # Registry is not decided yet. Set repo variables REGISTRY (e.g. 123456789.dkr.ecr.eu-west-2.amazonaws.com)
+      # and IMAGE_NAME (e.g. spa99) plus secrets REGISTRY_USERNAME / REGISTRY_PASSWORD to turn pushing on.
+      PUSH_ENABLED: ${{ vars.REGISTRY != '' && vars.IMAGE_NAME != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to registry
+        if: env.PUSH_ENABLED == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      - name: Build (and push when a registry is configured)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ env.PUSH_ENABLED == 'true' }}
+          tags: ${{ env.PUSH_ENABLED == 'true' && format('{0}/{1}:{2}', vars.REGISTRY, vars.IMAGE_NAME, github.ref_name) || format('spa99:{0}', github.ref_name) }}
+      - name: Note when nothing was pushed
+        if: env.PUSH_ENABLED != 'true'
+        run: echo "Image built but not pushed: no registry configured (set REGISTRY and IMAGE_NAME repo variables)."

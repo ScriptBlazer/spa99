@@ -1,0 +1,42 @@
+# Live stack: Caddy (HTTPS) -> web (gunicorn) + worker (background jobs). The database is managed PostgreSQL
+# (DATABASE_URL in .env), never a container. Image is built by GitHub Actions and pulled by tag.
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN}
+      CONTROL_DOMAIN: ${CONTROL_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+  web:
+    image: ${IMAGE}:${APP_TAG}
+    restart: unless-stopped
+    env_file: .env
+    command: ["web"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  worker:
+    image: ${IMAGE}:${APP_TAG}
+    restart: unless-stopped
+    env_file: .env
+    command: ["worker"]
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
+  caddy_config:
