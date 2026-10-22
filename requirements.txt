@@ -1,0 +1,15 @@
+# Pinned exact versions. Regenerate deliberately, not casually.
+Django==5.2.18
+asgiref==3.12.1
+sqlparse==0.6.0
+gunicorn==26.2.0
+whitenoise==6.12.0
+dj-database-url==3.1.2
+python-dotenv==1.2.4
+psycopg[binary]==3.3.6
+django-simple-history==3.13.0
+django-q2==1.11.1
+django-storages==1.14.6
+boto3==1.43.117
+phonenumbers==9.0.41
+sentry-sdk==2.73.0
