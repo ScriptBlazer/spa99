@@ -103,7 +103,7 @@ class PageTests(TestCase):
         html = self.client.get("/the-spa/").content.decode()
         for name in ["Dry sauna", "Wet sauna", "Cold plunge", "Showers", "Relaxing zone", "Massage room", "Gym", "Kitchenette"]:
             self.assertIn(name, html)
-        self.assertIn("photo-placeholder", html)  # the new renders do not exist yet
+        self.assertIn("type-tile", html)  # rooms without a render show the swan type tile (SPA-PAGE 2)
         self.assertNotIn("<img src=\"\"", html)
 
     def test_gold_page_perks_come_from_the_gold_plan(self):

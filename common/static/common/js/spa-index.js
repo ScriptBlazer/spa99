@@ -1,16 +1,15 @@
-/* The Rooms index on The spa page (desktop): tracks which room is in view. State only, no motion. */
+/* The spa page: a sideways scroll row (the phone tile row) with nothing focusable inside it gets a tab stop while it overflows,
+   so keyboard users can scroll it with the arrow keys. Not needed once it fits (desktop). Works without motion or GSAP. */
+const rows = [...document.querySelectorAll('[data-scroller]')];
+const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]';
 
-const index = document.querySelector('[data-spa-index]');
-if (index && 'IntersectionObserver' in window) {
-  const links = new Map([...index.querySelectorAll('[data-index-link]')].map((a) => [a.dataset.indexLink, a]));
-  const visible = new Set();
-  const setCurrent = () => {
-    const first = [...document.querySelectorAll('[data-facility]')].find((section) => visible.has(section.id));
-    links.forEach((link, id) => { if (first && id === first.id) link.setAttribute('aria-current', 'true'); else link.removeAttribute('aria-current'); });
-  };
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => (entry.isIntersecting ? visible.add(entry.target.id) : visible.delete(entry.target.id)));
-    setCurrent();
-  }, { rootMargin: '-30% 0px -40% 0px' });
-  document.querySelectorAll('[data-facility]').forEach((section) => observer.observe(section));
+const update = (row) => {
+  const overflows = row.scrollWidth > row.clientWidth + 1;
+  if (overflows && !row.querySelector(FOCUSABLE)) row.setAttribute('tabindex', '0');
+  else row.removeAttribute('tabindex');
+};
+
+if (rows.length && 'ResizeObserver' in window) {
+  const observer = new ResizeObserver((entries) => entries.forEach((entry) => update(entry.target)));
+  rows.forEach((row) => { update(row); observer.observe(row); });
 }

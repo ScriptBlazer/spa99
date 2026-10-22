@@ -1,0 +1,10 @@
+{# One step of How a visit works. Needs n, word (copy row), pills (list) and last (true for the third). #}
+<li class="vstep" data-step>
+  <span class="vstep-num num" aria-hidden="true">{{ n }}</span>
+  {% if not last %}<span class="vstep-line" aria-hidden="true"></span>{% endif %}
+  <div class="vstep-body">
+    <h3 class="vstep-word">{{ row.heading }}</h3>
+    <p class="muted">{{ row.body }}</p>
+    {% if pills %}<ul class="pills vstep-pills">{% for p in pills %}<li class="pill">{{ p }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+</li>

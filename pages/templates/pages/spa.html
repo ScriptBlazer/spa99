@@ -1,60 +1,103 @@
 {% extends "base.html" %}
 {% load static content_tags pages_tags %}
+{# The spa (docs/design/SPA-PAGE.md, round 3 house style, with the 2026-10-22 decisions: the door shrinks on normal scroll, the only future pin is the 3D room walk). One espresso walk through the building. Every room section comes from the data (`sections`), nothing about a room is typed here. #}
+{% block html_attrs %} data-page="marketing"{% endblock %}
+{% block body_class %}page-spa{% endblock %}
+{% block header_mode %}overlay{% endblock %}
+{% block head_extra %}
+{% page_content "spa" as spa_head %}{% if not spa_head.intro.image %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(prefers-reduced-motion: no-preference)" imagesrcset="{% photo_srcset "door-gold" %}" imagesizes="100vw">{% endif %}
+{% endblock %}
 {% block main %}
 {% page_content "spa" as spa %}
 
-<section class="on-dark spa-intro" aria-labelledby="spa-title">
-  <div class="container grid spa-intro-grid">
-    <div class="spa-intro-text" data-reveal="hero">
-      <h1 id="spa-title" class="statement">{{ spa.intro.heading }}</h1>
-      <p class="lead">{{ spa.intro.body }}</p>
+{# S1. The door: full screen with the words on it; on normal scroll it shrinks into the frame on the right (no pin). Without motion: just the end state, content height. #}
+<section class="scene door-scene on-dark" data-scene="door" data-glow aria-labelledby="spa-title">
+  <div class="door-window" data-door-window>
+    <div class="window-media" data-door-media>
+      <div class="door-zoom"><div class="door-still">{% photo "door-gold" alt="A frosted glass door etched with a gold swan, between stone jambs" sizes="100vw" override=spa.intro.image %}</div></div>
     </div>
-    <div class="spa-intro-image" data-reveal="image"><div class="frame frame-1x1">{% photo "door-gold" alt="Frosted glass door etched with a gold swan" sizes="(min-width: 64em) 50vw, 100vw" eager=True override=spa.intro.image %}</div></div>
+    <div class="frame-tint" aria-hidden="true"></div>
+    <div class="hero-veil" aria-hidden="true"></div>
   </div>
-</section>
-
-<section class="section on-light rooms" aria-label="The rooms">
-  <div class="container grid rooms-grid">
-    <nav class="rooms-index" aria-label="The rooms" data-spa-index>
-      <ul>
-        {% for f in facilities %}<li><a href="#{{ f.slug }}" data-index-link="{{ f.slug }}">{{ f.name }}</a></li>{% endfor %}
+  <div class="glow" aria-hidden="true"></div>
+  <div class="container grid door-grid">
+    <div class="door-run" aria-hidden="true"></div>
+    <div class="door-words">
+      <h1 class="display door-title" id="spa-title" data-rise>{{ spa.intro.heading }}</h1>
+      <p class="lead door-lead" data-fade>{{ spa.intro.body }}</p>
+      <ul class="door-facts" data-fade-row>
+        <li><b class="fact-value num" data-count>{{ room_count }}</b><span class="fact-label small">{{ spa.facts_rooms.body }}</span></li>
+        {% if hours_facts %}<li><b class="fact-value num">{{ hours_facts.range }}</b><span class="fact-label small">{{ spa.facts_hours.body }}</span></li>{% endif %}
+        <li><b class="fact-value">{{ spa.facts_men.heading }}</b><span class="fact-label small">{{ spa.facts_men.body }}</span></li>
       </ul>
-    </nav>
-    <div class="rooms-list">
-      {% for f in facilities %}
-      <article class="facility" id="{{ f.slug }}" data-reveal data-facility>
-        <div class="frame facility-frame">{% photo f.image_name|default:f.slug alt=f.alt sizes="(min-width: 64em) 62vw, 100vw" override=f.image %}</div>
-        <h2>{{ f.name }}</h2>
-        {% if f.line %}<p class="muted">{{ f.line }}</p>{% endif %}
-      </article>
-      {% endfor %}
+      <nav class="door-chips" aria-label="The rooms" data-fade-row>
+        <ul class="chips" data-scroller>{% for f in facilities %}<li><a class="chip" href="#{{ f.slug }}">{{ f.name }}</a></li>{% endfor %}</ul>
+      </nav>
     </div>
+    <figure class="frame frame--right door-target" data-door-target>
+      <div class="frame-media">{% photo "door-gold" alt="A frosted glass door etched with a gold swan, between stone jambs" sizes="(min-width: 64em) 36vw, 100vw" override=spa.intro.image %}</div>
+      <div class="frame-tint" aria-hidden="true"></div>
+    </figure>
   </div>
+  <button class="door-pause btn-quiet" type="button" aria-pressed="false" data-door-pause>Pause</button>
 </section>
 
-<section class="section on-dark visit-steps" aria-labelledby="how-title">
-  <div class="container">
-    <h2 class="sr-only" id="how-title">{{ spa.how_it_works.heading }}</h2>
-    <ol class="steps" data-reveal="stagger">
-      <li><p class="statement step-word">{{ spa.step_1.heading }}</p><p>{{ spa.step_1.body }}</p></li>
-      <li><p class="statement step-word">{{ spa.step_2.heading }}</p><p>{{ spa.step_2.body }}</p></li>
-      <li><p class="statement step-word">{{ spa.step_3.heading }}</p><p>{{ spa.step_3.body }}</p></li>
-    </ol>
-  </div>
-  <div class="steps-image" data-reveal="image"><div class="frame frame-21x9">{% photo "lockers" alt="Wooden lockers with the swan on each door, and a bench" sizes="100vw" %}</div></div>
-  {% if hours %}
-  <div class="container steps-hours"><dl class="hours small">{% for label, text in hours %}<dt>{{ label }}</dt><dd>{{ text }}</dd>{% endfor %}</dl></div>
+{# S2. The rooms, from the data: feature (with an optional companion) or a row of tiles. Sides alternate, the opening frame is on the right. #}
+{% for s in sections %}
+  {% if s.kind == "feature" %}
+    {% cycle "a" "b" "c" as ratio silent %}
+    {% include "pages/_spa_feature.html" with s=s ratio=ratio %}
+  {% else %}
+    {# the "Steam, cold, water." intro belongs to the first tile row only #}
+    {% cycle "yes" "" "" "" "" "" "" "" as tiles_intro silent %}
+    {% include "pages/_spa_tiles.html" with s=s intro=tiles_intro %}
   {% endif %}
+{% endfor %}
+
+{# S3. How a visit works: three steps joined by a line that draws as you scroll, the hours, the lockers frame. #}
+<section class="scene sp-sec sp-visit on-dark" data-scene="steps" data-glow aria-labelledby="how-title">
+  <div class="glow" aria-hidden="true"></div>
+  <div class="container grid sp-visit-grid">
+    <h2 class="statement sp-visit-head" id="how-title" data-rise>{{ spa.how_it_works.heading }}</h2>
+    <ol class="vsteps" role="list" data-steps>
+        {% include "pages/_spa_step.html" with n=1 row=spa.step_1 pills=visit_pills.book %}
+        {% include "pages/_spa_step.html" with n=2 row=spa.step_2 pills=visit_pills.arrive %}
+        {% include "pages/_spa_step.html" with n=3 row=spa.step_3 pills=visit_pills.stay last=True %}
+      </ol>
+    {% if hours %}
+    <div class="sp-hours" data-fade>
+      <dl class="hours small">{% for label, text in hours|slice:":5" %}<dt>{{ label }}</dt><dd>{{ text }}</dd>{% endfor %}</dl>
+      <a class="btn-quiet" href="{% url 'visit' %}">{{ spa.how_it_works.cta_label|default:"Visit us" }}</a>
+    </div>
+    {% endif %}
+    <figure class="frame frame--right sp-visit-frame" data-frame data-depth="6" style="--focus: 70% 50%">
+      <div class="frame-media">{% photo "lockers" alt="Wooden lockers with the swan on each door, and a bench" sizes="(min-width: 64em) 44vw, 100vw" override=spa.how_it_works.image %}</div>
+      <div class="frame-tint" aria-hidden="true"></div>
+    </figure>
+  </div>
 </section>
 
-<section class="section on-light spa-next" aria-labelledby="next-title">
-  <div class="container" data-reveal>
-    <h2 id="next-title" class="statement">{{ spa.next.heading }}</h2>
-    <div class="actions">
+{# S4. Next: a compact closing band. #}
+<section class="scene sp-band on-dark" data-scene="band" aria-labelledby="next-title">
+  <div class="sp-band-pattern" data-pattern aria-hidden="true"></div>
+  <div class="container grid sp-band-grid">
+    <div class="sp-band-main">
+      <h2 class="statement" id="next-title" data-rise>{{ spa.next.heading }}</h2>
+      {% if next_from %}<p class="small muted" data-fade>{{ next_from }}</p>{% endif %}
+    </div>
+    <div class="sp-band-actions actions" data-fade>
       <a class="btn btn-primary btn-block-phone" href="{% url 'journey' %}">{{ spa.next.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
       <a class="btn btn-secondary btn-block-phone" href="{% url 'memberships' %}">{{ spa.next_link.cta_label }}</a>
     </div>
   </div>
 </section>
 {% endblock %}
-{% block scripts %}<script type="module" src="{% static 'common/js/spa-index.js' %}"></script>{% endblock %}
+{% block scripts %}
+<script defer src="{% static 'common/vendor/gsap/gsap.min.js' %}"></script>
+<script defer src="{% static 'common/vendor/gsap/ScrollTrigger.min.js' %}"></script>
+<script defer src="{% static 'common/vendor/gsap/SplitText.min.js' %}"></script>
+<script defer src="{% static 'common/vendor/gsap/CustomEase.min.js' %}"></script>
+{# spa.js imports scenes.js (the helpers and the scene registry) and adds the scenes of this page. #}
+<script type="module" src="{% static 'common/js/spa.js' %}"></script>
+<script type="module" src="{% static 'common/js/spa-index.js' %}"></script>
+{% endblock %}

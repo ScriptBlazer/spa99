@@ -18,13 +18,13 @@ const { gsap, ScrollTrigger, SplitText, DrawSVGPlugin, CustomEase } = window;
 const root = document.documentElement;
 
 export const SCENES = {};
-const cleanups = [];
+export const cleanups = [];   // teardown callbacks (matchMedia revert); scene modules on other pages (spa.js) push to it
 let lenis = null;
 
 /* ---------- patterns (8.3 to 8.9) ---------- */
 
 /** Line rise: lines of a heading rise out of a mask (1.1s, 0.08s apart). On enter (once), or on load with trigger:false. */
-function lineRise(el, { trigger = true, delay = 0 } = {}) {
+export function lineRise(el, { trigger = true, delay = 0 } = {}) {
   return SplitText.create(el, {
     type: 'lines', mask: 'lines', linesClass: 'line', autoSplit: true,
     onSplit: (self) => {
@@ -44,14 +44,14 @@ function splitLines(el) {
 }
 
 /** Fade up (opacity 0 to 1, 16px, 0.9s) once when `trigger` enters. */
-function fadeUp(targets, { trigger, start = 'top 80%', delay = 0, stagger = 0 } = {}) {
+export function fadeUp(targets, { trigger, start = 'top 80%', delay = 0, stagger = 0 } = {}) {
   const items = gsap.utils.toArray(targets);
   if (!items.length) return;
   gsap.fromTo(items, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.9, delay, stagger, scrollTrigger: { trigger: trigger || items[0], start, once: true } });
 }
 
 /** Settle: the picture arrives (scale 1.06 to 1) and the lights come up (tint 0.3 to 0.14), from the frame entering to its centre. */
-function settle(frame, scrub) {
+export function settle(frame, scrub) {
   const media = frame.querySelector('.frame-media'), tint = frame.querySelector('.frame-tint');
   gsap.timeline({ defaults: { ease: 'none' }, scrollTrigger: { trigger: frame, start: 'top bottom', end: 'center center', scrub } })
     .fromTo(media, { scale: 1.06 }, { scale: 1 }, 0)
@@ -59,14 +59,14 @@ function settle(frame, scrub) {
 }
 
 /** Depth: a frame drifts against the page at its own speed (data-depth, percent of its height). Never on text. */
-function depth(el, scrub) {
+export function depth(el, scrub) {
   const amount = parseFloat(el.dataset.depth);
   gsap.fromTo(el, { yPercent: amount }, { yPercent: -amount, ease: 'none', scrollTrigger: { trigger: el.closest('.scene'), start: 'top bottom', end: 'bottom top', scrub } });
 }
 
 /** Drift: a caption lags its picture by a few pixels as the scene passes (data-drift, px, applied to its children so the fade-up on the
  *  caption itself does not fight it). Parallax depth between frame and words. */
-function drift(el, scrub) {
+export function drift(el, scrub) {
   const amount = parseFloat(el.dataset.drift) || 12;
   gsap.fromTo(el.children, { y: amount }, { y: -amount, ease: 'none', scrollTrigger: { trigger: el, start: 'top bottom', end: 'bottom top', scrub } });
 }
@@ -100,7 +100,7 @@ function pinnedScene(el, { segments, perSegment = 1, snap = false, scrub = 0.8 }
 
 /** Window (8.6): the full-bleed frame shrinks into `target`, the media inside is counter-scaled so it is a pure crop (transforms only).
  *  `focus` keeps that point of the media centred in the shrinking frame. */
-function windowTo(frame, media, target, tl, at, span, focus = { x: 0.5, y: 0.5 }) {
+export function windowTo(frame, media, target, tl, at, span, focus = { x: 0.5, y: 0.5 }) {
   const p = { v: 0 };
   const radius = () => parseFloat(getComputedStyle(target).borderTopLeftRadius) || 0;   // the frame's inner-corner radius (left side of a right-bleed frame)
   const setF = gsap.quickSetter(frame, 'css'), setM = gsap.quickSetter(media, 'css');
@@ -119,7 +119,9 @@ function windowTo(frame, media, target, tl, at, span, focus = { x: 0.5, y: 0.5 }
     const ty = Math.min(0, Math.max(m.h * sy - m.h, (m.h * sy) / 2 - fy * m.h));
     // The window is the clipping element, so it carries the radius. It is scaled, so the radius is divided by the scale: it lands as exactly the token radius.
     const R = radius() * v, rx = R / sx, ry = R / sy;
-    setF({ x: m.x * v, y: m.y * v, scaleX: sx, scaleY: sy, transformOrigin: '0 0', borderRadius: `${rx}px 0 0 ${rx}px / ${ry}px 0 0 ${ry}px` });
+    setF({ x: m.x * v, y: m.y * v, scaleX: sx, scaleY: sy, transformOrigin: '0 0' });
+    // Set natively: GSAP's css plugin drops the elliptical part after the "/", which left the vertical radius at rx (too round on a tall window, almost square on a wide one).
+    frame.style.borderRadius = `${rx}px 0 0 ${rx}px / ${ry}px 0 0 ${ry}px`;
     setM({ x: tx / sx, y: ty / sy, scaleX: 1 / sx, scaleY: 1 / sy, transformOrigin: '0 0' });
   };
   const onInit = () => measure();
@@ -330,7 +332,7 @@ SCENES.opening = (el) => {
 /* ---------- setup (8.2) ---------- */
 
 function boot() {
-  gsap.registerPlugin(ScrollTrigger, SplitText, DrawSVGPlugin, CustomEase);
+  gsap.registerPlugin(...[ScrollTrigger, SplitText, DrawSVGPlugin, CustomEase].filter(Boolean)); // DrawSVG is only loaded by pages that draw the swan
   CustomEase.create('soft', '0.22,1,0.36,1'); // = --ease-soft
   gsap.defaults({ ease: 'soft', duration: 1.1 });
   ScrollTrigger.config({ ignoreMobileResize: true }); // the address bar showing and hiding does not re-layout pins
@@ -348,7 +350,7 @@ function boot() {
     initHeader();
     if (fine) initGlow();
     document.querySelectorAll('[data-scene]').forEach((el) => {
-      try { SCENES[el.dataset.scene]?.(el, { desktop, fine }); }
+      try { if (SCENES[el.dataset.scene]) SCENES[el.dataset.scene](el, { desktop, fine }); else el.classList.add('scene-failed'); }
       catch (error) { console.error(`scene ${el.dataset.scene}`, error); el.classList.add('scene-failed'); }
     });
     return () => { cleanups.splice(0).forEach((fn) => fn()); };
