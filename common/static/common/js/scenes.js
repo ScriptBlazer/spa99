@@ -102,10 +102,12 @@ function pinnedScene(el, { segments, perSegment = 1, snap = false, scrub = 0.8 }
  *  `focus` keeps that point of the media centred in the shrinking frame. */
 function windowTo(frame, media, target, tl, at, span, focus = { x: 0.5, y: 0.5 }) {
   const p = { v: 0 };
+  const radius = () => parseFloat(getComputedStyle(target).borderTopLeftRadius) || 0;   // the frame's inner-corner radius (left side of a right-bleed frame)
   const setF = gsap.quickSetter(frame, 'css'), setM = gsap.quickSetter(media, 'css');
   let m;
   const measure = () => {
     gsap.set([frame, media], { clearProps: 'transform' });
+    gsap.set(frame, { clearProps: 'borderRadius' });
     const a = frame.getBoundingClientRect(), b = target.getBoundingClientRect();
     m = { sx: b.width / a.width, sy: b.height / a.height, x: b.left - a.left, y: b.top - a.top, w: a.width, h: a.height };
   };
@@ -115,7 +117,9 @@ function windowTo(frame, media, target, tl, at, span, focus = { x: 0.5, y: 0.5 }
     const fx = 0.5 + (focus.x - 0.5) * v, fy = 0.5 + (focus.y - 0.5) * v;
     const tx = Math.min(0, Math.max(m.w * sx - m.w, (m.w * sx) / 2 - fx * m.w));
     const ty = Math.min(0, Math.max(m.h * sy - m.h, (m.h * sy) / 2 - fy * m.h));
-    setF({ x: m.x * v, y: m.y * v, scaleX: sx, scaleY: sy, transformOrigin: '0 0' });
+    // The window is the clipping element, so it carries the radius. It is scaled, so the radius is divided by the scale: it lands as exactly the token radius.
+    const R = radius() * v, rx = R / sx, ry = R / sy;
+    setF({ x: m.x * v, y: m.y * v, scaleX: sx, scaleY: sy, transformOrigin: '0 0', borderRadius: `${rx}px 0 0 ${rx}px / ${ry}px 0 0 ${ry}px` });
     setM({ x: tx / sx, y: ty / sy, scaleX: 1 / sx, scaleY: 1 / sy, transformOrigin: '0 0' });
   };
   const onInit = () => measure();
@@ -234,8 +238,7 @@ SCENES.hero = (el, { desktop }) => {
     .to(q('.hero-veil'), { opacity: 0, duration: 0.5 }, 0.05)
     .to(q('.hero-window .frame-tint'), { opacity: 0.14, duration: 0.7 }, 0);
   windowTo(q('.hero-window'), q('.window-media'), q('[data-hero-target]'), tl, 0, 0.7, desktop ? { x: 0.46, y: 0.52 } : { x: 0.5, y: 0.5 });
-  tl.fromTo(el.querySelectorAll('.hero-corner'), { opacity: 0 }, { opacity: 1, duration: 0.08 }, 0.64)
-    .fromTo(words, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01 }, 0.66)
+  tl.fromTo(words, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01 }, 0.66)
     .fromTo(words.children, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.26, stagger: 0.08 }, 0.66);
   if (desktop) tl.fromTo(q('.thread'), { scaleY: 0 }, { scaleY: 1, transformOrigin: '50% 0', duration: 0.3 }, 0.7);
 

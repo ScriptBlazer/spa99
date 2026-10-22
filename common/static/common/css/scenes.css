@@ -98,10 +98,11 @@ html.lenis, html.lenis body { height: auto; }
 .hero-end-grid { row-gap: var(--space-4); }
 .hero-words, .hero-target { grid-column: 1 / -1; }
 .hero-target { order: -1; height: clamp(12.5rem, 36svh, 30rem); }
-.hero-lede { font-family: var(--font-display); font-weight: 400; font-size: var(--text-lg); line-height: var(--leading-snug); letter-spacing: var(--tracking-display); color: var(--color-text-inverse); max-width: 28rem; }
-.hero-caption { margin-top: var(--space-4); }
+.hero-lede { font-family: var(--font-display); font-weight: 400; font-size: var(--text-xl); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--color-text-inverse); max-width: 22ch; text-wrap: balance; }
+.hero-caption { margin-top: var(--space-5); }
+.hero-caption h2 { font-size: var(--text-lg); }
+.hero-caption p { font-size: var(--text-base); max-width: 34ch; }
 .hero-target .frame-media .photo { object-position: 45% 52%; }
-.hero-corner { display: none; }
 @media (min-width: 64em) {
   .hero-first { align-items: center; padding-block: var(--header-h) var(--space-5); }
   .hero-window .hero-still-wrap { inset: 0; height: 100%; }
@@ -113,8 +114,9 @@ html.lenis, html.lenis body { height: auto; }
   .hero-copy .actions { margin-top: var(--space-5); }
   .hero-end { padding-block: var(--space-6); }
   .hero-end-grid { align-items: center; row-gap: 0; }
-  .hero-words { grid-column: 1 / span 4; grid-row: 1; }
-  .hero-target { grid-column: 5 / -1; grid-row: 1; order: 0; height: min(39rem, 72svh); }
+  .hero-words { grid-column: 1 / span 5; grid-row: 1; }
+  .hero-lede { font-size: clamp(1.5rem, 2.4vw, var(--text-2xl)); }   /* a real statement: 25px at 1024, 35px at 1440, 48px at 1920+ */
+  .hero-target { grid-column: 6 / -1; grid-row: 1; order: 0; height: min(39rem, 72svh); }
 }
 
 /* ---------- R2 the ritual ---------- */
@@ -271,9 +273,6 @@ html.motion .hero-target .frame-media, html.motion .hero-target .frame-tint { di
 html.motion .hero-window .frame-tint { opacity: 0; }                                                                 /* the lights come up as it lands (scenes.js) */
 html.motion .hero-words { opacity: 0; visibility: hidden; align-self: start; }
 html.motion .scene-failed .hero-words { opacity: 1; visibility: visible; }
-html.motion .hero-corner { display: block; position: absolute; left: 0; width: var(--radius-md); height: var(--radius-md); opacity: 0; pointer-events: none; }
-html.motion .hero-corner--top { top: 0; background: radial-gradient(circle at 100% 100%, transparent calc(var(--radius-md) - 0.5px), var(--color-bg-inverse) var(--radius-md)); }
-html.motion .hero-corner--bottom { bottom: 0; background: radial-gradient(circle at 100% 0, transparent calc(var(--radius-md) - 0.5px), var(--color-bg-inverse) var(--radius-md)); }
 /* first paint: the image fades up from espresso while the picture settles (CSS, so the first image never waits for scripts) */
 html.motion .hero-window { animation: frame-in 1200ms var(--ease-soft) backwards; }
 html.motion .hero-still { animation: media-in 1600ms var(--ease-soft) backwards; }
