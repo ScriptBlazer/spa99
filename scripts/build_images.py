@@ -32,7 +32,8 @@ SOURCES = {
     # (arrival, lounge, reception). No grade: they are graded warm already.
     **{name: (f"{name}.png", None) for name in [
         "relaxing-zone", "gym", "dry-sauna", "door-gold", "door-white", "lockers", "arrival", "lounge",
-        "relax-loungers", "showers", "reception", "corridor", "showers-mosaic", "cold-plunge"]},
+        "relax-loungers", "showers", "reception", "corridor", "showers-mosaic", "cold-plunge",
+        "wet-sauna", "massage-room", "kitchenette"]},
     "cold-tub": ("cold-plunge.png", None),  # old name, still used by the cold plunge Facility until Control points it at cold-plunge
     # Kept from the earlier sets (built from the architect / Gemini folder).
     "hero": ("untitled_Gemini 3 Portrait_2026-08-25_12-21-20.png", (0, 0.03, 0.89, 0.80)),  # unused, water wall

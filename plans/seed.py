@@ -99,15 +99,15 @@ FACILITIES = [
 FACILITY_SPA_PAGE = {
     "dry-sauna": {"display": "feature", "image_name": "dry-sauna", "image_focus": "50% 55%",
                   "facts": ["80–90°C", "Dry heat", "10–15 minutes", "Sit on a towel"]},
-    "wet-sauna": {"display": "tile", "image_name": "", "image_focus": "50% 50%", "facts": ["About 45°C", "Soft steam", "10–15 minutes"]},
-    "cold-plunge": {"display": "tile", "image_name": "cold-tub", "image_focus": "100% 62%", "facts": ["8–10°C", "1–3 minutes", "After the heat"]},
+    "wet-sauna": {"display": "tile", "image_name": "wet-sauna", "image_focus": "50% 50%", "facts": ["About 45°C", "Soft steam", "10–15 minutes"]},
+    "cold-plunge": {"display": "tile", "image_name": "cold-plunge", "image_focus": "100% 62%", "facts": ["8–10°C", "1–3 minutes", "After the heat"]},
     "showers": {"display": "tile", "image_name": "showers-mosaic", "image_focus": "35% 55%", "facts": ["Rain showers", "Between rounds"]},
     "relaxing-zone": {"display": "feature", "image_name": "relaxing-zone", "image_focus": "55% 60%",
                       "facts": ["Loungers", "Low light", "Quiet"]},
-    "massage-room": {"display": "companion", "image_name": "", "image_focus": "50% 50%", "facts": ["Part of your visit"]},
+    "massage-room": {"display": "companion", "image_name": "massage-room", "image_focus": "50% 50%", "facts": ["Part of your visit"]},
     "gym": {"display": "feature", "image_name": "gym", "image_focus": "40% 55%",
             "facts": ["Free weights", "Machines", "Part of your visit"]},
-    "kitchenette": {"display": "companion", "image_name": "lounge", "image_focus": "55% 60%",
+    "kitchenette": {"display": "companion", "image_name": "kitchenette", "image_focus": "55% 60%",
                     "facts": ["Tea and coffee", "Somewhere to sit"]},
 }
 

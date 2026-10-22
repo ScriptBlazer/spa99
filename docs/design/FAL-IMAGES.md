@@ -147,7 +147,7 @@ Each prompt below goes **before** the house style block (section 3).
 - **Prompt:** "The entrance to the spa: a tall frosted glass door, floor to ceiling, set between warm stone jambs with dark walnut edges and a long vertical brushed bronze pull handle. The supplied Spa 99 logo is etched large into the frosted glass with a soft gold fill, exactly as the reference. Through the glass, a soft blur of warm light and travertine. Head-on, symmetrical, camera at chest height, a little warm light from the ceiling grazing the glass."
 - **Alt:** "A frosted glass door etched with a gold swan, between stone jambs" fits.
 
-### 8. `wet-sauna` (N1): new
+### 8. `wet-sauna` (N1): new (DONE 2026-10-22, live)
 - **Pages:** The spa wet sauna tile (3:4); journey tile (4:5). A 3D walk slot later.
 - **Generate:** 3:4 portrait, min 1536x2048.
 - **Logo:** yes, small. `mark-gold.png` inlaid in brushed gold in the travertine above the bench, softened by steam.
@@ -163,7 +163,7 @@ Each prompt below goes **before** the house style block (section 3).
 - **References:** the logo, plus the current `relaxing-zone` render (for layout), plus a text-free crop of the Escape ad relaxation photo (for the light).
 - **Prompt:** "A long relaxation room in the evening. A row of four upholstered cream zero-gravity loungers on curved oak frames, each with a folded caramel throw, small round travertine side tables. Travertine walls with vertical warm LED lines between the panels, low even warm light. On the end wall to the right, the supplied Spa 99 logo engraved into the travertine with a warm gold glow inside the lines, exactly as the reference. Wide composition, camera from the entrance end."
 
-### 10. `massage-room` (N4): new
+### 10. `massage-room` (N4): new (DONE 2026-10-22, live)
 - **Pages:** The spa massage companion thumbnail (4:5, small); journey tile (4:5).
 - **Generate:** 4:5, min 1280x1600. Simple and readable at 96 px: the table as one clear shape.
 - **Logo:** yes, small. `mark-gold.png` in brushed gold on the slatted wall behind the table.
@@ -179,7 +179,7 @@ Each prompt below goes **before** the house style block (section 3).
 - **Prompt:** "A close vertical view of one open rain shower: a square brushed bronze rain head, a fine curtain of falling water lit warm from above, a honed travertine wall behind with a walnut slatted screen at the edge of frame, a few drops on the travertine floor, a small lit niche with bronze bottles. Calm, warm, finished. Vertical composition."
 - **Alt:** the Facility alt "Rain showers behind walnut slatted screens" fits.
 
-### 12. `kitchenette` (N5): new
+### 12. `kitchenette` (N5): new (DONE 2026-10-22, live)
 - **Pages:** The spa kitchenette companion (4:5); journey tile (4:5). Optionally the Home kitchenette preview later.
 - **Generate:** 4:5, min 1280x1600 (if it will also be the Home preview, generate 3:2 at 2400x1600 instead, with the counter in the centre).
 - **Logo:** yes, small. `mark-gold.png` inlaid in the walnut panel above the counter.

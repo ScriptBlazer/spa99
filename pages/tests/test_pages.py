@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from plans.management.commands.seed_phase1 import seed_all
-from plans.models import Plan
+from plans.models import Facility, Plan
 
 PUBLIC_PAGES = [
     "/", "/the-spa/", "/memberships/", "/gold-card/", "/gold-card/apply/", "/gold-card/apply/property/", "/book/", "/visit/",
@@ -105,6 +105,7 @@ class PageTests(TestCase):
         self.assertNotIn("Tier 3", self.client.get("/memberships/").content.decode())
 
     def test_spa_page_lists_every_facility_with_a_finished_image_or_placeholder(self):
+        Facility.objects.filter(slug="wet-sauna").update(image_name="")
         html = self.client.get("/the-spa/").content.decode()
         for name in ["Dry sauna", "Wet sauna", "Cold plunge", "Showers", "Relaxing zone", "Massage room", "Gym", "Kitchenette"]:
             self.assertIn(name, html)

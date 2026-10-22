@@ -29,8 +29,9 @@ class SpaTemplateTests(TestCase):
         self.assertNotIn('id="gym"', html)
 
     def test_rooms_without_a_picture_show_the_type_tile_and_facts_render(self):
+        Facility.objects.filter(slug="wet-sauna").update(image_name="")
         html = self.page()
-        self.assertIn('class="type-tile"', html)  # wet sauna and massage room have no render yet
+        self.assertIn('class="type-tile"', html)  # a room with no picture keeps the swan type tile
         self.assertIn("Part of your visit", html)
 
     def test_walk_slots_and_the_pin_free_door(self):

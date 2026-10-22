@@ -173,5 +173,34 @@
       800,
       1600
     ]
+  },
+  "wet-sauna": {
+    "width": 1792,
+    "height": 2400,
+    "widths": [
+      480,
+      800,
+      1600
+    ]
+  },
+  "massage-room": {
+    "width": 1856,
+    "height": 2304,
+    "widths": [
+      480,
+      800,
+      1600,
+      1856
+    ]
+  },
+  "kitchenette": {
+    "width": 1856,
+    "height": 2304,
+    "widths": [
+      480,
+      800,
+      1600,
+      1856
+    ]
   }
 }

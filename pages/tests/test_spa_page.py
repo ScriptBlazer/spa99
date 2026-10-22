@@ -119,3 +119,11 @@ class BackfillTests(TestCase):
         self.assertEqual(Section.objects.get(page__key="spa", key="next").cta_label, "Tailor your membership")
         self.assertEqual(Section.objects.get(page__key="spa", key="intro").body, "{rooms} spaces, one quiet visit.")
         self.assertTrue(Section.objects.filter(page__key="spa", key="tiles_intro").exists())
+
+    def test_backfill_swaps_stand_in_images_only_while_unchanged(self):
+        seed_all()
+        Facility.objects.filter(slug="cold-plunge").update(image_name="cold-tub")
+        Facility.objects.filter(slug="kitchenette").update(image_name="gym")  # a hand edit
+        call_command("backfill_site_data", stdout=StringIO())
+        self.assertEqual(Facility.objects.get(slug="cold-plunge").image_name, "cold-plunge")
+        self.assertEqual(Facility.objects.get(slug="kitchenette").image_name, "gym")

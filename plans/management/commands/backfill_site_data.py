@@ -105,6 +105,8 @@ def backfill():
 
 OLD_MASSAGE_LINE = "A quiet room for a massage, by appointment."
 OLD_SPA_INTRO = "Eight spaces, one quiet visit."
+# Stand-in images replaced by the realistic fal set (2026-10-22): swapped only while the old name is still set.
+OLD_FACILITY_IMAGES = {"cold-plunge": "cold-tub", "kitchenette": "lounge"}
 
 
 def _spa_page():
@@ -118,6 +120,8 @@ def _spa_page():
                 if facility.display != seed["display"]:
                     facility.display, touched = seed["display"], True
             if seed["image_name"] and not facility.image_name:
+                facility.image_name, touched = seed["image_name"], True
+            elif OLD_FACILITY_IMAGES.get(facility.slug) == facility.image_name:
                 facility.image_name, touched = seed["image_name"], True
             if seed["image_focus"] != "50% 50%" and facility.image_focus in ("", "50% 50%"):
                 facility.image_focus, touched = seed["image_focus"], True
