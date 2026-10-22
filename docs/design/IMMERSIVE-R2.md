@@ -25,6 +25,8 @@ Pins that remain on the site: **The spa S2 room walk** (including the dry sauna 
 
 ---
 
+> **Round 3 (2026-10-22) is at the end of this file (section 8) and wins over sections 1 to 7 where they differ** (hero, Gold, Opening, motion level, the "no pins" line).
+
 ## 2.0 Amendments from Moishe (2026-10-22, win over this whole file)
 
 1. **Images bleed off their side of the screen.** An image placed on the right runs off the right edge of the viewport (no margin on that side) and gets a slight radius on its **left corners only** (`--radius-md` on top-left and bottom-left, 0 on the right). An image on the left mirrors it: runs off the left edge, radius on its right corners only. This replaces rule 1's "square-cornered frame" and rule 2's "one bleed per scene": **every** photo on Home is an edge-bleed frame unless it is a small detail inset (insets keep a slight radius on all four corners). No plain square boxed images. Alternate sides scene to scene so the page swings left and right.
@@ -317,3 +319,29 @@ BRAND 7A amendments needed:
 - "Scroll drives the story. Pinned scenes scrub ..." becomes: "Scroll drives the story with no pins on Home: image settle (1.06 → 1), depth between image layers, the thread. Pins only where a whole sequence changes in place (The spa room walk). Scrub 0.4 desktop, 0.3 phone."
 - "Smooth scrolling (Lenis) only on desktop" becomes: "Smooth scrolling is off (flag `data-smooth`, kept for later)."
 - The Draw on Home is time-based on enter, not scrubbed.
+
+---
+
+## 8. Round 3 (2026-10-22): the motion comes back, the image is the fish tank
+
+Moishe: round 2 cut too much scroll animation; Gold and Opening are still too big and empty; the fish tank is the feature image; the wooden tub is the cold plunge. Same design, more motion, no long pins. Built; screenshots in `.private/shots/r3/`.
+
+**Image.** `fish-tank` (`Provided 3D renders/Fish Tank.jpeg`, graded like the other renders, 480 / 800 / 1581 px) replaces `arrival` as the hero, the preload (`imagesizes="(min-width: 48em) 100vw, 300vw"`: on a phone the picture is cropped by height, so it is about three screens wide) and the end frame. Focal point: the tank and the three men (desktop 50% 54%, phone 40% 52%, gold cove above). `arrival` stays built, unused on Home. "Then cold." uses `cold-tub` (focal 100% 62%) until `cold-plunge` exists.
+
+**R1 Hero (pinned, `+=60%` desktop, `+=40%` phone, scrub 0.5 / 0.3).**
+- First paint: the fish tank full bleed, full screen. Heading, lead and both buttons sit on it, left, vertically centred on desktop and in the lower half on phone, on `.hero-veil`: espresso `--color-veil` under the header (solid for `--header-h`, clear by +4rem), solid under the words on the left (to `--bleed + 25rem`, clear by `--bleed + 45rem`) on desktop, from the bottom (solid to 54%, clear by 80%) on phone. The tank stays clear of the veil on desktop. Measured (cream `#F5F2D8` against the brightest pixel under each text box, veil on, at 1920, 1440, 1024, 768, 375, 360 wide): body (lead, links, nav) 6.63:1 at the worst, headings 5.13:1 at the worst (360 wide), 7.06:1 at 1440 and 1920. Needs: 4.5 body, 3 headings.
+- On scroll (`windowTo`, IMMERSIVE 8.6, reused from round 1): the full-screen window shrinks onto the round 2 frame (right edge bleed; phone: bleeds right, margin left) while the picture stays a pure crop (counter-scaled, focal 46% 52%). It finishes at 70% of the pin; the first words (`.hero-copy`) rise and fade out in the first 30%, the veil clears, the tint comes up 0 to 0.14, the inner-corner radius appears as two espresso corner pieces fading in (opacity only: a radius cannot be scaled without distorting), then the round 2 words come in (the statement body, gold hairline, "Reception." caption from `home.hero_caption`, one line from data) at 66% to 100%, and the thread draws.
+- Markup: `.hero-first` (window + words) and `.hero-end` (words + `.hero-target`, the measuring box). The target is a real second picture without motion, so the static layout is the full-screen image with its words, then the round 2 layout below. With motion the target picture is hidden (`display: none`), so the page loads the image once.
+- Living still and Pause as before. The Pause button stays at the bottom right (on its own espresso plate over the picture, outside the picture once it has shrunk).
+
+**R6 Gold Card: compact and rich.** Content height (about 0.7 screen, no `min-height`). Left: heading, "For people in property. Free, by application.", the perks as pills from the Gold plan (`services.gold_groups()`, eight pills: visits, any time, booking window, guests, waitlist, merch, Leil Shishi, events), quiet link. Right: the swan. **Scrubbed, no pin**: the swan draws itself (DrawSVG, ease none, scrub 0.5 / 0.3) from `top 80%` to `center 45%` of the section, fill and outline swap as in 8.7; heading Line rise and pills Fade up (0.06s apart) on enter. A pin was not needed: the compact section crosses the screen in about 550px of scroll, which reads as the same draw, and Home stays short.
+
+**R7 Opening: a compact band.** Hairline on top, then "January 2027." (`--text-hero`, gold), the address from `SiteSettings.address_one_line`, one small line from data ("Open 5am to 3am, every day. Closed for Shabbos and Yom Tov." from `OpeningRule`), primary "Register interest" at the right on desktop. About 0.4 screen. No coordinates: there is no such data; none were invented.
+
+**Motion, a bit more.** New: the hero window, the swan scrub, caption drift (`data-drift`, the children of each caption move 12px against their picture, so words and picture sit at different depths; the caption's own Fade up is not touched), depth on the heat frame and the inside preview (4%), tint rise on the hero. Kept: Line rise on every heading, Fade up on groups, settle 1.06 to 1, depth 12 / 5 / 6, the thread, counts, glow. Only transform and opacity (plus SVG stroke drawing).
+
+**Length.** Desktop 1440x800: hero 1.6 (1 + 0.6 pin), ritual, inside, entry, plans 1 each, Gold about 0.7, Opening about 0.4 = about 6.7 screens, plus the footer (7.1 in total). Phone: about 10 screens of native scroll including the footer.
+
+**Budget.** JS on Home (all scripts the page loads, gzip): 73.0 KB (gsap 28.2, ScrollTrigger 17.8, SplitText 3.4, DrawSVG 2.2, CustomEase 3.6, scenes.js 6.9, the rest 10.8). Journey and forms load no GSAP.
+
+**BRAND 7A.** The "no pins on Home" line becomes "one short pin on Home (the hero window, +=60% desktop, +=40% phone)"; everything else in section 7 stands.

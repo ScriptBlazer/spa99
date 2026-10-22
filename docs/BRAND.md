@@ -78,7 +78,7 @@ Shared everywhere:
 ### 7A. Immersive (marketing pages)
 
 - **Every section fits one screen on desktop** (`100svh`), complete on its own at 1440×800. On phone, a scene read in normal scroll (no pin) may run to two screens; nothing inside it may depend on a pin.
-- **Scroll drives the story, with no pins on Home:** image settle (scale 1.06 → 1), depth between image layers, the thread. Pins only where a whole sequence changes in place (The spa room walk). Scrub 0.4 desktop, 0.3 phone. No snapping on Home.
+- **Scroll drives the story, with one short pin on Home (the hero shrinking into its frame):** image settle (scale 1.06 → 1), depth between image layers, the thread. Pins only where a whole sequence changes in place (The spa room walk). Scrub 0.4 desktop, 0.3 phone. No snapping on Home.
 - **Headings rise line by line** from a mask (1.1s, 0.08s between lines), once. Body and actions fade up after them (0.9s, 16px).
 - **The swan draws itself** (stroke, then the gold fill) on the Gold Card, Book and the Home Gold scene. Nowhere else. On Home the draw is time-based on enter (2.4s), not scrubbed.
 - **Numbers count** only when they are small whole numbers that matter (visits a month, days ahead): 1.2s, once. Prices never animate.

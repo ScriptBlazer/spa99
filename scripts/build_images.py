@@ -41,6 +41,7 @@ SOURCES = {
     "reception": ("WhatsApp Image 2026-08-26 at 19.03.33 (2).jpeg", (0.40, 0, 1, 1), True),  # 13, until the lettering is cleaned
     "corridor": ("WhatsApp Image 2026-08-26 at 19.03.34 (5).jpeg", None, True),  # 17
     "showers-mosaic": ("Showers.jpeg", (0, 0, 0.80, 1), True),  # 04
+    "fish-tank": ("Fish Tank.jpeg", None, True),  # 01 reception with the large fish tank: the Home hero / feature image (Moishe, 2026-10-22)
 }
 
 

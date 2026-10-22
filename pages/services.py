@@ -55,6 +55,12 @@ def hours_summary():
     return f"Open {periods[0][0]} to {periods[0][1]}" if periods else ""
 
 
+def closure_title():
+    """The public name of the weekly closure ('Shabbos and Yom Tov'), or '' when none is set in Control."""
+    rule = OpeningRule.objects.filter(active=True, kind=OpeningRule.CLOSE_BEFORE_CANDLES).exclude(public_title="").first()
+    return rule.public_title if rule else ""
+
+
 def hours_facts():
     """The two numbers Home shows, from the open periods: {'range': '5am to 3am', 'hours': 22}. None when no period is set."""
     periods = [r for r in OpeningRule.objects.filter(active=True, kind=OpeningRule.PERIOD) if r.start_time and r.end_time]

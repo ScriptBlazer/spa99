@@ -81,9 +81,15 @@ class PageTests(TestCase):
         self.assertIn("guests at most, at any time", html)
         self.assertIn(">25<", html)
 
-    def test_home_preloads_the_arrival_render_and_runs_no_smooth_scroll(self):
+    def test_home_gold_and_opening_bands_use_data(self):
         html = self.client.get("/").content.decode()
-        self.assertRegex(html, r'rel="preload"[^>]*fetchpriority="high"[^>]*arrival-')
+        for needle in ["Unlimited visits", "Bring 2 guests a month", "Leil Shishi when offered", "99 Vale Road, London N4 1PR",
+                       "Open 5am to 3am, every day.", "Closed for Shabbos and Yom Tov.", "cold-tub-", "fish-tank-"]:
+            self.assertIn(needle, html)
+
+    def test_home_preloads_the_fish_tank_render_and_runs_no_smooth_scroll(self):
+        html = self.client.get("/").content.decode()
+        self.assertRegex(html, r'rel="preload"[^>]*fetchpriority="high"[^>]*fish-tank-')
         self.assertIn('data-smooth="off"', html)
 
     def test_memberships_show_ex_and_inc_vat_and_hide_hidden_plans(self):

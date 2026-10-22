@@ -5,34 +5,54 @@
 {% block header_mode %}overlay{% endblock %}
 {% block head_title %}{% include "common/_head.html" with title="Spa 99 | Beyond Luxury" description=meta.meta_description %}{% endblock %}
 {% block head_extra %}
-<link rel="preload" as="image" type="image/webp" fetchpriority="high" imagesrcset="{% photo_srcset "arrival" %}" imagesizes="(min-width: 64em) 65vw, 100vw">
+<link rel="preload" as="image" type="image/webp" fetchpriority="high" imagesrcset="{% photo_srcset "fish-tank" %}" imagesizes="(min-width: 48em) 100vw, 300vw">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"DaySpa","name":"Spa 99","description":"A private spa for men in North London.","url":"{{ request.scheme }}://{{ request.get_host }}/","email":"{{ site_settings.contact_email }}","address":{"@type":"PostalAddress","streetAddress":"{{ site_settings.address_street|default:"99 Vale Road"|escapejs }}","addressLocality":"{{ site_settings.address_town|default:"London"|escapejs }}","postalCode":"{{ site_settings.address_postcode|default:"N4 1PR"|escapejs }}","addressCountry":"GB"}}</script>
 {% endblock %}
 {% block main %}
 {% page_content "home" as home %}
 {% hero_video as hv %}
 
-{# R1. Arrival: the reception, shown whole, running off the right edge (docs/design/IMMERSIVE-R2.md section 3). #}
-<section class="scene hero-scene on-dark" data-scene="hero" data-glow aria-labelledby="hero-title">
+{# R1. Arrival (round 3): the fish tank opens full screen with the words on it; on scroll the image shrinks into the right edge-bleed frame (docs/design/IMMERSIVE-R2.md, Round 3). #}
+<section class="scene hero-scene scene--pin on-dark" data-scene="hero" aria-labelledby="hero-title">
   <div class="thread" aria-hidden="true"></div>
-  <div class="glow" aria-hidden="true"></div>
-  <div class="container grid hero-grid">
-    <div class="hero-frame">
-      <figure class="frame frame--right frame--lag" data-frame>
-        <div class="frame-media" data-hero-media>
+  <div class="hero-stage">
+    <div class="hero-first" data-glow>
+      <div class="hero-window" data-window>
+        <div class="window-media" data-hero-media>
           {% if hv %}<video class="hero-video" muted playsinline loop preload="none" aria-hidden="true" tabindex="-1"{% if hv.poster %} poster="{{ hv.poster }}"{% endif %} data-sources="{{ hv.sources }}"></video>{% endif %}
-          <div class="hero-still-wrap">{% photo "arrival" alt="The reception: a backlit travertine water wall under a gold-leaf cove, with a green wall and a stone bench" sizes="(min-width: 64em) 65vw, 100vw" eager=True override=home.hero.image css_class="hero-still" %}</div>
+          <div class="hero-still-wrap">{% photo "fish-tank" alt="The reception: three men in robes on a stone bench in front of a large fish tank, beside a green wall and the Spa 99 swan, under a gold-leaf cove" sizes="(min-width: 48em) 100vw, 300vw" eager=True override=home.hero.image css_class="hero-still" %}</div>
         </div>
         <div class="frame-tint" aria-hidden="true"></div>
-      </figure>
+        <div class="hero-veil" aria-hidden="true"></div>
+      </div>
+      <div class="glow" aria-hidden="true"></div>
+      <div class="container hero-first-inner">
+        <div class="hero-copy" data-hero-copy>
+          <h1 class="display hero-title" id="hero-title" data-rise>{{ home.hero.heading }}</h1>
+          <p class="lead" data-fade>{{ home.hero.body }}</p>
+          <div class="actions" data-fade>
+            <a class="btn btn-primary btn-block-phone" href="{% url 'journey' %}">{{ home.hero.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
+            {% if home.hero_link.cta_label %}<a class="btn-quiet" href="{% url 'spa' %}">{{ home.hero_link.cta_label }}</a>{% endif %}
+          </div>
+        </div>
+      </div>
       <button class="hero-pause btn-quiet" type="button" aria-pressed="false" data-hero-pause>Pause</button>
     </div>
-    <div class="hero-copy">
-      <h1 class="display hero-title" id="hero-title" data-rise>{{ home.hero.heading }}</h1>
-      <p class="lead" data-fade>{{ home.hero.body }}</p>
-      <div class="actions" data-fade>
-        <a class="btn btn-primary btn-block-phone" href="{% url 'journey' %}">{{ home.hero.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
-        {% if home.hero_link.cta_label %}<a class="btn-quiet" href="{% url 'spa' %}">{{ home.hero_link.cta_label }}</a>{% endif %}
+    {# The round 2 layout: the words on the left, the frame on the right. With motion this is where the image lands; without it, it is simply the next block. #}
+    <div class="hero-end">
+      <div class="container grid hero-end-grid">
+        <div class="hero-words" data-hero-words>
+          <p class="hero-lede">{{ home.statement.body }}</p>
+          <div class="frame-caption hero-caption">
+            <h2>{{ home.hero_caption.heading|default:"Reception." }}</h2>
+            <p class="small">{{ home.hero_caption.body|default:"A large fish tank to wait beside, before the rest of the spa." }}</p>
+          </div>
+        </div>
+        <figure class="frame frame--right hero-target" data-hero-target>
+          <div class="frame-media">{% photo "fish-tank" alt="" sizes="(min-width: 64em) 65vw, 100vw" css_class="hero-still-end" %}</div>
+          <div class="frame-tint" aria-hidden="true"></div>
+          <span class="hero-corner hero-corner--top" aria-hidden="true"></span><span class="hero-corner hero-corner--bottom" aria-hidden="true"></span>
+        </figure>
       </div>
     </div>
   </div>
@@ -45,21 +65,21 @@
     <div class="container grid ritual-grid">
       <h2 class="statement ritual-head" id="ritual-title" data-rise>{{ home.statement.heading }}</h2>
       <div class="ritual-item ritual-heat">
-        <figure class="frame frame--left" data-frame>
+        <figure class="frame frame--left" data-frame data-depth="4">
           <div class="frame-media">{% photo "dry-sauna" alt="Dry sauna with cedar benches and a glass door etched with the swan" sizes="(min-width: 64em) 26vw, 95vw" %}</div>
           <div class="frame-tint" aria-hidden="true"></div>
         </figure>
-        <div class="frame-caption" data-caption>
+        <div class="frame-caption" data-caption data-drift="12">
           <h3>{{ home.scene_heat.body }}</h3>
           <p class="small">{{ lines.dry_sauna }}</p>
         </div>
       </div>
       <div class="ritual-item ritual-cold">
-        <figure class="frame frame--inset" data-frame data-depth="12">
-          <div class="frame-media">{% has_photo "cold-plunge" as cold %}{% if cold %}{% photo "cold-plunge" alt="Cold plunge pool set into a travertine floor" sizes="(min-width: 64em) 22vw, 72vw" %}{% else %}{% photo "door-white" alt="A pale travertine doorway, the way to the cold plunge" sizes="(min-width: 64em) 22vw, 72vw" %}{% endif %}</div>
+        <figure class="frame frame--inset" data-frame data-depth="12" style="--focus: 100% 62%">
+          <div class="frame-media">{% has_photo "cold-plunge" as cold %}{% if cold %}{% photo "cold-plunge" alt="Cold plunge pool set into a travertine floor" sizes="(min-width: 64em) 22vw, 72vw" %}{% else %}{% photo "cold-tub" alt="The cold plunge: a wooden tub with steps, beside a stone bench" sizes="(min-width: 64em) 22vw, 72vw" %}{% endif %}</div>
           <div class="frame-tint" aria-hidden="true"></div>
         </figure>
-        <div class="frame-caption" data-caption>
+        <div class="frame-caption" data-caption data-drift="12">
           <h3>{{ home.scene_cold.body }}</h3>
           <p class="small">{{ lines.cold_plunge }}</p>
         </div>
@@ -69,7 +89,7 @@
           <div class="frame-media">{% photo "relax-loungers" alt="Relaxing room with wooden loungers, travertine walls and round moss panels" sizes="(min-width: 64em) 34vw, 95vw" %}</div>
           <div class="frame-tint" aria-hidden="true"></div>
         </figure>
-        <div class="frame-caption" data-caption>
+        <div class="frame-caption" data-caption data-drift="12">
           <h3>{{ home.scene_rest.body }}</h3>
           <p class="small">{{ lines.relaxing_zone }}</p>
           {% if home.scenes_link.cta_label %}<a class="btn-quiet" href="{% url 'spa' %}">{{ home.scenes_link.cta_label }}</a>{% endif %}
@@ -86,7 +106,7 @@
     <div class="container grid inside-grid">
       <div class="inside-main">
         <h2 class="statement" id="inside-title" data-rise>{{ home.inside.heading|default:"What's inside." }}</h2>
-        <figure class="frame frame--left inside-frame" data-frame data-preview>
+        <figure class="frame frame--left inside-frame" data-frame data-depth="4" data-preview>
           <div class="frame-media">
             {% for room in rooms %}{% if room.preview %}
             <div class="preview-pic{% if room.slug == "showers" %} is-active{% endif %}" data-preview-pic="{{ room.slug }}" aria-hidden="true">{% photo room.preview alt="" sizes="(min-width: 64em) 42vw, 95vw" override=room.image %}</div>
@@ -147,7 +167,7 @@
           <div class="frame-media">{% photo "lounge" alt="The lounge: a curved sofa by a window, under a gold-leaf ceiling cove" sizes="(min-width: 64em) 40vw, 100vw" %}</div>
           <div class="frame-tint" aria-hidden="true"></div>
         </figure>
-        <div class="frame-caption" data-caption>
+        <div class="frame-caption" data-caption data-drift="12">
           <h3>{{ home.lounge_caption.heading|default:"The lounge." }}</h3>
           <p class="small">{{ lines.kitchenette }}</p>
         </div>
@@ -181,29 +201,33 @@
   </div>
 </section>
 
-{# R6. The Gold Card: the swan draws itself once, when the thread arrives. #}
+{# R6. The Gold Card: compact. The swan draws itself as you scroll (scrubbed, no pin). #}
 <section class="scene gold-scene on-dark" data-scene="gold" data-glow aria-labelledby="gold-title">
   <div class="thread thread--half" aria-hidden="true"></div>
   <div class="scene-stage">
     <div class="glow" aria-hidden="true"></div>
-    <div class="container grid">
+    <div class="container grid gold-grid">
       <div class="gold-swan">{% include "common/_mark_draw.html" %}</div>
       <div class="gold-text">
         <h2 id="gold-title" class="statement" data-rise>{{ home.gold_teaser.heading }}</h2>
         <p data-fade>{{ home.gold_teaser.body }}</p>
+        {% if gold_perks %}<ul class="pills" aria-label="What the Gold Card holds">{% for perk in gold_perks %}<li class="pill" data-pill>{{ perk }}</li>{% endfor %}</ul>{% endif %}
         <a class="btn-quiet" data-fade href="{% url 'gold_card' %}">{{ home.gold_teaser.cta_label }}</a>
       </div>
     </div>
   </div>
 </section>
 
-{# R7. Opening: a closing band. #}
+{# R7. Opening: a compact band. #}
 <section class="scene opening-scene on-dark" data-scene="opening" aria-labelledby="opening-title">
   <div class="scene-stage">
-    <div class="container">
-      <h2 id="opening-title" class="opening-date" data-rise>{{ home.opening.heading|default:site_settings.opening_label }}</h2>
-      <p class="lead" data-fade>{{ home.opening.body }}</p>
-      <div class="actions" data-fade><a class="btn btn-primary btn-block-phone" href="{% url 'register' %}">{{ home.opening.cta_label }}</a></div>
+    <div class="container grid opening-grid">
+      <div class="opening-main">
+        <h2 id="opening-title" class="opening-date" data-rise>{{ home.opening.heading|default:site_settings.opening_label }}</h2>
+        <p class="lead opening-address" data-fade>{{ site_settings.address_one_line }}</p>
+        <p class="small opening-hours" data-fade>{% hours_summary %}, every day.{% if closure %} Closed for {{ closure }}.{% endif %}</p>
+      </div>
+      <div class="opening-action actions" data-fade><a class="btn btn-primary btn-block-phone" href="{% url 'register' %}">{{ home.opening.cta_label }}</a></div>
     </div>
   </div>
 </section>

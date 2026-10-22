@@ -8,10 +8,11 @@
  *    page (part 2: spa, memberships, gold, book, visit), add a function to SCENES below and the data-scene to the markup.
  *    A scene that throws is marked .scene-failed and shows its static content.
  *  - Only transform and opacity animate (plus SVG stroke drawing). Scroll-driven tweens use ease "none" (the scroll is the easing).
- *  - Home (docs/design/IMMERSIVE-R2.md) has no pins: frames settle (1.06 to 1), drift at different speeds (data-depth), a thread draws
- *    down the margin. pinnedScene() stays for The spa room walk.
+ *  - Home (docs/design/IMMERSIVE-R2.md, round 3): one short pin, the hero (the window shrinks onto the frame). Everywhere else frames settle
+ *    (1.06 to 1), drift at different speeds (data-depth), captions lag them (data-drift), a thread draws down the margin, and the Gold swan
+ *    draws as you scroll. pinnedScene() also serves The spa room walk.
  *  - Markup hooks: data-rise (line rise), data-fade (fade up), data-fade-row (fade up as a group), data-caption (fade up, one each),
- *    data-count (small whole numbers), data-glow (pointer light), data-frame (settle), data-depth (drift).
+ *    data-count (small whole numbers), data-glow (pointer light), data-frame (settle), data-depth (frame drift), data-drift (caption lag).
  */
 const { gsap, ScrollTrigger, SplitText, DrawSVGPlugin, CustomEase } = window;
 const root = document.documentElement;
@@ -63,6 +64,13 @@ function depth(el, scrub) {
   gsap.fromTo(el, { yPercent: amount }, { yPercent: -amount, ease: 'none', scrollTrigger: { trigger: el.closest('.scene'), start: 'top bottom', end: 'bottom top', scrub } });
 }
 
+/** Drift: a caption lags its picture by a few pixels as the scene passes (data-drift, px, applied to its children so the fade-up on the
+ *  caption itself does not fight it). Parallax depth between frame and words. */
+function drift(el, scrub) {
+  const amount = parseFloat(el.dataset.drift) || 12;
+  gsap.fromTo(el.children, { y: amount }, { y: -amount, ease: 'none', scrollTrigger: { trigger: el, start: 'top bottom', end: 'bottom top', scrub } });
+}
+
 /** Thread (desktop): the hairline in the left margin draws down as the scene passes. */
 function thread(scene, scrub, { start = 'top 60%', end = 'bottom 60%' } = {}) {
   const line = scene.querySelector('.thread');
@@ -74,6 +82,7 @@ function frames(el, { desktop }) {
   const scrub = desktop ? 0.4 : 0.3;
   el.querySelectorAll('[data-frame]').forEach((f) => settle(f, scrub));
   el.querySelectorAll('[data-depth]').forEach((f) => depth(f, scrub));
+  el.querySelectorAll('[data-drift]').forEach((c) => drift(c, scrub));
   if (desktop) thread(el, scrub);
 }
 
@@ -87,6 +96,35 @@ function pinnedScene(el, { segments, perSegment = 1, snap = false, scrub = 0.8 }
       snap: snap ? { snapTo: 'labelsDirectional', duration: { min: 0.3, max: 0.8 }, delay: 0.08, ease: 'power1.inOut' } : false,
     },
   });
+}
+
+/** Window (8.6): the full-bleed frame shrinks into `target`, the media inside is counter-scaled so it is a pure crop (transforms only).
+ *  `focus` keeps that point of the media centred in the shrinking frame. */
+function windowTo(frame, media, target, tl, at, span, focus = { x: 0.5, y: 0.5 }) {
+  const p = { v: 0 };
+  const setF = gsap.quickSetter(frame, 'css'), setM = gsap.quickSetter(media, 'css');
+  let m;
+  const measure = () => {
+    gsap.set([frame, media], { clearProps: 'transform' });
+    const a = frame.getBoundingClientRect(), b = target.getBoundingClientRect();
+    m = { sx: b.width / a.width, sy: b.height / a.height, x: b.left - a.left, y: b.top - a.top, w: a.width, h: a.height };
+  };
+  const apply = () => {
+    if (!m) return;
+    const v = p.v, sx = 1 + (m.sx - 1) * v, sy = 1 + (m.sy - 1) * v;
+    const fx = 0.5 + (focus.x - 0.5) * v, fy = 0.5 + (focus.y - 0.5) * v;
+    const tx = Math.min(0, Math.max(m.w * sx - m.w, (m.w * sx) / 2 - fx * m.w));
+    const ty = Math.min(0, Math.max(m.h * sy - m.h, (m.h * sy) / 2 - fy * m.h));
+    setF({ x: m.x * v, y: m.y * v, scaleX: sx, scaleY: sy, transformOrigin: '0 0' });
+    setM({ x: tx / sx, y: ty / sy, scaleX: 1 / sx, scaleY: 1 / sy, transformOrigin: '0 0' });
+  };
+  const onInit = () => measure();
+  const onRefresh = () => apply();
+  ScrollTrigger.addEventListener('refreshInit', onInit);
+  ScrollTrigger.addEventListener('refresh', onRefresh);
+  cleanups.push(() => { ScrollTrigger.removeEventListener('refreshInit', onInit); ScrollTrigger.removeEventListener('refresh', onRefresh); });
+  measure();
+  tl.to(p, { v: 1, duration: span, ease: 'none', onUpdate: apply }, at);
 }
 
 /** Draw (8.7): outline paths draw (DrawSVG), the gold fill fades in, the outline fades out. T is the total length in timeline units. */
@@ -179,21 +217,30 @@ function startLenis() {
 
 /* ---------- scenes ---------- */
 
-/** R1 Arrival: the frame fades in (CSS), the heading rises, the picture lags the page as the hero leaves. Living still until a video exists. */
+/** R1 Arrival (round 3): the fish tank fills the screen with the words on it; scrolling shrinks the window onto the frame on the right
+ *  (short pin: +=60% desktop, +=40% phone), the first words leave and the round 2 words come in. Living still until a video exists. */
 SCENES.hero = (el, { desktop }) => {
   const q = (s) => el.querySelector(s);
-  const scrub = desktop ? 0.4 : 0.3;
+  const tl = pinnedScene(el, { segments: 2, perSegment: desktop ? 0.6 : 0.4, scrub: desktop ? 0.5 : 0.3 });
+  tl.to({}, { duration: 1 }, 0);
+
+  // on load
   lineRise(q('.hero-title'), { trigger: false, delay: 0.2 });
   gsap.fromTo(el.querySelectorAll('.hero-copy [data-fade]'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.9, delay: 0.5 });
 
-  // leaving: the picture lags inside its frame, the tint deepens. Text does not move.
-  const media = q('.frame-media');
-  const leave = { trigger: el, start: 'top top', end: 'bottom top', scrub };
-  gsap.fromTo(media, { yPercent: 0 }, { yPercent: 6, ease: 'none', scrollTrigger: leave });
-  gsap.fromTo(q('.frame-tint'), { opacity: 0.14 }, { opacity: 0.35, ease: 'none', scrollTrigger: leave });
-  if (desktop) thread(el, scrub, { start: 'top top' });
+  // on scroll: words out, window onto the frame (veil clears, corners round), round 2 words in
+  const words = q('[data-hero-words]');
+  tl.to(q('[data-hero-copy]'), { autoAlpha: 0, y: -32, duration: 0.3 }, 0)
+    .to(q('.hero-veil'), { opacity: 0, duration: 0.5 }, 0.05)
+    .to(q('.hero-window .frame-tint'), { opacity: 0.14, duration: 0.7 }, 0);
+  windowTo(q('.hero-window'), q('.window-media'), q('[data-hero-target]'), tl, 0, 0.7, desktop ? { x: 0.46, y: 0.52 } : { x: 0.5, y: 0.5 });
+  tl.fromTo(el.querySelectorAll('.hero-corner'), { opacity: 0 }, { opacity: 1, duration: 0.08 }, 0.64)
+    .fromTo(words, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01 }, 0.66)
+    .fromTo(words.children, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.26, stagger: 0.08 }, 0.66);
+  if (desktop) tl.fromTo(q('.thread'), { scaleY: 0 }, { scaleY: 1, transformOrigin: '50% 0', duration: 0.3 }, 0.7);
 
   // the living still (one cycle per 48s), the optional video, and the Pause control
+  const media = q('.window-media');
   const still = q('.hero-still-wrap');
   const loops = [gsap.to(still, { scale: 1.03, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' })];
   const video = q('.hero-video');
@@ -258,22 +305,23 @@ SCENES.plans = (el, { desktop }) => {
   if (desktop) thread(el, 0.4);
 };
 
-/** R6 The Gold Card: the thread arrives at the centre line and the swan draws itself once (2.4s), then the words. Not pinned. */
+/** R6 The Gold Card (compact, not pinned): the swan draws itself as the section passes (scrubbed), the words and chips follow. */
 SCENES.gold = (el, { desktop }) => {
+  const scrub = desktop ? 0.5 : 0.3;
   if (desktop) thread(el, 0.4, { start: 'top 90%', end: 'top 55%' });
-  const tl = gsap.timeline({ paused: true });
-  drawSwan(el.querySelector('.mark-draw'), tl, 0, 2.4, 'soft');
-  const split = splitLines(el.querySelector('[data-rise]'));
-  tl.fromTo(split.lines, { yPercent: 105 }, { yPercent: 0, duration: 1.1, stagger: 0.08 }, 0.6)
-    .fromTo(el.querySelectorAll('[data-fade]'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.9 }, 1.2);
-  ScrollTrigger.create({ trigger: el, start: 'top 55%', once: true, onEnter: () => tl.play() });
+  const draw = gsap.timeline({ defaults: { ease: 'none' }, scrollTrigger: { trigger: el, start: 'top 80%', end: 'center 45%', scrub } });
+  drawSwan(el.querySelector('.mark-draw'), draw, 0, 1);
+  const h = el.querySelector('[data-rise]');
+  lineRise(h);
+  fadeUp(el.querySelectorAll('.gold-text > [data-fade]'), { trigger: h, start: 'top 75%', delay: 0.3, stagger: 0.15 });
+  fadeUp(el.querySelectorAll('[data-pill]'), { trigger: el.querySelector('.pills'), start: 'top 90%', delay: 0.2, stagger: 0.06 });
 };
 
 /** R7 Opening: the quiet end of the visit. */
 SCENES.opening = (el) => {
   const h = el.querySelector('[data-rise]');
   lineRise(h);
-  fadeUp(el.querySelectorAll('[data-fade]'), { trigger: h, delay: 0.5, stagger: 0.15 });
+  fadeUp(el.querySelectorAll('[data-fade]'), { trigger: h, start: 'top 90%', delay: 0.4, stagger: 0.12 });
 };
 
 /* ---------- setup (8.2) ---------- */

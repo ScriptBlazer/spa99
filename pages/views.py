@@ -43,8 +43,10 @@ def home(request):
     cards = services.purchasable_plans()
     rooms = services.room_index()
     half = (len(rooms) + 1) // 2
+    gold_perks = [perk for _, perks in (services.gold_groups() or []) for perk in perks]
     return _page(request, "pages/home.html", "home", time_question=_time_question(), rooms=rooms,
                  room_groups=[g for g in (rooms[:half], rooms[half:]) if g], facts=services.hours_facts(),
+                 gold_perks=gold_perks, closure=services.closure_title(),
                  lines={r["slug"].replace("-", "_"): r["line"] for r in rooms},
                  plan_cards=[c for c in cards if not c["is_single"]], single=next((c for c in cards if c["is_single"]), None))
 
