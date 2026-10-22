@@ -5,7 +5,7 @@
 
 /* ---------- page transitions (2.4): lights dimming between rooms, opacity only ---------- */
 @view-transition { navigation: auto; }
-.site-header { view-transition-name: site-header; }
+/* No view-transition-name on the header: it makes the header a backdrop root, so its blur layer would see nothing behind it and page content would show through at 88%. */
 ::view-transition-old(root) { animation: 240ms var(--ease-soft) both vt-out; }
 ::view-transition-new(root) { animation: var(--duration-page) var(--ease-soft) 80ms both vt-in; }
 @keyframes vt-out { to { opacity: 0; } }
@@ -255,9 +255,9 @@ html.motion .gc-stage { position: absolute; inset: 0; perspective: calc(var(--gc
 .gc-card { transform: rotateX(8deg) rotateY(-25deg); }
 .gc-front, .gc-back { position: absolute; inset: 0; border-radius: var(--gc-r); overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .gc-front { transform: translateZ(var(--gc-t)); }
-.gc-back { transform: rotateY(180deg) translateZ(var(--gc-t)); background: color-mix(in srgb, var(--color-gold-deep) 45%, var(--color-gold-shade)) url("../img/swan-pattern.svg"); background-size: calc(var(--gc-w) * 0.1168) auto; display: grid; place-items: end center; }
+.gc-back { transform: rotateY(180deg) translateZ(var(--gc-t)); background: color-mix(in srgb, var(--color-gold-deep) 75%, var(--color-gold-metal)) url("../img/swan-pattern.svg"); background-size: calc(var(--gc-w) * 0.1168) auto; display: grid; place-items: end center; }
 .gc-back::after { content: ""; position: absolute; inset: 0; background: linear-gradient(118deg, var(--color-gold-deep), transparent 55%, var(--color-gold-deep)); opacity: 0.32; }
-.gc-back-line { position: relative; z-index: 1; margin-bottom: calc(var(--gc-w) * 0.07); font-size: calc(var(--gc-w) * 0.021); letter-spacing: 0.2em; text-transform: uppercase; font-weight: 500; color: var(--color-gold-shade); }
+.gc-back-line { position: relative; z-index: 1; margin-bottom: calc(var(--gc-w) * 0.07); font-size: calc(var(--gc-w) * 0.021); letter-spacing: 0.2em; text-transform: uppercase; font-weight: 500; color: color-mix(in srgb, var(--color-gold-deep) 60%, var(--color-espresso)); text-shadow: 0 1px 0 color-mix(in srgb, var(--color-gold-light) 28%, transparent); }   /* engraved: one dark cut, one faint lit edge below */
 .gc-side { position: absolute; background: linear-gradient(to bottom, var(--color-gold-shade), var(--color-gold-light) 50%, var(--color-gold-shade)); }
 .gc-side--l, .gc-side--r { top: var(--gc-r); bottom: var(--gc-r); width: calc(var(--gc-t) * 2); }
 .gc-side--l { left: 0; transform: translateX(-50%) rotateY(90deg); }
@@ -267,7 +267,7 @@ html.motion .gc-stage { position: absolute; inset: 0; perspective: calc(var(--gc
 .gc-side--b { bottom: 0; transform: translateY(50%) rotateX(90deg); }
 .gc-metal { position: absolute; inset: 0;
   background: repeating-linear-gradient(0deg, color-mix(in srgb, var(--color-cream) 3%, transparent) 0 1px, transparent 1px 3px),
-              linear-gradient(118deg, var(--color-gold-shade) 0%, var(--color-gold-metal) 28%, var(--color-gold-light) 48%, var(--color-gold-metal) 66%, var(--color-gold-shade) 100%); }
+              linear-gradient(118deg, color-mix(in srgb, var(--color-gold-shade) 55%, var(--color-gold-metal)) 0%, color-mix(in srgb, var(--color-gold-metal) 50%, var(--color-gold-light)) 28%, var(--color-gold-light) 48%, color-mix(in srgb, var(--color-gold-metal) 50%, var(--color-gold-light)) 66%, color-mix(in srgb, var(--color-gold-shade) 55%, var(--color-gold-metal)) 100%); }   /* champagne: the brand metal lifted toward the light, ends toward the shade, never orange */
 .gc-guil { position: absolute; inset: 0; background: url("../img/guilloche.svg") center / 100% 100% no-repeat; opacity: 0.5; }
 .gc-border { position: absolute; inset: 3.5%; border-radius: calc(var(--gc-r) * 0.7); border: 1px solid color-mix(in srgb, var(--color-espresso) 28%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-gold-light) 55%, transparent), 0 1px 0 color-mix(in srgb, var(--color-gold-light) 60%, transparent); }
 .gc-micro { position: absolute; left: 0; right: 0; top: 7.4%; text-align: center; font-family: var(--font-body); font-weight: 500; font-size: calc(var(--gc-w) * 0.0125); line-height: 1; letter-spacing: 0.34em; text-transform: uppercase; white-space: nowrap; color: color-mix(in srgb, var(--color-espresso) 38%, transparent); text-shadow: 0 1px 0 color-mix(in srgb, var(--color-gold-light) 50%, transparent); }

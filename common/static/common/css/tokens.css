@@ -134,6 +134,7 @@
   --color-gold-light: #F3D2A2;                 /* derived: polished highlight, the drawn line (hue 36) */
   --color-gold-shade: #A9763F;                 /* derived: card edge and gradient ends (hue 31) */
   --color-gold-deep: #5A3A26;                  /* derived: the back of the card (hue 23) */
+  --color-gold-studio: #FFF0D8;                /* derived: neutral warm white, the fill panels and walls of the 3D studio (keeps the metal champagne, not orange) */
   --color-led: #FFE8C8;                        /* derived: warm LED white, the key and rim light of the 3D studio */
   --gc-w: min(86vw, 24rem);                    /* derived: card width (phone); desktop below */
   --gc-tilt-max: 6deg;                         /* derived: pointer tilt cap */

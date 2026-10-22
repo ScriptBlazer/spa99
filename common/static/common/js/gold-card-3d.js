@@ -11,9 +11,9 @@
 import * as THREE from '../vendor/three/three.module.min.js';
 
 const W = 85.6, H = 54, R = 3.18, BEV = 0.18, DEPTH = 0.44;       // millimetres: ISO ID-1
-const FW = 1024, FH = 646, BW = 512, BH = 323;                    // face and back map sizes
+const FW = 1024, FH = 646, BW = 1024, BH = 646;                    // face and back map sizes
 const D2R = Math.PI / 180;
-const WALL = 0.8;                                                 // brightness of the studio walls (the floor of the card's light)
+const WALL = 0.9;                                                // brightness of the studio walls (the floor of the card's light)
 const idle = (fn) => new Promise((resolve) => (window.requestIdleCallback ? requestIdleCallback(() => resolve(fn()), { timeout: 800 }) : setTimeout(() => resolve(fn()), 0)));
 
 function roundedRect(w, h, r) {
@@ -184,19 +184,19 @@ export function create(mount, { gsap, tokens, card }) {
     }));
     const fine = await idle(() => {
       const fw = W - 2 * BEV, wing = (x, y) => 1 - Math.max(0, Math.min(1, (x - 0.24 * fw) / (0.17 * fw))) * Math.max(0, Math.min(1, (0.76 * fw - x) / (0.17 * fw)));   // 1 in the wings, 0 behind the swan
-      const lines = mask(FW, FH, (ctx) => detail(ctx, ppm, { wings: true })), edge = mask(FW, FH, (ctx) => detail(ctx, ppm, { groove: true, micro: true }));
+      const lines = mask(FW, FH, (ctx) => detail(ctx, ppm, { wings: true })), edge = mask(FW, FH, (ctx) => detail(ctx, ppm, { groove: true })), micro = mask(FW, FH, (ctx) => detail(ctx, ppm, { micro: true }));
       for (let i = 0; i < lines.length; i++) lines[i] *= wing(((i % FW) / ppm), 0);
-      return { lines, edge };
+      return { lines, edge, micro };
     });
     const height = await idle(() => {
       const raw = new Float32Array(swanMask.length), thin = new Float32Array(swanMask.length);
-      for (let i = 0; i < raw.length; i++) { raw[i] = swanMask[i] - 0.22 * textMask[i]; thin[i] = -0.3 * fine.edge[i] - 0.1 * fine.lines[i]; }
+      for (let i = 0; i < raw.length; i++) { raw[i] = swanMask[i] - 0.22 * textMask[i] - 0.1 * fine.micro[i]; thin[i] = -0.3 * fine.edge[i] - 0.1 * fine.lines[i]; }   // engraved words: a shallow cut; the read comes from the ink (metalness) map, so no lit outline
       const soft = blur(raw, FW, FH, 2), crisp = blur(thin, FW, FH, 1);
       for (let i = 0; i < soft.length; i++) soft[i] += crisp[i];
       return soft;
     });
     maps.faceNormal = canvasTexture(await idle(() => normalCanvas(height, FW, FH, 4.2)));
-    const rc = await idle(() => roughCanvas(FW, FH, 0.21, { smooth: blur(swanMask, FW, FH, 1), smoothV: 0.1, rough: blur(textMask, FW, FH, 1), roughV: 0.3, dark: 0.95 }));
+    const rc = await idle(() => roughCanvas(FW, FH, 0.21, { smooth: blur(swanMask, FW, FH, 1), smoothV: 0.1, rough: blur(textMask.map((v, i) => Math.max(v, fine.micro[i])), FW, FH, 1), roughV: 0.3, dark: 0.95 }));
     maps.faceRough = canvasTexture(rc);
     own(maps.faceNormal); own(maps.faceRough);
   }
@@ -207,6 +207,7 @@ export function create(mount, { gsap, tokens, card }) {
       const s = (4 * ppm) / 484;                                    // each swan 4 mm tall
       for (let row = -1; row < H / 12 + 1; row++) for (let col = -1; col < W / 10 + 1; col++) {
         const x = (col + (row % 2 ? 0.5 : 0)) * 10 * ppm, y = row * 12 * ppm;
+        if (y > 40 * ppm) continue;                                  // a clear band under the pattern for the engraved words
         fillPaths(ctx, swan, [s, 0, 0, s, x + 2 * s, y + 2 * s]);
       }
     }));
@@ -216,11 +217,11 @@ export function create(mount, { gsap, tokens, card }) {
     }));
     const height = await idle(() => {
       const raw = new Float32Array(pat.length);
-      for (let i = 0; i < raw.length; i++) raw[i] = -0.5 * pat[i] - 0.7 * words[i];
-      return blur(raw, BW, BH, 1);
+      for (let i = 0; i < raw.length; i++) raw[i] = 0.5 * pat[i] - 0.12 * words[i];   // the swans are embossed (raised, a little lighter); the words are a shallow cut
+      return blur(raw, BW, BH, 2);
     });
-    maps.backNormal = canvasTexture(await idle(() => normalCanvas(height, BW, BH, 2.6)));
-    maps.backRough = canvasTexture(await idle(() => roughCanvas(BW, BH, 0.45, { rough: blur(words, BW, BH, 1), roughV: 0.55 })));
+    maps.backNormal = canvasTexture(await idle(() => normalCanvas(height, BW, BH, 3.2)));
+    maps.backRough = canvasTexture(await idle(() => roughCanvas(BW, BH, 0.42, { smooth: blur(pat, BW, BH, 2), smoothV: 0.2, rough: blur(words, BW, BH, 1), roughV: 0.3, dark: 0.9 })));
     own(maps.backNormal); own(maps.backRough);
   }
 
@@ -251,14 +252,14 @@ export function create(mount, { gsap, tokens, card }) {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: tok(hex).multiplyScalar(k) }));
       m.position.set(x, y, z); m.lookAt(0, 0, 0); studio.add(m);
     };
-    studio.add(new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshBasicMaterial({ color: tok('--color-gold-light').multiplyScalar(WALL), side: THREE.BackSide })));   // warm walls: the face never meets black
+    studio.add(new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshBasicMaterial({ color: tok('--color-gold-studio').multiplyScalar(WALL), side: THREE.BackSide })));   // warm walls: the face never meets black
     part(2.6, 0.9, '--color-led', 1.5, -2.5, 2.4, 3);        // key softbox
-    part(0.2, 5, '--color-cream', 3.5, 0, 0, 4.5);         // the sheen strip
+    part(0.2, 5, '--color-gold-studio', 3.5, 0, 0, 4.5);         // the sheen strip
     part(0.15, 4, '--color-led', 5, 4, 0.5, -1);         // rim strip
-    part(1.6, 4, '--color-gold-light', 1.1, -4.6, 0, 0.5); part(1.6, 4, '--color-gold-light', 1.1, 4.6, 0, 1);   // side fills: a soft panel is always in reach at grazing angles
-    part(5, 5, '--color-gold-light', 1.2, 0, 2.9, 0.5);  // overhead fill
-    part(6, 3, '--color-gold-light', 1.6, 0, 0, -4.6);   // behind: lights the back of the card
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ color: tok('--color-cream').multiplyScalar(0.4) }));
+    part(1.6, 4, '--color-gold-studio', 1.4, -4.6, 0, 0.5); part(1.6, 4, '--color-gold-studio', 1.4, 4.6, 0, 1);   // side fills: a soft panel is always in reach at grazing angles
+    part(5, 5, '--color-gold-studio', 1.1, 0, 2.9, 0.5);  // overhead fill
+    part(6, 3, '--color-gold-studio', 1.6, 0, 0, -4.6);   // behind: lights the back of the card
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ color: tok('--color-gold-studio').multiplyScalar(0.3) }));
     floor.rotation.x = -Math.PI / 2; floor.position.y = -2.9; studio.add(floor);
     pmrem = new THREE.PMREMGenerator(renderer);
     const rt = pmrem.fromScene(studio, 0.02);
@@ -270,20 +271,23 @@ export function create(mount, { gsap, tokens, card }) {
 
   /* --- scene --- */
   function buildScene() {
-    const gold = tok('--color-gold-metal');
+    const gold = tok('--color-gold-metal').lerp(tok('--color-gold-light'), 0.6);   // champagne: lit by a neutral warm studio it stays soft gold (hue 33), not orange
+    const rim = tok('--color-gold-metal').lerp(tok('--color-gold-light'), 0.3);
     const edgeGeo = own(new THREE.ExtrudeGeometry(roundedRect(W - 2 * BEV, H - 2 * BEV, R - BEV), { depth: DEPTH, bevelEnabled: true, bevelThickness: BEV, bevelSize: BEV, bevelSegments: 3, curveSegments: 10 }));
     edgeGeo.translate(0, 0, -DEPTH / 2);
     const zf = DEPTH / 2 + BEV + 0.004;
     maps.draw = own(canvasTexture(drawCanvas, { color: true }));
-    mats.edge = own(new THREE.MeshPhysicalMaterial({ color: gold, metalness: 1, roughness: 0.2 }));
+    mats.edge = own(new THREE.MeshPhysicalMaterial({ color: rim, metalness: 1, roughness: 0.2 }));
     mats.face = own(new THREE.MeshPhysicalMaterial({
       color: gold, metalness: 1, roughness: 1, anisotropy: 0.55, anisotropyRotation: Math.PI / 2, clearcoat: 0.35, clearcoatRoughness: 0.12,
       normalMap: maps.faceNormal, roughnessMap: maps.faceRough, metalnessMap: maps.faceRough, emissive: tok('--color-gold-light'), emissiveMap: maps.draw, emissiveIntensity: 0,
     }));
+    const bronze = tok('--color-gold-deep').lerp(tok('--color-gold-metal'), 0.22);
+    bronze.g += 0.03; bronze.b += 0.075;                                              // NeutralToneMapping takes ~0.04 off the weakest channel: a dark metal would go orange without this
     mats.back = own(new THREE.MeshPhysicalMaterial({
-      color: tok('--color-gold-deep').lerp(tok('--color-gold-shade'), 1), metalness: 1, roughness: 1, envMapIntensity: 1.9, clearcoat: 0.2, clearcoatRoughness: 0.3, normalMap: maps.backNormal, roughnessMap: maps.backRough,
+      color: bronze, metalness: 1, roughness: 1, envMapIntensity: 0.62, clearcoat: 0.2, clearcoatRoughness: 0.3, normalMap: maps.backNormal, roughnessMap: maps.backRough, metalnessMap: maps.backRough,
     }));
-    Object.assign(mats.face, { envMap: scene.environment, envMapIntensity: 0.9 }); mats.back.envMap = mats.edge.envMap = scene.environment; mats.edge.envMapIntensity = 0.6;   // per-material intensity needs the map set on the material (three r163+)
+    Object.assign(mats.face, { envMap: scene.environment, envMapIntensity: 0.5 }); mats.back.envMap = mats.edge.envMap = scene.environment; mats.edge.envMapIntensity = 0.6;   // per-material intensity needs the map set on the material (three r163+)
     const faceGeo = own(faceGeometry());
     const front = new THREE.Mesh(faceGeo, mats.face); front.position.z = zf;
     const back = new THREE.Mesh(faceGeo, mats.back); back.rotation.y = Math.PI; back.position.z = -zf;
