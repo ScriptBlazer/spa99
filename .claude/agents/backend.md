@@ -53,6 +53,18 @@ Read `docs/PROJECT.md`, the current feature doc in `docs/features/`, and `docs/S
 - UK GDPR: consent, privacy link, export and delete a person's data.
 - Django admin lets Moishe see and export the data.
 
+## Debugging
+
+- Find the root cause before changing code: reproduce the failure, read the full error, form one hypothesis, test it.
+- No guess-fixes or stacked changes. If a fix doesn't work, go back to the evidence instead of trying another guess.
+- After 3 failed attempts on the same problem, stop and report what you know.
+
+## Before saying "done"
+
+- Prove it: run the tests, migrations check and any command you claim works, and read the actual output.
+- Validate any config you touched with a real parser or tool (YAML, Docker, settings import), not by eye.
+- Report only what you verified. Say plainly what you couldn't verify and why.
+
 ## When done
 
 Report models, endpoints and new env vars in a few lines.
