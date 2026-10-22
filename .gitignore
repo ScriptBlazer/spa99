@@ -1,0 +1,23 @@
+# Secrets and private data
+.env
+.private/
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Django
+staticfiles/
+media/
+
+# Claude Code local settings
+.claude/settings.local.json
+.claude/.cc-writes/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
