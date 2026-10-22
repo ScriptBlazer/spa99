@@ -1,6 +1,10 @@
 """Optimise the brand renders for the site. Needs Pillow (not a runtime dependency): `pip install pillow`.
 
-    python scripts/build_images.py "<folder with the original renders>"
+    python scripts/build_images.py "<folder with the originals>"
+
+Only names whose original file is in that folder are rebuilt; every other image and its manifest entry is kept.
+The realistic fal photos (2026-10-22) live in SPA99_PRIVATE_DIR/media/fal-renders (fallback .private/fal-renders),
+named <name>.png. The old architect renders are backed up in .private/img-backup-2026-10-22-renders.
 
 Writes resized WebP and JPEG files (480 / 800 / 1600 / 2400 px wide, never upscaled; JPEG fallback up to 1600) to
 content/static/content/img/ and a manifest (content/image_manifest.json) the `{% photo %}` tag reads.
@@ -24,24 +28,15 @@ JPEG_MAX = 1600
 # name: (original file, crop or None) or (original file, crop or None, grade). grade=True warms the architect renders so they sit
 # on espresso (docs/design/IMMERSIVE-R2.md 5.3): colour x0.85, brightness x0.94, channels R x1.00, G x0.98, B x0.93.
 SOURCES = {
-    # 08 backlit travertine water wall. Crop the right edge: it holds the lounger with the candle.
-    "hero": ("untitled_Gemini 3 Portrait_2026-08-25_12-21-20.png", (0, 0.03, 0.89, 0.80)),
-    "relaxing-zone": ("untitled_Gemini 3 Portrait_2026-08-25_12-17-17.png", None),  # 04
-    "gym": ("untitled_Gemini 3 Square 2K_2026-08-25_12-17-10.png", None),  # 12
-    "dry-sauna": ("untitled_Gemini 3 Square 2K_2026-08-25_12-18-26.png", None),  # 14
-    "door-gold": ("untitled_Gemini 3 Square 2K_2026-08-25_12-16-03.png", None),  # 09
-    "door-white": ("untitled_Gemini 3 Square 2K_2026-08-25_12-16-09.png", None),  # 10
-    "lockers": ("untitled_Gemini 3 Square 2K_2026-08-25_13-32-08.png", None),  # 20
-    # Architect renders (docs/design/IMMERSIVE-R2.md 5.2), graded.
-    "arrival": ("WhatsApp Image 2026-08-26 at 19.03.34 (3).jpeg", (0.08, 0, 1, 1), True),  # 16 water wall under the gold cove
-    "lounge": ("WhatsApp Image 2026-08-26 at 19.03.34 (2).jpeg", None, True),  # 15
-    "relax-loungers": ("WhatsApp Image 2026-08-20 at 10.23.31 (4).jpeg", None, True),  # 08
-    "showers": ("WhatsApp Image 2026-08-20 at 10.23.31 (5).jpeg", (0, 0, 0.84, 1), True),  # 09
-    "cold-tub": ("WhatsApp Image 2026-08-20 at 10.23.31 (5).jpeg", (0.52, 0.28, 1, 1), True),  # 09, interim cold, small use only
-    "reception": ("WhatsApp Image 2026-08-26 at 19.03.33 (2).jpeg", (0.40, 0, 1, 1), True),  # 13, until the lettering is cleaned
-    "corridor": ("WhatsApp Image 2026-08-26 at 19.03.34 (5).jpeg", None, True),  # 17
-    "showers-mosaic": ("Showers.jpeg", (0, 0, 0.80, 1), True),  # 04
-    "fish-tank": ("Fish Tank.jpeg", None, True),  # 01 reception with the large fish tank: the Home hero / feature image (Moishe, 2026-10-22)
+    # Realistic fal photos made from the old renders (Moishe, 2026-10-22). Water walls became the fish tank
+    # (arrival, lounge, reception). No grade: they are graded warm already.
+    **{name: (f"{name}.png", None) for name in [
+        "relaxing-zone", "gym", "dry-sauna", "door-gold", "door-white", "lockers", "arrival", "lounge",
+        "relax-loungers", "showers", "reception", "corridor", "showers-mosaic", "cold-plunge"]},
+    "cold-tub": ("cold-plunge.png", None),  # old name, still used by the cold plunge Facility until Control points it at cold-plunge
+    # Kept from the earlier sets (built from the architect / Gemini folder).
+    "hero": ("untitled_Gemini 3 Portrait_2026-08-25_12-21-20.png", (0, 0.03, 0.89, 0.80)),  # unused, water wall
+    "fish-tank": ("Fish Tank.jpeg", None, True),  # 01 reception with the large fish tank: the Home hero still (Moishe, 2026-10-22)
 }
 
 
@@ -53,10 +48,13 @@ def grade(image):
 
 def main(folder):
     OUT.mkdir(parents=True, exist_ok=True)
-    for old in [*OUT.glob('*.webp'), *OUT.glob('*.jpg')]:  # start clean so removed sizes do not linger
-        old.unlink()
-    manifest = {}
+    manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
     for name, (filename, crop, *rest) in SOURCES.items():
+        if not (Path(folder) / filename).exists():
+            continue  # not in this folder: keep the built files and manifest entry as they are
+        for old in [*OUT.glob(f"{name}-*.webp"), *OUT.glob(f"{name}-*.jpg")]:  # clean so removed sizes do not linger
+            if old.stem.rsplit("-", 1)[0] == name:
+                old.unlink()
         image = Image.open(Path(folder) / filename).convert("RGB")
         if rest and rest[0]:
             image = grade(image)

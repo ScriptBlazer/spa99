@@ -29,8 +29,8 @@
     ]
   },
   "dry-sauna": {
-    "width": 2528,
-    "height": 1696,
+    "width": 2400,
+    "height": 1792,
     "widths": [
       480,
       800,
@@ -69,74 +69,82 @@
     ]
   },
   "arrival": {
-    "width": 1472,
-    "height": 1066,
+    "width": 2400,
+    "height": 1792,
     "widths": [
       480,
       800,
-      1472
+      1600,
+      2400
     ]
   },
   "lounge": {
-    "width": 1600,
-    "height": 1066,
+    "width": 2528,
+    "height": 1696,
     "widths": [
       480,
       800,
-      1600
+      1600,
+      2400
     ]
   },
   "relax-loungers": {
-    "width": 1600,
-    "height": 900,
+    "width": 2730,
+    "height": 1536,
     "widths": [
       480,
       800,
-      1600
+      1600,
+      2400
     ]
   },
   "showers": {
-    "width": 1344,
-    "height": 900,
+    "width": 2528,
+    "height": 1692,
     "widths": [
       480,
       800,
-      1344
+      1600,
+      2400
     ]
   },
   "cold-tub": {
-    "width": 768,
-    "height": 648,
-    "widths": [
-      480,
-      768
-    ]
-  },
-  "reception": {
-    "width": 960,
-    "height": 1052,
-    "widths": [
-      480,
-      800,
-      960
-    ]
-  },
-  "corridor": {
-    "width": 1600,
-    "height": 1066,
+    "width": 1792,
+    "height": 2400,
     "widths": [
       480,
       800,
       1600
     ]
   },
-  "showers-mosaic": {
-    "width": 1280,
-    "height": 1066,
+  "reception": {
+    "width": 1984,
+    "height": 2174,
     "widths": [
       480,
       800,
-      1280
+      1600,
+      1984
+    ]
+  },
+  "corridor": {
+    "width": 2528,
+    "height": 1684,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "showers-mosaic": {
+    "width": 2268,
+    "height": 1888,
+    "widths": [
+      480,
+      800,
+      1600,
+      2268
     ]
   },
   "fish-tank": {
@@ -155,6 +163,15 @@
       480,
       800,
       1280
+    ]
+  },
+  "cold-plunge": {
+    "width": 1792,
+    "height": 2400,
+    "widths": [
+      480,
+      800,
+      1600
     ]
   }
 }

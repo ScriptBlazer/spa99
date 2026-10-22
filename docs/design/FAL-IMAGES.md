@@ -1,6 +1,6 @@
 # Spa 99: fal image set (replace every site image except the hero)
 
-Decision: PROJECT.md decision log, 2026-10-22 ("Images: replace every site image except the hero ..."). This file is the job list. It covers every image the site shows today, including the ones chosen by data. Status 2026-10-22: `cold-plunge` has 4 options in `.private/previews/cold-plunge/`, waiting for Moishe's pick (all four made from the real tub photo with nano-banana edit models). `lockers` stays. `gym` goes last.
+Decision: PROJECT.md decision log, 2026-10-22 ("Images: replace every site image except the hero ..."). This file is the job list. It covers every image the site shows today, including the ones chosen by data. Status 2026-10-22 (later): superseded by the PROJECT.md decision "Realistic set is live". Every render was turned into a photo by a fal edit of the old render (same layout), not by the fresh prompts below. The prompts below stay as the plan for any image Moishe wants redone from scratch, and for the new rooms with no render yet (`wet-sauna`, `massage-room`, `kitchenette`).
 
 What the rules are, in short:
 - Every image is new, photoreal, and has **no people**.
