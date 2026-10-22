@@ -26,15 +26,16 @@ export function goldCard(mount, scene, { desktop, fine, ctx }) {
   const el = { card: q('.gc-card'), float: q('.gc-float'), shade: q('.gc-shade'), sheen: q('.gc-sheen'), pool: q('.gc-pool') };
   gc.render = () => {
     mount.style.opacity = gc.fade;
+    mount.style.transform = gc.lift + gc.drop ? `translate3d(0, ${gc.lift + gc.drop}%, 0)` : '';   // the whole mount (canvas, pool, card) moves, so nothing is ever cut by a canvas edge
     if (gc.gl) return;
     const ry = gc.ry + gc.turn + gc.tiltY, a = ((ry % 360) + 540) % 360 - 180, n = a / (25 * k);
     el.card.style.transform = `rotateX(${gc.rx + gc.tiltX}deg) rotateY(${ry}deg)`;
-    el.float.style.transform = `translate3d(0, ${gc.lift + gc.drop + gc.bob}%, 0) rotate(${gc.roll}deg)`;
-    el.shade.style.opacity = n < 0 ? 0.55 * Math.min(1, -n) : 0.25 * Math.min(1, n);
+    el.float.style.transform = `translate3d(0, ${gc.bob}%, 0) rotate(${gc.roll}deg)`;
+    el.shade.style.opacity = n < 0 ? 0.3 * Math.min(1, -n) : 0.12 * Math.min(1, n);
     el.sheen.style.transform = `translateX(${gc.sheen * 130}%) skewX(-14deg)`;
     el.pool.style.opacity = 0.85 + 0.15 * (gc.bob / 1.6);
   };
-  cleanups.push(() => { mount.style.opacity = ''; ['card', 'float', 'shade', 'sheen', 'pool'].forEach((n) => el[n].removeAttribute('style')); });
+  cleanups.push(() => { mount.style.opacity = ''; mount.style.transform = ''; ['card', 'float', 'shade', 'sheen', 'pool'].forEach((n) => el[n].removeAttribute('style')); });
 
   // Swan: the CSS card draws with DrawSVG, the canvas reads the same moments from the proxy. windows are [from, to] in timeline units.
   gc.swan = (tl, { draw, relief, line }, ease) => {

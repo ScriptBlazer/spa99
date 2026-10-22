@@ -13,6 +13,7 @@ import * as THREE from '../vendor/three/three.module.min.js';
 const W = 85.6, H = 54, R = 3.18, BEV = 0.18, DEPTH = 0.44;       // millimetres: ISO ID-1
 const FW = 1024, FH = 646, BW = 512, BH = 323;                    // face and back map sizes
 const D2R = Math.PI / 180;
+const WALL = 0.8;                                                 // brightness of the studio walls (the floor of the card's light)
 const idle = (fn) => new Promise((resolve) => (window.requestIdleCallback ? requestIdleCallback(() => resolve(fn()), { timeout: 800 }) : setTimeout(() => resolve(fn()), 0)));
 
 function roundedRect(w, h, r) {
@@ -123,6 +124,33 @@ function roughCanvas(w, h, base, { smooth, rough, smoothV, roughV, dark = 0 }) {
   return c;
 }
 
+
+/** Fine detail on the face, in mm on a face of `ppm` px per mm: guilloche (crossing fine waves, only in two wings either side of the swan),
+ *  a groove 3 mm in from the edge, and micro text along the top. The same drawing is in guilloche.svg for the CSS card. */
+function detail(ctx, ppm, { wings, groove, micro }) {
+  const fw = W - 2 * BEV, fh = H - 2 * BEV;
+  if (wings) {
+    ctx.lineWidth = 0.1 * ppm;
+    for (let fam = 0; fam < 2; fam++) for (let k = 0; k < 30; k++) {
+      ctx.beginPath();
+      for (let x = 4; x <= fw - 4; x += 0.5) {
+        const y = 8 + k * 1.25 + 1.5 * Math.sin((x / 26) * Math.PI * 2 + k * 0.16 * (fam ? -1 : 1) + fam * 1.6);
+        x === 4 ? ctx.moveTo(x * ppm, y * ppm) : ctx.lineTo(x * ppm, y * ppm);
+      }
+      ctx.stroke();
+    }
+  }
+  if (groove) {
+    ctx.lineWidth = 0.34 * ppm;
+    const r = (R - BEV - 3) * ppm, x = 3 * ppm, y = 3 * ppm, w = (fw - 6) * ppm, h = (fh - 6) * ppm;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, Math.max(r, 1)); ctx.stroke();
+  }
+  if (micro) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.textBaseline = 'alphabetic'; ctx.font = `500 ${1.15 * ppm}px Figtree`;
+    track(ctx, 'BEYOND LUXURY  \u00B7  SPA 99  \u00B7  LONDON N4', fw / 2 * ppm, 5.6 * ppm, 0.42 * 1.15 * ppm, 'center');
+  }
+}
+
 /* ---------- the module ---------- */
 
 export function create(mount, { gsap, tokens, card }) {
@@ -154,10 +182,18 @@ export function create(mount, { gsap, tokens, card }) {
       ctx.font = `500 ${(1.6 / 0.7) * ppm}px Figtree`;
       track(ctx, 'GOLD', FW - 6 * ppm, FH - 6 * ppm, 0.24 * (1.6 / 0.7) * ppm, 'right');
     }));
+    const fine = await idle(() => {
+      const fw = W - 2 * BEV, wing = (x, y) => 1 - Math.max(0, Math.min(1, (x - 0.24 * fw) / (0.17 * fw))) * Math.max(0, Math.min(1, (0.76 * fw - x) / (0.17 * fw)));   // 1 in the wings, 0 behind the swan
+      const lines = mask(FW, FH, (ctx) => detail(ctx, ppm, { wings: true })), edge = mask(FW, FH, (ctx) => detail(ctx, ppm, { groove: true, micro: true }));
+      for (let i = 0; i < lines.length; i++) lines[i] *= wing(((i % FW) / ppm), 0);
+      return { lines, edge };
+    });
     const height = await idle(() => {
-      const raw = new Float32Array(swanMask.length);
-      for (let i = 0; i < raw.length; i++) raw[i] = swanMask[i] - 0.22 * textMask[i];
-      return blur(raw, FW, FH, 2);
+      const raw = new Float32Array(swanMask.length), thin = new Float32Array(swanMask.length);
+      for (let i = 0; i < raw.length; i++) { raw[i] = swanMask[i] - 0.22 * textMask[i]; thin[i] = -0.3 * fine.edge[i] - 0.1 * fine.lines[i]; }
+      const soft = blur(raw, FW, FH, 2), crisp = blur(thin, FW, FH, 1);
+      for (let i = 0; i < soft.length; i++) soft[i] += crisp[i];
+      return soft;
     });
     maps.faceNormal = canvasTexture(await idle(() => normalCanvas(height, FW, FH, 4.2)));
     const rc = await idle(() => roughCanvas(FW, FH, 0.21, { smooth: blur(swanMask, FW, FH, 1), smoothV: 0.1, rough: blur(textMask, FW, FH, 1), roughV: 0.3, dark: 0.95 }));
@@ -215,11 +251,14 @@ export function create(mount, { gsap, tokens, card }) {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: tok(hex).multiplyScalar(k) }));
       m.position.set(x, y, z); m.lookAt(0, 0, 0); studio.add(m);
     };
-    studio.add(new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshBasicMaterial({ color: tok('--color-gold-deep').multiplyScalar(1.1), side: THREE.BackSide })));
-    part(4, 1.4, '--color-led', 3, -2.5, 2.4, 3);        // key softbox
-    part(0.2, 5, '--color-cream', 6, 0, 0, 4.5);         // the sheen strip
-    part(0.15, 4, '--color-led', 8, 4, 0.5, -1);         // rim strip
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ color: tok('--color-caramel').multiplyScalar(0.6) }));
+    studio.add(new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshBasicMaterial({ color: tok('--color-gold-light').multiplyScalar(WALL), side: THREE.BackSide })));   // warm walls: the face never meets black
+    part(2.6, 0.9, '--color-led', 1.5, -2.5, 2.4, 3);        // key softbox
+    part(0.2, 5, '--color-cream', 3.5, 0, 0, 4.5);         // the sheen strip
+    part(0.15, 4, '--color-led', 5, 4, 0.5, -1);         // rim strip
+    part(1.6, 4, '--color-gold-light', 1.1, -4.6, 0, 0.5); part(1.6, 4, '--color-gold-light', 1.1, 4.6, 0, 1);   // side fills: a soft panel is always in reach at grazing angles
+    part(5, 5, '--color-gold-light', 1.2, 0, 2.9, 0.5);  // overhead fill
+    part(6, 3, '--color-gold-light', 1.6, 0, 0, -4.6);   // behind: lights the back of the card
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ color: tok('--color-cream').multiplyScalar(0.4) }));
     floor.rotation.x = -Math.PI / 2; floor.position.y = -2.9; studio.add(floor);
     pmrem = new THREE.PMREMGenerator(renderer);
     const rt = pmrem.fromScene(studio, 0.02);
@@ -242,8 +281,9 @@ export function create(mount, { gsap, tokens, card }) {
       normalMap: maps.faceNormal, roughnessMap: maps.faceRough, metalnessMap: maps.faceRough, emissive: tok('--color-gold-light'), emissiveMap: maps.draw, emissiveIntensity: 0,
     }));
     mats.back = own(new THREE.MeshPhysicalMaterial({
-      color: tok('--color-gold-deep'), metalness: 1, roughness: 1, clearcoat: 0.2, clearcoatRoughness: 0.3, normalMap: maps.backNormal, roughnessMap: maps.backRough,
+      color: tok('--color-gold-deep').lerp(tok('--color-gold-shade'), 1), metalness: 1, roughness: 1, envMapIntensity: 1.9, clearcoat: 0.2, clearcoatRoughness: 0.3, normalMap: maps.backNormal, roughnessMap: maps.backRough,
     }));
+    Object.assign(mats.face, { envMap: scene.environment, envMapIntensity: 0.9 }); mats.back.envMap = mats.edge.envMap = scene.environment; mats.edge.envMapIntensity = 0.6;   // per-material intensity needs the map set on the material (three r163+)
     const faceGeo = own(faceGeometry());
     const front = new THREE.Mesh(faceGeo, mats.face); front.position.z = zf;
     const back = new THREE.Mesh(faceGeo, mats.back); back.rotation.y = Math.PI; back.position.z = -zf;
@@ -251,7 +291,7 @@ export function create(mount, { gsap, tokens, card }) {
     group = new THREE.Group(); group.add(body, front, back);
     pivot = new THREE.Group(); pivot.add(group);
     scene.add(pivot);
-    light = new THREE.DirectionalLight(tok('--color-led'), 1.4);
+    light = new THREE.DirectionalLight(tok('--color-led'), 0.6);
     light.position.set(-30, 40, 120);
     scene.add(light);
   }
@@ -261,7 +301,7 @@ export function create(mount, { gsap, tokens, card }) {
     const turn = card.ry + card.turn + card.tiltY, up = card.rx + card.tiltX;
     group.rotation.set(-up * D2R, turn * D2R, 0);
     pivot.rotation.z = -card.roll * D2R;
-    pivot.position.y = -((card.lift + card.drop + card.bob) / 100) * H;
+    pivot.position.y = -(card.bob / 100) * H;                      // lift and drop move the whole mount in CSS (gc.render), so the canvas moves with the card
     mats.face.emissiveIntensity = card.line * card.draw > 0 ? card.line * 1.15 : 0;
     const k = card.relief;
     mats.face.normalMap && mats.face.normalScale.set(k, k);
@@ -271,11 +311,18 @@ export function create(mount, { gsap, tokens, card }) {
     drawLine();
   }
 
+  /** The canvas is wider than the card (1/0.72) and taller than a 4:3 frame, so the turn, tilt and float never reach its edge. The card stays 72% of the canvas width at any aspect. */
+  function fit(aspect) {
+    camera.aspect = aspect;
+    camera.fov = 2 * Math.atan(W / 0.72 / aspect / 2 / camDistance()) / D2R;
+    camera.updateProjectionMatrix();
+  }
+
   function size() {
     const w = box.clientWidth || 1, h = box.clientHeight || 1;
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
-    camera.aspect = w / h; camera.updateProjectionMatrix();
+    fit(w / h);
   }
 
   function render() {
@@ -303,7 +350,7 @@ export function create(mount, { gsap, tokens, card }) {
     card.sheen = 0.13; card.draw = 1; card.line = 0; card.relief = 1; card.fade = 1;
     renderer.setClearColor(tok('--color-espresso'), 1);
     renderer.setPixelRatio(1); renderer.setSize(2560, 1920, false);
-    camera.aspect = 4 / 3; camera.updateProjectionMatrix();
+    fit(4 / 3);
     render();
     window.__gcExport = canvas.toDataURL('image/png');
     canvas.toBlob((b) => { const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(b), download: 'gold-card-master.png' }); a.click(); });
