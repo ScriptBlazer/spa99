@@ -1,5 +1,6 @@
 import json
 
+from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
 from gold.models import GoldRule
@@ -7,6 +8,8 @@ from journey import engine, services
 from journey.models import Answer, JourneySession, Option, SuggestionRule
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import Plan
+
+User = get_user_model()
 
 
 def make_session(**answers):
@@ -162,7 +165,8 @@ class AnswerTests(TestCase):
         self.assertNotIn("property_law", visible())
         self.assertEqual(services.result_step(session), 5)
         self.assertEqual(services.set_step(session, direction="next"), 2)
-        self.assertEqual(services.set_step(session, step=4), 4)
+        self.assertEqual(services.set_step(session, step=4), 3)  # not past the screen after the furthest one reached
+        self.assertEqual(services.set_step(session, direction="next"), 4)
         self.assertEqual(services.set_step(session, direction="next"), 5)  # the result
         self.assertEqual(services.set_step(session, direction="back"), 4)
         self.assertEqual(services.set_step(session, step=99), 5)
@@ -204,9 +208,19 @@ class EndpointTests(TestCase):
         session = JourneySession.objects.get()
         self.assertEqual((session.utm_source, session.device_type), ("instagram", "unknown"))
 
-        result = client.get("/journey/result/").json()
+        result = client.get("/journey/result/").json()  # a GET only reads: nothing is stored
         self.assertIn(result["suggested"]["slug"], {"tier-1", "tier-2", "tier-3"})
         self.assertEqual(result["gold"]["presentation"], "none")
+        session.refresh_from_db()
+        self.assertEqual((session.completed, session.furthest_step, session.suggested_plan_id), (False, 2, None))
+        self.assertEqual(self.post(client, "/journey/step/", {"step": 99}, token).json()["furthest_step"], 3)  # funnel cannot be inflated
+
+        stored = self.post(client, "/journey/result/", {}, token)  # arriving at the result stores it
+        self.assertEqual(stored.json()["suggested"]["slug"], result["suggested"]["slug"])
+        session.refresh_from_db()
+        self.assertTrue(session.completed)
+        self.assertEqual(session.suggested_plan.slug, result["suggested"]["slug"])
+        self.assertEqual(Client().get("/journey/result/").status_code, 404)  # no cookie, no journey
 
     def test_honeypot_hides_a_bot_from_the_statistics(self):
         client = Client(enforce_csrf_checks=True)
@@ -215,3 +229,41 @@ class EndpointTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Answer.objects.count(), 0)
         self.assertTrue(JourneySession.objects.get().is_bot)
+
+
+class SharedDeviceTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_a_session_owned_by_someone_is_not_reused_by_anyone_else(self):
+        owner = User.objects.create_user("owner@example.com", "a-long-password-1")
+        other = User.objects.create_user("other@example.com", "a-long-password-1")
+        session = services.create_session(user=owner)
+        self.assertEqual(services.get_or_create_session(session.key, user=owner), (session, False))
+        for visitor in (None, other):  # anonymous next person, or another account, on the same browser
+            fresh, created = services.get_or_create_session(session.key, user=visitor)
+            self.assertTrue(created)
+            self.assertNotEqual(fresh.pk, session.pk)
+            self.assertIsNone(services.session_from_cookies({"spa99_journey": session.key}, visitor))
+        anonymous = services.create_session()
+        self.assertEqual(services.get_or_create_session(anonymous.key, user=other), (anonymous, False))
+
+    def test_login_drops_a_foreign_cookie_and_logout_always_does(self):
+        owner = User.objects.create_user("owner@example.com", "a-long-password-1")
+        other = User.objects.create_user("other@example.com", "a-long-password-1")
+        theirs = services.create_session(user=owner)
+        client = Client()
+        client.cookies["spa99_journey"] = theirs.key
+        response = client.post("/login/", {"username": "other@example.com", "password": "a-long-password-1"})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.cookies["spa99_journey"]["max-age"], 0)  # cookie removed: next visit starts fresh
+
+        mine = services.create_session()  # an anonymous journey simply becomes the signed-in person's
+        client = Client()
+        client.cookies["spa99_journey"] = mine.key
+        response = client.post("/login/", {"username": "other@example.com", "password": "a-long-password-1"})
+        self.assertNotIn("spa99_journey", response.cookies)
+        mine.refresh_from_db()
+        self.assertEqual(mine.user_id, other.pk)
+        self.assertEqual(client.post("/logout/").cookies["spa99_journey"]["max-age"], 0)

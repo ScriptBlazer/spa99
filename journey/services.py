@@ -44,20 +44,36 @@ def touch(session):
     session.refresh_from_db(fields=["last_seen_at", "visit_count"])
 
 
+def _usable_by(session, user):
+    """A session belongs to one browser until a person is tied to it. Anyone may continue an unowned session; an
+    owned one only by that person. (On a shared device the next person must never inherit the last one's answers.)"""
+    owner = session.user_id
+    return owner is None or (user is not None and user.is_authenticated and owner == user.pk)
+
+
 def get_or_create_session(key, user_agent="", referrer="", utm=None, user=None):
-    """The session for a cookie value, or a new one. Returns (session, created)."""
+    """The session for a cookie value if this person may use it, or a new one. Returns (session, created)."""
     if key:
         session = JourneySession.objects.filter(key=key).first()
-        if session is not None:
+        if session is not None and _usable_by(session, user):
             touch(session)
             return session, False
     return create_session(user_agent, referrer, utm, user), True
 
 
-def session_from_cookies(cookies):
-    """The existing session for a request's cookies, or None. Never creates one (used by sign-up and Gold)."""
+def session_from_cookies(cookies, user=None):
+    """The existing session for a request's cookies if `user` may use it, else None. Never creates one (used by
+    sign-up and Gold)."""
     key = cookies.get(COOKIE_NAME)
-    return JourneySession.objects.filter(key=key).first() if key else None
+    session = JourneySession.objects.filter(key=key).first() if key else None
+    return session if session is not None and _usable_by(session, user) else None
+
+
+def cookie_belongs_to_someone_else(cookies, user):
+    """True when the journey cookie holds a session owned by a different person than `user` (shared device)."""
+    key = cookies.get(COOKIE_NAME)
+    session = JourneySession.objects.filter(key=key).first() if key else None
+    return session is not None and not _usable_by(session, user)
 
 
 def link_user(session, user):
@@ -215,7 +231,9 @@ def set_step(session, step=None, direction=None):
         target = previous_screen(session)
     elif isinstance(step, int) and not isinstance(step, bool) and step >= 1:
         target = step if step in numbers or step >= last else next((n for n in numbers if n > step), last)
-        target = min(target, last)
+        # Never further than the screen after the furthest one reached: the funnel statistics cannot be inflated by
+        # posting a big number.
+        target = min(target, last, next_screen(session, session.furthest_step))
     else:
         raise AnswerError("Choose a step.")
     session.current_step = target
@@ -258,6 +276,7 @@ def build_state(session):
     return {
         "session": {
             "id": str(session.pk),
+            "max_text_length": MAX_TEXT_LENGTH,
             "current_step": session.current_step,
             "furthest_step": session.furthest_step,
             "completed": session.completed,

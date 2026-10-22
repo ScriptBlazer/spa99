@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from django.utils import timezone
 
+from content import services as content_services
 from gold import rating as gold_rating
 from plans import services as plan_services
 
@@ -98,25 +99,22 @@ def _reasons(plan, supports):
 
 
 def gold_signals(session):
-    """Gold rating inputs from the journey answers (shared with the Gold application)."""
+    """Gold rating inputs from the journey answers (shared with the Gold application). Which question feeds which
+    signal is data (gold.GoldSignalSource). Returns ({signal: value}, extra points from options)."""
     answers = services.effective_answers(session)
-
-    def single(key):
-        answer = answers.get(key)
-        first = answer.options.all()[0].value if answer and answer.options.all() else None
-        return first
-
-    link = single("property_link")
-    if not link and single("industry") == "law" and single("property_law") == "yes":
-        link = "property_lawyer"
-    signals = {"property_link": link, "size": single("property_size")}
+    values = {key: [o.value for o in a.options.all()] for key, a in answers.items()}
     extra = sum(o.gold_points for a in answers.values() for o in a.options.all())
-    return {k: v for k, v in signals.items() if v}, extra
+    return gold_rating.signals_from_answers(values), extra
 
 
 def compute_gold(session):
     signals, extra = gold_signals(session)
     return gold_rating.rate_potential(signals, extra_points=extra)
+
+
+def preview(session):
+    """The result for the answers so far. Reads only: nothing is saved and the journey is not marked finished."""
+    return build_result(session, compute_suggestion(session), compute_gold(session))
 
 
 def complete(session):
@@ -152,8 +150,10 @@ def complete(session):
 def build_result(session, suggestion, rating):
     vat = plan_services.SiteSettings.load().vat_rate
     plans = list(plan_services.monthly_plans())
+    empty = content_services.page_content("journey")["result_empty"]
+    copy = {"empty": {"heading": empty.heading, "body": empty.body, "cta": empty.cta_label, "url": empty.cta_url}}
     if suggestion is None:
-        return {"suggested": None, "others": [], "gold": {"potential": rating.level, "presentation": "none"}}
+        return {"suggested": None, "others": [], "gold": {"potential": rating.level, "presentation": "none"}, "copy": copy}
     suggested = plan_services.plan_display(suggestion.plan, vat)
     suggested["reasons"] = suggestion.reasons
     others = []
@@ -170,4 +170,5 @@ def build_result(session, suggestion, rating):
             "score": rating.score,
             "presentation": GOLD_PRESENTATION[rating.level],
         },
+        "copy": copy,
     }

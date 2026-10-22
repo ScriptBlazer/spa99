@@ -40,7 +40,8 @@ class Plan(BaseModel):
     no_show_result = models.CharField(max_length=160, blank=True, help_text="Plain words, shown to staff.")
     perks = models.JSONField(
         default=list, blank=True,
-        help_text='List of {"key": "merch", "label": "Merch", "value": "Buy"}. Flexible: add any perk.',
+        help_text='List of {"key": "merch", "label": "Merch", "value": "Buy", "phrase": "Each merch release"}. '
+                  'Flexible: add any perk. "phrase" is the short line on the Gold Card page (empty = the label).',
     )
     short_description = models.CharField(max_length=200, blank=True)
     highlight = models.BooleanField(default=False, help_text="Shown as the recommended plan (Tier 2).")
@@ -58,6 +59,12 @@ class Plan(BaseModel):
     @property
     def is_daytime_only(self):
         return self.hours == self.DAYTIME_ONLY
+
+    @property
+    def interest_allowed(self):
+        """Can a person register interest in this plan? Visible monthly memberships only (not Gold, which is by
+        application, and not the single visit). Templates use this to hide the 'Register interest' action."""
+        return self.visible and self.kind == self.MONTHLY
 
     @property
     def is_unlimited(self):
@@ -85,6 +92,13 @@ class SiteSettings(BaseModel):
     slot_step_minutes = models.PositiveSmallIntegerField(default=30)
     booking_notice_minutes = models.PositiveSmallIntegerField(default=10)
     opening_date = models.DateField(null=True, blank=True, help_text="Leave empty until fixed.")
+    opening_text = models.CharField(
+        max_length=60, default="January 2027", blank=True,
+        help_text='Shown as the opening time while the opening date is empty, e.g. "January 2027". Used by the {opening} placeholder in site copy.',
+    )
+    address_street = models.CharField(max_length=120, default="99 Vale Road")
+    address_town = models.CharField(max_length=80, default="London")
+    address_postcode = models.CharField(max_length=12, default="N4 1PR")
 
     register_interest_open = models.BooleanField(default=True, help_text="Stage A: accounts and Gold applications.")
     subscribe_open = models.BooleanField(default=False, help_text="Stage B: checkout (Phase 2).")
@@ -135,6 +149,19 @@ class SiteSettings(BaseModel):
     def wording(self):
         return self.get_join_wording_display()
 
+    @property
+    def address_one_line(self):
+        """'99 Vale Road, London N4 1PR'."""
+        town_line = " ".join(part for part in (self.address_town, self.address_postcode) if part)
+        return ", ".join(part for part in (self.address_street, town_line) if part)
+
+    @property
+    def opening_label(self):
+        """'January 2027': the opening date as month and year if it is set, otherwise the opening text."""
+        if self.opening_date:
+            return f"{self.opening_date:%B %Y}"
+        return self.opening_text
+
 
 class OpeningRule(BaseModel):
     """Data for the opening hours (SPA99_RULES section 03). Used by the site now, by bookings later.
@@ -158,6 +185,13 @@ class OpeningRule(BaseModel):
     start_time = models.TimeField(null=True, blank=True, help_text="Periods and daily closure. May run past midnight.")
     end_time = models.TimeField(null=True, blank=True)
     offset_minutes = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Shabbos / Yom Tov rules only.")
+    public_title = models.CharField(
+        max_length=80, blank=True, help_text="Heading for the public hours list (closure rules). Empty = the label."
+    )
+    public_note = models.CharField(
+        max_length=200, blank=True,
+        help_text='Plain words shown on the site for a Shabbos / Yom Tov rule, e.g. "Closed from Friday afternoon until Saturday night". Empty = not listed.',
+    )
     active = models.BooleanField(default=True)
     order = models.PositiveSmallIntegerField(default=0)
 
@@ -198,6 +232,7 @@ class Facility(BaseModel):
     short_line = models.CharField(max_length=160, blank=True)
     description = models.TextField(blank=True)
     image = models.FileField(upload_to=facility_image_path, blank=True)  # default storage: S3 on live
+    image_alt = models.CharField(max_length=200, blank=True, help_text="Describes the picture for people who cannot see it. Empty = the name.")
     order = models.PositiveSmallIntegerField(default=0)
     visible = models.BooleanField(default=True)
 

@@ -7,14 +7,13 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
-from common.tasks import enqueue
+from common.tasks import enqueue, erase_task_records
 from journey import services as journey_services
+from notifications.services import subject_for
 from plans.models import SiteSettings
 
 from . import rating
-from .models import (
-    BML_CHOICES, PROPERTY_LINKS, SIZE_RANGES, WHERE_CHOICES, GoldApplication,
-)
+from .models import BML, PROPERTY_LINK, SIZE, WHERE, GoldApplication
 
 logger = logging.getLogger("spa99.gold")
 
@@ -24,10 +23,6 @@ POTENTIAL_LABELS = {rating.HIGH: "High", rating.MEDIUM: "Medium", rating.LOW: "L
 
 class ApplicationsClosed(Exception):
     """Stage switch register_interest_open is off."""
-
-
-def _label(choices, value):
-    return dict(choices).get(value, value or "")
 
 
 def rate_application(application):
@@ -87,7 +82,7 @@ def _journey_sentence(info):
 
 def application_sections(application):
     """The three sections of the email to Barry, as [{'title', 'rows': [(label, value)]}]. Control shows the same."""
-    created = timezone.localtime(application.created_at).strftime("%d %b %Y, %H:%M")
+    created = timezone.localtime(application.created_at).strftime("%d/%m/%Y, %H:%M")
     personal = [
         ("Name", application.full_name),
         ("Email", application.email),
@@ -96,11 +91,11 @@ def application_sections(application):
         ("Reference", application.reference),
     ]
     prop = [
-        ("Link to property", _label(PROPERTY_LINKS, application.property_link)),
+        ("Link to property", rating.label_for(PROPERTY_LINK, application.property_link)),
         ("Company and role", " / ".join(p for p in (application.company, application.role) if p) or "Not given"),
-        ("Size", _label(SIZE_RANGES, application.size_range) or "Not given"),
-        ("Where", _label(WHERE_CHOICES, application.location) or "Not given"),
-        ("Works with BML", _label(BML_CHOICES, application.bml_relationship) or "Not given"),
+        ("Size", rating.label_for(SIZE, application.size_range) or "Not given"),
+        ("Where", rating.label_for(WHERE, application.location) or "Not given"),
+        ("Works with BML", rating.label_for(BML, application.bml_relationship) or "Not given"),
         ("Referred by", application.referred_by or "Nobody named"),
         ("Potential", f"{POTENTIAL_LABELS.get(application.potential_level, '')} ({application.potential_score} points)"),
         ("Why", "\n".join(application.potential_reasons) or "No scoring signals"),
@@ -198,9 +193,8 @@ def barry_email_context(application):
 
 
 def barry_subject(application):
-    label = POTENTIAL_LABELS.get(application.potential_level, "")
-    suffix = " - repeat application" if application.is_repeat else ""
-    return f"Gold Card application: {application.full_name} ({label} potential){suffix}"
+    key = "gold_barry_repeat" if application.is_repeat else "gold_barry"
+    return subject_for(key, name=application.full_name, potential=POTENTIAL_LABELS.get(application.potential_level, ""))
 
 
 # ---------- GDPR ----------
@@ -220,9 +214,11 @@ def export_applications(email):
 
 @transaction.atomic
 def delete_applications(email):
-    """Erase Gold applications made with this email, including their history rows. Returns counts."""
+    """Erase Gold applications made with this email: the rows, their history, the emails about them (Barry's
+    included, found by EmailLog.subject_email) and the queue records of their email tasks. Returns counts."""
     applications = GoldApplication.objects.filter(email__iexact=email)
     ids = list(applications.values_list("pk", flat=True))
     removed = applications.delete()[0]
     history = GoldApplication.history.model.objects.filter(id__in=ids).delete()[0]
-    return {"gold_applications": removed, "gold_history_rows": history}
+    queue = erase_task_records(ids, ["gold.tasks."])
+    return {"gold_applications": removed, "gold_history_rows": history, "queue_records": queue}

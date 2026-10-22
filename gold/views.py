@@ -6,15 +6,18 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from common.ratelimit import rate_limited_json
+from common.audit import client_ip
+from common.ratelimit import hit, rate_limited_json, too_many_response
 from journey import engine as journey_engine
 from journey import services as journey_services
 
 from . import services
 from .forms import GoldApplicationForm
-from .models import BML_CHOICES, PROPERTY_LINKS, SIZE_RANGES, WHERE_CHOICES
+from . import rating
+from .models import BML, PROPERTY_LINK, SIZE, WHERE
 
 HONEYPOT_FIELD = "website"
+APPLY_SCOPE, APPLY_LIMIT, APPLY_WINDOW = "gold-apply", 10, 3600
 
 
 def _choices(pairs):
@@ -38,7 +41,7 @@ def _payload(request):
 @rate_limited_json("gold-options", 60, 60)
 def options(request):
     """Choices for the form plus anything already known (journey answers, signed-in details) so nothing is asked twice."""
-    session = journey_services.session_from_cookies(request.COOKIES)
+    session = journey_services.session_from_cookies(request.COOKIES, request.user)
     prefill = {}
     if session is not None:
         signals, _ = journey_engine.gold_signals(session)
@@ -52,17 +55,18 @@ def options(request):
             email=request.user.email, mobile=request.user.mobile or "",
         )
     return JsonResponse({
-        "property_link": _choices(PROPERTY_LINKS), "size_range": _choices(SIZE_RANGES),
-        "location": _choices(WHERE_CHOICES), "bml_relationship": _choices(BML_CHOICES),
+        "property_link": _choices(rating.choices(PROPERTY_LINK)), "size_range": _choices(rating.choices(SIZE)),
+        "location": _choices(rating.choices(WHERE)), "bml_relationship": _choices(rating.choices(BML)),
         "prefill": prefill, "spa_interest": services.interest_snapshot(session),
     })
 
 
 @login_not_required  # PUBLIC: see options()
 @require_POST
-@rate_limited_json("gold-apply", 10, 3600)
+@rate_limited_json("gold-apply-any", 120, 3600)  # generous cap on all posts; the real limit below counts valid ones only
 def apply(request):
-    """Submit an application. 201 with the reference, or 400 {"errors": {field: [messages]}}."""
+    """Submit an application. 201 with the reference, or 400 {"errors": {field: [messages]}}.
+    Ten valid applications an hour per IP: mistakes while filling in the form do not use them up."""
     data = _payload(request)
     if data is None:
         return JsonResponse({"error": "Send JSON."}, status=400)
@@ -71,7 +75,9 @@ def apply(request):
     form = GoldApplicationForm(data)
     if not form.is_valid():
         return JsonResponse({"errors": {k: [str(m) for m in v] for k, v in form.errors.items()}}, status=400)
-    session = journey_services.session_from_cookies(request.COOKIES)
+    if not hit(APPLY_SCOPE, client_ip(request) or "unknown", APPLY_LIMIT, APPLY_WINDOW):
+        return too_many_response(APPLY_WINDOW)
+    session = journey_services.session_from_cookies(request.COOKIES, request.user)
     try:
         application, _ = services.submit_application(form.cleaned_data, session=session)
     except services.ApplicationsClosed:

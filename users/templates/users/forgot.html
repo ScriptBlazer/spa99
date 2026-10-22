@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static validation_tags %}
 {% block head_title %}{% include "common/_head.html" with title="Forgotten password | Spa 99" %}{% endblock %}
 {% block main %}
 <section class="section on-light auth">
@@ -14,3 +14,4 @@
   </div>
 </section>
 {% endblock %}
+{% block scripts %}{% validation_config %}{% endblock %}

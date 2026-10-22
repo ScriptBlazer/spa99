@@ -10,7 +10,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from common.models import LoginEvent
-from common.tasks import enqueue
+from common.tasks import enqueue, erase_task_records
 from gold import services as gold_services
 from journey import services as journey_services
 from journey.models import Answer, JourneySession, new_session_key
@@ -57,8 +57,13 @@ def email_is_registered(email):
 
 
 def interest_plans():
-    """Plans a person can register interest in: visible monthly memberships."""
+    """Plans a person can register interest in: visible monthly memberships (same rule as Plan.interest_allowed)."""
     return Plan.objects.filter(visible=True, kind=Plan.MONTHLY)
+
+
+def interest_plan_slug(slug):
+    """`slug` if a person can register interest in that plan, else '' (a stale or hand-typed link is just ignored)."""
+    return slug if slug and interest_plans().filter(slug=slug).exists() else ""
 
 
 def _plan_for(slug):
@@ -85,6 +90,8 @@ def register_interest(data, journey_session=None):
     site = SiteSettings.load()
     if not site.register_interest_open:
         raise RegistrationClosed
+    if journey_session is not None and journey_session.user_id is not None:
+        journey_session = None  # a session already owned by someone (shared device) is never linked to a new person
     again = _existing_double_submit(data)
     if again is not None:
         return SignUpResult(again, created=False)
@@ -217,11 +224,16 @@ def export_user_data(user):
         "gold_applications": gold_services.export_applications(user.email),
         "emails": [
             {"template": e.template, "subject": e.subject, "status": e.status, "sent_at": _plain(e.sent_at)}
-            for e in EmailLog.objects.filter(to__iexact=user.email).order_by("created_at")
+            for e in _email_logs(user.email).order_by("created_at")
         ],
         "login_events": logins,
         "history": history,
     }
+
+
+def _email_logs(email):
+    """Emails sent to the person, plus emails about them sent to someone else (Barry's Gold email)."""
+    return EmailLog.objects.filter(Q(to__iexact=email) | Q(subject_email__iexact=email))
 
 
 def _plain(value):
@@ -281,14 +293,15 @@ def _anonymise_sessions(user):
 
 @transaction.atomic
 def delete_user_data(user):
-    """Erase a person: account, interest, Gold applications by their email, email log, login events and the history
+    """Erase a person: account, interest, Gold applications by their email, email log (including emails about them sent to staff), django-q task records, login events and the history
     rows that copy their details. Journey sessions are anonymised (kept for statistics, no longer linked).
     Erasure overrides the "history is never deleted" rule because history holds personal data."""
     pk, email = user.pk, user.email
     anonymised = _anonymise_sessions(user)
     removed_logins = _login_events(user).delete()[0]
-    removed_emails = EmailLog.objects.filter(to__iexact=email).delete()[0]
+    removed_emails = _email_logs(email).delete()[0]
     gold = gold_services.delete_applications(email)
+    queue = erase_task_records([pk], ["users.tasks."])
     interest_ids = list(InterestRegistration.objects.filter(user=user).values_list("pk", flat=True))
     user.delete()  # cascades the InterestRegistration
     interest_history = InterestRegistration.history.model.objects.filter(id__in=interest_ids).delete()[0]
@@ -296,5 +309,6 @@ def delete_user_data(user):
     return {
         "login_events": removed_logins, "history_rows": removed_history, "email_logs": removed_emails,
         "interest_history_rows": interest_history, "journey_sessions_anonymised": anonymised, **gold,
+        "queue_records": gold["queue_records"] + queue,
     }
 

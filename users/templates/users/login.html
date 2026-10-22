@@ -1,5 +1,5 @@
 {% extends layout %}
-{% load static %}
+{% load static validation_tags %}
 {% block head_title %}{% include "common/_head.html" with title="Sign in | Spa 99" %}{% endblock %}
 {% block main %}
 {% if control %}
@@ -38,4 +38,4 @@
 </section>
 {% endif %}
 {% endblock %}
-{% block scripts %}{% if not control %}<script type="module" src="{% static 'common/js/forms.js' %}"></script>{% endif %}{% endblock %}
+{% block scripts %}{% validation_config %}{% if not control %}<script type="module" src="{% static 'common/js/forms.js' %}"></script>{% endif %}{% endblock %}

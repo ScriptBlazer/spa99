@@ -3,10 +3,11 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core import mail
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 
 from gold import rating, services
-from gold.models import GoldApplication, GoldRule
+from gold.forms import GoldApplicationForm
+from gold.models import GoldApplication, GoldChoice, GoldRule, GoldSignalSource
 from journey import engine
 from journey import services as journey
 from notifications.models import EmailLog
@@ -185,3 +186,74 @@ class EndpointTests(TestCase):
         data = client.get("/gold/options/").json()
         self.assertEqual(data["prefill"], {"property_link": "developer", "size_range": "200_plus"})
         self.assertIn({"value": "none", "label": "None of these"}, data["property_link"])
+
+
+LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "gold-rate-limit"}}
+
+
+class EditableQuestionsTests(TestCase):
+    """The answer choices, the journey link and the email wording are rows, not code."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_choices_come_from_rows_and_retired_ones_are_refused_but_still_readable(self):
+        GoldChoice.objects.filter(group="property_link", value="agent").update(active=False)
+        GoldChoice.objects.filter(group="where", value="north_london").update(label="North London (N postcodes)")
+        form = GoldApplicationForm({**application_data(property_link="agent"), "privacy_accepted": True})
+        self.assertIn("property_link", form.errors)
+        self.assertNotIn({"value": "agent", "label": "Agent / broker"}, Client().get("/gold/options/").json()["property_link"])
+        application, _ = services.submit_application(application_data(property_link="owner_investor"))
+        GoldApplication.objects.filter(pk=application.pk).update(property_link="agent")  # an old answer to a retired choice
+        rows = dict(services.application_sections(GoldApplication.objects.get(pk=application.pk))[1]["rows"])
+        self.assertEqual(rows["Link to property"], "Agent / broker")
+        self.assertEqual(rows["Where"], "North London (N postcodes)")
+
+    def test_which_journey_answers_feed_gold_is_data(self):
+        session = journey.create_session()
+        journey.save_answer(session, "industry", options=["law"])
+        journey.save_answer(session, "property_law", options=["yes"])
+        self.assertEqual(engine.gold_signals(session)[0], {"property_link": "property_lawyer"})
+        GoldSignalSource.objects.filter(question_key="property_law").update(sets_value="agent")
+        self.assertEqual(engine.gold_signals(session)[0], {"property_link": "agent"})
+        GoldSignalSource.objects.filter(question_key="property_law").update(active=False)
+        self.assertEqual(engine.gold_signals(session)[0], {})
+
+    def test_email_subjects_and_dates_use_rows_and_the_uk_format(self):
+        from notifications.models import NotificationTemplate
+
+        NotificationTemplate.objects.filter(key="gold_ack").update(subject="Thanks from Spa 99")
+        application, _ = services.submit_application(application_data())
+        self.assertEqual(mail.outbox[1].subject, "Thanks from Spa 99")
+        applied = dict(services.application_sections(application)[0]["rows"])["Date applied"]
+        self.assertRegex(applied, r"^\d{2}/\d{2}/\d{4}, \d{2}:\d{2}$")
+
+    def test_the_barry_email_is_linked_to_the_applicant(self):
+        services.submit_application(application_data())
+        self.assertEqual(EmailLog.objects.get(template="gold_barry").subject_email, "dan@example.com")
+        self.assertEqual(EmailLog.objects.get(template="gold_ack").subject_email, "dan@example.com")
+
+
+@override_settings(CACHES=LOCMEM)
+class RateLimitTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_mistakes_do_not_use_up_the_limit_but_ten_valid_applications_do(self):
+        from django.core.cache import cache
+
+        cache.clear()
+        client = Client(enforce_csrf_checks=True)
+        token = client.get("/gold/options/").cookies["csrftoken"].value
+
+        def send(data):
+            return client.post("/gold/apply/", json.dumps(data), content_type="application/json", headers={"X-CSRFToken": token})
+
+        for _ in range(15):  # fifteen mistakes
+            self.assertEqual(send(application_data(mobile="1", privacy_accepted=True)).status_code, 400)
+        for number in range(10):  # still ten valid ones allowed
+            self.assertEqual(send(application_data(email=f"p{number}@example.com", privacy_accepted=True)).status_code, 201)
+        self.assertEqual(send(application_data(email="p11@example.com", privacy_accepted=True)).status_code, 429)
+        cache.clear()

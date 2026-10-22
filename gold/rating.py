@@ -5,7 +5,7 @@ signals: dict with any of  property_link, size, where, bml, referred  (answer va
 """
 from dataclasses import dataclass, field
 
-from .models import GoldRule
+from .models import GoldChoice, GoldRule, GoldSignalSource
 
 HIGH, MEDIUM, LOW = "high", "medium", "low"
 DEFAULT_THRESHOLDS = {HIGH: 6, MEDIUM: 3}  # only used if the threshold rows were deleted
@@ -61,3 +61,33 @@ def rate_potential(signals, extra_points=0):
     else:
         level = LOW
     return Rating(level, score, reasons, is_property_link(signals.get(GoldRule.PROPERTY_LINK), rules))
+
+
+# ---------- choices and journey signals (rows, edited in Control) ----------
+
+def choices(group, include_inactive=False):
+    """[(value, label)] for one group of Gold answers, in order."""
+    rows = GoldChoice.objects.filter(group=group)
+    if not include_inactive:
+        rows = rows.filter(active=True)
+    return [(row.value, row.label) for row in rows]
+
+
+def label_for(group, value):
+    """The label for a stored value (retired choices still resolve); the value itself if it has no row."""
+    return dict(choices(group, include_inactive=True)).get(value, value or "")
+
+
+def signals_from_answers(answers):
+    """Gold signals from journey answers. `answers` is {question key: [option values]} for answers that count.
+    Returns {signal: value}. Which question feeds which signal is GoldSignalSource rows."""
+    signals = {}
+    for source in GoldSignalSource.objects.filter(active=True):
+        if source.signal in signals:
+            continue
+        for value in answers.get(source.question_key) or []:
+            if source.answer_value and value != source.answer_value:
+                continue
+            signals[source.signal] = source.sets_value or value
+            break
+    return signals

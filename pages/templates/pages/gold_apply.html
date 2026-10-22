@@ -1,5 +1,5 @@
 {% extends "base_reduced.html" %}
-{% load static %}
+{% load static validation_tags %}
 {% block head_title %}{% include "common/_head.html" with title="Apply for the Gold Card | Spa 99" description=meta.meta_description %}{% endblock %}
 {% block head_extra %}<meta name="robots" content="noindex">{% endblock %}
 {% block messages %}{% endblock %}
@@ -16,4 +16,4 @@
 </div>
 {{ gold_config|json_script:"gold-config" }}
 {% endblock %}
-{% block scripts %}<script type="module" src="{% static 'common/js/gold-apply.js' %}"></script>{% endblock %}
+{% block scripts %}{% validation_config %}<script type="module" src="{% static 'common/js/gold-apply.js' %}"></script>{% endblock %}

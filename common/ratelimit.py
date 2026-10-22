@@ -25,6 +25,12 @@ def hit(scope, identifier, limit, window_seconds):
         return True
 
 
+def too_many_response(window_seconds):
+    response = JsonResponse({"error": "Too many requests. Please wait a moment."}, status=429)
+    response["Retry-After"] = str(window_seconds)
+    return response
+
+
 def rate_limited_json(scope, limit, window_seconds):
     """View decorator: per-IP limit, answers 429 JSON when exceeded."""
 
@@ -32,9 +38,7 @@ def rate_limited_json(scope, limit, window_seconds):
         @wraps(view)
         def wrapper(request, *args, **kwargs):
             if not hit(scope, client_ip(request) or "unknown", limit, window_seconds):
-                response = JsonResponse({"error": "Too many requests. Please wait a moment."}, status=429)
-                response["Retry-After"] = str(window_seconds)
-                return response
+                return too_many_response(window_seconds)
             return view(request, *args, **kwargs)
 
         return wrapper

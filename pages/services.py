@@ -9,21 +9,12 @@ from plans.models import OpeningRule, Plan, SiteSettings
 # Facility slug -> optimised render name (content/static/content/img). The new renders are not here yet:
 # those facilities show a placeholder until a file is uploaded on the Facility in Control.
 FACILITY_IMAGES = {"dry-sauna": "dry-sauna", "relaxing-zone": "relaxing-zone", "gym": "gym"}
-FACILITY_ALT = {
-    "dry-sauna": "Dry sauna with cedar benches and a glass door etched with the swan",
-    "wet-sauna": "Steam room clad in travertine",
-    "cold-plunge": "Cold plunge pool set into a travertine floor",
-    "showers": "Rain showers behind walnut slatted screens",
-    "relaxing-zone": "Relaxing zone with loungers, travertine and the swan on the wall",
-    "massage-room": "Massage room with a walnut table",
-    "gym": "Gym with free weights and a swan panel on the wall",
-    "kitchenette": "Kitchenette and lounge corner",
-}
-PERK_PHRASES = {
-    "merch": "Each merch release",
-    "leil_shishi": "Leil Shishi when offered",
-    "events": "BML members' events",
-}
+
+
+def split_label(label):
+    """'Early morning (5 to 9am)' -> ('Early morning', '5 to 9am'); no brackets -> (label, ''). Mirrored in api.js."""
+    main, sep, rest = (label or "").partition(" (")
+    return (main.strip(), rest.rstrip(")").strip()) if sep else ((label or "").strip(), "")
 
 
 # ---------- hours ----------
@@ -45,17 +36,21 @@ def opening_hours():
     for rule in rules:
         if rule.kind == OpeningRule.DAILY_CLOSURE and rule.start_time and rule.end_time:
             rows.append(("Closed", f"{_clock(rule.start_time)} to {_clock(rule.end_time)}, every day"))
-    if any(rule.kind in (OpeningRule.CLOSE_BEFORE_CANDLES, OpeningRule.OPEN_AFTER_NIGHTFALL) for rule in rules):
-        rows.append(("Shabbos and Yom Tov", "Closed from Friday afternoon until Saturday night"))
+    for rule in rules:  # Shabbos / Yom Tov rules that carry a public note (written in Control)
+        if rule.kind in (OpeningRule.CLOSE_BEFORE_CANDLES, OpeningRule.OPEN_AFTER_NIGHTFALL) and rule.public_note:
+            rows.append((rule.public_title or rule.label, rule.public_note))
     return rows
 
 
 def hours_summary():
     """One short line for the footer and menu, e.g. 'Open 5am to 3am'."""
-    periods = [r for r in opening_hours() if r[0] not in ("Closed", "Shabbos and Yom Tov")]
+    periods = [
+        (_clock(r.start_time), _clock(r.end_time))
+        for r in OpeningRule.objects.filter(active=True, kind=OpeningRule.PERIOD) if r.start_time and r.end_time
+    ]
     if len(periods) >= 2:
-        return f"Open {periods[0][1].split(' to ')[0]} to {periods[-1][1].split(' to ')[1]}"
-    return f"Open {periods[0][1]}" if periods else ""
+        return f"Open {periods[0][0]} to {periods[-1][1]}"
+    return f"Open {periods[0][0]} to {periods[0][1]}" if periods else ""
 
 
 # ---------- greeting ----------
@@ -72,11 +67,6 @@ def greeting(user, now=None):
 
 def _plural(n, word):
     return f"{n} {word}{'' if n == 1 else 's'}"
-
-
-def _trim(amount):
-    """'399.00' -> '399', '99.50' stays '99.50'."""
-    return amount[:-3] if amount.endswith(".00") else amount
 
 
 def character(plan):
@@ -112,7 +102,7 @@ def plan_card(plan, vat_rate=None):
         "character": character(plan),
         "lines": plan_lines(plan),
         "is_single": plan.kind == Plan.ONE_OFF,
-        "price_whole": _trim(display["price_ex_vat"]),
+        "price_whole": display["price_whole"],
         "price_inc": display["price_inc_vat"],
         "period": "a visit" if plan.kind == Plan.ONE_OFF else "a month",
     }
@@ -172,7 +162,7 @@ def gold_groups():
     if plan.perk("waitlist_priority"):
         visits.append("First call from the waitlist")
     beyond = [
-        PERK_PHRASES.get(perk.get("key"), perk.get("label", ""))
+        perk.get("phrase") or perk.get("label", "")
         for perk in plan.perks or []
         if perk.get("key") != "waitlist_priority"
     ]
@@ -190,7 +180,7 @@ def facility_cards():
             "line": f.short_line,
             "image": f.image,
             "image_name": FACILITY_IMAGES.get(f.slug, ""),
-            "alt": FACILITY_ALT.get(f.slug, f.name),
+            "alt": f.image_alt or f.name,
         }
         for f in plan_services.visible_facilities()
     ]

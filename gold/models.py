@@ -7,37 +7,75 @@ from simple_history.models import HistoricalRecords
 from common.ids import generate_public_code
 from common.models import BaseModel
 
-# Answer values shared by the application form, the journey (same option values) and the rules.
-PROPERTY_LINKS = [
-    ("owner_investor", "Owner / investor"),
-    ("developer", "Developer"),
-    ("manager", "Manager (block, estate, portfolio)"),
-    ("firm", "Work at a property or management firm"),
-    ("agent", "Agent / broker"),
-    ("property_lawyer", "Property lawyer"),
-    ("none", "None of these"),
+# The answer choices (link to property, size, where, BML) are GoldChoice rows, the points are GoldRule rows and the
+# journey questions that feed them are GoldSignalSource rows: all edited in Control.
+PROPERTY_LINK = "property_link"
+SIZE = "size"
+WHERE = "where"
+BML = "bml"
+CHOICE_GROUPS = [
+    (PROPERTY_LINK, "Link to property"),
+    (SIZE, "Size of portfolio"),
+    (WHERE, "Where"),
+    (BML, "Works with BML"),
 ]
-SIZE_RANGES = [("1_9", "1 to 9"), ("10_49", "10 to 49"), ("50_199", "50 to 199"), ("200_plus", "200 or more")]
-WHERE_CHOICES = [
-    ("north_london", "North London"),
-    ("rest_of_london", "Rest of London"),
-    ("rest_of_uk", "Rest of the UK"),
-    ("abroad", "Abroad"),
-]
-BML_CHOICES = [("yes", "Yes"), ("not_yet", "Not yet"), ("no", "No")]
 
 
 def new_reference():
     return "GC-" + generate_public_code(6)
 
 
+class GoldChoice(BaseModel):
+    """One answer on the Gold application form (and the Gold questions in the journey). Rows, so Control can change
+    the wording or retire a choice. The value is stored on applications and used by GoldRule: do not rename it."""
+
+    group = models.CharField(max_length=20, choices=CHOICE_GROUPS)
+    value = models.SlugField(max_length=20, help_text="Stable value stored on applications and matched by the rating rules. Do not rename.")
+    label = models.CharField(max_length=120)
+    order = models.PositiveSmallIntegerField(default=0)
+    active = models.BooleanField(default=True, help_text="Retire by unticking. Never delete: old applications keep their answer.")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["group", "order", "value"]
+        constraints = [models.UniqueConstraint(fields=["group", "value"], name="gold_choice_unique")]
+
+    def __str__(self):
+        return f"{self.group}:{self.value}"
+
+
+class GoldSignalSource(BaseModel):
+    """Which journey answer feeds which Gold signal, so the journey result can rate Gold potential from answers
+    already given. First matching row (by order) wins for each signal.
+
+    answer_value empty: pass the chosen option through (its value must be a GoldChoice value).
+    answer_value set: only when that option is chosen, and the signal becomes `sets_value`.
+    """
+
+    signal = models.CharField(max_length=20, choices=CHOICE_GROUPS)
+    question_key = models.SlugField(help_text="Key of the journey question to read, e.g. property_link.")
+    answer_value = models.SlugField(blank=True, help_text="Only when this option is chosen. Empty = any option, passed through.")
+    sets_value = models.SlugField(max_length=20, blank=True, help_text="The Gold value this gives, e.g. property_lawyer. Empty = the option's own value.")
+    order = models.PositiveSmallIntegerField(default=0)
+    active = models.BooleanField(default=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["signal", "order", "question_key"]
+
+    def __str__(self):
+        return f"{self.signal} from {self.question_key}"
+
+
 class GoldRule(BaseModel):
     """One weight or threshold of the potential rating. Rows, so Control can change them."""
 
-    PROPERTY_LINK = "property_link"
-    SIZE = "size"
-    WHERE = "where"
-    BML = "bml"
+    PROPERTY_LINK = PROPERTY_LINK
+    SIZE = SIZE
+    WHERE = WHERE
+    BML = BML
     REFERRED = "referred"
     THRESHOLD = "threshold"
     GROUP_CHOICES = [
@@ -82,12 +120,12 @@ class GoldApplication(BaseModel):
     email = models.EmailField(db_index=True)
     mobile = models.CharField(max_length=16, blank=True, help_text="E.164")
 
-    property_link = models.CharField(max_length=20, choices=PROPERTY_LINKS)
-    size_range = models.CharField(max_length=10, choices=SIZE_RANGES, blank=True)
-    location = models.CharField("where", max_length=20, choices=WHERE_CHOICES, blank=True)
+    property_link = models.CharField(max_length=20)
+    size_range = models.CharField(max_length=10, blank=True)
+    location = models.CharField("where", max_length=20, blank=True)
     company = models.CharField(max_length=150, blank=True)
     role = models.CharField(max_length=150, blank=True)
-    bml_relationship = models.CharField(max_length=10, choices=BML_CHOICES, blank=True)
+    bml_relationship = models.CharField(max_length=10, blank=True)
     referred_by = models.CharField(max_length=150, blank=True)
     note = models.TextField(blank=True)
 

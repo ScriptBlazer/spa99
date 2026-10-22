@@ -43,7 +43,8 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 CSRF_TRUSTED_ORIGINS = [f"https://{DOMAIN}", f"https://{CONTROL_HOST}"]
 SECURE_HSTS_SECONDS = 0
-TRUST_FORWARDED_FOR = True  # Caddy sets X-Forwarded-For to the real client IP
+TRUST_FORWARDED_FOR = True  # we only ever sit behind Caddy
+CLIENT_IP_HEADER = ENV.get("CLIENT_IP_HEADER", "X-Client-IP")  # set by Caddy from {client_ip}; empty = use X-Forwarded-For
 
 _sentry_dsn = ENV.get("SENTRY_DSN")
 if _sentry_dsn:

@@ -1,8 +1,10 @@
 from django.contrib import admin
 
+from simple_history.admin import SimpleHistoryAdmin
+
 from common.admin import ExportCsvMixin
 
-from .models import EmailLog
+from .models import EmailLog, NotificationTemplate
 
 
 @admin.register(EmailLog)
@@ -11,7 +13,7 @@ class EmailLogAdmin(ExportCsvMixin, admin.ModelAdmin):
 
     list_display = ("created_at", "template", "to", "subject", "status")
     list_filter = ("status", "template")
-    search_fields = ("to", "subject")
+    search_fields = ("to", "subject", "subject_email")
     date_hierarchy = "created_at"
 
     def has_add_permission(self, request):
@@ -22,3 +24,8 @@ class EmailLogAdmin(ExportCsvMixin, admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(NotificationTemplate)
+class NotificationTemplateAdmin(SimpleHistoryAdmin):
+    list_display = ("key", "subject", "note")

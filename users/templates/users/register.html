@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static content_tags pages_tags %}
+{% load static content_tags pages_tags validation_tags %}
 {% block head_title %}{% include "common/_head.html" with title=site_settings.wording|add:" | Spa 99" %}{% endblock %}
 {% block main %}
 {% page_content "register" as r %}
@@ -90,4 +90,4 @@
   </div>
 </section>
 {% endblock %}
-{% block scripts %}<script type="module" src="{% static 'common/js/register.js' %}"></script>{% endblock %}
+{% block scripts %}{% validation_config %}<script type="module" src="{% static 'common/js/register.js' %}"></script>{% endblock %}

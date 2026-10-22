@@ -1,7 +1,7 @@
 """Admin forms and the public sign-up forms. Validation comes from common/validators.py, the same rules the
 JS file common/static/common/js/validate.js mirrors (the data-validate attributes switch the JS checks on)."""
 from django import forms
-from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm as BaseUserChangeForm
+from django.contrib.auth.forms import AdminUserCreationForm, PasswordChangeForm, UserChangeForm as BaseUserChangeForm
 from django.core.exceptions import ValidationError
 
 from common.validators import normalise_email, normalise_uk_mobile, password_problems, validate_adult, validate_person_name
@@ -89,3 +89,15 @@ class ResetPasswordForm(forms.Form):
         label="New password", strip=False,
         widget=forms.PasswordInput(attrs=_attrs("required password", autocomplete="new-password")),
     )
+
+
+class ChangePasswordForm(PasswordChangeForm):
+    """Account page: change password. Django's checks (old password, same rules as sign-up) with the brand's live feedback."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["old_password"].widget.attrs.update(_attrs("required", autocomplete="current-password", autofocus=False))
+        self.fields["old_password"].widget.attrs["data-required-message"] = "Enter your current password."
+        self.fields["new_password1"].widget.attrs.update(_attrs("required password", autocomplete="new-password"))
+        self.fields["new_password2"].widget.attrs.update(_attrs("required", autocomplete="new-password"))
+        self.fields["new_password2"].widget.attrs["data-required-message"] = "Type the new password again."

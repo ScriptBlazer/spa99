@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static validation_tags %}
 {% block head_title %}{% include "common/_head.html" with title="Choose a new password | Spa 99" %}{% endblock %}
 {% block main %}
 <section class="section on-light auth">
@@ -12,4 +12,4 @@
   </div>
 </section>
 {% endblock %}
-{% block scripts %}<script type="module" src="{% static 'common/js/forms.js' %}"></script>{% endblock %}
+{% block scripts %}{% validation_config %}<script type="module" src="{% static 'common/js/forms.js' %}"></script>{% endblock %}

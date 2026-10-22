@@ -7,10 +7,23 @@ logger = logging.getLogger("spa99.audit")
 
 
 def client_ip(request):
-    """Real client IP. X-Forwarded-For is only trusted behind our own proxy (settings.TRUST_FORWARDED_FOR)."""
+    """Real client IP.
+
+    Behind our own proxy (settings.TRUST_FORWARDED_FOR) two things are trusted, in this order:
+      1. the header named by settings.CLIENT_IP_HEADER (off when empty). Caddy writes it from `{client_ip}`, which it
+         works out from Cloudflare's CF-Connecting-IP only when the connection really came from a Cloudflare range
+         (see the Caddyfile), and overwrites whatever the visitor sent. This is the one that cannot be forged.
+      2. the first X-Forwarded-For entry (fine with Caddy alone, but a visitor can put a fake first entry when
+         Cloudflare is in front, so do not rely on it there).
+    Anywhere else it is the socket address."""
     if request is None:
         return None
     if settings.TRUST_FORWARDED_FOR:
+        header = getattr(settings, "CLIENT_IP_HEADER", "")
+        if header:
+            value = request.META.get("HTTP_" + header.upper().replace("-", "_"), "").strip()
+            if value:
+                return value
         forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
         if forwarded:
             return forwarded.split(",")[0].strip() or None

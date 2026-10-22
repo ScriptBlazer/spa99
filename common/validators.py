@@ -18,7 +18,11 @@ MESSAGES = {
     "name_long": "That name is too long.",
     "dob_required": "Enter your date of birth.",
     "dob_invalid": "Enter a valid date of birth.",
-    "dob_under_age": "You must be 18 or over.",
+    "dob_under_age": "You must be {minimum} or over.",
+    # Wording for fields left empty (the JS shows these before the server is asked).
+    "required": "This field is required.",
+    "mobile_required": "Enter your mobile number.",
+    "password_required": "Choose a password.",
 }
 
 NAME_MAX_LENGTH = 100
@@ -46,7 +50,7 @@ def validate_adult(dob, today=None):
     had_birthday = (today.month, today.day) >= (dob.month, dob.day)
     age = today.year - dob.year - (0 if had_birthday else 1)
     if age < minimum:
-        raise ValidationError(MESSAGES["dob_under_age"], code="under_age")
+        raise ValidationError(MESSAGES["dob_under_age"].format(minimum=minimum), code="under_age")
     return dob
 
 
@@ -94,3 +98,53 @@ def password_problems(password, email="", first_name="", last_name=""):
     except ValidationError as error:
         return list(error.messages)
     return []
+
+
+# ---------- what the browser needs to give the same answers ----------
+
+def _password_messages():
+    """The wording of the active password validators, taken from the validators themselves (so the browser shows
+    exactly what the server would say). Keys are left out for validators that are switched off."""
+    from django.contrib.auth.password_validation import (
+        CommonPasswordValidator, MinimumLengthValidator, NumericPasswordValidator, UserAttributeSimilarityValidator,
+        get_default_password_validators,
+    )
+
+    probes = {
+        MinimumLengthValidator: ("password_short", lambda v: v.validate("a")),
+        CommonPasswordValidator: ("password_common", lambda v: v.validate("password")),
+        NumericPasswordValidator: ("password_numeric", lambda v: v.validate("12345678901")),
+        UserAttributeSimilarityValidator: (
+            "password_similar", lambda v: v.validate("probename", get_user_model()(first_name="probename")),
+        ),
+    }
+    messages, minimum_length = {}, None
+    for validator in get_default_password_validators():
+        entry = probes.get(type(validator))
+        if entry is None:
+            continue
+        key, run = entry
+        if isinstance(validator, MinimumLengthValidator):
+            minimum_length = validator.min_length
+        try:
+            run(validator)
+        except ValidationError as error:
+            first = error.error_list[0]
+            text = first.message % first.params if first.params else first.message
+            if key == "password_similar":  # "...similar to the first name." -> a {what} slot for the browser to fill
+                text = text.replace("first name", "{what}")
+            messages[key] = text
+    return messages, minimum_length
+
+
+def client_config(urls=None):
+    """Everything validate.js needs from the server, so the wording and limits live in Python only:
+    {messages, minimum_age, password_min_length, name_max_length, urls}."""
+    minimum = getattr(settings, "MINIMUM_AGE", 18)
+    password_messages, min_length = _password_messages()
+    messages = {**MESSAGES, **password_messages}
+    messages["dob_under_age"] = messages["dob_under_age"].format(minimum=minimum)
+    return {
+        "messages": messages, "minimum_age": minimum, "password_min_length": min_length,
+        "name_max_length": NAME_MAX_LENGTH, "urls": urls or {},
+    }

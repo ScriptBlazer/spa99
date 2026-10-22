@@ -27,3 +27,9 @@ def lines(text):
 def photo_srcset(name):
     """The WebP srcset of an optimised render, for <link rel="preload" imagesrcset>."""
     return images.srcset(name) if images.has_image(name) else ""
+
+
+@register.filter
+def parts(sections, prefix="part_"):
+    """The sections of a page whose key starts with `prefix`, in order (the numbered parts of a legal page)."""
+    return [section for key, section in sections.items() if key.startswith(prefix)]

@@ -168,6 +168,8 @@ Q_CLUSTER = {
 
 # Audit: trust X-Forwarded-For for the client IP only behind Caddy (prod).
 TRUST_FORWARDED_FOR = False
+# Header our proxy sets to the real client IP (off when empty). Prod: "X-Client-IP", written by Caddy (see Caddyfile).
+CLIENT_IP_HEADER = ""
 
 LOGGING = {
     "version": 1,

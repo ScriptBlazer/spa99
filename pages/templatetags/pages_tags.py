@@ -12,13 +12,12 @@ def hours_summary():
 
 @register.filter
 def split_main(label):
-    return (label or "").partition(" (")[0].strip()
+    return services.split_label(label)[0]
 
 
 @register.filter
 def split_sub(label):
-    _, sep, rest = (label or "").partition(" (")
-    return rest.rstrip(")").strip() if sep else ""
+    return services.split_label(label)[1]
 
 
 @register.simple_tag

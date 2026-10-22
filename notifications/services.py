@@ -9,7 +9,8 @@ from django.utils import timezone
 
 from plans.models import SiteSettings
 
-from .models import EmailLog
+from .models import EmailLog, NotificationTemplate
+from .seed import DEFAULT_SUBJECTS
 
 logger = logging.getLogger("spa99.email")
 
@@ -21,16 +22,30 @@ def base_context():
         "tagline": "Beyond Luxury",
         "contact_email": site.contact_email,
         "site_url": settings.SITE_URL,
-        "address": "99 Vale Road, London N4 1PR",
+        "address": site.address_one_line,
     }
 
 
-def send_templated(template, to, subject, context=None, cc=None):
+def subject_for(key, **values):
+    """The subject line for an email: the NotificationTemplate row (edited in Control), or the built-in default.
+    {placeholders} are replaced from `values`; unknown ones are left as typed."""
+    row = NotificationTemplate.objects.filter(key=key).first()
+    text = row.subject if row else DEFAULT_SUBJECTS[key][0]
+    for name, value in values.items():
+        text = text.replace("{" + name + "}", str(value))
+    return text
+
+
+def send_templated(template, to, subject, context=None, cc=None, subject_email=""):
     """Render notifications/emails/<template>.html and .txt, send, and log. Returns the EmailLog.
-    `to` and `cc` are lists of addresses."""
+    `to` and `cc` are lists of addresses. `subject_email` is the person the message is about when it goes to
+    someone else (Barry's Gold email), so deleting that person's data finds the log row."""
     to, cc = list(to or []), list(cc or [])
     ctx = {**base_context(), **(context or {})}
-    log = EmailLog(to=", ".join(to), cc=", ".join(cc), subject=subject[:300], template=template)
+    log = EmailLog(
+        to=", ".join(to), cc=", ".join(cc), subject=subject[:300], template=template,
+        subject_email=(subject_email or "").strip().lower(),
+    )
     try:
         text = render_to_string(f"notifications/emails/{template}.txt", ctx)
         html = render_to_string(f"notifications/emails/{template}.html", ctx)

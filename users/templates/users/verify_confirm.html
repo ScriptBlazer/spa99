@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load static %}
+{% block head_title %}{% include "common/_head.html" with title="Confirm your email | Spa 99" %}{% endblock %}
+{% block main %}
+<section class="section on-light auth">
+  <div class="container auth-inner">
+    <h1>Confirm your email.</h1>
+    <p class="lead">{% if first_name %}{{ first_name }}, one tap{% else %}One tap{% endif %} and your address is confirmed.</p>
+    <form method="post" class="form-stack-sm">{% csrf_token %}
+      <button type="submit" class="btn btn-primary btn-block" data-working-text="Confirming">Confirm my email</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/forms.js' %}"></script>{% endblock %}

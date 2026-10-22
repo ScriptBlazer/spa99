@@ -42,16 +42,42 @@ def plan_facts(plan):
     return facts
 
 
+def trim_price(amount):
+    """'399.00' -> '399', '99.50' stays '99.50'."""
+    amount = str(amount)
+    return amount[:-3] if amount.endswith(".00") else amount
+
+
+def _count(n, word):
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
+def character_line(plan):
+    """'Daytime, 6 visits a month.' / 'Any time, unlimited visits.' (for the journey result)."""
+    when = "Daytime" if plan.is_daytime_only else "Any time"
+    visits = "unlimited visits" if plan.is_unlimited else f"{_count(plan.visits_per_month, 'visit')} a month"
+    return f"{when}, {visits}."
+
+
+def price_line(plan, price_inc):
+    period = "a visit" if plan.kind == plan.ONE_OFF else "a month"
+    return f"£{trim_price(plan.price_ex_vat)} {period}, ex VAT (£{price_inc} inc VAT)"
+
+
 def plan_display(plan, vat_rate=None):
     """Everything a template or JSON response needs to show one plan."""
     if vat_rate is None:
         vat_rate = SiteSettings.load().vat_rate
+    price_inc = str(price_inc_vat(plan.price_ex_vat, vat_rate))
     return {
         "slug": plan.slug,
         "name": plan.name,
         "kind": plan.kind,
         "price_ex_vat": str(plan.price_ex_vat),
-        "price_inc_vat": str(price_inc_vat(plan.price_ex_vat, vat_rate)),
+        "price_inc_vat": price_inc,
+        "price_whole": trim_price(plan.price_ex_vat),
+        "price_line": price_line(plan, price_inc),
+        "character_line": character_line(plan),
         "visits_per_month": plan.visits_per_month,
         "hours": plan.hours,
         "booking_window_days": plan.booking_window_days,
@@ -61,6 +87,7 @@ def plan_display(plan, vat_rate=None):
         "perks": plan.perks,
         "short_description": plan.short_description,
         "highlight": plan.highlight,
+        "interest_allowed": plan.interest_allowed,
         "facts": plan_facts(plan),
     }
 

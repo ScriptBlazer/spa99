@@ -57,7 +57,7 @@ Thresholds for High/Medium/Low are settings. The rating and its reasons are stor
 
 To `barry@bmlgroup.co.uk`, cc `moishe.berkowitz@bmlgroup.co.uk` (recipients editable in Control). Sent on submit.
 
-**Subject:** Gold Card application: {Name} ({Potential} potential)
+**Subject:** Gold Card application: {Name} ({Potential} potential). The wording is a row in Notification templates (`gold_barry`, `gold_barry_repeat`, `gold_ack`), editable in Control. Dates in the email are 22/10/2026
 
 **1. Personal details:** name, email, mobile, date applied, application reference.
 
@@ -74,11 +74,13 @@ Clean, branded, readable on a phone. Applicant receives a short, calm acknowledg
 | Model | Holds |
 |---|---|
 | `GoldApplication` | UUID, `reference` (GC-XXXXXX), personal details, `property_link`, `size_range`, `location` (the "where"), company, role, `bml_relationship`, referred by, note, `spa_interest` (journey answers as readable text), linked journey session (and `user` if the same email registers), potential level + score + reasons, status (new / contacted / approved / declined, by hand in Control), internal notes, `email_sent_at` + `email_error`, `repeat_of`, marketing + privacy consent |
+| `GoldChoice` | The answers offered on the form and in the journey: group (property_link, size, where, bml), stable value, label, order, active. Retire by unticking; old applications keep their value and label |
+| `GoldSignalSource` | Which journey question feeds which Gold signal: signal, journey question key, optional answer value, the value it gives (e.g. `property_law` = `yes` gives `property_lawyer`), order, active |
 | `GoldRule` | One row per weight: group (property_link, size, where, bml, referred, threshold), match value, points, `is_property`. Thresholds are rows with group `threshold` and value `high` / `medium` |
 
 - Engine: `gold/rating.py` `rate_potential(signals)`, shared by the application and the journey result (the journey passes `property_link` and `size`).
 - Defaults (seeded, editable): owner/investor, developer, manager 5; works at a firm, agent, property lawyer 3; size 10-49 +1, 50-199 +2, 200+ +3; North London +1; works with BML +3; referred +1. High needs 6, Medium 3. So a bare owner is Medium and an owner with a portfolio of 10+ is High (matches journey.md "property link with scale").
-- Endpoints (public, CSRF + rate limit 10 per hour per IP + honeypot `website`): `GET /gold/options/` (choices, plus prefill from the journey cookie / signed-in user), `POST /gold/apply/` (JSON or form post; 201 `{"reference"}` or 400 `{"errors"}`).
+- Endpoints (public, CSRF + honeypot `website`; 10 *valid* applications per hour per IP (a form mistake does not use one up) plus a generous cap of 120 posts an hour of any kind): `GET /gold/options/` (choices, plus prefill from the journey cookie / signed-in user), `POST /gold/apply/` (JSON or form post; 201 `{"reference"}` or 400 `{"errors"}`).
 - Emails are queued (django-q2) as `gold.tasks.send_gold_emails(application_id)`: Barry (to + cc from Site settings, subject `Gold Card application: Name (High potential)`, suffix ` - repeat application` for repeats), then the applicant's acknowledgement. The three sections come from `gold.services.application_sections()` so Control can show the same. "Open in Control" links to `CONTROL_URL/gold/<id>/` (the Control page is built later). Resend (Barry only): `gold.services.resend_barry_email()`, also an action in the hidden admin.
 - A second submit within 2 minutes with the same email returns the first application and sends nothing new.
 - Stage switch `register_interest_open` also closes Gold applications.

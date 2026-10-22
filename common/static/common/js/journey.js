@@ -5,7 +5,7 @@
  *    with the answers shown. The current step is also saved on the server so closing and returning resumes.
  *  - Follow-up questions (property link, "Other") appear and disappear live from the questions' own conditions.
  */
-import { el, getJson, postJson, postWithRetry, splitLabel } from './api.js';
+import { el, getJson, postJson, postWithRetry } from './api.js';
 import { observeReveals } from './reveal.js';
 import { arrowIcon as makeArrow, segmentedEl, tileEl } from './choices.js';
 import { dismiss, showMessage } from './messages.js';
@@ -144,15 +144,14 @@ function questionBlock(q) {
   const layout = LAYOUT[q.key] || (q.type === 'scale' ? 'segmented' : q.type === 'multi' ? 'tiles-2' : 'tiles-stack');
   const hidden = !visibleKeys.has(q.key);
   const block = el(q.type === 'text' ? 'div' : 'fieldset', {
-    class: `question${parentKey(q) ? ' sub-question' : ''}`, dataset: { question: q.key }, hidden, 'data-reveal': parentKey(q) ? '' : null,
+    class: `question${parentKey(q) ? ' sub-question' : ''}`, dataset: { question: q.key }, hidden,
   });
-  if (parentKey(q)) block.setAttribute('data-reveal', '');
 
   if (q.type === 'text') {
     const id = `t-${q.key}`;
-    const input = el('input', { type: 'text', id, class: 'input', maxlength: '120', autocomplete: 'off', value: answers[q.key]?.text || '', 'data-q': q.key, 'data-text': '' });
+    const input = el('input', { type: 'text', id, class: 'input', maxlength: String(state.session.max_text_length), autocomplete: 'off', value: answers[q.key]?.text || '', 'data-q': q.key, 'data-text': '' });
     input.value = answers[q.key]?.text || '';
-    block.append(el('div', { class: 'field' }, el('label', { for: id }, q.text, ' ', el('span', { class: 'optional', text: '(optional)' })), input));
+    block.append(el('div', { class: 'field' }, el('label', { for: id }, q.text, ' ', el('span', { class: 'optional', text: copyOf('optional').body })), input));
     return block;
   }
 
@@ -231,8 +230,6 @@ function renderQuestionScreen(number) {
 
 /* ---------- result ---------- */
 
-const money = (amount) => (String(amount).endsWith('.00') ? String(amount).slice(0, -3) : String(amount));
-const characterOf = (plan) => `${plan.hours === 'daytime' ? 'Daytime' : 'Any time'}, ${plan.visits_per_month == null ? 'unlimited visits' : `${plan.visits_per_month} visits a month`}.`;
 const registerUrl = (slug) => `${config.urls.register}?plan=${encodeURIComponent(slug)}`;
 
 function goldMark() { return el('span', { class: 'mark-glyph', 'aria-hidden': 'true' }); }
@@ -240,10 +237,11 @@ function goldMark() { return el('span', { class: 'mark-glyph', 'aria-hidden': 't
 function renderResult(data) {
   const s = data.suggested;
   if (!s) {
+    const empty = data.copy?.empty || {};
     return el('section', { class: 'result', tabindex: '-1', 'data-reveal': 'hero' },
-      el('h1', { class: 'screen-title', tabindex: '-1', text: 'Thank you.' }),
-      el('p', { class: 'lead', text: 'Have a look at the memberships and choose the one that suits you.' }),
-      el('div', { class: 'result-actions' }, el('a', { class: 'btn btn-primary', href: config.urls.memberships, text: 'See memberships' })));
+      el('h1', { class: 'screen-title', tabindex: '-1', text: empty.heading || '' }),
+      el('p', { class: 'lead', text: empty.body || '' }),
+      el('div', { class: 'result-actions' }, el('a', { class: 'btn btn-primary', href: empty.url || config.urls.memberships, text: empty.cta || '' })));
   }
   const presentation = data.gold?.presentation || 'none';
   const goldPanelCopy = copyOf('gold_panel');
@@ -253,8 +251,8 @@ function renderResult(data) {
   const main = el('div', { class: 'result-main', 'data-reveal': 'hero' },
     el('p', { class: 'result-label small', text: copyOf('result_label').body }),
     el('h1', { class: 'display result-tier', tabindex: '-1', text: `${s.name}.` }),
-    el('p', { class: 'result-price num', text: `£${money(s.price_ex_vat)} a month, ex VAT (£${s.price_inc_vat} inc VAT)` }),
-    el('p', { class: 'result-char', text: characterOf(s) }),
+    el('p', { class: 'result-price num', text: s.price_line }),
+    el('p', { class: 'result-char', text: s.character_line }),
     el('div', { class: 'why' }, el('h2', { text: copyOf('why').heading }), el('ul', { class: 'reasons' }, (s.reasons || []).map((r) => el('li', { text: r })))),
     el('div', { class: 'result-actions' },
       el('a', { class: 'btn btn-primary btn-block-phone', href: registerUrl(s.slug) }, ctaText, ' ', arrowIcon()),
@@ -266,8 +264,8 @@ function renderResult(data) {
   const others = (data.others || []).length
     ? el('div', { class: 'others', 'data-reveal': '' }, el('h2', { text: copyOf('others').heading }),
       data.others.map((plan) => el('div', { class: 'other-plan' },
-        el('div', {}, el('strong', { text: plan.name }), ' ', el('span', { class: 'muted', text: characterOf(plan) }), plan.not_a_fit ? el('p', { class: 'not-fit', text: plan.hours === 'daytime' ? 'Daytime only' : '' }) : null),
-        el('span', { class: 'num', text: `£${money(plan.price_ex_vat)}` }),
+        el('div', {}, el('strong', { text: plan.name }), ' ', el('span', { class: 'muted', text: plan.character_line }), plan.not_a_fit ? el('p', { class: 'not-fit', text: copyOf('not_a_fit').body }) : null),
+        el('span', { class: 'num', text: `£${plan.price_whole}` }),
         el('a', { class: 'btn-quiet', href: registerUrl(plan.slug), text: copyOf('others').cta.replace('{plan}', plan.name) }))))
     : null;
 
@@ -302,7 +300,7 @@ function updateProgress() {
   fill.style.setProperty('--p', String(p));
   progress.setAttribute('aria-valuenow', String(Math.round(p * 100)));
   const name = copyOf(`screen_${current}`).heading.replace(/\.$/, '');
-  progress.setAttribute('aria-valuetext', onResult ? 'Your membership' : `${name}, part ${index + 1} of ${numbers.length}`);
+  progress.setAttribute('aria-valuetext', onResult ? copyOf('result_label').body : `${name}, part ${index + 1} of ${numbers.length}`);
 }
 
 function setSurface(light) {
@@ -320,13 +318,17 @@ async function show(step) {
   setSurface(onResult);
   let node;
   if (onResult) {
-    root.replaceChildren(el('p', { class: 'muted flow-loading', text: 'One moment' }));
+    root.replaceChildren(el('p', { class: 'muted flow-loading', text: copyOf('result_loading').body }));
     updateProgress();
     try {
-      node = renderResult(await getJson('/journey/result/'));
+      // POST: arriving at the result is what stores the suggestion and marks the journey finished (a GET changes nothing).
+      const reply = await postWithRetry('/journey/result/', {});
+      if (!reply.ok) throw new Error('result');
+      node = renderResult(reply.data);
     } catch {
-      showMessage('error', 'We could not load your result just now. Please try again.');
-      node = el('section', { class: 'result' }, el('p', { class: 'lead' }, 'Please try again, or ', el('a', { href: config.urls.memberships, text: 'see the memberships' }), '.'));
+      const failed = copyOf('result_error');
+      showMessage('error', failed.heading);
+      node = el('section', { class: 'result' }, el('p', { class: 'lead' }, `${failed.body} `, el('a', { href: config.urls.memberships, text: failed.cta }), '.'));
     }
   } else {
     node = renderQuestionScreen(step);
@@ -378,8 +380,6 @@ function setAnswer(key, value) {
   const controls = root.querySelector(`[data-controls="${key}"]`);
   if (controls) { if (value.skipped) controls.dataset.skipped = 'true'; else delete controls.dataset.skipped; }
   syncVisibility();
-  // A follow-up question that just appeared gets its own reveal.
-  observeReveals(root);
 }
 
 root.addEventListener('change', (event) => {
@@ -448,7 +448,8 @@ async function boot() {
   try {
     state = await getJson(`/journey/state/?${params}`);
   } catch {
-    root.replaceChildren(el('p', { class: 'lead' }, 'The guided journey is not available just now. You can ', el('a', { href: config.urls.memberships, text: 'see the memberships' }), '.'));
+    const down = copyOf('unavailable');
+    root.replaceChildren(el('p', { class: 'lead' }, `${down.body} `, el('a', { href: config.urls.memberships, text: down.cta }), '.'));
     return;
   }
   answers = {};

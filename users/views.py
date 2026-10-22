@@ -9,7 +9,7 @@ from django.contrib.auth.decorators import login_not_required
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
-from django.urls import NoReverseMatch, reverse
+from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from common.audit import client_ip
@@ -19,7 +19,7 @@ from journey import services as journey_services
 from plans.models import SiteSettings
 
 from . import services, tokens
-from .forms import ForgotPasswordForm, ResetPasswordForm, SignUpForm
+from .forms import ChangePasswordForm, ForgotPasswordForm, ResetPasswordForm, SignUpForm
 from .models import User
 
 PENDING_EMAIL_KEY = "pending_verification_email"
@@ -47,6 +47,11 @@ def _login_layout(request):
         return {"layout": "base_bare.html", "control": True}
     return {"layout": "base.html", "control": False}
 
+def _forget_journey_cookie(response):
+    response.delete_cookie(journey_services.COOKIE_NAME, path="/", samesite="Lax")
+    return response
+
+
 class LoginView(auth_views.LoginView):
     """Public sign-in (Django marks LoginView as login_not_required). Limited to 10 attempts per 5 minutes per IP."""
 
@@ -58,11 +63,28 @@ class LoginView(auth_views.LoginView):
         context.update(_login_layout(self.request))
         return context
 
+    def form_valid(self, form):
+        """Shared device: if the journey cookie holds someone else's session, drop it so this person starts fresh;
+        an anonymous session just becomes theirs."""
+        user = form.get_user()
+        foreign = journey_services.cookie_belongs_to_someone_else(self.request.COOKIES, user)
+        mine = None if foreign else journey_services.session_from_cookies(self.request.COOKIES, user)
+        response = super().form_valid(form)
+        journey_services.link_user(mine, user)
+        return _forget_journey_cookie(response) if foreign else response
+
     def post(self, request, *args, **kwargs):
         if _throttled(request, "login", 10, 300):
             context = {"form": self.get_form_class()(request), "throttled": True, **_login_layout(request)}
             return render(request, self.template_name, context, status=429)
         return super().post(request, *args, **kwargs)
+
+
+class LogoutView(auth_views.LogoutView):
+    """Sign out (POST only). The journey cookie goes too, so the next person on this device starts a new journey."""
+
+    def post(self, request, *args, **kwargs):
+        return _forget_journey_cookie(super().post(request, *args, **kwargs))
 
 
 # ---------- register interest ----------
@@ -74,8 +96,9 @@ def register(request):
         return redirect("account")
     if not SiteSettings.load().register_interest_open:
         return _message(request, "Not open yet", "Registration is not open yet.", status=403)
-    session = journey_services.session_from_cookies(request.COOKIES)
-    plan_slug = request.GET.get("plan") or (session.suggested_plan.slug if session and session.suggested_plan_id else "")
+    session = journey_services.session_from_cookies(request.COOKIES, request.user)
+    suggested = session.suggested_plan.slug if session and session.suggested_plan_id else ""
+    plan_slug = services.interest_plan_slug(request.GET.get("plan")) or services.interest_plan_slug(suggested)
     plans = services.interest_plans()
     if request.method == "POST":
         if _throttled(request, "register", 20, 3600):
@@ -121,10 +144,7 @@ def check_email(request):
 
 # ---------- verification ----------
 
-@login_not_required  # PUBLIC: the link in the verification email (signed, expires, single use)
-@require_GET
-def verify_email(request, token):
-    status, user = services.verify_email(token)
+def _verify_result(request, status, user):
     if status == tokens.VERIFIED:
         login(request, user, backend=BACKEND)
         messages.success(request, "Your email is confirmed.")
@@ -134,6 +154,19 @@ def verify_email(request, token):
     if status == tokens.EXPIRED:
         return _message(request, "Link expired", "This link has expired. Sign in and ask for a new one.", status=410)
     return _message(request, "Link not valid", "This link is not valid.", status=400)
+
+
+@login_not_required  # PUBLIC: the link in the verification email (signed, expires, single use)
+@require_http_methods(["GET", "POST"])
+def verify_email(request, token):
+    """GET only shows a 'Confirm my email' button, so a mail scanner opening the link uses nothing up; POST confirms
+    and signs the person in."""
+    if request.method == "POST":
+        return _verify_result(request, *services.verify_email(token))
+    status, user = tokens.read_verify_token(token)
+    if user is not None and not user.email_verified_at:
+        return render(request, "users/verify_confirm.html", {"first_name": user.first_name})
+    return _verify_result(request, tokens.ALREADY if user is not None else status, user)
 
 
 @login_not_required  # PUBLIC: asks for a new link; same answer whoever asks, rate limited
@@ -190,6 +223,24 @@ def account(request):
     })
 
 
+class ChangePasswordView(auth_views.PasswordChangeView):
+    """Change password (signed in; the default login lock applies). Limited to 10 attempts an hour per IP, so a
+    stolen session cannot be used to guess the current password."""
+
+    template_name = "users/password_change.html"
+    form_class = ChangePasswordForm
+    success_url = reverse_lazy("account")
+
+    def post(self, request, *args, **kwargs):
+        if _throttled(request, "password-change", 10, 3600):
+            return _message(request, "Please wait", "Too many attempts. Please try again later.", status=429)
+        return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        messages.success(self.request, "Your password has been changed.")
+        return super().form_valid(form)  # keeps this session signed in
+
+
 @require_POST
 def account_interest(request):
     plan = services.interest_plans().filter(slug=request.POST.get("plan", "")).first()
@@ -218,4 +269,4 @@ def account_delete(request):
         return redirect("account")
     logout(request)
     services.delete_user_data(user)
-    return _message(request, "Account deleted", "Your account and data have been deleted.")
+    return _forget_journey_cookie(_message(request, "Account deleted", "Your account and data have been deleted."))

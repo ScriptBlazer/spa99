@@ -3,7 +3,7 @@ from simple_history.admin import SimpleHistoryAdmin
 
 from common.admin import ExportCsvMixin
 
-from .models import GoldApplication, GoldRule
+from .models import GoldApplication, GoldChoice, GoldRule, GoldSignalSource
 from .services import resend_barry_email
 
 
@@ -25,3 +25,15 @@ class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
 class GoldRuleAdmin(SimpleHistoryAdmin):
     list_display = ("group", "match_value", "label", "points", "is_property", "active")
     list_filter = ("group", "active")
+
+
+@admin.register(GoldChoice)
+class GoldChoiceAdmin(SimpleHistoryAdmin):
+    list_display = ("group", "value", "label", "order", "active")
+    list_filter = ("group", "active")
+
+
+@admin.register(GoldSignalSource)
+class GoldSignalSourceAdmin(SimpleHistoryAdmin):
+    list_display = ("signal", "question_key", "answer_value", "sets_value", "order", "active")
+    list_filter = ("signal", "active")

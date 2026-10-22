@@ -1,14 +1,17 @@
 """Starting copy for every page in docs/features/website.md and docs/design/BRIEF.md. Short, calm, no
 exclamation marks. Real copy is edited in Control. Only creates what is missing, so edits are never overwritten.
 
+"{opening}" in any text is replaced by the opening time in Site settings (opening date, or its text while empty),
+so the date lives in one place.
+
 Section keys use underscores so templates can reach them: {{ home.journey_entry.heading }}.
 Multi-line text (steps, role lists) is one line per row in `body`."""
 from .models import Page, Section
 
 # page key: (title, meta description, [(section key, heading, body, cta label, cta url)])
 PAGES = {
-    "home": ("Home", "Spa 99. A private spa for men in North London. Beyond Luxury. Opening January 2027.", [
-        ("hero", "Beyond Luxury.", "A private spa for men in North London. Opening January 2027.", "Find your membership", "/journey/"),
+    "home": ("Home", "Spa 99. A private spa for men in North London. Beyond Luxury. Opening {opening}.", [
+        ("hero", "Beyond Luxury.", "A private spa for men in North London. Opening {opening}.", "Find your membership", "/journey/"),
         ("hero_link", "", "", "See the spa", "/the-spa/"),
         ("statement", "Heat, cold, quiet, and time that is yours.",
          "Two saunas, a cold plunge, a gym and a room to do nothing in. Come early, come late, stay as long as you like.", "", ""),
@@ -19,7 +22,7 @@ PAGES = {
         ("journey_entry", "Which membership suits you?", "A few taps. Under two minutes.", "Find your membership", "/journey/"),
         ("memberships_teaser", "Three memberships. One single visit.", "", "Compare memberships", "/memberships/"),
         ("gold_teaser", "The Gold Card.", "For people in property. Free, by application.", "About the Gold Card", "/gold-card/"),
-        ("opening", "January 2027.", "99 Vale Road, London N4.", "Register interest", "/register/"),
+        ("opening", "{opening}.", "99 Vale Road, London N4.", "Register interest", "/register/"),
     ]),
     "spa": ("The spa", "Sauna, cold plunge, relaxing zone, gym and massage at 99 Vale Road.", [
         ("intro", "The spa.", "Eight spaces, one quiet visit.", "", ""),
@@ -78,10 +81,16 @@ PAGES = {
         ("prefer_not", "", "", "Prefer not to say", ""),
         ("start_again", "", "", "Start again", ""),
         ("save_error", "", "We couldn't save that just now. Your answers are safe on this page.", "", ""),
+        ("result_empty", "Thank you.", "Have a look at the memberships and choose the one that suits you.", "See memberships", "/memberships/"),
+        ("result_loading", "", "One moment", "", ""),
+        ("result_error", "We could not load your result just now. Please try again.", "Please try again.", "See the memberships", "/memberships/"),
+        ("unavailable", "", "The guided journey is not available just now.", "See the memberships", "/memberships/"),
+        ("not_a_fit", "", "Daytime only", "", ""),
+        ("optional", "", "(optional)", "", ""),
     ]),
     "book": ("Book", "Booking at Spa 99 opens soon.", [
         ("placeholder", "Booking opens soon.", "When the doors open, you'll choose your time here.", "Register interest", "/register/"),
-        ("opening_month", "January 2027", "", "", ""),
+        ("opening_month", "{opening}", "", "", ""),
         ("how", "How booking will work", "", "", ""),
     ]),
     "register": ("Register interest", "Register your interest in Spa 99.", [
@@ -91,7 +100,7 @@ PAGES = {
         ("verified", "Thank you.", "Your email is confirmed.", "", ""),
     ]),
     "account": ("Your account", "Your Spa 99 account.", [
-        ("opening_soon", "Opens January 2027", "", "", ""),
+        ("opening_soon", "Opens {opening}", "", "", ""),
         ("id_note", "", "Share it with a member who wants to bring you as a guest.", "", ""),
     ]),
     "visit": ("Visit us", "Spa 99, 99 Vale Road, London N4 1PR.", [
@@ -100,10 +109,19 @@ PAGES = {
         ("getting_here", "", "", "", ""),
     ]),
     "privacy": ("Privacy notice", "How Spa 99 uses your information.", [
-        ("body", "Privacy notice.", "To be supplied.", "", ""),
+        ("body", "Privacy notice.", "", "", ""),
+        ("draft_note", "Draft.", "The full text is to be supplied before launch.", "", ""),
+        ("part_1", "What we collect", "To be supplied.", "", ""),
+        ("part_2", "How we use it", "To be supplied.", "", ""),
+        ("part_3", "Your rights", "To be supplied.", "", ""),
+        ("contact", "Contact", "Write to us at", "", ""),
     ]),
     "terms": ("Terms", "Spa 99 terms.", [
-        ("body", "Terms.", "To be supplied.", "", ""),
+        ("body", "Terms.", "", "", ""),
+        ("draft_note", "Draft.", "The full text is to be supplied before launch.", "", ""),
+        ("part_1", "Membership", "To be supplied.", "", ""),
+        ("part_2", "Using the spa", "To be supplied.", "", ""),
+        ("contact", "Contact", "Write to us at", "", ""),
     ]),
 }
 

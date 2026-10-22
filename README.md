@@ -78,6 +78,7 @@ Private folder (default `/Users/moishe/Library/CloudStorage/OneDrive-Personal/BM
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` | SMTP settings (only with the SMTP backend) |
 | `DEFAULT_FROM_EMAIL` | From address (default `Spa 99 <hello@spa99.uk>`); replies go to the contact email in Site settings |
 | `AWS_SES_REGION_NAME` | Region for `SesBackend` (default `eu-west-2`) |
+| `CLIENT_IP_HEADER` | Prod only. Header Caddy fills with the real visitor IP (default `X-Client-IP`; see below). Used for rate limits and the login log |
 | `SITE_URL`, `CONTROL_URL` | Absolute links in emails (defaults from `DOMAIN` / `CONTROL_DOMAIN`; dev `http://localhost:8000` and `http://control.localhost:8000`) |
 | `SENTRY_DSN` | Error reporting. Off when empty |
 | `IMAGE`, `APP_TAG` | Read by `docker-compose.yml`: image name and the git tag to run |
@@ -85,6 +86,17 @@ Private folder (default `/Users/moishe/Library/CloudStorage/OneDrive-Personal/BM
 
 Media goes to `dev/` (dev settings) or `prod/` (prod settings) inside the bucket; files are private and served by signed URL.
 Without S3 settings, files go to `$SPA99_PRIVATE_DIR/media` or `.private/media`.
+
+### After the 2026-10-22 review fixes (existing installs)
+
+```bash
+python manage.py migrate
+python manage.py seed_phase1                       # adds the new rows (Gold choices, email subjects, legal page parts); never overwrites
+python manage.py backfill_site_data --dry-run      # then without --dry-run: "January 2027" copy -> {opening}, facility alt text, Gold perk phrases, Shabbos line
+```
+
+The address and the opening time are in Site settings (`address_street`, `address_town`, `address_postcode`, `opening_text`; a set
+`opening_date` wins and shows as "January 2027"). Site copy can say `{opening}` and it is filled from there.
 
 ## Backup and restore (local SQLite)
 
@@ -100,7 +112,10 @@ Live uses managed PostgreSQL: take an RDS snapshot before every deploy and backf
 Images are built by GitHub Actions on a version tag (`1.2.3`, no `v`) after the tests pass. The server holds
 `docker-compose.yml`, `Caddyfile` and `.env` only. Services: `caddy` (HTTPS), `web` (runs migrations, then gunicorn),
 `worker` (background jobs). Deploy by changing `APP_TAG` in the server `.env`, then `docker compose up -d`.
-Check `https://<domain>/health/` afterwards. Pushing the image needs repo variables `REGISTRY`, `IMAGE_NAME` and
+Check `https://<domain>/health/` afterwards.
+Client IP: with Cloudflare in front, the `Caddyfile` trusts Cloudflare's ranges only (`trusted_proxies`), takes the visitor IP from
+`CF-Connecting-IP` (Cloudflare overwrites it, so a visitor cannot fake it) and passes it to the app as `X-Client-IP`. Without Cloudflare
+(DNS only) the same file still works: the IP is then the connection's. Re-check the range list at <https://www.cloudflare.com/ips/> now and then. Pushing the image needs repo variables `REGISTRY`, `IMAGE_NAME` and
 secrets `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`; until set, the workflow builds the image and skips the push.
 
 ## Project layout

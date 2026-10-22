@@ -82,9 +82,10 @@ Which answers count as property, and the thresholds, are editable in Control.
 - Conditions: `{"question": "industry", "any_of": ["property"]}`; a list means all must match. A question is shown when its condition holds given the answers to the questions before it; answers to hidden questions stay saved but are ignored.
 - Endpoints (JSON, public, CSRF protected, rate limited per IP, honeypot field `website`; the CSRF cookie is set by `GET /journey/state/`, send it back as `X-CSRFToken`):
   - `GET /journey/state/?ref=&utm_source=...` session, screens, questions (with `visible`, `options`, saved `answer`) and `current_step`. Creates the session and sets the cookie `spa99_journey` (first party, HttpOnly, SameSite=Lax, 1 year). The page passes `document.referrer` as `ref` and any UTM values.
-  - `POST /journey/answer/` `{"question", "options": [...], "text", "skipped"}` or `{"answers": [...]}` in one go (cookie-blocked browsers post at the end). Saving the same answer twice changes nothing. 400 `{"error"}` for anything invalid.
+  - `POST /journey/answer/` `{"question", "options": [...], "text", "skipped"}` or `{"answers": [...]}` in one go (for scripts and tests; the page sends one answer at a time). Saving the same answer twice changes nothing. 400 `{"error"}` for anything invalid.
   - `POST /journey/step/` `{"step": 2}` or `{"direction": "next" | "back"}`; remembered so a refresh resumes.
-  - `GET /journey/result/` suggested plan with three reasons, the other plans (`not_a_fit` when excluded), Gold nudge (`presentation`: `panel` High, `line` Medium, `none` Low). Marks the journey completed.
+  - `POST /journey/result/` suggested plan with three reasons, the other plans (`not_a_fit` when excluded), Gold nudge (`presentation`: `panel` High, `line` Medium, `none` Low), and `copy.empty` for the no-plans case. Stores the suggestion and marks the journey completed; the page calls it on arriving at the result. `GET /journey/result/` returns the same thing for an existing session but changes nothing (404 with no cookie). Each plan carries `price_line`, `character_line`, `price_whole`, `not_a_fit`, so the page writes no copy of its own.
+  - `POST /journey/step/` cannot go further than the screen after the furthest one reached (a posted `99` cannot inflate the funnel).
   - `POST /journey/restart/` "Start again": new session, old one kept for the statistics.
 - Questions or options retired in Control are hidden, never deleted, so old answers stay readable.
 - On sign-up the session is linked to the new `User`; on a Gold application the application points at the session.
@@ -106,7 +107,9 @@ Which answers count as property, and the thresholds, are editable in Control.
 - Returning visitor on the same device: resume, with "Start again" available.
 - Signed-in user retaking the journey: new session linked to his account; latest counts for his profile, history kept.
 - Bots: honeypot and rate limit on the answer endpoint; sessions with no human signals are excluded from stats.
-- Cookie blocked: journey still works in-page; saving falls back to the page's own state and posts at the end.
+- Cookie blocked: the journey still works in the page, but nothing can be saved (no cookie means no CSRF token and no session, so the answer posts are refused). The page shows its "couldn't save" message once and carries on with the answers held in the page; those visitors are not in the statistics. There is no "post at the end".
+- Shared device: a session is used only by an anonymous browser or by the person who owns it. The `spa99_journey` cookie is dropped at sign-out, and at sign-in when it holds someone else's session; an anonymous session becomes the signed-in person's. Sign-up and Gold never read or link a session owned by another person.
+- Answer text boxes allow as many characters as the server does (`max_text_length` in the state, 500).
 
 ## Acceptance checks
 

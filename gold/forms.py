@@ -3,7 +3,8 @@ from django import forms
 
 from common.validators import normalise_email, normalise_uk_mobile, validate_person_name
 
-from .models import BML_CHOICES, PROPERTY_LINKS, SIZE_RANGES, WHERE_CHOICES
+from . import rating
+from .models import BML, PROPERTY_LINK, SIZE, WHERE
 
 
 class GoldApplicationForm(forms.Form):
@@ -11,16 +12,22 @@ class GoldApplicationForm(forms.Form):
     last_name = forms.CharField(max_length=200)
     email = forms.CharField(max_length=254)
     mobile = forms.CharField(max_length=40)
-    property_link = forms.ChoiceField(choices=PROPERTY_LINKS)
-    size_range = forms.ChoiceField(choices=SIZE_RANGES, required=False)
-    location = forms.ChoiceField(choices=WHERE_CHOICES, required=False)
+    property_link = forms.ChoiceField(choices=[])
+    size_range = forms.ChoiceField(choices=[], required=False)
+    location = forms.ChoiceField(choices=[], required=False)
     company = forms.CharField(max_length=150, required=False)
     role = forms.CharField(max_length=150, required=False)
-    bml_relationship = forms.ChoiceField(choices=BML_CHOICES, required=False)
+    bml_relationship = forms.ChoiceField(choices=[], required=False)
     referred_by = forms.CharField(max_length=150, required=False)
     note = forms.CharField(max_length=2000, required=False)
     privacy_accepted = forms.BooleanField(error_messages={"required": "Please accept the privacy notice."})
     marketing_opt_in = forms.BooleanField(required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The choices are GoldChoice rows (edited in Control), read each time the form is built.
+        for field, group in (("property_link", PROPERTY_LINK), ("size_range", SIZE), ("location", WHERE), ("bml_relationship", BML)):
+            self.fields[field].choices = rating.choices(group)
 
     def clean_first_name(self):
         return validate_person_name(self.cleaned_data["first_name"])

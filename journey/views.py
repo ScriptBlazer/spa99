@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_not_required
 from django.http import JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from common.ratelimit import rate_limited_json
 
@@ -117,10 +117,17 @@ def step(request):
 
 
 @login_not_required  # PUBLIC: see state()
-@require_GET
+@require_http_methods(["GET", "POST"])
 @rate_limited_json("journey-result", 60, 60)
 def result(request):
-    """The suggested plan with reasons, the other plans and the Gold nudge. Marks the journey as finished."""
+    """The suggested plan with reasons, the other plans and the Gold nudge.
+    GET only reads (a link preview or a refresh changes nothing); POST also stores the suggestion and marks the
+    journey as finished, which is what the page does when he reaches the result."""
+    if request.method == "GET":
+        session = services.session_from_cookies(request.COOKIES, request.user)
+        if session is None:
+            return _bad("No journey yet.", status=404)
+        return JsonResponse(engine.preview(session))
     session, _ = _session_for(request)
     return _with_cookie(JsonResponse(engine.complete(session)), session)
 

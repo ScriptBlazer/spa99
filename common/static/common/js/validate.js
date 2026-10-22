@@ -1,5 +1,9 @@
 /* Live field validation. Mirrors common/validators.py (Python is authoritative; this is for instant feedback).
  *
+ * The wording and limits are NOT written here: the page includes {% validation_config %} (a json_script made by
+ * common.validators.client_config), so the messages are the server's own words. The mobile number is also checked by the
+ * server (debounced) because only phonenumbers knows which numbers are real.
+ *
  * Mark fields:  <input name="email" data-validate="required email">
  *               <input name="mobile" data-validate="mobile">
  *               <input name="password1" data-validate="password" data-password-related="email,first_name,last_name">
@@ -12,25 +16,33 @@
  * The form's API is kept on form.spaValidation. A field may name another element to focus via data-focus-target.
  */
 
+const config = (() => {
+  try { return JSON.parse(document.getElementById('validation-config')?.textContent || '{}'); } catch { return {}; }
+})();
+const text = config.messages || {};
+
 export const MESSAGES = {
-  required: 'This field is required.',
-  emailRequired: 'Enter your email address.',
-  emailInvalid: 'Enter a valid email address.',
-  mobileInvalid: 'Enter a valid UK mobile number, like 07123 456789.',
-  nameRequired: 'Enter your name.',
-  nameLong: 'That name is too long.',
-  dobRequired: 'Enter your date of birth.',
-  dobInvalid: 'Enter a valid date of birth.',
-  dobUnderAge: 'That date makes you under 18. Spa 99 is for 18 and over.',
-  passwordShort: 'This password is too short. It must contain at least 10 characters.',
-  passwordCommon: 'This password is too common.',
-  passwordNumeric: 'This password is entirely numeric.',
-  passwordSimilar: (what) => `The password is too similar to the ${what}.`,
+  required: text.required || '',
+  emailRequired: text.email_required || '',
+  emailInvalid: text.email_invalid || '',
+  mobileRequired: text.mobile_required || '',
+  mobileInvalid: text.mobile_invalid || '',
+  nameRequired: text.name_required || '',
+  nameLong: text.name_long || '',
+  dobRequired: text.dob_required || '',
+  dobInvalid: text.dob_invalid || '',
+  dobUnderAge: text.dob_under_age || '',
+  passwordRequired: text.password_required || '',
+  passwordShort: text.password_short || '',
+  passwordCommon: text.password_common || '',
+  passwordNumeric: text.password_numeric || '',
+  passwordSimilar: (what) => (text.password_similar || '').replace('{what}', what),
 };
 
-export const PASSWORD_MIN_LENGTH = 10;
-export const NAME_MAX_LENGTH = 100;
-export const MINIMUM_AGE = 18; // mirrors settings.MINIMUM_AGE
+// Limits come from the server too; when the page has no config the browser skips that check and the server decides.
+export const PASSWORD_MIN_LENGTH = config.password_min_length || 0;
+export const NAME_MAX_LENGTH = config.name_max_length || 0;
+export const MINIMUM_AGE = config.minimum_age || 0;
 
 // A short list only: the server checks Django's full list of ~20,000 common passwords.
 const COMMON_PASSWORDS = new Set([
@@ -43,12 +55,16 @@ export function normaliseEmail(value) {
   return (value || '').trim().toLowerCase();
 }
 
+// The shape Django's validate_email accepts: dot-separated name (no empty parts, so no "a..b" or leading/trailing dot),
+// then a domain of non-empty labels that do not start or end with a hyphen, and a letters-only (or xn--) ending.
+const EMAIL_NAME = "[a-z0-9!#$%&'*+/=?^_`{|}~-]+";
+const EMAIL_LABEL = '[^\\s@.-](?:[^\\s@.]*[^\\s@.-])?';
+const EMAIL_PATTERN = new RegExp(`^${EMAIL_NAME}(?:\\.${EMAIL_NAME})*@(?:${EMAIL_LABEL}\\.)+(?:[a-z\\u00a1-\\uffff]{2,63}|xn--[a-z0-9]{1,59})$`);
+
 export function validateEmail(value) {
   const email = normaliseEmail(value);
   if (!email) return MESSAGES.emailRequired;
-  // Same shape Django accepts for practical purposes: something@domain.tld, no spaces.
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return MESSAGES.emailInvalid;
-  return null;
+  return EMAIL_PATTERN.test(email) ? null : MESSAGES.emailInvalid;
 }
 
 /** '07123 456789' / '+44 7123 456789' -> '+447123456789', or null if it is not a plausible UK mobile. */
@@ -69,7 +85,7 @@ export function validateMobile(value) {
 export function validateName(value) {
   const name = (value || '').trim().replace(/\s+/g, ' ');
   if (!name) return MESSAGES.nameRequired;
-  if (name.length > NAME_MAX_LENGTH) return MESSAGES.nameLong;
+  if (NAME_MAX_LENGTH && name.length > NAME_MAX_LENGTH) return MESSAGES.nameLong;
   return null;
 }
 
@@ -85,36 +101,39 @@ export function validateDateOfBirth(value, today = new Date()) {
   if (year > ty || (year === ty && (month > tm || (month === tm && day > td))) || year < 1900) return MESSAGES.dobInvalid;
   const hadBirthday = tm > month || (tm === month && td >= day);
   const age = ty - year - (hadBirthday ? 0 : 1);
-  return age < MINIMUM_AGE ? MESSAGES.dobUnderAge : null;
+  return MINIMUM_AGE && age < MINIMUM_AGE ? MESSAGES.dobUnderAge : null;
 }
 
-/** Array of problems (empty = fine). `related` is { email, first_name, last_name }. */
-export function passwordProblems(password, related = {}) {
-  const problems = [];
-  if (password.length < PASSWORD_MIN_LENGTH) problems.push(MESSAGES.passwordShort);
-  if (COMMON_PASSWORDS.has(password.toLowerCase())) problems.push(MESSAGES.passwordCommon);
-  if (password && /^\d+$/.test(password)) problems.push(MESSAGES.passwordNumeric);
+/** Problems with a password as [{ id, text }] (empty = fine). `related` is { email, first_name, last_name }. */
+function passwordIssues(password, related = {}) {
+  const issues = [];
+  if (PASSWORD_MIN_LENGTH && password.length < PASSWORD_MIN_LENGTH) issues.push({ id: 'length', text: MESSAGES.passwordShort });
+  if (COMMON_PASSWORDS.has(password.toLowerCase())) issues.push({ id: 'common', text: MESSAGES.passwordCommon });
+  if (password && /^\d+$/.test(password)) issues.push({ id: 'numeric', text: MESSAGES.passwordNumeric });
   const lower = password.toLowerCase();
   const labels = { email: 'email address', first_name: 'first name', last_name: 'last name' };
   for (const [key, label] of Object.entries(labels)) {
     const raw = (related[key] || '').toLowerCase();
     const parts = key === 'email' ? [raw, raw.split('@')[0]] : [raw];
     if (parts.some((part) => part.length >= 3 && (lower.includes(part) || part.includes(lower) && lower.length >= 3))) {
-      problems.push(MESSAGES.passwordSimilar(label));
+      issues.push({ id: 'similar', text: MESSAGES.passwordSimilar(label) });
     }
   }
-  return problems;
+  return issues;
+}
+
+/** Array of problem messages (empty = fine). */
+export function passwordProblems(password, related = {}) {
+  return passwordIssues(password, related).map((issue) => issue.text);
 }
 
 /** The password checklist, using the same rules as passwordProblems. [{ id, ok }] */
 export function passwordChecks(password, related = {}) {
-  const problems = passwordProblems(password, related);
-  const has = (text) => problems.some((p) => p === text);
-  const similar = problems.some((p) => p.startsWith('The password is too similar'));
+  const ids = new Set(passwordIssues(password, related).map((issue) => issue.id));
   return [
-    { id: 'length', ok: password.length >= PASSWORD_MIN_LENGTH },
-    { id: 'common', ok: Boolean(password) && !has(MESSAGES.passwordCommon) && !has(MESSAGES.passwordNumeric) },
-    { id: 'similar', ok: Boolean(password) && !similar },
+    { id: 'length', ok: !ids.has('length') && password.length > 0 },
+    { id: 'common', ok: Boolean(password) && !ids.has('common') && !ids.has('numeric') },
+    { id: 'similar', ok: Boolean(password) && !ids.has('similar') },
   ];
 }
 
@@ -167,10 +186,10 @@ function render(field, { state, text = '', link = null }) {
 /** The calm "needs filling in" wording for the kind of field. */
 function requiredMessage(rules) {
   if (rules.includes('email')) return MESSAGES.emailRequired;
-  if (rules.includes('mobile')) return 'Enter your mobile number.';
+  if (rules.includes('mobile')) return MESSAGES.mobileRequired;
   if (rules.includes('name')) return MESSAGES.nameRequired;
   if (rules.includes('dob')) return MESSAGES.dobRequired;
-  if (rules.includes('password')) return 'Choose a password.';
+  if (rules.includes('password')) return MESSAGES.passwordRequired;
   return MESSAGES.required;
 }
 
@@ -199,8 +218,24 @@ function localMessages(field, form) {
 
 const REMOTE_DELAY_MS = 450;
 
+/** The mobile number is checked by the server too (debounced like the email check): it uses the same phone number
+ *  library as the sign-up, so the page and the server cannot disagree. Returns the server's message if not valid. */
+function mobileCheck() {
+  const url = config.urls?.mobile;
+  if (!url) return {};
+  return {
+    mobile: async (value) => {
+      const response = await fetch(`${url}?mobile=${encodeURIComponent(value.trim())}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      if (!response.ok) return null; // busy or offline: the server checks again on submit
+      const data = await response.json();
+      return data.valid ? null : (data.message || MESSAGES.mobileInvalid);
+    },
+  };
+}
+
 /** Attach live validation to a form. Returns { validateAll, validateField } for custom flows. */
-export function attachValidation(form, { remote = {} } = {}) {
+export function attachValidation(form, { remote: extraRemote = {} } = {}) {
+  const remote = { ...mobileCheck(), ...extraRemote };
   const fields = () => [...form.querySelectorAll('[data-validate]')];
   const latest = new Map();
   const timers = new Map();

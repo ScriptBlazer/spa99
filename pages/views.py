@@ -26,18 +26,12 @@ def _page(request, template, key, **context):
     return render(request, template, {"meta": content.page_meta(key), "page_key": key, **context})
 
 
-def _split(label):
-    """'Early morning (5 to 9am)' -> ('Early morning', '5 to 9am'). Mirrored in journey.js."""
-    main, sep, rest = label.partition(" (")
-    return (main.strip(), rest.rstrip(")").strip()) if sep else (label, "")
-
-
 def _time_question():
     question = Question.objects.filter(key="time", active=True).first()
     if question is None:
         return None
     options = [
-        {"value": o.value, "label": _split(o.label)[0], "sub": _split(o.label)[1]}
+        {"value": o.value, "label": services.split_label(o.label)[0], "sub": services.split_label(o.label)[1]}
         for o in Option.objects.filter(question=question, active=True).order_by("order", "value")
     ]
     return {"text": question.text, "options": options} if options else None
@@ -118,7 +112,7 @@ def journey(request, slug=""):
     _check_slug(slug, {*JOURNEY_SLUGS.values(), JOURNEY_RESULT_SLUG})
     keys = ["screen_1", "screen_2", "screen_3", "screen_4", "result_label", "why", "result_cta", "change_answers",
             "gold_panel", "gold_line", "others", "continue", "skip", "last", "back", "prefer_not", "start_again",
-            "save_error"]
+            "save_error", "result_loading", "result_error", "unavailable", "not_a_fit", "optional"]
     config = {
         "slugs": JOURNEY_SLUGS, "resultSlug": JOURNEY_RESULT_SLUG, "base": reverse("journey"),
         "copy": _copy("journey", keys), "facilityImages": services.journey_facility_images(),

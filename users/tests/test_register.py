@@ -180,9 +180,13 @@ class VerificationTests(TestCase):
 
     def test_replaying_the_link_never_signs_anyone_in(self):
         first, replay = Client(), Client()
-        self.assertEqual(first.get(f"/verify/{self.token}/").status_code, 302)
+        scanner = Client().get(f"/verify/{self.token}/")  # a mail scanner opening the link: only a button, nothing used up
+        self.assertContains(scanner, "Confirm my email")
+        self.assertFalse(User.objects.get(pk=self.user.pk).email_verified_at)
+        self.assertEqual(first.post(f"/verify/{self.token}/").status_code, 302)
         self.assertIn("_auth_user_id", first.session)
         self.assertEqual(replay.get(f"/verify/{self.token}/").status_code, 200)
+        self.assertEqual(replay.post(f"/verify/{self.token}/").status_code, 200)
         self.assertNotIn("_auth_user_id", replay.session)
 
     def test_expired_tampered_and_changed_email_links_are_refused(self):
@@ -290,3 +294,42 @@ class PersonDataTests(TestCase):
         self.assertEqual(session.referrer, "")
         self.assertEqual(session.answers.count(), 1)
         self.assertEqual(session.history.filter(user__isnull=False).count(), 0)
+
+
+class AccountTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_a_plan_link_for_a_non_interest_plan_is_ignored_not_silently_posted(self):
+        response = self.client.get("/register/?plan=single-visit")
+        self.assertEqual(response.context["selected_plan"], "")
+        self.assertEqual(self.client.get("/register/?plan=tier-3").context["selected_plan"], "tier-3")
+        self.assertEqual(services.interest_plan_slug("gold"), "")
+
+    def test_signing_up_never_links_a_journey_owned_by_someone_else(self):
+        owner = services.register_interest(cleaned()).user
+        theirs = journey.create_session(user=owner)
+        newcomer = services.register_interest(cleaned(email="new@example.com", mobile="07912 345679"), journey_session=theirs).user
+        theirs.refresh_from_db()
+        self.assertEqual(theirs.user_id, owner.pk)
+        self.assertIsNone(newcomer.interest.journey_session)
+        mine = journey.create_session()
+        other = services.register_interest(cleaned(email="third@example.com", mobile="07912 345670"), journey_session=mine).user
+        mine.refresh_from_db()
+        self.assertEqual((mine.user_id, other.interest.journey_session_id), (other.pk, mine.pk))
+
+    def test_change_password_needs_the_old_one_and_keeps_the_session(self):
+        user = services.register_interest(cleaned()).user
+        self.assertEqual(Client().get("/account/password/").status_code, 302)  # signed in only
+        self.client.force_login(user)
+        bad = self.client.post("/account/password/", {"old_password": "wrong", "new_password1": "a-new-long-password-9", "new_password2": "a-new-long-password-9"})
+        self.assertEqual(bad.status_code, 200)
+        self.assertTrue(User.objects.get(pk=user.pk).check_password(PASSWORD))
+        weak = self.client.post("/account/password/", {"old_password": PASSWORD, "new_password1": "12345678", "new_password2": "12345678"})
+        self.assertEqual(weak.status_code, 200)
+        ok = self.client.post("/account/password/", {"old_password": PASSWORD, "new_password1": "a-new-long-password-9", "new_password2": "a-new-long-password-9"})
+        self.assertRedirects(ok, "/account/", fetch_redirect_response=False)
+        self.assertTrue(User.objects.get(pk=user.pk).check_password("a-new-long-password-9"))
+        self.assertEqual(self.client.get("/account/").status_code, 200)  # still signed in
+        self.assertContains(self.client.get("/account/"), "Change password")
