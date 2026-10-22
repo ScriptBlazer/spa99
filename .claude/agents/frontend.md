@@ -27,6 +27,16 @@ Read `docs/BRAND.md`, the current feature doc in `docs/features/`, and the desig
 - Static files go through Django manifest static storage.
 - Follow the build standards the manager passes you. If you break one because it clearly helps, say so in one line.
 
+## Debugging
+
+- Find the root cause before changing code: reproduce the issue, read the console and network errors, form one hypothesis, test it.
+- No guess-fixes or stacked changes. After 3 failed attempts on the same problem, stop and report what you know.
+
+## Before saying "done"
+
+- Prove it: load the page, click through the flow (including refresh and back), check the console is clean, and run the tests.
+- Report only what you verified. Say plainly what you couldn't verify and why.
+
 ## When done
 
 - Take screenshots at 375px and 1440px.
