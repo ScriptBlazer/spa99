@@ -3,7 +3,7 @@ import re
 
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles import finders
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from plans.management.commands.seed_phase1 import seed_all
@@ -25,6 +25,11 @@ class PageTests(TestCase):
         for path in PUBLIC_PAGES:
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_webgl_switch_reaches_the_html_element(self):
+        self.assertContains(self.client.get("/"), 'data-webgl="on"')
+        with override_settings(SITE_WEBGL=False):
+            self.assertContains(self.client.get("/"), 'data-webgl="off"')
 
     def test_unknown_journey_screens_are_404(self):
         self.assertEqual(self.client.get("/journey/nope/").status_code, 404)

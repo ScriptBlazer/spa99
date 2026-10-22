@@ -70,5 +70,6 @@
 <script defer src="{% static 'common/vendor/gsap/SplitText.min.js' %}"></script>
 <script defer src="{% static 'common/vendor/gsap/DrawSVGPlugin.min.js' %}"></script>
 <script defer src="{% static 'common/vendor/gsap/CustomEase.min.js' %}"></script>
-<script type="module" src="{% static 'common/js/scenes.js' %}"></script>
+{# gold-hero.js imports scenes.js (the registry and the card) and adds this page's hero scene. #}
+<script type="module" src="{% static 'common/js/gold-hero.js' %}"></script>
 {% endblock %}

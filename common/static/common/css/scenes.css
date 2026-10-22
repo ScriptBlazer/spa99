@@ -402,7 +402,7 @@ html.motion .frame-media, html.motion .window-media, html.motion .hero-window, h
 
 /* ---------- S1 the door: static layout = the end state, content height ---------- */
 .door-scene { position: relative; background: var(--color-bg-inverse); overflow-x: clip; min-height: 0; }
-.door-window, .door-pause, .door-run { display: none; }
+.door-window, .door-pause { display: none; }
 .door-grid { position: relative; z-index: 1; padding-block: calc(var(--header-h) + var(--space-3)) var(--space-5); row-gap: var(--space-4); }
 .door-words, .door-target { grid-column: 1 / -1; }
 .door-target { grid-row: 1; order: -1; height: clamp(12.5rem, 38svh, 30rem); --focus: 50% 45%; }
@@ -559,23 +559,15 @@ html.motion .sp-rule { transform: scaleX(0); }
 html.motion .scene-failed .sp-rule, html.motion .scene-failed .vstep-line { transform: none; }
 html.motion .sp-sec .glow, html.motion .door-scene .glow { z-index: 0; }
 
-/* The door: one full screen of picture lies over the top of the section; scenes.js shrinks it onto .door-target as the page scrolls normally. */
-html.motion .door-scene { --door-run: 20svh; }
-html.motion .door-run { display: block; grid-column: 1 / -1; grid-row: 1; height: var(--door-run); }
-html.motion .door-target { grid-row: 2; }
-html.motion .door-words { grid-row: 3; }
+/* The door: one full screen of picture lies over the section; scenes.js pins the section for a short scroll (like Home's arrival) and shrinks the picture onto .door-target. */
+html.motion .door-scene:not(.scene-failed) { min-height: 100svh; }
 html.motion .door-window { display: block; position: absolute; z-index: 0; top: 0; left: 0; width: 100%; height: 100svh; overflow: hidden; animation: frame-in 1200ms var(--ease-soft) backwards; }
 html.motion .door-window .frame-tint { opacity: 0; }                                   /* the lights come up as it lands (scenes) */
 html.motion .door-still { animation: media-in 1600ms var(--ease-soft) backwards; }
 html.motion .door-target .frame-media, html.motion .door-target .frame-tint { display: none; }   /* only a measuring box: the window is the picture */
 html.motion .door-pause { display: inline-flex; align-items: center; position: absolute; z-index: 3; right: var(--page-margin); top: calc(100svh - var(--space-3) - 2.75rem - env(safe-area-inset-bottom)); min-width: 2.75rem; min-height: 2.75rem; justify-content: center;
   padding: 0 var(--space-2); background: var(--color-veil); border-radius: var(--radius-sm); font-size: var(--text-sm); }
-@media (min-width: 64em) {
-  html.motion .door-scene { --door-run: 30svh; }
-  html.motion .door-words { grid-row: 2; }
-}
 html.motion .frame-media, html.motion .window-media, html.motion .sp-detail, html.motion .sp-thumb { will-change: transform; }
 /* if the door scene fails: no full-screen picture, the frame shows its own picture */
 html.motion .door-scene.scene-failed .door-window, html.motion .door-scene.scene-failed .door-pause { display: none; }
 html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .door-scene.scene-failed .door-target .frame-tint { display: block; }
-html.motion .door-scene.scene-failed .door-run { display: none; }

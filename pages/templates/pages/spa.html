@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static content_tags pages_tags %}
-{# The spa (docs/design/SPA-PAGE.md, round 3 house style, with the 2026-10-22 decisions: the door shrinks on normal scroll, the only future pin is the 3D room walk). One espresso walk through the building. Every room section comes from the data (`sections`), nothing about a room is typed here. #}
+{# The spa (docs/design/SPA-PAGE.md, round 3 house style, with the 2026-10-22 decisions: the door shrinks onto its frame inside a short pin like Home's arrival, the 3D room walk gets the other pin). One espresso walk through the building. Every room section comes from the data (`sections`), nothing about a room is typed here. #}
 {% block html_attrs %} data-page="marketing"{% endblock %}
 {% block body_class %}page-spa{% endblock %}
 {% block header_mode %}overlay{% endblock %}
@@ -10,7 +10,7 @@
 {% block main %}
 {% page_content "spa" as spa %}
 
-{# S1. The door: full screen with the words on it; on normal scroll it shrinks into the frame on the right (no pin). Without motion: just the end state, content height. #}
+{# S1. The door: full screen with the words on it; inside a short pin it shrinks into the frame on the right. Without motion: just the end state, content height. #}
 <section class="scene door-scene on-dark" data-scene="door" data-glow aria-labelledby="spa-title">
   <div class="door-window" data-door-window>
     <div class="window-media" data-door-media>
@@ -21,7 +21,6 @@
   </div>
   <div class="glow" aria-hidden="true"></div>
   <div class="container grid door-grid">
-    <div class="door-run" aria-hidden="true"></div>
     <div class="door-words">
       <h1 class="display door-title" id="spa-title" data-rise>{{ spa.intro.heading }}</h1>
       <p class="lead door-lead" data-fade>{{ spa.intro.body }}</p>

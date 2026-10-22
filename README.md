@@ -79,6 +79,7 @@ Private folder (default `/Users/moishe/Library/CloudStorage/OneDrive-Personal/BM
 | `DEFAULT_FROM_EMAIL` | From address (default `Spa 99 <hello@spa99.uk>`); replies go to the contact email in Site settings |
 | `AWS_SES_REGION_NAME` | Region for `SesBackend` (default `eu-west-2`) |
 | `CLIENT_IP_HEADER` | Prod only. Header Caddy fills with the real visitor IP (default `X-Client-IP`; see below). Used for rate limits and the login log |
+| `SITE_WEBGL` | `false` switches the 3D Gold Card off for everyone (sets `data-webgl="off"` on `<html>`; the CSS card stays). Default `true` |
 | `SITE_URL`, `CONTROL_URL` | Absolute links in emails (defaults from `DOMAIN` / `CONTROL_DOMAIN`; dev `http://localhost:8000` and `http://control.localhost:8000`) |
 | `SENTRY_DSN` | Error reporting. Off when empty |
 | `IMAGE`, `APP_TAG` | Read by `docker-compose.yml`: image name and the git tag to run |

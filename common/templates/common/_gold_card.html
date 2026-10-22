@@ -1,5 +1,5 @@
 {% load static content_tags %}{# The Gold Card (docs/design/GOLD-CARD-3D.md). Three tiers from one mount: three.js canvas (capable desktops, gold-card-3d.js), this CSS 3D card (phones and everything else with motion), the still (reduced motion, no JS). Decorative: aria-hidden, nothing focusable. Param: variant = "home" or "hero". #}
-<div class="gold-card gold-card--{{ variant }}" data-gold-card="{{ variant }}" data-webgl="gold-card" data-webgl-src="{% static 'common/js/gold-card-3d.js' %}"{% if gc_export %} data-gc-export{% endif %} aria-hidden="true">
+<div class="gold-card gold-card--{{ variant }}" data-gold-card="{{ variant }}" data-webgl="gold-card" data-webgl-src="{% static 'common/js/gold-card-3d.js' %}" data-webgl-gate="{% static 'common/js/gold-gl.js' %}" data-scene-src="{% static 'common/js/gold-card.js' %}"{% if gc_export %} data-gc-export{% endif %} aria-hidden="true">
   <svg class="gc-defs" width="0" height="0" focusable="false"><defs><linearGradient id="gc-polish" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="gc-s-hi"/><stop offset="0.5" class="gc-s-light"/><stop offset="1" class="gc-s-metal"/></linearGradient></defs></svg>
   <div class="gc-pool"></div>
   <div class="gc-stage">

@@ -1,5 +1,5 @@
 {% load static %}<!doctype html>
-<html lang="en-GB" data-smooth="off"{% block html_attrs %}{% endblock %}>
+<html lang="en-GB" data-smooth="off" data-webgl="{% if site_webgl is False %}off{% else %}on{% endif %}"{% block html_attrs %}{% endblock %}>
 <head>
 {% with title=meta.title|default:"Spa 99" description=meta.meta_description %}
 {% block head_title %}{% include "common/_head.html" with title=title|add:" | Spa 99" description=description %}{% endblock %}

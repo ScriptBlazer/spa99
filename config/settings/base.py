@@ -114,6 +114,7 @@ EMAIL_USE_TLS = ENV.bool("EMAIL_USE_TLS", True)
 DEFAULT_FROM_EMAIL = ENV.get("DEFAULT_FROM_EMAIL", "Spa 99 <hello@spa99.uk>")
 AWS_SES_REGION_NAME = ENV.get("AWS_SES_REGION_NAME", "eu-west-2")
 # Absolute links used in emails (no trailing slash).
+SITE_WEBGL = ENV.bool("SITE_WEBGL", True)  # false = the 3D Gold Card never loads (CSS card only); read by base.html as data-webgl
 SITE_URL = ENV.get("SITE_URL", f"https://{DOMAIN}").rstrip("/")
 CONTROL_URL = ENV.get("CONTROL_URL", f"https://{CONTROL_HOST}").rstrip("/")
 

@@ -72,13 +72,13 @@ Two modes, one feeling (slow, soft, never bouncy):
 Shared everywhere:
 - **Easing:** `cubic-bezier(0.22, 1, 0.36, 1)` (`--ease-soft`; in GSAP `CustomEase` named `soft`). Scroll-scrubbed motion uses linear easing, because the scroll is the easing.
 - Only `transform` and `opacity` animate (plus SVG stroke drawing on the swan). Never `width`, `height`, `top`, `left`, animated `clip-path` or filters.
-- No bounce, no rotation, no blur transitions, no sideways travel of text, no sound.
+- No bounce, no rotation, no blur transitions, no sideways travel of text, no sound. One exception to rotation: the 3D Gold Card object may rotate (decision log 2026-10-22; text never rotates and never lives in WebGL).
 - Hover motion only under `(hover: hover) and (pointer: fine)`.
 
 ### 7A. Immersive (marketing pages)
 
 - **Every section fits one screen on desktop** (`100svh`), complete on its own at 1440×800. On phone, a scene read in normal scroll (no pin) may run to two screens; nothing inside it may depend on a pin.
-- **Scroll drives the story, with one short pin on Home (the hero shrinking into its frame):** image settle (scale 1.06 → 1), depth between image layers, the thread. Pins only where a whole sequence changes in place (The spa room walk). Scrub 0.4 desktop, 0.3 phone. No snapping on Home.
+- **Scroll drives the story, with one short pin on Home (the hero shrinking into its frame) and the same short pin on The spa (the door shrinking into its frame):** image settle (scale 1.06 → 1), depth between image layers, the thread. Pins only where a whole sequence changes in place (The spa room walk). Scrub 0.4 desktop, 0.3 phone. No snapping on Home.
 - **Headings rise line by line** from a mask (1.1s, 0.08s between lines), once. Body and actions fade up after them (0.9s, 16px).
 - **The swan draws itself** (stroke, then the gold fill) on the Gold Card, Book and the Home Gold scene. Nowhere else. On Home the draw is time-based on enter (2.4s), not scrubbed.
 - **Numbers count** only when they are small whole numbers that matter (visits a month, days ahead): 1.2s, once. Prices never animate.
@@ -114,6 +114,8 @@ Smooth and restrained. Built with CSS and one small shared script (IntersectionO
 
 **Interaction feedback** (separate from entrances)
 - Buttons and clickable cards without their own feedback: scale 1.01 on hover, 0.99 on press, 0.25s, same easing.
+- Tall selectable cards (the Memberships key cards) lift instead of scale, because scaling a tall card blurs its type: 4px up on hover (`--tier-hover-lift`), 2px up on press. The selected card sits up (`--tier-lift`, 8px from 64em); its colour and check change instantly, the lift eases over `--duration-tier` (0.6s). Off under reduced motion.
+- The one-off sheen: the selected Memberships card gets one band of light across it on selection (`--color-sheen`, 1.6s, once, CSS only). Same family as the Gold Card sheen. Not on hover, never looping, off under reduced motion; the band is not text, so the ban on sideways travel of text does not apply.
 - If scale is already used on that element, use opacity 0.9 on hover and 0.8 on press instead.
 - Inline links and non-interactive elements don't scale. Scaled elements must never clip.
 
@@ -240,10 +242,22 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --color-thread-light: rgb(187 136 85 / 0.6); /* derived: the thread (caramel) on cream */
   --frame-gap: var(--space-6);                 /* derived: minimum espresso between two frames */
   --bleed: calc(var(--page-margin) + max(0px, (100vw - var(--container-max)) / 2)); /* derived: content edge to screen edge, for edge-bleed frames */
-  /* Memberships page (docs/design/MEMBERSHIPS-PAGE.md, cream page). Derived. */
-  --color-pill-line: rgb(245 242 216 / 0.28);  /* derived: pill border inside the selected (espresso) tier column; decoration, the text is cream. Unselected pills use --color-control-line */
-  --tier-media-h: 7rem;                        /* derived: picture box in a tier column (desktop); phone uses a square --tier-media-s */
-  --tier-media-s: 5.5rem;                      /* derived */
+  /* Memberships round 2, the key cards (docs/design/MEMBERSHIPS-R2.md section 7). Derived, decoration only; shadows are warm (espresso), never black. */
+  --shadow-tier: 0 1px 1px rgb(73 46 33 / 0.04), 0 6px 12px -4px rgb(73 46 33 / 0.06), 0 24px 44px -20px rgb(73 46 33 / 0.14); /* derived: a tier card at rest */
+  --shadow-tier-hover: 0 2px 2px rgb(73 46 33 / 0.05), 0 12px 20px -6px rgb(73 46 33 / 0.08), 0 36px 64px -24px rgb(73 46 33 / 0.20); /* derived */
+  --shadow-tier-selected: 0 2px 3px rgb(73 46 33 / 0.10), 0 16px 28px -10px rgb(73 46 33 / 0.20), 0 52px 88px -30px rgb(73 46 33 / 0.38); /* derived */
+  --shadow-bar: 0 -10px 28px -18px rgb(73 46 33 / 0.22); /* derived: the sticky tag on phone */
+  --color-tier-edge: rgb(73 46 33 / 0.07);     /* derived: 1px edge of a cream tier card (decoration) */
+  --color-tier-edge-gold: rgb(229 172 110 / 0.55); /* derived: 1px edge of the selected tier card */
+  --color-sheen: rgb(245 242 216 / 0.10);      /* derived: the one band of light across the selected card */
+  --tier-w: 18rem;                             /* derived: a tier card */
+  --tier-h: clamp(33rem, 100svh - 15rem, 37.5rem); /* derived */
+  --tier-gap: 2.5rem;                          /* derived */
+  --tier-tag-w: 18rem;                         /* derived: the tag column */
+  --tier-num-size: 3.5rem;                     /* derived: the visits numeral; 4.5rem from 64em */
+  --tier-lift: 0px;                            /* derived: how far the selected card sits up; -8px from 64em */
+  --tier-hover-lift: -4px;                     /* derived */
+  --duration-tier: 600ms;                      /* derived: the selected card's rise */
   --bar-h: 4.5rem;                             /* derived: Continue bar; 4rem from 64em */
   /* The Gold Card (docs/design/GOLD-CARD-3D.md 7.3). Derived, decoration only: the metal of one object. Brand gold is hue 31 degrees; nothing here goes brass (45+). */
   --color-gold-metal: #D9A46C;                 /* derived: card base metal (hue 31) */

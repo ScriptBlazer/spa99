@@ -106,7 +106,7 @@ function normalCanvas(height, w, h, strength) {
 }
 
 /** Roughness (green channel): field with a hairline brush, `smooth` areas polished, `rough` areas engraved. */
-function roughCanvas(w, h, base, { smooth, rough, smoothV, roughV }) {
+function roughCanvas(w, h, base, { smooth, rough, smoothV, roughV, dark = 0 }) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const ctx = c.getContext('2d'), img = ctx.createImageData(w, h), d = img.data;
   for (let y = 0; y < h; y++) {
@@ -116,7 +116,7 @@ function roughCanvas(w, h, base, { smooth, rough, smoothV, roughV }) {
       let v = base + streak + (Math.random() - 0.5) * 0.006;
       if (smooth) v += (smoothV - base) * smooth[i];
       if (rough) v += (roughV - base) * rough[i];
-      d[p] = 255; d[p + 1] = Math.max(0, Math.min(255, v * 255)); d[p + 2] = 255; d[p + 3] = 255;
+      d[p] = 255; d[p + 1] = Math.max(0, Math.min(255, v * 255)); d[p + 2] = 255 * (1 - dark * (rough ? rough[i] : 0)); d[p + 3] = 255;   // blue = metalness: engraved areas are a little less metal, so they read darker, not as a lit rim
     }
   }
   ctx.putImageData(img, 0, 0);
@@ -156,11 +156,11 @@ export function create(mount, { gsap, tokens, card }) {
     }));
     const height = await idle(() => {
       const raw = new Float32Array(swanMask.length);
-      for (let i = 0; i < raw.length; i++) raw[i] = swanMask[i] - 0.45 * textMask[i];
+      for (let i = 0; i < raw.length; i++) raw[i] = swanMask[i] - 0.22 * textMask[i];
       return blur(raw, FW, FH, 2);
     });
     maps.faceNormal = canvasTexture(await idle(() => normalCanvas(height, FW, FH, 4.2)));
-    const rc = await idle(() => roughCanvas(FW, FH, 0.21, { smooth: blur(swanMask, FW, FH, 1), smoothV: 0.1, rough: blur(textMask, FW, FH, 1), roughV: 0.3 }));
+    const rc = await idle(() => roughCanvas(FW, FH, 0.21, { smooth: blur(swanMask, FW, FH, 1), smoothV: 0.1, rough: blur(textMask, FW, FH, 1), roughV: 0.3, dark: 0.95 }));
     maps.faceRough = canvasTexture(rc);
     own(maps.faceNormal); own(maps.faceRough);
   }
@@ -239,7 +239,7 @@ export function create(mount, { gsap, tokens, card }) {
     mats.edge = own(new THREE.MeshPhysicalMaterial({ color: gold, metalness: 1, roughness: 0.2 }));
     mats.face = own(new THREE.MeshPhysicalMaterial({
       color: gold, metalness: 1, roughness: 1, anisotropy: 0.55, anisotropyRotation: Math.PI / 2, clearcoat: 0.35, clearcoatRoughness: 0.12,
-      normalMap: maps.faceNormal, roughnessMap: maps.faceRough, emissive: tok('--color-gold-light'), emissiveMap: maps.draw, emissiveIntensity: 0,
+      normalMap: maps.faceNormal, roughnessMap: maps.faceRough, metalnessMap: maps.faceRough, emissive: tok('--color-gold-light'), emissiveMap: maps.draw, emissiveIntensity: 0,
     }));
     mats.back = own(new THREE.MeshPhysicalMaterial({
       color: tok('--color-gold-deep'), metalness: 1, roughness: 1, clearcoat: 0.2, clearcoatRoughness: 0.3, normalMap: maps.backNormal, roughnessMap: maps.backRough,

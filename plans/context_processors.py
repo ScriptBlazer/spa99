@@ -8,4 +8,4 @@ from .models import SiteSettings
 
 def site(request):
     # gc_export: local dev only; lets gold-card-3d.js render the still (docs/design/GOLD-CARD-3D.md 4.3) with ?gc-export=1.
-    return {"site_settings": SimpleLazyObject(SiteSettings.load), "gc_export": settings.DEBUG}
+    return {"site_settings": SimpleLazyObject(SiteSettings.load), "gc_export": settings.DEBUG, "site_webgl": settings.SITE_WEBGL}

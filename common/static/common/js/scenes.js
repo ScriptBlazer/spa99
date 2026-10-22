@@ -73,7 +73,7 @@ export function drift(el, scrub) {
 }
 
 /** Thread (desktop): the hairline in the left margin draws down as the scene passes. */
-function thread(scene, scrub, { start = 'top 60%', end = 'bottom 60%' } = {}) {
+export function thread(scene, scrub, { start = 'top 60%', end = 'bottom 60%' } = {}) {
   const line = scene.querySelector('.thread');
   if (line) gsap.fromTo(line, { scaleY: 0 }, { scaleY: 1, ease: 'none', transformOrigin: '50% 0', scrollTrigger: { trigger: scene, start, end, scrub } });
 }
@@ -88,7 +88,7 @@ function frames(el, { desktop }) {
 }
 
 /** A pinned scene whose timeline is scrubbed. The section is pinned; .scene-stage fills it (CSS). */
-function pinnedScene(el, { segments, perSegment = 1, snap = false, scrub = 0.8 }) {
+export function pinnedScene(el, { segments, perSegment = 1, snap = false, scrub = 0.8 }) {
   return gsap.timeline({
     defaults: { ease: 'none' },
     scrollTrigger: {
@@ -224,6 +224,16 @@ function startLenis() {
 
 /* ---------- scenes ---------- */
 
+/** R6b The Gold Card (Home) is built in gold-card.js (the CSS card, its pose and the swan), fetched when the section is within two screens.
+ *  The 3D layer's gate is in gold-gl.js. Both are named by data attributes (static file URLs). */
+SCENES.gold = (el, o) => {
+  const src = el.querySelector('[data-gold-card]').dataset.sceneSrc;
+  let dead = false, io = null;
+  cleanups.push(() => { dead = true; io?.disconnect(); });
+  const go = () => import(src).then((m) => { if (!dead) o.ctx.add(() => m.gold(el, o)); }).catch((e) => { console.error('scene gold', e); el.classList.add('scene-failed'); });
+  if ('IntersectionObserver' in window) { io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { io.disconnect(); go(); } }, { rootMargin: '200% 0px' }); io.observe(el); } else go();
+};
+
 /** R1 Arrival (round 3): the fish tank fills the screen with the words on it; scrolling shrinks the window onto the frame on the right
  *  (short pin: +=60% desktop, +=40% phone), the first words leave and the round 2 words come in. Living still until a video exists. */
 SCENES.hero = (el, { desktop }) => {
@@ -311,157 +321,12 @@ SCENES.plans = (el, { desktop }) => {
   if (desktop) thread(el, 0.4);
 };
 
-/* ---------- the Gold Card (docs/design/GOLD-CARD-3D.md) ---------- */
-
-export const cards = new Map();                                  // mount -> pose proxy, for the three.js loader
-const ramp = (pts) => (t) => {                            // piecewise linear through [t, value] points
-  for (let i = 1; i < pts.length; i++) if (t <= pts[i][0]) return pts[i - 1][1] + ((pts[i][1] - pts[i - 1][1]) * (t - pts[i - 1][0])) / (pts[i][0] - pts[i - 1][0] || 1);
-  return pts[pts.length - 1][1];
-};
-const HOME_RY = ramp([[0, -25], [0.05, -25], [0.3, -14], [0.45, -8], [0.75, 12], [1, 25]]);
-const HOME_RX = ramp([[0, 8], [0.05, 8], [0.3, 5], [0.45, 3], [0.75, -2], [1, -6]]);
-const HOME_SHEEN = ramp([[0, -1], [0.45, -1], [0.75, 1], [1, 1]]);
-
-/** The pose proxy and the CSS card. Everything that moves the card writes to `gc`; render() puts it on the CSS card (and the page-level opacity);
- *  gold-card-3d.js reads the same fields. ry/rx are the base pose in degrees (rx positive tips the face up), turn is the scroll half turn (hero),
- *  bob/roll are the idle float, lift/drop are in percent of the card height. */
-function goldCard(mount, scene, { desktop, fine }) {
-  const q = (sel) => mount.querySelector(sel);
-  const k = desktop ? 1 : 18 / 25;
-  const gc = { ry: -25 * k, rx: desktop ? 8 : 5, turn: 0, tiltX: 0, tiltY: 0, roll: 0, bob: 0, lift: 0, drop: 0, sheen: -1, draw: 0, line: 1, relief: 0, fade: 1, gl: false, k, p: 0 };
-  const el = { card: q('.gc-card'), float: q('.gc-float'), shade: q('.gc-shade'), sheen: q('.gc-sheen'), pool: q('.gc-pool') };
-  gc.render = () => {
-    mount.style.opacity = gc.fade;
-    if (gc.gl) return;
-    const ry = gc.ry + gc.turn + gc.tiltY, a = ((ry % 360) + 540) % 360 - 180, n = a / (25 * k);
-    el.card.style.transform = `rotateX(${gc.rx + gc.tiltX}deg) rotateY(${ry}deg)`;
-    el.float.style.transform = `translate3d(0, ${gc.lift + gc.drop + gc.bob}%, 0) rotate(${gc.roll}deg)`;
-    el.shade.style.opacity = n < 0 ? 0.55 * Math.min(1, -n) : 0.25 * Math.min(1, n);
-    el.sheen.style.transform = `translateX(${gc.sheen * 130}%) skewX(-14deg)`;
-    el.pool.style.opacity = 0.85 + 0.15 * (gc.bob / 1.6);
-  };
-  cards.set(mount, gc);
-  cleanups.push(() => { cards.delete(mount); mount.style.opacity = ''; ['card', 'float', 'shade', 'sheen', 'pool'].forEach((n) => el[n].removeAttribute('style')); });
-
-  // Swan: the CSS card draws with DrawSVG, the canvas reads the same moments from the proxy. windows are [from, to] in timeline units.
-  gc.swan = (tl, { draw, relief, line }, ease) => {
-    const svg = q('.mark-draw'), W = draw[1] - draw[0];
-    const shadow = q('.gc-swan-shadow');
-    tl.fromTo(svg.querySelectorAll('.mark-line path'), { drawSVG: '0%' }, { drawSVG: '100%', duration: (W * 0.4) / 0.7, stagger: (W * 0.1) / 0.7, ease }, draw[0])
-      .fromTo(gc, { draw: 0 }, { draw: 1, duration: W, ease }, draw[0])
-      .fromTo(svg.querySelector('.mark-fill'), { opacity: 0 }, { opacity: 1, duration: relief[1] - relief[0], ease }, relief[0])
-      .fromTo(shadow, { opacity: 0 }, { opacity: 0.5, duration: relief[1] - relief[0], ease }, relief[0])
-      .fromTo(gc, { relief: 0 }, { relief: 1, duration: relief[1] - relief[0], ease }, relief[0])
-      .fromTo(svg.querySelector('.mark-line'), { opacity: 1 }, { opacity: 0, duration: line[1] - line[0], ease }, line[0])
-      .fromTo(gc, { line: 1 }, { line: 0, duration: line[1] - line[0], ease }, line[0]);
-  };
-
-  // Idle float (18s bob, 23s roll), paused off screen and in a hidden tab (BRAND 7A loop rule).
-  const floats = [
-    gsap.fromTo(gc, { bob: -1.6 }, { bob: 1.6, duration: 9, ease: 'sine.inOut', yoyo: true, repeat: -1, onUpdate: gc.render }),
-    gsap.fromTo(gc, { roll: -0.6 }, { roll: 0.6, duration: 11.5, ease: 'sine.inOut', yoyo: true, repeat: -1 }),
-  ];
-  let onScreen = false;
-  const sync = () => floats.forEach((t) => (onScreen && !document.hidden ? t.resume() : t.pause()));
-  ScrollTrigger.create({ trigger: scene, start: 'top bottom', end: 'bottom top', onToggle: (self) => { onScreen = self.isActive; sync(); } });
-  document.addEventListener('visibilitychange', sync);
-  cleanups.push(() => document.removeEventListener('visibilitychange', sync));
-  sync();
-
-  // Pointer tilt (desktop, fine pointer): up to 6 degrees, damped, no overshoot.
-  if (desktop && fine) {
-    const max = 6, target = { x: 0, y: 0 };
-    const move = (e) => { const r = scene.getBoundingClientRect(); target.y = ((e.clientX - r.left) / r.width * 2 - 1) * max; target.x = -((e.clientY - r.top) / r.height * 2 - 1) * max; };
-    const leave = () => { target.x = target.y = 0; };
-    const follow = (_, dt) => {
-      const f = 1 - Math.pow(0.94, dt / 16.7);
-      if (Math.abs(target.x - gc.tiltX) + Math.abs(target.y - gc.tiltY) < 0.002) return;
-      gc.tiltX += (target.x - gc.tiltX) * f; gc.tiltY += (target.y - gc.tiltY) * f; gc.render();
-    };
-    scene.addEventListener('pointermove', move); scene.addEventListener('pointerleave', leave); gsap.ticker.add(follow);
-    cleanups.push(() => { scene.removeEventListener('pointermove', move); scene.removeEventListener('pointerleave', leave); gsap.ticker.remove(follow); });
-  }
-  gc.render();
-  return gc;
-}
-
-/** R6b The Gold Card (Home): no pin. The card swings -25 to +25 degrees as the section passes; the swan draws itself on its face (shaded, line),
- *  becomes raised metal, a band of light crosses it with the card square to you, the edge catches the light as it leaves. */
-SCENES.gold = (el, { desktop, fine }) => {
-  const scrub = desktop ? 0.5 : 0.3;
-  if (desktop) thread(el, 0.4, { start: 'top 90%', end: 'top 55%' });
-  const gc = goldCard(el.querySelector('[data-gold-card]'), el, { desktop, fine });
-  const tl = gsap.timeline({ defaults: { ease: 'none' }, scrollTrigger: { trigger: el, start: 'top 85%', end: 'bottom 15%', scrub } });
-  tl.to(gc, { p: 1, duration: 1, onUpdate: () => { gc.ry = HOME_RY(gc.p) * gc.k; gc.rx = gc.k === 1 ? HOME_RX(gc.p) : 5 + (HOME_RX(gc.p) - 8) * (9 / 14); gc.sheen = HOME_SHEEN(gc.p); gc.render(); } }, 0);
-  gc.swan(tl, { draw: [0.05, 0.3], relief: [0.3, 0.42], line: [0.36, 0.45] }, 'none');
-  const h = el.querySelector('[data-rise]');
-  lineRise(h);
-  fadeUp(el.querySelectorAll('.gold-text > [data-fade]'), { trigger: h, start: 'top 75%', delay: 0.3, stagger: 0.15 });
-  fadeUp(el.querySelectorAll('[data-pill]'), { trigger: el.querySelector('.pills'), start: 'top 90%', delay: 0.2, stagger: 0.06 });
-};
-
-/** G1 The Gold Card page hero: on load the card fades in at -25 degrees, the line draws, becomes metal, one sheen crosses it as it settles at -12.
- *  On scroll a slow half turn (-12 to +168) shows the back as the hero leaves. */
-SCENES['gold-hero'] = (el, { desktop, fine }) => {
-  const mount = el.querySelector('[data-gold-card]');
-  const gc = goldCard(mount, el, { desktop, fine });
-  gc.fade = 0; gc.lift = 4; gc.render();
-  const soft = 'soft', k = gc.k;
-  const tl = gsap.timeline({ defaults: { ease: soft }, onUpdate: gc.render });
-  tl.to(gc, { fade: 1, lift: 0, duration: 1.2 }, 0);
-  gc.swan(tl, { draw: [0.3, 2.7], relief: [2.4, 3], line: [2.4, 3] }, soft);
-  tl.to(gc, { ry: -12 * k, rx: desktop ? 3 : 1, duration: 1.6 }, 3)
-    .fromTo(gc, { sheen: -1 }, { sheen: 0.05, duration: 0.9 }, 3)
-    .to(gc, { sheen: -0.35, duration: 0.7 }, 3.9);
-  // The half turn runs over the first 45% of the hero's scroll while the card drifts up 35% slower than the page: the back is fully on screen (under the header, clear of the next section) when it arrives.
-  const dropEnd = () => (0.35 * 0.45 * el.offsetHeight) / mount.offsetHeight * 100;
-  const turn = gsap.timeline({ defaults: { ease: 'none' }, onUpdate: gc.render, scrollTrigger: { trigger: el, start: 'top top', end: () => '+=' + 0.45 * el.offsetHeight, scrub: desktop ? 0.5 : 0.3, invalidateOnRefresh: true } });
-  turn.fromTo(gc, { turn: 0 }, { turn: 180, duration: 1 }, 0)
-    .fromTo(gc, { drop: 0 }, { drop: dropEnd, duration: 1 }, 0);
-  lineRise(el.querySelector('[data-rise]'), { trigger: false, delay: 0.4 });
-  gsap.fromTo(el.querySelectorAll('.gold-hero-text [data-fade]'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.9, delay: 0.9, stagger: 0.12 });
-};
-
 /** R7 Opening: the quiet end of the visit. */
 SCENES.opening = (el) => {
   const h = el.querySelector('[data-rise]');
   lineRise(h);
   fadeUp(el.querySelectorAll('[data-fade]'), { trigger: h, start: 'top 90%', delay: 0.4, stagger: 0.12 });
 };
-
-/* ---------- three.js (IMMERSIVE 14.0 and 14.3): a layer on top of the CSS card, never a replacement ---------- */
-
-/** One synchronous gate: large screen, motion allowed, no Save-Data, a real GPU with WebGL2. Phones and tablets never pass. */
-function webglGate() {
-  if (root.dataset.webgl === 'off') return false;
-  if (!matchMedia('(min-width: 64em)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
-  if (navigator.connection?.saveData || matchMedia('(prefers-reduced-data: reduce)').matches) return false;
-  if ((navigator.deviceMemory ?? 8) < 4 || (navigator.hardwareConcurrency ?? 8) < 4) return false;
-  const gl = document.createElement('canvas').getContext('webgl2', { failIfMajorPerformanceCaveat: true });
-  if (!gl) return false;
-  gl.getExtension('WEBGL_lose_context')?.loseContext();
-  return true;
-}
-const tokens = (name) => getComputedStyle(root).getPropertyValue(name).trim();
-
-/** Load gold-card-3d.js after `load` + idle, and (Home) only when the mount is within two screens. Returns nothing; teardown goes to cleanups. */
-function loadCards(ctx) {
-  if (!ctx.conditions.desktop || !cards.size || !webglGate()) return;
-  cards.forEach((gc, mount) => {
-    let inst = null, dead = false, io = null;
-    const go = () => import(mount.dataset.webglSrc)
-      .then((m) => { if (!dead) ctx.add(() => { inst = m.create(mount, { gsap, ScrollTrigger, tokens, card: gc }); inst.ready.catch((e) => { console.error('gold card 3d', e); inst.dispose(); }); }); })
-      .catch((e) => console.error('gold card 3d', e));
-    const near = () => {
-      if (mount.dataset.goldCard === 'hero' || !('IntersectionObserver' in window)) return go();
-      io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { io.disconnect(); go(); } }, { rootMargin: '200% 0px' });
-      io.observe(mount);
-    };
-    const start = () => (window.requestIdleCallback || setTimeout)(() => { if (!dead) near(); }, { timeout: 2000 });
-    if (document.readyState === 'complete') start(); else window.addEventListener('load', start, { once: true });
-    cleanups.push(() => { dead = true; io?.disconnect(); inst?.dispose(); inst = null; });
-  });
-}
 
 /* ---------- setup (8.2) ---------- */
 
@@ -484,10 +349,9 @@ function boot() {
     initHeader();
     if (fine) initGlow();
     document.querySelectorAll('[data-scene]').forEach((el) => {
-      try { if (SCENES[el.dataset.scene]) SCENES[el.dataset.scene](el, { desktop, fine }); else el.classList.add('scene-failed'); }
+      try { if (SCENES[el.dataset.scene]) SCENES[el.dataset.scene](el, { desktop, fine, ctx }); else el.classList.add('scene-failed'); }
       catch (error) { console.error(`scene ${el.dataset.scene}`, error); el.classList.add('scene-failed'); }
     });
-    loadCards(ctx);
     return () => { cleanups.splice(0).forEach((fn) => fn()); };
   });
 

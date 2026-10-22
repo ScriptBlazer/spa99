@@ -112,10 +112,22 @@
   --color-thread-light: rgb(187 136 85 / 0.6); /* the thread (caramel) on cream */
   --frame-gap: var(--space-6);                 /* minimum espresso between two frames */
   /* Distance from the content edge to the screen edge: how far an edge-bleed frame runs out (also past the 1440 container). */
-  /* Memberships page (docs/design/MEMBERSHIPS-PAGE.md section 8). Derived. */
-  --color-pill-line: rgb(245 242 216 / 0.28);  /* pill border inside the selected (espresso) tier column; decoration, the text is cream. Unselected pills use --color-control-line */
-  --tier-media-h: 7rem;                        /* picture box in a tier column; phone uses a square --tier-media-s */
-  --tier-media-s: 5.5rem;
+  /* Memberships round 2, the key cards (docs/design/MEMBERSHIPS-R2.md section 7). Derived, decoration only. Shadows are warm (espresso), never black. */
+  --shadow-tier: 0 1px 1px rgb(73 46 33 / 0.04), 0 6px 12px -4px rgb(73 46 33 / 0.06), 0 24px 44px -20px rgb(73 46 33 / 0.14);
+  --shadow-tier-hover: 0 2px 2px rgb(73 46 33 / 0.05), 0 12px 20px -6px rgb(73 46 33 / 0.08), 0 36px 64px -24px rgb(73 46 33 / 0.20);
+  --shadow-tier-selected: 0 2px 3px rgb(73 46 33 / 0.10), 0 16px 28px -10px rgb(73 46 33 / 0.20), 0 52px 88px -30px rgb(73 46 33 / 0.38);
+  --shadow-bar: 0 -10px 28px -18px rgb(73 46 33 / 0.22);
+  --color-tier-edge: rgb(73 46 33 / 0.07);      /* the 1px edge of a cream tier card (decoration) */
+  --color-tier-edge-gold: rgb(229 172 110 / 0.55); /* the 1px edge of the selected (espresso) tier card */
+  --color-sheen: rgb(245 242 216 / 0.10);       /* the one band of light that crosses the selected card */
+  --tier-w: 18rem;                              /* a tier card */
+  --tier-h: clamp(33rem, 100svh - 15rem, 37.5rem);
+  --tier-gap: 2.5rem;
+  --tier-tag-w: 18rem;                          /* the tag column left of the cards */
+  --tier-num-size: 3.5rem;                      /* the visits numeral; 4.5rem from 64em */
+  --tier-lift: 0px;                             /* how far the selected card sits up; -8px from 64em */
+  --tier-hover-lift: -4px;
+  --duration-tier: 600ms;
   --bar-h: 4.5rem;                             /* Continue bar; 4rem from 64em */
   /* The Gold Card (docs/design/GOLD-CARD-3D.md 7.3). Derived, decoration only: the metal of one object. Brand gold is hue 31 degrees; nothing here goes brass (45+). */
   --color-gold-metal: #D9A46C;                 /* derived: card base metal (hue 31) */
@@ -146,7 +158,7 @@ html[data-page="marketing"] {
 }
 
 @media (min-width: 64em) {
-  :root { --header-h: 4.5rem; --gc-w: min(40rem, 44vw); }
+  :root { --header-h: 4.5rem; --gc-w: min(40rem, 44vw); --tier-num-size: 4.5rem; --tier-lift: -8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

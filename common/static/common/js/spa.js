@@ -1,15 +1,15 @@
-/* The spa page scenes (docs/design/SPA-PAGE.md, with the 2026-10-22 decisions: the door shrinks on normal scroll, no pin).
+/* The spa page scenes (docs/design/SPA-PAGE.md, with the 2026-10-22 decisions: the door shrinks onto its frame inside a short pin, the same method as Home's arrival).
  * Loaded only by spa.html, after the vendored GSAP, ScrollTrigger, SplitText and CustomEase. scenes.js (imported) owns the registry,
  * the matchMedia setup, the header and the shared patterns; this file adds the scenes of this page so Home's script stays as small as it was.
  * Same rules as scenes.js: transform and opacity only, scroll-driven tweens use ease "none", a scene that throws shows its static content.
- *   door   S1: the full-screen door shrinks onto .door-target as the page scrolls (windowTo), facts and chips arrive, "8" counts once
+ *   door   S1: the full-screen door shrinks onto .door-target inside a short pin (windowTo), facts and chips arrive, "8" counts once
  *   feature S2a/c/d: name rises, line and pills fade up, hairline draws (scrubbed), frame settles and drifts, inset and thumbnail travel more
  *   tiles  S2b: intro, staggered tiles settle at their own depth (desktop only), captions lag
  *   steps  S3: the line draws through the three steps (scrubbed), numbers come up as it reaches them
  *   band   S4: heading, line, buttons, the swan pattern drifts
  * Hooks: data-door-window / data-door-media / data-door-target / data-door-pause, data-rule, data-step, data-steps, data-walk (the future room walk).
  */
-import { SCENES, cleanups, lineRise, fadeUp, settle, depth, drift, windowTo } from './scenes.js';
+import { SCENES, cleanups, lineRise, fadeUp, settle, depth, drift, windowTo, pinnedScene } from './scenes.js';
 
 const { gsap, ScrollTrigger } = window;
 
@@ -54,11 +54,9 @@ if (gsap && ScrollTrigger) {
   /* ---------- S1 the door ---------- */
   SCENES.door = (el, { desktop }) => {
     const q = (s) => el.querySelector(s);
-    const run = () => q('.door-run').offsetHeight;   // how far the page scrolls while the door shrinks (CSS --door-run)
-    const tl = gsap.timeline({
-      defaults: { ease: 'none' },
-      scrollTrigger: { trigger: el, start: 'top top', end: () => '+=' + Math.max(1, run()), scrub: desktop ? 0.5 : 0.3, invalidateOnRefresh: true },
-    });
+    // Same method as Home's arrival: a short pin (+=50% desktop, +=35% phone of a screen) with the same scrub, so the picture never also moves with the page while it shrinks.
+    const per = desktop ? 0.5 : 0.35;
+    const tl = pinnedScene(el, { segments: 2, perSegment: per, scrub: desktop ? 0.5 : 0.3 });
     tl.to({}, { duration: 1 }, 0);
 
     // on load: the words come in (the picture fades in from espresso in CSS)
@@ -77,7 +75,7 @@ if (gsap && ScrollTrigger) {
     const play = countCue(q('[data-count]') || document.createElement('i'));
     tl.fromTo(q('.door-facts'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3 }, 0.66)
       .fromTo(q('.door-chips'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.28 }, 0.72);
-    ScrollTrigger.create({ trigger: el, start: () => 'top+=' + Math.round(run() * 0.66) + ' top', once: true, onEnter: play });
+    tl.call(play, null, 0.66);
 
     // the living still (one cycle per 48s) and its Pause control (the choice is remembered with Home's)
     const loop = gsap.to(q('.door-still'), { scale: 1.03, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' });
@@ -92,7 +90,7 @@ if (gsap && ScrollTrigger) {
     cleanups.push(() => { button.removeEventListener('click', toggle); document.removeEventListener('visibilitychange', sync); });
     ScrollTrigger.create({ trigger: el, start: 'top bottom', end: 'bottom top', onToggle: (self) => { inView = self.isActive; sync(); } });
     tl.to(button, { autoAlpha: 0, duration: 0.2 }, 0.05);
-    ScrollTrigger.create({ trigger: el, start: 'top top', end: () => '+=' + Math.max(1, run()), onUpdate: (self) => { const next = self.progress > 0.7; if (next !== shrunk) { shrunk = next; sync(); } } });
+    ScrollTrigger.create({ trigger: el, start: 'top top', end: () => '+=' + Math.max(1, per * window.innerHeight), onUpdate: (self) => { const next = self.progress > 0.7; if (next !== shrunk) { shrunk = next; sync(); } } });
     label();
     sync();
   };

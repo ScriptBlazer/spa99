@@ -1,26 +1,6 @@
 /* Memberships round 2 (docs/design/MEMBERSHIPS-R2.md): "the key cards". Cream page, three slim tall cards like a jeweller's display,
-   a tag column that holds the choice and the one Continue. Tokens only; the round 2 tokens below are scoped to this page
-   until they move to tokens.css (list in the build report).
+   a tag column that holds the choice and the one Continue. Tokens only (the round 2 tier tokens are in tokens.css).
    The form works with no script: the checked radio is the choice, everything here is CSS. */
-
-.page-mem {
-  --shadow-tier: 0 1px 1px rgb(73 46 33 / 0.04), 0 6px 12px -4px rgb(73 46 33 / 0.06), 0 24px 44px -20px rgb(73 46 33 / 0.14);
-  --shadow-tier-hover: 0 2px 2px rgb(73 46 33 / 0.05), 0 12px 20px -6px rgb(73 46 33 / 0.08), 0 36px 64px -24px rgb(73 46 33 / 0.20);
-  --shadow-tier-selected: 0 2px 3px rgb(73 46 33 / 0.10), 0 16px 28px -10px rgb(73 46 33 / 0.20), 0 52px 88px -30px rgb(73 46 33 / 0.38);
-  --shadow-bar: 0 -10px 28px -18px rgb(73 46 33 / 0.22);
-  --color-tier-edge: rgb(73 46 33 / 0.07);
-  --color-tier-edge-gold: rgb(229 172 110 / 0.55);
-  --color-sheen: rgb(245 242 216 / 0.10);
-  --tier-w: 18rem;
-  --tier-h: clamp(33rem, 100svh - 15rem, 37.5rem);
-  --tier-gap: 2.5rem;
-  --tier-tag-w: 18rem;
-  --tier-num-size: 3.5rem;
-  --tier-lift: 0px;
-  --tier-hover-lift: -4px;
-  --duration-tier: 600ms;
-}
-@media (min-width: 64em) { .page-mem { --tier-num-size: 4.5rem; --tier-lift: -8px; } }
 
 .page-mem main { padding-top: var(--header-h); overflow-x: clip; }
 html:has(.page-mem) { scroll-padding-bottom: calc(var(--bar-h) + var(--space-3)); }
