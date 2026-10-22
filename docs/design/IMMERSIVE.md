@@ -122,7 +122,7 @@ Total scroll at desktop: about 9.5 screens, of which 4.4 are pinned scenes.
 
 **On screen (first paint):** full-bleed hero media under the header (overlay header). Bottom left over the legibility veil: "Beyond Luxury." in `--text-hero` (Signika 400 cream, BRIEF 3), lead "A private spa for men in North London. Opening January 2027.", primary gold "Find your membership" with arrow, quiet "See the spa". A small quiet "Pause" control bottom right (section 3.1).
 
-**Media:** `<video>` slot with poster (markup in 3.1). Until a video exists, the living still: render **08** (`hero`) with slow settle and a steam layer (3.2).
+**Media:** `<video>` slot with poster (markup in 3.1). Until a video exists, the living still: render **08** (`hero`) with slow settle and a steam layer (3.2). On desktop with a capable GPU and no video, the living still is the WebGL water pass instead (section 14.1); phones keep the CSS living still.
 
 **On load:** headline Line rise (2 lines max: "Beyond / Luxury." on phone, one line on desktop), lead and actions Fade up 0.3s after. Media fades from espresso `opacity 0 → 1` over 1.4s (prevents a hard poster pop).
 
@@ -215,9 +215,11 @@ Phone: same, the light line is 6% wide.
 
 **Reduced motion / static:** door-gold full-bleed with veil, "The spa." and the lead bottom left. One screen.
 
-### S2. The rooms - pinned, `+=70%` per room after the first (8 rooms: `+=490%`)
+### S2. The rooms - pinned, `+=70%` per room after the first (8 rooms: `+=490%`; `+=630%` when the dry sauna walk runs)
 
 The core of the page. Eight facilities in visiting order (from `visible_facilities()`, hidden ones drop out and the pin shortens automatically: `(n - 1) * 70%`).
+
+**Dry sauna walk:** on desktop with a capable GPU, the dry-sauna room (first in the list) is a scroll-driven 3D walk through the glass door to the top bench, three segments long instead of one. Phones, reduced motion and every other fallback keep render 14 as a normal one-segment room. Full spec: section 14.2.
 
 **Markup:** an ordered list of `<article>` items (image, `<h2>` name, line) stacked absolutely inside the stage. Screen readers get a normal list; nothing is `aria-hidden`.
 
@@ -351,6 +353,8 @@ common/static/common/vendor/gsap/   gsap.min.js, ScrollTrigger.min.js, SplitText
 common/static/common/vendor/lenis/  lenis.min.js (+ LICENSE)
 common/static/common/js/scenes.js   one ES module: setup + a registry of scene patterns keyed by data-scene
 common/static/common/css/scenes.css motion layouts (all rules under html.motion), veil, glow, video
+common/static/common/vendor/three/  three.module.min.js (+ LICENSE, VERSION), only for section 14
+common/static/common/js/webgl/      hero-water.js, sauna-walk.js (section 14), lazy-loaded by scenes.js
 ```
 
 - GSAP is free for commercial use including all plugins since 3.13 (GreenSock "no charge" licence). Self-host, no CDN.
@@ -446,7 +450,7 @@ Per scene settings:
 | Home H2 ritual | 3 | 1.0 | 0.8 / 0.5 | desktop only |
 | Home H5 Gold | 2 | 0.6 desktop, 0.4 phone | 0.8 / 0.5 | no |
 | Spa S1 door | 2 | 1.0 | 0.8 / 0.5 | no |
-| Spa S2 rooms | number of rooms | 0.7 | 0.8 / 0.5 | desktop only |
+| Spa S2 rooms | number of rooms (the dry sauna walk counts 3, section 14.2) | 0.7 | 0.8 / 0.5 | desktop only, never inside the walk |
 | Spa S3 steps | 3 | 0.75 | 0.8 / 0.5 | desktop only |
 | Gold G2 who | 2 | 1.0 | 0.8 / 0.5 | no |
 | Visit V2 arrival | 2 | 0.8 | 0.8 / 0.5 | no |
@@ -600,6 +604,7 @@ Markup (Home H1; the same slot pattern can be reused on other dark heroes later)
 - **Pause control** (WCAG 2.2.2, motion longer than 5s): quiet text button bottom right, "Pause"/"Play", 44px target. Pauses the video or the living still loop and the steam. Remember the choice in `sessionStorage`.
 - **Living still** (until a video exists): `.hero-still img` loops `scale 1.0 → 1.06` over 24s, `yoyo`, `repeat: -1`, `sine.inOut` (one cycle per 48s, far below the 0.2Hz discomfort zone), plus `.hero-steam`: a steam-on-black WebP (asset to make, see HERO-VIDEO.md) at `mix-blend-mode: screen`, `opacity 0.28` desktop / `0.18` phone, drifting `xPercent -6 → 6` over 30s yoyo. The one blend layer on the site.
 - Video and steam pause when the hero is out of view (`ScrollTrigger` `onToggle`), and on `visibilitychange`.
+- **WebGL water pass** (section 14.1): on desktop with a capable GPU and no video, a canvas `.hero-gl` inside `.window-media` replaces the CSS living still and the `.hero-steam` layer. Same Pause control, same pausing rules.
 
 ### 8.12 Legibility veil
 
@@ -631,6 +636,7 @@ Text is placed inside the solid part of the veil (bottom 22% / left 18%). Worst 
 | Text scale | `--text-hero` 48px, `--text-2xl` 36px | 128px, 64px |
 | Type over images | Bottom veil only | Bottom or left veil |
 | Header | Overlay, hides on scroll down | Same |
+| WebGL (three.js) | Never downloaded. CSS living still, render 14 | Home hero water pass (no video only) and the dry sauna walk, if the GPU gate passes (section 14) |
 
 Tablet (48-64em) follows phone layouts with desktop video.
 
@@ -640,7 +646,8 @@ Tablet (48-64em) follows phone layouts with desktop video.
 
 | Item | Budget |
 |---|---|
-| JS on marketing pages (gzip) | gsap 28 KB, ScrollTrigger 18 KB, SplitText 7 KB, DrawSVG 3 KB, CustomEase 3 KB, Lenis 5 KB, scenes.js ≤ 10 KB. **Total ≤ 75 KB.** Journey, forms, account: 0 KB of this |
+| JS on marketing pages (gzip) | gsap 28 KB, ScrollTrigger 18 KB, SplitText 3.5 KB, DrawSVG 2.2 KB, CustomEase 3.6 KB, Lenis 5.4 KB (measured 2026-10-22: 60.7 KB), scenes.js ≤ 10 KB. **Total ≤ 75 KB.** Journey, forms, account: 0 KB of this |
+| WebGL JS (gzip, counted separately, section 14.3) | three.js custom build ≤ 145 KB (measured r186.1: 143.5 KB), hero-water.js ≤ 4 KB, sauna-walk.js ≤ 10 KB. Downloaded only on Home and The spa, on desktop, after load and idle, when the gate passes. **New total for those visits: Home ≤ 224 KB, The spa ≤ 230 KB.** Phones, reduced motion and the other four pages stay ≤ 75 KB |
 | Hero video, landscape | 1920×1080, 24 fps, 8 s, no audio track. AV1 WebM ≤ 1.6 MB; H.264 MP4 (High, CRF ~23, `+faststart`) ≤ 2.5 MB |
 | Hero video, portrait | 720×1280, same length. AV1 ≤ 0.8 MB; H.264 ≤ 1.2 MB |
 | Poster / still | Landscape 1920 WebP ≤ 160 KB; portrait 900 WebP ≤ 90 KB |
@@ -655,7 +662,7 @@ Tablet (48-64em) follows phone layouts with desktop video.
 
 ## 11. Reduced motion summary
 
-`prefers-reduced-motion: reduce` (and no JS, and GSAP failure) gives the **static layout**: every scene is a normal one-screen section, everything visible, final numbers, filled swans, no pins, no scrub, no Lenis, no glow, no page transitions, no autoplay video (poster only), no steam, header always solid. The content and order are identical. Per scene fallbacks are listed under each scene above.
+`prefers-reduced-motion: reduce` (and no JS, and GSAP failure) gives the **static layout**: every scene is a normal one-screen section, everything visible, final numbers, filled swans, no pins, no scrub, no Lenis, no glow, no page transitions, no autoplay video (poster only), no steam, no WebGL (three.js is never downloaded; the dry sauna is render 14), header always solid. The content and order are identical. Per scene fallbacks are listed under each scene above.
 
 ---
 
@@ -671,6 +678,25 @@ Tablet (48-64em) follows phone layouts with desktop video.
 | `--duration-line` | `1100ms` | Line rise |
 | `--stagger-line` | `80ms` | Between lines of one heading |
 | `--duration-page` | `480ms` | Page transition in (out is 240ms) |
+| `--duration-gl-in` | `1200ms` | WebGL canvas fade in over its fallback (hero and sauna walk) |
+
+**WebGL palette (derived, decoration only, never for text).** Read by `hero-water.js` and `sauna-walk.js` with `getComputedStyle(document.documentElement)` so the 3D colours live in `tokens.css`, not in JS. All warm; nothing with a blue cast.
+
+| Token | Value | Use |
+|---|---|---|
+| `--color-light-warm` | `#FFA957` | 2700K light: every point light in the sauna |
+| `--color-led` | `#FFC48A` | LED strips (self-lit) behind the backrest and under the step |
+| `--color-heater-glow` | `#FF8A3D` | The one low light inside the heater stones |
+| `--color-aspen` | `#E3CCA6` | Bench seats, step and backrest slats |
+| `--color-aspen-shade` | `#CDB48C` | Bench skirts (vertical boards under the seats) |
+| `--color-cedar` | `#7E5236` | Walls and ceiling |
+| `--color-walnut` | `#3B271B` | Door frame, bench end panels, heater rail |
+| `--color-stone` | `#7A604C` | Split stone, lightest strip |
+| `--color-stone-dark` | `#4A372B` | Split stone, darkest strip |
+| `--color-floor-stone` | `#3A2B22` | Floor tiles and the shower area beyond the door |
+| `--color-glass-bronze` | `rgb(107 74 48 / 0.28)` | Glass door |
+
+The swan on the glass uses `--color-gold`; the hero steam uses `--color-cream`; the hero glint uses `--color-gold`.
 
 GSAP uses `CustomEase.create('soft', '0.22,1,0.36,1')`, the same curve as `--ease-soft`.
 
@@ -683,3 +709,252 @@ GSAP uses `CustomEase.create('soft', '0.22,1,0.36,1')`, the same curve as `--eas
 3. Renders N1-N6 (BRIEF section 10), now more important: the room walk and the cold scene depend on them. N2 first.
 4. A 16:9 outpainted version of render 08 for the desktop living still (the current file is portrait, 1367 px wide, so it is soft and tightly cropped full-bleed at 1440). fal.ai outpaint, same grade.
 5. `_mark_draw.html` (the mark as fill + line groups), from the existing mark paths.
+6. `hero-water-mask.webp` for the WebGL water pass (section 14.1): 480×270 greyscale, aligned pixel for pixel to the 16:9 render 08 (item 4), white on the water sheet, black elsewhere, 12px soft edge, ≤ 8 KB. Painted by hand over the 16:9 still. The water pass cannot ship before items 4 and 6 exist.
+
+---
+
+## 14. Three.js moments
+
+Two moments only, both on desktop: the water on the Home hero and a walk into the dry sauna on The spa. Everything else stays GSAP and DOM. Both are decoration on top of a complete page: if three.js never loads, nothing is missing.
+
+Rules that still hold: slow, no bounce, no camera roll, text never rotates and never lives in WebGL (all copy stays DOM, over the veil), DOM moves by `transform` and `opacity` only, warm light only, no people.
+
+### 14.0 The gate (one function, run once, synchronously)
+
+```js
+function webglGate() {
+  const html = document.documentElement;
+  if (html.dataset.webgl === 'off') return false;                       // kill switch, like data-smooth
+  if (!matchMedia('(min-width: 64em)').matches) return false;           // phones and tablets: never
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  if (navigator.connection?.saveData || matchMedia('(prefers-reduced-data: reduce)').matches) return false;
+  if ((navigator.deviceMemory ?? 8) < 4 || (navigator.hardwareConcurrency ?? 8) < 4) return false;
+  const gl = document.createElement('canvas').getContext('webgl2', { failIfMajorPerformanceCaveat: true });
+  if (!gl) return false;                                                 // no WebGL2, or software rendering
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return true;
+}
+```
+
+- `<html data-webgl="on">` is set from a Django setting (default on), so either moment can be switched off without a deploy of new JS.
+- The gate runs before any pinned timeline is built, because the sauna walk changes the S2 pin length. The pin length never changes after it is built (no layout shift).
+- `(pointer: fine)` is not required: a large touch screen at 64em or wider with a real GPU gets the moments too. Lenis and Glow keep their own fine-pointer rule.
+
+### 14.1 Home hero: the water pass
+
+**Decision: a shader pass over the still, not a steam-only layer.** The still already has cheap CSS steam; the one thing a still cannot do is move its water. The pass makes the water sheet on render 08 ripple and catch light, and draws the steam in the same shader, so the CSS `.hero-steam` blend layer is switched off and the site still has one blend.
+
+**When it runs:**
+
+| Situation | Hero shows |
+|---|---|
+| Reduced motion, no JS, GSAP failed | Poster only (static layout) |
+| A hero video exists and may play (8.11) | The video. three.js is not downloaded on Home |
+| Save-Data, phone or tablet (< 64em), gate fails | CSS living still (8.11) |
+| Desktop, gate passes, no video, assets 4 and 6 exist | **WebGL water pass** |
+| The pass fails later (watchdog, context lost) | Cross-fade back to the CSS living still within 1.2s |
+
+When the video arrives, it wins and the pass switches off: two kinds of moving water on one hero would look fake and doubles the GPU cost. Moishe can change this (report, question 1).
+
+**Layers inside `.window-media`, bottom to top:** `video` (unused on this path) → `.hero-still` (the `<img>`, still the LCP element) → `.hero-gl` (the canvas, created by JS) → `.hero-steam` (hidden on this path). The veil and the text sit above `.window`, as now.
+
+**Window shrink (8.6):** the canvas is a child of `.window-media`, so the counter-scaled frame crops it exactly like the image. Its drawing buffer follows the layout box of `.window-media` (`ResizeObserver` content box, which ignores transforms), so the shrink never resizes the canvas. The scroll zoom `1.0 → 1.08` (H1, 0 → 0.75) targets `.hero-gl` with the same tween values as the image. The 48s living cycle (`1.0 → 1.06`) runs inside the shader (`uZoom`), so it never fights the scroll zoom on the same element.
+
+**Texture source:** the already decoded `<img class="hero-still">` (`new THREE.Texture(img)` after `img.decode()`), so the still is not downloaded twice. The mask is `data-mask-src` on `.hero-gl`. Both textures use `colorSpace = NoColorSpace` and the material is a `ShaderMaterial` without the colour-space chunk: the still's pixels pass through unchanged, so the first frame matches the `<img>` exactly.
+
+**Fragment shader (load-bearing, keep the numbers):**
+
+```glsl
+precision highp float;
+uniform sampler2D uImage, uMask;
+uniform vec2 uCover, uFocal;        // object-fit: cover and object-position of the <img>, in uv (y up)
+uniform float uTime, uAmp, uZoom, uSteam;
+uniform vec3 uSteamTint, uGlint;    // --color-cream, --color-gold as 0..1 sRGB
+varying vec2 vUv;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p){ vec2 i = floor(p), f = fract(p), u = f * f * (3. - 2. * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + 1.), u.x), u.y); }
+float fbm(vec2 p){ float v = 0., a = .5; for (int i = 0; i < 3; i++) { v += a * noise(p); p *= 2.03; a *= .5; } return v; }
+void main(){
+  vec2 uv = (vUv - uFocal) * uCover / uZoom + uFocal;               // same crop as the <img>, living zoom on the focal point
+  float m = texture2D(uMask, uv).r;                                   // 1 on the water sheet
+  vec2 flow = vec2(uv.x * 38., uv.y * 6. + uTime * .35);              // fine vertical ripples, falling slowly
+  vec2 d = (vec2(noise(flow), noise(flow + 17.3)) - .5) * vec2(.0022, .0010) * m * uAmp;
+  vec3 c = texture2D(uImage, uv + d).rgb;
+  c += m * uAmp * pow(noise(flow * vec2(1., 2.) + 5.), 8.) * .06 * uGlint;           // a faint gold glint on the water
+  vec2 s = vUv * vec2(2.2, 1.4) + vec2(.15 * sin(uTime * .021), -uTime * .009);       // steam rises, drifts sideways over 300s
+  float zone = smoothstep(.38, .62, vUv.y) * (1. - smoothstep(.88, 1., vUv.y)) * smoothstep(.18, .34, vUv.x);
+  float steam = smoothstep(.45, .85, fbm(s)) * zone * uSteam * uAmp;
+  c = 1. - (1. - c) * (1. - uSteamTint * steam);                      // screen blend, in the shader
+  gl_FragColor = vec4(c, 1.);
+}
+```
+
+- `uCover`: `r = viewAspect / imageAspect; uCover = r > 1 ? [1, 1 / r] : [r, 1]`. `uFocal` = the image's `object-position` (x, `1 - y`).
+- `uZoom = 1 + 0.03 * (1 - cos(2π · t / 48))`: the same 48s cycle as the CSS living still.
+- `uSteam = 0.16`. The `zone` keeps steam out of the lower 38% and the left 18%, where text sits on the veil, so hero text contrast is unchanged.
+- Displacement is at most about 2 CSS px at 1440 wide. The ripples are continuous water, not a loop; the only cyclic parts (zoom 48s, steam drift 300s) are far slower than 15s.
+- `uAmp` ramps `0 → 1` over 2.4s after the canvas fades in, so the fade shows no jump.
+
+**Start:** after `load` + `requestIdleCallback` (timeout 2000ms) and `img.decode()`: dynamic import, build, `renderer.compile()`, render one frame with `uAmp = 0`, then fade `.hero-gl` `opacity 0 → 1` over `--duration-gl-in` (1.2s, `soft`) and `.hero-steam` `1 → 0` over the same time (then kill its drift tween). If Pause is stored in `sessionStorage`, nothing is downloaded until the guest presses Play.
+
+**Running:**
+- Renderer: `antialias: false` (a full-screen image pass gains nothing), `alpha: false`, `powerPreference: 'low-power'`, pixel ratio `min(devicePixelRatio, 1.5)`.
+- Cadence: 30 fps (the water is slow; this halves GPU and battery cost). One callback on `gsap.ticker`, rendering when 33ms have passed. No second `requestAnimationFrame` loop on the page.
+- `uTime` advances only while running, with a capped step (`min(dt, 1/15 s)`), so it never jumps after a pause or a hidden tab.
+- Budget per frame: GPU ≤ 2ms, main thread ≤ 0.5ms at 1440×800.
+
+**Pause control (same button as 8.11):** Pause stops the ticker callback; the canvas keeps its last frame; no GPU work while paused. Play resumes from the same `uTime`. Same label swap, `aria-pressed` and `sessionStorage` key as the video.
+
+**Off screen and hidden:** a `ScrollTrigger` on the hero (`onToggle`) stops it when the hero leaves the viewport and starts it again on return; `visibilitychange` stops it while the tab is hidden.
+
+**Watchdog and failure:** after 3s of running, if the median `gsap.ticker.deltaRatio()` over the last 90 ticks is above 1.35 (the page is under about 45 fps), cross-fade back to the CSS living still and dispose. Same on `webglcontextlost`. Never retry in the same page view.
+
+### 14.2 The spa: the dry sauna walk
+
+**Decision: inside S2, as the dry-sauna room, not its own scene.** It is the first room in the visiting order, it keeps its place in the index and the list for screen readers, and the next room (wet sauna) arrives with the normal S2 cross-fade, so the handover needs no new pattern. The story becomes: the spa door opens (S1), you stand at the sauna's glass door, it opens, you walk in to the stone wall and sit on the top bench, then the wet sauna fades in.
+
+**Geometry: procedural, as in the concept file (Concept B), no GLB.** The room is boxes, planes and instanced slats. Building it costs about 10 KB of JS against a GLB of 300 KB or more plus a loader, and the palette stays in tokens. Use the concept's dimensions and coordinates (metres, `x` east, `z` south, `y` up): inner room `xL -1.4625 … xR 1.4625`, `zB -2.172 … zF 2.172`, ceiling 2.10; glass door 0.70 wide in the east wall, `z -0.834 … -0.134` (centre `-0.484`); heater centred on the north wall at `(0, 0, -1.697)`; two-tier bench across the south wall (upper seat 0.60 deep at 0.936, step 0.54 deep at 0.466).
+
+**Markup (the dry-sauna `<article>` in S2):**
+
+```html
+<article class="scene-item" data-label="dry-sauna" data-walk>
+  {% photo "dry-sauna" alt="..." css_class="scene-media" %}   {# render 14: the fallback and the screen-reader image #}
+  <div class="walk-gl" data-webgl="sauna-walk" data-webgl-src="{% static 'common/js/webgl/sauna-walk.js' %}" aria-hidden="true"></div>
+  <h2>...</h2><p>...</p>
+</article>
+```
+
+**Pin length:** when the gate passes, the item has a span of 3 segments instead of 1. Eight rooms: `(7 + 3 - 1) × 70% = +=630%` (was 490%). The walk alone is 2.1 screens of scroll. Labels sit at cumulative spans:
+
+```js
+const span = (item) => (glOn && desktop && item.hasAttribute('data-walk')) ? 3 : 1;
+let t = 0;
+items.forEach((item) => { tl.addLabel(item.dataset.label, t); /* cross-fade, settle, captions as 8.4, with duration span(item) */ t += span(item); });
+// end: '+=' + (t - 1) * 0.7 * innerHeight   (replaces (segments - 1))
+const walk = { w: 0 };                                     // read by sauna-walk.js every tick
+if (glOn && desktop) tl.fromTo(walk, { w: 0 }, { w: 3, duration: 3, ease: 'none' }, 0);
+```
+
+Snap (desktop) must never move the camera: inside the walk, return the value unchanged.
+
+```js
+snapTo: (v, st) => v < (3 - 0.35) / tl.duration() ? v
+  : ScrollTrigger.snapDirectional(Object.values(tl.labels).map((l) => l / tl.duration()))(v, st.direction),
+```
+
+**Storyboard (walk time `w`, 0 → 3; scrubbed, ease none; scroll is the easing):**
+
+| w | Camera | Also |
+|---|---|---|
+| 0 → 0.15 | Hold at A, outside the glass door, the gold swan centred | Name and line already visible (first room, Line rise on enter as 8.4) |
+| 0.15 → 0.6 | Starts moving towards B | Door leaf opens `0° → 90°` outwards, hinge on the south jamb |
+| 0.15 → 2.4 | A → B → C → D along the curves below | Grazing light on the stone, LEDs on, nothing flickers |
+| 2.4 → 2.65 | Hold at D, seated on the top bench | Quiet hold |
+| 2.65 → 3.0 | Hold | Wet sauna Cross-fades in over the canvas (normal S2, 0.35 before its label). Name and line leave in 2.8 → 3.0 |
+
+Camera poses (position → target, vertical field of view):
+
+| Pose | Where | Position | Target | FOV |
+|---|---|---|---|---|
+| A | In the shower area, facing the glass door | `(2.55, 1.55, -0.484)` | `(1.46, 1.40, -0.484)` | 46° |
+| B | On the threshold, turning to the stone | `(1.62, 1.55, -0.484)` | `(0.20, 1.15, -1.45)` | 54° |
+| C | In the room, stone wall and heater ahead | `(0.75, 1.52, 0.05)` | `(0.00, 1.00, -1.85)` | 56° |
+| D | Seated, top bench, facing the stone | `(0.45, 1.66, 1.85)` | `(0.00, 0.95, -1.75)` | 58° |
+
+- Position and target are two `CatmullRomCurve3` (`'centripetal'`) through A-D. `u = clamp((w - 0.15) / 2.25, 0, 1)`; use `getPointAt(u)` (arc length, so speed is even). FOV interpolates linearly with `u`.
+- `camera.up` stays `(0, 1, 0)`: no roll, ever. No pointer look-around: scroll is the only control.
+- The camera crosses the door plane at about `w 0.8`, after the door is fully open.
+
+**Text:** the S2 caption only (room name `--text-2xl`, its line `--text-lg`), bottom left inside the solid part of the veil, and the desktop index (`.veil--left`) as for every room. No extra copy, no labels in 3D, no text in the canvas. The veil sits above the canvas exactly as above an image. Keep the bright stone grazing light in the upper right of every frame (the poses above do this), never under the caption.
+
+**Materials and light (Spa 99 palette, section 12 tokens):**
+
+| Part | Build | Material |
+|---|---|---|
+| North wall, split stone | `InstancedMesh` of boxes: about 16 rows (7-18 cm tall), stones 15-45 cm wide, depth 2-25 mm random, about 200 instances | `MeshStandardMaterial`, instance colour random between `--color-stone-dark` and `--color-stone`, roughness 0.92, one 1024² canvas detail texture (concept's `stoneCv`, re-tinted warm) |
+| Other walls and ceiling | Planes, 0.6 m boards (concept `planks`), ceiling boards vertical | `--color-cedar`, roughness 0.8 |
+| Bench, step, backrest | Slats, skirts and the vertical backrest slats as one `InstancedMesh` per material | `--color-aspen` (seats, slats), `--color-aspen-shade` (skirts), roughness 0.7 |
+| Bench ends, door frame, heater rail | Boxes and the concept's tube rail | `--color-walnut`, roughness 0.6 |
+| Floor and shower area | Planes, 0.6 m tiles | `--color-floor-stone`, roughness 0.75 (the concept's grey slate is replaced: no cool greys) |
+| Heater | Cylinder body, 24 instanced vertical bars (not wireframe), the concept's instanced stones | Body walnut-dark metal (`--color-walnut`, metalness 0.4, roughness 0.5); stones warm greys from `--color-stone-dark` |
+| Glass door | One thin box | `--color-glass-bronze`, roughness 0.05, `transparent`, `depthWrite: false` |
+| Swan on the glass (once) | A 512² `CanvasTexture`: the mark's path strings drawn with `Path2D`, filled `--color-gold`, on a plane 1 mm in front of the glass, 0.24 m tall, centre at 1.40 m | `MeshBasicMaterial`, `transparent`, opacity 0.9 |
+| LED strips | Concept positions: under the step lip, top and bottom of the backrest | `MeshBasicMaterial`, `--color-led` |
+
+Removed from the concept: bucket and ladle, the control panel and its blue screen, vents, labels, OrbitControls, the theme switcher.
+
+Lights (three r155+ uses physical units: these are starting values in candela, tune by eye against render 14):
+
+| Light | Colour | Intensity | Distance / decay | Position |
+|---|---|---|---|---|
+| Hemisphere | sky `--color-led`, ground `--color-floor-stone` | 0.6 | | |
+| Backrest wash × 2 | `--color-light-warm` | 2.0 | 2.2 / 2 | `(±0.8, 1.40, 2.02)` |
+| Under the step | `--color-light-warm` | 1.2 | 1.8 / 2 | `(0, 0.30, 0.93)` |
+| Stone grazing × 2 | `--color-light-warm` | 3.0 | 2.4 / 2 | `(±0.9, 2.05, -2.05)` |
+| Heater stones | `--color-heater-glow` | 0.8 | 1.4 / 2 | `(0, 0.75, -1.697)` |
+| Shower area (behind A) | `--color-light-warm` | 1.0 | 3.0 / 2 | `(2.8, 1.9, -0.484)` |
+
+- `outputColorSpace = SRGBColorSpace`, canvas textures `SRGBColorSpace`, `ACESFilmicToneMapping`, exposure 0.95. No shadow maps, no post-processing, no fog. Background `--color-espresso`.
+- Grade check: the mean luminance of pose D is within ±10% of render 14, and no rendered pixel has blue above red.
+
+**Budget:** ≤ 40,000 triangles, ≤ 40 draw calls, ≤ 6 textures (one 1024², the rest 512²), GPU memory ≤ 16 MB. Renderer `antialias: true`, `powerPreference: 'high-performance'`, pixel ratio `min(devicePixelRatio, 1.5)`, dropped to 1 if three rendered frames exceed 20ms. GPU ≤ 6ms per frame at 1440×800.
+
+**Render on demand:** the room is static. A `gsap.ticker` callback renders only when `walk.w` changed since the last frame or the canvas was resized; a still scroll costs nothing. It stops completely once the wet sauna image is fully opaque (`w ≥ 3`) and starts again on scroll back. Build, `renderer.compile()` and one frame at pose A happen in idle time after `load`, long before S2 (the S1 door pin is above it).
+
+**Handover and fallbacks:**
+- The canvas fades in over render 14 (`--duration-gl-in`) only while S2 is not active. If it is not ready when the S2 pin starts, render 14 stays for this page view: the item keeps its span of 3 and the image Settles slowly `1.15 → 1` across all three segments. It may swap in later only when the guest is back above S2.
+- Phone, tablet, reduced motion, Save-Data, the kill switch, a failed gate: render 14 as a normal one-segment room (S2 as written). three.js is not downloaded.
+- Context lost or build error: render 14 shows again at once (canvas `opacity 0`, no fade), dispose.
+
+### 14.3 Loading and the scenes.js pattern
+
+**three.js file.** r186.1 is current (2026-10-22) and no longer ships minified files, and the full core plus module build is 196 KB gzip. So vendor one custom, tree-shaken build:
+
+- `tools/three/entry.js` re-exports only what the two modules use (`WebGLRenderer`, `Scene`, `PerspectiveCamera`, `OrthographicCamera`, `Mesh`, `InstancedMesh`, `Group`, `BoxGeometry`, `PlaneGeometry`, `CylinderGeometry`, `IcosahedronGeometry`, `TubeGeometry`, `CatmullRomCurve3`, `Vector3`, `Color`, `Object3D`, `MeshStandardMaterial`, `MeshBasicMaterial`, `ShaderMaterial`, `Texture`, `CanvasTexture`, `TextureLoader`, `HemisphereLight`, `PointLight`, colour-space and tone-mapping constants) from `three@0.186.1`.
+- Build once: `npx esbuild@0.28 tools/three/entry.js --bundle --minify --format=esm --legal-comments=eof --outfile=common/static/common/vendor/three/three.module.min.js`. Measured 143.5 KB gzip. Commit the output with three's `LICENSE` (MIT) and a `VERSION` file (`three 0.186.1, esbuild 0.28.2, entry tools/three/entry.js`). No build step at deploy.
+- `hero-water.js` and `sauna-walk.js` import it statically (`import * as THREE from '../../vendor/three/three.module.min.js'`). `SpaStaticFilesStorage` already rewrites static module imports to hashed names. Dynamic `import()` is not rewritten, so scenes.js imports the modules by the hashed URL in `data-webgl-src` (`{% static %}` in the template).
+
+**When it loads:** never in `<head>`, never preloaded. Only on Home and The spa, only when `webglGate()` passed, and on Home only when there is no video. Start after `window` `load` + `requestIdleCallback` (timeout 2000ms). Phones never request it.
+
+**Module contract (both files):**
+
+```js
+export function create(mount, { gsap, ScrollTrigger, tokens, walk }) {
+  // builds renderer, scene and canvas inside mount; returns:
+  return { ready /* Promise, resolves after the first frame */, start() {}, stop() {}, dispose() {} };
+}
+```
+
+`dispose()` is idempotent: removes its ticker callback, observers and listeners, disposes every geometry, material and texture, calls `renderer.dispose()` and `renderer.forceContextLoss()`, removes the canvas, and restores the fallback (`.hero-still` and `.hero-steam` visible on Home, render 14 visible on The spa).
+
+**In scenes.js:** compute `const glOn = webglGate()` once at the top (before `mm.add`). Inside the `mm.add` callback, after the scenes are built, and only when `motion && desktop`:
+
+```js
+const disposers = [];
+document.querySelectorAll('[data-webgl]').forEach((mount) => {
+  if (!glOn || (mount.dataset.webgl === 'hero-water' && heroHasVideo)) return;
+  let inst = null, dead = false;
+  afterLoadIdle(() => import(mount.dataset.webglSrc)
+    .then((m) => { if (dead) return; ctx.add(() => { inst = m.create(mount, { gsap, ScrollTrigger, tokens, walk }); }); })
+    .catch(() => {}));                                   // the fallback is already on screen
+  disposers.push(() => { dead = true; inst?.dispose(); });
+});
+return () => { disposers.forEach((d) => d()); stopLenis(); };
+```
+
+- `ctx.add` puts the tweens and ScrollTriggers created after the async import into the same matchMedia context, so a switch to reduced motion or below 64em reverts them, and the cleanup disposes the renderer.
+- `heroHasVideo` is the 8.11 check (sources present, not Save-Data, a type can play).
+- `walk` is the proxy object tweened in the S2 timeline (14.2); the hero ignores it.
+
+### 14.4 Acceptance checks (frontend, before review)
+
+1. **Frame rate.** Chrome Performance panel at 1440×800 on an M1 MacBook Air and on an Intel laptop with integrated graphics: scrolling H1 and S2 holds 60 fps on the M1 and ≥ 50 fps on the Intel; hero pass renders at a steady 30 fps; GPU per frame within budget (hero ≤ 2ms, walk ≤ 6ms); no long task over 50ms during scroll; build and compile happen before the scene is reached.
+2. **No layout shift.** CLS ≤ 0.05 with WebGL on and off. Document height is identical right after `load` and after the WebGL moments are ready. A screenshot of the hero just before and just after the canvas fades in differs by no more than antialiasing (`uAmp = 0` first frame).
+3. **Fallbacks visible, never blank.** Check each one shows its fallback with no empty frame: 375px (no three.js request in the network panel), reduced motion, `data-webgl="off"`, WebGL disabled in the browser, a hero video present (no three.js on Home), and a forced `WEBGL_lose_context` in the console (fallback back within 1.2s).
+4. **Pause and hidden.** Pause stops all GPU work on Home (Performance panel shows no WebGL frames), survives a reload in the same session, the button is 44px and keyboard reachable. A hidden tab does no work; returning does not jump the water.
+5. **Clean revert.** Toggling reduced motion while on the page, and resizing below 64em, removes the canvas, frees the context (`renderer.info.memory` geometries and textures at 0 after `dispose()`) and leaves the static layout correct. Visiting Home then The spa never holds more than one WebGL context.
+6. **Contrast.** Caption text over the walk at `w` 0, 0.8, 1.5 and 2.4, and hero text over the water pass, measure ≥ 4.5:1 against the brightest pixel under the text box (cream on the veil). No steam inside the hero text zone.
+7. **Look.** Warm only (no pixel with blue above red in the sauna; the hero still's colours unchanged at `uAmp = 0`). No camera roll, no text in WebGL, nothing flickers, no people. The swan appears once, on the glass door.
+8. **Budget.** `three.module.min.js` ≤ 145 KB gzip, `hero-water.js` ≤ 4 KB, `sauna-walk.js` ≤ 10 KB. Lighthouse mobile ≥ 90 unchanged (phones do not download any of it). LCP is still the poster.
