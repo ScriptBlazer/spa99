@@ -12,6 +12,11 @@ export const MESSAGES = {
   emailRequired: 'Enter your email address.',
   emailInvalid: 'Enter a valid email address.',
   mobileInvalid: 'Enter a valid UK mobile number, like 07123 456789.',
+  nameRequired: 'Enter your name.',
+  nameLong: 'That name is too long.',
+  dobRequired: 'Enter your date of birth.',
+  dobInvalid: 'Enter a valid date of birth.',
+  dobUnderAge: 'You must be 18 or over.',
   passwordShort: 'This password is too short. It must contain at least 10 characters.',
   passwordCommon: 'This password is too common.',
   passwordNumeric: 'This password is entirely numeric.',
@@ -19,6 +24,8 @@ export const MESSAGES = {
 };
 
 export const PASSWORD_MIN_LENGTH = 10;
+export const NAME_MAX_LENGTH = 100;
+export const MINIMUM_AGE = 18; // mirrors settings.MINIMUM_AGE
 
 // A short list only: the server checks Django's full list of ~20,000 common passwords.
 const COMMON_PASSWORDS = new Set([
@@ -52,6 +59,28 @@ export function normaliseUkMobile(value) {
 
 export function validateMobile(value) {
   return normaliseUkMobile(value) ? null : MESSAGES.mobileInvalid;
+}
+
+export function validateName(value) {
+  const name = (value || '').trim().replace(/\s+/g, ' ');
+  if (!name) return MESSAGES.nameRequired;
+  if (name.length > NAME_MAX_LENGTH) return MESSAGES.nameLong;
+  return null;
+}
+
+/** `value` is 'YYYY-MM-DD' (what <input type="date"> gives). */
+export function validateDateOfBirth(value, today = new Date()) {
+  if (!value) return MESSAGES.dobRequired;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return MESSAGES.dobInvalid;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const dob = new Date(Date.UTC(year, month - 1, day));
+  if (dob.getUTCFullYear() !== year || dob.getUTCMonth() !== month - 1 || dob.getUTCDate() !== day) return MESSAGES.dobInvalid;
+  const [ty, tm, td] = [today.getFullYear(), today.getMonth() + 1, today.getDate()];
+  if (year > ty || (year === ty && (month > tm || (month === tm && day > td))) || year < 1900) return MESSAGES.dobInvalid;
+  const hadBirthday = tm > month || (tm === month && td >= day);
+  const age = ty - year - (hadBirthday ? 0 : 1);
+  return age < MINIMUM_AGE ? MESSAGES.dobUnderAge : null;
 }
 
 /** Array of problems (empty = fine). `related` is { email, first_name, last_name }. */
@@ -103,6 +132,8 @@ function localMessages(field, form) {
   if (!value.trim()) return messages; // optional and empty: fine
   if (rules.includes('email')) { const m = validateEmail(value); if (m) messages.push(m); }
   if (rules.includes('mobile')) { const m = validateMobile(value); if (m) messages.push(m); }
+  if (rules.includes('name')) { const m = validateName(value); if (m) messages.push(m); }
+  if (rules.includes('dob')) { const m = validateDateOfBirth(value); if (m) messages.push(m); }
   if (rules.includes('password')) {
     const related = {};
     (field.dataset.passwordRelated || '').split(',').filter(Boolean).forEach((name) => {

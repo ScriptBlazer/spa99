@@ -1,7 +1,10 @@
 """Shared validation rules. The same rules are mirrored in common/static/common/js/validate.js
 for live feedback; this Python side is the one that actually protects the data.
 """
+from datetime import date
+
 import phonenumbers
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -11,7 +14,40 @@ MESSAGES = {
     "email_required": "Enter your email address.",
     "email_invalid": "Enter a valid email address.",
     "mobile_invalid": "Enter a valid UK mobile number, like 07123 456789.",
+    "name_required": "Enter your name.",
+    "name_long": "That name is too long.",
+    "dob_required": "Enter your date of birth.",
+    "dob_invalid": "Enter a valid date of birth.",
+    "dob_under_age": "You must be 18 or over.",
 }
+
+NAME_MAX_LENGTH = 100
+
+
+def validate_person_name(value):
+    """Trim and check a first or last name. Returns the clean name or raises ValidationError."""
+    cleaned = " ".join((value or "").split())
+    if not cleaned:
+        raise ValidationError(MESSAGES["name_required"], code="required")
+    if len(cleaned) > NAME_MAX_LENGTH:
+        raise ValidationError(MESSAGES["name_long"], code="max_length")
+    return cleaned
+
+
+def validate_adult(dob, today=None):
+    """Date of birth must be a real past date and the person 18 or over (ACC-08).
+    The age comes from settings.MINIMUM_AGE. Returns the date or raises ValidationError."""
+    if dob is None:
+        raise ValidationError(MESSAGES["dob_required"], code="required")
+    today = today or date.today()
+    if dob > today or dob.year < 1900:
+        raise ValidationError(MESSAGES["dob_invalid"], code="invalid")
+    minimum = getattr(settings, "MINIMUM_AGE", 18)
+    had_birthday = (today.month, today.day) >= (dob.month, dob.day)
+    age = today.year - dob.year - (0 if had_birthday else 1)
+    if age < minimum:
+        raise ValidationError(MESSAGES["dob_under_age"], code="under_age")
+    return dob
 
 
 def normalise_email(value):

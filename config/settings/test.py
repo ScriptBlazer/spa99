@@ -16,6 +16,7 @@ STORAGES = {
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
 Q_CLUSTER = {**Q_CLUSTER, "sync": True}  # noqa: F405
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.dummy.DummyCache"}}  # rate limits off unless a test turns them on
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 STARTUP_REPORT = None  # keep test output quiet
@@ -26,5 +27,6 @@ LOGGING = {  # noqa: F405
     "loggers": {
         "django.request": {"level": "CRITICAL"},
         "spa99.health": {"level": "CRITICAL"},
+        "spa99.email": {"level": "CRITICAL"},  # tests that break sending on purpose
     },
 }

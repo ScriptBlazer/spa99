@@ -19,6 +19,11 @@ CONTROL_HOST = ENV.get("CONTROL_DOMAIN", "control.spa99.uk")
 # ALLOWED_HOSTS in the environment ADDS to these. localhost / 127.0.0.1: the container health check.
 ALLOWED_HOSTS = [DOMAIN, CONTROL_HOST, "localhost", "127.0.0.1"] + ENV.list("ALLOWED_HOSTS", [])
 
+# Email: SMTP unless EMAIL_BACKEND says otherwise (notifications.backends.SesBackend for SES via the IAM role).
+EMAIL_BACKEND = ENV.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+SITE_URL = ENV.get("SITE_URL", f"https://{DOMAIN}").rstrip("/")
+CONTROL_URL = ENV.get("CONTROL_URL", f"https://{CONTROL_HOST}").rstrip("/")
+
 DATABASES = build_databases(ENV.get("DATABASE_URL"), None, require_ssl=True)
 
 # Media: S3 prod/ folder. Credentials come from the EC2 instance role (no AWS keys in the server .env).
