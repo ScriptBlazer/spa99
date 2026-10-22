@@ -1,0 +1,71 @@
+{
+  "hero": {
+    "width": 1367,
+    "height": 2119,
+    "widths": [
+      480,
+      800,
+      1367
+    ]
+  },
+  "relaxing-zone": {
+    "width": 3168,
+    "height": 1344,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "gym": {
+    "width": 2400,
+    "height": 1792,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "dry-sauna": {
+    "width": 2528,
+    "height": 1696,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "door-gold": {
+    "width": 2048,
+    "height": 2048,
+    "widths": [
+      480,
+      800,
+      1600,
+      2048
+    ]
+  },
+  "door-white": {
+    "width": 2048,
+    "height": 2048,
+    "widths": [
+      480,
+      800,
+      1600,
+      2048
+    ]
+  },
+  "lockers": {
+    "width": 2528,
+    "height": 1696,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  }
+}
