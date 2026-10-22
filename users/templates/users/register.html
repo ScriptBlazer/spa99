@@ -1,0 +1,38 @@
+{# PLACEHOLDER template: unstyled, only here so the view works. The frontend replaces it. Keep the field names.
+   Live "already registered" check: GET {% url 'check_email' %}?email=... returns {"registered": true|false}. #}
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ site_settings.wording }} | Spa 99</title>
+{% include "common/_assets.html" %}
+</head>
+<body>
+<main>
+  <h1>{{ site_settings.wording }}</h1>
+  <form method="post" data-live-validate data-check-email-url="{% url 'check_email' %}">{% csrf_token %}
+    {# Honeypot: hidden from people, bots fill it. #}
+    <div style="position:absolute;left:-10000px" aria-hidden="true"><input name="website" tabindex="-1" autocomplete="off"></div>
+    {% if form.non_field_errors %}<p class="field-error" role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+    {% include "common/_field.html" with field=form.first_name %}
+    {% include "common/_field.html" with field=form.last_name %}
+    {% include "common/_field.html" with field=form.email %}
+    {% include "common/_field.html" with field=form.mobile %}
+    {% include "common/_field.html" with field=form.password %}
+    {% include "common/_field.html" with field=form.date_of_birth %}
+    <fieldset><legend>Membership you are interested in</legend>
+      {% for plan in plans %}
+      <label><input type="radio" name="plan" value="{{ plan.slug }}"{% if plan.slug == selected_plan %} checked{% endif %}> {{ plan.name }}</label>
+      {% endfor %}
+    </fieldset>
+    {% include "common/_field.html" with field=form.men_only_accepted %}
+    {% include "common/_field.html" with field=form.privacy_accepted %}
+    <p><a href="/privacy/">Privacy notice</a></p>
+    {% include "common/_field.html" with field=form.marketing_opt_in %}
+    <button type="submit" data-working-text="Working...">{{ site_settings.wording }}</button>
+  </form>
+  {% include "common/_modal.html" %}
+</main>
+</body>
+</html>

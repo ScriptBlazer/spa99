@@ -1,0 +1,36 @@
+{# PLACEHOLDER template: unstyled, only here so the view works. The frontend replaces it. Keep the context names. #}
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your account | Spa 99</title>
+{% include "common/_assets.html" %}
+</head>
+<body>
+<main>
+  <h1>Your account</h1>
+  {% include "common/_messages.html" %}
+  <p>{{ request.user.get_full_name }} | {{ request.user.email }} | Account ID {{ request.user.public_id_display }}</p>
+  {% if not verified %}
+  <form method="post" action="{% url 'resend_verification' %}">{% csrf_token %}
+    <p>Please confirm your email. <button type="submit">Send the link again</button></p>
+  </form>
+  {% endif %}
+  <h2>Your interest</h2>
+  <p>{% if interest and interest.plan %}You are registered for {{ interest.plan.name }} interest.{% else %}No membership chosen yet.{% endif %}</p>
+  <form method="post" action="{% url 'account_interest' %}">{% csrf_token %}
+    {% for plan in plans %}<label><input type="radio" name="plan" value="{{ plan.slug }}"{% if interest.plan_id == plan.pk %} checked{% endif %}> {{ plan.name }}</label>{% endfor %}
+    <button type="submit">Update</button>
+  </form>
+  <h2>Your data</h2>
+  <p><a href="{% url 'account_export' %}">Download my data</a></p>
+  <form method="post" action="{% url 'account_delete' %}">{% csrf_token %}
+    <label>Password <input type="password" name="password" autocomplete="current-password"></label>
+    <button type="submit">Delete my account</button>
+  </form>
+  <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
+  {% include "common/_modal.html" %}
+</main>
+</body>
+</html>
