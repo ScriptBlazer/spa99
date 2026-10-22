@@ -2,7 +2,9 @@
 
 For whoever makes the Home hero loop (text-to-video, stock, or a shoot later). Used by scene H1 in `docs/design/IMMERSIVE.md`. Brand: `docs/BRAND.md`.
 
-> **Update 2026-10-22 (Moishe):** the reception feature is now a large fish tank, not a water wall. The lead concept becomes the fish tank (slow fish, light rays in the water, warm room around it); concept A below is retired. Rewrite the prompts when fal is connected.
+> **Update 2026-10-22 (Moishe):** the reception feature is now a large fish tank, not a water wall. The lead concept becomes the fish tank (slow fish, light rays in the water, warm room around it); concept A below is retired.
+>
+> **Done 2026-10-22:** Moishe supplied the video himself (`Software Files/media/fish-tank-loop.mp4`, a 13s push-in on the fish tank). It loops with a 3s cross-fade (option B) and is encoded to the files in section 3. Details in `content/static/content/video/SOURCES.txt`. Portrait is 608x1080 (cropped from the 1076px source, not upscaled). No fal video needed.
 
 ## 1. What the loop must do
 
