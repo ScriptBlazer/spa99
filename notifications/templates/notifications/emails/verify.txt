@@ -1,0 +1,11 @@
+{% autoescape off %}Hello {{ first_name }},
+
+Please confirm your email address to finish setting up your Spa 99 account. The link works for 24 hours.
+
+{{ url }}
+
+If you did not ask for this, you can ignore this email.
+
+{{ site_name }}, {{ address }}
+Questions? Reply to this email or write to {{ contact_email }}.
+{% endautoescape %}

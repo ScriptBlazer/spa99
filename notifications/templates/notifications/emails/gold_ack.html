@@ -1,0 +1,7 @@
+{% extends "notifications/emails/_base.html" %}
+{% block title %}Your Gold Card application{% endblock %}
+{% block content %}
+<p style="margin:0 0 12px;">Hello {{ first_name }},</p>
+<p style="margin:0 0 12px;">Thank you. We have your Gold Card application and we will be in touch.</p>
+<p style="margin:0;font-size:14px;">Your reference is <strong>{{ reference }}</strong>.</p>
+{% endblock %}

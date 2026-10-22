@@ -1,0 +1,11 @@
+{% autoescape off %}Hello {{ first_name }},
+
+Thank you for confirming your email. {% if plan_name %}We have noted your interest in {{ plan_name }}.{% else %}We have noted your interest.{% endif %}
+
+There is nothing to pay and nothing more to do right now. We will write to you before booking opens{% if opening_text %}, {{ opening_text }}{% endif %}.
+
+Your account ID is {{ account_id }}.
+
+{{ site_name }}, {{ address }}
+Questions? Reply to this email or write to {{ contact_email }}.
+{% endautoescape %}
