@@ -112,6 +112,11 @@
   --color-thread-light: rgb(187 136 85 / 0.6); /* the thread (caramel) on cream */
   --frame-gap: var(--space-6);                 /* minimum espresso between two frames */
   /* Distance from the content edge to the screen edge: how far an edge-bleed frame runs out (also past the 1440 container). */
+  /* Memberships page (docs/design/MEMBERSHIPS-PAGE.md section 8). Derived. */
+  --color-pill-line: rgb(245 242 216 / 0.28);  /* quiet pill border on espresso-raised; decoration, the text is cream */
+  --tier-media-h: 7rem;                        /* picture box in a tier column; phone uses a square --tier-media-s */
+  --tier-media-s: 5.5rem;
+  --bar-h: 4.5rem;                             /* Continue bar; 4rem from 64em */
   --bleed: calc(var(--page-margin) + max(0px, (100vw - var(--container-max)) / 2));
 }
 

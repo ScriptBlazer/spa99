@@ -238,33 +238,9 @@ body:has(dialog[open]) { overflow: hidden; }
 .soon-card h3 { font-size: var(--text-xl); }
 .soon-card p { margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
 
-/* ---------- plan rows (memberships) ---------- */
+/* ---------- price (register page) ---------- */
 .price { font-family: var(--font-display); font-weight: 400; font-size: var(--text-2xl); line-height: 1; letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; }
 .price-sm { font-size: var(--text-xl); }
-.plan { display: grid; gap: var(--space-4); padding-block: var(--space-6); border-top: 1px solid var(--s-hair); }
-.plan-name h2 { font-size: var(--text-2xl); line-height: 1; }
-.plan-name .lead { margin-top: var(--space-2); }
-.plan-price > * + * { margin-top: var(--space-2); }
-.plan-lines { display: grid; gap: var(--space-2); align-content: start; }
-.plan-action { align-self: end; }
-.plan-featured { border-top: 0; margin-block: var(--space-6); padding: var(--space-6) var(--space-5); border-radius: var(--radius-md); background: var(--color-bg-inverse); color: var(--color-text-inverse); }
-.plan-featured .label { color: var(--color-gold); margin-bottom: var(--space-3); }
-@media (min-width: 48em) {
-  .plan { grid-template-columns: repeat(8, minmax(0, 1fr)); column-gap: var(--gutter); row-gap: var(--space-5); }
-  .plan-name, .plan-price { grid-column: span 4; }
-  .plan-lines { grid-column: span 4; }
-  .plan-action { grid-column: span 4; justify-self: start; }
-}
-@media (min-width: 64em) {
-  .plan { grid-template-columns: repeat(12, minmax(0, 1fr)); }
-  .plan-name { grid-column: 1 / span 4; }
-  .plan-price { grid-column: 5 / span 3; }
-  .plan-lines { grid-column: 8 / span 3; }
-  .plan-action { grid-column: 11 / span 2; justify-self: stretch; }
-  .plan-featured { padding: var(--space-6); }
-}
-.plan-single { padding-block: var(--space-5); }
-.plan-single h2 { font-size: var(--text-xl); }
 
 /* ---------- footer ---------- */
 .site-footer { padding-top: var(--section-y); padding-bottom: var(--space-6); }

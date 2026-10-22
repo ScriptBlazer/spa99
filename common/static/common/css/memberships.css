@@ -1,0 +1,160 @@
+/* Memberships page (docs/design/MEMBERSHIPS-PAGE.md). Espresso page, tall selectable tier columns, one Continue. Tokens only.
+   The form works with no script: the checked radio is the choice, everything here is CSS. */
+
+.page-mem main { padding-top: var(--header-h); overflow-x: clip; }
+html:has(.page-mem) { scroll-padding-bottom: calc(var(--bar-h) + var(--space-3)); }
+
+/* ---------- intro ---------- */
+.mem-intro { padding-block: var(--space-4) var(--space-3); }
+.mem-intro-inner { display: grid; gap: var(--space-1) var(--gutter); align-items: end; }
+.mem-title { font-weight: 500; line-height: var(--leading-display); overflow: clip; }
+.mem-title-line { display: block; }
+.mem-intro .lead { margin-top: var(--space-2); font-size: var(--text-body); color: var(--color-text-muted-inverse); }
+.mem-notsure .btn-quiet { gap: var(--space-2); }
+@media (min-width: 64em) {
+  .mem-intro { padding-block: var(--space-5) var(--space-4); }
+  .mem-intro-inner { grid-template-columns: minmax(0, 1fr) auto; }
+  .mem-notsure { padding-bottom: 0.1rem; }
+}
+
+/* ---------- the choice ---------- */
+.tiers { display: grid; gap: var(--space-3); grid-template-columns: minmax(0, 1fr); max-width: 40rem; }
+@media (min-width: 64em) {
+  .tiers { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gutter); max-width: none; align-items: stretch; }
+}
+
+.tier {
+  position: relative; display: grid; align-content: start; gap: var(--space-2) var(--space-3);
+  grid-template-columns: var(--tier-media-s) minmax(0, 1fr);
+  grid-template-areas: "media top" "price price" "facts facts";
+  padding: var(--space-3); background: var(--color-espresso-raised); border: 1px solid var(--color-hairline-inverse); border-radius: var(--radius-md);
+  color: var(--color-text-inverse); text-align: left; cursor: pointer;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  transition: transform var(--duration-press) var(--ease-soft);
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) { .tier:hover { transform: scale(1.01); } .tier:active { transform: scale(0.99); } }
+@media (prefers-reduced-motion: no-preference) { .tier:active { transform: scale(0.99); } }
+.tier input { position: absolute; opacity: 0; pointer-events: none; }
+.tier-media { grid-area: media; position: relative; display: block; width: var(--tier-media-s); height: var(--tier-media-s); overflow: hidden; border-radius: var(--radius-sm); background: var(--color-espresso); }
+.tier-media picture, .tier-media .photo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tier-media .photo { object-fit: cover; }
+.tier-media .photo-placeholder .mark { width: 40%; min-width: 0; }
+.tier-top { grid-area: top; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); align-content: start; min-width: 0; }
+.tier-head { display: inline-flex; align-items: center; gap: var(--space-2); }
+.tier-name { font-family: var(--font-display); font-weight: 500; font-size: var(--text-lg); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
+.tier-rec { color: var(--color-gold); }
+.tier-tagline { flex-basis: 100%; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--color-text-muted-inverse); }
+.tier-price-group { grid-area: price; display: block; }
+.tier-price { font-family: var(--font-display); font-weight: 500; font-size: var(--text-2xl); line-height: 1; letter-spacing: var(--tracking-display); }
+.tier-per { font-size: var(--text-sm); color: var(--color-text-muted-inverse); }
+.tier-inc { display: block; margin-top: var(--space-1); font-size: var(--text-sm); color: var(--color-text-muted-inverse); }
+.tier-facts { grid-area: facts; display: block; }
+.tier-visits { display: block; font-family: var(--font-display); font-weight: 500; font-size: var(--text-lg); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
+.tier-visits::before { content: ""; display: block; width: 1.5rem; height: 1px; margin-bottom: var(--space-2); background: var(--color-gold); }
+.tier .pills { margin-top: var(--space-2); gap: var(--space-2); }
+.pill--quiet { border-color: var(--color-pill-line); pointer-events: none; }
+
+/* the drawn mark: a ring; selected = gold fill and a check (not colour only) */
+.tier-mark { position: relative; flex: none; width: 1.25rem; height: 1.25rem; border: 1.5px solid var(--color-text-muted-inverse); border-radius: 50%; }
+/* selected: instant, no transition. The 2px ring is an inset shadow so nothing moves. */
+.tier:has(input:checked) { box-shadow: inset 0 0 0 2px var(--color-gold); border-color: var(--color-gold); }
+.tier:has(input:checked) .tier-mark { border-color: var(--color-gold); background: var(--color-gold); }
+.tier:has(input:checked) .tier-mark::after {
+  content: ""; position: absolute; inset: 2px; background: var(--color-espresso);
+  -webkit-mask: url("../img/icon-check.svg") center / contain no-repeat; mask: url("../img/icon-check.svg") center / contain no-repeat;
+}
+.tier:has(input:checked) .pill--quiet { border-color: var(--color-gold); }
+.tier:has(input:focus-visible) { outline: 2px solid var(--color-focus-inverse); outline-offset: 3px; }
+
+@media (min-width: 64em) {
+  .tier { grid-template-columns: minmax(0, 1fr); grid-template-areas: "media" "top" "price" "facts"; gap: var(--space-3); padding: var(--space-3); }
+  .tier-media { width: 100%; height: var(--tier-media-h); }
+  .tier-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--space-1); }
+  .tier-tagline { grid-column: 1 / -1; }
+  .tier-price-group { align-self: end; }
+  .tier-facts { align-self: start; }
+}
+
+/* ---------- Continue bar: sticky inside the form, so it only sticks while the choice is on screen ---------- */
+.continue-bar {
+  position: sticky; bottom: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  min-height: var(--bar-h); margin: var(--space-3) calc(var(--page-margin) * -1) 0;
+  padding: var(--space-2) var(--page-margin) calc(var(--space-2) + env(safe-area-inset-bottom));
+  background: var(--color-espresso); border-top: 1px solid var(--color-hairline-inverse);
+}
+.continue-summary { min-width: 0; }
+.continue-name { font-family: var(--font-display); font-weight: 500; font-size: var(--text-base); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
+.continue-name + .continue-price, .mem-intro p + p, .plan-aside-body p + p, .gold-aside p + p { margin-top: 0; }
+.continue-price { font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--color-text-muted-inverse); }
+.continue-price span { white-space: nowrap; }
+.continue-inc { display: block; }
+@media (min-width: 64em) { .continue-inc { display: inline; } .continue-inc::before { content: "\00b7\00a0"; } }
+.continue-note { display: none; font-size: var(--text-sm); color: var(--color-text-muted-inverse); }
+.continue-bar .btn { flex: none; min-width: 8rem; }
+@media (min-width: 64em) {
+  :root { --bar-h: 4rem; }
+  .continue-bar { margin-top: var(--space-4); margin-inline: 0; padding-inline: 0; border-top: 0; }
+  .continue-name { font-size: var(--text-lg); }
+  .continue-note { display: block; margin-left: auto; }
+  .continue-bar .btn { min-width: 12rem; }
+}
+
+/* ---------- also: single visit and the Gold line ---------- */
+.mem-also { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
+.plan-aside, .gold-aside { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-hairline-inverse); border-radius: var(--radius-md); }
+.plan-aside-media { position: relative; flex: none; width: 4.5rem; height: 4.5rem; overflow: hidden; border-radius: var(--radius-sm); background: var(--color-espresso-raised); }
+.plan-aside-media picture, .plan-aside-media .photo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.plan-aside-media .photo { object-fit: cover; }
+.plan-aside-media .photo-placeholder .mark { width: 40%; min-width: 0; }
+.plan-aside-body > * + * { margin-top: var(--space-1); }
+.plan-aside h2 { font-size: var(--text-lg); font-weight: 500; line-height: var(--leading-tight); }
+.plan-aside-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.plan-aside-meta .pill { min-height: 1.75rem; }
+.gold-aside .mark { width: 1.5rem; height: auto; flex: none; color: var(--color-gold); }
+.gold-aside p { max-width: none; }
+.gold-aside .btn-quiet { min-height: 2.75rem; font-size: var(--text-sm); }
+@media (min-width: 64em) { .mem-also { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gutter); } }
+
+/* ---------- compare ---------- */
+.compare { margin-top: var(--space-4); }
+.compare summary { list-style: none; display: flex; justify-content: space-between; align-items: center; min-height: 3.5rem; border-top: 1px solid var(--color-hairline-inverse); }
+.compare summary::-webkit-details-marker { display: none; }
+.compare-summary { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 500; letter-spacing: var(--tracking-display); }
+.compare summary::after { content: "+"; font-family: var(--font-display); font-size: var(--text-xl); }
+.compare[open] summary::after { content: "\2212"; }
+.compare summary:focus-visible { outline: 2px solid var(--color-focus-inverse); outline-offset: -2px; }
+.compare-picker { margin-bottom: var(--space-3); }
+@media (min-width: 48em) { .compare-picker { display: none; } }
+.compare-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.compare-table th, .compare-table td { height: 2.5rem; padding: var(--space-2) var(--space-3); text-align: left; vertical-align: middle; }
+.compare-table tr.grp-start > * { border-top: 1px solid var(--color-hairline-inverse); }
+.compare-table thead th { font-family: var(--font-display); font-weight: 500; font-size: var(--text-base); color: var(--color-text-inverse); }
+.compare-table tbody th { font-weight: 400; color: var(--color-text-muted-inverse); }
+.compare-table td { color: var(--color-text-inverse); }
+.compare-table .is-selected { background: var(--color-espresso-raised); }
+.cmp-head { display: inline-flex; align-items: center; gap: var(--space-2); }
+.cmp-check { display: none; width: 1rem; height: 1rem; color: var(--color-gold); }
+.compare-table th.is-selected .cmp-check { display: inline-block; }
+@media (prefers-reduced-motion: no-preference) { .compare[open] .compare-body { animation: mem-fade 400ms var(--ease-soft) both; } }
+@media (max-width: 47.99em) {
+  .compare-table [data-col] { display: none; }
+  .compare-table[data-active="0"] [data-col="0"], .compare-table[data-active="1"] [data-col="1"],
+  .compare-table[data-active="2"] [data-col="2"], .compare-table[data-active="3"] [data-col="3"],
+  .compare-table[data-active=""] [data-col="0"] { display: table-cell; }
+  .compare-table thead { display: none; }
+  .compare-table .is-selected { background: none; }
+}
+.vat-note { margin-top: var(--space-4); padding-bottom: var(--space-6); max-width: none; }
+
+/* ---------- motion (BRAND 7B, restrained): the title rises, the rest fades up, the form arrives as one group. Prices never move. ---------- */
+@keyframes mem-line { from { transform: translateY(100%); } }
+@keyframes mem-rise { from { opacity: 0; transform: translateY(var(--rise)); } }
+@keyframes mem-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: no-preference) {
+  .mem-title-line { animation: mem-line var(--duration-line) var(--ease-soft) both; }
+  .mem-fade { animation: mem-rise var(--duration-hero) var(--ease-soft) 150ms both; }
+  /* pictures settle inside their boxes with the group */
+  .js .tier-media .photo, .js .tier-media .photo-placeholder { transform: scale(1.04); }
+  .js [data-reveal].is-visible .tier-media .photo, .js [data-reveal].is-visible .tier-media .photo-placeholder { transform: none; transition: transform 1000ms var(--ease-soft); }
+}
+@media (max-width: 47.99em) { .continue-bar .btn { min-width: 7.5rem; } }

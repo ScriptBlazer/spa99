@@ -41,34 +41,6 @@
 .steps-hours { padding-block: var(--space-5) var(--space-6); }
 .spa-next .actions { margin-top: var(--space-5); }
 
-/* ---------- memberships ---------- */
-.plans-intro { padding-block: var(--space-7) var(--space-6); border-bottom: 1px solid var(--s-hair); }
-.plans-intro .lead { margin-top: var(--space-3); }
-.plans .plan:first-child { border-top: 0; }
-.not-sure { padding-bottom: var(--space-6); }
-.not-sure-band { padding: var(--space-6) var(--space-5); }
-.compare-section { padding-block: var(--space-5); }
-.compare summary { list-style: none; display: flex; justify-content: space-between; align-items: center; padding-block: var(--space-4); border-top: 1px solid var(--s-hair); }
-.compare summary::-webkit-details-marker { display: none; }
-.compare-summary { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); }
-.compare summary::after { content: "+"; font-family: var(--font-display); font-size: var(--text-xl); }
-.compare[open] summary::after { content: "\2212"; }
-.compare-picker { margin-bottom: var(--space-4); }
-@media (min-width: 48em) { .compare-picker { display: none; } }
-.compare-table { width: 100%; border-collapse: collapse; }
-.compare-table th, .compare-table td { padding: var(--space-3); text-align: left; border-top: 1px solid var(--s-hair); vertical-align: top; }
-.compare-table thead th { border-top: 0; font-size: var(--text-sm); font-weight: 600; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--s-muted); }
-.compare-table tbody th { font-weight: 400; color: var(--s-muted); }
-.compare-table .is-featured { background: var(--color-cream-raised); }
-@media (max-width: 47.99em) {
-  .compare-table [data-col] { display: none; }
-  .compare-table[data-active="0"] [data-col="0"], .compare-table[data-active="1"] [data-col="1"],
-  .compare-table[data-active="2"] [data-col="2"], .compare-table[data-active="3"] [data-col="3"] { display: table-cell; }
-  .compare-table thead { display: none; }
-}
-.gold-line { padding-block: var(--space-6) var(--space-4); }
-.vat-note { padding-block: var(--space-4) var(--space-7); }
-
 /* ---------- Gold Card: espresso from top to bottom ---------- */
 .gold-hero { padding-block: var(--space-6) var(--section-y); }
 .gold-hero-grid { row-gap: var(--space-6); align-items: center; }
