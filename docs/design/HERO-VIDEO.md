@@ -2,6 +2,8 @@
 
 For whoever makes the Home hero loop (text-to-video, stock, or a shoot later). Used by scene H1 in `docs/design/IMMERSIVE.md`. Brand: `docs/BRAND.md`.
 
+> **Update 2026-10-22 (Moishe):** the reception feature is now a large fish tank, not a water wall. The lead concept becomes the fish tank (slow fish, light rays in the water, warm room around it); concept A below is retired. Rewrite the prompts when fal is connected.
+
 ## 1. What the loop must do
 
 - **6 to 10 seconds, seamless.** Locked-off camera (no pan, no dolly): camera moves cannot loop cleanly. Motion comes from the subject (water, steam, light).
