@@ -12,6 +12,13 @@ from common.envloader import Env, PrivateDir, example_keys, load_env, pick_setti
 from common.settings_helpers import build_databases, build_media_storage, describe_database
 
 
+def make_tmp(test):
+    """A temp folder that is always removed after the test."""
+    folder = tempfile.TemporaryDirectory()
+    test.addCleanup(folder.cleanup)
+    return Path(folder.name)
+
+
 def write(path, text):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text)
@@ -19,7 +26,7 @@ def write(path, text):
 
 class EnvLoaderTests(SimpleTestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = make_tmp(self)
         self.base = self.tmp / "project"
         self.base.mkdir()
 
@@ -108,7 +115,7 @@ class ProdSettingsTests(SimpleTestCase):
     }
 
     def import_prod(self, environ):
-        tmp = Path(tempfile.mkdtemp())
+        tmp = make_tmp(self)
         private = PrivateDir(tmp, using_fallback=True, writable=True, fallback_path=tmp)
         fake_loader = lambda base_dir: Env([("environment", environ)], private, None)  # noqa: E731
         names = ["config.settings.base", "config.settings.prod"]
@@ -162,7 +169,7 @@ class ProdSettingsTests(SimpleTestCase):
 
 class CorruptEnvFileTests(SimpleTestCase):
     def test_unreadable_env_file_is_ignored_with_a_warning(self):
-        tmp = Path(tempfile.mkdtemp())
+        tmp = make_tmp(self)
         (tmp / ".env").write_bytes(b"\xff\xfe\x00bad=\x80\n")
         with self.assertLogs("spa99.startup", "WARNING"):
             env = load_env(tmp, environ={"SPA99_PRIVATE_DIR": str(tmp / "nope")})

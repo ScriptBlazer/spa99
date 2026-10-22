@@ -25,3 +25,6 @@ media/
 # Tooling
 .coverage
 htmlcov/
+
+# Stray temp folders (never commit)
+tmp*/
