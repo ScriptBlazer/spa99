@@ -1,5 +1,5 @@
 {% extends layout %}
-{% load static validation_tags %}
+{% load static validation_tags pages_tags %}
 {% block head_title %}{% include "common/_head.html" with title="Sign in | Spa 99" %}{% endblock %}
 {% block main %}
 {% if control %}
@@ -19,23 +19,24 @@
   </div>
 </section>
 {% else %}
-<section class="section on-light auth">
-  <div class="container auth-inner">
-    <h1>Welcome back.</h1>
-    {% if throttled %}<p class="form-error" role="alert">Too many attempts. Please wait a few minutes.</p>{% endif %}
-    <form method="post" data-live-validate class="form-stack-sm" novalidate>
-      {% csrf_token %}
-      <input type="hidden" name="next" value="{{ next }}">
-      {% if form.non_field_errors %}<p class="form-error" role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
-      {% include "common/_field.html" with field=form.username %}
-      {% include "common/_field.html" with field=form.password toggle=True %}
-      <button type="submit" class="btn btn-primary btn-block" data-working-text="One moment">Sign in</button>
-    </form>
-    {% url 'forgot_password' as forgot_url %}
-    <p class="auth-links">{% if forgot_url %}<a class="btn-quiet" href="{{ forgot_url }}">Forgotten your password?</a>{% endif %}</p>
-    <p class="muted">New here? <a href="{% url 'register' %}">Register interest</a></p>
-  </div>
-</section>
+{% signin_shell as shell %}
+{% include "users/_shell_top.html" %}
+      <h1>{{ shell.heading }}</h1>
+      <p class="signin-lead">{{ shell.lead }}</p>
+      {% if throttled %}<p class="form-error signin-alert" role="alert">Too many attempts. Please wait a few minutes.</p>{% endif %}
+      <form method="post" data-live-validate class="signin-fields" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+        {% if form.non_field_errors %}<p class="form-error signin-alert" role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+        {% include "common/_field.html" with field=form.username %}
+        {% url 'forgot_password' as forgot_url %}
+        {% include "common/_field.html" with field=form.password toggle=True aside_url=forgot_url aside_text="Forgotten?" aside_label="Forgotten your password?" %}
+        <button type="submit" class="btn btn-primary btn-block" data-working-text="One moment">Sign in</button>
+      </form>
+      <div class="signin-foot">
+        <p class="small"><span class="muted">New here?</span> <a class="btn-quiet small" href="{% url 'register' %}">Register interest</a></p>
+      </div>
+{% include "users/_shell_bottom.html" %}
 {% endif %}
 {% endblock %}
 {% block scripts %}{% validation_config %}{% if not control %}<script type="module" src="{% static 'common/js/forms.js' %}"></script>{% endif %}{% endblock %}

@@ -1,6 +1,7 @@
 {% comment %}One form field: label, control, and a feedback line that never shifts the layout.
-Usage: {% include "common/_field.html" with field=form.email hint="We'll send a link." good="Looks right" optional=False toggle=False meter=False %}{% endcomment %}
-<div class="field">
+Usage: {% include "common/_field.html" with field=form.email hint="We'll send a link." good="Looks right" optional=False toggle=False meter=False %}
+Optional aside (sign-in shell): aside_url, aside_text, aside_label put a quiet link on the label row, after the control in tab order.{% endcomment %}
+<div class="field{% if aside_url %} field--aside{% endif %}">
   <label for="{{ field.id_for_label }}">{{ field.label }}{% if optional %} <span class="optional">(optional)</span>{% endif %}</label>
   {% if toggle %}<div class="field-row">{{ field }}<button type="button" class="field-toggle" data-password-toggle aria-controls="{{ field.id_for_label }}" aria-pressed="false">Show</button></div>{% else %}{{ field }}{% endif %}
   <p class="feedback" data-error-for="{{ field.html_name }}" id="error-{{ field.html_name }}" aria-live="polite" data-hint="{{ hint }}" data-good="{{ good }}" data-state="{% if field.errors %}error{% else %}hint{% endif %}">{% if field.errors %}{{ field.errors|join:" " }}{% else %}{{ hint }}{% endif %}</p>
@@ -13,4 +14,5 @@ Usage: {% include "common/_field.html" with field=form.email hint="We'll send a 
   <div class="strength" data-password-strength data-level="0" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
   <p class="strength-word" data-password-word aria-live="polite"></p>
   {% endif %}
+  {% if aside_url %}<a class="btn-quiet field-aside" href="{{ aside_url }}"{% if aside_label %} aria-label="{{ aside_label }}"{% endif %}>{{ aside_text }}</a>{% endif %}
 </div>

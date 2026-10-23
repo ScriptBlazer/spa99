@@ -128,6 +128,10 @@
   --tier-lift: 0px;                             /* how far the selected card sits up; -8px from 64em */
   --tier-hover-lift: -4px;
   --duration-tier: 600ms;
+  /* Memberships round 3 (MEMBERSHIPS-R3.md section 4). Proposed, round 3: derived, decoration only. */
+  --color-pool: rgb(229 172 110 / 0.35);        /* proposed, round 3: warm light pool on the cream under the selected card */
+  --color-room-veil: rgb(251 249 236 / 0.24);   /* proposed, round 3: cream veil over an unselected card's picture */
+  --duration-ack: 240ms;                        /* proposed, round 3: the tag's acknowledgement fade */
   --bar-h: 4.5rem;                             /* Continue bar; 4rem from 64em */
   /* The Gold Card (docs/design/GOLD-CARD-3D.md 7.3). Derived, decoration only: the metal of one object. Brand gold is hue 31 degrees; nothing here goes brass (45+). */
   --color-gold-metal: #D9A46C;                 /* derived: card base metal (hue 31) */
@@ -143,6 +147,7 @@
   --pill-h: 2rem;                              /* a static pill */
   --frame-h-feature: min(68svh, 34rem);        /* max height of a feature frame, desktop */
   --tile-w-phone: 72vw;                        /* a tile in the phone scroll row */
+  --signin-w: 26rem;                            /* derived (round 3): the sign-in form column */
   --ratio-tile: 3 / 4;
   --bleed: calc(var(--page-margin) + max(0px, (100vw - var(--container-max)) / 2));
 }

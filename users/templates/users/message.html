@@ -1,11 +1,11 @@
 {% extends "base.html" %}
+{% load pages_tags %}
 {% block head_title %}{% include "common/_head.html" with title=title|add:" | Spa 99" %}{% endblock %}
 {% block main %}
-<section class="section on-light auth">
-  <div class="container auth-inner">
-    <h1>{{ title }}</h1>
-    <p class="lead">{{ text }}</p>
-    <div class="actions"><a class="btn btn-primary btn-block-phone" href="{% url 'login' %}">Sign in</a><a class="btn-quiet" href="{% url 'home' %}">Back to home</a></div>
-  </div>
-</section>
+{% signin_shell as shell %}
+{% include "users/_shell_top.html" %}
+      <h1>{{ title }}</h1>
+      <p class="signin-lead">{{ text }}</p>
+      <div class="signin-actions"><a class="btn btn-primary btn-block" href="{% url 'login' %}">Sign in</a><a class="btn-quiet small" href="{% url 'home' %}">Back to home</a></div>
+{% include "users/_shell_bottom.html" %}
 {% endblock %}

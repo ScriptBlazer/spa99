@@ -1,15 +1,14 @@
 {% extends "base.html" %}
-{% load static validation_tags %}
+{% load static validation_tags pages_tags %}
 {% block head_title %}{% include "common/_head.html" with title="Choose a new password | Spa 99" %}{% endblock %}
 {% block main %}
-<section class="section on-light auth">
-  <div class="container auth-inner">
-    <h1>Choose a new password.</h1>
-    <form method="post" data-live-validate class="form-stack-sm" novalidate>{% csrf_token %}
-      {% include "common/_field.html" with field=form.password toggle=True meter=True hint="At least 10 characters." %}
-      <button type="submit" class="btn btn-primary btn-block" data-working-text="Saving">Save password</button>
-    </form>
-  </div>
-</section>
+{% signin_shell as shell %}
+{% include "users/_shell_top.html" %}
+      <h1 class="signin-title-sm">Choose a new password.</h1>
+      <form method="post" data-live-validate class="signin-fields" novalidate>{% csrf_token %}
+        {% include "common/_field.html" with field=form.password toggle=True meter=True hint="At least 10 characters." %}
+        <button type="submit" class="btn btn-primary btn-block" data-working-text="Saving">Save password</button>
+      </form>
+{% include "users/_shell_bottom.html" %}
 {% endblock %}
 {% block scripts %}{% validation_config %}<script type="module" src="{% static 'common/js/forms.js' %}"></script>{% endblock %}
