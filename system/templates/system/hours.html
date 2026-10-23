@@ -21,7 +21,7 @@
     {% for row in rules %}{% with pk=row.obj.pk f=row.form %}
       <tr data-system-rule="{{ row.obj.key }}" data-row-label="{{ row.obj.key }}"{% if not row.obj.active %} data-hidden{% endif %}>
         <td><form id="f-{{ pk }}" method="post" action="{% url 'system_rule_save' pk %}" data-system-form="rule" data-system-risky="{{ risky_fields|join:',' }}" data-noun="opening rule setting" data-plural="opening rule settings" data-line="Opening hours change at once.">{% csrf_token %}</form>
-          <span class="mono">{{ row.obj.key }}</span> <span class="sys-muted">{{ row.obj.get_kind_display }}</span></td>
+          <span class="sys-name"><span class="mono">{{ row.obj.key }}</span><span class="sys-muted">{{ row.obj.get_kind_display }}</span></span></td>
         <td>{% cell f.label pk "Label" %}</td>
         <td>{% cell f.start_time pk "Start" %}</td>
         <td>{% cell f.end_time pk "End" %}</td>

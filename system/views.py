@@ -2,13 +2,12 @@
 brief is docs/design/SYSTEM.md). Every page except sign-in goes through `signed_in` or `unlocked` (404 for strangers)."""
 import time
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -70,7 +69,7 @@ class SystemLoginView(LoginView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        self.request.session.set_expiry(settings.SYSTEM_SESSION_AGE)
+        self.request.session.set_expiry(services.session_age_seconds())
         self.request.session[services.SIGNED_IN_KEY] = time.time()  # the 12 hour limit counts from here
         services.lock(self.request.session)
         return response
@@ -94,11 +93,13 @@ def unlock(request):
 @signed_in
 @require_POST
 def unlock_ping(request):
-    """'Stay unlocked': slides the 15 minute window. 204 when unlocked, 403 when already locked (the page then goes to unlock)."""
+    """Activity ping: slides the idle window and answers {"remaining": seconds} (the server is the clock). 403 when already
+    locked (the page then goes to unlock). `peek=1` only reads the time left, without sliding it."""
     if not services.is_unlocked(request.session):
-        return HttpResponse(status=403)
-    services.unlock(request.session)
-    return HttpResponse(status=204)
+        return JsonResponse({"remaining": 0}, status=403)
+    if request.POST.get("peek") != "1":
+        services.unlock(request.session)
+    return JsonResponse({"remaining": services.remaining_seconds(request.session)})
 
 
 @signed_in

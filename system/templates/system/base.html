@@ -19,7 +19,7 @@ Any `<form data-system-form="<section>">` gets the save bar, dirty marks, Cmd/Ct
 <script type="module" src="{% static 'common/js/system.js' %}"></script>
 {% block head_extra %}{% endblock %}
 </head>
-<body class="system{% if env == 'live' %} live{% endif %}" data-system-section="{{ section }}" data-env="{{ env }}" data-system-idle="{% system_idle_seconds %}" data-system-ping="{% url 'system_unlock_ping' %}" data-system-unlock-url="{% url 'system_unlock' %}">
+<body class="system{% if env == 'live' %} live{% endif %}" data-system-section="{{ section }}" data-env="{{ env }}" data-system-idle="{% system_idle_seconds %}" data-system-remaining="{% system_remaining %}" data-system-ping="{% url 'system_unlock_ping' %}" data-system-unlock-url="{% url 'system_unlock' %}">
 {% if env == "live" %}<div class="sys-stripe" aria-hidden="true"></div>{% endif %}
 <a class="sys-skip" href="#system-main">Skip to content</a>
 <header class="sys-top" data-system-top>
@@ -28,7 +28,8 @@ Any `<form data-system-form="<section>">` gets the save bar, dirty marks, Cmd/Ct
   <span class="sys-env" data-system-env="{{ env }}" data-env="{{ env }}" title="{% if env == 'live' %}This is the live site{% else %}This is the development copy{% endif %}">{{ env|upper }}</span>
   <span class="sys-grow"></span>
   <div class="sys-lock-timer" data-system-timer>
-    <span data-system-timer-text>Locks in 15 min</span>
+    <svg class="sys-lock-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    <span data-system-timer-text>Unlocked</span>
     <button type="button" class="sys-btn sm" data-system-stay hidden>Stay unlocked</button>
   </div>
   <details class="sys-who" data-system-who>

@@ -1,9 +1,9 @@
 /* System tables, inline edit and diffs (docs/design/SYSTEM.md 4.1, 7). */
 .sys-scroll { overflow-x: auto; max-width: 100%; }
 .sys-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-.sys-table th, .sys-table td { height: var(--sys-row); padding: 0 var(--sys-3); text-align: left; border-bottom: 1px solid var(--sys-line); white-space: nowrap; vertical-align: middle; }
+.sys-table th, .sys-table td { height: var(--sys-row); padding: 0 10px; text-align: left; border-bottom: 1px solid var(--sys-line); white-space: nowrap; vertical-align: middle; }
 .sys-table tbody tr:last-child td { border-bottom: 0; }
-.sys-table th { position: sticky; top: calc(var(--sys-top-h) + var(--sys-stripe)); z-index: 2; background: var(--sys-subtle); color: var(--sys-text-2); font-size: var(--sys-fs-sm); font-weight: 600; }
+.sys-table th { background: var(--sys-subtle); color: var(--sys-text-2); font-size: var(--sys-fs-sm); font-weight: 600; }
 .sys-table tbody tr:hover td { background: var(--sys-subtle); }
 .sys-table .sys-num { text-align: right; font-family: var(--sys-mono); }
 .sys-table .mono, .sys-table time { font-family: var(--sys-mono); font-size: var(--sys-fs-sm); }
@@ -20,19 +20,50 @@
 .sys-filters label { display: flex; align-items: center; gap: var(--sys-1); color: var(--sys-text-2); }
 .sys-filters input[type=search] { width: 200px; }
 .sys-more { display: flex; justify-content: center; align-items: center; gap: var(--sys-4); padding: var(--sys-3); border-top: 1px solid var(--sys-line); color: var(--sys-text-2); }
-.sys-team-roles { display: flex; flex-wrap: wrap; gap: var(--sys-1) var(--sys-3); align-items: center; } .sys-team-roles label { display: inline-flex; align-items: center; gap: 6px; }
 .sys-table td:first-child { background: var(--sys-surface); }
 .sys-table tbody tr:hover td:first-child { background: var(--sys-subtle); }
 @media (max-width: 48em) {
+  .sys-table tr.sys-sub > td:first-child { position: static; }
+  .sys-subgrid { position: sticky; left: var(--sys-3); width: calc(100vw - 6 * var(--sys-3)); }
   .sys-table th:first-child, .sys-table td:first-child { position: sticky; left: 0; z-index: 1; }
   .sys-table th:first-child { z-index: 3; }
   .sys-filters { padding: var(--sys-3); } .sys-filters input[type=search] { width: 100%; }
   .sys-table td { height: 40px; }
 }
-.sys-table td input:not([type=checkbox]) { width: 150px; } .sys-table td input[type=number] { width: 76px; } .sys-table td input[type=time] { width: 96px; } .sys-table td input[type=datetime-local] { width: 184px; }
-.sys-table td .sys-toggle input { width: 28px; } .sys-table td[data-edited] input { background: var(--sys-warn-bg); }
+.sys-table td input:not([type=checkbox]) { width: 132px; } .sys-table td input[type=number] { width: 72px; } .sys-table td input[type=time] { width: 96px; } .sys-table td input[type=datetime-local] { width: 184px; }
+.sys-table td[data-edited] input { background: var(--sys-warn-bg); }
 .sys-table tr.sys-rowerr td { height: auto; padding-block: var(--sys-1); background: var(--sys-danger-bg); white-space: normal; }
 .sys-edit summary { cursor: pointer; color: var(--sys-accent); } .sys-edit[open] .sys-pop2 { width: 300px; display: grid; gap: var(--sys-2); padding: var(--sys-2) 0; white-space: normal; }
 .sys-edit .sys-pop2 label { display: grid; gap: var(--sys-1); } .sys-edit .sys-pop2 input, .sys-edit .sys-pop2 textarea { width: 100%; }
 .js .sys-rowsave { display: none; } details.sys-panel > summary.sys-add, details > summary.sys-add { cursor: pointer; padding: var(--sys-3) var(--sys-4); font-weight: 600; color: var(--sys-accent); }
 details.sys-panel[open] > summary.sys-add, details[open] > summary.sys-add { border-bottom: 1px solid var(--sys-line); }
+
+/* the plans table: the everyday columns in the row, the rarely used fields in a row that opens under it */
+.sys-table td .sys-name { display: grid; gap: 2px; } .sys-table td .sys-name .mono { font-size: var(--sys-fs-sm); }
+.sys-table td.sys-nameCell { min-width: 150px; } .sys-table td.sys-nameCell input { width: 150px; }
+.sys-expand { display: none; } .js .sys-expand { display: inline-flex; }
+.js tr.sys-sub:not([data-open]) { display: none; }
+.sys-table tr.sys-sub > td { height: auto; padding: var(--sys-3) var(--sys-3) var(--sys-3) var(--sys-4); white-space: normal; background: var(--sys-bg); }
+.sys-table tr.sys-sub:hover > td { background: var(--sys-bg); }
+.sys-subgrid { display: flex; flex-wrap: wrap; gap: var(--sys-3) var(--sys-4); align-items: flex-start; }
+.sys-subgrid label { display: grid; gap: var(--sys-1); color: var(--sys-text-2); font-size: var(--sys-fs-sm); font-weight: 500; }
+.sys-subgrid label.grow { flex: 1 1 260px; } .sys-table .sys-subgrid label.grow input, .sys-table .sys-subgrid label.grow textarea { width: 100%; max-width: none; }
+.sys-subgrid textarea { min-height: 56px; font: var(--sys-fs-sm)/1.4 var(--sys-mono); }
+.sys-table tr.sys-sub td[data-edited] { background: var(--sys-warn-bg); }
+
+/* team: a role is a pill (real checkbox inside), Save roles beside them, Deactivate in its own column */
+.sys-table td.sys-rolesCell { white-space: normal; padding-block: var(--sys-2); }
+.sys-table td form.sys-team-roles { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-2); }
+.sys-pill { position: relative; display: inline-flex; align-items: center; height: var(--sys-ctl-sm); padding: 0 10px; border: 1px solid var(--sys-control); border-radius: 12px; background: var(--sys-surface); color: var(--sys-text-2); font-weight: 500; cursor: pointer; user-select: none; transition: background-color .1s ease-out, border-color .1s ease-out; }
+.system .sys-pill input[type=checkbox] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.sys-pill:hover { background: var(--sys-subtle); }
+.sys-pill:has(input:checked) { background: var(--sys-accent); border-color: var(--sys-accent); color: var(--sys-surface); }
+.sys-pill:has(input:focus-visible) { outline: 2px solid var(--sys-accent); outline-offset: 2px; }
+.sys-team-roles .sys-btn { margin-left: var(--sys-1); }
+
+/* journey: one small number box per plan */
+.sys-points { display: inline-flex; gap: 6px; align-items: flex-end; }
+.sys-pp { display: grid; gap: 2px; justify-items: start; color: var(--sys-text-3); } .sys-pp .mono { font-size: 11px; line-height: 1; }
+.system .sys-pp input[type=number], .sys-table td .sys-pp input[type=number] { width: 48px; padding: 0 var(--sys-1); text-align: center; -moz-appearance: textfield; appearance: textfield; }
+.sys-pp input::-webkit-inner-spin-button, .sys-pp input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.sys-row .sys-points { flex-wrap: wrap; }

@@ -110,7 +110,7 @@ class ChangeLogTests(TestCase):
     def test_a_settings_change_logs_who_when_old_and_new_and_undo_restores_it(self):
         site = SiteSettings.load()
         self.assertEqual(site.vat_rate, Decimal("20.00"))
-        response = self.client.post("/settings/", {"opening_text": "January 2027", "register_interest_open": "on", "join_wording": "register_interest", "vat_rate": "25.00"})
+        response = self.client.post("/settings/", {"opening_text": "January 2027", "register_interest_open": "on", "join_wording": "register_interest", "vat_rate": "25.00", "lock_idle_minutes": "15", "max_sign_in_hours": "12"})
         self.assertEqual(response.status_code, 302)
         change = SystemChange.objects.get(field="vat_rate")
         self.assertEqual((change.old_value, change.new_value, change.user, change.section, change.model_label),

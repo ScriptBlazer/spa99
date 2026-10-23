@@ -16,17 +16,19 @@ from system import services
 from system.models import SystemChange
 from system.tests.test_system import PASSWORD, make_user, sign_in, unlocked_client
 
-SETTINGS_POST = {"opening_text": "January 2027", "register_interest_open": "on", "join_wording": "register_interest", "vat_rate": "20.00"}
+SETTINGS_POST = {"opening_text": "January 2027", "register_interest_open": "on", "join_wording": "register_interest", "vat_rate": "20.00", "lock_idle_minutes": "15", "max_sign_in_hours": "12"}
 
 
 class PingTests(TestCase):
     def test_ping_slides_the_unlock_and_is_refused_when_locked(self):
         client, _ = sign_in(make_user())
-        self.assertEqual(client.post("/unlock/ping/").status_code, 403)  # signed in but locked
+        locked = client.post("/unlock/ping/")
+        self.assertEqual((locked.status_code, locked.json()), (403, {"remaining": 0}))  # signed in but locked
         with mock.patch("system.services.time.time", return_value=1000.0):
             client.post("/unlock/", {"password": PASSWORD})
         with mock.patch("system.services.time.time", return_value=1000.0 + 14 * 60):
-            self.assertEqual(client.post("/unlock/ping/").status_code, 204)
+            ping = client.post("/unlock/ping/")
+            self.assertEqual((ping.status_code, ping.json()), (200, {"remaining": 15 * 60}))
         with mock.patch("system.services.time.time", return_value=1000.0 + 28 * 60):  # 14 min after the ping: still unlocked
             self.assertEqual(client.get("/").status_code, 200)
         self.assertEqual(Client(HTTP_HOST="system.localhost").post("/unlock/ping/").status_code, 404)

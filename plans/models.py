@@ -140,6 +140,14 @@ class SiteSettings(BaseModel):
         max_length=20, default="draft-1", help_text="Recorded on each person who accepts the privacy notice."
     )
 
+    # System security (edited in System > Settings > Security; the settings constants are only the fallback defaults).
+    lock_idle_minutes = models.PositiveSmallIntegerField(
+        "Lock after idle minutes", default=15, validators=[MinValueValidator(1), MaxValueValidator(240)],
+        help_text="System asks for the password again after this many minutes without activity (1 to 240).")
+    max_sign_in_hours = models.PositiveSmallIntegerField(
+        "Longest sign-in (hours)", default=12, validators=[MinValueValidator(1), MaxValueValidator(72)],
+        help_text="A System sign-in ends after this many hours, however active the person is (1 to 72).")
+
     history = HistoricalRecords()
 
     class Meta:

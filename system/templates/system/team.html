@@ -9,9 +9,9 @@
       <tr data-system-person="{{ row.user.pk }}"{% if not row.user.is_active %} data-hidden{% endif %}>
         <td><span class="mono">{{ row.user.email }}</span>{% if row.user.is_superuser %} <span class="sys-badge info" data-superuser>Superuser</span>{% endif %}</td>
         <td>{% if row.user.is_active %}<span class="sys-badge ok">Active</span>{% else %}<span class="sys-badge">Inactive</span>{% endif %}</td>
-        <td>
+        <td class="sys-rolesCell">
           <form method="post" action="{% url 'system_team_roles' row.user.pk %}" class="sys-team-roles" data-system-roles-form data-noun="role" data-plural="roles" data-line="Access changes at once." data-system-person-label="{{ row.user.email }}" data-superuser="{{ row.user.is_superuser|yesno:'1,0' }}">{% csrf_token %}
-            {% for role in roles %}<label><input type="checkbox" name="roles" value="{{ role }}" data-risky="roles"{% if role in row.roles %} checked{% endif %}> {{ role }}</label>{% endfor %}
+            {% for role in roles %}<label class="sys-pill"><input type="checkbox" name="roles" value="{{ role }}" data-risky="roles"{% if role in row.roles %} checked{% endif %}><span>{{ role }}</span></label>{% endfor %}
             <button type="submit" class="sys-btn sm">Save roles</button>
           </form>
         </td>

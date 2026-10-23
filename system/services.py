@@ -37,21 +37,48 @@ UNLOCK_KEY = "system_unlocked_at"
 SIGNED_IN_KEY = "system_signed_in"  # the time of the System sign-in (set only by the System sign-in page: a session made on another host never counts)
 
 
-def sign_in_valid(session, now=None):
-    """True while this System sign-in is younger than SYSTEM_SESSION_AGE (12 h), however active the person is."""
+def _security_values():
+    """(idle minutes, sign-in hours) from the site settings row, or None for a value that is missing (no row yet)."""
+    from plans.models import SiteSettings
+
+    row = SiteSettings.objects.filter(singleton_key="site").values("lock_idle_minutes", "max_sign_in_hours").first() or {}
+    return row.get("lock_idle_minutes"), row.get("max_sign_in_hours")
+
+
+def lock_idle_seconds():
+    """Seconds without activity before System locks: the Security setting, else the SYSTEM_UNLOCK_SECONDS default."""
     from django.conf import settings
 
+    minutes = _security_values()[0]
+    return minutes * 60 if minutes else settings.SYSTEM_UNLOCK_SECONDS
+
+
+def session_age_seconds():
+    """Longest System sign-in in seconds: the Security setting, else the SYSTEM_SESSION_AGE default."""
+    from django.conf import settings
+
+    hours = _security_values()[1]
+    return hours * 3600 if hours else settings.SYSTEM_SESSION_AGE
+
+
+def sign_in_valid(session, now=None):
+    """True while this System sign-in is younger than the longest sign-in (12 h by default), however active the person is."""
     stamp = session.get(SIGNED_IN_KEY)
     now = time.time() if now is None else now
-    return bool(stamp) and now - stamp < settings.SYSTEM_SESSION_AGE
+    return bool(stamp) and now - stamp < session_age_seconds()
+
+
+def remaining_seconds(session, now=None, idle_seconds=None):
+    """Whole seconds left before the lock (0 when locked). The page and the ping both show this; the server decides."""
+    stamp = session.get(UNLOCK_KEY)
+    now = time.time() if now is None else now
+    if not stamp:
+        return 0
+    return max(0, int((idle_seconds or lock_idle_seconds()) - (now - stamp)))
 
 
 def is_unlocked(session, now=None, idle_seconds=None):
-    from django.conf import settings
-
-    stamp = session.get(UNLOCK_KEY)
-    now = time.time() if now is None else now
-    return bool(stamp) and now - stamp < (idle_seconds or settings.SYSTEM_UNLOCK_SECONDS)
+    return remaining_seconds(session, now, idle_seconds) > 0
 
 
 def unlock(session):

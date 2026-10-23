@@ -9,7 +9,7 @@ const IS_LIVE = ENV === 'LIVE';
 let submitting = false;
 let resetIdle = () => {};
 
-const bare = (name) => (name || '').split('-').pop(); // "<row id>-price_ex_vat" -> "price_ex_vat"
+const bare = (name) => (name || '').split('.')[0].split('-').pop(); // "<row id>-price_ex_vat" -> "price_ex_vat"; "<row id>-plan_points.tier-2" -> "plan_points"
 const plural = (n, one, many) => (n === 1 ? one : many);
 
 /* ---------- dirty state and the save bar ---------- */
@@ -265,34 +265,60 @@ function initMessages() {
   list.remove();
 }
 
-/* ---------- lock countdown ---------- */
+/* ---------- lock countdown: the server is the clock; activity slides it ---------- */
 
 function initTimer() {
   const text = $('[data-system-timer-text]'); const mirror = $('[data-system-timer-mirror]');
   const box = $('[data-system-timer]'); const stay = $('[data-system-stay]');
   if (!text) return;
-  const idle = Number(body.dataset.systemIdle || 900) * 1000;
-  let deadline = Date.now() + idle;
-  resetIdle = () => { deadline = Date.now() + idle; tick(); };
+  const idle = Number(body.dataset.systemIdle || 900);
+  const showAt = Math.min(120, idle / 2) * 1000; // the countdown shows only in the last 2 minutes
+  const throttle = Math.min(60000, idle * 250); // at most one ping a minute (a quarter of the idle time when that is shorter)
+  const unlockUrl = () => `${body.dataset.systemUnlockUrl}?next=${encodeURIComponent(location.pathname + location.search)}`;
+  let deadline = Date.now() + Number(body.dataset.systemRemaining ?? idle) * 1000;
+  let lastPing = Date.now(); let inflight = false; let checking = false;
+  const sync = (remaining) => { deadline = Date.now() + remaining * 1000; tick(); };
+  resetIdle = () => { lastPing = Date.now(); sync(idle); }; // a request to a System page just slid the server's clock
+
+  async function ask(peek) {
+    const token = $('#system-csrf')?.content.querySelector('input')?.value || '';
+    const response = await fetch(body.dataset.systemPing, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': token, 'X-Requested-With': 'fetch', 'Content-Type': 'application/x-www-form-urlencoded' }, body: peek ? 'peek=1' : '' });
+    if (response.status === 403 || response.status === 404) return null;
+    if (!response.ok) throw new Error(`ping ${response.status}`);
+    return (await response.json()).remaining;
+  }
+  async function ping(peek = false) {
+    if (inflight) return;
+    inflight = true;
+    try {
+      const remaining = await ask(peek);
+      if (remaining === null) return lockNow();
+      if (!peek) lastPing = Date.now();
+      sync(remaining);
+    } catch { /* offline: keep the local clock; the server still decides */ } finally { inflight = false; }
+  }
+  function lockNow() { submitting = true; location.href = unlockUrl(); }
+  function activity() {
+    if (Date.now() - lastPing >= throttle && Date.now() < deadline) ping();
+  }
   function tick() {
     const left = deadline - Date.now();
-    const minutes = Math.max(1, Math.ceil(left / 60000));
-    const soon = left < 120000;
-    let message = `Locks in ${minutes} min`;
-    if (soon && isDirty()) message = 'Unsaved changes will be lost';
+    const soon = left <= showAt;
+    const secs = Math.max(0, Math.ceil(left / 1000));
+    let message = 'Unlocked';
+    if (soon) message = left <= 0 ? 'Locking' : `Locks in ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    if (soon && isDirty()) message += ', unsaved changes will be lost';
     text.textContent = message; if (mirror) mirror.textContent = message;
     box.toggleAttribute('data-warn', soon); stay.hidden = !soon;
-    if (left <= 0 && !isDirty()) { submitting = true; location.href = `${body.dataset.systemUnlockUrl}?next=${encodeURIComponent(location.pathname + location.search)}`; }
+    if (left <= 0 && !checking) { // another tab may have kept the session alive: ask the server before locking (without sliding it)
+      checking = true;
+      ask(true).then((remaining) => { if (remaining === null || remaining <= 0) { if (!isDirty()) return lockNow(); setTimeout(() => { checking = false; }, 10000); } else { checking = false; sync(remaining); } }, () => { setTimeout(() => { checking = false; }, 10000); });
+    }
   }
-  stay.addEventListener('click', async () => {
-    stay.disabled = true;
-    try {
-      const token = $('#system-csrf')?.content.querySelector('input')?.value || '';
-      const response = await fetch(body.dataset.systemPing, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': token, 'X-Requested-With': 'fetch' } });
-      if (response.status === 204) resetIdle(); else location.href = `${body.dataset.systemUnlockUrl}?next=${encodeURIComponent(location.pathname + location.search)}`;
-    } finally { stay.disabled = false; }
-  });
-  tick(); setInterval(tick, 10000);
+  stay.addEventListener('click', async () => { stay.disabled = true; await ping(); stay.disabled = false; });
+  for (const name of ['mousemove', 'keydown', 'scroll', 'click', 'touchstart']) window.addEventListener(name, activity, { passive: true, capture: true });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { tick(); activity(); } });
+  tick(); setInterval(tick, 1000);
 }
 
 /* ---------- keyboard ---------- */
@@ -379,4 +405,18 @@ function initMenu() {
   document.addEventListener('click', (event) => { const who = $('[data-system-who]'); if (who?.open && !who.contains(event.target)) who.open = false; });
 }
 
-initForms(); initSubmit(); initMessages(); initTimer(); initKeys(); initChangeLog(); initMenu(); refreshBar();
+/* ---------- rows that open a second row of settings ---------- */
+
+function initExpand() {
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-system-expand]');
+    if (!button) return;
+    const sub = document.getElementById(button.getAttribute('aria-controls'));
+    const open = !sub.hasAttribute('data-open');
+    sub.toggleAttribute('data-open', open); button.setAttribute('aria-expanded', String(open));
+    button.textContent = open ? 'Less' : 'More';
+  });
+  $$('[data-system-expand][aria-expanded=true]').forEach((b) => { b.textContent = 'Less'; });
+}
+
+initForms(); initExpand(); initSubmit(); initMessages(); initTimer(); initKeys(); initChangeLog(); initMenu(); refreshBar();

@@ -8,7 +8,7 @@ from journey.models import Option, Question, SuggestionRule
 from plans.models import Closure, OpeningRule, Plan, SiteSettings
 
 RISKY = {
-    "settings": ["vat_rate", "opening_date", "register_interest_open", "subscribe_open", "booking_open"],
+    "settings": ["vat_rate", "opening_date", "register_interest_open", "subscribe_open", "booking_open", "lock_idle_minutes", "max_sign_in_hours"],
     "emails": ["gold_approver_emails", "gold_approver_cc", "contact_email"],
     "plans": ["price_ex_vat", "visits_per_month", "hours", "booking_window_days", "upcoming_limit", "cancel_hours", "guests_per_month", "visible"],
     "hours": ["start_time", "end_time", "offset_minutes", "active", "starts_at", "ends_at", "capacity", "slot_length_minutes", "slot_step_minutes"],
@@ -19,6 +19,52 @@ RISKY = {
 
 def _plan_slugs():
     return set(Plan.objects.values_list("slug", flat=True))
+
+
+class PlanPointsWidget(forms.Widget):
+    """One small whole-number input per plan (named `<field>.<slug>`), assembled into the points object on submit. A single
+    JSON text under the plain field name is still accepted. An empty box means no points for that plan."""
+
+    def _slugs(self):
+        return list(Plan.objects.order_by("order", "slug").values_list("slug", flat=True))
+
+    def value_from_datadict(self, data, files, name):
+        if name in data:  # the old single JSON text
+            return data.get(name)
+        points = {}
+        for slug in self._slugs():
+            raw = (data.get(f"{name}.{slug}") or "").strip()
+            if raw != "":
+                points[slug] = int(raw) if raw.lstrip("-").isdigit() else raw  # a non-number stays text so validation can refuse it
+        return points
+
+    def value_omitted_from_data(self, data, files, name):
+        return name not in data and not any(key.startswith(f"{name}.") for key in data)
+
+    def render(self, name, value, attrs=None, renderer=None):
+        from django.utils.html import format_html, format_html_join
+
+        value = value if isinstance(value, dict) else {}
+        extra = {k: v for k, v in (attrs or {}).items() if k not in ("id", "aria-label")}
+        extra_html = format_html_join("", ' {}="{}"', extra.items())
+        label = (attrs or {}).get("aria-label", "Plan points")
+        boxes = format_html_join("", '<label class="sys-pp"><span class="mono">{}</span><input type="number" step="1" name="{}.{}" value="{}" aria-label="{} {}"{}></label>',
+                                 ((slug, name, slug, value.get(slug, ""), label, slug, extra_html) for slug in self._slugs()))
+        return format_html('<span class="sys-points">{}</span>', boxes)
+
+
+class PlanPointsField(forms.JSONField):
+    widget = PlanPointsWidget
+
+    def bound_data(self, data, initial):
+        return data if isinstance(data, dict) else super().bound_data(data, initial)
+
+    def has_changed(self, initial, data):
+        try:
+            now = data if isinstance(data, dict) else (self.to_python(data) or {})
+        except ValidationError:
+            return True
+        return (initial or {}) != now
 
 
 # ---------- plans ----------
@@ -167,6 +213,8 @@ class QuestionForm(forms.ModelForm):
 
 
 class OptionForm(forms.ModelForm):
+    plan_points = PlanPointsField(required=False, label="Plan points", help_text="Whole points for each plan this answer points towards. Empty means none.")
+
     class Meta:
         model = Option
         fields = ["label", "order", "active", "plan_points", "gold_points", "weight", "reason"]

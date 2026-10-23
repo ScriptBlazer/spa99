@@ -20,6 +20,8 @@ RISKY = {
     "gold_approver_emails": ("recipient list", "recipient lists", "Gold applications go to the new list at once."),
     "gold_approver_cc": ("recipient list", "recipient lists", "Copies go to the new list at once."),
     "contact_email": ("contact address", "contact addresses", "The site shows and replies from the new address at once."),
+    "lock_idle_minutes": ("lock setting", "lock settings", "System locks after the new idle time at once."),
+    "max_sign_in_hours": ("lock setting", "lock settings", "Every System sign-in ends after the new limit."),
     "roles": ("role", "roles", "Access changes at once."),
     "is_active": ("account", "accounts", "Access changes at once."),
 }
@@ -124,7 +126,18 @@ def shown_stage(value):
 
 @register.simple_tag
 def system_idle_seconds():
-    return getattr(settings, "SYSTEM_UNLOCK_SECONDS", 900)
+    from system import services
+
+    return services.lock_idle_seconds()
+
+
+@register.simple_tag(takes_context=True)
+def system_remaining(context):
+    """Seconds left before System locks, as the server sees it now (0 when there is no request)."""
+    from system import services
+
+    request = context.get("request")
+    return services.remaining_seconds(request.session) if request is not None else 0
 
 
 @register.filter
@@ -150,10 +163,21 @@ def cell(field, pk, label=""):
     attrs = {"form": f"f-{pk}", "aria-label": label or str(field.label)}
     if field.errors:
         attrs.update({"aria-invalid": "true"})
-    widget = field.as_widget(attrs=attrs)
     if getattr(field.field.widget, "input_type", "") == "checkbox":
-        return format_html('<span class="sys-toggle">{}</span>', widget)
-    return widget
+        attrs["role"] = "switch"
+        return format_html('<label class="sys-toggle">{}</label>', field.as_widget(attrs=attrs))
+    return field.as_widget(attrs=attrs)
+
+
+@register.simple_tag
+def switch(field, text=True):
+    """The one switch: a real checkbox (role=switch) with a 36x20 track, and On/Off beside it (system.js keeps it current)."""
+    from django.utils.html import format_html
+
+    widget = field.as_widget(attrs={"role": "switch"})
+    if not text:
+        return format_html('<label class="sys-toggle">{}</label>', widget)
+    return format_html('<label class="sys-toggle">{} <span data-system-state>{}</span></label>', widget, "On" if field.value() else "Off")
 
 
 @register.filter
