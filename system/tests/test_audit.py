@@ -275,3 +275,29 @@ class AuditPageTests(TestCase):
         self.assertEqual(sorted(g["category"] for g in groups), ["change", "change", "failure"])
         self.assertContains(self.client.get("/changes/"), "Changed since")
         self.assertEqual(feed.entry_detail(old.pk)["row"].blocked_pk is not None, True)
+
+
+class StoredCheckTests(TestCase):
+    def test_verify_writes_the_stored_record_and_a_broken_chain_is_stored_and_shown(self):
+        user = make_user()
+        audit.log_event("sign_in", user=user)
+        self.assertIsNone(audit.stored_status())
+        call_command("verify_audit_log", stdout=io.StringIO())
+        status = audit.stored_status()
+        self.assertTrue(status["ok"])
+        self.assertEqual(status["entries"], 1)
+        client = unlocked_client(user)
+        self.assertTrue(client.get("/changes/").context["chain"]["ok"])
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE system_systemevent SET sentence = 'hacked' WHERE seq = 1")
+        audit.scheduled()
+        chain = client.get("/changes/").context["chain"]
+        self.assertFalse(chain["ok"])
+        self.assertEqual(chain["broken_seq"], 1)
+        self.assertTrue(chain["broken_at_id"])
+
+    def test_check_now_runs_stores_and_is_logged(self):
+        client = unlocked_client(make_user())
+        client.post("/changes/check/")
+        self.assertTrue(audit.stored_status()["ok"])
+        self.assertEqual(SystemEvent.objects.filter(kind="audit_check").count(), 1)

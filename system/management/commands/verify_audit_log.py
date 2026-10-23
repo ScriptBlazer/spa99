@@ -8,7 +8,7 @@ class Command(BaseCommand):
     help = "Verify the System audit log hash chain (changes and security events)."
 
     def handle(self, *args, **options):
-        result = audit.verify()
+        result = audit.check_and_store()
         if not result["ok"]:
             raise CommandError(result["message"])
         self.stdout.write(result["message"])

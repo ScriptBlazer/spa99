@@ -33,7 +33,7 @@ KINDS = {
     SystemEvent.ROLE_CHANGED: ("security", "team", "ok"), SystemEvent.USER_DEACTIVATED: ("security", "team", "ok"),
     SystemEvent.USER_REACTIVATED: ("security", "team", "ok"), SystemEvent.UNDO: ("undo", "changes", "ok"),
     SystemEvent.UNDO_ALL: ("undo", "changes", "ok"), SystemEvent.EXPORT: ("security", "changes", "ok"),
-    SystemEvent.AUDIT_PRUNED: ("security", "changes", "ok"),
+    SystemEvent.AUDIT_PRUNED: ("security", "changes", "ok"), SystemEvent.AUDIT_CHECK: ("security", "changes", "ok"),
 }
 CATEGORIES = [("change", "Changes"), ("security", "Security"), ("undo", "Undos"), ("failure", "Failures")]
 EVENT_SECTION_LABELS = {"security": "Security", "changes": "Change log"}
@@ -108,6 +108,32 @@ def verify():
     note = f" {legacy} older row(s) from before the chain are not covered." if legacy else ""
     pruned = f" History up to number {anchor_seq} was pruned (anchor)." if anchor_seq else ""
     return {"ok": True, "checked": checked, "legacy": legacy, "broken": None, "message": f"OK: {checked} row(s) verified.{pruned}{note}"}
+
+
+def check_and_store():
+    """Run the full verify and store the result on the head row. Returns the verify() dict. Never call this on a page load."""
+    result = verify()
+    broken = result["broken"] or ("", "", None)
+    AuditHead.objects.get_or_create(pk=1)
+    AuditHead.objects.filter(pk=1).update(
+        verified_at=timezone.now(), verify_ok=result["ok"], verify_entries=result["checked"],
+        verify_broken_id=broken[1] if broken[0] != "missing" else "", verify_broken_seq=broken[2], verify_message=result["message"][:300])
+    return result
+
+
+def scheduled():
+    """django-q2 entry point (hourly, common register_schedules). Returns a status string."""
+    return check_and_store()["message"]
+
+
+def stored_status():
+    """The last stored verification for the page ({ok, verified_at, checked_at, entries, broken_at_id, broken_seq, message}), or
+    None when no check has run yet. One tiny query."""
+    head = AuditHead.objects.filter(pk=1).first()
+    if head is None or head.verified_at is None:
+        return None
+    return {"ok": bool(head.verify_ok), "verified_at": head.verified_at, "checked_at": head.verified_at, "entries": head.verify_entries,
+            "broken_at_id": head.verify_broken_id, "broken_seq": head.verify_broken_seq, "message": head.verify_message}
 
 
 def prune(days, dry_run=False):

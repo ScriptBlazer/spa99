@@ -151,3 +151,5 @@ html:not(.js) .au-dates { display: flex; } html:not(.js) .au-custom-btn { displa
   @keyframes au-hold { 0%, 99% { background: var(--sys-selected); } 100% { background: transparent; } }
   .system .au-drawer { animation-name: sys-fade !important; } .au-caret { transform: none !important; }
 }
+
+.au-check { display: inline-block; margin: 0 0 0 var(--sys-2); }

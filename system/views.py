@@ -166,8 +166,19 @@ def change_log(request):
                "link_query": "&".join(part for part in (filters, f"page={number}" if number > 1 else "") if part),
                "drawer": feed.entry_detail(entry) if entry else None, "filters_set": bool(filters),
                "active_filters": sum(bool(v) for v in (params["user"], params["section"], params["category"], params["range"] or params["date_from"] or params["date_to"])),
-               "chain": None}  # no stored "last verified" status exists yet; a full verify per page load is too costly
+               "chain": audit.stored_status()}  # the stored result only: a full verify per page load is too costly
     return page(request, "system/changes.html", "changes", context)
+
+
+@unlocked
+@require_POST
+def audit_check(request):
+    """Check now: run the full verify, store the result, log it as an event."""
+    result = audit.check_and_store()
+    audit.log_event(SystemEvent.AUDIT_CHECK, request, user=request.user, outcome=SystemEvent.OK if result["ok"] else SystemEvent.FAILED,
+                    detail={"ok": result["ok"], "entries": result["checked"]}, sentence=f"{request.user.email} checked the audit chain: {result['message']}"[:1000])
+    (messages.success if result["ok"] else messages.error)(request, result["message"])
+    return redirect(safe_next(request, "system_changes"))
 
 
 @unlocked

@@ -44,6 +44,13 @@ class AuditHead(models.Model):
     last_hash = models.CharField(max_length=64, blank=True)
     anchor_seq = models.BigIntegerField(default=0)
     anchor_hash = models.CharField(max_length=64, blank=True)
+    # the last stored verification result (written by verify_audit_log, the hourly job and "Check now"; pages only read it)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verify_ok = models.BooleanField(null=True, blank=True)
+    verify_entries = models.PositiveBigIntegerField(default=0)
+    verify_broken_id = models.CharField(max_length=64, blank=True)
+    verify_broken_seq = models.BigIntegerField(null=True, blank=True)
+    verify_message = models.CharField(max_length=300, blank=True)
 
     @classmethod
     def lock(cls):
@@ -140,13 +147,13 @@ class SystemEvent(AuditRow):
     LOCK_MANUAL, LOCK_IDLE = "lock_manual", "lock_idle"
     SIGN_OUT, SESSION_EXPIRED, ACCESS_DENIED = "sign_out", "session_expired", "access_denied"
     ROLE_CHANGED, USER_DEACTIVATED, USER_REACTIVATED = "role_changed", "user_deactivated", "user_reactivated"
-    UNDO, UNDO_ALL, EXPORT, AUDIT_PRUNED = "undo", "undo_all", "export", "audit_pruned"
+    UNDO, UNDO_ALL, EXPORT, AUDIT_PRUNED, AUDIT_CHECK = "undo", "undo_all", "export", "audit_pruned", "audit_check"
     KIND_CHOICES = [
         (SIGN_IN, "Signed in"), (SIGN_IN_FAILED, "Sign-in failed"), (UNLOCK, "Unlocked"), (UNLOCK_FAILED, "Unlock failed"),
         (UNLOCK_RATE_LIMITED, "Unlock blocked (too many tries)"), (LOCK_MANUAL, "Locked"), (LOCK_IDLE, "Locked (idle)"),
         (SIGN_OUT, "Signed out"), (SESSION_EXPIRED, "Sign-in expired"), (ACCESS_DENIED, "Access refused"),
         (ROLE_CHANGED, "Roles changed"), (USER_DEACTIVATED, "Account deactivated"), (USER_REACTIVATED, "Account reactivated"),
-        (UNDO, "Undo"), (UNDO_ALL, "Undo all"), (EXPORT, "Export"), (AUDIT_PRUNED, "Old log removed"),
+        (UNDO, "Undo"), (UNDO_ALL, "Undo all"), (EXPORT, "Export"), (AUDIT_PRUNED, "Old log removed"), (AUDIT_CHECK, "Chain checked"),
     ]
     OK, FAILED, BLOCKED = "ok", "failed", "blocked"
     OUTCOME_CHOICES = [(OK, "OK"), (FAILED, "Failed"), (BLOCKED, "Blocked")]

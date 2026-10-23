@@ -11,7 +11,7 @@ Hooks: data-system-audit, data-system-day, data-system-group (data-type, data-ca
 <div class="sys-head">
   <div><h1>Audit log</h1><p>Every change and every sign-in, newest first. Undo restores the old value as a new entry.</p></div>
   <div class="sys-actions">
-    {% if chain %}{% if chain.ok %}<span class="au-chain ok" title="Checked {{ chain.checked_at|date:'H:i' }}">{% include "system/_audit_icon.html" with name="shield-check" %}Chain verified · {{ chain.entries }} entries</span>{% else %}<span class="au-chain bad">Chain broken</span>{% endif %}{% endif %}
+    {% if chain %}{% if chain.ok %}<span class="au-chain ok" title="Checked {{ chain.checked_at|date:'H:i' }}">{% include "system/_audit_icon.html" with name="shield-check" %}Chain verified · {{ chain.entries }} entries</span>{% else %}<span class="au-chain bad">Chain broken</span>{% endif %}{% endif %}<form method="post" action="{% url 'system_audit_check' %}" class="au-check">{% csrf_token %}<button type="submit" class="sys-btn">Check now</button></form>
     <a class="sys-btn au-export" href="{% url 'system_audit_export' %}{% if export_query %}?{{ export_query }}{% endif %}" data-system-export>{% include "system/_audit_icon.html" with name="download-simple" %}Export CSV</a>
   </div>
 </div>
