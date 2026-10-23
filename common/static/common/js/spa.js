@@ -92,9 +92,10 @@ if (gsap && ScrollTrigger) {
     const still = q('.door-still'), media = q('[data-door-media]'), video = q('.door-video');
     const loops = [gsap.to(still, { scale: 1.03, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' })];
     const button = q('[data-door-pause]');
-    let userPaused = sessionStorage.getItem('spa99-hero-paused') === '1', inView = true, playing = false;
+    let userPaused = sessionStorage.getItem('spa99-hero-paused') === '1', inView = true, playing = false, shrunk = false;
     const sync = () => {
-      const run = inView && !userPaused && !document.hidden;
+      // once Pause fades away (15% of the pin) nothing may keep moving: the loop and the video stop with it (WCAG 2.2.2)
+      const run = inView && !userPaused && !document.hidden && !shrunk;
       loops.forEach((t) => (run && !playing ? t.resume() : t.pause()));
       if (video && playing) (run ? video.play() : video.pause())?.catch?.(() => {});
     };
@@ -105,6 +106,7 @@ if (gsap && ScrollTrigger) {
     cleanups.push(() => { button.removeEventListener('click', toggle); document.removeEventListener('visibilitychange', sync); });
     ScrollTrigger.create({ trigger: el, start: 'top bottom', end: 'bottom top', onToggle: (self) => { inView = self.isActive; sync(); } });
     tl.to(button, { autoAlpha: 0, duration: 0.2 }, 0.15);
+    tl.eventCallback('onUpdate', () => { const past = tl.time() >= 0.15; if (past !== shrunk) { shrunk = past; sync(); } });
     label();
     sync();
 
