@@ -67,6 +67,7 @@ Private folder (default `/Users/moishe/Library/CloudStorage/OneDrive-Personal/BM
 | `CONTROL_DOMAIN` | Control domain (prod `control.spa99.uk`; local default `control.localhost`) |
 | `OFFICE_DOMAIN` | Office domain (prod `office.spa99.uk`; local default `office.localhost`) |
 | `SYSTEM_DOMAIN` | System domain, developers only (prod `system.spa99.uk`; local default `system.localhost`) |
+| `SYSTEM_ENV_LABEL` | `DEV` or `LIVE`: the label System shows in its title bar and stripe (default DEV; LIVE with the prod settings) |
 | `DATABASE_URL` | Managed PostgreSQL on live (required in prod, `sslmode=require` added). Unset locally = SQLite |
 | `DEBUG` | Dev only. Prod forces it off |
 | `ALLOWED_HOSTS` | Optional extra hosts, comma separated (added to the defaults) |

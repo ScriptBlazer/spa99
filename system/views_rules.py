@@ -13,7 +13,7 @@ from plans.models import Closure, OpeningRule, Plan, SiteSettings
 from . import forms_rules as f
 from . import services
 from .permissions import unlocked
-from .views import page
+from .views import page, saved
 from django.views.decorators.http import require_GET, require_POST
 
 
@@ -31,7 +31,10 @@ def _save(request, model, form_class, pk, key, url_name, build, **kwargs):
     form = form_class(request.POST, instance=obj, prefix=key, **kwargs)
     if form.is_valid():
         try:
-            messages.success(request, "Saved." if services.save_form(form, request.user) else "Nothing changed.")
+            if services.save_form(form, request.user):
+                saved(request)
+            else:
+                messages.info(request, "Nothing changed.")
             return redirect(url_name)
         except ValidationError as error:  # a rule only the whole row can check
             form.add_error(None, error)
@@ -47,25 +50,16 @@ def _plans(request, bound=None, status=200):
     return page(request, "system/plans.html", "plans", context, status)
 
 
-@require_GET
 @unlocked
+@require_GET
 def plans(request):
     return _plans(request)
 
 
-@require_POST
 @unlocked
+@require_POST
 def plan_save(request, pk=None):
     return _save(request, Plan, f.PlanAddForm if pk is None else f.PlanForm, pk, "new" if pk is None else str(pk), "system_plans", _plans)
-
-
-@require_POST
-@unlocked
-def plan_visibility(request, pk):
-    plan = get_object_or_404(Plan, pk=pk)
-    services.toggle_visible(plan, request.user, request.POST.get("visible") == "1")
-    messages.success(request, "Saved.")
-    return redirect("system_plans")
 
 
 # ---------- hours and closures ----------
@@ -81,35 +75,35 @@ def _hours(request, bound=None, status=200):
     return page(request, "system/hours.html", "hours", context, status)
 
 
-@require_GET
 @unlocked
+@require_GET
 def hours(request):
     return _hours(request)
 
 
-@require_POST
 @unlocked
+@require_POST
 def rule_save(request, pk=None):
     key = "new-rule" if pk is None else str(pk)
     return _save(request, OpeningRule, f.OpeningRuleAddForm if pk is None else f.OpeningRuleForm, pk, key, "system_hours", _hours)
 
 
-@require_POST
 @unlocked
+@require_POST
 def closure_save(request, pk=None):
     return _save(request, Closure, f.ClosureForm, pk, "new-closure" if pk is None else str(pk), "system_hours", _hours)
 
 
-@require_POST
 @unlocked
+@require_POST
 def closure_delete(request, pk):
     services.delete_logged(get_object_or_404(Closure, pk=pk), request.user)
     messages.success(request, "Closure deleted (kept in the change log).")
     return redirect("system_hours")
 
 
-@require_POST
 @unlocked
+@require_POST
 def capacity_save(request):
     return _save(request, SiteSettings, f.CapacityForm, SiteSettings.load().pk, "capacity", "system_hours", _hours)
 
@@ -123,14 +117,14 @@ def _gold(request, bound=None, status=200):
     return page(request, "system/gold.html", "gold", context, status)
 
 
-@require_GET
 @unlocked
+@require_GET
 def gold(request):
     return _gold(request)
 
 
-@require_POST
 @unlocked
+@require_POST
 def gold_save(request, pk=None):
     return _save(request, GoldRule, f.GoldRuleAddForm if pk is None else f.GoldRuleForm, pk, "new" if pk is None else str(pk), "system_gold", _gold)
 
@@ -151,40 +145,40 @@ def _journey(request, bound=None, status=200):
     return page(request, "system/journey.html", "journey", context, status)
 
 
-@require_GET
 @unlocked
+@require_GET
 def journey(request):
     return _journey(request)
 
 
-@require_POST
 @unlocked
+@require_POST
 def question_save(request, pk):
     return _save(request, Question, f.QuestionForm, pk, str(pk), "system_journey", _journey)
 
 
-@require_POST
 @unlocked
+@require_POST
 def option_save(request, pk):
     return _save(request, Option, f.OptionForm, pk, str(pk), "system_journey", _journey)
 
 
-@require_POST
 @unlocked
+@require_POST
 def option_add(request, question_pk):
     question = get_object_or_404(Question, pk=question_pk)
     form = f.OptionAddForm(request.POST, prefix=f"new-{question.pk}", instance=Option(question=question))
     if form.is_valid():
         try:
             services.save_form(form, request.user)
-            messages.success(request, "Saved.")
+            saved(request)
             return redirect("system_journey")
         except ValidationError as error:
             form.add_error(None, error)
     return _journey(request, {f"new-{question.pk}": form}, 400)
 
 
-@require_POST
 @unlocked
+@require_POST
 def suggestion_save(request, pk):
     return _save(request, SuggestionRule, f.SuggestionRuleForm, pk, str(pk), "system_journey", _journey)

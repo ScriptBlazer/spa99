@@ -8,9 +8,11 @@
     <div class="v" data-system-health-queue>{% if health.queue_size is None %}Unknown{% else %}{{ health.queue_size }}{% endif %}</div><div class="m">pending jobs</div></div>
   <div class="sys-tile" data-system-tile="rollup"><div class="l">Last roll-up {% if not health.last_rollup %}<span class="sys-badge warn">None yet</span>{% endif %}</div>
     <div class="v" data-system-health-rollup>{% if health.last_rollup %}{{ health.last_rollup|date:"H:i" }}{% else %}Unknown{% endif %}</div><div class="m">{% if health.last_rollup %}{{ health.last_rollup|timesince }} ago{% else %}Not recorded{% endif %}</div></div>
-  <div class="sys-tile" data-system-tile="snapshot"><div class="l">Snapshot {% if health.snapshot_age_seconds is None %}<span class="sys-badge warn">Unknown</span>{% elif health.snapshot_age_seconds > 900 %}<span class="sys-badge warn">Stale</span>{% endif %}</div>
+  <div class="sys-tile" data-system-tile="snapshot"><div class="l">Snapshot {% if health.snapshot_age_seconds is None %}<span class="sys-badge warn">Unknown</span>{% elif health.snapshot_stale %}<span class="sys-badge warn">Stale</span>{% endif %}</div>
     <div class="v" data-system-health-snapshot="{{ health.snapshot_age_seconds|default_if_none:'' }}">{% if health.snapshot_age_seconds is None %}Unknown{% elif health.snapshot_age_seconds < 90 %}{{ health.snapshot_age_seconds }} s{% else %}{% widthratio health.snapshot_age_seconds 60 1 %} min{% endif %}</div><div class="m">Office figures</div></div>
-  <div class="sys-tile" data-system-tile="people"><div class="l">People</div><div class="v" data-system-count="registrations">{{ health.counts.registrations|default:0 }}</div><div class="m">registered</div></div>
+  <div class="sys-tile" data-system-tile="people"><div class="l">People</div><div class="v" data-system-count="registrations">{{ health.people_total }}</div><div class="m">registered</div></div>
+  <div class="sys-tile" data-system-tile="failed"><div class="l">Failed jobs {% if health.failed_tasks_24h %}<span class="sys-badge danger">Check</span>{% endif %}</div><div class="v" data-system-failed-tasks>{{ health.failed_tasks_24h|default_if_none:"Unknown" }}</div><div class="m">last 24 hours</div></div>
+  <div class="sys-tile" data-system-tile="gold-waiting"><div class="l">Gold waiting</div><div class="v" data-system-gold-waiting>{{ health.gold_waiting }}</div><div class="m">new or contacted</div></div>
   <div class="sys-tile" data-system-tile="gold"><div class="l">Gold applications</div><div class="v" data-system-count="gold_applications">{{ health.counts.gold_applications|default:0 }}</div><div class="m">all time</div></div>
 </section>
 <div class="sys-cols">

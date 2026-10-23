@@ -19,7 +19,7 @@ Any `<form data-system-form="<section>">` gets the save bar, dirty marks, Cmd/Ct
 <script type="module" src="{% static 'common/js/system.js' %}"></script>
 {% block head_extra %}{% endblock %}
 </head>
-<body class="system{% if env == 'live' %} live{% endif %}" data-system-section="{{ section }}" data-env="{{ env }}" data-system-idle="{% system_idle_seconds %}" data-system-ping="{% url 'system_emails' %}" data-system-unlock-url="{% url 'system_unlock' %}">
+<body class="system{% if env == 'live' %} live{% endif %}" data-system-section="{{ section }}" data-env="{{ env }}" data-system-idle="{% system_idle_seconds %}" data-system-ping="{% url 'system_unlock_ping' %}" data-system-unlock-url="{% url 'system_unlock' %}">
 {% if env == "live" %}<div class="sys-stripe" aria-hidden="true"></div>{% endif %}
 <a class="sys-skip" href="#system-main">Skip to content</a>
 <header class="sys-top" data-system-top>
@@ -44,11 +44,9 @@ Any `<form data-system-form="<section>">` gets the save bar, dirty marks, Cmd/Ct
 <div class="sys-app">
   <nav class="sys-nav" id="system-nav" data-system-nav aria-label="System">
     <ul>
-      {% for key, label, url_name in nav %}{% if key != "changes" %}
-      <li>{% if url_name %}<a href="{% url url_name %}" data-system-nav-item="{{ key }}"{% if section == key %} aria-current="page"{% endif %}>{{ label }}{% if section == key %}<span class="sys-dot" data-system-dot hidden title="Unsaved changes"></span>{% endif %}</a>{% else %}<span class="sys-soon" data-system-nav-item="{{ key }}" data-system-soon aria-disabled="true">{{ label }} <small>Coming soon</small></span>{% endif %}</li>{% endif %}{% endfor %}
-      <li><hr></li>
       {% for key, label, url_name in nav %}{% if key == "changes" %}
-      <li>{% if url_name %}<a href="{% url url_name %}" data-system-nav-item="{{ key }}"{% if section == key %} aria-current="page"{% endif %}>{{ label }}{% if section == key %}<span class="sys-dot" data-system-dot hidden title="Unsaved changes"></span>{% endif %}</a>{% else %}<span class="sys-soon" data-system-nav-item="{{ key }}" data-system-soon aria-disabled="true">{{ label }} <small>Coming soon</small></span>{% endif %}</li>{% endif %}{% endfor %}
+      <li><hr></li>{% endif %}
+      <li>{% if url_name %}<a href="{% url url_name %}" data-system-nav-item="{{ key }}"{% if section == key %} aria-current="page"{% endif %}>{{ label }}{% if section == key %}<span class="sys-dot" data-system-dot hidden title="Unsaved changes"></span>{% endif %}</a>{% else %}<span class="sys-soon" data-system-nav-item="{{ key }}" data-system-soon aria-disabled="true">{{ label }} <small>Coming soon</small></span>{% endif %}</li>{% endfor %}
     </ul>
     <div class="sys-nav-meta">
       <p>{{ request.user.email }}</p>

@@ -1,6 +1,6 @@
 """System logic: saving with a person recorded, undo, the change list, the dashboard figures and Team. Views stay short."""
 import time
-from datetime import date
+from datetime import date, timedelta
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
@@ -8,6 +8,8 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import connection, transaction
+from django.db.models import Count, Q, TextField
+from django.db.models.functions import Cast
 from django.utils import timezone
 
 from . import changes
@@ -15,6 +17,7 @@ from .models import SystemChange
 
 ROLES = ("Owner", "Manager", "Viewer", "Approver", "System")
 PAGE_SIZE = 50
+SNAPSHOT_STALE_SECONDS = 15 * 60
 
 
 class ChangeRefused(Exception):
@@ -81,12 +84,6 @@ def delete_logged(obj, user):
     obj.delete()
 
 
-def toggle_visible(obj, user, visible):
-    """Hide or show a plan (plans are never hard deleted: people and journeys point at them)."""
-    obj.visible = visible
-    return save_logged(obj, user, fields=["visible"])
-
-
 def undo_change(change, user):
     """Put the old value back as a new logged change. Refused unless the field still holds the value this change set
     (otherwise undo the newer change first), and for created, deleted or file entries."""
@@ -111,6 +108,52 @@ def undo_change(change, user):
     return obj
 
 
+def undo_batch(batch_id, user):
+    """Undo every undoable, not yet undone entry saved together. Returns (undone count, refused messages)."""
+    entries = SystemChange.objects.filter(batch_id=batch_id, kind=SystemChange.UPDATED, undo_of__isnull=True, undone_by__isnull=True)
+    done, refused = 0, []
+    for change in entries.order_by("-created_at"):
+        try:
+            undo_change(change, user)
+            done += 1
+        except ChangeRefused as error:
+            refused.append(str(error))
+    return done, refused
+
+
+def undo_url_for_batch(batch_id):
+    """The URL that undoes what this request saved: one entry -> its undo, several -> undo all, none -> ''."""
+    from django.urls import reverse
+
+    if not batch_id:
+        return ""
+    rows = [c for c in SystemChange.objects.filter(batch_id=batch_id, undo_of__isnull=True) if c.undoable]
+    if len(rows) == 1:
+        return reverse("system_undo", args=[rows[0].pk])
+    return reverse("system_undo_batch", args=[batch_id]) if rows else ""
+
+
+def annotate_batches(entries):
+    """Mark entries saved together (one query for the whole list): `batch_size`, `batch_open` (entries still undoable)
+    and `batch_first` (the first row of that group in this list, where the page shows 'Saved together' and Undo all)."""
+    entries = list(entries)
+    ids = {c.batch_id for c in entries if c.batch_id}
+    stats = {}
+    if ids:
+        rows = SystemChange.objects.filter(batch_id__in=ids).values("batch_id").annotate(
+            size=Count("id", distinct=True),
+            open=Count("id", distinct=True, filter=Q(kind=SystemChange.UPDATED, undo_of__isnull=True, undone_by__isnull=True, history_id__isnull=False)))
+        stats = {r["batch_id"]: r for r in rows}
+    seen = set()
+    for c in entries:
+        info = stats.get(c.batch_id)
+        c.batch_size = info["size"] if info else 1
+        c.batch_open = info["open"] if info else 0
+        c.batch_first = bool(info) and c.batch_id not in seen
+        seen.add(c.batch_id)
+    return entries
+
+
 def record_direct(user, section, model_label, obj, field, old, new):
     """A change to something without history (Team). Not undoable."""
     return SystemChange.objects.create(
@@ -122,35 +165,52 @@ def record_direct(user, section, model_label, obj, field, old, new):
 # ---------- the change list ----------
 
 def change_list(params, page=1):
-    """Filtered, paginated entries. params: section, user (email contains), date_from, date_to (YYYY-MM-DD)."""
-    queryset = SystemChange.objects.select_related("user")
+    """Filtered, paginated entries (a fixed number of queries). params: section, user (a person's email), q (text in the
+    field, row, person or values), range (1, 7 or 30 days, wins over the dates), date_from, date_to (YYYY-MM-DD)."""
+    queryset = SystemChange.objects.select_related("user").prefetch_related("undone_by")
     if params.get("section"):
         queryset = queryset.filter(section=params["section"])
     if params.get("user"):
         queryset = queryset.filter(user_label__icontains=params["user"].strip())
-    for key, lookup in (("date_from", "created_at__date__gte"), ("date_to", "created_at__date__lte")):
-        value = params.get(key)
+    if params.get("q"):
+        text = params["q"].strip()
+        queryset = queryset.annotate(old_text=Cast("old_value", TextField()), new_text=Cast("new_value", TextField())).filter(
+            Q(field__icontains=text) | Q(object_repr__icontains=text) | Q(user_label__icontains=text) | Q(old_text__icontains=text) | Q(new_text__icontains=text))
+    start, end = params.get("date_from"), params.get("date_to")
+    if params.get("range") in ("1", "7", "30"):
+        start, end = (timezone.localdate() - timedelta(days=int(params["range"]) - 1)).isoformat(), ""
+    for value, lookup in ((start, "created_at__date__gte"), (end, "created_at__date__lte")):
         if value:
             try:
                 queryset = queryset.filter(**{lookup: date.fromisoformat(value)})
             except ValueError:
                 pass
-    return Paginator(queryset, PAGE_SIZE).get_page(page)
+    result = Paginator(queryset, PAGE_SIZE).get_page(page)
+    result.object_list = annotate_batches(result.object_list)
+    return result
+
+
+def change_people():
+    """Who has made changes (for the person filter)."""
+    return list(SystemChange.objects.exclude(user_label="").order_by("user_label").values_list("user_label", flat=True).distinct())
 
 
 def recent_changes(count=10):
-    return list(SystemChange.objects.select_related("user")[:count])
+    return annotate_batches(SystemChange.objects.select_related("user").prefetch_related("undone_by")[:count])
 
 
 # ---------- the dashboard (stored figures only) ----------
 
 def health_report():
     """DB ok, queue size, last roll-up, snapshot age, and the key counts from the stored dashboard snapshot."""
-    from django_q.models import OrmQ, Success
+    from django_q.models import Failure, OrmQ, Success
 
+    from insights.metrics import K
     from insights.models import OfficeSnapshot
+    from office import selectors
 
-    report = {"database_ok": True, "queue_size": None, "last_rollup": None, "snapshot_age_seconds": None, "counts": {}}
+    report = {"database_ok": True, "queue_size": None, "last_rollup": None, "snapshot_age_seconds": None, "snapshot_stale": True,
+              "counts": {}, "failed_tasks_24h": None, "gold_waiting": 0, "people_total": 0}
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
@@ -161,10 +221,15 @@ def health_report():
     report["queue_size"] = OrmQ.objects.count()
     last = Success.objects.filter(func="insights.rollup.scheduled").order_by("-stopped").values_list("stopped", flat=True).first()
     report["last_rollup"] = last
+    report["failed_tasks_24h"] = Failure.objects.filter(stopped__gte=timezone.now() - timedelta(hours=24)).count()
     snapshot = OfficeSnapshot.objects.filter(page=OfficeSnapshot.DASHBOARD, range="7d").first()
     if snapshot is not None:
-        report["snapshot_age_seconds"] = max(0, int((timezone.now() - snapshot.updated_at).total_seconds()))
+        age = max(0, int((timezone.now() - snapshot.updated_at).total_seconds()))
+        report["snapshot_age_seconds"], report["snapshot_stale"] = age, age > SNAPSHOT_STALE_SECONDS  # no snapshot at all counts as stale
         report["counts"] = (snapshot.payload or {}).get("totals", {})
+    stored = selectors.counters(K.GOLD_BY_STATUS, K.REGISTRATIONS)  # stored counters, nothing summed here
+    report["gold_waiting"] = selectors.waiting_count(stored)
+    report["people_total"] = stored.get((K.REGISTRATIONS, ""), report["counts"].get("registrations", 0))
     return report
 
 

@@ -25,6 +25,7 @@ class SystemChange(BaseModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     user_label = models.CharField(max_length=254, blank=True, help_text="The person's email when it was made (kept if the account goes).")
     history_id = models.PositiveBigIntegerField(null=True, blank=True, help_text="The simple-history row this came from (not a foreign key: one table per model).")
+    batch_id = models.UUIDField(null=True, blank=True, db_index=True, help_text="Changes saved in one request share this (shown as 'Saved together', undone with 'Undo all').")
     undo_of = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="undone_by")
 
     class Meta:

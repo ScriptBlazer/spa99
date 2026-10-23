@@ -286,7 +286,11 @@ function initTimer() {
   }
   stay.addEventListener('click', async () => {
     stay.disabled = true;
-    try { await fetch(body.dataset.systemPing, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } }); resetIdle(); } finally { stay.disabled = false; }
+    try {
+      const token = $('#system-csrf')?.content.querySelector('input')?.value || '';
+      const response = await fetch(body.dataset.systemPing, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': token, 'X-Requested-With': 'fetch' } });
+      if (response.status === 204) resetIdle(); else location.href = `${body.dataset.systemUnlockUrl}?next=${encodeURIComponent(location.pathname + location.search)}`;
+    } finally { stay.disabled = false; }
   });
   tick(); setInterval(tick, 10000);
 }

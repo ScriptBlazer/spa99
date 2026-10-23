@@ -43,6 +43,20 @@ SKIP_FIELDS = {"id", "created_at", "updated_at", "singleton_key"}
 _context = threading.local()
 
 
+def start_batch():
+    """One id per System request: every change saved while it runs shares it."""
+    _context.batch = uuid.uuid4()
+    return _context.batch
+
+
+def current_batch():
+    return getattr(_context, "batch", None)
+
+
+def end_batch():
+    _context.batch = None
+
+
 def section_for(model_label, field=""):
     return FIELD_SECTIONS.get((model_label, field)) or MODEL_SECTIONS.get(model_label, "settings")
 
@@ -86,10 +100,10 @@ def record(history_instance, instance, history_user, **_):
     base = {
         "model_label": model_label, "object_pk": str(instance.pk), "object_repr": str(instance)[:200],
         "user": history_user if history_user and history_user.pk else None, "user_label": current_user_label(history_user),
-        "history_id": history_instance.pk, "undo_of_id": getattr(_context, "undo_of", None),
+        "history_id": history_instance.pk, "undo_of_id": getattr(_context, "undo_of", None), "batch_id": current_batch(),
     }
     if kind_code in ("+", "-"):
-        if kind_code == "+" and history_user is None:
+        if kind_code == "+" and (history_user is None or model_label == "plans.sitesettings"):  # seeds, and the singleton's first load
             return
         kind = SystemChange.CREATED if kind_code == "+" else SystemChange.DELETED
         SystemChange.objects.create(section=section_for(model_label), kind=kind, **base)

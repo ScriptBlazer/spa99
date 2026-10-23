@@ -80,6 +80,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "plans.context_processors.site",
                 "office.context.office",
+                "system.context.system",
             ],
         },
     },
@@ -130,6 +131,7 @@ SITE_URL = ENV.get("SITE_URL", f"https://{DOMAIN}").rstrip("/")
 CONTROL_URL = ENV.get("CONTROL_URL", f"https://{CONTROL_HOST}").rstrip("/")
 OFFICE_URL = ENV.get("OFFICE_URL", f"https://{OFFICE_HOST}").rstrip("/")
 SYSTEM_URL = ENV.get("SYSTEM_URL", f"https://{SYSTEM_HOST}").rstrip("/")
+SYSTEM_ENV_LABEL = ENV.get("SYSTEM_ENV_LABEL", "DEV").upper()  # DEV or LIVE: the label System shows in the title bar and stripe (prod default LIVE)
 SYSTEM_UNLOCK_SECONDS = 15 * 60  # System asks for the password again after this much idle time
 SYSTEM_SESSION_AGE = 12 * 60 * 60  # a System sign-in lasts 12 hours at most
 

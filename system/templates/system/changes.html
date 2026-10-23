@@ -4,21 +4,22 @@
 <section class="sys-panel" aria-label="Changes">
   <form method="get" class="sys-filters" data-system-filters role="search">
     <label>Section <select name="section" aria-label="Section"><option value="">All</option>{% for key, label in section_labels.items %}<option value="{{ key }}"{% if params.section == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-    <label>Person <input type="text" name="user" value="{{ params.user }}" placeholder="Email" autocomplete="off" aria-label="Person"></label>
+    <label>Person <select name="user" aria-label="Person"><option value="">Everyone</option>{% for email in people %}<option value="{{ email }}"{% if params.user == email %} selected{% endif %}>{{ email }}</option>{% endfor %}</select></label>
+    <label>Find <input type="search" name="q" value="{{ params.q }}" placeholder="Field, row, person or value" aria-label="Find"></label>
     <span class="sys-seg" role="group" aria-label="Date range" data-system-range hidden>
-      <label><input type="radio" name="range" value="1">Today</label><label><input type="radio" name="range" value="7">7 days</label><label><input type="radio" name="range" value="30">30 days</label><label><input type="radio" name="range" value="" checked>Custom</label>
+      <label><input type="radio" name="range" value="1"{% if params.range == "1" %} checked{% endif %}>Today</label><label><input type="radio" name="range" value="7"{% if params.range == "7" %} checked{% endif %}>7 days</label><label><input type="radio" name="range" value="30"{% if params.range == "30" %} checked{% endif %}>30 days</label><label><input type="radio" name="range" value=""{% if not params.range %} checked{% endif %}>Custom</label>
     </span>
     <label>From <input type="date" name="date_from" value="{{ params.date_from }}"></label>
     <label>To <input type="date" name="date_to" value="{{ params.date_to }}"></label>
     <input type="search" data-system-search placeholder="Find a field or value" aria-label="Find a field or value on this page" hidden>
     <button type="submit" class="sys-btn">Filter</button>
-    {% if params.section or params.user or params.date_from or params.date_to %}<a href="{% url 'system_changes' %}" data-system-clear>Clear filters</a>{% endif %}
+    {% if params.section or params.user or params.q or params.range or params.date_from or params.date_to %}<a href="{% url 'system_changes' %}" data-system-clear>Clear filters</a>{% endif %}
   </form>
   {% include "system/_changes_table.html" %}
   <nav class="sys-more" data-system-pages aria-label="Pages">
-    {% if entries.has_previous %}<a href="?page={{ entries.previous_page_number }}&section={{ params.section|urlencode }}&user={{ params.user|urlencode }}&date_from={{ params.date_from|urlencode }}&date_to={{ params.date_to|urlencode }}">Newer</a>{% endif %}
+    {% if entries.has_previous %}<a href="?page={{ entries.previous_page_number }}&section={{ params.section|urlencode }}&user={{ params.user|urlencode }}&q={{ params.q|urlencode }}&range={{ params.range|urlencode }}&date_from={{ params.date_from|urlencode }}&date_to={{ params.date_to|urlencode }}">Newer</a>{% endif %}
     <span>Page {{ entries.number }} of {{ entries.paginator.num_pages }}</span>
-    {% if entries.has_next %}<a href="?page={{ entries.next_page_number }}&section={{ params.section|urlencode }}&user={{ params.user|urlencode }}&date_from={{ params.date_from|urlencode }}&date_to={{ params.date_to|urlencode }}" data-system-more>Load 50 more</a>{% endif %}
+    {% if entries.has_next %}<a href="?page={{ entries.next_page_number }}&section={{ params.section|urlencode }}&user={{ params.user|urlencode }}&q={{ params.q|urlencode }}&range={{ params.range|urlencode }}&date_from={{ params.date_from|urlencode }}&date_to={{ params.date_to|urlencode }}" data-system-more>Load 50 more</a>{% endif %}
   </nav>
 </section>
 {% endblock %}

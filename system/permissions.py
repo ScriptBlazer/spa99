@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_not_required
 from django.http import Http404
 from django.shortcuts import redirect
 
-from . import services
+from . import changes, services
 
 
 def _allowed(request):
@@ -34,5 +34,9 @@ def unlocked(view):
         if not services.is_unlocked(request.session):
             return redirect(f"/unlock/?{urlencode({'next': request.get_full_path()})}")
         services.unlock(request.session)
-        return view(request, *args, **kwargs)
+        changes.start_batch()  # changes saved by this request are grouped
+        try:
+            return view(request, *args, **kwargs)
+        finally:
+            changes.end_batch()
     return login_not_required(wrapper)

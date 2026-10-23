@@ -54,7 +54,7 @@ Compact, dense and calm: small boxes, small controls, tables you can edit in pla
 |---|---|
 | `/` | Dashboard: DB ok, queue size (django-q `OrmQ`), last roll-up (django-q `Success`), snapshot age, key counts from the stored dashboard snapshot, last 10 changes, stage switches (read only, link to Settings) |
 | `/login/`, `POST /logout/`, `/unlock/`, `POST /lock/` | Sign-in, sign-out, unlock, lock |
-| `/changes/` | Change log, filters `section`, `user`, `date_from`, `date_to`, 50 a page |
+| `/changes/` | Change log, filters `section`, `user` (select of people who made changes), `q` (field, row, person or value), `range` (1, 7, 30 days), `date_from`, `date_to`, 50 a page, fixed query count |
 | `POST /changes/<id>/undo/` | Undo one entry |
 | `/emails/` | Edit the three recipients |
 | `/settings/` | Opening date and text, stage switches, wording, VAT |
@@ -75,3 +75,14 @@ Each page lists rows as small forms (field prefix = the row id; `new...` prefixe
 | `/hours/`, `POST /hours/capacity/`, `POST /hours/rules/add/`, `POST /hours/rules/<id>/`, `POST /hours/closures/add/`, `POST /hours/closures/<id>/`, `POST /hours/closures/<id>/delete/` | Capacity and slot sizes; opening rules (times for periods and daily closure, minute offsets for Shabbos / Yom Tov rules); closures add, edit, delete (delete is logged, not undoable) |
 | `/gold/`, `POST /gold/add/`, `POST /gold/<id>/` | Gold rules: points, property flag, active; the High threshold cannot fall below Medium |
 | `/journey/`, `POST /journey/questions/<id>/`, `POST /journey/questions/<id>/options/add/`, `POST /journey/options/<id>/`, `POST /journey/suggestions/<id>/` | Questions (text, screen, order, min choices, active), options (label, order, active, plan points JSON checked against real plan slugs, Gold points, weight, reason), suggestion rules (conditions and plan slugs checked) |
+
+### Follow-ups (2026-10-23)
+
+- `POST /unlock/ping/` ("Stay unlocked"): slides the 15 minutes, 204; 403 when already locked; 404 for strangers. `system.js` uses it (CSRF header).
+- Nav order: Team, then Change log last (the template reorder is gone).
+- Dashboard `health`: `failed_tasks_24h` (django-q `Failure`), `gold_waiting` and `people_total` (stored counters), `snapshot_stale` (older than 15 minutes, or no snapshot).
+- Change log: `SystemChange.batch_id` (migration `system.0002`, schema only) is one id per System request; changes saved together show "Saved together (N)" and **Undo all** (`POST /changes/batch/<id>/undo/`, only entries not yet undone and still at the saved value). Rows carry `batch_size`, `batch_open`, `batch_first`; `undone_by` is prefetched and the page runs a fixed number of queries (tested). The singleton's first creation is not logged.
+- Toasts: after a save the message has `extra_tags="undo:<url>"` (the entry's undo, or undo all when several) via `views.saved()`.
+- `SYSTEM_ENV_LABEL` (DEV/LIVE; dev default DEV, prod default LIVE, optional env var) reaches System templates as `system_env` through `system.context.system` (System host only).
+- The plan hide/show endpoint is removed: the row's Visible toggle saves through the normal row POST, which is logged and undoable.
+

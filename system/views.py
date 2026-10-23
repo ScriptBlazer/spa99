@@ -6,6 +6,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -22,7 +23,13 @@ from .permissions import signed_in, unlocked
 
 NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", "system_plans"), ("hours", "Hours and closures", "system_hours"),
        ("gold", "Gold rules", "system_gold"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"),
-       ("settings", "Settings", "system_settings"), ("changes", "Change log", "system_changes"), ("team", "Team", "system_team")]
+       ("settings", "Settings", "system_settings"), ("team", "Team", "system_team"), ("changes", "Change log", "system_changes")]
+
+
+def saved(request, text="Saved."):
+    """A success toast; when this request saved undoable changes it carries the undo link (undo all for several)."""
+    url = services.undo_url_for_batch(changes.current_batch())
+    messages.success(request, text, extra_tags=f"undo:{url}" if url else "")
 
 
 def page(request, template, section, context=None, status=200):
@@ -83,6 +90,16 @@ def unlock(request):
 
 @signed_in
 @require_POST
+def unlock_ping(request):
+    """'Stay unlocked': slides the 15 minute window. 204 when unlocked, 403 when already locked (the page then goes to unlock)."""
+    if not services.is_unlocked(request.session):
+        return HttpResponse(status=403)
+    services.unlock(request.session)
+    return HttpResponse(status=204)
+
+
+@signed_in
+@require_POST
 def lock(request):
     services.lock(request.session)
     return redirect("system_unlock")
@@ -109,9 +126,9 @@ def dashboard(request):
 @unlocked
 @require_GET
 def change_log(request):
-    params = {key: request.GET.get(key, "") for key in ("section", "user", "date_from", "date_to")}
+    params = {key: request.GET.get(key, "") for key in ("section", "user", "q", "range", "date_from", "date_to")}
     entries = services.change_list(params, request.GET.get("page"))
-    return page(request, "system/changes.html", "changes", {"entries": entries, "params": params})
+    return page(request, "system/changes.html", "changes", {"entries": entries, "params": params, "people": services.change_people()})
 
 
 @unlocked
@@ -126,13 +143,26 @@ def undo(request, pk):
     return redirect(safe_next(request, "system_changes"))
 
 
+@unlocked
+@require_POST
+def undo_all(request, batch):
+    done, refused = services.undo_batch(batch, request.user)
+    if done:
+        messages.success(request, f"Put back {done} change{'s' if done != 1 else ''} as new changes.")
+    for text in refused:
+        messages.error(request, text)
+    if not done and not refused:
+        messages.info(request, "Nothing to undo.")
+    return redirect(safe_next(request, "system_changes"))
+
+
 def _edit_site(request, form_class, template, section):
     site = SiteSettings.load()
     form = form_class(request.POST or None, instance=site)
     if request.method == "POST" and form.is_valid():
         if form.changed_data:
             services.save_logged(form.instance, request.user, fields=form.changed_data)
-            messages.success(request, "Saved.")
+            saved(request)
         else:
             messages.info(request, "Nothing changed.")
         return redirect(request.path)
@@ -163,7 +193,7 @@ def _team_action(request, pk, action):
     target = get_object_or_404(get_user_model(), pk=pk, is_staff=True)
     try:
         action(target)
-        messages.success(request, "Saved.")
+        saved(request)
     except services.ChangeRefused as error:
         messages.error(request, str(error))
     return redirect("system_team")

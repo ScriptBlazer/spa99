@@ -20,6 +20,7 @@ DEBUG = False
 CONTROL_HOST = ENV.get("CONTROL_DOMAIN", "control.spa99.uk")
 OFFICE_HOST = ENV.get("OFFICE_DOMAIN", "office.spa99.uk")
 SYSTEM_HOST = ENV.get("SYSTEM_DOMAIN", "system.spa99.uk")
+SYSTEM_ENV_LABEL = ENV.get("SYSTEM_ENV_LABEL", "LIVE").upper()
 # ALLOWED_HOSTS in the environment ADDS to these. localhost / 127.0.0.1: the container health check.
 ALLOWED_HOSTS = [DOMAIN, CONTROL_HOST, OFFICE_HOST, SYSTEM_HOST, "localhost", "127.0.0.1"] + ENV.list("ALLOWED_HOSTS", [])
 
