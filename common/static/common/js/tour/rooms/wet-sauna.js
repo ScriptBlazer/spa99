@@ -77,7 +77,7 @@ export async function build(scene, ctx) {
   [[0, -1.1], [-1.1, 0.0], [1.1, 0.0], [0, 0.6], [-0.6, 1.4]].forEach(([x, z]) => {
     const y = vy(x) - 0.005, g = new THREE.CircleGeometry(0.04, 14);
     g.lookAt(new THREE.Vector3(-x / (A * A), -(y - WH) / (RY * RY), 0).normalize()); K.put(g, led, { x, y, z });
-    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.36, 1.0, 20, 1, true), new THREE.MeshBasicMaterial({ color: K.col('--color-led-warm'), transparent: true, opacity: 0.09, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.36, 1.0, 20, 1, true), new THREE.MeshBasicMaterial({ color: K.col('--color-led-warm'), transparent: true, opacity: 0.022, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     c.position.set(x, y - 0.5, z); c.renderOrder = 2; scene.add(c); cones.push(c);
   });
   K.flush();

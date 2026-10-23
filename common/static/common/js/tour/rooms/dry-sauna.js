@@ -147,7 +147,7 @@ export async function build(scene, ctx) {
   update(0, 1);
 
   return {
-    view: { pos: [-0.2, 1.6, 1.7], yaw: 18, pitch: -10 },
+    view: { pos: [-0.6, 1.6, 1.7], yaw: 42, pitch: -12 },
     exposure: 0.9, ambient: true, update,
     arrive: { pos: [1.7, 1.6, 4.35], yaw: 0, pitch: -1, ms: 2400, input: 1200 },     // from the corridor, through the open door, then the turn toward the benches and the stove
     markers: [{ to: 'massage-room', at: [1.7, 1.1, Z1] }, { to: 'wet-sauna', at: [0.5, 1.1, Z1] }],
