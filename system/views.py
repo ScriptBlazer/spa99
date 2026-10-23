@@ -7,7 +7,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -17,10 +17,10 @@ from common.ratelimit import hit
 from plans.models import SiteSettings
 from users.views import LoginView
 
-from . import changes, services
+from . import audit, changes, feed, services
 from .forms import EmailsForm, SettingsForm
 from .forms_rules import RISKY
-from .models import SystemChange
+from .models import SystemChange, SystemEvent
 from .permissions import signed_in, unlocked
 
 NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", "system_plans"), ("hours", "Hours and closures", "system_hours"),
@@ -72,6 +72,19 @@ class SystemLoginView(LoginView):
         self.request.session.set_expiry(services.session_age_seconds())
         self.request.session[services.SIGNED_IN_KEY] = time.time()  # the 12 hour limit counts from here
         services.lock(self.request.session)
+        audit.log_event(SystemEvent.SIGN_IN, self.request, user=form.get_user())
+        return response
+
+    def form_invalid(self, form):
+        audit.log_event(SystemEvent.SIGN_IN_FAILED, self.request, email=self.request.POST.get("username", "").strip().lower(),
+                        detail={"reason": "wrong email or password"})
+        return super().form_invalid(form)
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == 429:  # the shared sign-in refused: too many tries from this IP
+            audit.log_event(SystemEvent.SIGN_IN_FAILED, request, email=request.POST.get("username", "").strip().lower(),
+                            outcome=SystemEvent.BLOCKED, detail={"rate_limited": True}, dedupe_seconds=300)
         return response
 
 
@@ -82,10 +95,13 @@ def unlock(request):
     error = ""
     if request.method == "POST":
         if not hit("system-unlock", f"{request.user.pk}:{client_ip(request) or 'unknown'}", 5, 300):
+            audit.log_event(SystemEvent.UNLOCK_RATE_LIMITED, request, user=request.user, dedupe_seconds=300)
             return render(request, "system/unlock.html", {"next": target, "error": "Too many attempts. Please wait a few minutes."}, status=429)
         if request.user.check_password(request.POST.get("password", "")):
             services.unlock(request.session)
+            audit.log_event(SystemEvent.UNLOCK, request, user=request.user)
             return redirect(target)
+        audit.log_event(SystemEvent.UNLOCK_FAILED, request, user=request.user)
         error = "That password is not right."
     return render(request, "system/unlock.html", {"next": target, "error": error})
 
@@ -96,6 +112,7 @@ def unlock_ping(request):
     """Activity ping: slides the idle window and answers {"remaining": seconds} (the server is the clock). 403 when already
     locked (the page then goes to unlock). `peek=1` only reads the time left, without sliding it."""
     if not services.is_unlocked(request.session):
+        services.note_idle_lock(request)
         return JsonResponse({"remaining": 0}, status=403)
     if request.POST.get("peek") != "1":
         services.unlock(request.session)
@@ -105,6 +122,8 @@ def unlock_ping(request):
 @signed_in
 @require_POST
 def lock(request):
+    if services.is_unlocked(request.session):
+        audit.log_event(SystemEvent.LOCK_MANUAL, request, user=request.user)
     services.lock(request.session)
     return redirect("system_unlock")
 
@@ -112,6 +131,8 @@ def lock(request):
 @require_POST
 @login_not_required  # sign out is harmless for anyone, and a locked-out person must always be able to leave
 def sign_out(request):
+    if request.user.is_authenticated and services.may_use_system(request.user) and request.session.get(services.SIGNED_IN_KEY):
+        audit.log_event(SystemEvent.SIGN_OUT, request, user=request.user)
     logout(request)
     return redirect("login")
 
@@ -130,9 +151,24 @@ def dashboard(request):
 @unlocked
 @require_GET
 def change_log(request):
-    params = {key: request.GET.get(key, "") for key in ("section", "user", "q", "range", "date_from", "date_to")}
-    entries = services.change_list(params, request.GET.get("page"))
-    return page(request, "system/changes.html", "changes", {"entries": entries, "params": params, "people": services.change_people()})
+    params = feed.params_from(request.GET)
+    context = {"feed": feed.audit_feed(params, request.GET.get("page")), "params": params, "people": feed.people(),
+               "section_choices": feed.section_choices(), "category_choices": audit.CATEGORIES,
+               "kind_choices": SystemEvent.KIND_CHOICES, "export_query": feed.query_string(params)}
+    return page(request, "system/changes.html", "changes", context)
+
+
+@unlocked
+@require_GET
+def audit_export(request):
+    """The filtered audit feed as a CSV download (streamed; written to the log as an export event first)."""
+    params = feed.params_from(request.GET)
+    rows = feed.export_count(params)
+    audit.log_event(SystemEvent.EXPORT, request, user=request.user, detail={"rows": rows, "filters": {k: v for k, v in params.items() if v}})
+    response = StreamingHttpResponse(feed.export_rows(params), content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="spa99-system-audit.csv"'
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @unlocked
@@ -141,6 +177,9 @@ def undo(request, pk):
     change = get_object_or_404(SystemChange, pk=pk)
     try:
         services.undo_change(change, request.user)
+        audit.log_event(SystemEvent.UNDO, request, user=request.user, section=change.section,
+                        detail={"change": str(change.pk), "was": change.sentence},
+                        sentence=f"{request.user.email} undid: {change.sentence}"[:1000])
         messages.success(request, "Put back as a new change.")
     except services.ChangeRefused as error:
         messages.error(request, str(error))
@@ -150,8 +189,11 @@ def undo(request, pk):
 @unlocked
 @require_POST
 def undo_all(request, batch):
+    sections = set(SystemChange.objects.filter(batch_id=batch).values_list("section", flat=True))
     done, refused = services.undo_batch(batch, request.user)
     if done:
+        audit.log_event(SystemEvent.UNDO_ALL, request, user=request.user, section=sections.pop() if len(sections) == 1 else "changes",
+                        detail={"batch": str(batch), "count": done, "refused": refused})
         messages.success(request, f"Put back {done} change{'s' if done != 1 else ''} as new changes.")
     for text in refused:
         messages.error(request, text)

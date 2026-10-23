@@ -1,25 +1,56 @@
 {% extends "system/base.html" %}
+{% load system_ui %}
 {% block main %}
-{% include "system/_page_header.html" with title="Change log" description="Every change made in System. Undo restores the old value as a new change." %}
-<section class="sys-panel" aria-label="Changes">
+{% include "system/_page_header.html" with title="Audit log" description="Every change and security event on System: who, when, from where, in plain words. Entries can never be edited or deleted." %}
+{% comment %}
+Context: feed (days > groups > items, page; see system/feed.py), params, people, section_choices, category_choices, kind_choices, export_query.
+Hooks: data-system-audit, data-system-day, data-system-group (data-type, data-category, data-outcome), data-system-item, data-system-sentence.
+{% endcomment %}
+<section class="sys-panel" aria-label="Audit log" data-system-audit>
   <form method="get" class="sys-filters" data-system-filters role="search">
-    <label>Section <select name="section" aria-label="Section"><option value="">All</option>{% for key, label in section_labels.items %}<option value="{{ key }}"{% if params.section == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>Type <select name="category" aria-label="Type"><option value="">Everything</option>{% for key, label in category_choices %}<option value="{{ key }}"{% if params.category == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>Section <select name="section" aria-label="Section"><option value="">All</option>{% for key, label in section_choices %}<option value="{{ key }}"{% if params.section == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
     <label>Person <select name="user" aria-label="Person"><option value="">Everyone</option>{% for email in people %}<option value="{{ email }}"{% if params.user == email %} selected{% endif %}>{{ email }}</option>{% endfor %}</select></label>
-    <label>Find <input type="search" name="q" value="{{ params.q }}" placeholder="Field, row, person or value" aria-label="Find"></label>
-    <span class="sys-seg" role="group" aria-label="Date range" data-system-range hidden>
-      <label><input type="radio" name="range" value="1"{% if params.range == "1" %} checked{% endif %}>Today</label><label><input type="radio" name="range" value="7"{% if params.range == "7" %} checked{% endif %}>7 days</label><label><input type="radio" name="range" value="30"{% if params.range == "30" %} checked{% endif %}>30 days</label><label><input type="radio" name="range" value=""{% if not params.range %} checked{% endif %}>Custom</label>
-    </span>
+    <label>Event <select name="kind" aria-label="Event"><option value="">Any</option>{% for key, label in kind_choices %}<option value="{{ key }}"{% if params.kind == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>Find <input type="search" name="q" value="{{ params.q }}" placeholder="Words, email or IP" aria-label="Find"></label>
     <label>From <input type="date" name="date_from" value="{{ params.date_from }}"></label>
     <label>To <input type="date" name="date_to" value="{{ params.date_to }}"></label>
-    <input type="search" data-system-search placeholder="Find a field or value" aria-label="Find a field or value on this page" hidden>
+    <input type="hidden" name="range" value="{{ params.range }}">
     <button type="submit" class="sys-btn">Filter</button>
-    {% if params.section or params.user or params.q or params.range or params.date_from or params.date_to %}<a href="{% url 'system_changes' %}" data-system-clear>Clear filters</a>{% endif %}
+    <a href="{% url 'system_audit_export' %}{% if export_query %}?{{ export_query }}{% endif %}" data-system-export>Download CSV</a>
+    {% if export_query %}<a href="{% url 'system_changes' %}" data-system-clear>Clear filters</a>{% endif %}
   </form>
-  {% include "system/_changes_table.html" %}
+  <div data-system-results>
+  {% for day in feed.days %}
+    <section data-system-day="{{ day.date|date:'Y-m-d' }}"><h2>{{ day.date|date:"l j F Y" }}</h2>
+    {% for g in day.groups %}
+      <article data-system-group="{{ g.key }}" data-type="{{ g.type }}" data-category="{{ g.category }}" data-outcome="{{ g.outcome }}">
+        <header>
+          <time datetime="{{ g.time|date:'c' }}" title="{{ g.time|date:'Y-m-d H:i:s' }}">{{ g.time|date:"H:i" }}</time>
+          <span data-system-summary>{{ g.summary }}</span>
+          <small data-system-source>{% if g.ip_address %}{{ g.ip_address }}{% endif %}{% if g.user_agent %} · {{ g.user_agent }}{% endif %}</small>
+          {% if g.undo_all_url %}<form method="post" action="{{ g.undo_all_url }}" data-system-undo-form>{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="sys-btn sm" data-system-undo-all>Undo all</button></form>{% endif %}
+        </header>
+        {% if g.type == "batch" %}
+        <ul>{% for c in g.items %}
+          <li data-system-item="{{ c.pk }}"><span data-system-sentence>{{ c.sentence|default:c.object_repr }}</span>
+            {% if c.undo_of_id %}<span class="sys-badge">Undo of an earlier change</span>{% endif %}
+            {% if c.undone_label %}<span class="sys-badge">Undone by {{ c.undone_label }}</span>
+            {% elif c.can_undo %}<form method="post" action="{% url 'system_undo' c.pk %}" data-system-undo-form{% if c.field|is_risky %} data-system-risky="{{ c.field }}" data-noun="{{ c.field|risky_noun }}" data-line="{{ c.field|risky_line }}" data-what="{{ c.sentence }}" data-old="{{ c.new_value|shown:c.field }}" data-new="{{ c.old_value|shown:c.field }}"{% endif %}>{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="sys-btn sm" data-system-undo>Undo</button></form>{% endif %}
+          </li>{% endfor %}
+        </ul>
+        {% endif %}
+      </article>
+    {% endfor %}
+    </section>
+  {% empty %}
+    <p class="sys-empty" data-system-empty>Nothing matches these filters.</p>
+  {% endfor %}
+  </div>
   <nav class="sys-more" data-system-pages aria-label="Pages">
-    {% if entries.has_previous %}<a href="?page={{ entries.previous_page_number }}&section={{ params.section|urlencode }}&user={{ params.user|urlencode }}&q={{ params.q|urlencode }}&range={{ params.range|urlencode }}&date_from={{ params.date_from|urlencode }}&date_to={{ params.date_to|urlencode }}">Newer</a>{% endif %}
-    <span>Page {{ entries.number }} of {{ entries.paginator.num_pages }}</span>
-    {% if entries.has_next %}<a href="?page={{ entries.next_page_number }}&section={{ params.section|urlencode }}&user={{ params.user|urlencode }}&q={{ params.q|urlencode }}&range={{ params.range|urlencode }}&date_from={{ params.date_from|urlencode }}&date_to={{ params.date_to|urlencode }}" data-system-more>Load 50 more</a>{% endif %}
+    {% if feed.page.has_previous %}<a href="?{{ export_query }}{% if export_query %}&{% endif %}page={{ feed.page.previous_number }}">Newer</a>{% endif %}
+    <span>Page {{ feed.page.number }} of {{ feed.page.num_pages }}</span>
+    {% if feed.page.has_next %}<a href="?{{ export_query }}{% if export_query %}&{% endif %}page={{ feed.page.next_number }}" data-system-more>Older</a>{% endif %}
   </nav>
 </section>
 {% endblock %}

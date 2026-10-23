@@ -1,15 +1,15 @@
+import csv
+
 from django.contrib import admin
+from django.http import HttpResponse
 
-from .models import SystemChange
+from .models import SystemChange, SystemEvent
 
 
-@admin.register(SystemChange)
-class SystemChangeAdmin(admin.ModelAdmin):
-    """The change log: read only (undo is done in System, which adds a new entry)."""
+class ReadOnlyAudit(admin.ModelAdmin):
+    """The audit log: read only, no delete (not even the bulk action), CSV export of the selected rows."""
 
-    list_display = ("created_at", "user_label", "section", "model_label", "object_repr", "field", "old_value", "new_value")
-    list_filter = ("section", "kind")
-    search_fields = ("user_label", "object_repr", "field")
+    actions = ["export_csv"]
 
     def has_add_permission(self, request):
         return False
@@ -19,3 +19,27 @@ class SystemChangeAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    @admin.action(description="Export selected rows as CSV")
+    def export_csv(self, request, queryset):
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="system-audit.csv"'
+        writer = csv.writer(response)
+        writer.writerow(self.list_display)
+        for row in queryset:
+            writer.writerow(["'" + str(v) if str(v)[:1] in "=+-@" else v for v in (getattr(row, f) for f in self.list_display)])
+        return response
+
+
+@admin.register(SystemChange)
+class SystemChangeAdmin(ReadOnlyAudit):
+    list_display = ("created_at", "seq", "user_label", "ip_address", "section", "sentence", "old_value", "new_value")
+    list_filter = ("section", "kind")
+    search_fields = ("user_label", "object_repr", "field", "sentence", "ip_address")
+
+
+@admin.register(SystemEvent)
+class SystemEventAdmin(ReadOnlyAudit):
+    list_display = ("created_at", "seq", "kind", "outcome", "user_label", "ip_address", "sentence")
+    list_filter = ("kind", "outcome", "section")
+    search_fields = ("user_label", "ip_address", "sentence", "path")

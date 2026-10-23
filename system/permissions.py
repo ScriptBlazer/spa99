@@ -10,7 +10,7 @@ from django.http import Http404
 from django.shortcuts import redirect
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from . import changes, services
+from . import audit, changes, services
 
 SECTIONS = {"plans", "hours", "gold", "journey", "emails", "settings", "team", "changes"}
 
@@ -18,8 +18,10 @@ SECTIONS = {"plans", "hours", "gold", "journey", "emails", "settings", "team", "
 def gate(request):
     """None when the person may be here; a redirect to sign-in when their 12 hour System sign-in has ended; else 404."""
     if not services.may_use_system(request.user) or not request.session.get(services.SIGNED_IN_KEY):
+        audit.note_access_denied(request)
         raise Http404
     if not services.sign_in_valid(request.session):
+        audit.log_event(audit.SystemEvent.SESSION_EXPIRED, request, user=request.user, detail={"max_hours": services.session_age_seconds() // 3600})
         logout(request)
         return redirect("/login/")
     return None
@@ -58,9 +60,10 @@ def unlocked(view):
         if refused:
             return refused
         if not services.is_unlocked(request.session):
+            services.note_idle_lock(request)
             return redirect(f"/unlock/?{urlencode({'next': unlock_target(request)})}")
         services.unlock(request.session)
-        changes.start_batch()  # changes saved by this request are grouped
+        changes.start_batch(request)  # changes saved by this request are grouped
         try:
             return view(request, *args, **kwargs)
         finally:

@@ -12,8 +12,8 @@ from django.db.models import Count, Q, TextField
 from django.db.models.functions import Cast
 from django.utils import timezone
 
-from . import changes
-from .models import SystemChange
+from . import audit, changes, sentences
+from .models import SystemChange, SystemEvent
 
 ROLES = ("Owner", "Manager", "Viewer", "Approver", "System")
 PAGE_SIZE = 50
@@ -87,6 +87,15 @@ def unlock(session):
 
 def lock(session):
     session.pop(UNLOCK_KEY, None)
+
+
+def note_idle_lock(request):
+    """The unlock has run out and this request is the first to notice: record 'locked (idle)' once, then drop the stamp
+    so the next request does not record it again."""
+    stamp = request.session.get(UNLOCK_KEY)
+    if stamp and not is_unlocked(request.session):
+        audit.log_event(SystemEvent.LOCK_IDLE, request, user=request.user, detail={"idle_seconds": lock_idle_seconds(), "last_activity_age_seconds": int(time.time() - stamp)})
+    lock(request.session)
 
 
 # ---------- saving and undo ----------
@@ -202,7 +211,8 @@ def record_direct(user, section, model_label, obj, field, old, new):
     return SystemChange.objects.create(
         section=section, model_label=model_label, object_pk=str(obj.pk), object_repr=str(obj)[:200], field=field,
         old_value=changes.to_json(old), new_value=changes.to_json(new), kind=SystemChange.DIRECT,
-        user=user, user_label=changes.current_user_label(user))
+        sentence=sentences.team_sentence(field, getattr(obj, "email", "") or str(obj), old, new),
+        user=user, user_label=changes.current_user_label(user), **changes.current_info())
 
 
 # ---------- the change list ----------
@@ -306,6 +316,8 @@ def set_roles(actor, target, roles):
     target.groups.set(keep + [groups[r] for r in roles])
     if old != roles:
         record_direct(actor, "team", "users.user", target, "roles", old, roles)
+        audit.log_event(SystemEvent.ROLE_CHANGED, user=actor, detail={"person": target.email, "old": old, "new": roles},
+                        sentence=sentences.team_sentence("roles", target.email, old, roles))
     return roles
 
 
@@ -319,3 +331,5 @@ def set_active(actor, target, active):
         target._history_user = actor
         target.save(update_fields=["is_active", "updated_at"])
         record_direct(actor, "team", "users.user", target, "is_active", old, active)
+        audit.log_event(SystemEvent.USER_REACTIVATED if active else SystemEvent.USER_DEACTIVATED, user=actor,
+                        detail={"person": target.email}, sentence=sentences.team_sentence("is_active", target.email, old, active))

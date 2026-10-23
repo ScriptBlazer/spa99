@@ -102,7 +102,7 @@ Feedback only. Colour and border transitions 100ms ease-out. Dialog: opacity plu
 | Settings     |                                                             |
 | Team         |                                                             |
 | ------------ |                                                             |
-| Change log   |                                                             |
+| Audit log    |                                                             |
 +--------------+-------------------------------------------------------------+
 ```
 
@@ -113,10 +113,10 @@ Feedback only. Colour and border transitions 100ms ease-out. Dialog: opacity plu
 - **Lock countdown**: "Locks in 14 min" 12px `--sys-text-3`, updates each minute, resets on any request. Under 2 minutes it turns `--sys-warn` and gains a "Stay unlocked" small button (pings the server). At 0 the page goes to the unlock screen; if there are unsaved edits, the countdown warning says "Unsaved changes will be lost" and stays until acted on.
 - **Signed in**: name or email 13px, opens a small menu (`--sys-shadow-pop`): role ("Superuser" or "System group"), "Open Office" link, "Sign out".
 - **Lock**: secondary button 28px "Lock". Locks at once, no confirm.
-- **Left list** (220px, `--sys-bg`, 1px `--sys-line` right). Text only, no icons. Items 32px, 13px 500 `--sys-text-2`, padding 0 12px, radius 4px. Hover `--sys-subtle`. Current: `--sys-selected` fill, `--sys-text` 600, `aria-current="page"`, 2px gold bar on the left edge. Order: Dashboard, Plans and pricing, Hours and closures, Gold rules, Journey, Emails, Settings, Team; a hairline; Change log. A section with unsaved edits shows a 6px `--sys-warn` dot after its label (real state).
+- **Left list** (220px, `--sys-bg`, 1px `--sys-line` right). Text only, no icons. Items 32px, 13px 500 `--sys-text-2`, padding 0 12px, radius 4px. Hover `--sys-subtle`. Current: `--sys-selected` fill, `--sys-text` 600, `aria-current="page"`, 2px gold bar on the left edge. Order: Dashboard, Plans and pricing, Hours and closures, Gold rules, Journey, Emails, Settings, Team; a hairline; Audit log. A section with unsaved edits shows a 6px `--sys-warn` dot after its label (real state).
 - **Content**: padding 24px, max 1200px. Page header: title 18px 600, optional one-line description 13px `--sys-text-2` ("Prices are ex VAT. Changes apply at once."), primary action right-aligned. Below: panels.
 - **Panel**: `--sys-surface`, 1px `--sys-line`, radius 6px, no shadow. Panel header 40px: title 15px 600, actions right. Panels stack with 16px gaps.
-- **Keyboard**: everything reachable by Tab; focus ring `2px solid var(--sys-accent)`, offset 2px (`:focus-visible`). `/` focuses the page filter, `Ctrl/Cmd+S` saves the current section, `Esc` cancels the cell being edited, `Enter` commits it, `g` then `d` / `c` jumps to Dashboard / Change log. A `?` opens a small shortcuts list. Shortcuts never fire while typing in a field (except Esc, Enter, Cmd+S).
+- **Keyboard**: everything reachable by Tab; focus ring `2px solid var(--sys-accent)`, offset 2px (`:focus-visible`). `/` focuses the page filter, `Ctrl/Cmd+S` saves the current section, `Esc` cancels the cell being edited, `Enter` commits it, `g` then `d` / `a` jumps to Dashboard / Audit log. A `?` opens a small shortcuts list. Shortcuts never fire while typing in a field (except Esc, Enter, Cmd+S).
 
 ---
 
@@ -191,25 +191,120 @@ All values read stored rows (snapshots, queue table), never page-load sums. A ti
 
 ---
 
-## 7. Change log
+## 7. Audit log
 
-Page title "Change log". Description: "Every change made in System. Undo restores the old value as a new change."
+Replaces the Change log page. Nav label "Audit log" (last item, after the hairline); shortcut `g a`. Page title "Audit log". Description: "Every change and every sign-in, newest first. Undo restores the old value as a new entry."
 
-**Filter bar** (one row, 28px controls, sticky under the page header): Section (select: All, then the eight sections), Person (select), Date (segmented: Today · 7 days · 30 days · Custom; Custom reveals two date inputs), search box ("Find a field or value", `/` focuses it). Filters live in the URL (`?section=plans&user=3&range=7d`), HTMX swaps the table, back button safe. "Clear filters" link when any is set.
+The question this page answers in one glance: **who did what, where, when, and did it work.** Everything else (raw values, hashes, request ids) is one click deeper, never on the surface.
 
-**Table** columns (row 32px, hairlines):
+### 7.1 Structure
 
-| When | Who | Section | What | Change | |
-|---|---|---|---|---|---|
-| `14:02` today (title: `2026-10-23 14:02:11`) | Moishe | Plans and pricing | Gold · Price ex VAT | `£95.00` → `£110.00` | Undo |
+```
+Audit log                                   [✓ Chain verified · 1,284 entries]  [Export CSV]
+Every change and every sign-in, newest first. Undo restores the old value as a new entry.
+[Person v] [Section v] (All)(Changes)(Security)(Undo)(Failures)  [Today|7 days|30 days|Custom]  [Find a field or value  /]
+214 entries in 61 groups                                                   Expand all
+------------------------------------------------------------------------------------------
+Today  Fri 23 Oct 2026                                                        38 entries   <- sticky
+ [✎] Moishe changed 3 fields in Plans and pricing                     [Undo all 3]   14:32
+       Gold · Price ex VAT        £95.00  →  £110.00                        [Undo]    [i]
+       Gold · Visits a month      8  →  10                                  [Undo]    [i]
+       Silver · Visible           On  →  Off                Changed since 14:40       [i]
+       81.2.69.160 · Safari 18 on macOS · req 7f3a9c
+ [↺] Moishe undid 1 change from 14:05 in Settings                                   14:20
+ [!] Sign-in failed for moishe@berko.media · wrong password                          14:02
+       81.2.69.160 · Chrome 130 on Windows · /login/
+ [⌂] Moishe unlocked System                                                          13:58
+```
 
-- When: mono, "14:02" for today, "Yesterday 09:40", then `21 Oct 09:40`; full timestamp on hover and in a `<time datetime>`.
-- What: the human path, not the model name ("Journey · Q3 · Option 2 · Gold points").
-- Change: old (del style) → new (add style), mono chips, truncated at 40 characters with "Show" expanding a line diff for long text (templates).
-- Undo: 24px secondary button. Risky fields go through the confirm dialog. Rows already undone show a neutral "Undone by Moishe" badge instead of the button; the undo itself appears as its own row with a badge "Undo of 14:02 change". Undo is disabled with a title ("A later change replaced this value") when the field has moved on since; the row links to the newer change.
-- Grouping: changes saved together share one "Saved together" bracket (2px `--sys-line` left rule across the rows) and an "Undo all 3" on the first row.
-- 50 rows, then "Load 50 more". Empty: "No changes match these filters."
-- Phone: each row becomes a 2-line block (line 1: what + Undo; line 2: when, who, old → new).
+Three levels, never more: **day → group → item**. A group is one save batch or one security event. Items are field changes inside a batch.
+
+### 7.2 Type hierarchy (exact)
+
+| Level | Size / weight | Colour | Font | Notes |
+|---|---|---|---|---|
+| Page title | 18px 600 | `--sys-text` | Figtree | One per page |
+| Day header | 12px 600 | `--sys-text-2` | Figtree | "Today" / "Yesterday" / weekday, then the date in 12px 400 `--sys-text-3` ("Fri 23 Oct 2026"). Right: "38 entries" 12px mono `--sys-text-3`. 28px high, `--sys-bg` fill, 1px `--sys-line` bottom, `position: sticky` under the filter bar. Sentence case. |
+| Group summary | 13px; **who 600**, verb 400, **what 600**, "in" + section 400 | who/what `--sys-text`, verb and section `--sys-text-2` | Figtree | Row min 36px, 16px icon in a 24px column on the left. Time right-aligned, 12px mono `--sys-text-3`, `<time datetime>` with full timestamp in `title`. Group actions sit just left of the time. |
+| Item line | 13px 400 | object `--sys-text-2`, field 500 `--sys-text` | Figtree | Indented 32px (text aligns with the summary text, past the icon). Row 32px, hairline between groups only, not between items. Grid: path (min 240px) / diff (1fr) / actions (auto) / details (24px). |
+| Diff | 12px | old `--sys-del` on `--sys-del-bg`, line-through; new `--sys-add` on `--sys-add-bg`; arrow `--sys-text-3` | mono | Chips 20px high, padding 0 4px, radius 4px. Screen readers get "was £95.00, now £110.00" (visually hidden), never colour alone. |
+| Meta line | 12px 400 | `--sys-text-3` | mono | Last line of the group, indented 32px: `IP · browser · req id` (changes) or `IP · browser · path` (security). Browser parsed ("Safari 18 on macOS"), full UA in the drawer. Request id first 6 chars. |
+| Reasons and links | 12px 400 | `--sys-text-3`; links `--sys-accent` underline on hover | Figtree | "Changed since 14:40", "Undone by Moishe · 14:40" |
+
+Weights stay 400 / 500 / 600. Hierarchy comes from weight and grey steps, not size jumps: everything below the page title is 12 or 13px.
+
+**Wording of the summary** (who + verb + what + where): "Moishe changed 3 fields in Plans and pricing", "Moishe changed Gold · Price ex VAT in Plans and pricing" (single item: the diff sits inline on the same line, right of the text, before actions), "Moishe added a closure in Hours and closures", "Moishe removed a closure ...", "A script changed 2 fields in Journey" (no person). The stored plain sentence is the accessible name of the group and the CSV text; the screen shows the structured version.
+
+### 7.3 Categories
+
+One 16px Phosphor icon (regular weight, from `icons.svg`; add the symbols below) plus colour on the icon only. The row stays white. Failures additionally get a 2px left rule. No coloured row fills, no badges on every row.
+
+| Category | Events | Icon | Icon colour | Extra |
+|---|---|---|---|---|
+| Change | field saves, add, remove | `pencil-simple` (add: `plus`, remove: `minus`) | `--sys-text-2` | none: the default, quietest |
+| Security | sign_in, unlock, lock_manual, lock_idle, sign_out, session_expired, export | `sign-in`, `lock-key-open`, `lock-key`, `timer`, `sign-out`, `download-simple` | `--sys-info` | none |
+| Access and roles | role_changed, user_deactivated, user_reactivated | `user-gear` | `--sys-info` | summary names old → new roles as diff chips |
+| Undo | undo, undo_all | `arrow-counter-clockwise` | `--sys-accent` | "from 14:05" links to the original group |
+| Failure | sign_in_failed, unlock_failed, unlock_rate_limited, access_denied | `warning-octagon` | `--sys-danger` | 2px `--sys-danger` left rule on the group; outcome word ("wrong password", "rate limited", "denied") in 13px 600 `--sys-danger` after the summary |
+
+Failures stand out by the red icon, rule and outcome word, not by a red block. `access_denied` is deduped: "Access denied 14 times from 81.2.69.160", time shows the range "13:10 to 13:52".
+
+**Security summaries:** "Moishe signed in", "Sign-in failed for moishe@berko.media · wrong password" (email as entered, mono), "Moishe unlocked System", "Unlock failed for Moishe", "Unlock blocked for Moishe · rate limited", "Moishe locked System", "System locked after 15 idle minutes", "Moishe signed out", "Moishe's sign-in expired after 12 hours", "Moishe changed Daniel's roles" (chips `Viewer` → `Manager, Approver`), "Moishe deactivated Daniel", "Moishe exported 214 entries".
+
+### 7.4 Expand, undo, links
+
+- **Collapse rule.** 1 item: inline on the summary line. 2 to 3 items: shown open. More than 3: collapsed to the summary with a disclosure "Show 7 changes" (12px, `caret-right` rotating 90deg, 100ms; `aria-expanded`, `aria-controls`). "Expand all" / "Collapse all" toggle right of the result count. Expanded state survives Load more but not a filter change.
+- **Undo** (24px secondary, per item) and **Undo all N** (24px secondary, on the summary; counts only items still undoable). Risky fields go through the confirm dialog (4.4). After success the button row is replaced by "Undone by you · 14:40" and the new undo group appears at the top (no animation beyond the toast).
+- **Disabled states** keep the button visible with `aria-disabled="true"` and a written reason beside it, 12px `--sys-text-3`, never tooltip-only:
+  - "Changed since 14:40" (links to the newer entry)
+  - "Undone by Moishe · 14:40" replaces the button entirely (links to the undo group)
+  - Not undoable (created, deleted, team, file): no button, no reason on the row; the drawer says "Cannot be undone: removals are permanent." Keeps rows quiet.
+  - Undo all with some items blocked: "Undo all 2 of 3", title explains which.
+- **Links jump in place**: clicking a time link scrolls to the target group (loading pages if needed via `?entry=<id>`), focuses it and gives it a `--sys-selected` fill for 1.5s (opacity fade; instant under reduced motion).
+
+### 7.5 Header, filters, count
+
+- **Integrity badge** (header right, before Export CSV), 24px, radius 4px, 12px 600:
+  - OK: `--sys-ok-bg` / `--sys-ok`, `shield-check` icon, "Chain verified · 1,284 entries"; title "Checked 14:30".
+  - Checking: neutral `--sys-subtle` / `--sys-text-2`, "Checking chain".
+  - Broken: badge becomes `--sys-danger` fill, white "Chain broken", and a full-width banner under the page header (`--sys-danger-bg` fill, 3px `--sys-danger` left rule, 13px `--sys-text`, `role="alert"`): "**The audit chain is broken at entry 1,042.** Entries from there on may have been altered outside System." + link "Show entry 1,042". That entry carries a "Chain breaks here" danger badge and a red rule. The banner cannot be dismissed.
+- **Filter bar** (sticky under the top bar; the day header sticks under it). One row at 1440: Person (select), Section (select), type chips (All · Changes · Security · Undo · Failures; toggle buttons, `aria-pressed`, multi-select, "All" clears the rest; 24px, radius 4px, selected = `--sys-selected` fill + `--sys-text` 600), Date (segmented Today · 7 days · 30 days · Custom; Custom shows two date inputs), search ("Find a field or value", `/`). All in the URL, HTMX swaps the list, back button safe. "Clear filters" link appears when any is set.
+- **Result count** under the bar, 12px `--sys-text-2`, numbers mono: "214 entries in 61 groups". Announced via `aria-live="polite"` after each swap.
+- **Export CSV** (secondary button, `download-simple`): exports the current filter, one row per item (security events one row each) with raw and formatted values, IP, UA, request id, hashes. Each export is itself logged as a Security entry.
+
+### 7.6 Detail drawer
+
+Opened by the 24px `info` icon button on any item or security group, or Enter on a focused row. Right side panel 480px (same as 4.1), `--sys-shadow-pop`, focus moves into it, Esc closes and returns focus. Deep-linkable (`?entry=<id>`).
+
+- Title: the stored plain sentence, 15px 600.
+- Field rows (grid `120px 1fr`, 12px label `--sys-text-2`, 13px value): When (`2026-10-23 14:32:07 BST`, mono), Who (name, email mono, user id), Section, Object (`plans.Plan #3 · Gold`, mono), Field (`price_ex_vat`, mono), Kind, Batch id, Request id, IP, Browser (parsed, then full UA mono wrapped), Path (`POST /plans/3/`), Outcome.
+- **Old / New**: two blocks, each with a 12px label and a 24px "Copy" button (becomes "Copied" for 1.5s, `aria-live`). Raw JSON pretty-printed, 12px mono, 1.5 line height, `--sys-subtle` fill, radius 4px, padding 8px, max-height 240px scroll, wraps long strings. Formatted value shown above each block in the diff chip style.
+- **Integrity**: Entry hash and Previous hash, mono, middle-truncated (`a3f91c…e209bc`) with copy for the full value; "Verified" ok text or "Does not match" danger text.
+- Links: "Undo of 14:05 change", "Undone by Moishe · 14:40", "Open Plans and pricing". Undo button here too, same disabled rules.
+
+### 7.7 States and paging
+
+- Loading a swap: the list keeps its height and drops to 50% opacity, no spinner; under 150ms nothing changes.
+- 50 groups per page; a group is never split across pages. "Load 50 more" (secondary, full width of the list, 32px); while loading "Loading", disabled. Day headers do not repeat when a day continues onto the next page. End: "Start of the log · 23 Sep 2026" 12px `--sys-text-3`.
+- Empty, no filters: "Nothing logged yet." Empty with filters: "No entries match these filters." + "Clear filters".
+- Load error: inline `--sys-danger-bg` line "Could not load entries. Try again." with a Retry button.
+
+### 7.8 Keyboard
+
+`/` search, `j` / `k` next / previous group (focus ring on the group), `Enter` expand or open the drawer, `u` undo the focused item (opens the confirm when risky), `Esc` closes the drawer. Never while typing.
+
+### 7.9 Phone (below 48em)
+
+- Filter bar: search full width + "Filters" button with count ("Filters 2") opening a bottom sheet holding person, section, type chips, date, and the Export CSV button. Integrity badge stays in the header, shortened to "Verified" / "Chain broken"; the broken banner stays full.
+- Day header sticky, 32px.
+- Group: line 1 icon + summary (wraps freely); line 2 section and time, 12px. Items stack: path on one line, diff chips on the next (chips wrap, never truncate below 24 characters), actions on a third line with 36px buttons. Meta line wraps; request id moves to the drawer.
+- Drawer becomes a full-height sheet; JSON blocks scroll inside; copy buttons 36px.
+- No page-level horizontal scroll.
+
+### 7.10 Proposed additions
+
+- Icons to add to `common/static/common/img/icons.svg` (Phosphor, MIT, licence already in `img/`): `pencil-simple`, `plus`, `minus`, `sign-in`, `sign-out`, `lock-key`, `lock-key-open`, `timer`, `user-gear`, `arrow-counter-clockwise`, `warning-octagon`, `shield-check`, `download-simple`, `info`, `caret-right`, `copy`. This is the one exception to "no icons" in System: icons carry category in the log, nowhere else.
+- No new colour tokens. All colours above are from 2.1.
 
 ---
 
@@ -234,7 +329,7 @@ Plain, short, exact. Sentence case. Name the thing and the value: "Save", "Disca
 
 1. No CSS library added; `system.css` and `system-tables.css` together under 8 KB gzipped; all tokens `--sys-*`, scoped to `body.system`; no hex outside `system.css`; `base.css`, `components.css` and Office CSS not loaded on System.
 2. Every page (including unlock) shows the env badge; LIVE has the 3px red top stripe, solid red badge and `LIVE ·` title prefix; DEV has the blue badge and `DEV ·` prefix.
-3. Left list in the specified order with `aria-current`; Change log separated by a hairline; unsaved dot appears on sections with drafts.
+3. Left list in the specified order with `aria-current`; Audit log separated by a hairline; unsaved dot appears on sections with drafts.
 4. Lock button locks at once; countdown updates, turns warn under 2 minutes, offers "Stay unlocked", sends to unlock at 0 and returns to the requested page after unlock.
 5. Base text 13px, rows 32px, controls 28px (in-row 24px); phone controls 36px with 16px inputs; no layout shift when a cell enters edit mode.
 6. Tables: hairlines, sticky head, numbers right-aligned in mono; inline edit with Enter / Esc / Tab / F2; edited cells marked warn with "Was ..." title; long text edits in the side panel.
@@ -242,9 +337,22 @@ Plain, short, exact. Sentence case. Name the thing and the value: "Save", "Disca
 8. Every risky change (list in 4.4) opens the confirm with old → new diff, environment named in the title, specific action label, red action on LIVE; typed "LIVE" guard where specified; focus trap and Esc work.
 9. Unlock screen as specified, wrong-password and rate-limit messages inline; non-developers get the anonymous 404 with no brand, CSS or System wording.
 10. Dashboard: six tiles from stored rows only, warn/fail badges on real state, "Unknown" when a source fails; recent changes (10) and read-only stage switches linking to Settings.
-11. Change log: section, person, date and search filters in the URL with HTMX swaps; rows show when (with full timestamp), who, section, human path, old → new, Undo; undone and superseded states; grouped saves with "Undo all"; Load more.
+11. Audit log (section 7):
+    a. Newest first, grouped day → group → item; day header sticky under the sticky filter bar; a group never splits across pages; day headers do not repeat across Load more.
+    b. Type exactly as 7.2: summary who/what 600 `--sys-text`, verb/section 400 `--sys-text-2`; items 13px indented 32px; diff 12px mono chips (old struck, new add colours) with visually hidden "was / now"; meta line 12px mono `--sys-text-3`; times mono with full timestamp in `title` and `<time datetime>`.
+    c. Category icon and colour per 7.3 on every group; failures have the red icon, 2px red left rule and red outcome word, no red row fill; `access_denied` shows as one deduped group with count and time range.
+    d. Single-item groups inline; 2 to 3 items open; more than 3 collapsed with "Show N changes" (`aria-expanded`); Expand all / Collapse all works and survives Load more.
+    e. Undo per item and Undo all N per group; risky ones open the confirm; disabled states visible with written reasons ("Changed since 14:40", "Undone by ... · 14:40") that link and jump to the target; not-undoable kinds show no button.
+    f. Filters (person, section, type chips with `aria-pressed`, date, search) in the URL, HTMX swap, back button safe, Clear filters; result count "N entries in M groups" updates and is announced.
+    g. Integrity: OK badge with entry count; "Checking chain" while unknown; broken = red badge plus undismissable `role="alert"` banner naming the entry, with a working "Show entry" link and the entry marked "Chain breaks here".
+    h. Export CSV exports the current filter and then appears in the log as a Security entry.
+    i. Drawer: opens from the info button or Enter, deep-links by `?entry=`, traps and returns focus, Esc closes; shows all fields of 7.6, pretty JSON old/new with working Copy ("Copied" announced), hashes middle-truncated with full copy and verified/does-not-match state.
+    j. Empty (no filters / with filters), load error with Retry, and loading at 50% opacity with no layout shift.
+    k. Keyboard `j` / `k` / `Enter` / `u` / `Esc` / `/` work and never fire while typing.
+    l. Phone 375px: search + Filters sheet, stacked groups, chips wrap, 36px buttons, drawer as full sheet, no page-level horizontal scroll.
+    m. Contrast: every text pair from 2.1 only; icon colours 3:1 or more on white; category never shown by colour alone (icon shape + words).
 12. Contrast: all text pairs as in 2.1 (4.5:1 or more), control borders 3:1 or more, focus ring visible on every interactive element; `--sys-text-3` never on `--sys-selected`.
-13. Keyboard: full Tab order, `/`, Cmd/Ctrl+S, Esc, Enter, `g d`, `g c`, `?` work and never fire while typing.
+13. Keyboard: full Tab order, `/`, Cmd/Ctrl+S, Esc, Enter, `g d`, `g a`, `?` work and never fire while typing.
 14. Reduced motion removes all transforms; nothing animates on load.
 15. Phone at 375px: menu sheet, stacked field rows, sideways-scrolling tables with sticky first column, save bar and dialogs usable; no page-level horizontal scroll.
-16. Screenshots at 375 and 1440 of Dashboard, Plans and pricing (with drafts and the confirm open), Change log, Unlock, and the 404 sent for design review.
+16. Screenshots at 375 and 1440 of Dashboard, Plans and pricing (with drafts and the confirm open), Audit log (with a collapsed group, an open drawer, and the broken-chain banner forced on DEV), Unlock, and the 404 sent for design review.

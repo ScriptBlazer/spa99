@@ -10,6 +10,8 @@ from django.apps import apps
 from django.db import models
 from simple_history.signals import post_create_historical_record
 
+from . import sentences
+
 # model (app_label.model) -> System section. Fields can override (FIELD_SECTIONS) because SiteSettings serves three sections.
 MODEL_SECTIONS = {
     "plans.sitesettings": "settings",
@@ -43,10 +45,20 @@ SKIP_FIELDS = {"id", "created_at", "updated_at", "singleton_key"}
 _context = threading.local()
 
 
-def start_batch():
-    """One id per System request: every change saved while it runs shares it."""
+def start_batch(request=None):
+    """One id per System request: every change saved while it runs shares it (and the request's IP, browser and path)."""
+    from common.audit import client_ip
+
     _context.batch = uuid.uuid4()
+    _context.info = {} if request is None else {
+        "ip_address": (client_ip(request) or "")[:45], "user_agent": request.META.get("HTTP_USER_AGENT", "")[:300],
+        "path": request.path[:200]}
     return _context.batch
+
+
+def current_info():
+    """IP, browser, path and request id of the System request being served ('' when none: a script or shell)."""
+    return {"ip_address": "", "user_agent": "", "path": "", **getattr(_context, "info", {}), "batch_id": current_batch()}
 
 
 def current_batch():
@@ -55,6 +67,7 @@ def current_batch():
 
 def end_batch():
     _context.batch = None
+    _context.info = {}
 
 
 def section_for(model_label, field=""):
@@ -97,29 +110,32 @@ def record(history_instance, instance, history_user, **_):
     if model_label not in MODEL_SECTIONS:
         return
     kind_code = history_instance.history_type
+    undo_of = getattr(_context, "undo_of", None)
+    model = instance._meta.model
     base = {
-        "model_label": model_label, "object_pk": str(instance.pk), "object_repr": str(instance)[:200],
+        "model_label": model_label, "object_pk": str(instance.pk), "object_repr": str(instance)[:200], **current_info(),
         "user": history_user if history_user and history_user.pk else None, "user_label": current_user_label(history_user),
-        "history_id": history_instance.pk, "undo_of_id": getattr(_context, "undo_of", None), "batch_id": current_batch(),
+        "history_id": history_instance.pk, "undo_of_id": undo_of,
     }
     if kind_code in ("+", "-"):
         if kind_code == "+" and (history_user is None or model_label == "plans.sitesettings"):  # seeds, and the singleton's first load
             return
         kind = SystemChange.CREATED if kind_code == "+" else SystemChange.DELETED
-        SystemChange.objects.create(section=section_for(model_label), kind=kind, **base)
+        SystemChange.objects.create(section=section_for(model_label), kind=kind, **base,
+                                    sentence=sentences.change_sentence(kind, model, base["object_repr"]))
         return
     previous = type(history_instance).objects.filter(**{instance._meta.pk.attname: instance.pk}).exclude(pk=history_instance.pk)
     previous = previous.order_by("-history_date", "-history_id").first()
     if previous is None:
         return
-    rows = []
-    for field in tracked_fields(instance._meta.model):
+    for field in tracked_fields(model):
         old, new = getattr(previous, field.attname), getattr(history_instance, field.attname)
         if old != new:
-            rows.append(SystemChange(
+            old_json, new_json = to_json(old), to_json(new)
+            SystemChange.objects.create(
                 section=section_for(model_label, field.name), kind=SystemChange.UPDATED, field=field.name,
-                old_value=to_json(old), new_value=to_json(new), **base))
-    SystemChange.objects.bulk_create(rows)
+                old_value=old_json, new_value=new_json, **base,
+                sentence=sentences.change_sentence(SystemChange.UPDATED, model, base["object_repr"], field.name, old_json, new_json, undo=bool(undo_of)))
 
 
 def connect():

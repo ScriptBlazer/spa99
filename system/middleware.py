@@ -3,7 +3,7 @@ from django.http import Http404
 from django.shortcuts import redirect
 from django.views.defaults import page_not_found
 
-from . import services
+from . import audit, services
 
 OPEN_PATHS = ("/login/", "/health/", "/robots.txt")
 
@@ -21,8 +21,11 @@ class SystemGateMiddleware:
         if getattr(request, "urlconf", "") == "config.urls_system" and request.path not in OPEN_PATHS:
             user = get_user(request)
             if not services.may_use_system(user) or not request.session.get(services.SIGNED_IN_KEY):
+                request.user = user  # for the log row (CSRF and auth middleware have not set it yet)
+                audit.note_access_denied(request)
                 return page_not_found(request, Http404())
             if not services.sign_in_valid(request.session):
+                audit.log_event(audit.SystemEvent.SESSION_EXPIRED, request, user=user, detail={"max_hours": services.session_age_seconds() // 3600})
                 request.session.flush()  # the 12 hour sign-in is over: signed out, back to the sign-in
                 return redirect("/login/")
         return self.get_response(request)

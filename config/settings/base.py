@@ -134,6 +134,7 @@ OFFICE_URL = ENV.get("OFFICE_URL", f"https://{OFFICE_HOST}").rstrip("/")
 SYSTEM_URL = ENV.get("SYSTEM_URL", f"https://{SYSTEM_HOST}").rstrip("/")
 SYSTEM_ENV_LABEL = ENV.get("SYSTEM_ENV_LABEL", "DEV").upper()  # DEV or LIVE: the label System shows in the title bar and stripe (prod default LIVE)
 SYSTEM_UNLOCK_SECONDS = 15 * 60  # System asks for the password again after this much idle time
+SYSTEM_AUDIT_RETENTION_DAYS = int(ENV.get("SYSTEM_AUDIT_RETENTION_DAYS", "0") or 0)  # 0 = keep the audit log forever; used only by `manage.py prune_audit_log`
 SYSTEM_SESSION_AGE = 12 * 60 * 60  # a System sign-in lasts 12 hours at most
 
 

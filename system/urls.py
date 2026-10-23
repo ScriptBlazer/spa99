@@ -8,6 +8,7 @@ urlpatterns = [
     path("unlock/ping/", views.unlock_ping, name="system_unlock_ping"),
     path("lock/", views.lock, name="system_lock"),
     path("changes/", views.change_log, name="system_changes"),
+    path("changes/export.csv", views.audit_export, name="system_audit_export"),
     path("changes/<uuid:pk>/undo/", views.undo, name="system_undo"),
     path("changes/batch/<uuid:batch>/undo/", views.undo_all, name="system_undo_batch"),
     path("emails/", views.emails, name="system_emails"),

@@ -129,10 +129,9 @@ class ChangeLogTests(TestCase):
         site = SiteSettings.load()
         site.capacity = 30
         site.save()  # a script: no person
-        response = self.client.get("/changes/?section=hours&user=")
-        entries = list(response.context["entries"])
+        entries = list(services.change_list({"section": "hours"}))
         self.assertEqual([(e.field, e.user_label) for e in entries], [("capacity", "")])  # no person: shown as "a script"
-        self.assertEqual(list(self.client.get("/changes/?section=gold").context["entries"]), [])
+        self.assertEqual(list(services.change_list({"section": "gold"})), [])
 
     def test_created_and_team_entries_cannot_be_undone(self):
         for entry in (SystemChange(kind="created", field="", history_id=1), SystemChange(kind="direct", field="roles")):
