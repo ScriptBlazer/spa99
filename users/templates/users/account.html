@@ -68,12 +68,12 @@
         <a class="btn-quiet" href="{% url 'account_export' %}">Download my data</a>
         <button type="button" class="btn-quiet" data-delete-open aria-expanded="false" aria-controls="delete-form">Delete my account</button>
       </div>
-      <form id="delete-form" method="post" action="{% url 'account_delete' %}" hidden class="delete-form form-stack-sm">
+      <form id="delete-form" method="post" action="{% url 'account_delete' %}" hidden class="delete-form form-panel form-stack-sm">
         {% csrf_token %}
         <div class="field">
           <label for="delete-password">Your password</label>
-          <input id="delete-password" name="password" type="password" autocomplete="current-password" required>
-          <p class="feedback" data-hint-static>We ask for it to make sure this is you.</p>
+          <input id="delete-password" name="password" type="password" autocomplete="current-password" aria-describedby="delete-password_error" required>
+          <p class="feedback" id="delete-password_error" data-hint-static>We ask for it to make sure this is you.</p>
         </div>
         <button type="submit" class="btn btn-danger" data-confirm data-confirm-title="Delete your account?"
           data-confirm-message="This removes your details and your interest. It can't be undone."

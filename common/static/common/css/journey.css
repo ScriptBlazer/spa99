@@ -57,9 +57,6 @@
   @starting-style { [data-live] .sub-question { opacity: 0; transform: translateY(var(--rise)); } }
 }
 
-/* typed answers on espresso */
-.on-dark .field input:not([type="checkbox"]):not([type="radio"]), .on-dark .field textarea { background: transparent; }
-
 /* ---------- result (cream: arrival into light) ---------- */
 .result { padding-block: var(--space-7) var(--space-7); }
 @media (min-width: 64em) {
@@ -236,44 +233,13 @@ html:has(.gold-apply) { scroll-padding-top: calc(var(--header-h) + var(--space-4
 .gold-apply .seg:has(input:checked) { background: var(--color-gold); color: var(--color-espresso); }
 @media (hover: hover) and (pointer: fine) { .gold-apply .seg:hover:not(:has(input:checked)) { background: var(--color-espresso-raised); } }
 
-/* text fields: the register well, in the dark */
-.gold-apply .field { position: relative; gap: var(--space-1); }
-.gold-apply .field > label:not(.check) {
-  position: absolute; top: 0.5rem; left: var(--space-3); z-index: 1; max-width: calc(100% - var(--space-4)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--text-sm); font-weight: 500; line-height: 1.2; color: var(--color-text-muted-inverse); pointer-events: none;
-}
-.gold-apply .field .optional { color: inherit; }
-.gold-apply .field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .gold-apply .field textarea {
-  min-height: var(--control-h-label); padding: 1.5rem var(--space-3) 0.375rem; background: var(--color-espresso); color: var(--color-text-inverse);
-  border: 0; border-bottom: 1px solid var(--color-control-line); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-}
-.gold-apply .field textarea { min-height: 7.5rem; padding-top: 1.75rem; }
-.gold-apply .field input:not([type="checkbox"]):focus-visible, .gold-apply .field textarea:focus-visible { outline: none; }
-.gold-apply .field input:not([type="checkbox"]):focus, .gold-apply .field textarea:focus { border-bottom-color: var(--color-gold); box-shadow: inset 0 -2px 0 var(--color-gold); }
-.gold-apply .field:has(input:not([type="checkbox"]):focus) > label:not(.check), .gold-apply .field:has(textarea:focus) > label { color: var(--color-text-inverse); }
-.gold-apply .field input[aria-invalid="true"]:not([type="checkbox"]), .gold-apply .field textarea[aria-invalid="true"] { border-bottom-color: var(--color-danger-inverse); box-shadow: inset 0 -2px 0 var(--color-danger-inverse); }
-.gold-apply .field:has(input[aria-invalid="true"]:not([type="checkbox"])) > label:not(.check), .gold-apply .field:has(textarea[aria-invalid="true"]) > label { color: var(--color-danger-inverse); }
-@media (hover: hover) and (pointer: fine) { .gold-apply .field input:not([type="checkbox"]):hover, .gold-apply .field textarea:hover { border-bottom-color: var(--color-text-inverse); } }
-.gold-apply .feedback { margin-top: var(--space-1); color: var(--color-text-muted-inverse); }
-.gold-apply .feedback[data-state="error"] { color: var(--color-danger-inverse); }
+/* text fields, checks and buttons are the shared form style (components.css); on the gold panel the wells are espresso */
+.gold-apply { --s-well: var(--color-espresso); --s-well-line: var(--color-control-line); }
 .gold-apply .field-pair { display: grid; gap: var(--space-3); }
 .gold-apply .field-pair .field { margin-top: 0; }
 .gold-apply .fieldset-gap { margin-top: var(--space-3); }
 
-/* consents: choosing, not ticking */
 .gold-apply .question > .field:has(.check) { margin-top: var(--space-3); }
-.gold-apply .check {
-  align-items: center; min-height: var(--tile-min-h); padding: var(--space-3) var(--space-4); background: var(--color-espresso);
-  border: 1px solid var(--color-hairline-inverse); border-radius: var(--radius-md);
-}
-.gold-apply .check input { background: none; border-color: var(--color-control-line); }
-.gold-apply .check input:checked { background: var(--color-gold); border-color: var(--color-gold); }
-.gold-apply .check span a { color: inherit; text-decoration: underline; text-underline-offset: 0.2em; }
-.gold-apply .check:has(input:checked) { border-color: var(--color-gold); box-shadow: inset 0 0 0 1px var(--color-gold); }
-.gold-apply .check:has(input[aria-invalid="true"]) { border-color: var(--color-danger-inverse); box-shadow: inset 0 0 0 1px var(--color-danger-inverse); }
-.gold-apply .check:has(input:focus-visible) { outline: 2px solid var(--color-gold); outline-offset: 3px; }
-.gold-apply .check input:focus-visible { outline: none; }
-@media (hover: hover) and (pointer: fine) { .gold-apply .check:hover:not(:has(input:checked)):not(:has(input[aria-invalid="true"])) { border-color: var(--color-control-line); } }
 
 /* "From your earlier answers" */
 .gold-apply .summary-panel { margin-top: var(--space-5); padding: var(--space-4); background: var(--color-espresso); border: 1px solid var(--color-tier-edge-gold); border-radius: var(--radius-md); }
