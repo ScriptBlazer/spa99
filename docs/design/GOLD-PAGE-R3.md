@@ -73,7 +73,7 @@ Perks (from the plan's `perks`, in order, excluding the waitlist which is a pill
 |---|---|
 | Leil Shishi when offered | The Thursday evening meal, included. |
 | BML members' events | Invitations through the year. |
-| Each merch release | (see question in section 6; hidden until answered) |
+| Each merch release | shown as it is (owner, 2026-10-23: keep as is) |
 
 Fit at 1440: padding 64 + h2 58 + lead 32 + 40 + title 20 + 16 + figures 2 x (1 + 8 + 40 + 22) + 40 + 24 + pills 32 + 64 + engraved 20 + 64 = **about 640**. Section with padding: about 0.85 of a screen.
 
@@ -147,6 +147,7 @@ Fit at 1440: padding 64 + h2 58 + lead 32 + 40 + title 20 + 16 + figures 2 x (1 
 ## 6. Open question for the owner
 
 The Gold plan lists "Each merch release" as a perk (PRICING.md, EXT-02), and it shows on Home's Gold pills today. The owner said on 2026-10-23: no merch or shop framing anywhere this round. Options:
+**Answered 2026-10-23: C, keep as is.**
 - **A (recommended):** set the merch perk to `public: false`: it disappears from this page and Home until merch is on sale; the rule stays in the data.
 - **B:** keep it as a perk, worded "New Spa 99 pieces, as they come", no word "merch".
 - **C:** keep it as it is.
@@ -171,4 +172,4 @@ Contrast on `--color-gold-deep`: cream 8.98, muted inverse 5.33, gold (pill bord
 6. Sheen passes once over the panel and never again on that page view; no motion under reduced motion; numbers final.
 7. Three different section shapes below the hero (panel, edge-bleed frame, steps with the card); no two in a row look alike.
 8. Phone: no horizontal scroll; figures stay 2 x 2; pills wrap; the apply button is full width.
-9. The merch perk follows the owner's answer to question 6 (default: hidden).
+9. The merch perk "Each merch release" stays visible, worded as it is (owner's answer 2026-10-23).

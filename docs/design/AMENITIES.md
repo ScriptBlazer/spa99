@@ -160,7 +160,7 @@ In the also row (MEMBERSHIPS-R3.md section 3.6): one line with four tiny cream-m
 
 ### 5.3 Gold Card page
 
-Nothing this round (owner's correction). The existing "Each merch release" perk is a separate question (GOLD-PAGE-R3.md section 6).
+Nothing this round (owner's correction). The existing "Each merch release" Gold perk stays visible as it is (owner, 2026-10-23).
 
 ---
 
