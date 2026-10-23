@@ -56,7 +56,11 @@ def home(request):
 def spa(request):
     cards = services.facility_cards()
     copy = content.page_content("spa")
-    return _page(request, "pages/spa.html", "spa", facilities=cards, sections=services.spa_sections(cards),
+    moments = services.spa_moments(copy)
+    return _page(request, "pages/spa.html", "spa", facilities=cards,
+                 sections=services.place_moments(services.spa_sections(cards), moments), tote=moments.get("tote"),
+                 opener_lines=services.opener_lines(copy), opener=services.opener_picture(copy),
+                 arrive_kit=services.arrive_kit(copy),
                  room_count=len(cards), visit_pills=services.visit_pills(copy), next_from=services.next_from_line(copy),
                  hours=services.opening_hours(), hours_facts=services.hours_facts())
 
@@ -67,14 +71,15 @@ def memberships(request):
     cards = services.purchasable_plans()
     return _page(request, "pages/memberships.html", "memberships", cards=cards, table=services.compare_table(cards),
                  tiers=[c for c in cards if c["interest_allowed"]], single=next((c for c in cards if c["is_single"]), None),
-                 selected_slug=services.selected_plan_slug(request, cards),
+                 selected_slug=services.selected_plan_slug(request, cards), every_visit=services.every_visit(),
                  vat_rate=SiteSettings.load().vat_rate.normalize())
 
 
 @login_not_required  # PUBLIC marketing page
 @require_GET
 def gold_card(request):
-    return _page(request, "pages/gold.html", "gold", groups=services.gold_groups())
+    return _page(request, "pages/gold.html", "gold", groups=services.gold_groups(), gold=services.gold_facts(),
+                 hours_facts=services.hours_facts())
 
 
 @login_not_required  # PUBLIC placeholder: booking opens later

@@ -31,3 +31,9 @@ def interest_cards():
 @register.simple_tag(takes_context=True)
 def account_greeting(context):
     return services.greeting(context["request"].user)
+
+
+@register.simple_tag
+def signin_shell():
+    """{% signin_shell as shell %}: heading, lead, caption, picture and address line for the sign-in shell (SIGN-IN.md)."""
+    return services.signin_shell()

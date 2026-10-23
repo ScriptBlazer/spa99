@@ -1,5 +1,6 @@
 """Glue between the data apps (plans, content, journey) and the page templates. Nothing here is a rule:
 every number and word comes from rows edited in Control."""
+import re
 from decimal import Decimal
 
 from django.utils import timezone
@@ -199,9 +200,23 @@ def booking_lines(cards):
 
 # ---------- Gold ----------
 
+def public_perks(plan):
+    """A plan's perks that may be shown on the site. A perk with "public": false stays in the data (rules can use it)
+    but is shown nowhere. Default is public."""
+    return [perk for perk in plan.perks or [] if perk.get("public", True)]
+
+
+def _gold_plan():
+    return Plan.objects.filter(slug="gold", visible=True).first()
+
+
+def _has_public_perk(plan, key):
+    return any(perk.get("key") == key for perk in public_perks(plan))
+
+
 def gold_groups():
-    """The two perk groups on the Gold Card page, from the Gold plan row. None if the plan is hidden."""
-    plan = Plan.objects.filter(slug="gold", visible=True).first()
+    """The two perk groups on Home's Gold pills, from the Gold plan row. None if the plan is hidden."""
+    plan = _gold_plan()
     if plan is None:
         return None
     visits = ["Unlimited visits" if plan.is_unlimited else f"{_plural(plan.visits_per_month, 'visit')} a month"]
@@ -209,14 +224,57 @@ def gold_groups():
     visits.append(f"Book up to {_plural(plan.booking_window_days, 'day')} ahead")
     if plan.guests_per_month:
         visits.append(f"Bring {_plural(plan.guests_per_month, 'guest')} a month")
-    if plan.perk("waitlist_priority"):
+    if _has_public_perk(plan, "waitlist_priority"):
         visits.append("First call from the waitlist")
     beyond = [
         perk.get("phrase") or perk.get("label", "")
-        for perk in plan.perks or []
+        for perk in public_perks(plan)
         if perk.get("key") != "waitlist_priority"
     ]
     return [("Your visits", visits), ("Beyond the spa", [b for b in beyond if b])]
+
+
+def _daytime_range():
+    periods = OpeningRule.objects.filter(active=True, kind=OpeningRule.PERIOD)
+    rule = periods.filter(key="daytime").first() or periods.first()
+    if rule and rule.start_time and rule.end_time:
+        return f"{_clock(rule.start_time)} to {_clock(rule.end_time)}"
+    return ""
+
+
+def _figure(value, label, number=None, suffix=""):
+    """One engraved figure. `number` (an int or None) is what the page may count up to; `suffix` follows it."""
+    return {"value": value, "label": label, "number": number, "suffix": suffix}
+
+
+def gold_facts():
+    """Everything the Gold Card page shows below the card, from the visible Gold plan (GOLD-PAGE-R3 section 5):
+    {"figures": [{value, label, number, suffix}], "pills": [str], "perks": [{name, note}]}. None when the plan is hidden.
+    Figures: visits, hours, booking window, guests (no figure when the plan has no guests). Perks leave out the waitlist
+    (it is a pill) and anything marked "public": false."""
+    plan = _gold_plan()
+    if plan is None:
+        return None
+    figures = [_figure("Unlimited", "visits") if plan.is_unlimited
+               else _figure(str(plan.visits_per_month), "visits a month", plan.visits_per_month)]
+    if plan.is_daytime_only:
+        daytime = _daytime_range()
+        if daytime:
+            figures.append(_figure("Daytime", daytime))
+    else:
+        facts = hours_facts()
+        if facts:
+            figures.append(_figure("Any time", facts["range"]))
+    days = plan.booking_window_days
+    figures.append(_figure(f"{days} {'day' if days == 1 else 'days'}", "to book ahead", days, " day" if days == 1 else " days"))
+    if plan.guests_per_month:
+        figures.append(_figure(str(plan.guests_per_month), "guests a month", plan.guests_per_month))
+    pills = [f"{_plural(plan.upcoming_limit, 'booking')} at a time", f"Cancel up to {plan.cancel_hours} hours before"]
+    if _has_public_perk(plan, "waitlist_priority"):
+        pills.append("First call from the waitlist")
+    perks = [{"name": perk.get("phrase") or perk.get("label", ""), "note": perk.get("note", "")}
+             for perk in public_perks(plan) if perk.get("key") != "waitlist_priority"]
+    return {"figures": figures, "pills": pills, "perks": [p for p in perks if p["name"]]}
 
 
 # ---------- facilities ----------
@@ -350,3 +408,174 @@ def journey_facility_images():
             url = images.src(card["image_name"], 480)
         mapping[card["slug"].replace("-", "_")] = {"src": url, "alt": card["alt"]}
     return mapping
+
+
+# ---------- the spa opener (SPA-OPENER.md section 2) ----------
+
+OPENER_MAX_LINES = 5
+OPENER_PICTURES = ["robe", "door-gold"]  # the design picture, then the picture that exists today (until the robe is built)
+
+
+def _opener_values():
+    facts = hours_facts()
+    count = Facility.objects.filter(visible=True).count()
+    rooms = content.NUMBER_WORDS[count] if 0 < count < len(content.NUMBER_WORDS) else (str(count) if count else "")
+    return {"hours": facts["range"] if facts else "", "closure": closure_title(), "rooms": rooms,
+            "Rooms": rooms[:1].upper() + rooms[1:]}
+
+
+_PLACEHOLDER = re.compile(r"\{(hours|closure|rooms|Rooms)\}")
+
+
+def _fill_statement(text, values):
+    """None when a value the text needs is missing (the line is then skipped: never 'Open .')."""
+    if any(not values[name] for name in _PLACEHOLDER.findall(text)):
+        return None
+    return _PLACEHOLDER.sub(lambda m: values[m.group(1)], text)
+
+
+def _fill_note(text, values):
+    """Sentences that need a missing value are dropped ('Every day. Closed for {closure}.' -> 'Every day.')."""
+    sentences = re.findall(r"[^.!?]+[.!?]?\s*", text)
+    kept = [s for s in sentences if all(values[name] for name in _PLACEHOLDER.findall(s))]
+    return _PLACEHOLDER.sub(lambda m: values[m.group(1)], "".join(kept)).strip()
+
+
+def opener_lines(copy=None):
+    """The line stack on The spa opener: [{statement, note}] from the `opener_1..5` rows of the `spa` page, placeholders
+    {hours} {closure} {rooms} {Rooms} filled from the opening rules and the visible rooms. Rows with an empty heading
+    (or a statement that needs a value we do not have) are skipped. Never more than 5."""
+    copy = copy if copy is not None else content.page_content("spa")
+    values, lines = _opener_values(), []
+    for n in range(1, OPENER_MAX_LINES + 1):
+        row = copy[f"opener_{n}"]
+        statement = _fill_statement(row.heading, values) if row.heading else None
+        if statement:
+            lines.append({"statement": statement, "note": _fill_note(row.body, values)})
+    return lines
+
+
+def opener_picture(copy=None):
+    """Which picture opens The spa. Order: an upload on `intro`, the `opener_image` row's name, `robe`, then the old door.
+    Returns {"upload", "name", "portrait", "is_door"}; `name` is '' when none of them is built (the template then
+    shows the brand tile, never a broken image). `portrait` is `<name>-portrait` when that is built."""
+    copy = copy if copy is not None else content.page_content("spa")
+    chosen = copy["opener_image"].body.strip()
+    name = next((n for n in [chosen, *OPENER_PICTURES] if n and images.has_image(n)), "")
+    portrait = f"{name}-portrait" if name and images.has_image(f"{name}-portrait") else ""
+    return {"upload": copy["intro"].image, "name": name, "portrait": portrait, "is_door": name.startswith("door")}
+
+
+# ---------- the amenity moments (AMENITIES.md sections 3 and 4) ----------
+
+# moment key -> its content row and the pictures it shows: (default name, focus, alt). A row's upload replaces the first picture.
+MOMENTS = {
+    "towel": ("moment_towel", [("towel-bench", "40% 55%", "A white towel with the gold swan, folded on the sauna bench")]),
+    "shower": ("moment_shower", [("toiletries", "50% 55%", "Three frosted bottles with the gold swan in a stone niche"),
+                                 ("towel-rail", "50% 50%", "A swan towel on a bronze rail by the shower")]),
+    "slippers": ("moment_slippers", [("slippers", "62% 60%", "A pair of white swan slippers by a wooden lounger")]),
+    "tote": ("moment_tote", [("tote", "50% 50%", "An espresso canvas bag with the gold swan on a stone bench")]),
+}
+
+
+def _moment_pictures(row, pictures):
+    out = []
+    for index, (name, focus, alt) in enumerate(pictures):
+        upload = row.image if index == 0 else None
+        out.append({
+            "name": name, "focus": focus, "alt": (row.image_alt if index == 0 and row.image_alt else alt), "upload": upload,
+            "has_image": bool(upload) or images.has_image(name),
+            "portrait": f"{name}-portrait" if images.has_image(f"{name}-portrait") else "",
+        })
+    return out
+
+
+def spa_moments(copy=None):
+    """Moments that can be shown: {key: {key, heading, body, pictures}} for towel, shower, slippers and tote.
+    A moment is left out when its row has no heading (how Moishe turns one off) or none of its pictures exist
+    (an upload, or a built render), so the page never shows an empty frame. Each picture has `has_image`."""
+    copy = copy if copy is not None else content.page_content("spa")
+    moments = {}
+    for key, (row_key, pictures) in MOMENTS.items():
+        row = copy[row_key]
+        built = _moment_pictures(row, pictures)
+        if row.heading and any(p["has_image"] for p in built):
+            moments[key] = {"key": key, "heading": row.heading, "body": row.body, "pictures": built}
+    return moments
+
+
+def place_moments(sections, moments):
+    """Insert moment items ({"kind": "moment", "moment": {...}}) into the room sections by rule, so hiding or moving
+    rooms never breaks the page: towel first; shower after the first tiles row (else after the first feature, else
+    last); slippers after the first feature that follows the shower (else last, before 'How a visit works')."""
+    sections = list(sections)
+
+    def item(key):
+        return {"kind": "moment", "moment": moments[key]}
+
+    def first(kind, start=0):
+        return next((i for i in range(start, len(sections)) if sections[i]["kind"] == kind), None)
+
+    anchor = first("tiles")
+    anchor = first("feature") if anchor is None else anchor
+    at = len(sections) if anchor is None else anchor + 1  # where the shower moment goes (or would go)
+    if "shower" in moments:
+        sections.insert(at, item("shower"))
+        at += 1
+    if "slippers" in moments:
+        anchor = first("feature", at)
+        sections.insert(len(sections) if anchor is None else anchor + 1, item("slippers"))
+    if "towel" in moments:
+        sections.insert(0, item("towel"))
+    return sections
+
+
+KIT_MAX = 5
+
+
+def arrive_kit(copy=None):
+    """'Every visit includes': {"heading", "items": [{label, name, focus, has_image}]} from the `arrive_kit` row, one item per
+    line as `Label | image-name | focus` (max 5). An unknown image name gives `has_image` False (the swan tile)."""
+    copy = copy if copy is not None else content.page_content("spa")
+    row, items = copy["arrive_kit"], []
+    for line in row.body.splitlines():
+        label, _, rest = (part.strip() for part in line.partition("|"))
+        name, _, focus = (part.strip() for part in rest.partition("|"))
+        if label:
+            items.append({"label": label, "name": name, "focus": focus or "50% 50%", "has_image": bool(name) and images.has_image(name)})
+    return {"heading": row.heading, "items": items[:KIT_MAX]}
+
+
+def _words(labels):
+    labels = [label[:1].lower() + label[1:] for label in labels]
+    return labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + " and " + labels[-1] if labels else ""
+
+
+def every_visit():
+    """The Memberships 'Every visit' row, from the kit on The spa page so it changes in one place:
+    {"text", "items", "pictured", "cta_label", "cta_url"}; None when the `every_visit` row is hidden or there is no kit.
+    {kit} in the row's text becomes 'towels, robe, slippers and toiletries'. `pictured` = items whose picture is built."""
+    row = content.page_content("memberships")["every_visit"]
+    kit = arrive_kit()["items"]
+    if not row.body or not kit:
+        return None
+    return {"text": row.body.replace("{kit}", _words([i["label"] for i in kit])), "items": kit,
+            "pictured": [i for i in kit if i["has_image"]], "cta_label": row.cta_label, "cta_url": row.cta_url}
+
+
+# ---------- sign in (SIGN-IN.md section 6) ----------
+
+def signin_shell():
+    """Words and picture for the public sign-in and the pages that share its shell:
+    {"heading", "lead", "caption", "upload", "name", "has_image", "address_line": [str]}. Falls back to the words in the
+    brief when the rows are missing. `name` is the default picture; an upload overrides it."""
+    copy = content.page_content("signin")
+    site = SiteSettings.load()
+    return {
+        "heading": copy["intro"].heading or "Welcome back.",
+        "lead": copy["intro"].body or "Sign in to your Spa 99 account.",
+        "caption": copy["caption"].body or "Your own locker, every visit.",
+        "upload": copy["intro"].image, "name": "lockers",
+        "has_image": bool(copy["intro"].image) or images.has_image("lockers"),
+        "address_line": [part for part in (site.address_one_line, site.opening_text) if part],
+    }
