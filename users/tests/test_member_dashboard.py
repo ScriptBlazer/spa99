@@ -151,3 +151,17 @@ class PasswordScreenShellTests(TestCase):
         response = self.client.get("/account/you/password/")
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "data-verify-banner")
+
+
+class StaffHostLoginRedirectTests(TestCase):
+    def test_login_on_staff_hosts_goes_to_their_home_not_the_member_dashboard(self):
+        from django.conf import settings as dj
+        user = User.objects.create_user(email="staff.redirect@example.test", password="Correct-horse-9")
+        user.is_staff = True
+        user.is_superuser = True
+        user.save()
+        for host in (dj.OFFICE_HOST, dj.SYSTEM_HOST, dj.CONTROL_HOST):
+            self.client.logout()
+            response = self.client.post("/login/", {"username": user.email, "password": "Correct-horse-9"}, HTTP_HOST=host)
+            self.assertEqual(response.status_code, 302, host)
+            self.assertNotIn("/account/", response["Location"], host)

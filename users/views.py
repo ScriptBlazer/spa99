@@ -55,6 +55,9 @@ def _forget_journey_cookie(response):
     return response
 
 
+STAFF_URLCONFS = ("config.urls_office", "config.urls_control", "config.urls_system")
+
+
 class LoginView(auth_views.LoginView):
     """Public sign-in (Django marks LoginView as login_not_required). Limited to 10 attempts per 5 minutes per IP."""
 
@@ -65,6 +68,13 @@ class LoginView(auth_views.LoginView):
         context = super().get_context_data(**kwargs)
         context.update(_login_layout(self.request))
         return context
+
+    def get_default_redirect_url(self):
+        """Members land on their dashboard (LOGIN_REDIRECT_URL, /account/); the staff hosts (Office, Control, System)
+        land on their own home page, which is "/" on each host. A safe `next` still wins (Django checks it first)."""
+        if getattr(self.request, "urlconf", "") in STAFF_URLCONFS:
+            return "/"
+        return super().get_default_redirect_url()
 
     def form_valid(self, form):
         """Shared device: if the journey cookie holds someone else's session, drop it so this person starts fresh;
