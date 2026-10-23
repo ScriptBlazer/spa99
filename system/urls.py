@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import views, views_rules as r
 
 urlpatterns = [
     path("", views.dashboard, name="system_dashboard"),
@@ -13,4 +13,23 @@ urlpatterns = [
     path("team/", views.team, name="system_team"),
     path("team/<uuid:pk>/roles/", views.team_roles, name="system_team_roles"),
     path("team/<uuid:pk>/active/", views.team_active, name="system_team_active"),
+    path("plans/", r.plans, name="system_plans"),
+    path("plans/add/", r.plan_save, name="system_plan_add"),
+    path("plans/<uuid:pk>/", r.plan_save, name="system_plan_save"),
+    path("plans/<uuid:pk>/visibility/", r.plan_visibility, name="system_plan_visibility"),
+    path("hours/", r.hours, name="system_hours"),
+    path("hours/rules/add/", r.rule_save, name="system_rule_add"),
+    path("hours/rules/<uuid:pk>/", r.rule_save, name="system_rule_save"),
+    path("hours/closures/add/", r.closure_save, name="system_closure_add"),
+    path("hours/closures/<uuid:pk>/", r.closure_save, name="system_closure_save"),
+    path("hours/closures/<uuid:pk>/delete/", r.closure_delete, name="system_closure_delete"),
+    path("hours/capacity/", r.capacity_save, name="system_capacity"),
+    path("gold/", r.gold, name="system_gold"),
+    path("gold/add/", r.gold_save, name="system_gold_add"),
+    path("gold/<uuid:pk>/", r.gold_save, name="system_gold_save"),
+    path("journey/", r.journey, name="system_journey"),
+    path("journey/questions/<uuid:pk>/", r.question_save, name="system_question_save"),
+    path("journey/questions/<uuid:question_pk>/options/add/", r.option_add, name="system_option_add"),
+    path("journey/options/<uuid:pk>/", r.option_save, name="system_option_save"),
+    path("journey/suggestions/<uuid:pk>/", r.suggestion_save, name="system_suggestion_save"),
 ]

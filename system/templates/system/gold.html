@@ -1,0 +1,32 @@
+{% extends "system/base.html" %}
+{% load system_ui %}
+{% block title %}Gold rules{% endblock %}
+{% block main %}
+{% include "system/_page_header.html" with title="Gold rules" description="Points per answer, the High and Medium thresholds, and which answers count as property." %}
+<ul hidden data-system-risky-fields>{% for name in risky_fields %}<li>{{ name }}</li>{% endfor %}</ul>
+<section class="sys-panel" aria-labelledby="gold-h"><header><h2 id="gold-h">Rules</h2></header>
+  <div class="sys-scroll"><table class="sys-table">
+    <thead><tr><th scope="col">Rule</th><th scope="col">Label</th><th scope="col" class="sys-num">Points</th><th scope="col">Property</th><th scope="col">Active</th><th scope="col"><span class="sr">Save</span></th></tr></thead>
+    <tbody>
+    {% for row in rows %}{% with pk=row.obj.pk f=row.form %}
+      <tr data-system-gold-rule="{{ row.obj.group }}:{{ row.obj.match_value }}" data-row-label="{{ row.obj.get_group_display }} {{ row.obj.match_value }}"{% if not row.obj.active %} data-hidden{% endif %}>
+        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_gold_save' pk %}" data-system-form="gold-rule" data-system-risky="{{ risky_fields|join:',' }}" data-noun="Gold rule" data-plural="Gold rules" data-line="Gold applications are judged on the new value at once.">{% csrf_token %}</form>
+          {{ row.obj.get_group_display }} · <span class="mono">{{ row.obj.match_value }}</span></td>
+        <td>{% cell f.label pk "Label" %}</td>
+        <td class="sys-num">{% cell f.points pk "Points" %}</td>
+        <td>{% cell f.is_property pk "Counts as property" %}</td>
+        <td>{% cell f.active pk "Active" %}</td>
+        <td><button type="submit" form="f-{{ pk }}" class="sys-btn sm sys-rowsave">Save</button></td>
+      </tr>
+      {% if f.errors %}<tr class="sys-rowerr"><td colspan="6" class="sys-error" role="alert">{{ f|error_text }}</td></tr>{% endif %}
+    {% endwith %}{% empty %}<tr><td class="sys-empty" colspan="6">No rules yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+<details class="sys-panel" data-system-add="gold-rule"{% if add_form.errors %} open{% endif %}><summary class="sys-add">Add a rule</summary>
+  <form method="post" action="{% url 'system_gold_add' %}" data-system-form="gold-rule-add" class="sys-group">{% csrf_token %}
+    {% include "system/_fields.html" with form=add_form %}
+    <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add rule</button></div>
+  </form>
+</details>
+{% endblock %}

@@ -1,19 +1,26 @@
-<table data-system-changes>
-  <thead><tr><th>When</th><th>Who</th><th>Section</th><th>What</th><th>Field</th><th>Old</th><th>New</th><th></th></tr></thead>
+{% load system_ui %}{% comment %}
+Change rows. Context: entries (page or list of SystemChange), compact (optional: no Undo column). Optional prefetch: undone_by.
+Each row: when (with full timestamp), who, section, what, old -> new, Undo (a plain POST form; system.js adds the confirm for risky fields).
+{% endcomment %}
+<div class="sys-scroll" data-system-results><table class="sys-table" data-system-changes>
+  <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Section</th><th scope="col">What</th><th scope="col">Change</th>{% if not compact %}<th scope="col"><span class="sr">Undo</span></th>{% endif %}</tr></thead>
   <tbody>
   {% for c in entries %}
-    <tr data-system-change="{{ c.pk }}">
-      <td>{{ c.created_at|date:"j M Y H:i" }}</td>
-      <td>{{ c.user_label|default:"a script" }}</td>
-      <td>{{ c.section }}</td>
-      <td>{{ c.model_label }}: {{ c.object_repr }}{% if c.kind == "created" %} (created){% elif c.kind == "deleted" %} (deleted){% endif %}</td>
-      <td>{{ c.field }}</td>
-      <td>{{ c.old_value|default_if_none:"" }}</td>
-      <td>{{ c.new_value|default_if_none:"" }}</td>
-      <td>{% if c.undoable %}<form method="post" action="{% url 'system_undo' c.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" data-system-undo>Undo</button></form>{% endif %}</td>
+    <tr data-system-change="{{ c.pk }}" data-system-searchable{% if c.undo_of_id %} class="undo-row"{% endif %}>
+      <td><time datetime="{{ c.created_at|date:'c' }}" title="{{ c.created_at|date:'Y-m-d H:i:s' }}">{% now "Y-m-d" as today %}{% if c.created_at|date:"Y-m-d" == today %}{{ c.created_at|date:"H:i" }}{% else %}{{ c.created_at|date:"j M H:i" }}{% endif %}</time></td>
+      <td>{{ c.user_label|default:"A script" }}</td>
+      <td>{% for key, label in section_labels.items %}{% if key == c.section %}{{ label }}{% endif %}{% empty %}{{ c.section }}{% endfor %}</td>
+      <td>{{ c|what }}</td>
+      <td>{% if c.kind == "updated" or c.kind == "direct" %}<span class="sys-old sys-chip" data-old>{{ c.old_value|shown:c.field }}</span><span class="sys-arrow" aria-label="to">→</span><span class="sys-new sys-chip" data-new>{{ c.new_value|shown:c.field }}</span>{% else %}<span class="sys-muted">{{ c.get_kind_display }}</span>{% endif %}{% if c.undo_of_id %} <span class="sys-badge">Undo of earlier change</span>{% endif %}</td>
+      {% if not compact %}<td>
+        {% with undone=c.undone_by.all %}
+        {% if undone %}<span class="sys-badge">Undone by {{ undone.0.user_label|default:"a script" }}</span>
+        {% elif c.undoable and not c.undo_of_id %}<form method="post" action="{% url 'system_undo' c.pk %}" data-system-undo-form{% if c.field|is_risky %} data-system-risky="{{ c.field }}" data-noun="{{ c.field|risky_noun }}" data-line="{{ c.field|risky_line }}" data-what="{{ c|what }}" data-old="{{ c.new_value|shown:c.field }}" data-new="{{ c.old_value|shown:c.field }}"{% endif %}>{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="sys-btn sm" data-system-undo>Undo</button></form>{% endif %}
+        {% endwith %}
+      </td>{% endif %}
     </tr>
   {% empty %}
-    <tr><td colspan="8" data-system-empty>No changes yet.</td></tr>
+    <tr><td class="sys-empty" colspan="{% if compact %}5{% else %}6{% endif %}" data-system-empty>No changes match these filters.</td></tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>

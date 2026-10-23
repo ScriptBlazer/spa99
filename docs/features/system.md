@@ -61,6 +61,17 @@ Compact, dense and calm: small boxes, small controls, tables you can edit in pla
 | `/team/`, `POST /team/<id>/roles/`, `POST /team/<id>/active/` | Staff users and roles (Owner, Manager, Viewer, Approver, System); deactivate or reactivate. Superuser flags are never changed; you cannot deactivate yourself or drop your own System role; only a superuser can change a superuser |
 | `/health/`, `/robots.txt` | Open |
 
-Nav entries for Plans and pricing, Hours and closures, Gold rules and Journey are stubs (`data-system-soon`, no link) until the next step. No CSS yet (design brief: `docs/design/SYSTEM.md`).
+No CSS yet (design brief: `docs/design/SYSTEM.md`).
 
 New env vars: `SYSTEM_DOMAIN`, `SYSTEM_URL` (both optional locally). Removed: `GOLD_APPROVER_EMAILS`, `GOLD_APPROVER_CC`, `CONTACT_EMAIL`. Caddyfile and docker-compose pass `SYSTEM_DOMAIN`. Nothing is Postgres-only. Run `manage.py migrate` then `setup_roles` after pulling; give a developer the System role with the Django admin (Staff status plus the System group).
+
+### Rule sections (2026-10-23)
+
+Each page lists rows as small forms (field prefix = the row id; `new...` prefixes for add forms); one POST saves one row through `services.save_form` / `save_logged`, so the change log and undo cover it. Invalid input re-renders the page with field errors (400) and saves nothing. Every page puts `risky_fields` in its context (and `data-system-risky` on the forms) for the frontend's confirm step (old -> new). Validation lives in `system/forms_rules.py`; views in `system/views_rules.py`. The nav now has real links. No site-settings cache exists in the code (pages read the rows each time; the only `lru_cache` is the static logo), so there is nothing to clear on save.
+
+| Path | What |
+|---|---|
+| `/plans/`, `POST /plans/add/`, `POST /plans/<id>/`, `POST /plans/<id>/visibility/` | Plans table (name, price ex VAT with inc-VAT shown by the `inc_vat` filter from the stored rate, visits, hours, booking window, upcoming limit, cancel hours, guests, perks JSON checked for key/label/value, description, highlight, visible, order). Add; hide or show. No delete exists. VAT stays on Settings |
+| `/hours/`, `POST /hours/capacity/`, `POST /hours/rules/add/`, `POST /hours/rules/<id>/`, `POST /hours/closures/add/`, `POST /hours/closures/<id>/`, `POST /hours/closures/<id>/delete/` | Capacity and slot sizes; opening rules (times for periods and daily closure, minute offsets for Shabbos / Yom Tov rules); closures add, edit, delete (delete is logged, not undoable) |
+| `/gold/`, `POST /gold/add/`, `POST /gold/<id>/` | Gold rules: points, property flag, active; the High threshold cannot fall below Medium |
+| `/journey/`, `POST /journey/questions/<id>/`, `POST /journey/questions/<id>/options/add/`, `POST /journey/options/<id>/`, `POST /journey/suggestions/<id>/` | Questions (text, screen, order, min choices, active), options (label, order, active, plan points JSON checked against real plan slugs, Gold points, weight, reason), suggestion rules (conditions and plan slugs checked) |

@@ -1,13 +1,13 @@
 {% extends "system/base_bare.html" %}
 {% block main %}
-<h1>Spa 99 System</h1>
-{% if throttled %}<p data-system-error role="alert">Too many attempts. Please wait a few minutes.</p>{% endif %}
-<form method="post" data-system-signin>
+<h1>Sign in</h1>
+{% if throttled %}<p class="sys-note error" data-system-error role="alert">Too many tries. Try again in a few minutes.</p>{% endif %}
+<form method="post" data-system-signin style="display:grid;gap:12px">
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ next }}">
-  {% if form.non_field_errors %}<p data-system-error role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
-  <label>Email <input type="email" name="username" autocomplete="username" required></label>
+  {% if form.non_field_errors %}<p class="sys-note error" data-system-error role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+  <label>Email <input type="email" name="username" autocomplete="username" autofocus required></label>
   <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
-  <button type="submit">Sign in</button>
+  <button type="submit" class="sys-btn primary">Sign in</button>
 </form>
 {% endblock %}

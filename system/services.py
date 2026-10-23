@@ -61,6 +61,32 @@ def save_logged(obj, user, fields=None):
     return obj
 
 
+def save_form(form, user):
+    """Save a valid ModelForm through the change log: a new row is created, an existing one saves only the fields that
+    changed. Returns True when something was written."""
+    obj = form.instance
+    if obj._state.adding:
+        save_logged(obj, user)
+        return True
+    if not form.changed_data:
+        return False
+    save_logged(obj, user, fields=form.changed_data)
+    return True
+
+
+@transaction.atomic
+def delete_logged(obj, user):
+    """Delete a row with the person recorded (the change log keeps a 'deleted' entry)."""
+    obj._history_user = user
+    obj.delete()
+
+
+def toggle_visible(obj, user, visible):
+    """Hide or show a plan (plans are never hard deleted: people and journeys point at them)."""
+    obj.visible = visible
+    return save_logged(obj, user, fields=["visible"])
+
+
 def undo_change(change, user):
     """Put the old value back as a new logged change. Refused unless the field still holds the value this change set
     (otherwise undo the newer change first), and for created, deleted or file entries."""

@@ -20,8 +20,8 @@ from .forms import EmailsForm, SettingsForm
 from .models import SystemChange
 from .permissions import signed_in, unlocked
 
-NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", None), ("hours", "Hours and closures", None),
-       ("gold", "Gold rules", None), ("journey", "Journey", None), ("emails", "Emails", "system_emails"),
+NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", "system_plans"), ("hours", "Hours and closures", "system_hours"),
+       ("gold", "Gold rules", "system_gold"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"),
        ("settings", "Settings", "system_settings"), ("changes", "Change log", "system_changes"), ("team", "Team", "system_team")]
 
 

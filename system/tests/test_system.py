@@ -130,9 +130,9 @@ class ChangeLogTests(TestCase):
         site.capacity = 30
         site.save()  # a script: no person
         response = self.client.get("/changes/?section=hours&user=")
-        self.assertContains(response, "capacity")
-        self.assertContains(response, "a script")
-        self.assertNotContains(self.client.get("/changes/?section=gold"), "capacity")
+        entries = list(response.context["entries"])
+        self.assertEqual([(e.field, e.user_label) for e in entries], [("capacity", "")])  # no person: shown as "a script"
+        self.assertEqual(list(self.client.get("/changes/?section=gold").context["entries"]), [])
 
     def test_created_and_team_entries_cannot_be_undone(self):
         for entry in (SystemChange(kind="created", field="", history_id=1), SystemChange(kind="direct", field="roles")):
@@ -219,5 +219,4 @@ class TeamAndDashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         health = response.context["health"]
         self.assertEqual((health["database_ok"], health["queue_size"], health["counts"]), (True, 0, {"registrations": 12, "gold_applications": 3}))
-        self.assertContains(response, 'data-system-count="registrations">12<')
-        self.assertContains(response, "Register interest: on")
+        self.assertEqual(response.context["stages"][0], ("Register interest", True))

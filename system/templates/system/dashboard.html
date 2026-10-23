@@ -1,31 +1,30 @@
 {% extends "system/base.html" %}
-{% block title %}Dashboard | Spa 99 System{% endblock %}
 {% block main %}
-<h1>Dashboard</h1>
-<section data-system-health aria-label="Health">
-  <h2>Health</h2>
-  <dl>
-    <dt>Database</dt><dd data-system-health-db="{{ health.database_ok|yesno:'ok,error' }}">{{ health.database_ok|yesno:"OK,Not answering" }}</dd>
-    <dt>Queue</dt><dd data-system-health-queue>{{ health.queue_size|default_if_none:"unknown" }}</dd>
-    <dt>Last roll-up</dt><dd data-system-health-rollup>{% if health.last_rollup %}{{ health.last_rollup|date:"j M Y H:i" }}{% else %}Not recorded{% endif %}</dd>
-    <dt>Snapshot age (seconds)</dt><dd data-system-health-snapshot>{{ health.snapshot_age_seconds|default_if_none:"none yet" }}</dd>
-  </dl>
+{% include "system/_page_header.html" with title="Dashboard" description="Stored figures only. Nothing here is counted when the page loads." %}
+<section class="sys-tiles" data-system-health aria-label="Health">
+  <div class="sys-tile" data-system-tile="health"><div class="l">Health {% if health.database_ok %}<span class="sys-badge ok">OK</span>{% else %}<span class="sys-badge danger">Failing</span>{% endif %}</div>
+    <div class="v" data-system-health-db="{{ health.database_ok|yesno:'ok,error' }}">{{ health.database_ok|yesno:"OK,Failing" }}</div><div class="m">Checked {% now "H:i" %}</div></div>
+  <div class="sys-tile" data-system-tile="queue"><div class="l">Queue {% if health.queue_size is None %}<span class="sys-badge warn">Unknown</span>{% endif %}</div>
+    <div class="v" data-system-health-queue>{% if health.queue_size is None %}Unknown{% else %}{{ health.queue_size }}{% endif %}</div><div class="m">pending jobs</div></div>
+  <div class="sys-tile" data-system-tile="rollup"><div class="l">Last roll-up {% if not health.last_rollup %}<span class="sys-badge warn">None yet</span>{% endif %}</div>
+    <div class="v" data-system-health-rollup>{% if health.last_rollup %}{{ health.last_rollup|date:"H:i" }}{% else %}Unknown{% endif %}</div><div class="m">{% if health.last_rollup %}{{ health.last_rollup|timesince }} ago{% else %}Not recorded{% endif %}</div></div>
+  <div class="sys-tile" data-system-tile="snapshot"><div class="l">Snapshot {% if health.snapshot_age_seconds is None %}<span class="sys-badge warn">Unknown</span>{% elif health.snapshot_age_seconds > 900 %}<span class="sys-badge warn">Stale</span>{% endif %}</div>
+    <div class="v" data-system-health-snapshot="{{ health.snapshot_age_seconds|default_if_none:'' }}">{% if health.snapshot_age_seconds is None %}Unknown{% elif health.snapshot_age_seconds < 90 %}{{ health.snapshot_age_seconds }} s{% else %}{% widthratio health.snapshot_age_seconds 60 1 %} min{% endif %}</div><div class="m">Office figures</div></div>
+  <div class="sys-tile" data-system-tile="people"><div class="l">People</div><div class="v" data-system-count="registrations">{{ health.counts.registrations|default:0 }}</div><div class="m">registered</div></div>
+  <div class="sys-tile" data-system-tile="gold"><div class="l">Gold applications</div><div class="v" data-system-count="gold_applications">{{ health.counts.gold_applications|default:0 }}</div><div class="m">all time</div></div>
 </section>
-<section data-system-counts aria-label="Key counts">
-  <h2>Key counts</h2>
-  <dl>
-    <dt>Registrations</dt><dd data-system-count="registrations">{{ health.counts.registrations|default:0 }}</dd>
-    <dt>Gold applications</dt><dd data-system-count="gold_applications">{{ health.counts.gold_applications|default:0 }}</dd>
-  </dl>
-</section>
-<section data-system-stages aria-label="Stage switches">
-  <h2>Stage switches</h2>
-  <ul>{% for label, on in stages %}<li data-system-stage="{{ label }}">{{ label }}: {{ on|yesno:"on,off" }}</li>{% endfor %}</ul>
-  <p><a href="{% url 'system_settings' %}">Change in Settings</a></p>
-</section>
-<section data-system-recent aria-label="Recent changes">
-  <h2>Recent changes</h2>
-  {% include "system/_changes_table.html" with entries=recent %}
-  <p><a href="{% url 'system_changes' %}">All changes</a></p>
-</section>
+<div class="sys-cols">
+  <section class="sys-panel" data-system-recent aria-labelledby="dash-recent">
+    <header><h2 id="dash-recent">Recent changes</h2><a href="{% url 'system_changes' %}">Open change log</a></header>
+    {% include "system/_changes_table.html" with entries=recent compact=True %}
+  </section>
+  <section class="sys-panel" data-system-stages aria-labelledby="dash-stages">
+    <header><h2 id="dash-stages">Stage switches</h2></header>
+    <div class="sys-pad">
+      {% for label, on in stages %}<div class="sys-state" data-system-stage="{{ label }}"><span>{{ label }}</span><span class="sys-badge {% if on %}ok{% endif %}">{{ on|yesno:"On,Off" }}</span></div>{% endfor %}
+      {% if site.opening_date %}<div class="sys-state"><span>Opening date</span><span class="mono">{{ site.opening_date|date:"j M Y" }}</span></div>{% endif %}
+      <p class="sys-muted" style="margin-top:8px"><a href="{% url 'system_settings' %}">Change in Settings</a>. Switches change only there, behind a confirm.</p>
+    </div>
+  </section>
+</div>
 {% endblock %}

@@ -1,0 +1,72 @@
+{% extends "system/base.html" %}
+{% load system_ui %}
+{% block title %}Hours and closures{% endblock %}
+{% block main %}
+{% include "system/_page_header.html" with title="Hours and closures" description="Capacity, opening rules and one-off closures. Changes apply at once." %}
+<ul hidden data-system-risky-fields>{% for name in risky_fields %}<li>{{ name }}</li>{% endfor %}</ul>
+<form method="post" action="{% url 'system_capacity' %}" data-system-form="capacity" data-system-risky="{{ risky_fields|join:',' }}" data-noun="capacity setting" data-plural="capacity settings" data-line="Booking availability changes at once.">{% csrf_token %}
+  <section class="sys-panel" data-system-capacity><header><h2>Capacity and slots</h2></header>
+    <div class="sys-group">
+      {% if capacity_form.non_field_errors %}<p class="sys-note error" role="alert">{{ capacity_form.non_field_errors|join:" " }}</p>{% endif %}
+      {% for field in capacity_form %}{% include "system/_field_row.html" %}{% endfor %}
+    </div>
+  </section>
+  <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>
+</form>
+
+<section class="sys-panel" data-system-rules aria-labelledby="rules-h"><header><h2 id="rules-h">Opening rules</h2></header>
+  <div class="sys-scroll"><table class="sys-table">
+    <thead><tr><th scope="col">Rule</th><th scope="col">Label</th><th scope="col">Start</th><th scope="col">End</th><th scope="col" class="sys-num">Offset (min)</th><th scope="col">Public text</th><th scope="col" class="sys-num">Order</th><th scope="col">Active</th><th scope="col"><span class="sr">Save</span></th></tr></thead>
+    <tbody>
+    {% for row in rules %}{% with pk=row.obj.pk f=row.form %}
+      <tr data-system-rule="{{ row.obj.key }}" data-row-label="{{ row.obj.key }}"{% if not row.obj.active %} data-hidden{% endif %}>
+        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_rule_save' pk %}" data-system-form="rule" data-system-risky="{{ risky_fields|join:',' }}" data-noun="opening rule setting" data-plural="opening rule settings" data-line="Opening hours change at once.">{% csrf_token %}</form>
+          <span class="mono">{{ row.obj.key }}</span> <span class="sys-muted">{{ row.obj.get_kind_display }}</span></td>
+        <td>{% cell f.label pk "Label" %}</td>
+        <td>{% cell f.start_time pk "Start" %}</td>
+        <td>{% cell f.end_time pk "End" %}</td>
+        <td class="sys-num">{% cell f.offset_minutes pk "Offset minutes" %}</td>
+        <td><details class="sys-edit"><summary>Edit</summary><div class="sys-pop2"><label>Public title {% cell f.public_title pk "Public title" %}</label><label>Public note {% cell f.public_note pk "Public note" %}</label></div></details></td>
+        <td class="sys-num">{% cell f.order pk "Order" %}</td>
+        <td>{% cell f.active pk "Active" %}</td>
+        <td><button type="submit" form="f-{{ pk }}" class="sys-btn sm sys-rowsave">Save</button></td>
+      </tr>
+      {% if f.errors %}<tr class="sys-rowerr"><td colspan="9" class="sys-error" role="alert">{{ row.obj.key }}: {{ f|error_text }}</td></tr>{% endif %}
+    {% endwith %}{% empty %}<tr><td class="sys-empty" colspan="9">No opening rules yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+<details class="sys-panel" data-system-add="rule"{% if rule_add_form.errors %} open{% endif %}><summary class="sys-add">Add a rule</summary>
+  <form method="post" action="{% url 'system_rule_add' %}" data-system-form="rule-add" class="sys-group">{% csrf_token %}
+    {% include "system/_fields.html" with form=rule_add_form %}
+    <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add rule</button></div>
+  </form>
+</details>
+
+<section class="sys-panel" data-system-closures aria-labelledby="closures-h"><header><h2 id="closures-h">Closures</h2></header>
+  <div class="sys-scroll"><table class="sys-table">
+    <thead><tr><th scope="col">Name</th><th scope="col">Starts</th><th scope="col">Ends</th><th scope="col">Public note</th><th scope="col">Active</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
+    <tbody>
+    {% for row in closures %}{% with pk=row.obj.pk f=row.form %}
+      <tr data-system-closure="{{ pk }}" data-row-label="{{ row.obj.name }}"{% if not row.obj.active %} data-hidden{% endif %}>
+        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_closure_save' pk %}" data-system-form="closure" data-system-risky="{{ risky_fields|join:',' }}" data-noun="closure setting" data-plural="closure settings" data-line="Booking is blocked or opened for these dates at once.">{% csrf_token %}</form>
+          <form id="d-{{ pk }}" method="post" action="{% url 'system_closure_delete' pk %}" data-system-form="closure-delete" data-system-confirm="closure" data-system-confirm-label="Remove closure" data-system-confirm-what="{{ row.obj.name }}" data-noun="closure" data-plural="closures" data-line="Booking opens for these dates at once. This is logged but cannot be undone.">{% csrf_token %}</form>
+          {% cell f.name pk "Name" %}</td>
+        <td>{% cell f.starts_at pk "Starts" %}</td>
+        <td>{% cell f.ends_at pk "Ends" %}</td>
+        <td>{% cell f.public_note pk "Public note" %}</td>
+        <td>{% cell f.active pk "Active" %}</td>
+        <td><button type="submit" form="f-{{ pk }}" class="sys-btn sm sys-rowsave">Save</button> <button type="submit" form="d-{{ pk }}" class="sys-btn sm">Remove</button></td>
+      </tr>
+      {% if f.errors %}<tr class="sys-rowerr"><td colspan="6" class="sys-error" role="alert">{{ row.obj.name }}: {{ f|error_text }}</td></tr>{% endif %}
+    {% endwith %}{% empty %}<tr><td class="sys-empty" colspan="6" data-system-empty>No closures yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+<details class="sys-panel" data-system-add="closure"{% if closure_add_form.errors %} open{% endif %}><summary class="sys-add">Add closure</summary>
+  <form method="post" action="{% url 'system_closure_add' %}" data-system-form="closure-add" class="sys-group">{% csrf_token %}
+    {% include "system/_fields.html" with form=closure_add_form %}
+    <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add closure</button></div>
+  </form>
+</details>
+{% endblock %}

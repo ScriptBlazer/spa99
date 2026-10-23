@@ -1,29 +1,71 @@
-{% comment %}The System shell. Minimal on purpose: stable data-system-* hooks for the designer (docs/design/SYSTEM.md); no CSS yet.
-Pages fill: title, main. Set `section` in the view.{% endcomment %}<!doctype html>
+{% load static system_ui %}{% system_env as env %}{% comment %}
+The System shell (docs/design/SYSTEM.md). Pages fill: title (the section name, no suffix), main. Set `section` in the view.
+Any `<form data-system-form="<section>">` gets the save bar, dirty marks, Cmd/Ctrl+S and the risky-change confirm for free
+(fields with a name listed in system_ui.RISKY are confirmed). Environment: `system_env` ("dev"/"live") in the context, else DEBUG.
+{% endcomment %}<!doctype html>
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>{% block title %}Spa 99 System{% endblock %}</title>
+<meta name="color-scheme" content="light">
+<title>{{ env|upper }} · {% block title %}{% for key, label, url_name in nav %}{% if key == section %}{{ label }}{% endif %}{% endfor %}{% endblock %} · System</title>
+<link rel="icon" href="{% static 'common/img/mark-gold.svg' %}" type="image/svg+xml">
+<link rel="stylesheet" href="{% static 'common/css/fonts.css' %}">
+<link rel="stylesheet" href="{% static 'common/css/tokens.css' %}">
+<link rel="stylesheet" href="{% static 'common/css/system.css' %}">
+<link rel="stylesheet" href="{% static 'common/css/system-tables.css' %}">
+<script>document.documentElement.classList.add('js')</script>
+<script type="module" src="{% static 'common/js/system.js' %}"></script>
 {% block head_extra %}{% endblock %}
 </head>
-<body class="system" data-system-section="{{ section }}">
-<nav data-system-nav aria-label="System">
-  <ul>
-    {% for key, label, url_name in nav %}
-    <li>{% if url_name %}<a href="{% url url_name %}" data-system-nav-item="{{ key }}"{% if section == key %} aria-current="page"{% endif %}>{{ label }}</a>{% else %}<span data-system-nav-item="{{ key }}" data-system-soon aria-disabled="true">{{ label }} (next)</span>{% endif %}</li>
-    {% endfor %}
-  </ul>
-  <div data-system-who>
-    <span data-system-user>{{ request.user.email }}</span>
-    <form method="post" action="{% url 'system_lock' %}" data-system-lock>{% csrf_token %}<button type="submit">Lock</button></form>
-    <form method="post" action="{% url 'logout' %}" data-system-signout>{% csrf_token %}<button type="submit">Sign out</button></form>
+<body class="system{% if env == 'live' %} live{% endif %}" data-system-section="{{ section }}" data-env="{{ env }}" data-system-idle="{% system_idle_seconds %}" data-system-ping="{% url 'system_emails' %}" data-system-unlock-url="{% url 'system_unlock' %}">
+{% if env == "live" %}<div class="sys-stripe" aria-hidden="true"></div>{% endif %}
+<a class="sys-skip" href="#system-main">Skip to content</a>
+<header class="sys-top" data-system-top>
+  <button type="button" class="sys-btn sm sys-menu-btn" data-system-menu aria-expanded="false" aria-controls="system-nav">Menu</button>
+  <a class="sys-brand" href="{% url 'system_dashboard' %}"><img src="{% static 'common/img/mark-gold.svg' %}" alt="" width="11" height="16"><span>System</span></a>
+  <span class="sys-env" data-system-env="{{ env }}" data-env="{{ env }}" title="{% if env == 'live' %}This is the live site{% else %}This is the development copy{% endif %}">{{ env|upper }}</span>
+  <span class="sys-grow"></span>
+  <div class="sys-lock-timer" data-system-timer>
+    <span data-system-timer-text>Locks in 15 min</span>
+    <button type="button" class="sys-btn sm" data-system-stay hidden>Stay unlocked</button>
   </div>
-</nav>
-<main id="system-main" data-system-main>
-  {% if messages %}<ul data-system-messages>{% for message in messages %}<li data-system-message="{{ message.level_tag }}">{{ message }}</li>{% endfor %}</ul>{% endif %}
-  {% block main %}{% endblock %}
-</main>
+  <details class="sys-who" data-system-who>
+    <summary><span data-system-user>{{ request.user.email }}</span></summary>
+    <div class="sys-pop">
+      <p>{% if request.user.is_superuser %}Superuser{% else %}System group{% endif %}</p>
+      <a href="{% office_url %}" data-system-office>Open Office</a>
+      <form method="post" action="{% url 'logout' %}" data-system-signout>{% csrf_token %}<button type="submit">Sign out</button></form>
+    </div>
+  </details>
+  <form method="post" action="{% url 'system_lock' %}" data-system-lock>{% csrf_token %}<button type="submit" class="sys-btn">Lock</button></form>
+</header>
+<div class="sys-app">
+  <nav class="sys-nav" id="system-nav" data-system-nav aria-label="System">
+    <ul>
+      {% for key, label, url_name in nav %}{% if key != "changes" %}
+      <li>{% if url_name %}<a href="{% url url_name %}" data-system-nav-item="{{ key }}"{% if section == key %} aria-current="page"{% endif %}>{{ label }}{% if section == key %}<span class="sys-dot" data-system-dot hidden title="Unsaved changes"></span>{% endif %}</a>{% else %}<span class="sys-soon" data-system-nav-item="{{ key }}" data-system-soon aria-disabled="true">{{ label }} <small>Coming soon</small></span>{% endif %}</li>{% endif %}{% endfor %}
+      <li><hr></li>
+      {% for key, label, url_name in nav %}{% if key == "changes" %}
+      <li>{% if url_name %}<a href="{% url url_name %}" data-system-nav-item="{{ key }}"{% if section == key %} aria-current="page"{% endif %}>{{ label }}{% if section == key %}<span class="sys-dot" data-system-dot hidden title="Unsaved changes"></span>{% endif %}</a>{% else %}<span class="sys-soon" data-system-nav-item="{{ key }}" data-system-soon aria-disabled="true">{{ label }} <small>Coming soon</small></span>{% endif %}</li>{% endif %}{% endfor %}
+    </ul>
+    <div class="sys-nav-meta">
+      <p>{{ request.user.email }}</p>
+      <p data-system-timer-mirror></p>
+      <p>{% if request.user.is_superuser %}Superuser{% else %}System group{% endif %}</p>
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit" class="sys-btn sm" style="margin-top:8px">Sign out</button></form>
+    </div>
+  </nav>
+  <div class="sys-scrim" data-system-scrim hidden></div>
+  <main class="sys-main" id="system-main" data-system-main>
+    {% if messages %}<ul class="sys-stack" data-system-messages>{% for message in messages %}<li class="sys-note {{ message.level_tag }}" data-system-message="{{ message.level_tag }}" data-undo="{{ message.extra_tags|split_extra:'undo' }}">{{ message }}</li>{% endfor %}</ul>{% endif %}
+    {% block main %}{% endblock %}
+    {% include "system/_save_bar.html" %}
+  </main>
+</div>
+{% include "system/_confirm.html" %}
+<div class="sys-toasts" data-system-toasts role="status" aria-live="polite"></div>
+<template id="system-csrf">{% csrf_token %}</template>
 </body>
 </html>

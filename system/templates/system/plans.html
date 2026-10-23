@@ -1,0 +1,42 @@
+{% extends "system/base.html" %}
+{% load system_tags system_ui %}
+{% block title %}Plans and pricing{% endblock %}
+{% block main %}
+{% include "system/_page_header.html" with title="Plans and pricing" description="Prices are ex VAT. Changes apply at once." %}
+<ul hidden data-system-risky-fields>{% for name in risky_fields %}<li>{{ name }}</li>{% endfor %}</ul>
+<section class="sys-panel" data-system-plans aria-labelledby="plans-h">
+  <header><h2 id="plans-h">Plans</h2><span class="sys-muted">VAT <span class="mono">{{ vat_rate }}%</span> · <a href="{% url 'system_settings' %}">change in Settings</a></span></header>
+  <div class="sys-scroll"><table class="sys-table">
+    <thead><tr><th scope="col">Plan</th><th scope="col" class="sys-num">Price ex VAT</th><th scope="col" class="sys-num">Inc VAT</th><th scope="col" class="sys-num">Visits</th><th scope="col" class="sys-num">Hours</th><th scope="col" class="sys-num">Window (days)</th><th scope="col" class="sys-num">Upcoming</th><th scope="col" class="sys-num">Cancel (h)</th><th scope="col" class="sys-num">Guests</th><th scope="col" class="sys-num">Order</th><th scope="col">Highlight</th><th scope="col">Visible</th><th scope="col">Text and perks</th><th scope="col"><span class="sr">Save</span></th></tr></thead>
+    <tbody>
+    {% for row in rows %}{% with pk=row.obj.pk f=row.form %}
+      <tr data-system-plan="{{ row.obj.slug }}" data-row-label="{{ row.obj.slug }}"{% if not row.obj.visible %} data-hidden{% endif %}>
+        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_plan_save' pk %}" data-system-form="plan" data-system-risky="{{ risky_fields|join:',' }}" data-noun="plan setting" data-plural="plan settings" data-line="Members see the changes at once.">{% csrf_token %}</form>
+          {% cell f.name pk "Name" %} <span class="mono sys-muted" data-system-plan-name>{{ row.obj.slug }}</span>{% if not row.obj.visible %} <span class="sys-badge">Hidden</span>{% endif %}</td>
+        <td class="sys-num">£ {% cell f.price_ex_vat pk "Price ex VAT" %}</td>
+        <td class="sys-num" data-system-price-inc-vat>£{{ row.obj.price_ex_vat|inc_vat:vat_rate }}</td>
+        <td class="sys-num">{% cell f.visits_per_month pk "Visits" %}</td>
+        <td class="sys-num">{% cell f.hours pk "Hours" %}</td>
+        <td class="sys-num">{% cell f.booking_window_days pk "Booking window (days)" %}</td>
+        <td class="sys-num">{% cell f.upcoming_limit pk "Upcoming limit" %}</td>
+        <td class="sys-num">{% cell f.cancel_hours pk "Cancel hours" %}</td>
+        <td class="sys-num">{% cell f.guests_per_month pk "Guests per month" %}</td>
+        <td class="sys-num">{% cell f.order pk "Order" %}</td>
+        <td>{% cell f.highlight pk "Highlight" %}</td>
+        <td>{% cell f.visible pk "Visible" %}</td>
+        <td><details class="sys-edit"><summary>Edit</summary><div class="sys-pop2"><label>Short description {% cell f.short_description pk "Short description" %}</label><label>Perks (JSON) {% cell f.perks pk "Perks" %}</label></div></details></td>
+        <td><button type="submit" form="f-{{ pk }}" class="sys-btn sm sys-rowsave">Save</button></td>
+      </tr>
+      {% if f.errors %}<tr class="sys-rowerr"><td colspan="14" class="sys-error" role="alert">{{ row.obj.slug }}: {{ f|error_text }}</td></tr>{% endif %}
+    {% endwith %}{% empty %}<tr><td class="sys-empty" colspan="14">No plans yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+<details class="sys-panel" data-system-add="plan"{% if add_form.errors %} open{% endif %}>
+  <summary class="sys-add">Add a plan</summary>
+  <form method="post" action="{% url 'system_plan_add' %}" data-system-form="plan-add" class="sys-group">{% csrf_token %}
+    {% include "system/_fields.html" with form=add_form %}
+    <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add plan</button></div>
+  </form>
+</details>
+{% endblock %}

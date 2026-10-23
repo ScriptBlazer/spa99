@@ -1,18 +1,24 @@
 {% extends "system/base.html" %}
-{% block title %}Change log | Spa 99 System{% endblock %}
 {% block main %}
-<h1>Change log</h1>
-<form method="get" data-system-filters>
-  <label>Section <select name="section"><option value="">All</option>{% for key, label in section_labels.items %}<option value="{{ key }}"{% if params.section == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-  <label>Who <input type="text" name="user" value="{{ params.user }}"></label>
-  <label>From <input type="date" name="date_from" value="{{ params.date_from }}"></label>
-  <label>To <input type="date" name="date_to" value="{{ params.date_to }}"></label>
-  <button type="submit">Filter</button>
-</form>
-{% include "system/_changes_table.html" %}
-<nav data-system-pages aria-label="Pages">
-  {% if entries.has_previous %}<a href="?page={{ entries.previous_page_number }}&section={{ params.section|urlencode }}&user={{ params.user|urlencode }}&date_from={{ params.date_from|urlencode }}&date_to={{ params.date_to|urlencode }}">Newer</a>{% endif %}
-  <span>Page {{ entries.number }} of {{ entries.paginator.num_pages }}</span>
-  {% if entries.has_next %}<a href="?page={{ entries.next_page_number }}&section={{ params.section|urlencode }}&user={{ params.user|urlencode }}&date_from={{ params.date_from|urlencode }}&date_to={{ params.date_to|urlencode }}">Older</a>{% endif %}
-</nav>
+{% include "system/_page_header.html" with title="Change log" description="Every change made in System. Undo restores the old value as a new change." %}
+<section class="sys-panel" aria-label="Changes">
+  <form method="get" class="sys-filters" data-system-filters role="search">
+    <label>Section <select name="section" aria-label="Section"><option value="">All</option>{% for key, label in section_labels.items %}<option value="{{ key }}"{% if params.section == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>Person <input type="text" name="user" value="{{ params.user }}" placeholder="Email" autocomplete="off" aria-label="Person"></label>
+    <span class="sys-seg" role="group" aria-label="Date range" data-system-range hidden>
+      <label><input type="radio" name="range" value="1">Today</label><label><input type="radio" name="range" value="7">7 days</label><label><input type="radio" name="range" value="30">30 days</label><label><input type="radio" name="range" value="" checked>Custom</label>
+    </span>
+    <label>From <input type="date" name="date_from" value="{{ params.date_from }}"></label>
+    <label>To <input type="date" name="date_to" value="{{ params.date_to }}"></label>
+    <input type="search" data-system-search placeholder="Find a field or value" aria-label="Find a field or value on this page" hidden>
+    <button type="submit" class="sys-btn">Filter</button>
+    {% if params.section or params.user or params.date_from or params.date_to %}<a href="{% url 'system_changes' %}" data-system-clear>Clear filters</a>{% endif %}
+  </form>
+  {% include "system/_changes_table.html" %}
+  <nav class="sys-more" data-system-pages aria-label="Pages">
+    {% if entries.has_previous %}<a href="?page={{ entries.previous_page_number }}&section={{ params.section|urlencode }}&user={{ params.user|urlencode }}&date_from={{ params.date_from|urlencode }}&date_to={{ params.date_to|urlencode }}">Newer</a>{% endif %}
+    <span>Page {{ entries.number }} of {{ entries.paginator.num_pages }}</span>
+    {% if entries.has_next %}<a href="?page={{ entries.next_page_number }}&section={{ params.section|urlencode }}&user={{ params.user|urlencode }}&date_from={{ params.date_from|urlencode }}&date_to={{ params.date_to|urlencode }}" data-system-more>Load 50 more</a>{% endif %}
+  </nav>
+</section>
 {% endblock %}

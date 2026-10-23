@@ -1,10 +1,14 @@
 {% extends "system/base.html" %}
-{% block title %}Emails | Spa 99 System{% endblock %}
 {% block main %}
-<h1>Emails</h1>
-<p>Recipients. Sender address and mail transport stay in the server settings.</p>
+{% include "system/_page_header.html" with title="Emails" description="Who receives Gold applications and where replies go. Sender address and mail transport stay in the server settings." %}
 <form method="post" data-system-form="emails">{% csrf_token %}
-  {% include "system/_fields.html" %}
-  <button type="submit">Save</button>
+  <section class="sys-panel">
+    <header><h2>Recipients</h2></header>
+    <div class="sys-group">
+      {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error>{{ form.non_field_errors|join:" " }}</p>{% endif %}
+      {% for field in form %}{% include "system/_field_row.html" %}{% endfor %}
+    </div>
+  </section>
+  <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>
 </form>
 {% endblock %}
