@@ -2,15 +2,21 @@
 
 Config comes from common.envloader (env vars -> private .env -> project .env -> defaults).
 """
+import os
 from datetime import time
 from pathlib import Path
 
 from common.envloader import load_env
+from common.observability import init_sentry
 from common.settings_helpers import build_databases, build_media_storage, describe_database
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ENV = load_env(BASE_DIR)
 PRIVATE_DIR = ENV.private_dir
+
+# Sentry: off when SENTRY_DSN is empty. Environment tag defaults to "live" under the prod settings, else "dev".
+_default_sentry_environment = "live" if os.environ.get("DJANGO_SETTINGS_MODULE", "").endswith(".prod") else "dev"
+SENTRY_STATE = init_sentry(ENV, _default_sentry_environment)  # "off" or "on(<environment>)"
 
 # Not a secret: only ever used when SECRET_KEY is unset locally. prod.py refuses to start with it.
 DEV_SECRET_KEY = "dev-insecure-key-not-for-production-use-0123456789abcdef"
@@ -58,6 +64,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "common.observability.SentryContextMiddleware",  # Sentry host/staff tags and user id (no-op when Sentry is off)
     "system.middleware.AuditContextMiddleware",  # staff edits (admin too) are logged with IP and browser
     # Locked by default: every view needs a login unless marked @login_not_required.
     "django.contrib.auth.middleware.LoginRequiredMiddleware",
@@ -212,6 +219,7 @@ def build_startup_report(settings_module):
         "database": describe_database(DATABASES),
         "hosts": f"office={OFFICE_HOST} control={CONTROL_HOST} system={SYSTEM_HOST}",
         "media": MEDIA_DESCRIPTION,
+        "sentry": SENTRY_STATE,
         "media_is_local": MEDIA_IS_LOCAL,
         "missing_keys": ENV.missing_example_keys(),
     }

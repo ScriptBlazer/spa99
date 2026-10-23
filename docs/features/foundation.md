@@ -26,6 +26,13 @@ No visible pages. Everything later phases sit on.
 - `export_user_data` covers everything `delete_user_data` removes: profile, login events (by user and by attempted email) and history rows.
 - Error pages: 400, 403, 404, 500; CSRF failures show the 403 page.
 
+## Errors and Sentry
+- `common/observability.py`: `init_sentry` runs from `base.py` after the env loads. Off when `SENTRY_DSN` is empty. Env: `SENTRY_DSN`, `SENTRY_ENVIRONMENT` (default `dev`, `live` under prod settings), `APP_VERSION` (release; docker-compose passes `APP_TAG`; no git calls at runtime), `SENTRY_TRACES_SAMPLE_RATE` and `SENTRY_PROFILES_SAMPLE_RATE` (default 0). Dev sends too when a DSN is set; tests never do.
+- Getting the DSN: Sentry > create a new Django project > Settings > Client Keys (DSN). Locally put it in `SPA99_PRIVATE_DIR/env/.env`; on live put it in the server env file. Test with `manage.py sentry_test` (prints whether a DSN is set and the event ids, never the DSN).
+- Events: Django integration, ERROR+ log records become events, INFO records are breadcrumbs. django-q failures are logged at ERROR by its monitor (`Failed '...'`), so they arrive with no extra hook.
+- Privacy: `send_default_pii=False`; `before_send` removes cookies, Authorization/Cookie/X-CSRFToken headers, request bodies, query strings on `/journey/ /register/ /gold-card/apply/ /login/ /unlock/`, values under keys containing password/token/secret/key/email/phone/mobile/name/address, and email addresses in messages. Only user id plus `staff` and `host` (public/office/control/system, `worker` for jobs) tags are sent (`SentryContextMiddleware`).
+- Ignored: Http404, PermissionDenied, DisallowedHost, client disconnects, 429s. The startup log line ends with `sentry=on(live)` or `sentry=off`. Server side only: no browser SDK, so the CSP needs no change.
+
 ## Known follow-ups
 - (Closed) Public login route: `/login/` now works on both hosts (see `register-interest.md`).
 - Rate limiting uses Django's default cache, which is per process: with 3 gunicorn workers the real limit is about 3x. Move `CACHES` to the database or Redis if a hard limit matters.

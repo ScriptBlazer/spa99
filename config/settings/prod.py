@@ -53,11 +53,6 @@ SECURE_HSTS_SECONDS = 0
 TRUST_FORWARDED_FOR = True  # we only ever sit behind Caddy
 CLIENT_IP_HEADER = ENV.get("CLIENT_IP_HEADER", "X-Client-IP")  # set by Caddy from {client_ip}; empty = use X-Forwarded-For
 
-_sentry_dsn = ENV.get("SENTRY_DSN")
-if _sentry_dsn:
-    import sentry_sdk
-
-    sentry_sdk.init(dsn=_sentry_dsn, send_default_pii=False, traces_sample_rate=0)
 
 STARTUP_REPORT = build_startup_report("config.settings.prod")
 STARTUP_REPORT["database"] = describe_database(DATABASES)
