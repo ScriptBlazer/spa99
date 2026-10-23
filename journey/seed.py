@@ -33,6 +33,8 @@ INDUSTRY = [
     ("property", "Property"), ("finance", "Finance"), ("business_owner", "Business owner"), ("law", "Law"),
     ("medical", "Medical"), ("tech", "Tech"), ("creative", "Creative"), ("other", "Other"),
 ]
+# Gold points per occupation (Moishe 2026-10-23): these reach the "Gold might suit you" level, like a property owner.
+INDUSTRY_GOLD_POINTS = {"finance": 3, "business_owner": 3, "law": 3}
 PROPERTY_LINK = [
     ("owner_investor", "Owner or investor"), ("developer", "Developer"), ("manager", "Manager (block, estate, portfolio)"),
     ("firm", "At a property or management firm"), ("agent", "Agent or broker"), ("property_lawyer", "Property lawyer"),
@@ -98,6 +100,8 @@ def run(ensure):
         })
         for position, option in enumerate(options, start=1):
             value, fields = _normalise(option)
+            if key == "industry" and value in INDUSTRY_GOLD_POINTS:
+                fields["gold_points"] = INDUSTRY_GOLD_POINTS[value]
             ensure(Option, {"question": question, "value": value}, {**fields, "order": position})
 
     ensure(SuggestionRule, {"name": "Evening or late night: not for daytime-only plans"}, {

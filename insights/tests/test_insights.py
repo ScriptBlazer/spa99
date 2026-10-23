@@ -95,7 +95,7 @@ class StatisticsTests(TestCase):
         qs = services.sessions()
         industries = services.industries(qs)
         self.assertEqual((industries["answered"], industries["property_sessions"], industries["property_percent"]), (2, 1, 50.0))
-        self.assertEqual(industries["gold_potential"], {"high": 1, "medium": 0, "low": 1})
+        self.assertEqual(industries["gold_potential"], {"high": 1, "medium": 1, "low": 0})  # finance now reaches medium
         company = {o["value"]: o["count"] for o in services.company(qs)["options"]}
         self.assertEqual((company["sometimes"], company["alone"]), (1, 1))
         sources = services.sources(qs)

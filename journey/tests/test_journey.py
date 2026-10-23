@@ -103,14 +103,17 @@ class GoldPotentialTests(TestCase):
 
     def test_thresholds_from_the_journey(self):
         self.assertEqual(self.level().level, "low")
-        self.assertEqual(self.level(industry="finance").level, "low")
+        self.assertEqual(self.level(industry="finance").level, "medium")  # Finance, Business owner, Law: 3 points (2026-10-23)
+        self.assertEqual(self.level(industry="business_owner").level, "medium")
+        self.assertEqual(self.level(industry="tech").level, "low")
+        self.assertEqual(self.level(industry="medical").level, "low")
         owner = self.level(industry="property", property_link="owner_investor")
         self.assertEqual((owner.level, owner.score), ("medium", 5))  # a property link without scale
         scaled = self.level(industry="property", property_link="owner_investor", property_size="50_199")
         self.assertEqual((scaled.level, scaled.score), ("high", 7))
         self.assertEqual(self.level(industry="property", property_link="firm").level, "medium")
-        self.assertEqual(self.level(industry="law", property_law="yes").level, "medium")  # property lawyer
-        self.assertEqual(self.level(industry="law", property_law="no").level, "low")
+        self.assertEqual(self.level(industry="law", property_law="yes").level, "high")  # law 3 + property lawyer 3
+        self.assertEqual(self.level(industry="law", property_law="no").level, "medium")
 
     def test_weights_and_thresholds_are_editable(self):
         GoldRule.objects.filter(group="threshold", match_value="high").update(points=5)
@@ -121,7 +124,7 @@ class GoldPotentialTests(TestCase):
     def test_hidden_answers_do_not_count(self):
         session = make_session(industry="property", property_link="owner_investor", property_size="200_plus")
         self.assertEqual(engine.compute_gold(session).level, "high")
-        services.save_answer(session, "industry", options=["finance"])  # property questions disappear
+        services.save_answer(session, "industry", options=["tech"])  # property questions disappear
         self.assertEqual(engine.compute_gold(session).level, "low")
 
 

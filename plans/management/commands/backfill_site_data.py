@@ -137,6 +137,7 @@ def backfill():
     changed.update(_gold_invite_emails())
     changed.update(_approver_email_rows())
     changed.update(_gold_bml_no_off())
+    changed.update(_industry_gold_points())
     return changed
 
 
@@ -163,6 +164,20 @@ def _gold_bml_no_off():
     updated = GoldChoice.objects.filter(group="bml", value="no", active=True).update(active=False)
     if updated:
         changed["gold.GoldChoice (BML: No switched off)"] += updated
+    return changed
+
+
+def _industry_gold_points():
+    """2026-10-23 (Moishe): Finance, Business owner and Law reach the Gold suggestion (3 points each, like a property
+    owner). Only options still at 0 are set, so a value already changed in System is never overwritten."""
+    from journey.models import Option
+    from journey.seed import INDUSTRY_GOLD_POINTS
+
+    changed = Counter()
+    for value, points in INDUSTRY_GOLD_POINTS.items():
+        updated = Option.objects.filter(question__key="industry", value=value, gold_points=0).update(gold_points=points)
+        if updated:
+            changed[f"journey.Option (industry {value}: {points} Gold points)"] += updated
     return changed
 
 
