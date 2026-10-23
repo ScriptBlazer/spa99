@@ -12,6 +12,7 @@
       <p class="muted flow-loading">One moment</p>
     </div>
   </div>
+  <div class="container flow-note"><p class="small muted"><a href="{% url 'privacy' %}">How we use your answers</a></p></div>
   <noscript><div class="container flow-container"><p class="lead">The guided journey needs JavaScript. You can <a href="{% url 'memberships' %}">see the memberships</a> instead.</p></div></noscript>
 </div>
 {{ journey_config|json_script:"journey-config" }}

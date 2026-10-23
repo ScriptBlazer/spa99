@@ -37,3 +37,15 @@ class HomeImageTests(TestCase):
         names = re.findall(r"img/([a-z0-9-]+)-480\.webp", html)
         self.assertIn("cold-plunge", names)
         self.assertEqual(len(names), len(set(names)), names)
+
+
+class SmallFixTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_header_has_no_tailor_button_and_journey_links_privacy(self):
+        home = self.client.get("/").content.decode()
+        header = home[home.index("<header"):home.index("</dialog>")]
+        self.assertNotIn("Tailor your membership", header)
+        self.assertIn('href="/privacy/"', self.client.get("/journey/").content.decode())
