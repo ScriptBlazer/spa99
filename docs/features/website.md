@@ -18,11 +18,11 @@ All copy and images come from `content` (editable in Control). Plan details come
 |---|---|
 | **Home** | Full-bleed hero, "Beyond Luxury". The spa in a few calm scenes. Entry to the journey ("Find your membership"). Memberships teaser. Gold teaser. Opening January 2027 |
 | **The spa** | Facilities: wet sauna, dry sauna, cold plunge and showers, relaxing zone, gym, massage room, kitchenette. One image and a line each. How a visit works (book, arrive, stay as long as you like) |
-| **Memberships** | Tier 1, 2, 3 and single visit from `plans` (price ex VAT shown with inc VAT), what each includes. Tier 2 highlighted. "Not sure? Find yours" → journey. Register interest per tier |
+| **Memberships** | Tier 1, 2, 3 and single visit from `plans` (price ex VAT shown with inc VAT), what each includes. Tier 2 highlighted. "Not sure? Find yours" → journey. Register per tier |
 | **Gold Card** | What it is, who it's for (property), perks. Apply |
 | **Journey** | See `journey.md` |
-| **Book** | Finished-looking placeholder: "Booking opens soon." Register interest to hear first. No fake working buttons |
-| **Register interest / Sign in / Account** | See `register-interest.md` |
+| **Book** | Finished-looking placeholder: "Booking opens soon." Register to hear first. No fake working buttons |
+| **Register / Sign in / Account** | See `register-interest.md` |
 | **Visit us** | 99 Vale Road, London N4 1PR. Map (static image, no third-party tracking). Contact: hello@spa99.uk |
 | **Privacy, Terms** | Legal text (to be supplied) |
 | **404 / error** | Branded, plain words, back to home |

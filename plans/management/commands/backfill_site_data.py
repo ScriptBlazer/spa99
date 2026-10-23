@@ -27,6 +27,8 @@ written by hand:
 
 - (Gold approval, 2026-10-23) the `gold_invite` and `gold_active` email rows are created when missing
 
+- ("Register interest" becomes "Register", 2026-10-23) the button / heading / title rows, only while exactly the old wording
+
 - (virtual tour, 2026-10-23) the `tour` page and its rows, and the `spa` `tour_link` row, are created when missing
 
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
@@ -190,6 +192,18 @@ OLD_SECTION_TEXT = [  # page key, section key, field, old value, new value
     *[("spa", "arrive_kit", "body", old, content_seed.KIT_BODY) for old in OLD_KIT_BODIES],
     ("memberships", "every_visit", "body", "Every visit: {kit}, and every room.", "Every visit: every room, as long as you like."),
     ("spa", "step_2", "body", "A towel, robe and slippers are waiting.", "Leave the day at the door."),
+    # "Register interest" becomes "Register" everywhere (2026-10-23, owner decision)
+    ("home", "opening", "cta_label", "Register interest", "Register"),
+    ("memberships", "register_label", "cta_label", "Register interest", "Register"),
+    ("memberships", "continue", "body", "Register your interest. Nothing to pay now.", "Register. Nothing to pay now."),
+    ("journey", "result_cta", "cta_label", "Register interest in {plan}", "Register for {plan}"),
+    ("book", "placeholder", "cta_label", "Register interest", "Register"),
+    ("register", "intro", "heading", "Register interest", "Register"),
+]
+# (page key, field, old value, new value) for the Page row itself
+OLD_PAGE_TEXT = [
+    ("register", "title", "Register interest", "Register"),
+    ("register", "meta_description", "Register your interest in Spa 99.", "Register at Spa 99. Nothing to pay now."),
 ]
 # Retired, never deleted: hidden from new journeys, old answers keep their label. (question, value, old label)
 OLD_RETIRED_OPTIONS = [("company", "often", "Often with someone (Most visits.)"), ("heard_via", "instagram", "Instagram"),
@@ -242,6 +256,12 @@ def _journey_and_gold_2026_10_23():
             setattr(section, field, new)
             section.save()
             changed["content.Section (journey / Gold apply / spa / home wording)"] += 1
+    for page_key, field, old, new in OLD_PAGE_TEXT:
+        page = Page.objects.filter(key=page_key, **{field: old}).first()
+        if page is not None:
+            setattr(page, field, new)
+            page.save()
+            changed["content.Page (Register wording)"] += 1
     changed.update(_journey_options_2026_10_23())
     return changed
 

@@ -33,7 +33,7 @@ Mobile-usable, fast, calm. Same shared buttons, modal, messages and validation a
 | **Journey** | Questions and options: add, edit, reorder, hide. Plan points and Gold points per option. Suggestion rules and tie-break. Preview the journey |
 | **Plans** | Tiers and single visit: name, price ex VAT, visits, hours (daytime/any), booking window, upcoming limit, cancel hours, guests, perks, shown on site yes/no, order. VAT rate setting |
 | **Hours** | Daytime/evening times, daily closure, Shabbos/Yom Tov rule offsets, one-off closures, capacity. (Used by the site now, by bookings later) |
-| **Content** | Site copy and images per page/section; facilities and their descriptions; "Register interest" vs "Join" wording; booking placeholder text |
+| **Content** | Site copy and images per page/section; facilities and their descriptions; "Register" vs "Join" wording; booking placeholder text |
 | **Gold rules** | Potential weights and thresholds; which answers count as property |
 | **Notifications** | Gold alert recipients; email templates preview; send log |
 | **Settings** | Opening date (when set), stage switches (register interest / subscribe / book), contact details |

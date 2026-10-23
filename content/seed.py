@@ -32,7 +32,7 @@ PAGES = {
         ("memberships_teaser", "Three memberships. One single visit.", "", "Compare memberships", "/memberships/"),
         ("gold_teaser", "The Gold Card.", "For people in property. Free, by application.", "About the Gold Card", "/gold-card/"),
         ("opening_label", "", "Launching", "", ""),
-        ("opening", "{opening}.", "99 Vale Road, London N4.", "Register interest", "/register/"),
+        ("opening", "{opening}.", "99 Vale Road, London N4.", "Register", "/register/"),
     ]),
     "spa": ("The spa", "Sauna, cold plunge, relaxing zone, gym and massage at 99 Vale Road.", [
         ("intro", "The spa.", "{rooms} spaces, one quiet visit.", "", ""),
@@ -83,8 +83,8 @@ PAGES = {
         ("every_visit", "", "Every visit: every room, as long as you like.", "See the spa", "/the-spa/"),
         ("gold_line", "", "There is also the Gold Card, for people in property.", "About the Gold Card", "/gold-card/"),
         ("price_note", "", "Prices including VAT are shown under each price.", "", ""),
-        ("register_label", "", "", "Register interest", "/register/"),
-        ("continue", "", "Register your interest. Nothing to pay now.", "Continue", ""),
+        ("register_label", "", "", "Register", "/register/"),
+        ("continue", "", "Register. Nothing to pay now.", "Continue", ""),
         ("recommended_label", "Recommended", "", "", ""),
         ("single_note", "", "Single visits open with booking.", "", ""),
     ]),
@@ -120,7 +120,7 @@ PAGES = {
         ("screen_4", "About you.", "Optional, and only to suggest the right fit.", "", ""),
         ("result_label", "", "Your membership", "", ""),
         ("why", "Why it suits you", "", "", ""),
-        ("result_cta", "", "", "Register interest in {plan}", "/register/"),
+        ("result_cta", "", "", "Register for {plan}", "/register/"),
         ("change_answers", "", "", "Start again", ""),  # same wording as start_again; the page reads start_again
         ("gold_panel", "The Gold Card.",
          "With your property background, you may be invited to hold the Gold Card. It's free, by application, and your answers come with you.",
@@ -144,12 +144,12 @@ PAGES = {
         ("optional", "", "(optional)", "", ""),
     ]),
     "book": ("Book", "Booking at Spa 99 opens soon.", [
-        ("placeholder", "Booking opens soon.", "When the doors open, you'll choose your time here.", "Register interest", "/register/"),
+        ("placeholder", "Booking opens soon.", "When the doors open, you'll choose your time here.", "Register", "/register/"),
         ("opening_month", "{opening}", "", "", ""),
         ("how", "How booking will work", "", "", ""),
     ]),
-    "register": ("Register interest", "Register your interest in Spa 99.", [
-        ("intro", "Register interest", "No payment now. We'll write before the doors open.", "", ""),
+    "register": ("Register", "Register at Spa 99. Nothing to pay now.", [
+        ("intro", "Register", "No payment now. We'll write before the doors open.", "", ""),
         ("journey_note", "", "Your answers come with you.", "", ""),
         ("sent", "Check your email.", "It works for 24 hours.", "", ""),
         ("verified", "Thank you.", "Your email is confirmed.", "", ""),
