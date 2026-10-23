@@ -285,12 +285,26 @@ def account_emails(request):
     return redirect("account_you")
 
 
-class ChangePasswordView(auth_views.PasswordChangeView):
-    """Change password (signed in; the default login lock applies). Limited to 10 attempts an hour per IP, so a
-    stolen session cannot be used to guess the current password."""
+class _PasswordChange(auth_views.PasswordChangeView):
+    """Change password (signed in). Limited to 10 attempts an hour per IP, so a stolen session cannot be used to guess the
+    current password."""
+
+    form_class = ChangePasswordForm
+
+    def post(self, request, *args, **kwargs):
+        if _throttled(request, "password-change", 10, 3600):
+            return _message(request, "Please wait", "Too many attempts. Please try again later.", status=429)
+        return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        messages.success(self.request, "Your password has been changed.")
+        return super().form_valid(form)  # keeps this session signed in
+
+
+class ChangePasswordView(_PasswordChange):
+    """The member area's change password (members only)."""
 
     template_name = "users/password_change.html"
-    form_class = ChangePasswordForm
     success_url = reverse_lazy("account_you")
 
     @method_decorator(member_area)
@@ -301,14 +315,12 @@ class ChangePasswordView(auth_views.PasswordChangeView):
         # the member shell (verify banner, greeting, email) needs the same base context as the other screens
         return {**member.base_context(self.request.user), **super().get_context_data(**kwargs)}
 
-    def post(self, request, *args, **kwargs):
-        if _throttled(request, "password-change", 10, 3600):
-            return _message(request, "Please wait", "Too many attempts. Please try again later.", status=429)
-        return super().post(request, *args, **kwargs)
 
-    def form_valid(self, form):
-        messages.success(self.request, "Your password has been changed.")
-        return super().form_valid(form)  # keeps this session signed in
+class TeamPasswordView(_PasswordChange):
+    """Change password for team members on the Office and System hosts (they may hold no membership, so no member area).
+    The caller's access check wraps this view; it lands back on `/password/` of the same host."""
+
+    success_url = "/password/"
 
 
 @member_area

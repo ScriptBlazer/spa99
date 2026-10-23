@@ -137,9 +137,9 @@ class PermissionTests(TestCase):
         anonymous = self.get()
         self.assertEqual(anonymous.status_code, 302)
         self.assertIn("/login/", anonymous["Location"])
-        self.assertEqual(self.get(self.staff("norole@example.com")).status_code, 403)
+        self.assertEqual(self.get(self.staff("norole@example.com")).status_code, 404)
         public_member = User.objects.create_user("member@example.com", "x")
-        self.assertEqual(self.get(public_member).status_code, 403)
+        self.assertEqual(self.get(public_member).status_code, 404)
 
     def test_roles_can_read(self):
         for role in ("Office", "Admin", "Developer"):

@@ -168,3 +168,18 @@ class MigrateRolesTests(TestCase):
         call_command("setup_roles", stdout=StringIO())
         self.assertEqual(set(Group.objects.values_list("name", flat=True)), {"Office", "Admin", "Developer", "Approver"})
         self.assertEqual(levels.held(dev), ("developer", False))
+
+
+class SystemPasswordTests(TestCase):
+    def test_a_developer_changes_their_password_behind_the_unlock(self):
+        dev = at("developer", "dev@example.com")
+        locked, _ = sign_in(dev)
+        self.assertEqual(locked.get("/password/").status_code, 302)  # to the unlock page
+        client = unlocked_client(dev)
+        self.assertEqual(client.get("/password/").status_code, 200)
+        response = client.post("/password/", {"old_password": PASSWORD, "new_password1": "another-long-password-2", "new_password2": "another-long-password-2"})
+        self.assertEqual((response.status_code, response["Location"]), (302, "/password/"))
+        dev.refresh_from_db()
+        self.assertTrue(dev.check_password("another-long-password-2"))
+        admin_client, _ = sign_in(at("admin", "a@example.com"))
+        self.assertEqual(admin_client.get("/password/").status_code, 404)

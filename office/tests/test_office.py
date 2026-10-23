@@ -85,8 +85,8 @@ class RoutingAndRoleTests(OfficeTestCase):
 
     def test_members_and_staff_without_a_role_are_refused_and_roles_can_read(self):
         member = User.objects.create_user("member@example.com", "x")
-        self.assertEqual(get(member, "/").status_code, 403)
-        self.assertEqual(get(staff(), "/").status_code, 403)
+        self.assertEqual(get(member, "/").status_code, 404)
+        self.assertEqual(get(staff(), "/").status_code, 404)
         for role in ("Office", "Admin", "Developer"):
             user = staff(role)
             for path in ("/", "/analytics/", "/people/", "/gold/", "/dashboard.json", "/analytics/data/", "/analytics/pages/"):
@@ -96,7 +96,7 @@ class RoutingAndRoleTests(OfficeTestCase):
         member = User.objects.create_user("memberrole@example.com", "x")  # not staff
         member.groups.add(Group.objects.get(name="Admin"))
         for path in ("/", "/people/", "/gold/", "/insights/summary/"):
-            self.assertEqual(get(member, path).status_code, 403, path)
+            self.assertEqual(get(member, path).status_code, 404, path)
 
     def test_lists_vary_on_htmx_and_are_not_cached(self):
         response = get(staff("Viewer"), "/people/")
@@ -357,3 +357,16 @@ class OneTapApprovalTests(OfficeTestCase):
         _approver_email_rows()
         self.assertEqual(NotificationTemplate.objects.get(key="gold_approver").subject, "Edited {name}")
         self.assertFalse(NotificationTemplate.objects.filter(key="gold_barry").exists())
+
+
+class TeamPasswordTests(OfficeTestCase):
+    def test_a_team_member_changes_their_password_on_the_office_host_and_lands_back_there(self):
+        user = staff("Viewer", "pw@example.com")
+        user.set_password("a-long-test-password-1")
+        user.save()
+        self.assertEqual(get(user, "/password/").status_code, 200)
+        self.assertEqual(get(User.objects.create_user("m@example.com", "x"), "/password/").status_code, 404)
+        response = post(user, "/password/", old_password="a-long-test-password-1", new_password1="another-long-password-2", new_password2="another-long-password-2")
+        self.assertEqual((response.status_code, response["Location"]), (302, "/password/"))
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("another-long-password-2"))

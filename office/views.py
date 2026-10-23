@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.utils.cache import patch_vary_headers
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
@@ -13,6 +14,7 @@ from gold.models import GoldApplication
 from insights.metrics import K
 from plans.models import Plan
 from users import services as user_services
+from users import views as user_views
 from users.models import User
 
 from . import lists, selectors
@@ -204,3 +206,16 @@ def gold_decline(request, pk):
         else:
             messages.warning(request, "Nothing changed: this application was already decided.")
     return _act(request, pk, run)
+
+
+# ---------- change password (team members; the member area is for members only) ----------
+
+class OfficePasswordView(user_views.TeamPasswordView):
+    template_name = "office/password.html"
+
+    @method_decorator(reader)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        return {**super().get_context_data(**kwargs), "section": "password"}

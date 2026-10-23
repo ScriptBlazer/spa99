@@ -15,7 +15,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from common.audit import client_ip
 from common.ratelimit import hit
 from plans.models import SiteSettings
-from users.views import LoginView
+from users.views import LoginView, TeamPasswordView
 
 from common import levels
 
@@ -349,3 +349,12 @@ def team_merge(request):
         except services.ChangeRefused as error:
             messages.error(request, str(error))
     return page(request, "system/team_merge.html", "team", context)
+
+
+# ---------- change password (behind the unlock) ----------
+
+class SystemPasswordView(TeamPasswordView):
+    template_name = "system/password.html"
+
+    def get_context_data(self, **kwargs):
+        return {**super().get_context_data(**kwargs), "section": "", "nav": NAV, "section_labels": changes.SECTION_LABELS}

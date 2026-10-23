@@ -13,6 +13,7 @@ urlpatterns = [
     path("people/<uuid:pk>/", views.person, name="office_person"),
     path("people/<uuid:pk>/export/", views.person_export, name="office_person_export"),
     path("people/<uuid:pk>/delete/", views.person_delete, name="office_person_delete"),
+    path("password/", views.OfficePasswordView.as_view(), name="office_password"),
     path("gold/", views.gold, name="office_gold"),
     path("gold/<uuid:pk>/", views.gold_application, name="office_gold_application"),
     path("gold/<uuid:pk>/approve/confirm/", views.gold_approve_confirm, name="office_gold_approve_confirm"),
