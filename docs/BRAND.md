@@ -317,7 +317,7 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
 }
 ```
 
-**Virtual tour tokens** (VIRTUAL-TOUR 7.2, added 2026-10-23; the four brand colours are untouched, everything below is derived and decoration only, never text; the three `--color-reef-*` and the sage and moss are outside the brand hues and live inside the lounge only):
+**Virtual tour tokens** (VIRTUAL-TOUR 7.2, added 2026-10-23; the four brand colours are untouched, everything below is derived and decoration only, never text; sage and moss are outside the brand hues and live inside the lounge only; the tank colours (water, deep water, coral) live in the lounge room code, not as tokens):
 
 ```css
 /* Virtual tour (docs/design/VIRTUAL-TOUR.md 7.2). Derived, decoration only, never text. The WebGL palette (IMMERSIVE 12) is read by the 3D script with getComputedStyle. */
@@ -338,15 +338,17 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --color-iron: #2C1C14;                       /* derived: espresso at 60%; the darkest value anywhere */
   --color-sage: #A3A98A;                       /* derived, outside the brand hues: lounge pillows */
   --color-moss: #5F6B3C;                       /* derived, outside the brand hues: green wall, moss discs */
-  --color-reef-water: #2E6E86;                 /* derived, outside the brand hues: inside the lounge tank only */
-  --color-reef-deep: #17465A;                  /* derived, inside the tank only: deep water and rock shade */
-  --color-reef-coral: #D9805F;                 /* derived, inside the tank only: coral and clownfish */
   --tour-caption-w: 26rem;                     /* derived: caption width */
   --tour-ring: 1.75rem;                        /* derived: marker ring (the tap target stays 2.75rem) */
   --ease-glide: cubic-bezier(0.65, 0, 0.35, 1); /* proposed: camera travel toward a doorway only */
   --duration-glide-fade: 700ms;                /* derived: room cross-fade */
   --duration-settle: 1400ms;                   /* derived: arrival settle */
   --duration-gl-in: 1200ms;                    /* derived: the canvas fading in */
+  --duration-tour-fade: 300ms;                 /* derived: marker and hint fade */
+  --duration-tour-quick: 200ms;                /* derived: markers leaving */
+  --duration-tour-tap: 120ms;                  /* derived: ring press colour */
+  --duration-tour-pulse: 1600ms;               /* derived: the one marker pulse */
+  --duration-tour-wait: 8s;                    /* derived: the waiting line; matches the 8 s give-up in engine.js */
 }
 ```
 

@@ -5,7 +5,7 @@
  * Lights are authored in the brief's units (intensity "2", distance "3"); LIGHT_GAIN turns them into three's physical units.
  *
  * SHARED LOOK DEFAULTS (every room inherits these; the lounge is the reference, tuned against .private/fal-renders/lounge.png):
- *   tone mapping   ACES filmic (engine.js), default exposure 0.8 (DEFAULTS.exposure). Darks get contrast, highlights roll off, nothing glows by itself.
+ *   tone mapping   Linear (engine.js, no curve), default exposure 0.8 (DEFAULTS.exposure). Nothing glows by itself; colours above 1 clip.
  *   ambient        low and dark-footed: K.baseLight() = hemisphere sky --color-led over an espresso ground at 0.28, scene.environmentIntensity 0.3.
  *                  Rooms are lit by a few warm PRACTICALS (cove, downlight, sconce, LED under furniture) that pool, never by a flat fill.
  *   albedo         pale stone/cream surfaces are tinted to ~0.75-0.8 of the token (DEFAULTS.stone) so they sit under the light instead of clipping.
@@ -89,7 +89,7 @@ export function makeKit(scene, { tier = 'high' } = {}) {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), K.glow(c, a)), rot = { s: [0, 0], n: [0, Math.PI], e: [0, Math.PI / 2], w: [0, -Math.PI / 2], up: [-Math.PI / 2, 0], down: [Math.PI / 2, 0] }[face];
       m.position.set(x, y, z); m.rotation.set(rot[0], rot[1], 0); m.renderOrder = 2; scene.add(m); return m;
     },
-    /** Self-lit but hot: colour pushed past 1 so ACES clips the core to near white and leaves a warm edge (LED lines, filaments). */
+    /** Self-lit but hot: colour pushed past 1 so the tone map clips the core to near white and leaves a warm edge (LED lines, filaments). */
     hot(c = '--color-led-warm', k = 1.9, o = {}) { return new THREE.MeshBasicMaterial({ color: K.col(c).clone().multiplyScalar(k), ...o }); },
     /** A pale surface colour scaled to DEFAULTS.stone (or k) so it does not clip under light. Returns a THREE.Color. */
     tint(c, k = DEFAULTS.stone) { return K.col(c).clone().multiplyScalar(k); },

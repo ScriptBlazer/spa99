@@ -41,19 +41,14 @@ More rooms only after these five feel good.
 - Looks like the site's photos side by side (reviewed against the room pictures at 375 and 1440).
 - First room under 3 s on a throttled mid phone profile; no console errors.
 
-## Open
-
-- Which design reference per room (the current site photos are the default).
-- Whether the menu item reads "Virtual tour" or "Tour".
-
 ## Built: server side (2026-10-23)
 
 - Routes (`pages`): `/tour/` (lounge), `/tour/<slug>/` for `dry-sauna`, `wet-sauna`, `relaxing-zone`, `gym`; `/tour/lounge/` 301s to `/tour/`; anything else is a 404. The list and order live in `TOUR_ROOMS` in `pages/services.py` (slug, fallback name, photo alt, photo focus): adding a room is one line. A room whose Facility is hidden leaves the tour (404, dropped from the list); the lounge has no Facility so it is always in.
-- Template `pages/tour.html` is the full fallback (photo, h1, line, spa link, room list). Hooks for the 3D script: `#tour` (`data-room`), `#tour-stage`, `#tour-photo`, `#tour-caption`, `#tour-title`, `#tour-line`, `#tour-spa-link`, `#tour-rooms` (links carry `data-room-link`), `#tour-live`, hidden `#tour-logos` holding `#tour-mark`, `#tour-logo` and `#tour-logo-stacked` (inline gold stacked SVG, plus `data-src`), `{{ tour_config|json_script:"tour-config" }}`. The `{% block scripts %}` is empty and marked for the three.js tag.
+- Template `pages/tour.html` is the full fallback (photo, h1, line, spa link, room list). Hooks for the 3D script: `#tour` (`data-room`), `#tour-stage`, `#tour-photo`, `#tour-caption`, `#tour-title`, `#tour-line`, `#tour-spa-link`, `#tour-rooms` (links carry `data-room-link`), `#tour-live`, hidden `#tour-logos` holding `#tour-mark`, `#tour-logo` and `#tour-logo-stacked` (inline gold stacked SVG, plus `data-src`), `{{ tour_config|json_script:"tour-config" }}`. The `{% block scripts %}` loads `tour/boot.js` (a module), which checks the gate and then loads three.js and the engine.
 - Config JSON: `{current, rooms: [{slug, name, line, photo, alt, focus, spa_url, spa_label, tour_url, order}], copy: {intro, hint, hint_tilt, tilt: {heading, body, cta_label}}}`.
 - Photo: the `room_<slug>` section image if set, else the manifest render named after the slug (1600 px WebP), else the brand placeholder.
 - Content: page `tour` rows as in the brief, and `spa` row `tour_link` (cta_label "Take the tour") created by seed and `backfill_site_data` (create-if-missing only).
-- Menu: "Virtual tour" after The spa (header, menu, footer); "Take the tour" link on every toured room on The spa except the lounge (not on that page); `/tour/` is in the sitemap. Minimal fallback CSS is in `pages.css` (`.tour-*`) for the frontend to restyle.
+- Menu: "Virtual tour" after The spa (header, menu, footer); "Take the tour" link on every toured room on The spa except the lounge (not on that page); `/tour/` is in the sitemap. The tour's CSS, fallback included, is in `common/css/tour.css`.
 - Titles are "{Room}, virtual tour | Spa 99" (set server side for each room).
 
 ## Built: frontend (2026-10-23)

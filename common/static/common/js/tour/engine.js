@@ -30,7 +30,7 @@
  *           tier     optional (name) called when the engine drops to 'low'
  *           dispose  optional, for anything the engine cannot see; the engine already disposes every geometry, material, texture and env target in the scene
  *
- * Dispose: current room and the previous one stay in memory, older ones are disposed. Everything here is idempotent and removed on dispose().
+ * Dispose: at most three rooms stay built (current, previous, one warmed by hover or focus); older ones are disposed. Everything here is idempotent and removed on dispose().
  */
 import * as THREE from '../../vendor/three/three.module.min.js';
 import * as T from './textures.js';
@@ -75,10 +75,10 @@ export async function start({ root, config, modules, icons }) {
   /* ---------- renderer, camera, layers ---------- */
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', alpha: false });
   const canvas = renderer.domElement;
-  canvas.className = 'tour-canvas'; canvas.tabIndex = 0; canvas.setAttribute('role', 'img');
+  canvas.className = 'tour-canvas'; canvas.tabIndex = 0; canvas.setAttribute('role', 'application'); canvas.setAttribute('aria-roledescription', '3D view');
   renderer.setClearColor(T.tok('--color-espresso'));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;       // contrast in the darks, highlights roll off (kit.js header: shared look)
+  renderer.toneMapping = THREE.LinearToneMapping;           // the approved look: no curve, exposure only (kit.js header: shared look)
   const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 40); camera.rotation.order = 'YXZ';
   const snap = document.createElement('canvas'); snap.className = 'tour-snap'; snap.setAttribute('aria-hidden', 'true');
   const markersEl = document.createElement('div'); markersEl.className = 'tour-markers'; markersEl.dataset.state = 'away';
@@ -155,7 +155,7 @@ export async function start({ root, config, modules, icons }) {
       if (typeof DOE.requestPermission === 'function') {                       // iOS: only inside this tap
         let res = 'denied';
         try { res = await DOE.requestPermission(); } catch { /* denied or not allowed here */ }
-        if (res !== 'granted') { chip.remove(); chip = null; store.set('tour-tilt-no', '1'); hintText(copy.tilt.body, 4000); return; }
+        if (res !== 'granted') { canvas.focus({ preventScroll: true }); chip.remove(); chip = null; store.set('tour-tilt-no', '1'); hintText(copy.tilt.body, 4000); return; }
         addOrient(); setTilt(true);
       } else {                                                                 // Android and others: no prompt
         addOrient(); setTilt(true);
@@ -245,7 +245,7 @@ export async function start({ root, config, modules, icons }) {
       el.setAttribute('aria-label', 'Walk to the ' + dest.name.toLowerCase());
       el.innerHTML = '<span class="tour-ring"></span><span class="tour-marker-label"></span>'; el.lastChild.textContent = dest.name;
       const mk = { el, to: m.to, at: new THREE.Vector3(...m.at), on: false, x: -1e4, y: -1e4 };
-      const warm = () => { if (modules[m.to]) buildRoom(m.to).catch(() => {}); };
+      const warm = () => { if (modules[m.to]) buildRoom(m.to).then(trimBuilt, () => {}); };
       on(el, 'pointerenter', warm); on(el, 'pointerdown', warm); on(el, 'focus', () => { warm(); if (!mk.on && !busy) turnTo(mk); });
       on(el, 'click', () => walk(mk));
       markersEl.append(el); markers.push(mk);
@@ -379,6 +379,17 @@ export async function start({ root, config, modules, icons }) {
     const yaw = v.yaw * D2R, back = new THREE.Vector3(-Math.sin(yaw), 0, Math.cos(yaw)).multiplyScalar(0.9);
     return { p: spot.clone().add(back), yaw: v.yaw, pitch: v.pitch - 3, ms: 1400, input: 1400 };
   }
+  /** Cap built rooms at three: current, previous, and one warmed (hover or focus) that has not been entered. Oldest warmed goes first. */
+  function trimBuilt() {
+    if (dead) return;
+    const keep = [cur?.slug, prev?.slug, target, pending?.[0]];
+    const spare = target || pending ? 0 : 1;
+    const warmed = [...built.keys()].filter((k) => !keep.includes(k));
+    warmed.slice(0, Math.max(0, warmed.length - spare)).forEach((k) => {
+      const p = built.get(k);
+      p.then((r) => { if (r !== cur && r !== prev && built.get(k) === p) { built.delete(k); disposeRoom(r); } }).catch(() => {});
+    });
+  }
   /** Put the room on screen and run the settle. Returns when the settle ends. */
   function present(room) {
     prev = cur === room ? prev : cur; cur = room;
@@ -386,9 +397,7 @@ export async function start({ root, config, modules, icons }) {
     const v = room.api.view, a = arrivalPose(room);
     pos.copy(a.p); look.yaw = look.ty = a.yaw; look.pitch = look.tp = a.pitch; vel.y = vel.p = 0; rezero(); drew = false;
     setMarkers(room);
-    // keep this room and the previous one; dispose the rest
-    const keep = [cur.slug, prev?.slug, target, pending?.[0]];
-    built.forEach((p, k) => { if (!keep.includes(k)) p.then((r) => { if (!keep.includes(k) && r !== cur && r !== prev && built.get(k) === p) { built.delete(k); disposeRoom(r); } }).catch(() => {}); });
+    trimBuilt();
     const goal = new THREE.Vector3(...v.pos);
     locked = true; later(() => { if (cur === room) locked = false; }, Math.min(a.input, a.ms));
     const settle = moveTo({ yaw: v.yaw, pitch: v.pitch, p: goal, ms: a.ms });
@@ -402,11 +411,13 @@ export async function start({ root, config, modules, icons }) {
     later(() => (window.requestIdleCallback || setTimeout)(() => markers.forEach((m) => prefetch(m.to))), 600);
   }
 
+  let popCount = 0;                 // popstate events so far: a walk that sees it change must not push its own entry
   /** Walk to a room through a marker, or jump (list, popstate). */
   async function go(s, { marker = null, push = true, focusTitle = false } = {}) {
     if (dead || s === slug || !R[s]) return;
     if (!modules[s]) { location.assign(R[s].tour_url); return; }              // no 3D room yet: the photo page
     if (busy) { pending = [s, { marker, push, focusTitle }]; return; }
+    const pops = popCount;
     busy = true; transitioning = true; locked = true; target = s; hideHint(); cancelTweens();
     caption.classList.add('is-out'); markersEl.dataset.state = 'away';
     const ready = buildRoom(s); ready.catch(() => {});
@@ -437,7 +448,7 @@ export async function start({ root, config, modules, icons }) {
       slug = s;
       const settled = present(room);
       later(() => { setCaption(s); caption.classList.remove('is-out'); caption.classList.add('is-in'); later(() => caption.classList.remove('is-in'), 900);
-        const url = R[s].tour_url; if (push && location.pathname !== url) history.pushState({ tour: s }, '', url);
+        const url = R[s].tour_url; if (push && pops === popCount && location.pathname !== url) history.pushState({ tour: s }, '', url);
         if (focusTitle || marker) title.focus({ preventScroll: true }); }, 350);
       await settled;
       later(showMarkers, 400);
@@ -456,6 +467,7 @@ export async function start({ root, config, modules, icons }) {
     e.preventDefault(); if (s !== slug) go(s);
   });
   on(window, 'popstate', () => {
+    popCount++;
     const hit = config.rooms.find((r) => r.tour_url === location.pathname); if (hit) go(hit.slug, { push: false });
   });
 
@@ -490,7 +502,7 @@ export async function start({ root, config, modules, icons }) {
   if (dead) return { dispose };
   const settled = present(first);
   /* the photo stays up until the first real frame is on the canvas, then the canvas fades in over it */
-  requestAnimationFrame(() => requestAnimationFrame(() => { if (!dead) body.classList.add('tour-3d'); }));
+  requestAnimationFrame(() => requestAnimationFrame(() => { if (!dead) { html.classList.add('tour-gl'); body.classList.add('tour-3d'); } }));
   firstHint();
   settled.then(() => { if (!dead) { locked = false; transitioning = false; later(showMarkers, 400); } });
   transitioning = true;

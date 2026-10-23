@@ -1,6 +1,7 @@
 """Glue between the data apps (plans, content, journey) and the page templates. Nothing here is a rule:
 every number and word comes from rows edited in Control."""
 import re
+from functools import lru_cache
 from decimal import Decimal
 
 from django.utils import timezone
@@ -677,8 +678,9 @@ def tour_config(rooms, current, copy):
 _STACKED_LOGO = "common/img/logo-stacked-gold.svg"
 
 
+@lru_cache(maxsize=1)
 def stacked_logo_svg():
-    """The stacked gold lockup, inline, for the hidden logo holder the 3D script reads its paths from."""
+    """The stacked gold lockup, inline, for the hidden logo holder the 3D script reads its paths from. Read once per process (restart to pick up an edit)."""
     from django.contrib.staticfiles import finders
     from django.utils.safestring import mark_safe
 

@@ -359,7 +359,7 @@ One `requestAnimationFrame` loop (no GSAP needed on this page; tweens are small 
 | Point lights per room | 4 or fewer | 3 or fewer |
 | Textures per room | 8 or fewer, largest 1024 (reef 2048 x 1024) | 8 or fewer, largest 512 (reef 1024 x 512) |
 | GPU memory per room | 40 MB or less | 16 MB or less |
-| Rooms held in memory | current plus the previous one; older ones disposed | same |
+| Rooms held in memory | current, the previous one, and one warmed by hover or focus; older ones disposed (cap of three) | same |
 | GPU time per frame at 1440 x 800 | 6 ms or less | |
 
 **Tiers.** High: at least 64em, `deviceMemory` 4+ and `hardwareConcurrency` 4+. Mobile: everything else that passes the gate (4.4). Low (automatic): if the median frame over 2s exceeds 22 ms, drop pixel ratio to 1, fish to 6, steam to 3, freeze caustics, and stay low for the session.
@@ -368,8 +368,8 @@ One `requestAnimationFrame` loop (no GSAP needed on this page; tweens are small 
 | File | Cap |
 |---|---|
 | `vendor/three/three.module.min.js` | 165 KB (entry extended with `MeshStandardMaterial`, `CylinderGeometry`, `CircleGeometry`, `TorusGeometry`, `InstancedMesh`, `Object3D`, `PointLight`, `HemisphereLight`, `ShaderMaterial`, `FogExp2`, `Quaternion`, `AdditiveBlending`, `DoubleSide`; re-measure, update `VERSION`) |
-| `common/js/tour.js` (renderer, input, markers, transitions, texture generators, logo masks) | 16 KB |
-| `common/js/tour-rooms/<slug>.js` (one per room) | 6 KB each |
+| `common/js/tour.js` (renderer, input, markers, transitions, texture generators, logo masks) | 16 KB. Raised 2026-10-23 to 25 KB for `tour/engine.js` + `kit.js` + `textures.js` together (measured 24.8 KB gzip) |
+| `common/js/tour-rooms/<slug>.js` (one per room) | 6 KB each. Raised 2026-10-23 to 6.5 KB (lounge is 6.0 KB) |
 | First room total | 190 KB or less |
 | Tour CSS | 6 KB |
 

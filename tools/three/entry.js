@@ -11,7 +11,7 @@ export {
   Color, Vector2, Vector3, Euler, Quaternion, Matrix4,
   CanvasTexture, Texture,
   BackSide, FrontSide, DoubleSide, AdditiveBlending, NormalBlending,
-  NeutralToneMapping, SRGBColorSpace, NoColorSpace, LinearFilter, LinearMipmapLinearFilter, ClampToEdgeWrapping, RepeatWrapping,
+  NeutralToneMapping, LinearToneMapping, SRGBColorSpace, NoColorSpace, LinearFilter, LinearMipmapLinearFilter, ClampToEdgeWrapping, RepeatWrapping,
   MathUtils,
 } from 'three';
 export { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';

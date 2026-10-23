@@ -38,6 +38,6 @@ class TourAssetsTests(TestCase):
 
     def test_tour_tokens_exist(self):
         css = (STATIC / "css" / "tokens.css").read_text()
-        for token in ("--color-light-warm", "--color-led-warm", "--color-travertine", "--color-sage", "--color-moss", "--color-reef-water",
+        for token in ("--color-light-warm", "--color-led-warm", "--color-travertine", "--color-sage", "--color-moss", "--duration-tour-fade",
                       "--color-iron", "--tour-caption-w", "--tour-ring", "--ease-glide", "--duration-settle", "--duration-glide-fade"):
             self.assertIn(token + ":", css)
