@@ -309,3 +309,9 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
 **Immersive tokens** (`--color-veil`, `--color-header-solid`, `--color-glow`, `--scene-h`, `--scene-pad-top`, `--scene-centre-top`, `--scene-centre-bottom`, `--color-veil-soft`, `--duration-line`, `--stagger-line`, `--duration-page`, `--color-frame-tint`, `--color-thread`, `--color-thread-light`, `--frame-gap`, `--bleed`) are derived and now live in `tokens.css`. Values and contrast: `docs/design/IMMERSIVE.md` section 12.
 
 The designer refines these per task. Frontend uses only tokens, never raw values. Breakpoints are constants (CSS variables can't be used in media queries): `48em` (tablet) and `64em` (desktop).
+
+### Round 3 layout tokens (The spa, 2026-10-23, derived)
+- `--mount-gap` 0.375rem (0.5rem from 48em): margin between a mount's gold line and its photo.
+- `--band-h` min(62svh, 36rem): height of a full-bleed amenity band.
+- `--opener-measure` 26rem: widest the opener words go.
+- `--opener-pin` 0.6 (0.8 from 64em): opener pin length in screens.
