@@ -8,6 +8,8 @@ Section keys use underscores so templates can reach them: {{ home.journey_entry.
 Multi-line text (steps, role lists) is one line per row in `body`."""
 from .models import Page, Section
 
+STEP_2_PILLS = "Your own locker\nPhones stay in the locker"  # the kit row (arrive_kit) now says towel, robe and slippers
+
 # page key: (title, meta description, [(section key, heading, body, cta label, cta url)])
 PAGES = {
     "home": ("Home", "Spa 99. A private spa for men in North London. Beyond Luxury. Opening {opening}.", [
@@ -32,16 +34,27 @@ PAGES = {
     ]),
     "spa": ("The spa", "Sauna, cold plunge, relaxing zone, gym and massage at 99 Vale Road.", [
         ("intro", "The spa.", "{rooms} spaces, one quiet visit.", "", ""),
+        ("opener_1", "Open {hours}.", "Every day. Closed for {closure}.", "", ""),
+        ("opener_2", "For men only.", "18 and over.", "", ""),
+        ("opener_3", "Heat, steam, cold and rest.", "{Rooms} rooms, all part of the same visit.", "", ""),
+        ("opener_4", "Stay as long as you like.", "Your robe and slippers are waiting.", "", ""),
+        ("opener_image", "", "robe", "", ""),  # name of the opener picture; "door-wide" switches to the door
         ("facts_rooms", "", "rooms, one visit", "", ""),
         ("facts_hours", "", "every day", "", ""),
         ("facts_men", "Men only", "18 and over", "", ""),
+        ("moment_towel", "Before the heat.", "A swan towel, folded on the bench.", "", ""),
         ("tiles_intro", "Steam, cold, water.", "Between rounds of heat.", "", ""),
+        ("moment_shower", "In every shower.", "Toiletries in the swan bottles. A fresh towel on the rail.", "", ""),
+        ("moment_slippers", "Soft underfoot.", "Swan slippers, from the lockers to the loungers.", "", ""),
+        ("moment_tote", "On the way out.", "", "", ""),
+        ("arrive_kit", "Every visit includes",
+         "Towels | towel-bench | 45% 50%\nRobe | robe | 66% 38%\nSlippers | slippers | 62% 60%\nToiletries | toiletries | 50% 55%", "", ""),
         ("how_it_works", "How a visit works", "", "", ""),
         ("step_1", "Book.", "Choose a time that suits you.", "", ""),
         ("step_1_pills", "", "", "", ""),
         ("booking_pending", "", "Booking opens with membership", "", ""),
         ("step_2", "Arrive.", "A towel, robe and slippers are waiting.", "", ""),
-        ("step_2_pills", "", "Towel, robe and slippers\nYour own locker\nPhones stay in the locker", "", ""),
+        ("step_2_pills", "", STEP_2_PILLS, "", ""),
         ("step_3", "Stay.", "As long as you like, until closing.", "", ""),
         ("step_3_pills", "", "Every room is part of the visit", "", ""),
         ("next", "Find the right way to visit.", "", "Tailor your membership", "/journey/"),
@@ -52,6 +65,7 @@ PAGES = {
         ("intro", "Memberships.", "Choose when you come and how often.", "", ""),
         ("not_sure", "Not sure?", "", "Tailor your membership", "/journey/"),
         ("compare", "Compare everything", "", "", ""),
+        ("every_visit", "", "Every visit: {kit}, and every room.", "See the spa", "/the-spa/"),
         ("gold_line", "", "There is also the Gold Card, for people in property.", "About the Gold Card", "/gold-card/"),
         ("price_note", "", "Prices including VAT are shown under each price.", "", ""),
         ("register_label", "", "", "Register interest", "/register/"),
@@ -65,11 +79,17 @@ PAGES = {
          "Owners and investors\nDevelopers\nBlock, estate and portfolio managers\nPeople at property and management firms\nAgents and brokers\nProperty lawyers", "", ""),
         ("who_note", "", "Not in property? You're still welcome to apply.", "", ""),
         ("holds", "What it holds.", "", "", ""),
+        ("holds_lead", "", "The fullest membership, and a little more.", "", ""),
         ("how", "How it works.", "", "", ""),
         ("step_1", "Apply.", "A few minutes, mostly taps.", "", ""),
         ("step_2", "We read it.", "Each application is read personally.", "", ""),
         ("step_3", "We'll be in touch.", "If it's a fit, we'll invite you.", "", ""),
         ("apply", "Apply for the Gold Card", "A few taps, and we will be in touch.", "Apply for the Gold Card", "/gold-card/apply/"),
+        ("apply_note", "", "Free. No account needed.", "", ""),
+    ]),
+    "signin": ("Sign in", "Sign in to your Spa 99 account.", [
+        ("intro", "Welcome back.", "Sign in to your Spa 99 account.", "", ""),  # an uploaded image overrides the lockers picture
+        ("caption", "", "Your own locker, every visit.", "", ""),
     ]),
     "gold-apply": ("Apply for the Gold Card", "Apply for the Spa 99 Gold Card.", [
         ("screen_1", "Your property.", "A few taps about your work in property.", "", ""),

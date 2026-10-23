@@ -282,6 +282,10 @@ class Facility(BaseModel):
         ordering = ["order", "name"]
         verbose_name_plural = "facilities"
 
+    def _saved_with(self, field, value):
+        """True when this row is already saved with this value (the gym's picture is named before it is built)."""
+        return bool(self.pk) and Facility.objects.filter(pk=self.pk, **{field: value}).exists()
+
     def clean(self):
         from content import images  # local: keeps this module free of the content app at import time
 
@@ -295,7 +299,7 @@ class Facility(BaseModel):
             errors["facts"] = f"Each fact must be 1 to {self.FACT_MAX_LENGTH} characters."
         for field in ("image_name", "detail_image_name"):
             name = getattr(self, field)
-            if name and not images.has_image(name):
+            if name and not images.has_image(name) and not self._saved_with(field, name):  # an unchanged name never blocks a save
                 errors[field] = "No built render with this name."
         if errors:
             raise ValidationError(errors)

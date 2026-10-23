@@ -18,6 +18,11 @@ written by hand:
   still have the exact old wording; the kitchenette goes from companion to tile only while it still has its seeded
   image and facts; the kitchenette moves after the showers only while all eight orders are still the old seeded ones
 
+- (2026-10-23, round 3) missing rows for the opener lines, amenity moments and kit (`spa`), Gold page notes (`gold`), the
+  Memberships "every visit" row and the whole `signin` page are created (never overwritten, never re-created for pages
+  you did not ask about); step 2 pills lose "Towel, robe and slippers" only while exactly the old wording; Gold perks
+  without a `note` get the starting one; the gym gets its bottle picture name only while it has no small picture at all
+
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 from collections import Counter
 
@@ -113,6 +118,64 @@ def backfill():
         changed["content.Section (memberships: Not sure?)"] += 1
 
     changed.update(_spa_page())
+    changed.update(_round_3())
+    return changed
+
+
+OLD_STEP_2_PILLS = "Towel, robe and slippers\nYour own locker\nPhones stay in the locker"
+# page key -> the rows added in round 3 (None = every row of the page, creating the page too)
+ROUND_3_ROWS = {
+    "spa": ["opener_1", "opener_2", "opener_3", "opener_4", "opener_image", "moment_towel", "moment_shower",
+            "moment_slippers", "moment_tote", "arrive_kit"],
+    "gold": ["holds_lead", "apply_note"],
+    "memberships": ["every_visit"],
+    "signin": None,
+}
+
+
+def _round_3():
+    """Round 3 data (2026-10-23): fills missing rows only; the one wording change needs the exact old text."""
+    changed = Counter()
+    pages = list(content_seed.PAGES)
+    for page_key, wanted in ROUND_3_ROWS.items():
+        title, description, sections = content_seed.PAGES[page_key]
+        page = Page.objects.filter(key=page_key).first()
+        if page is None and wanted is None:
+            page = Page.objects.create(key=page_key, title=title, meta_description=description, order=pages.index(page_key) + 1)
+            changed["content.Page (round 3)"] += 1
+        if page is None:
+            continue
+        for order, (key, heading, body, cta_label, cta_url) in enumerate(sections, start=1):
+            if wanted is not None and key not in wanted:
+                continue
+            _, made = Section.objects.get_or_create(page=page, key=key, defaults={
+                "heading": heading, "body": body, "cta_label": cta_label, "cta_url": cta_url, "order": order})
+            if made:
+                changed["content.Section (round 3 rows)"] += 1
+    pills = Section.objects.filter(page__key="spa", key="step_2_pills", body=OLD_STEP_2_PILLS).first()
+    if pills is not None:
+        pills.body = content_seed.STEP_2_PILLS
+        pills.save()
+        changed["content.Section (spa step 2 pills)"] += 1
+
+    gold = Plan.objects.filter(slug="gold").first()
+    if gold is not None:
+        perks, touched = [dict(p) for p in gold.perks or []], False
+        for perk in perks:
+            note = plans_seed.GOLD_PERK_NOTES.get(perk.get("key"))
+            if note and "note" not in perk:
+                perk["note"], touched = note, True
+        if touched:
+            gold.perks = perks
+            gold.save()
+            changed["plans.Plan (Gold perk notes)"] += 1
+
+    gym = Facility.objects.filter(slug="gym").first()
+    if gym is not None and not gym.detail_image and not gym.detail_image_name:
+        gym.detail_image_name = plans_seed.GYM_DETAIL["detail_image_name"]
+        gym.detail_alt = gym.detail_alt or plans_seed.GYM_DETAIL["detail_alt"]
+        gym.save()
+        changed["plans.Facility (gym small picture)"] += 1
     return changed
 
 

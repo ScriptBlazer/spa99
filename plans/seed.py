@@ -5,6 +5,12 @@ from decimal import Decimal
 
 from .models import Facility, OpeningRule, Plan, SiteSettings
 
+# One calm line under a Gold perk on the Gold Card page (the perk's optional "note"). Merch has none, on purpose.
+GOLD_PERK_NOTES = {"leil_shishi": "The Thursday evening meal, included.", "events": "Invitations through the year."}
+
+# The gym's small second picture on The spa page (AMENITIES.md M4). The render is made later; until then it is not shown.
+GYM_DETAIL = {"detail_image_name": "bottle-gym", "detail_alt": "A steel Spa 99 bottle on the gym bench"}
+
 PLANS = [
     {
         "slug": "tier-1", "name": "Tier 1", "kind": Plan.MONTHLY, "price_ex_vat": Decimal("299.00"),
@@ -42,9 +48,11 @@ PLANS = [
         "cancel_hours": 5, "guests_per_month": 2, "no_show_result": "Booking window drops to today + 3",
         "perks": [
             {"key": "merch", "label": "Merch", "value": "Free with each release", "phrase": "Each merch release"},
-            {"key": "leil_shishi", "label": "Leil Shishi", "value": "Included", "phrase": "Leil Shishi when offered"},
+            {"key": "leil_shishi", "label": "Leil Shishi", "value": "Included", "phrase": "Leil Shishi when offered",
+             "note": GOLD_PERK_NOTES["leil_shishi"]},
             {"key": "waitlist_priority", "label": "Waitlist", "value": "First call"},
-            {"key": "events", "label": "BML members' events", "value": "Yes", "phrase": "BML members' events"},
+            {"key": "events", "label": "BML members' events", "value": "Yes", "phrase": "BML members' events",
+             "note": GOLD_PERK_NOTES["events"]},
         ],
         "short_description": "Free, by application. For people in property.", "order": 4,
     },
@@ -122,5 +130,5 @@ def run(ensure):
     for order, (slug, name, line, description, alt) in enumerate(FACILITIES, start=1):
         ensure(Facility, {"slug": slug}, {
             "name": name, "short_line": line, "description": description, "image_alt": alt, "order": order,
-            **FACILITY_SPA_PAGE.get(slug, {}),
+            **FACILITY_SPA_PAGE.get(slug, {}), **(GYM_DETAIL if slug == "gym" else {}),
         })
