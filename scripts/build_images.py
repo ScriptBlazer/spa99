@@ -33,7 +33,10 @@ SOURCES = {
     **{name: (f"{name}.png", None) for name in [
         "relaxing-zone", "gym", "dry-sauna", "door-gold", "door-white", "lockers", "arrival", "lounge",
         "relax-loungers", "showers", "reception", "corridor", "showers-mosaic", "cold-plunge",
-        "wet-sauna", "massage-room", "kitchenette"]},
+        "wet-sauna", "massage-room", "kitchenette",
+        # Moishe's own mock-ups, used as they are (2026-10-23), cropped to the page shapes:
+        "towel-bench", "towel-bench-portrait", "slippers", "slippers-portrait", "toiletries", "towel-rail",
+        "tote", "bottle-gym", "robe", "robe-portrait"]},
     "cold-tub": ("cold-plunge.png", None),  # old name, still used by the cold plunge Facility until Control points it at cold-plunge
     # Kept from the earlier sets (built from the architect / Gemini folder).
     "hero": ("untitled_Gemini 3 Portrait_2026-08-25_12-21-20.png", (0, 0.03, 0.89, 0.80)),  # unused, water wall

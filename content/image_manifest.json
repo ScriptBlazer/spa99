@@ -202,5 +202,95 @@
       1600,
       1856
     ]
+  },
+  "towel-bench": {
+    "width": 1536,
+    "height": 658,
+    "widths": [
+      480,
+      800,
+      1536
+    ]
+  },
+  "towel-bench-portrait": {
+    "width": 1536,
+    "height": 1920,
+    "widths": [
+      480,
+      800,
+      1536
+    ]
+  },
+  "slippers": {
+    "width": 2048,
+    "height": 878,
+    "widths": [
+      480,
+      800,
+      1600,
+      2048
+    ]
+  },
+  "slippers-portrait": {
+    "width": 1638,
+    "height": 2048,
+    "widths": [
+      480,
+      800,
+      1600
+    ]
+  },
+  "toiletries": {
+    "width": 1536,
+    "height": 2752,
+    "widths": [
+      480,
+      800,
+      1536
+    ]
+  },
+  "towel-rail": {
+    "width": 1536,
+    "height": 2752,
+    "widths": [
+      480,
+      800,
+      1536
+    ]
+  },
+  "tote": {
+    "width": 2048,
+    "height": 2048,
+    "widths": [
+      480,
+      800,
+      1600,
+      2048
+    ]
+  },
+  "bottle-gym": {
+    "width": 1536,
+    "height": 2752,
+    "widths": [
+      480,
+      800,
+      1536
+    ]
+  },
+  "robe": {
+    "width": 768,
+    "height": 1376,
+    "widths": [
+      480,
+      768
+    ]
+  },
+  "robe-portrait": {
+    "width": 768,
+    "height": 1376,
+    "widths": [
+      480,
+      768
+    ]
   }
 }
