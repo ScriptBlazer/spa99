@@ -1,0 +1,261 @@
+/* Memberships round 2 (docs/design/MEMBERSHIPS-R2.md): "the key cards". Cream page, three slim tall cards like a jeweller's display,
+   a tag column that holds the choice and the one Continue. Tokens only (the round 2 tier tokens are in tokens.css).
+   The form works with no script: the checked radio is the choice, everything here is CSS. */
+
+.page-mem main { padding-top: var(--header-h); overflow-x: clip; }
+html:has(.page-mem) { scroll-padding-bottom: calc(var(--bar-h) + var(--space-3)); }
+
+/* ---------- the stage: tag | case ---------- */
+/* round 3, the counter light (MEMBERSHIPS-R3 3.1): one soft light behind the cards, static. Decoration only. */
+.mem-stage { background: radial-gradient(120% 40% at 50% 0%, var(--color-cream-raised) 0%, transparent 70%), var(--color-cream); }
+@media (min-width: 64em) { .mem-stage { background: radial-gradient(70% 60% at 50% 40%, var(--color-cream-raised) 0%, transparent 70%), var(--color-cream); } }
+@media (min-width: 80em) { .mem-stage { background: radial-gradient(70% 60% at 64% 40%, var(--color-cream-raised) 0%, transparent 70%), var(--color-cream); } }
+.mem-grid { display: grid; grid-template-columns: minmax(0, 1fr); padding-block: var(--space-4) 0; row-gap: var(--space-4); }
+.mem-title { font-weight: 500; line-height: var(--leading-display); overflow: clip; }
+.mem-title-line { display: block; }
+.mem-top .lead { margin-top: var(--space-2); font-size: var(--text-body); color: var(--color-text-muted); max-width: 16rem; }
+.mem-notsure { margin-top: var(--space-3); }
+.mem-notsure .btn-quiet { gap: var(--space-2); font-size: var(--text-sm); }
+@media (min-width: 48em) { .mem-top .lead { max-width: 28rem; } }
+@media (min-width: 64em) { .mem-grid { padding-block: var(--space-5) var(--space-4); } }
+@media (min-width: 80em) {
+  .mem-stage { min-height: calc(100svh - var(--header-h)); display: grid; align-items: center; }
+  .mem-grid {
+    grid-template-columns: minmax(0, var(--tier-tag-w)) minmax(0, 1fr); grid-template-rows: auto 1fr auto;
+    grid-template-areas: "top cards" ". cards" "choice cards"; column-gap: var(--space-5); row-gap: var(--space-4);
+    padding-block: var(--space-5);
+  }
+  .mem-top { grid-area: top; }
+  .tiers { grid-area: cards; }
+  .mem-choice { grid-area: choice; }
+}
+
+/* ---------- the case ---------- */
+.tiers { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr); width: 100%; max-width: 30rem; margin-inline: auto; padding: var(--space-2) 0 var(--space-3); }
+@media (min-width: 64em) {
+  .tiers { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tier-gap); max-width: none; align-items: stretch; padding-top: var(--space-4); }
+}
+@media (min-width: 90em) { .mem-grid { column-gap: var(--space-6); } }
+@media (min-width: 80em) {
+  .tiers { grid-template-columns: repeat(3, minmax(0, var(--tier-w))); justify-content: end; align-content: center; padding-block: 0; }
+}
+
+/* ---------- the key card ---------- */
+.tier {
+  --tier-bg: var(--color-cream-raised);
+  position: relative; isolation: isolate; display: grid; align-content: start;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 var(--space-4) var(--space-4); background: var(--tier-bg); border: 1px solid var(--color-tier-edge); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-tier); color: var(--color-text); text-align: left; cursor: pointer;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  transform: translateY(0);
+}
+@media (min-width: 64em) {
+  .tier { min-height: var(--tier-h); grid-template-rows: auto auto auto auto 1fr auto; }
+}
+.tier input { position: absolute; opacity: 0; pointer-events: none; }
+
+/* picture: full bleed to the card edges, fades into the card colour; no text on it */
+.tier-media {
+  position: relative; display: block; height: 9rem; margin: 0 calc(var(--space-4) * -1);
+  overflow: hidden; border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0; background: var(--color-espresso-raised);
+}
+@media (min-width: 64em) { .tier-media { height: calc(var(--tier-h) * 0.3); } }
+.tier-media picture, .tier-media .photo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tier-media .photo { object-fit: cover; }
+.tier-media .photo-placeholder .mark { width: 28%; min-width: 0; }
+.tier-media::after { content: ""; z-index: 2; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 55%, var(--tier-bg) 100%); pointer-events: none; }
+/* round 3 (R3 3.3): an unselected room looks softly unlit; choosing it (or considering it, fine pointer) brings the light up */
+.tier-media::before { content: ""; z-index: 1; position: absolute; inset: 0; background: var(--color-room-veil); pointer-events: none; }
+.tier:has(input:checked) .tier-media::before { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) { .tier-media::before { transition: opacity var(--duration-tier) var(--ease-soft); } }
+
+.tier-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-2); margin-top: var(--space-3); }
+.tier-name { font-family: var(--font-display); font-weight: 500; font-size: var(--text-lg); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
+.tier-head-end { display: inline-flex; align-items: center; gap: var(--space-2); }
+.tier-rec { font-size: var(--text-sm); font-weight: 500; color: var(--color-text-muted); }
+.tier-tagline { flex-basis: 100%; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--color-text-muted); }
+
+.tier-num-row { display: flex; align-items: baseline; gap: var(--space-2); margin-top: var(--space-4); }
+.cur { font-size: 0.58em; vertical-align: 0.62em; margin-right: 0.06em; font-weight: 400; }   /* the pound sign as on a price tag; still read as one price */
+.tier-num { font-family: var(--font-display); font-weight: 300; font-size: var(--tier-num-size); line-height: 0.85; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.tier-num-side { font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--color-text-muted); }
+
+.tier-list { display: grid; gap: 0.375rem; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-hairline); font-size: var(--text-sm); line-height: 1.5; list-style: none; padding-inline: 0; align-content: start; }
+.tier-list li::before { content: ""; display: inline-block; width: 0.5rem; height: 1px; margin-right: 0.625rem; vertical-align: 0.3em; background: var(--color-line); }   /* a fine tick, decoration */
+.tier:has(input:checked) .tier-list li::before { background: var(--color-gold); }
+.tier:has(input:checked) .tier-num { color: var(--color-gold); }
+@media (min-width: 64em) { .tier-list { margin-top: var(--space-3); } }
+@media (min-width: 64em) and (max-height: 56rem) { .tier-list { gap: 0.25rem; } }
+
+.tier-price-group { display: block; margin-top: var(--space-4); align-self: end; }
+.tier-price { font-family: var(--font-display); font-weight: 400; font-size: min(var(--text-xl), 2rem); line-height: 1; letter-spacing: -0.02em; }
+.tier-per { font-size: var(--text-sm); color: var(--color-text-muted); }
+.tier-inc { display: block; margin-top: var(--space-1); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+/* the drawn mark: a ring (3.79:1 on cream-raised) */
+.tier-mark { position: relative; flex: none; width: 1.25rem; height: 1.25rem; border: 1.5px solid var(--color-control-line); border-radius: 50%; }
+
+/* shadow layers: only opacity animates. rest = the card's own shadow; hover layer = ::before; selected layer = .tier-shadow */
+.tier::before, .tier-shadow { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; opacity: 0; z-index: -1; }
+.tier::before { box-shadow: var(--shadow-tier-hover); }
+.tier-shadow { box-shadow: var(--shadow-tier-selected); }
+/* round 3 (R3 3.2): the chosen card is lit from above and casts a warm pool on the counter; it shares the shadow layer's fade */
+.tier-shadow::after { content: ""; position: absolute; left: 12%; right: 12%; bottom: -1.5rem; height: 2rem; background: radial-gradient(closest-side, var(--color-pool), transparent); pointer-events: none; }
+@media (min-width: 64em) { .tier-shadow::after { bottom: -2.25rem; height: 3rem; } }
+
+/* selected: colour, edge, check and labels change instantly (same border width, nothing moves); lift and shadow ease */
+.tier:has(input:checked) {
+  --tier-bg: var(--color-espresso); border-color: var(--color-tier-edge-gold); color: var(--color-text-inverse);
+  transform: translateY(var(--tier-lift));
+}
+.tier:has(input:checked) .tier-shadow { opacity: 1; }
+.tier:has(input:checked) .tier-mark { border-color: var(--color-gold); background: var(--color-gold); }
+.tier:has(input:checked) .tier-mark::after {
+  content: ""; position: absolute; inset: 2px; background: var(--color-espresso);
+  -webkit-mask: url("../img/icon-check.svg") center / contain no-repeat; mask: url("../img/icon-check.svg") center / contain no-repeat;
+}
+@keyframes mem-check { from { opacity: 0; transform: scale(0.6); } }
+@media (prefers-reduced-motion: no-preference) { .tier:has(input:checked) .tier-mark::after { animation: mem-check 200ms var(--ease-soft) both; } }
+.tier:has(input:checked) .tier-rec { color: var(--color-gold); }
+.tier:has(input:checked) .tier-tagline, .tier:has(input:checked) .tier-num-side, .tier:has(input:checked) .tier-per, .tier:has(input:checked) .tier-inc { color: var(--color-text-muted-inverse); }
+.tier:has(input:checked) .tier-list { border-top-color: var(--color-hairline-inverse); }
+.tier:has(input:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: 4px; }
+
+/* hover and press: fine pointer only, tall objects lift instead of scale (type stays sharp) */
+@media (hover: hover) and (pointer: fine) {
+  .tier { cursor: pointer; }
+  .tier:not(:has(input:checked)):hover { transform: translateY(var(--tier-hover-lift)); }
+  .tier:not(:has(input:checked)):hover::before { opacity: 1; }
+  .tier:not(:has(input:checked)):hover .tier-media::before { opacity: 0.4; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tier { transition: transform var(--duration-tier) var(--ease-soft); }
+  .tier::before, .tier-shadow { transition: opacity var(--duration-tier) var(--ease-soft); }
+  .tier:active { transform: translateY(-2px); transition-duration: 120ms; }
+}
+
+/* the one sheen: a single class. Remove it with `.tier-sheen { display: none; }` or by deleting the span. */
+.tier-sheen { position: absolute; inset: 0; z-index: 1; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.tier-sheen::before {   /* round 3 (R3 3.4): the inlaid line of the selected card, instant with the colour */
+  content: ""; position: absolute; inset: 6px; border: 1px solid var(--color-tier-edge-gold); border-radius: calc(var(--radius-md) - 4px); opacity: 0;
+}
+.tier:has(input:checked) .tier-sheen::before { opacity: 0.45; }
+.tier-sheen::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, var(--color-sheen) 50%, transparent 65%); transform: translateX(-110%); }
+@keyframes tier-sheen { to { transform: translateX(110%); } }
+@media (prefers-reduced-motion: no-preference) {
+  .tier:has(input:checked) .tier-sheen::after { animation: tier-sheen 1.6s var(--ease-soft) both; }
+  /* on arrival: wait for the group, then 0.3s; after the first change (.is-settled) a new choice plays at once */
+  .js .tiers:not(.is-visible) .tier-sheen::after { animation: none; }
+  .js .tiers:not(.is-settled) .tier:has(input:checked) .tier-sheen::after { animation-delay: 1.4s; }
+}
+@media (prefers-reduced-motion: reduce) { .tier-sheen::after { display: none; } }   /* only the band of light goes; the inlay is part of "selected" */
+
+/* round 3 (R3 3.7): the pointer light, scaled to the one chosen card (memberships.js writes --px / --py). Fine pointer, motion allowed. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .tier:has(input:checked) { background-image: radial-gradient(14rem 14rem at var(--px, 50%) var(--py, 30%), var(--color-glow), transparent 70%); }
+}
+/* round 3 (R3 3.8): the tag acknowledges a change (opacity only; memberships.js toggles .is-ack, never on arrival) */
+@keyframes mem-ack { from { opacity: 0; } }
+@media (prefers-reduced-motion: no-preference) { .is-ack { animation: mem-ack var(--duration-ack) var(--ease-soft); } }
+
+/* ---------- the tag's choice group (receipt + Continue). Phone and tablet: the cream sticky tag ---------- */
+.mem-choice {
+  position: sticky; bottom: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  min-height: var(--bar-h); margin-inline: calc(var(--page-margin) * -1);
+  padding: var(--space-2) var(--page-margin) calc(var(--space-2) + env(safe-area-inset-bottom));
+  background: var(--color-cream-raised); border-top: 1px solid var(--color-hairline); box-shadow: var(--shadow-bar);
+}
+.continue-summary { min-width: 0; }
+.continue-summary p { margin: 0; max-width: none; }
+.continue-label, .continue-inc, .continue-note { display: none; }
+.continue-name { font-family: var(--font-display); font-weight: 500; font-size: var(--text-base); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
+.continue-price, .continue-inc { font-variant-numeric: tabular-nums; }
+.continue-price { font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--color-text-muted); white-space: nowrap; }
+.mem-choice .btn { flex: none; min-width: 9rem; }
+@media (max-width: 29.99em) { .mem-choice .btn { min-width: 7.5rem; } }
+@media (min-width: 80em) {
+  .mem-choice { position: static; display: block; min-height: 0; margin: 0; padding: 0; background: none; border: 0; box-shadow: none; }
+  .continue-label, .continue-inc, .continue-note { display: block; }
+  .continue-label { font-size: var(--text-sm); color: var(--color-text-muted); }
+  .continue-name { margin-top: var(--space-1); font-weight: 400; font-size: var(--text-xl); }
+  .continue-price { margin-top: var(--space-2); color: var(--color-text); }
+  .continue-inc { color: var(--color-text-muted); font-size: var(--text-sm); }
+  .mem-choice .btn { width: 100%; margin-top: var(--space-4); }
+  .continue-note { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); max-width: none; }
+}
+
+/* ---------- also: single visit and the Gold line (unboxed) ---------- */
+.mem-also { display: grid; gap: var(--space-4); margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--color-hairline); }
+/* round 3 (R3 3.6): what every visit includes, the first row of the also area (mounts only for pictures that exist) */
+.every-visit { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); padding-bottom: var(--space-4); border-bottom: 1px solid var(--color-hairline); }
+.every-mounts { display: flex; gap: var(--space-2); }
+.every-mount { position: relative; width: 2.5rem; height: 2.5rem; padding: var(--space-1); background: var(--color-cream-raised); border: 1px solid var(--color-tier-edge); border-radius: var(--radius-sm); }
+.every-mount-media { position: relative; display: block; width: 100%; height: 100%; overflow: hidden; border-radius: 2px; }
+.every-mount picture, .every-mount .photo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.every-mount .photo { object-fit: cover; object-position: var(--focus, 50% 50%); }
+.every-visit p { max-width: none; font-size: var(--text-sm); }
+.every-visit .btn-quiet { font-size: var(--text-sm); }
+@media (min-width: 48em) { .every-visit { flex-direction: row; align-items: center; gap: var(--space-4); } .every-visit-text { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-4); } }
+.plan-aside, .gold-aside { display: flex; align-items: center; gap: var(--space-3); }
+.plan-aside-media { position: relative; flex: none; width: 3.5rem; height: 3.5rem; overflow: hidden; border-radius: var(--radius-sm); background: var(--color-espresso-raised); }
+.plan-aside-media picture, .plan-aside-media .photo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.plan-aside-media .photo { object-fit: cover; }
+.plan-aside-media .photo-placeholder .mark { width: 40%; min-width: 0; }
+.plan-aside-body > * + * { margin-top: var(--space-1); }
+.plan-aside h2 { font-size: var(--text-lg); font-weight: 500; line-height: var(--leading-tight); }
+.plan-aside-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
+.gold-aside .mark { width: 1.75rem; height: auto; flex: none; color: var(--color-text); }
+.gold-aside p { max-width: none; }
+.gold-aside .btn-quiet { min-height: 2.75rem; font-size: var(--text-sm); }
+@media (min-width: 64em) { .mem-also { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gutter); } }
+
+/* ---------- compare ---------- */
+.compare { margin-top: var(--space-4); }
+.compare summary { list-style: none; display: flex; justify-content: space-between; align-items: center; min-height: 3.5rem; border-top: 1px solid var(--color-hairline); }
+.compare summary::-webkit-details-marker { display: none; }
+.compare-summary { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 500; letter-spacing: var(--tracking-display); }
+.compare summary::after { content: "+"; font-family: var(--font-display); font-size: var(--text-xl); line-height: 1; transform-origin: 50% 50%; }
+.compare[open] summary::after { transform: rotate(45deg); }   /* the plus turns 45 degrees and becomes an X, never a minus */
+@media (prefers-reduced-motion: no-preference) { .compare summary::after { transition: transform var(--duration-base) var(--ease-soft); } }
+.compare summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+/* no ring after a mouse or touch (memberships.js sets html[data-input]); keyboard users keep the rings above */
+html[data-input="pointer"] .compare summary:focus-visible, html[data-input="pointer"] .tier:has(input:focus-visible) { outline: none; }
+.compare-picker { margin-bottom: var(--space-3); }
+@media (min-width: 48em) { .compare-picker { display: none; } }
+.compare-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.compare-table th, .compare-table td { height: 2.5rem; padding: var(--space-2) var(--space-3); text-align: left; vertical-align: middle; }
+.compare-table tr.grp-start > * { border-top: 1px solid var(--color-hairline); }
+.compare-table thead th { font-family: var(--font-display); font-weight: 500; font-size: var(--text-base); color: var(--color-text); }
+.compare-table tbody th { font-weight: 400; color: var(--color-text-muted); }
+.compare-table td { color: var(--color-text); }
+.compare-table td.is-selected, .compare-table th.is-selected { background: var(--color-cream-raised); }
+.compare-table td.is-selected { font-weight: 600; }
+.compare-table thead th.is-selected { box-shadow: inset 0 2px 0 var(--color-espresso); }
+.cmp-head { display: inline-flex; align-items: center; gap: var(--space-2); }
+.cmp-check { display: none; width: 1rem; height: 1rem; color: var(--color-text); }
+.compare-table th.is-selected .cmp-check { display: inline-block; }
+@media (prefers-reduced-motion: no-preference) { .compare[open] .compare-body { animation: mem-fade 400ms var(--ease-soft) both; } }
+@media (max-width: 47.99em) {
+  .compare-table [data-col] { display: none; }
+  .compare-table[data-active="0"] [data-col="0"], .compare-table[data-active="1"] [data-col="1"],
+  .compare-table[data-active="2"] [data-col="2"], .compare-table[data-active="3"] [data-col="3"],
+  .compare-table[data-active=""] [data-col="0"] { display: table-cell; }
+  .compare-table thead { display: none; }
+  .compare-table td.is-selected { background: none; }
+}
+
+/* ---------- motion (BRAND 7B, restrained): the title rises, the rest fades up, the cards arrive as one group. Prices never move. ---------- */
+@keyframes mem-line { from { transform: translateY(100%); } }
+@keyframes mem-rise { from { opacity: 0; transform: translateY(var(--rise)); } }
+@keyframes mem-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: no-preference) {
+  .mem-title-line { animation: mem-line var(--duration-line) var(--ease-soft) both; }
+  .mem-fade, .mem-choice { animation: mem-rise var(--duration-hero) var(--ease-soft) 150ms both; }
+  /* pictures settle inside their boxes with the group */
+  .js .tier-media .photo, .js .tier-media .photo-placeholder { transform: scale(1.04); }
+  .js [data-reveal].is-visible .tier-media .photo, .js [data-reveal].is-visible .tier-media .photo-placeholder { transform: none; transition: transform 1000ms var(--ease-soft); }
+  /* round 3 (R3 3.3): after the arrival an unselected room rests slightly large; choosing it settles it into focus (1.2s) */
+  .js [data-reveal].is-visible .tier:not(:has(input:checked)) .tier-media .photo, .js [data-reveal].is-visible .tier:not(:has(input:checked)) .tier-media .photo-placeholder { transform: scale(1.03); transition-duration: 1200ms; }
+}
+.vat-note { margin-top: var(--space-4); padding-bottom: var(--space-6); max-width: none; }

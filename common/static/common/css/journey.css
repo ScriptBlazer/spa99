@@ -1,0 +1,122 @@
+/* The guided journey and the Gold application: one shell, one screen at a time. */
+
+.journey { position: relative; min-height: calc(100dvh - var(--header-h)); display: flex; flex-direction: column; background: var(--s-bg); color: var(--s-text); }
+.progress { height: 2px; background: var(--s-hair); }
+.progress-fill { display: block; height: 100%; background: var(--s-accent); transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform var(--duration-slow) var(--ease-soft); }
+.flow-container { flex: 1; display: flex; flex-direction: column; }
+.flow-col { width: 100%; flex: 1; display: flex; flex-direction: column; }
+.flow-loading { padding-top: var(--space-6); }
+.flow-note { padding-block: var(--space-4) var(--space-5); }
+.flow-note a { display: inline-flex; align-items: center; min-height: 2.75rem; }
+
+/* question screens: heading, lead and questions. Phone is one column; from 64em an editorial split (heading left, choices right). */
+.screen { flex: 1; display: flex; flex-direction: column; padding-top: var(--space-6); }
+.screen-head .lead { margin-top: var(--space-4); max-width: var(--measure-lead); color: var(--s-muted); }
+.screen-title { font-size: var(--text-2xl); font-weight: 400; line-height: var(--leading-tight); max-width: var(--measure-display); }
+.screen-body { flex: 1; }
+.question { margin-top: var(--space-6); }
+.question > legend, .question-title { font-size: var(--text-lg); line-height: var(--leading-snug); font-weight: 500; padding: 0; }
+.question-help { display: block; margin-top: var(--space-1); font-size: var(--text-sm); color: var(--s-muted); }
+.question-help[data-state="nudge"] { color: var(--s-text); font-weight: 500; }
+.question .tiles, .question .segmented, .question .field { margin-top: var(--space-3); }
+.prefer-not { margin-left: var(--space-1); min-height: 2.75rem; font-size: var(--text-sm); font-weight: 400; }
+.question[hidden] { display: none; }
+.sub-question { margin-top: var(--space-6); }
+.tiles--4 .tile:not(.tile-image) { min-height: var(--tile-compact-h); }
+.tiles--4 .tile:not(.tile-image):not(.tile-multi) .tile-body { padding-right: 1.75rem; }
+.last-suggestion { margin-top: var(--space-4); }
+.last-suggestion a { display: inline-flex; align-items: center; min-height: 2.75rem; font-size: var(--text-sm); }
+@media (min-width: 64em) {
+  .screen:not(.gold-sent) { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gutter); align-content: start; padding-top: var(--space-7); }
+  .screen-head { grid-column: 1 / 5; grid-row: 1 / span 4; position: sticky; top: calc(var(--header-h) + var(--space-6)); align-self: start; }
+  .screen-body, .action-bar, .start-again { grid-column: 6 / 13; }
+  .question { margin-top: var(--space-7); }
+  .screen-body > .question:first-child { margin-top: 0; }
+  .sub-question { margin-top: var(--space-7); }
+}
+
+/* sticky action bar on phones, inline after the last question on desktop */
+.action-bar {
+  position: sticky; bottom: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  margin: var(--space-6) calc(var(--page-margin) * -1) 0; padding: var(--space-3) var(--page-margin) calc(var(--space-3) + env(safe-area-inset-bottom));
+  background: var(--s-bg); border-top: 1px solid var(--s-hair);
+}
+.action-bar .btn-primary { margin-left: auto; min-width: 12rem; }
+/* not ready (needs a choice): outlined and muted, still focusable so the reason is announced. No opacity trick. */
+.action-bar .btn-primary[aria-disabled="true"] { opacity: 1; background: transparent; border-color: var(--color-control-line); color: var(--s-muted); cursor: default; }
+@media (min-width: 64em) {
+  .action-bar { position: static; margin: var(--space-6) 0 0; padding: 0 0 var(--space-6); border-top: 0; justify-content: flex-start; gap: var(--space-5); }
+  .action-bar .btn-primary { margin-left: 0; order: 2; }
+}
+.start-again { padding: var(--space-2) 0 var(--space-6); }
+.flow-error { margin-top: var(--space-3); }
+
+/* a follow-up rises in only after the screen has settled (script sets data-live two frames after render); hiding is instant */
+@media (prefers-reduced-motion: no-preference) {
+  [data-live] .sub-question { transition: opacity var(--duration-slow) var(--ease-soft), transform var(--duration-slow) var(--ease-soft); }
+  @starting-style { [data-live] .sub-question { opacity: 0; transform: translateY(var(--rise)); } }
+}
+
+/* typed answers on espresso */
+.on-dark .field input:not([type="checkbox"]):not([type="radio"]), .on-dark .field textarea { background: transparent; }
+
+/* ---------- result (cream: arrival into light) ---------- */
+.result { padding-block: var(--space-7) var(--space-7); }
+@media (min-width: 64em) {
+  .result {
+    width: calc((100% - 11 * var(--gutter)) / 12 * 8 + 7 * var(--gutter));
+    margin-left: calc((100% - 11 * var(--gutter)) / 12 * 2 + 2 * var(--gutter));
+  }
+}
+.result-grid { display: grid; gap: var(--space-6); }
+.result-label { color: var(--s-muted); }
+.result-tier { margin-top: var(--space-2); }
+.result-price { margin-top: var(--space-4); font-size: var(--text-lg); }
+.result-char { margin-top: var(--space-1); color: var(--s-muted); font-size: var(--text-lg); }
+.why { margin-top: var(--space-6); }
+.reasons { margin-top: var(--space-3); display: grid; gap: var(--space-3); }
+.reasons li { display: flex; align-items: flex-start; gap: var(--space-3); font-size: var(--text-lg); line-height: var(--leading-snug); }
+.reasons li::before { content: ""; flex: none; width: 0.875rem; height: 1.25rem; margin-top: 0.1875rem; background: var(--color-caramel); -webkit-mask: url("../img/mark-espresso.svg") center / contain no-repeat; mask: url("../img/mark-espresso.svg") center / contain no-repeat; }
+.result-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-top: var(--space-5); }
+.gold-line-note { margin-top: var(--space-4); }
+.others { margin-top: var(--space-7); }
+.others h2 { margin-bottom: var(--space-3); }
+.other-plan { display: grid; gap: var(--space-2) var(--space-4); padding-block: var(--space-4); border-top: 1px solid var(--s-hair); align-items: center; }
+.other-plan .num { font-family: var(--font-display); font-size: var(--text-xl); }
+.other-plan .not-fit { font-size: var(--text-sm); color: var(--s-muted); }
+@media (min-width: 48em) { .other-plan { grid-template-columns: 1fr auto auto; } }
+@media (min-width: 64em) {
+  .result-grid.has-gold { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); column-gap: var(--gutter); align-items: start; }
+  .result-gold { margin-top: var(--space-4); }
+}
+.result .gold-panel { margin-top: 0; }
+
+/* ---------- Gold application ---------- */
+.summary-panel { margin-top: var(--space-6); padding: var(--space-4) var(--space-5); background: var(--s-raised); border-radius: var(--radius-md); }
+.summary-panel h2 { font-size: var(--text-lg); font-family: var(--font-body); font-weight: 500; letter-spacing: var(--tracking-body); }
+.summary-panel ul { margin-top: var(--space-3); display: grid; gap: var(--space-2); }
+.summary-panel .btn-quiet { margin-top: var(--space-2); }
+.toggle-line { margin-top: var(--space-2); font-size: var(--text-sm); }
+.gold-sent { align-items: center; text-align: center; justify-content: center; padding-block: var(--space-7); }
+.gold-sent .mark { width: 3rem; height: auto; color: var(--color-gold); margin-inline: auto; }
+.gold-sent p { margin-inline: auto; }
+.gold-sent .reference { margin-top: var(--space-4); font-size: var(--text-sm); color: var(--s-muted); }
+.gold-sent .actions { justify-content: center; }
+.fieldset-gap { margin-top: var(--space-4); }
+
+/* a calm swan glyph (CSS mask of the vector mark) for places that are built by script */
+.mark-glyph { display: block; width: 2rem; aspect-ratio: 325 / 480; background: currentColor; -webkit-mask: url("../img/mark-espresso.svg") center / contain no-repeat; mask: url("../img/mark-espresso.svg") center / contain no-repeat; }
+.mark-glyph--lg { width: 3rem; margin-inline: auto; color: var(--color-gold); }
+.photo-placeholder .mark-glyph { width: 22%; min-width: 1.75rem; max-width: 4rem; color: var(--color-gold); }
+.gold-panel .mark-glyph { color: var(--color-gold); margin-bottom: var(--space-4); }
+.journey-light { background: var(--color-bg); }
+.tile-multi.is-chosen .tile-mark { border-color: var(--s-accent); background: var(--s-accent); }
+.tile-multi.is-chosen .tile-mark::after { content: ""; position: absolute; inset: 1px; background: var(--s-on-accent); -webkit-mask: url("../img/icon-check.svg") center / contain no-repeat; mask: url("../img/icon-check.svg") center / contain no-repeat; }
+.tiles-entry .tile[aria-disabled="true"] { pointer-events: none; }
+.result-grid { grid-template-areas: "main" "gold" "others"; }
+.result-main { grid-area: main; }
+.result-gold { grid-area: gold; }
+.others { grid-area: others; }
+@media (min-width: 64em) {
+  .result-grid.has-gold { grid-template-areas: "main gold" "others ."; }
+}

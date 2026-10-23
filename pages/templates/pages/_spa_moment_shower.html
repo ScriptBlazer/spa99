@@ -1,0 +1,17 @@
+{# The overlapping mounted pair (docs/design/AMENITIES.md M2): the bottles and the towel on the rail. Needs m. A picture that is not built is left out, the other stands alone. #}
+<section class="scene sp-sec sp-moment sp-moment--shower on-dark" data-scene="moment" data-glow aria-labelledby="moment-shower">
+  <div class="glow" aria-hidden="true"></div>
+  <div class="container grid sp-shower-grid">
+    <div class="sp-moment-words sp-shower-words">
+      <span class="sp-rule" data-rule aria-hidden="true"></span>
+      <h2 class="sp-moment-title" id="moment-shower" data-rise>{{ m.heading }}</h2>
+      {% if m.body %}<p class="muted sp-moment-line" data-fade>{{ m.body }}</p>{% endif %}
+    </div>
+    <div class="sp-pair">
+      {% for p in m.pictures %}{% if p.has_image %}
+      {% if forloop.first %}{% include "pages/_spa_mount.html" with name=p.name alt=p.alt sizes="(min-width: 64em) 28vw, 78vw" focus=p.focus upload=p.upload depth="4" cls="sp-pair-a" %}
+      {% else %}{% include "pages/_spa_mount.html" with name=p.name alt=p.alt sizes="(min-width: 64em) 20vw, 52vw" focus=p.focus upload=p.upload depth="12" cls="sp-pair-b" %}{% endif %}
+      {% endif %}{% endfor %}
+    </div>
+  </div>
+</section>

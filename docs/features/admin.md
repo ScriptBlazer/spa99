@@ -2,13 +2,28 @@
 
 Phase 1. Apps: `control`, `insights`, plus each app's `services.py`.
 
+## Status: what is built and what is not (2026-10-23)
+
+**Spa 99 Control is NOT built yet.** There is no `control` app and none of the sections below exist as screens.
+
+| Built | Not built |
+|---|---|
+| Control host routing (`CONTROL_DOMAIN` uses `config.urls_control`), login required, staff only | Every section in the table below (Dashboard, People, Gold, Journey, Plans, Hours, Content, Gold rules, Notifications, Settings, Team) |
+| `config.views.control_index`: a placeholder that returns the plain text "Spa 99 Control" | The Control screens in the brand look, CSV export buttons, GDPR export and delete buttons |
+| Roles `Owner`, `Manager`, `Viewer` (`setup_roles`) | Field-level permissions (Manager cannot change Team or Gold status) |
+| Statistics as JSON: `GET /insights/summary/` on the Control host (staff roles only) | Statistics charts and cards |
+| Change history on every model (`django-simple-history`) | History shown on each item |
+| The hidden Django admin (path from `ADMIN_PATH`, superusers): the ONLY place today to edit plans, hours, facilities, copy, Gold rules, notification templates and settings, and to see and export people and Gold applications | |
+
+Everything in the sections below is the plan, not the current state. Barry's Gold email has no "Open in Control" link for now. TODO: add it back when Control has `/gold/<id>/` (see `docs/features/gold-application.md`).
+
 ## What it is
 
 A custom back office in the Spa 99 look. Not the regular Django admin (that stays hidden as a superuser fallback). Everything that might change lives here, so rules and prices never need a developer.
 
 Mobile-usable, fast, calm. Same shared buttons, modal, messages and validation as the site (`common`).
 
-## Sections (Phase 1)
+## Sections (Phase 1, planned, not built)
 
 | Section | What you can do |
 |---|---|
@@ -26,7 +41,7 @@ Mobile-usable, fast, calm. Same shared buttons, modal, messages and validation a
 
 Every change is recorded (who, when, before and after) via `django-simple-history` and shown on the item (ADM-11).
 
-## Roles (Phase 1, to approve)
+## Roles (Phase 1, to approve; the groups exist, the Control checks do not)
 
 | Role | Can |
 |---|---|
@@ -34,7 +49,18 @@ Every change is recorded (who, when, before and after) via `django-simple-histor
 | Manager | Everything except Team and Gold status |
 | Viewer | Read-only: dashboard, people, Gold |
 
-Roles are Django Groups. Checks on every view.
+Roles are Django Groups. Checks on every view. `python manage.py setup_roles [--dry-run]` creates or refreshes `Owner`, `Manager`, `Viewer` (idempotent). Proposed permissions, to approve: Owner has every permission on the project apps plus groups; Manager has everything on the project apps except groups/permissions, with People (`users.User`) and Gold applications view-only at model level (Control does the field-level edits, since Django cannot split "Team" from "People" on the same model); Viewer has `view_` on people, interest, Gold applications, journey sessions and answers. Every model is also registered in the hidden Django admin (superuser fallback).
+
+## Data as built (Phase 1 backend)
+
+| App | Models |
+|---|---|
+| `plans` | `Plan` (slug, kind monthly / free_by_application / one_off, price ex VAT, visits per month (empty = unlimited), hours daytime / any, booking window days, upcoming limit, cancel hours, guests per month, no-show result, `perks` list of key / label / value, short description, highlight, order, visible), `SiteSettings` (singleton: VAT rate, capacity 25, slot length 120, slot step 30, booking notice 10, opening date, stage switches, wording, contact email, Gold alert to / cc, privacy version), `OpeningRule` (periods daytime 5:00-18:00 and evening 18:00-3:00, daily closure 3:00-5:00, Shabbos / Yom Tov offsets 120 before and 60 after; Hebcal times arrive in Phase 3), `Closure` (one-offs), `Facility` (image goes to default storage, S3 on live) |
+| `content` | `Page`, `Section` (key, heading, body, image, CTA, order, visible) |
+| `journey`, `gold`, `users` | see their feature docs |
+| `notifications` | `EmailLog` (to, cc, subject, template, status, error, sent at) |
+
+All of them have history except `EmailLog` and `LoginEvent`, and are registered in the hidden Django admin.
 
 ## Statistics (Insights)
 
@@ -51,7 +77,7 @@ Filters: date range, source, completed vs not.
 | Sources | Heard via, referrer, UTM |
 | Trend | Registrations and Gold applications per day/week |
 
-All figures are live queries on saved answers (no third-party analytics). Charts in the brand palette, readable in light backgrounds, accessible.
+All figures are live queries on saved answers (no third-party analytics). Built in `insights/services.py` (one function per card, bots excluded) and served as JSON by `GET /insights/summary/?from=YYYY-MM-DD&to=YYYY-MM-DD&source=&completed=yes|no` on the Control host (Owner, Manager, Viewer or superuser; anonymous is sent to login, others get 403). Frequency weights for "expected visits per week" are `Option.weight` on the frequency options. Charts in the brand palette, readable in light backgrounds, accessible.
 
 ## Later sections (planned, not built)
 

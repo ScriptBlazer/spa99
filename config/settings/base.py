@@ -36,6 +36,13 @@ INSTALLED_APPS = [
     "django_q",
     "common",
     "users",
+    "plans",
+    "content",
+    "journey",
+    "gold",
+    "notifications",
+    "insights",
+    "pages",
 ]
 
 MIDDLEWARE = [
@@ -66,6 +73,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "plans.context_processors.site",
             ],
         },
     },
@@ -89,6 +97,26 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+# Sign-up rules. (Prices, hours, journey and Gold rules are database rows, not settings.)
+MINIMUM_AGE = 18  # ACC-08; mirrored in common/static/common/js/validate.js
+EMAIL_VERIFY_MAX_AGE = 24 * 60 * 60  # seconds a verification link works
+PASSWORD_RESET_TIMEOUT = 60 * 60  # seconds a password reset link works
+
+# Email. Dev prints to the console, tests use the in-memory outbox, live sets EMAIL_BACKEND
+# (notifications.backends.SesBackend for Amazon SES via the server's IAM role, or Django's SMTP backend).
+EMAIL_BACKEND = ENV.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = ENV.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(ENV.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = ENV.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = ENV.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = ENV.bool("EMAIL_USE_TLS", True)
+DEFAULT_FROM_EMAIL = ENV.get("DEFAULT_FROM_EMAIL", "Spa 99 <hello@spa99.uk>")
+AWS_SES_REGION_NAME = ENV.get("AWS_SES_REGION_NAME", "eu-west-2")
+# Absolute links used in emails (no trailing slash).
+SITE_WEBGL = ENV.bool("SITE_WEBGL", True)  # false = the 3D Gold Card never loads (CSS card only); read by base.html as data-webgl
+SITE_URL = ENV.get("SITE_URL", f"https://{DOMAIN}").rstrip("/")
+CONTROL_URL = ENV.get("CONTROL_URL", f"https://{CONTROL_HOST}").rstrip("/")
 
 LANGUAGE_CODE = "en-gb"
 TIME_ZONE = "Europe/London"
@@ -141,6 +169,8 @@ Q_CLUSTER = {
 
 # Audit: trust X-Forwarded-For for the client IP only behind Caddy (prod).
 TRUST_FORWARDED_FOR = False
+# Header our proxy sets to the real client IP (off when empty). Prod: "X-Client-IP", written by Caddy (see Caddyfile).
+CLIENT_IP_HEADER = ""
 
 LOGGING = {
     "version": 1,

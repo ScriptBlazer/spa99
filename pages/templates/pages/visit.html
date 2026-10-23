@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load content_tags pages_tags %}
+{% block main %}
+{% page_content "visit" as v %}
+<section class="section on-light visit-address" aria-labelledby="visit-title">
+  <div class="container" data-reveal="hero">
+    <h1 id="visit-title">{{ v.address.heading }}</h1>
+    <p class="statement visit-lines">{% for line in v.address.body|lines %}<span>{{ line }}</span>{% endfor %}</p>
+    <p class="visit-email"><a class="big-link" href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a></p>
+    {% if hours %}<dl class="hours visit-hours">{% for label, text in hours %}<dt>{{ label }}</dt><dd>{{ text }}</dd>{% endfor %}</dl>{% endif %}
+    {% if v.getting_here.body %}<div class="visit-getting"><h2>{{ v.getting_here.heading|default:"Getting here" }}</h2><p>{{ v.getting_here.body }}</p></div>{% endif %}
+    {% if v.men_only.body %}<p class="small muted visit-men">{{ v.men_only.body }}</p>{% endif %}
+  </div>
+</section>
+<section class="on-dark visit-arrival" aria-label="The entrance">
+  <div data-reveal="image"><div class="frame frame-21x9">{% photo "door-white" alt="Frosted glass door etched with a white swan" sizes="100vw" %}</div></div>
+</section>
+{% endblock %}

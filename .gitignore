@@ -6,7 +6,7 @@
 # Python
 __pycache__/
 *.py[cod]
-.venv/
+.venv
 venv/
 
 # Django
@@ -28,3 +28,6 @@ htmlcov/
 
 # Stray temp folders (never commit)
 tmp*/
+
+# Agent worktrees
+.claude/worktrees/

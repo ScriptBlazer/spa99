@@ -1,0 +1,20 @@
+{% load content_tags %}{# A full-bleed amenity band (docs/design/AMENITIES.md M1 and M3). Needs m (the moment) and over (true: the words sit on the picture, on the veil, from 64em). #}
+{% with p=m.pictures.0 %}
+<section class="scene sp-sec sp-moment sp-moment--{{ m.key }}{% if over %} sp-moment--over{% endif %} on-dark" data-scene="moment" data-glow aria-labelledby="moment-{{ m.key }}">
+  <div class="glow" aria-hidden="true"></div>
+  <div class="sp-bandwrap">
+    <figure class="frame sp-bandpic" data-frame data-band style="--focus: {{ p.focus }}">
+      <div class="frame-media">{% include "pages/_spa_pic.html" with name=p.name portrait=p.portrait upload=p.upload alt=p.alt sizes="100vw" %}</div>
+      <div class="frame-tint" aria-hidden="true"></div>
+      {% if over %}<div class="hero-veil sp-bandveil" aria-hidden="true"></div>{% endif %}
+    </figure>
+    <div class="container grid sp-bandtext">
+      <div class="sp-moment-words{% if over %} sp-moment-words--over{% endif %}">
+        <span class="sp-rule" data-rule aria-hidden="true"></span>
+        <h2 class="sp-moment-title" id="moment-{{ m.key }}" data-rise>{{ m.heading }}</h2>
+        {% if m.body %}<p class="lead sp-moment-line{% if not over %} muted{% endif %}" data-fade>{{ m.body }}</p>{% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endwith %}

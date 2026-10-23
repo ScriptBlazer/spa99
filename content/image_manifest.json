@@ -1,0 +1,300 @@
+{
+  "hero": {
+    "width": 1367,
+    "height": 2119,
+    "widths": [
+      480,
+      800,
+      1367
+    ]
+  },
+  "relaxing-zone": {
+    "width": 4224,
+    "height": 1792,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "gym": {
+    "width": 2400,
+    "height": 1792,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "dry-sauna": {
+    "width": 2400,
+    "height": 1792,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "door-gold": {
+    "width": 2048,
+    "height": 2048,
+    "widths": [
+      480,
+      800,
+      1600,
+      2048
+    ]
+  },
+  "door-white": {
+    "width": 2048,
+    "height": 2048,
+    "widths": [
+      480,
+      800,
+      1600,
+      2048
+    ]
+  },
+  "lockers": {
+    "width": 2528,
+    "height": 1696,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "arrival": {
+    "width": 2400,
+    "height": 1792,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "lounge": {
+    "width": 5056,
+    "height": 3392,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "relax-loungers": {
+    "width": 5504,
+    "height": 3072,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "showers": {
+    "width": 2528,
+    "height": 1692,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "cold-tub": {
+    "width": 1792,
+    "height": 2400,
+    "widths": [
+      480,
+      800,
+      1600
+    ]
+  },
+  "reception": {
+    "width": 1984,
+    "height": 2174,
+    "widths": [
+      480,
+      800,
+      1600,
+      1984
+    ]
+  },
+  "corridor": {
+    "width": 2528,
+    "height": 1684,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "showers-mosaic": {
+    "width": 2268,
+    "height": 1888,
+    "widths": [
+      480,
+      800,
+      1600,
+      2268
+    ]
+  },
+  "fish-tank": {
+    "width": 1581,
+    "height": 995,
+    "widths": [
+      480,
+      800,
+      1581
+    ]
+  },
+  "gold-card": {
+    "width": 1280,
+    "height": 960,
+    "widths": [
+      480,
+      800,
+      1280
+    ]
+  },
+  "cold-plunge": {
+    "width": 1792,
+    "height": 2400,
+    "widths": [
+      480,
+      800,
+      1600
+    ]
+  },
+  "wet-sauna": {
+    "width": 1792,
+    "height": 2400,
+    "widths": [
+      480,
+      800,
+      1600
+    ]
+  },
+  "massage-room": {
+    "width": 3712,
+    "height": 4608,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "kitchenette": {
+    "width": 1856,
+    "height": 2304,
+    "widths": [
+      480,
+      800,
+      1600,
+      1856
+    ]
+  },
+  "towel-bench": {
+    "width": 1536,
+    "height": 658,
+    "widths": [
+      480,
+      800,
+      1536
+    ]
+  },
+  "towel-bench-portrait": {
+    "width": 1536,
+    "height": 1920,
+    "widths": [
+      480,
+      800,
+      1536
+    ]
+  },
+  "slippers": {
+    "width": 2048,
+    "height": 878,
+    "widths": [
+      480,
+      800,
+      1600,
+      2048
+    ]
+  },
+  "slippers-portrait": {
+    "width": 1638,
+    "height": 2048,
+    "widths": [
+      480,
+      800,
+      1600
+    ]
+  },
+  "toiletries": {
+    "width": 1536,
+    "height": 2752,
+    "widths": [
+      480,
+      800,
+      1536
+    ]
+  },
+  "towel-rail": {
+    "width": 1536,
+    "height": 2752,
+    "widths": [
+      480,
+      800,
+      1536
+    ]
+  },
+  "tote": {
+    "width": 2048,
+    "height": 2048,
+    "widths": [
+      480,
+      800,
+      1600,
+      2048
+    ]
+  },
+  "bottle-gym": {
+    "width": 1536,
+    "height": 2752,
+    "widths": [
+      480,
+      800,
+      1536
+    ]
+  },
+  "robe": {
+    "width": 5504,
+    "height": 3072,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  },
+  "robe-portrait": {
+    "width": 3072,
+    "height": 5504,
+    "widths": [
+      480,
+      800,
+      1600,
+      2400
+    ]
+  }
+}

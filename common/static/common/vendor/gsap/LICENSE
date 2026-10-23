@@ -1,0 +1,8 @@
+GSAP 3.13.0 (gsap, ScrollTrigger, SplitText, DrawSVGPlugin, CustomEase)
+Copyright 2025, GreenSock. All rights reserved.
+
+Used under the GreenSock Standard "no charge" licence, which covers commercial use of GSAP
+and all its plugins from version 3.13:
+https://gsap.com/standard-license
+
+Files in this folder are the unmodified dist/*.min.js files from the npm package gsap@3.13.0.

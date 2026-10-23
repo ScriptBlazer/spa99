@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load static content_tags %}
+{% block head_title %}{% include "common/_head.html" with title="Check your email | Spa 99" %}{% endblock %}
+{% block main %}
+{% page_content "register" as r %}
+<section class="section on-light register register--solo">
+  <div class="container grid register-grid">
+    {% include "users/_register_stage_solo.html" %}
+    <div class="register-panel register-panel--sm" data-reveal>
+      <h1>{{ r.sent.heading }}</h1>
+      <p class="lead">{% if email %}We've sent a link to <strong>{{ email }}</strong>. {% else %}We've sent you a link. {% endif %}{{ r.sent.body }}</p>
+      <div class="actions">
+        <form method="post" action="{% url 'resend_verification' %}" data-resend>{% csrf_token %}
+          <button type="submit" class="btn-quiet" data-working-text="Sending">Send it again</button>
+        </form>
+        <a class="btn-quiet" href="{% url 'register' %}">Wrong address? Change it</a>
+      </div>
+      <p class="small muted" role="status" aria-live="polite" data-resend-status></p>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/forms.js' %}"></script>{% endblock %}

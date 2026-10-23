@@ -7,14 +7,15 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import OperationalError
 from django.http import HttpResponse
-from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
+from django.test import Client, RequestFactory, SimpleTestCase, TestCase, override_settings
 from django_q.models import Success
 
 from common.middleware import HostRoutingMiddleware
+from common.audit import client_ip
 from common.models import LoginEvent
 from common.spa_day import spa_day_bounds, spa_day_for
 from common.tasks import enqueue
-from common.validators import normalise_email, normalise_uk_mobile, password_problems
+from common.validators import MESSAGES, client_config, normalise_email, normalise_uk_mobile, password_problems
 
 LONDON = ZoneInfo("Europe/London")
 UTC = ZoneInfo("UTC")
@@ -59,7 +60,7 @@ class ControlAccessTests(TestCase):
     def test_anonymous_is_sent_to_login_and_public_host_has_no_control_pages(self):
         response = self.client.get("/", **self.host)
         self.assertRedirects(response, "/login/?next=/", fetch_redirect_response=False)
-        self.assertEqual(self.client.get("/").status_code, 404)  # public host has no control pages
+        self.assertEqual(self.client.get("/insights/").status_code, 404)  # public host has no control pages
 
     def test_only_staff_reach_the_index(self):
         User = get_user_model()
@@ -172,6 +173,55 @@ class LoginAuditTests(TestCase):
         self.assertEqual(LoginEvent.objects.get().ip_address, "198.51.100.9")
 
 
+class ClientIpTests(SimpleTestCase):
+    def ip(self, **meta):
+        return client_ip(RequestFactory().get("/", **meta))
+
+    @override_settings(TRUST_FORWARDED_FOR=True, CLIENT_IP_HEADER="X-Client-IP")
+    def test_the_proxy_header_wins_over_a_forged_forwarded_for(self):
+        self.assertEqual(
+            self.ip(HTTP_X_CLIENT_IP="198.51.100.9", HTTP_X_FORWARDED_FOR="6.6.6.6, 198.51.100.9", REMOTE_ADDR="10.0.0.2"),
+            "198.51.100.9",
+        )
+        self.assertEqual(self.ip(HTTP_X_FORWARDED_FOR="203.0.113.5", REMOTE_ADDR="10.0.0.2"), "203.0.113.5")  # header missing: old behaviour
+
+    @override_settings(TRUST_FORWARDED_FOR=False, CLIENT_IP_HEADER="X-Client-IP")
+    def test_nothing_is_trusted_unless_we_are_behind_our_proxy(self):
+        self.assertEqual(self.ip(HTTP_X_CLIENT_IP="6.6.6.6", HTTP_X_FORWARDED_FOR="6.6.6.6", REMOTE_ADDR="192.0.2.1"), "192.0.2.1")
+
+    @override_settings(TRUST_FORWARDED_FOR=True, CLIENT_IP_HEADER="")
+    def test_header_is_off_by_default(self):
+        self.assertEqual(self.ip(HTTP_X_CLIENT_IP="6.6.6.6", HTTP_X_FORWARDED_FOR="198.51.100.9", REMOTE_ADDR="10.0.0.2"), "198.51.100.9")
+
+
+class SharedValidationTests(TestCase):
+    def test_the_server_check_agrees_with_the_signup_rules(self):
+        good = self.client.post("/validate/mobile/", {"mobile": "07912 345678"}).json()
+        self.assertEqual(good, {"valid": True})
+        for number in ("07911 654321", "07700 900123", "020 7946 0958", "nonsense"):  # the numbers the page used to accept
+            with self.subTest(number=number):
+                bad = self.client.post("/validate/mobile/", {"mobile": number}).json()
+                self.assertFalse(bad["valid"])
+                self.assertEqual(bad["message"], MESSAGES["mobile_invalid"])
+        self.assertEqual(self.client.get("/validate/mobile/", {"mobile": "07912 345678"}).status_code, 405)  # never in a URL
+        strict = Client(enforce_csrf_checks=True)
+        self.assertEqual(strict.post("/validate/mobile/", {"mobile": "07912 345678"}).status_code, 403)  # needs the token
+
+    def test_the_browser_gets_the_python_wording_and_limits(self):
+        config = client_config({"mobile": "/validate/mobile/"})
+        self.assertEqual(config["messages"]["email_invalid"], MESSAGES["email_invalid"])
+        self.assertEqual(config["minimum_age"], 18)
+        self.assertEqual(config["messages"]["dob_under_age"], "You must be 18 or over.")
+        self.assertEqual(config["password_min_length"], 10)
+        # The password wording is read from the real validators, so it is exactly what the server would say.
+        self.assertEqual(config["messages"]["password_short"], password_problems("a")[0])
+        self.assertIn("{what}", config["messages"]["password_similar"])
+        html = self.client.get("/register/").content.decode()
+        self.assertIn('id="validation-config"', html)
+        with override_settings(MINIMUM_AGE=21):
+            self.assertEqual(client_config()["messages"]["dob_under_age"], "You must be 21 or over.")
+
+
 class BackgroundTaskTests(TestCase):
     def test_example_task_runs_synchronously_in_tests(self):
         enqueue("common.tasks.heartbeat")
@@ -183,14 +233,14 @@ class ErrorPageTests(SimpleTestCase):
         from django.template.loader import render_to_string
 
         expected = {
-            "400.html": "That request didn&rsquo;t work",
-            "403.html": "You don&rsquo;t have access to this page",
-            "404.html": "We can&rsquo;t find that page",
-            "500.html": "Something went wrong",
+            "400.html": "That request didn't look right.",
+            "403.html": "This page is private.",
+            "404.html": "This page isn't here.",
+            "500.html": "Something went wrong on our side.",
         }
         for name, heading in expected.items():
             with self.subTest(name=name):
-                self.assertIn(f"<h1>{heading}</h1>", render_to_string(name))
+                self.assertIn(heading, render_to_string(name))
 
     def test_csrf_failure_view_gives_friendly_403(self):
         from django.test import RequestFactory
@@ -199,4 +249,4 @@ class ErrorPageTests(SimpleTestCase):
 
         response = csrf_failure(RequestFactory().post("/x/"))
         self.assertEqual(response.status_code, 403)
-        self.assertIn("have access", response.content.decode())
+        self.assertIn("This page is private.", response.content.decode())

@@ -1,0 +1,7 @@
+{# Reduced header: lockup (home) and a quiet "Leave". Everything is saved, so leaving is safe. #}
+<header class="site-header on-dark">
+  <div class="container header-bar">
+    <a class="brand" href="/" aria-label="Spa 99, home">{% include "common/_logo.html" %}</a>
+    <a class="btn-quiet" href="/">{{ leave_label|default:"Leave" }}</a>
+  </div>
+</header>

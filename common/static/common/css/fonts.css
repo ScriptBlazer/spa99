@@ -1,0 +1,35 @@
+/* Self-hosted, latin subset, variable. Fallbacks are sized so the swap does not shift the layout. */
+@font-face {
+  font-family: "Signika";
+  src: url("../fonts/signika-latin.woff2") format("woff2");
+  font-weight: 300 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Figtree";
+  src: url("../fonts/figtree-latin.woff2") format("woff2");
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Signika Fallback";
+  src: local("Arial");
+  size-adjust: 96%;
+  ascent-override: 97.9%;
+  descent-override: 30.4%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Figtree Fallback";
+  src: local("Arial");
+  size-adjust: 103.3%;
+  ascent-override: 92%;
+  descent-override: 24.2%;
+  line-gap-override: 0%;
+}
+:root {
+  --font-display: "Signika", "Signika Fallback", system-ui, sans-serif;
+  --font-body: "Figtree", "Figtree Fallback", system-ui, sans-serif;
+}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load static validation_tags pages_tags %}
+{% block head_title %}{% include "common/_head.html" with title="Forgotten password | Spa 99" %}{% endblock %}
+{% block main %}
+{% signin_shell as shell %}
+{% include "users/_shell_top.html" %}
+      <h1 class="signin-title-sm">Forgotten your password?</h1>
+      <p class="signin-lead">Enter your email and we'll send you a link to choose a new one.</p>
+      <form method="post" data-live-validate class="signin-fields" novalidate>{% csrf_token %}
+        {% include "common/_field.html" with field=form.email %}
+        <button type="submit" class="btn btn-primary btn-block" data-working-text="Sending">Send the link</button>
+      </form>
+      <div class="signin-foot">
+        <p class="small"><a class="btn-quiet small" href="{% url 'login' %}">Back to sign in</a></p>
+      </div>
+{% include "users/_shell_bottom.html" %}
+{% endblock %}
+{% block scripts %}{% validation_config %}{% endblock %}

@@ -1,4 +1,5 @@
-/* Brand tokens (docs/BRAND.md section 8). Components use these, never raw values. */
+/* Brand tokens (docs/BRAND.md section 8). Components use these, never raw values.
+   Anything marked "Derived" is not a brand colour/value; see docs/design/BRIEF.md section 11 for contrast. */
 :root {
   /* Colour */
   --color-cream: #F5F2D8;
@@ -13,21 +14,46 @@
   --color-accent: var(--color-gold);       /* on dark only for text */
   --color-line: var(--color-caramel);
   /* Derived (not brand colours): a deep red for destructive actions, a translucent espresso behind modals. */
-  --color-danger: #8B1E1E;
+  --color-danger: #8B1E1E;                 /* 8.07 on cream; not for text on espresso */
   --color-overlay: rgb(73 46 33 / 0.6);
+
+  /* Derived surfaces and text (design brief) */
+  --color-cream-raised: #FBF9EC;           /* espresso text 11.71 */
+  --color-espresso-raised: #553729;        /* cream 9.45, gold 5.32, caramel 3.44 */
+  --color-text-muted: #745F4F;             /* 5.32 on cream, 5.69 on cream-raised */
+  --color-text-muted-inverse: #C5BBA5;     /* 6.50 on espresso, 5.61 on espresso-raised */
+  --color-control-line: #8E7C6A;           /* field/tile borders: 3.54 cream, 3.79 cream-raised, 3.09 espresso; not on espresso-raised */
+  --color-hairline: rgb(73 46 33 / 0.14);  /* decoration only */
+  --color-hairline-inverse: rgb(245 242 216 / 0.14); /* decoration only */
+  --color-danger-inverse: #F4B09E;         /* error text on espresso, 6.81 */
+  --color-focus: var(--color-espresso);
+  --color-focus-inverse: var(--color-gold);
+  --color-pattern: rgb(229 172 110 / 0.08); /* swan pattern on espresso */
+  /* Derived chart colours for Control (light background, >= 3:1 on cream-raised) */
+  --color-chart-1: var(--color-espresso);  /* 11.71 */
+  --color-chart-2: #A0703F;                /* caramel deep, 4.07 */
+  --color-chart-3: #745F4F;                /* 5.69, always with a hatch pattern */
 
   /* Type */
   --font-display: "Signika", system-ui, sans-serif;
   --font-body: "Figtree", system-ui, sans-serif;
   --tracking-display: -0.025em;
   --tracking-body: -0.01em;
+  --tracking-engraved: 0.2em;                   /* derived (round 3): the engraved brand line on the Gold panel, as on the card's back */
+  --tracking-label: 0.08em;                /* derived: small uppercase labels only */
 
   --text-sm: 0.875rem;
   --text-base: 1rem;
+  --text-body: 1rem;                       /* derived: may become 1.0625rem at desktop */
   --text-lg: 1.25rem;
   --text-xl: clamp(1.5rem, 2vw + 1rem, 2.25rem);
   --text-2xl: clamp(2.25rem, 4vw + 1rem, 4rem);
   --text-hero: clamp(3rem, 8vw + 1rem, 8rem);
+
+  --leading-display: 1;
+  --leading-tight: 1.1;
+  --leading-snug: 1.4;
+  --leading-body: 1.6;
 
   /* Space */
   --space-1: 0.25rem;
@@ -39,16 +65,141 @@
   --space-7: 6rem;
   --space-8: 10rem;
 
+  /* Layout (derived) */
+  --container-max: 90rem;                  /* 1440px including margins */
+  --page-margin: clamp(1.25rem, 4.4vw, 4rem);
+  --gutter: clamp(1.25rem, 2.2vw, 2rem);
+  --measure: 34rem;
+  --measure-display: 14ch;
+  --section-y: clamp(6rem, 11vw, 10rem);
+  --header-h: 4rem;
+  --control-h: 3.25rem;                    /* 52px buttons and fields */
+  --control-h-compact: 2.5rem;             /* 40px, Control only */
+  --tile-min-h: 4.5rem;
+
   /* Shape */
-  --radius-sm: 6px;
-  --radius-md: 12px;
+  --radius-sm: 6px;                        /* controls */
+  --radius-md: 12px;                       /* surfaces; photography is always square */
+  --shadow-raised: 0 24px 60px -24px rgb(73 46 33 / 0.35); /* derived: modal only */
 
   /* Motion */
   --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
   --duration-slow: 700ms;
   --duration-base: 400ms;
+  /* BRAND section 7 timings (derived names, values from the spec) */
+  --duration-hero: 800ms;
+  --duration-reveal: 1000ms;
+  --delay-reveal: 100ms;
+  --stagger: 100ms;
+  --duration-press: 250ms;
+  --rise: 8px;
+
+  /* Immersive marketing pages (docs/design/IMMERSIVE.md section 12). Derived, not brand colours. */
+  --color-veil: rgb(73 46 33 / 0.82);          /* solid part of the legibility veil; cream on it >= 6.5:1 over the brightest render */
+  --color-header-solid: rgb(73 46 33 / 0.88);  /* fixed header after scroll, with blur */
+  --color-glow: rgb(229 172 110 / 0.16);       /* pointer light centre, decoration only */
+  --scene-h: 100svh;
+  --scene-pad-top: calc(var(--header-h) + var(--space-5));
+  /* Text groups sit at the optical centre: centre of the area under the header, nudged up by --space-4 (IMMERSIVE section 0). */
+  --scene-centre-top: var(--header-h);
+  --scene-centre-bottom: calc(var(--space-4) * 2);
+  --color-veil-soft: rgb(73 46 33 / 0.4);      /* light overall veil under the phone band veil */
+  --duration-line: 1100ms;
+  --stagger-line: 80ms;
+  --duration-page: 480ms;
+  /* Home round 2 (docs/design/IMMERSIVE-R2.md section 7). Derived, decoration only. */
+  --color-frame-tint: rgb(73 46 33 / 0.14);    /* resting tint inside every frame on dark scenes */
+  --color-thread: rgb(229 172 110 / 0.45);     /* the thread (gold) on espresso */
+  --color-thread-light: rgb(187 136 85 / 0.6); /* the thread (caramel) on cream */
+  --frame-gap: var(--space-6);                 /* minimum espresso between two frames */
+  /* Distance from the content edge to the screen edge: how far an edge-bleed frame runs out (also past the 1440 container). */
+  /* Memberships round 2, the key cards (docs/design/MEMBERSHIPS-R2.md section 7). Derived, decoration only. Shadows are warm (espresso), never black. */
+  --shadow-tier: 0 1px 1px rgb(73 46 33 / 0.04), 0 6px 12px -4px rgb(73 46 33 / 0.06), 0 24px 44px -20px rgb(73 46 33 / 0.14);
+  --shadow-tier-hover: 0 2px 2px rgb(73 46 33 / 0.05), 0 12px 20px -6px rgb(73 46 33 / 0.08), 0 36px 64px -24px rgb(73 46 33 / 0.20);
+  --shadow-tier-selected: 0 2px 3px rgb(73 46 33 / 0.10), 0 16px 28px -10px rgb(73 46 33 / 0.20), 0 52px 88px -30px rgb(73 46 33 / 0.38);
+  --shadow-bar: 0 -10px 28px -18px rgb(73 46 33 / 0.22);
+  --color-tier-edge: rgb(73 46 33 / 0.07);      /* the 1px edge of a cream tier card (decoration) */
+  --color-tier-edge-gold: rgb(229 172 110 / 0.55); /* the 1px edge of the selected (espresso) tier card */
+  --color-sheen: rgb(245 242 216 / 0.10);       /* the one band of light that crosses the selected card */
+  --tier-w: 18rem;                              /* a tier card */
+  --tier-h: clamp(33rem, 100svh - 15rem, 37.5rem);
+  --tier-gap: 2.5rem;
+  --tier-tag-w: 18rem;                          /* the tag column left of the cards */
+  --tier-num-size: 3.5rem;                      /* the visits numeral; 4.5rem from 64em */
+  --tier-lift: 0px;                             /* how far the selected card sits up; -8px from 64em */
+  --tier-hover-lift: -4px;
+  --duration-tier: 600ms;
+  /* Memberships round 3 (MEMBERSHIPS-R3.md section 4). Proposed, round 3: derived, decoration only. */
+  --color-pool: rgb(229 172 110 / 0.35);        /* proposed, round 3: warm light pool on the cream under the selected card */
+  --color-room-veil: rgb(251 249 236 / 0.24);   /* proposed, round 3: cream veil over an unselected card's picture */
+  --duration-ack: 240ms;                        /* proposed, round 3: the tag's acknowledgement fade */
+  /* Forms round 4 (docs/design/FORMS-ROUND4.md section 5). Proposed, round 4. */
+  --color-chosen-wash: var(--color-pattern);   /* proposed, round 4: alias, no new colour. Gold at 8% over a chosen tile; decoration only */
+  --tile-tall-h: 11rem;                        /* proposed, round 4: Company tiles from 64em */
+  --tile-compact-h: 3.5rem;                    /* derived, round 4: industry tiles (no sub line) */
+  --tile-large-h: 5.5rem;                      /* derived, round 4: Company tiles on a phone */
+  --tile-mark-room: 2rem;                      /* derived, round 4: room for the tile's mark at the right */
+  --glyph-col-w: 3rem;                         /* derived, round 4: the swan glyph column in a Company tile */
+  --measure-lead: 22rem;                       /* derived, round 4: the lead under a screen heading */
+  --bar-h: 4.5rem;                             /* Continue bar; 4rem from 64em */
+  /* The Gold Card (docs/design/GOLD-CARD-3D.md 7.3). Derived, decoration only: the metal of one object. Brand gold is hue 31 degrees; nothing here goes brass (45+). */
+  --color-gold-metal: #D9A46C;                 /* derived: card base metal (hue 31) */
+  --color-gold-light: #F3D2A2;                 /* derived: polished highlight, the drawn line (hue 36) */
+  --color-gold-shade: #A9763F;                 /* derived: card edge and gradient ends (hue 31) */
+  --color-gold-deep: #5A3A26;                  /* derived: the back of the card (hue 23) */
+  --color-gold-studio: #FFF0D8;                /* derived: neutral warm white, the fill panels and walls of the 3D studio (keeps the metal champagne, not orange) */
+  --color-led: #FFE8C8;                        /* derived: warm LED white, the key and rim light of the 3D studio */
+  --gc-w: min(86vw, 24rem);                    /* derived: card width (phone); desktop below */
+  --gc-tilt-max: 6deg;                         /* derived: pointer tilt cap */
+  /* The spa page (docs/design/SPA-PAGE.md 7.3). Derived. */
+  --chip-h: 2.75rem;                           /* a link chip: 44px tap target */
+  --pill-h: 2rem;                              /* a static pill */
+  --frame-h-feature: min(68svh, 34rem);        /* max height of a feature frame, desktop */
+  --tile-w-phone: 72vw;                        /* a tile in the phone scroll row */
+  --control-h-label: 3.75rem;                   /* proposed, round 4: a field with its label inside (60px) */
+  --color-field-well: var(--color-cream);        /* proposed, round 4: alias, no new colour. The filled field on the raised cream panel (espresso text 10.95, muted label 5.32) */
+  --register-photo-h: clamp(10rem, 100svh - var(--header-h) - 34rem, 20rem); /* proposed, round 4: the register stage picture, desktop (280px at 800 tall) */
+  --panel-overlap: var(--space-5);               /* proposed, round 4: how far the cream panel rises over the espresso stage, below 64em */
+  --signin-w: 26rem;                            /* derived (round 3): the sign-in form column */
+  --ratio-tile: 3 / 4;
+  --bleed: calc(var(--page-margin) + max(0px, (100vw - var(--container-max)) / 2));
 }
 
+/* Marketing pages are one type step smaller (IMMERSIVE section 0). Scoped here because the same tokens set the headings of the journey,
+   forms, account and legal pages, which keep the larger scale. */
+html[data-page="marketing"] {
+  --text-2xl: clamp(2rem, 2.5vw + 1rem, 3rem);
+  --text-hero: clamp(2.75rem, 5vw + 1rem, 6rem);
+}
+
+@media (min-width: 48em) {
+  :root { --rise: 12px; }
+}
+
+@media (min-width: 64em) {
+  :root { --header-h: 4.5rem; --gc-w: min(40rem, 44vw); --tier-num-size: 4.5rem; --tier-lift: -8px; }
+}
+
+/* Round 3, The spa (derived, 2026-10-23) */
+:root {
+  --mount-gap: 0.375rem;                       /* derived: margin between the gold line of a mount and its photo (8px from 48em) */
+  --mount-gap-sm: 0.375rem;                    /* derived: the mount gap on small mounts (kit tiles), does not grow at 48em */
+  --band-h: min(62svh, 36rem);                 /* derived: height of a full-bleed amenity band, desktop */
+  --opener-measure: 26rem;                     /* derived: widest the opener words go, keeps them on the solid veil */
+  --opener-pin: 0.6;                           /* derived: pin length of the opener in screens (0.8 from 64em), read by spa.js */
+}
+@media (min-width: 48em) { :root { --mount-gap: 0.5rem; } }
+@media (min-width: 64em) { :root { --opener-pin: 0.8; } }
+
 @media (prefers-reduced-motion: reduce) {
-  :root { --duration-slow: 0ms; --duration-base: 0ms; }
+  :root {
+    --duration-slow: 0ms;
+    --duration-base: 0ms;
+    --duration-hero: 0ms;
+    --duration-reveal: 0ms;
+    --delay-reveal: 0ms;
+    --stagger: 0ms;
+    --duration-press: 0ms;
+    --rise: 0px;
+  }
 }

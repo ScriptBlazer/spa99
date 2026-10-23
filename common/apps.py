@@ -21,7 +21,28 @@ class CommonConfig(AppConfig):
         # last_login is set by our audit receiver with a queryset update, so logging in does not
         # add a history row to the user every time.
         user_logged_in.disconnect(update_last_login, dispatch_uid="update_last_login")
+        if settings.DEBUG:
+            self.no_cache_dev_static()
         self.log_startup()
+
+    @staticmethod
+    def no_cache_dev_static():
+        """Dev only: runserver serves CSS/JS unhashed (app.css @imports plain file names), so browsers kept old
+        copies and pages looked broken after a change. Tell the browser to always revalidate. Live uses hashed
+        manifest files and never runs this."""
+        from django.contrib.staticfiles.handlers import StaticFilesHandlerMixin
+
+        if getattr(StaticFilesHandlerMixin, "_spa99_no_cache", False):
+            return
+        original = StaticFilesHandlerMixin.serve
+
+        def serve(self, request):
+            response = original(self, request)
+            response["Cache-Control"] = "no-cache"
+            return response
+
+        StaticFilesHandlerMixin.serve = serve
+        StaticFilesHandlerMixin._spa99_no_cache = True
 
     @staticmethod
     def log_startup():

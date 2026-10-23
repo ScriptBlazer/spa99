@@ -26,4 +26,5 @@ No visible pages. Everything later phases sit on.
 - Error pages: 400, 403, 404, 500; CSRF failures show the 403 page.
 
 ## Known follow-ups
-- Public login route when the account feature lands (`LOGIN_URL` is currently Control-only).
+- (Closed) Public login route: `/login/` now works on both hosts (see `register-interest.md`).
+- Rate limiting uses Django's default cache, which is per process: with 3 gunicorn workers the real limit is about 3x. Move `CACHES` to the database or Redis if a hard limit matters.

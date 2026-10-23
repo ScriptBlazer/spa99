@@ -9,7 +9,8 @@ const DEFAULT_TEXT = 'Working…';
 export function setWorking(button, text) {
   if (button.dataset.working === 'true') return;
   button.dataset.working = 'true';
-  button.dataset.originalText = button.textContent;
+  button.dataset.originalHtml = button.innerHTML;
+  button.style.minWidth = `${button.offsetWidth}px`; // lock the width so nothing jumps
   button.textContent = text || button.dataset.workingText || DEFAULT_TEXT;
   button.setAttribute('aria-busy', 'true');
   button.disabled = true;
@@ -17,7 +18,8 @@ export function setWorking(button, text) {
 
 export function clearWorking(button) {
   if (button.dataset.working !== 'true') return;
-  button.textContent = button.dataset.originalText;
+  button.innerHTML = button.dataset.originalHtml;
+  button.style.minWidth = '';
   delete button.dataset.working;
   button.removeAttribute('aria-busy');
   button.disabled = false;

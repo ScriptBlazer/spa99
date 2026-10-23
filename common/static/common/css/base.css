@@ -1,0 +1,142 @@
+/* Reset, surfaces, type, layout, motion. Only brand tokens: see tokens.css and docs/design/BRIEF.md. */
+
+*, *::before, *::after { box-sizing: border-box; }
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  scroll-padding-top: calc(var(--header-h) + var(--space-3));
+}
+body { margin: 0; min-height: 100vh; min-height: 100dvh; }
+img, svg, picture { display: block; max-width: 100%; }
+img { height: auto; }
+h1, h2, h3, p, ul, ol, dl, dd, figure, blockquote { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+button { cursor: pointer; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+summary { cursor: pointer; }
+[hidden] { display: none !important; }
+
+/* ---------- surfaces: one set of names, two palettes (BRIEF section 2) ---------- */
+:root, .on-light {
+  --s-bg: var(--color-bg);
+  --s-text: var(--color-text);
+  --s-muted: var(--color-text-muted);
+  --s-line: var(--color-control-line);
+  --s-hair: var(--color-hairline);
+  --s-raised: var(--color-cream-raised);
+  --s-field: var(--color-cream-raised);
+  --s-focus: var(--color-focus);
+  --s-danger: var(--color-danger);
+  --s-accent: var(--color-text);
+  --s-on-accent: var(--color-bg);
+}
+.on-dark {
+  --s-bg: var(--color-bg-inverse);
+  --s-text: var(--color-text-inverse);
+  --s-muted: var(--color-text-muted-inverse);
+  --s-line: var(--color-control-line);
+  --s-hair: var(--color-hairline-inverse);
+  --s-raised: var(--color-espresso-raised);
+  --s-field: transparent;
+  --s-focus: var(--color-focus-inverse);
+  --s-danger: var(--color-danger-inverse);
+  --s-accent: var(--color-gold);
+  --s-on-accent: var(--color-espresso);
+}
+.on-light, .on-dark { background: var(--s-bg); color: var(--s-text); }
+body { background: var(--s-bg); color: var(--s-text); font-family: var(--font-body); font-size: var(--text-body); line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
+.muted { color: var(--s-muted); }
+
+/* ---------- type ---------- */
+h1, h2, h3, .display, .statement {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: var(--tracking-display);
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+h1 { font-size: var(--text-2xl); }
+h2 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-xl); }
+.display { font-size: var(--text-hero); line-height: var(--leading-display); }
+.on-dark .display { font-weight: 400; }
+.statement { font-size: var(--text-2xl); }
+.lead { font-size: var(--text-lg); line-height: var(--leading-snug); }
+.small { font-size: var(--text-sm); line-height: 1.5; }
+.label { font-size: var(--text-sm); font-weight: 600; text-transform: uppercase; letter-spacing: var(--tracking-label); line-height: 1.2; }
+.num { font-variant-numeric: tabular-nums; }
+p { max-width: var(--measure); }
+p + p { margin-top: var(--space-3); }
+h1 + p, h2 + p, h3 + p, .display + p { margin-top: var(--space-4); }
+
+a { color: inherit; }
+a:not([class]) { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.25em; }
+@media (hover: hover) and (pointer: fine) {
+  a:not([class]):hover { text-decoration-thickness: 2px; }
+}
+
+:focus-visible { outline: 2px solid var(--s-focus); outline-offset: 3px; }
+/* Elements focused by script (headings, sections) only to move the screen reader: never a visible ring.
+   Controls keep their :focus-visible ring. */
+[tabindex="-1"]:focus,
+[tabindex="-1"]:focus-visible { outline: none; }
+::selection { background: var(--color-gold); color: var(--color-espresso); }
+
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip-link { position: absolute; left: var(--space-3); top: -10rem; z-index: 50; padding: var(--space-2) var(--space-3); background: var(--color-gold); color: var(--color-espresso); border-radius: var(--radius-sm); }
+.skip-link:focus { top: var(--space-2); }
+main:focus { outline: none; }
+
+/* ---------- layout ---------- */
+.container { width: 100%; max-width: var(--container-max); margin-inline: auto; padding-inline: var(--page-margin); }
+.section { padding-block: var(--section-y); }
+.grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: var(--gutter); }
+@media (min-width: 48em) { .grid { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+@media (min-width: 64em) { .grid { grid-template-columns: repeat(12, minmax(0, 1fr)); } }
+.stack-4 > * + * { margin-top: var(--space-4); }
+.stack-6 > * + * { margin-top: var(--space-6); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); margin-top: var(--space-5); }
+
+/* ---------- photography: square corners, always ---------- */
+.photo { width: 100%; height: 100%; object-fit: cover; border-radius: 0; background: var(--color-espresso-raised); }
+picture { width: 100%; height: 100%; }
+/* The wide relaxing-zone render keeps the swan wall in view when it is cropped to portrait or 3:2. */
+img[src*="relaxing-zone"] { object-position: 72% 50%; }
+.photo-placeholder {
+  display: grid; place-items: center; min-height: 100%;
+  background-color: var(--color-espresso-raised);
+  color: var(--color-gold);
+}
+.photo-placeholder .mark { width: 22%; max-width: 6rem; min-width: 2.5rem; height: auto; opacity: 0.9; }
+.frame { position: relative; overflow: hidden; }
+.frame-3x2 { aspect-ratio: 3 / 2; }
+.frame-4x5 { aspect-ratio: 4 / 5; }
+.frame-1x1 { aspect-ratio: 1 / 1; }
+.frame-16x9 { aspect-ratio: 16 / 9; }
+.frame-21x9 { aspect-ratio: 4 / 5; }
+@media (min-width: 48em) { .frame-21x9 { aspect-ratio: 21 / 9; } }
+figcaption { margin-top: var(--space-3); font-size: var(--text-sm); color: var(--s-muted); }
+
+/* ---------- motion (BRAND section 7): CSS does the work, reveal.js only adds .is-visible ---------- */
+.js [data-reveal], .js [data-reveal="stagger"] > * { opacity: 0; transform: translateY(var(--rise)); }
+.js [data-reveal="image"], .js [data-reveal="hero-image"] { transform: scale(0.98); }
+.js [data-reveal="stagger"] { opacity: 1; transform: none; }
+.js [data-reveal].is-visible, .js [data-reveal="stagger"].is-visible > * {
+  opacity: 1; transform: none;
+  transition: opacity var(--duration-reveal) var(--ease-soft) var(--delay-reveal), transform var(--duration-reveal) var(--ease-soft) var(--delay-reveal);
+}
+.js [data-reveal="stagger"].is-visible { transition: none; }
+.js [data-reveal="hero"].is-visible, .js [data-reveal="hero-image"].is-visible {
+  transition: opacity var(--duration-hero) var(--ease-soft), transform var(--duration-hero) var(--ease-soft);
+}
+@media (min-width: 48em) {
+  .js [data-reveal="stagger"].is-visible > :nth-child(2) { transition-delay: calc(var(--delay-reveal) + var(--stagger)); }
+  .js [data-reveal="stagger"].is-visible > :nth-child(3) { transition-delay: calc(var(--delay-reveal) + 2 * var(--stagger)); }
+  .js [data-reveal="stagger"].is-visible > :nth-child(4) { transition-delay: calc(var(--delay-reveal) + 3 * var(--stagger)); }
+}
+/* If the scripts never load, nothing stays hidden. */
+.no-reveal [data-reveal], .no-reveal [data-reveal] > * { opacity: 1 !important; transform: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .js [data-reveal], .js [data-reveal="stagger"] > * { opacity: 1; transform: none; transition: none; }
+}

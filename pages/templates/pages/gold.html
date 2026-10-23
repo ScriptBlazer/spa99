@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% load static content_tags pages_tags %}
+{% block html_attrs %} data-page="marketing"{% endblock %}
+{% block header_mode %}overlay{% endblock %}
+{% block main %}
+{% page_content "gold" as g %}
+<div class="on-dark gold-world">
+<section class="gold-hero" data-scene="gold-hero" data-glow aria-labelledby="gold-title">
+  <div class="glow" aria-hidden="true"></div>
+  <div class="container grid gold-hero-grid">
+    <div class="gold-hero-text">
+      <h1 id="gold-title" class="statement" data-rise>{{ g.hero.heading }}</h1>
+      <p class="lead" data-fade>{{ g.hero.body }}</p>
+      <div class="actions" data-fade><a class="btn btn-primary btn-block-phone" href="{% url 'gold_apply' %}">{{ g.hero.cta_label }}</a></div>
+    </div>
+    {% include "common/_gold_card.html" with variant="hero" %}
+  </div>
+</section>
+
+{% if gold %}
+{# G2 What it holds: the back of the card (GOLD-PAGE-R3.md). Every figure, pill and perk comes from the Gold plan (gold_facts). #}
+<section class="gold-holds" data-scene="gold-holds" data-glow aria-labelledby="holds-title">
+  <div class="glow" aria-hidden="true"></div>
+  <div class="container">
+    <div class="gold-back" data-fade>
+      <div class="gb-grid">
+        <header class="gb-head">
+          <h2 id="holds-title" class="statement" data-rise>{{ g.holds.heading }}</h2>
+          {% if g.holds_lead.body %}<p class="gb-lead" data-fade>{{ g.holds_lead.body }}</p>{% endif %}
+        </header>
+        <div class="gb-visits">
+          <h3 class="gb-title">{{ groups.0.0|default:"Your visits" }}</h3>
+          <ul class="gb-figures" role="list">
+            {% for f in gold.figures %}<li class="gb-fig" data-fade-row><span class="gb-value num">{% if f.number is not None %}<span data-count>{{ f.number }}</span>{{ f.suffix }}{% else %}{{ f.value }}{% endif %}</span><span class="gb-label">{{ f.label }}</span></li>{% endfor %}
+          </ul>
+          <ul class="gb-pills" role="list">{% for p in gold.pills %}<li class="pill" data-fade-row>{{ p }}</li>{% endfor %}</ul>
+        </div>
+        {% if gold.perks %}
+        <div class="gb-beyond">
+          <h3 class="gb-title">{{ groups.1.0|default:"Beyond the spa" }}</h3>
+          <ul class="gb-perks" role="list">
+            {% for perk in gold.perks %}<li class="gb-perk" data-fade-row><span class="gb-perk-name">{{ perk.name }}</span>{% if perk.note %}<span class="gb-perk-note">{{ perk.note }}</span>{% endif %}</li>{% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        <p class="gb-line" aria-hidden="true">Beyond Luxury</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# G3 Who it is for: a room, and the roles as pills. #}
+<section class="gold-who" data-scene="gold-who" aria-labelledby="who-title">
+  <div class="container gw-grid">
+    <div class="gw-text">
+      <h2 id="who-title" class="statement" data-rise>{{ g.who.heading }}</h2>
+      <ul class="gw-roles" role="list">{% for role in g.who.body|lines %}<li class="gw-role" data-fade-row>{{ role }}</li>{% endfor %}</ul>
+      <p class="muted gw-note" data-fade>{{ g.who_note.body }}</p>
+    </div>
+    <div class="gw-pic">
+      <div class="frame frame--right gw-frame" data-frame>
+        <div class="frame-media" style="--focus: 30% 50%">{% photo "gym" alt="The gym: dark walls, warm light and the gold swan with the Spa 99 name" sizes="(min-width: 64em) 55vw, 100vw" %}</div>
+        <div class="frame-tint" aria-hidden="true"></div>
+      </div>
+      <div class="gw-inset" data-inset>
+        <div class="gw-inset-media">{% photo "kitchenette" alt="The kitchenette: a gold ceiling and the swan on walnut" sizes="12rem" %}</div>
+      </div>
+      {% if hours_facts %}<p class="gw-caption" data-caption>Any time, {{ hours_facts.range }}.</p>{% endif %}
+    </div>
+  </div>
+</section>
+
+{# G4 How it works, and apply. #}
+<section class="gold-how" data-scene="gold-how" aria-labelledby="how-title">
+  <div class="container gh-grid">
+    <div class="gh-steps">
+      <h2 id="how-title" class="statement" data-rise>{{ g.how.heading }}</h2>
+      <ol class="gsteps" role="list" data-gsteps>
+        {% include "pages/_gold_step.html" with n=1 row=g.step_1 %}
+        {% include "pages/_gold_step.html" with n=2 row=g.step_2 %}
+        {% include "pages/_gold_step.html" with n=3 row=g.step_3 last=True %}
+      </ol>
+    </div>
+    <div class="gh-apply">
+      <div class="gh-card" data-card>{% photo "gold-card" alt="" sizes="20rem" %}</div>
+      <div class="gh-apply-text" data-fade>
+        <h2 id="apply-title" class="gh-apply-title">{{ g.apply.heading }}</h2>
+        <p class="muted">{{ g.apply.body }}</p>
+        <a class="btn btn-primary btn-block-phone" href="{% url 'gold_apply' %}">{{ g.hero.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
+        {% if g.apply_note.body %}<p class="muted small gh-note">{{ g.apply_note.body }}</p>{% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script defer src="{% static 'common/vendor/gsap/gsap.min.js' %}"></script>
+<script defer src="{% static 'common/vendor/gsap/ScrollTrigger.min.js' %}"></script>
+<script defer src="{% static 'common/vendor/gsap/SplitText.min.js' %}"></script>
+<script defer src="{% static 'common/vendor/gsap/DrawSVGPlugin.min.js' %}"></script>
+<script defer src="{% static 'common/vendor/gsap/CustomEase.min.js' %}"></script>
+{# gold-page.js loads gold-hero.js (the card hero scene) and gold-below.js (G2 to G4) in one module graph, so both register before the scenes start. #}
+<script type="module" src="{% static 'common/js/gold-page.js' %}"></script>
+{% endblock %}

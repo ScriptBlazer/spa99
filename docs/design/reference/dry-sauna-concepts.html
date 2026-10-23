@@ -1,0 +1,415 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Dry Sauna Concepts</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+/* Layout: a drawing sheet. Concept tabs across the top, big render stage, and a title-block column describing the selected concept. */
+:root{
+  --bg:#E9EBE6; --panel:#F7F8F4; --ink:#1B201E; --muted:#58615D; --line:#CDD1CA; --accent:#25665D;
+  --stage:#D5D9D2; --chip:#E3E7E0; --hover:#EEF0EA; --ok:#2C7A45; --warn:#B0530C;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#131615; --panel:#1B1F1D; --ink:#E6E9E4; --muted:#98A29D; --line:#2D3330; --accent:#6CB7AA;
+  --stage:#0E1110; --chip:#242A27; --hover:#222725; --ok:#5DBB79; --warn:#E78C40; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#131615; --panel:#1B1F1D; --ink:#E6E9E4; --muted:#98A29D; --line:#2D3330; --accent:#6CB7AA;
+  --stage:#0E1110; --chip:#242A27; --hover:#222725; --ok:#5DBB79; --warn:#E78C40; color-scheme:dark}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body)}
+.wrap{max-width:1480px;margin:0 auto;padding-block:20px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px 24px}
+.eyebrow{font:500 12px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font:600 clamp(28px,4vw,40px)/1.05 var(--f-display);margin:6px 0 0;letter-spacing:-.01em;text-wrap:balance}
+.lede{margin:6px 0 0;color:var(--muted);max-width:66ch}
+.spec{display:flex;flex-wrap:wrap;gap:6px}
+.spec span{font:500 12px/1 var(--f-mono);background:var(--chip);border:1px solid var(--line);padding:6px 9px;border-radius:4px;font-variant-numeric:tabular-nums}
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:700px){.tabs{grid-template-columns:minmax(0,1fr)}}
+.tab{display:flex;flex-direction:column;gap:4px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;color:var(--ink);font:inherit}
+.tab:hover{background:var(--hover)}
+.tab[aria-selected="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.tab .k{font:500 11.5px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tab .n{font:600 20px/1.1 var(--f-display)}
+.tab .d{font-size:13px;color:var(--muted);line-height:1.4}
+.studio{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media (max-width:1000px){.studio{grid-template-columns:minmax(0,1fr)}}
+.viewer{position:relative;height:min(76vh,780px);min-height:420px;background:var(--stage);border:1px solid var(--line);border-radius:10px;overflow:hidden;touch-action:none}
+@media (max-width:600px){.viewer{height:68vh;min-height:380px}}
+.viewer canvas{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none}
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;white-space:nowrap;font:500 11.5px/1 var(--f-body);color:var(--ink);background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);padding:4px 8px;border-radius:999px;will-change:transform}
+.toolbar{position:absolute;top:12px;left:12px;right:12px;display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;pointer-events:none}
+.toolbar>*{pointer-events:auto}
+.seg{display:flex;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:3px;gap:2px}
+.seg button,.tog{font:500 13px/1 var(--f-body);color:var(--ink);background:transparent;border:0;border-radius:5px;padding:8px 11px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.tog{background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:7px}
+.tog .sw{width:28px;height:16px;border-radius:9px;background:var(--line);position:relative;transition:background .2s}
+.tog .sw::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--panel);transition:transform .2s}
+.tog[aria-pressed="true"] .sw{background:var(--accent)}
+.tog[aria-pressed="true"] .sw::after{transform:translateX(12px)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{position:absolute;left:12px;bottom:10px;font:12px/1.3 var(--f-body);color:var(--muted);pointer-events:none}
+.fallback{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--muted)}
+aside{display:flex;flex-direction:column;gap:12px;min-width:0}
+.block{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
+h2{font:600 22px/1.1 var(--f-display);margin:0}
+h3{font:600 17px/1.1 var(--f-display);margin:0}
+.summary{margin:0;color:var(--muted);font-size:14px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.facts div{display:flex;flex-direction:column;gap:3px;background:var(--chip);border:1px solid var(--line);border-radius:6px;padding:8px}
+.facts b{font:500 17px/1 var(--f-mono);font-variant-numeric:tabular-nums}
+.facts span{font-size:11.5px;color:var(--muted);line-height:1.25}
+ul.plain{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.45}
+ul.plain li{display:grid;grid-template-columns:10px minmax(0,1fr);gap:10px}
+ul.plain li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--muted);margin-top:7px}
+.checks li::before{background:var(--ok)!important;width:8px!important;height:8px!important;margin-top:6px!important}
+.checks li.warn::before{background:var(--warn)!important}
+.sw-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.swatch{display:grid;grid-template-columns:26px minmax(0,1fr);gap:8px;align-items:center;font-size:12.5px;line-height:1.3}
+.swatch i{width:26px;height:26px;border-radius:5px;border:1px solid var(--line);background:var(--c)}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">BML Spa · GF07 dry sauna</div>
+      <h1>Dry sauna concepts</h1>
+      <p class="lede">Three layouts for the same room, each with the Pillar IKI 18 kW and HUUM UKU. A is the current scheme. B and C are the two new options. Start inside at the door, then look round.</p>
+    </div>
+    <div class="spec"><span>3.225 × 4.644 m shell</span><span>2.10 m ceiling</span><span>26.7 m³ inside</span></div>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Concept">
+    <button class="tab" role="tab" id="tab-a" data-c="a" aria-selected="false"><span class="k">Concept A · current</span><span class="n">Corner heater</span><span class="d">Heater by the door, L-shaped benches on the far walls.</span></button>
+    <button class="tab" role="tab" id="tab-b" data-c="b" aria-selected="true"><span class="k">Concept B · new</span><span class="n">Stone wall</span><span class="d">Heater on a stone feature wall, facing one wide stepped bench.</span></button>
+    <button class="tab" role="tab" id="tab-c" data-c="c" aria-selected="false"><span class="k">Concept C · new</span><span class="n">Dark lie-down</span><span class="d">Dark timber and star ceiling, with a full-length bench for lying down.</span></button>
+  </div>
+
+  <section class="studio">
+    <div class="viewer" id="viewer">
+      <div class="labels" id="labels"></div>
+      <div class="toolbar">
+        <div class="seg" role="group" aria-label="Camera view">
+          <button data-view="door" aria-pressed="true">From the door</button>
+          <button data-view="bench" aria-pressed="false">Top bench</button>
+          <button data-view="cut" aria-pressed="false">Cutaway</button>
+          <button data-view="plan" aria-pressed="false">Plan</button>
+        </div>
+        <button class="tog" id="t-labels" aria-pressed="false"><span class="sw"></span>Labels</button>
+      </div>
+      <div class="hint">Drag to look round · scroll or pinch to zoom · right-drag to move</div>
+      <div class="fallback" id="fallback" hidden>The 3D viewer couldn't load in this browser. Try reopening the page.</div>
+    </div>
+
+    <aside>
+      <div class="block">
+        <div class="eyebrow" id="c-kicker"></div>
+        <h2 id="c-name"></h2>
+        <p class="summary" id="c-summary"></p>
+        <div class="facts" id="c-facts"></div>
+      </div>
+      <div class="block"><h3>What's in it</h3><ul class="plain" id="c-points"></ul></div>
+      <div class="block"><h3>Finishes</h3><div class="sw-row" id="c-swatches"></div></div>
+      <div class="block"><h3>Checks</h3><ul class="plain checks" id="c-checks"></ul></div>
+    </aside>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const viewer=document.getElementById('viewer'),layer=document.getElementById('labels');
+if(!window.THREE||!THREE.OrbitControls){document.getElementById('fallback').hidden=false;return;}
+
+/* room: plan GF07, shell 3225 × 4644, 150 mm insulated lining, 2.10 m ceiling. x east, z south */
+const W0=3.225,D0=4.644,T=0.15,H=2.10;
+const xL=-W0/2+T,xR=W0/2-T,zB=-D0/2+T,zF=D0/2-T;
+const DZ0=-D0/2+1.488,DZ1=-D0/2+2.188; // 700 mm glass door in the east wall, near the north end
+const U=0.6,LO=1.14;
+
+/* ---------- renderer ---------- */
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
+viewer.prepend(renderer.domElement);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(62,1,0.03,60);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=0.08;controls.minDistance=0.05;controls.maxDistance=14;controls.maxPolarAngle=Math.PI*0.52;
+function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#d5d9d2';}
+function applyTheme(){scene.background=new THREE.Color(cssVar('--stage'));}
+applyTheme();
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);}catch(e){}
+new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+/* ---------- textures ---------- */
+function rng(seed){let s=seed%2147483647;if(s<=0)s+=2147483646;return()=>{s=s*16807%2147483647;return(s-1)/2147483646;};}
+function tex(cv,rx,ry){const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx,ry);t.encoding=THREE.sRGBEncoding;t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());return t;}
+function planks(base,boards,seed,vertical){
+  const c=document.createElement('canvas');c.width=c.height=512;const g=c.getContext('2d');const r=rng(seed);const bw=512/boards,col=new THREE.Color(base);
+  for(let i=0;i<boards;i++){const cc=col.clone().multiplyScalar(0.9+r()*0.2);g.save();g.beginPath();vertical?g.rect(i*bw,0,bw,512):g.rect(0,i*bw,512,bw);g.clip();
+    g.fillStyle='#'+cc.getHexString();g.fillRect(0,0,512,512);
+    for(let j=0;j<26;j++){g.strokeStyle='rgba(40,20,6,'+(0.04+r()*0.08)+')';g.lineWidth=0.6+r()*1.4;g.beginPath();const o=i*bw+r()*bw;
+      if(vertical){g.moveTo(o,0);g.bezierCurveTo(o+r()*8-4,170,o+r()*8-4,340,o+r()*6-3,512);}else{g.moveTo(0,o);g.bezierCurveTo(170,o+r()*8-4,340,o+r()*8-4,512,o+r()*6-3);}g.stroke();}
+    g.restore();g.fillStyle='rgba(22,10,3,.38)';vertical?g.fillRect(i*bw,0,3,512):g.fillRect(0,i*bw,512,3);}
+  return c;
+}
+function stoneCv(seed){
+  const c=document.createElement('canvas');c.width=c.height=512;const g=c.getContext('2d');const r=rng(seed);
+  g.fillStyle='#2b2c2c';g.fillRect(0,0,512,512);
+  let y=0;while(y<512){const h=18+r()*26;let x=-r()*60;while(x<512){const w=50+r()*120;const v=70+Math.floor(r()*45);const t=r()*8;
+    g.fillStyle='rgb('+(v+t)+','+(v+t-2)+','+(v-4)+')';g.fillRect(x+2,y+2,w-4,h-4);
+    for(let k=0;k<8;k++){g.fillStyle='rgba(255,255,255,'+(r()*0.05)+')';g.fillRect(x+r()*w,y+r()*h,2+r()*20,1+r()*3);}x+=w;}y+=h;}
+  return c;
+}
+function tileCv(base,joint,n,seed){const c=document.createElement('canvas');c.width=c.height=512;const g=c.getContext('2d');const r=rng(seed);const s=512/n;const col=new THREE.Color(base);
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++){const cc=col.clone().multiplyScalar(0.94+r()*0.12);g.fillStyle='#'+cc.getHexString();g.fillRect(i*s,j*s,s,s);}
+  g.fillStyle=joint;for(let i=0;i<=n;i++){g.fillRect(i*s-1,0,2,512);g.fillRect(0,i*s-1,512,2);}return c;}
+
+const CV={
+  spruce:planks('#B98652',6,3),thermo:planks('#5A3B26',6,11),thermoD:planks('#3E281A',6,29),aspen:planks('#DCC6A2',6,17),
+  aspenV:planks('#DCC6A2',8,23,true),bench:planks('#E2C497',4,19),benchAspen:planks('#E9D6B4',4,31),
+  stone:stoneCv(5),floorWarm:tileCv('#9E968A','rgba(60,55,50,.6)',2,7),floorSlate:tileCv('#4A4D4F','rgba(20,20,22,.7)',2,9)
+};
+
+/* ---------- scene graph ---------- */
+const root=new THREE.Group();scene.add(root);
+const amb=new THREE.HemisphereLight(0xfff0dc,0x2e241b,0.5);scene.add(amb);
+let walls=[],ceiling=null,labels=[],disposables=[];
+function track(o){disposables.push(o);return o;}
+function mat(o){return track(new THREE.MeshStandardMaterial(o));}
+function texMat(cv,rx,ry,extra){return mat(Object.assign({map:track(tex(cv,rx,ry)),roughness:.8},extra||{}));}
+function box(w,h,d,m,x,y,z,parent){const b=new THREE.Mesh(track(new THREE.BoxGeometry(w,h,d)),m);b.position.set(x,y,z);(parent||root).add(b);return b;}
+function cyl(r,h,m,x,y,z,seg,parent){const b=new THREE.Mesh(track(new THREE.CylinderGeometry(r,r,h,seg||32)),m);b.position.set(x,y,z);(parent||root).add(b);return b;}
+function plight(c,i,d,x,y,z){const p=new THREE.PointLight(c,i,d,2);p.position.set(x,y,z);root.add(p);return p;}
+function label(text,p){const el=document.createElement('div');el.className='lbl';el.textContent=text;layer.appendChild(el);labels.push({el,pos:new THREE.Vector3(...p)});}
+function clear(){
+  while(root.children.length)root.remove(root.children[0]);
+  disposables.forEach(o=>o.dispose&&o.dispose());disposables=[];walls=[];ceiling=null;
+  labels.forEach(l=>l.el.remove());labels=[];
+}
+function wallPlane(len,h,m,x,y,z,ry,side){const p=new THREE.Mesh(track(new THREE.PlaneGeometry(len,h)),m);p.position.set(x,y,z);p.rotation.y=ry;root.add(p);walls.push({mesh:p,side});return p;}
+
+/* ---------- shared kit ---------- */
+function shell(f){
+  const W=xR-xL,D=zF-zB;
+  const fl=new THREE.Mesh(track(new THREE.PlaneGeometry(W,D)),texMat(f.floor,W/1.2,D/1.2,{roughness:.7}));fl.rotation.x=-Math.PI/2;root.add(fl);
+  wallPlane(W,H,texMat(f.north,W/0.6,H/0.6),0,H/2,zB,0,'n');
+  wallPlane(W,H,texMat(f.south,W/0.6,H/0.6),0,H/2,zF,Math.PI,'s');
+  wallPlane(D,H,texMat(f.west,D/0.6,H/0.6),xL,H/2,0,Math.PI/2,'w');
+  const a=DZ0-zB,b=zF-DZ1,eM=f.east;
+  wallPlane(a,H,texMat(eM,a/0.6,H/0.6),xR,H/2,(zB+DZ0)/2,-Math.PI/2,'e');
+  wallPlane(b,H,texMat(eM,b/0.6,H/0.6),xR,H/2,(DZ1+zF)/2,-Math.PI/2,'e');
+  wallPlane(DZ1-DZ0,H-1.95,texMat(eM,0.7/0.6,0.25/0.6),xR,(H+1.95)/2,(DZ0+DZ1)/2,-Math.PI/2,'e');
+  // bronze glass door and frame
+  const fr=mat({color:f.frame||0x6E4B30,roughness:.6});
+  box(0.11,1.95,0.05,fr,xR+0.04,0.975,DZ0-0.02);box(0.11,1.95,0.05,fr,xR+0.04,0.975,DZ1+0.02);box(0.11,0.05,DZ1-DZ0+0.09,fr,xR+0.04,1.95,(DZ0+DZ1)/2);
+  box(0.008,1.88,DZ1-DZ0-0.02,mat({color:0x8A6440,transparent:true,opacity:.32,roughness:.05,depthWrite:false}),xR+0.03,0.95,(DZ0+DZ1)/2);
+  box(0.03,0.36,0.03,mat({color:0x2a2a2a,roughness:.4}),xR-0.03,1.0,DZ1-0.07);
+  // shower room beyond the glass door
+  const sh=texMat(CV.floorSlate,2,2,{color:0x9aa3a0});
+  const bw=new THREE.Mesh(track(new THREE.PlaneGeometry(2.4,2.6)),sh);bw.position.set(xR+1.4,1.3,(DZ0+DZ1)/2);bw.rotation.y=-Math.PI/2;root.add(bw);
+  const bf=new THREE.Mesh(track(new THREE.PlaneGeometry(1.4,2.4)),sh);bf.rotation.x=-Math.PI/2;bf.position.set(xR+0.7,0.001,(DZ0+DZ1)/2);root.add(bf);
+  walls.push({mesh:bw,side:'e'});walls.push({mesh:bf,side:'e'});
+  // ceiling
+  const cm=texMat(f.ceil,W/0.6,D/0.6);cm.side=THREE.DoubleSide;
+  ceiling=new THREE.Mesh(track(new THREE.PlaneGeometry(W,D)),cm);ceiling.rotation.x=Math.PI/2;ceiling.position.y=H;root.add(ceiling);
+  // UKU glass control panel by the door, top edge at 1.00 m
+  box(0.012,0.13,0.09,mat({color:0x0f1012,roughness:.15}),xR-0.006,0.935,DZ1+0.3);
+  const scr=new THREE.Mesh(track(new THREE.PlaneGeometry(0.05,0.03)),track(new THREE.MeshBasicMaterial({color:0xDFF3FF})));scr.position.set(xR-0.013,0.955,DZ1+0.3);scr.rotation.y=-Math.PI/2;root.add(scr);
+  return {fr};
+}
+function heater(hx,hz,rail){
+  const g=new THREE.Group();g.position.set(hx,0,hz);root.add(g);
+  const steel=mat({color:0xC4CACE,metalness:.3,roughness:.35});
+  if(rail.plinth){cyl(0.36,0.06,rail.plinth,0,0.03,0,48,g);}
+  const y0=rail.plinth?0.06:0;
+  cyl(0.235,0.04,steel,0,y0+0.045,0,40,g);
+  const cage=new THREE.Mesh(track(new THREE.CylinderGeometry(0.225,0.225,0.88,36,12,true)),mat({color:0xB4BABF,metalness:.3,roughness:.4,wireframe:true}));cage.position.y=y0+0.505;g.add(cage);
+  const stoneM=mat({color:0xffffff,roughness:.92});
+  const r=rng(42),N=560,inst=new THREE.InstancedMesh(track(new THREE.IcosahedronGeometry(1,0)),stoneM,N),d=new THREE.Object3D(),c=new THREE.Color();
+  for(let i=0;i<N;i++){let x,z,y;if(i<500){do{x=(r()*2-1)*0.2;z=(r()*2-1)*0.2;}while(x*x+z*z>0.04);y=y0+0.09+r()*0.84;}else{const t=r(),rad=0.18*(1-t*0.7),a=r()*6.283,rr=Math.sqrt(r())*rad;x=Math.cos(a)*rr;z=Math.sin(a)*rr;y=y0+0.93+t*0.07;}
+    d.position.set(x,y,z);d.rotation.set(r()*6,r()*6,r()*6);const s=0.026+r()*0.018;d.scale.set(s,s*(0.7+r()*0.4),s);d.updateMatrix();inst.setMatrixAt(i,d.matrix);
+    const k=r();c.setRGB(0.2+k*0.16,0.21+k*0.16,0.22+k*0.15);if(r()<0.08)c.setRGB(0.36,0.29,0.24);inst.setColorAt(i,c);}
+  g.add(inst);
+  const glow=new THREE.PointLight(0xFF7A30,0.8,1.8,2);glow.position.set(0,y0+0.75,0);g.add(glow);
+  // guard rail 250 mm off the mesh
+  const R=0.475,a0=rail.a0,a1=rail.a1,n=Math.round((a1-a0)/0.26);
+  for(let k=0;k<=n;k++){const th=a0+(a1-a0)*k/n;const s=box(rail.post[0],0.72,rail.post[1],rail.mat,R*Math.cos(th),0.46,R*Math.sin(th),g);s.rotation.y=-th-Math.PI/2;}
+  const pts=[];for(let k=0;k<=40;k++){const th=a0+(a1-a0)*k/40;pts.push(new THREE.Vector3(R*Math.cos(th),0.84,R*Math.sin(th)));}
+  g.add(new THREE.Mesh(track(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),120,rail.tube,8,false)),rail.mat));
+  (rail.returns||[]).forEach(([x,z0,z1])=>{box(0.032,0.032,Math.abs(z1-z0),rail.mat,x,0.84,(z0+z1)/2,g);});
+  // bucket and ladle beside the heater
+  return g;
+}
+function bucket(x,y,z,m){const g=new THREE.Group();g.position.set(x,y,z);root.add(g);
+  const b=new THREE.Mesh(track(new THREE.CylinderGeometry(0.13,0.11,0.2,24)),m);b.position.y=0.1;g.add(b);
+  const lad=box(0.02,0.02,0.42,m,0.08,0.24,0,g);lad.rotation.x=-0.5;}
+function slatsX(x0,x1,z0,z1,y,m){const n=Math.max(1,Math.round((z1-z0)/0.1024)),p=(z1-z0)/n;for(let i=0;i<n;i++)box(x1-x0,0.028,p-0.014,m,(x0+x1)/2,y,z0+p*(i+0.5));}
+function slatsZ(x0,x1,z0,z1,y,m){const n=Math.max(1,Math.round((x1-x0)/0.1024)),p=(x1-x0)/n;for(let i=0;i<n;i++)box(p-0.014,0.028,z1-z0,m,x0+p*(i+0.5),y,(z0+z1)/2);}
+function skirtX(x0,x1,z,y0,y1,m){const n=Math.max(1,Math.round((x1-x0)/0.1)),w=(x1-x0)/n;for(let i=0;i<n;i++)box(w-0.012,y1-y0,0.018,m,x0+w*(i+0.5),(y0+y1)/2,z);}
+function skirtZ(z0,z1,x,y0,y1,m){const n=Math.max(1,Math.round((z1-z0)/0.1)),w=(z1-z0)/n;for(let i=0;i<n;i++)box(0.018,y1-y0,w-0.012,m,x,(y0+y1)/2,z0+w*(i+0.5));}
+function vent(x,y,z,face,m){const g=box(face==='x'?0.012:0.2,0.11,face==='x'?0.2:0.012,m,x,y,z);return g;}
+function ledMat(c){return track(new THREE.MeshBasicMaterial({color:c||0xFFC48A}));}
+
+/* ---------- concepts ---------- */
+const CONCEPTS={
+a:{
+  kicker:'Concept A · current scheme',name:'Corner heater',
+  summary:'The layout from last week, now set to the real door position. The heater sits in the corner by the door and both benches face it from the far walls.',
+  facts:[['8–10','seated'],['1.1 m','heater to nearest bench'],['0.4 m','feed run from UKU']],
+  points:['Pillar IKI 18 kW in the north-east corner, 475 mm off both walls, with a timber guard rail curving between them.','Two-tier L-shaped benches on the south and west walls, 600 mm upper tier and 540 mm step.','Dark thermo timber on the two walls behind the heater, spruce elsewhere.','LED strips under the lower bench lip and behind the backrest.','Shortest heater feed: the UKU sits on the shower-room side of the same wall.'],
+  swatches:[['#B98652','Spruce cladding'],['#5A3B26','Thermo timber, heater walls'],['#E2C497','Abachi benches'],['#9E968A','Warm stone floor tile']],
+  checks:[['Volume 26.7 m³, inside the 18–28 m³ range',1],['1.15 m clear above the heater',1],['Rail 250 mm off the mesh on both open sides',1],['Heater 0.9 m from the door opening; rail keeps the walk-in clear',1],['Inlet on the east wall, 1.0 m from the safety sensor',1]],
+  views:{bench:{p:[xL+0.45,1.62,zF-0.3],t:[xR-0.6,0.85,zB+0.5]}},
+  build(){
+    const f={floor:CV.floorWarm,north:CV.thermo,east:CV.thermo,south:CV.spruce,west:CV.spruce,ceil:CV.spruce};
+    shell(f);
+    const bm=texMat(CV.bench,1,1,{roughness:.7}),sk=mat({color:0xCDAA79,roughness:.75});
+    slatsX(xL,xR,zF-U,zF,0.936,bm);slatsX(xL+U,xR,zF-LO,zF-U,0.466,bm);
+    slatsZ(xL,xL+U,zB,zF-U,0.936,bm);slatsZ(xL+U,xL+LO,zB,zF-LO,0.466,bm);
+    skirtX(xL+U,xR,zF-U-0.009,0.5,0.92,sk);skirtZ(zB,zF-U,xL+U-0.009,0.5,0.92,sk);
+    skirtX(xL+LO,xR,zF-LO-0.009,0.12,0.45,sk);skirtZ(zB,zF-LO,xL+LO-0.009,0.12,0.45,sk);
+    [1.22,1.42].forEach(y=>{box(xR-xL-0.1,0.075,0.028,bm,0,y,zF-0.014);box(0.028,0.075,zF-zB-U-0.05,bm,xL+0.014,y,(zB+zF-U)/2);});
+    const led=ledMat();box(xR-xL-U-0.1,0.006,0.01,led,(xL+U+xR)/2,0.447,zF-LO+0.06);box(0.01,0.006,zF-zB-LO-0.1,led,xL+LO-0.06,0.447,(zB+zF-LO)/2);
+    box(xR-xL-0.1,0.01,0.006,led,0,1.47,zF-0.012);box(0.006,0.01,zF-zB-U-0.1,led,xL+0.012,1.47,(zB+zF-U)/2);
+    [[-0.3,0.3,zF-LO-0.08],[0.9,0.3,zF-LO-0.08],[xL+LO+0.08,0.3,-0.6],[0,1.56,zF-0.1],[xL+0.1,1.56,-0.6]].forEach(p=>plight(0xFFB06A,0.45,1.5,...p));
+    const hx=xR-0.475,hz=zB+0.475;
+    heater(hx,hz,{a0:0,a1:Math.PI*1.5,mat:bm,post:[0.04,0.022],tube:0.016});
+    bucket(xR-1.1,0.95,zF-0.3,mat({color:0x9C6B3F,roughness:.6}));
+    vent(xR-0.006,1.45,hz+0.6,'x',mat({color:0xC4CACE,roughness:.35}));vent(xL+0.006,0.16,zF-1.4,'x',mat({color:0xC4CACE,roughness:.35}));
+    label('Pillar IKI 18 kW',[hx,1.1,hz]);label('L-shaped two-tier benches',[xL+0.6,1.05,0.6]);label('Fresh air in',[xR,1.55,hz+0.6]);
+  }
+},
+b:{
+  kicker:'Concept B · new',name:'Stone wall',
+  summary:'The heater stands centred on the back wall against full-height split stone, like a fireplace. One wide stepped bench runs the full width of the opposite wall, so everyone faces the stone and the steam.',
+  facts:[['7–8','seated'],['2.5 m','heater to bench'],['1.6 m','feed run from UKU']],
+  points:['Pillar IKI 18 kW centred on the north wall, with a timber rail around its front and returns back to the stone.','Split stone cladding on the whole north wall. Stone isn’t combustible, so it also protects the wall behind the heater.','One 2.9 m two-tier bench across the south wall: 600 mm upper seat, 540 mm step.','Vertical aspen slatted backrest with LED washing up behind it, plus LED under the step.','Pale aspen walls and ceiling with a dark slate floor, so the stone wall and heater read as the focal point.','The heater feed goes to a junction box low on the north wall, about 1.6 m along from the UKU on the shower-room side.'],
+  swatches:[['#DCC6A2','Aspen walls and ceiling'],['#6E6A63','Split stone, north wall'],['#E9D6B4','Aspen benches'],['#4A4D4F','Dark slate floor']],
+  checks:[['Volume 26.7 m³, inside the 18–28 m³ range',1],['1.15 m clear above the heater',1],['Rail 250 mm off the mesh; side walls 1.0 m away',1],['Heater 1.5 m clear of the door, and nobody walks past it',1],['Inlet on the stone wall 600 mm to the side, 1.0 m from the safety sensor',1],['Bench front 2.5 m from the heater, so the step will feel gentler than in A',0]],
+  views:{bench:{p:[0.6,1.62,zF-0.3],t:[0,0.9,zB+0.4]},doorT:[xL,0.95,-0.15]},
+  build(){
+    const f={floor:CV.floorSlate,north:CV.stone,east:CV.aspen,south:CV.aspen,west:CV.aspen,ceil:CV.aspenV,frame:0x2a2a2a};
+    shell(f);
+    const bm=texMat(CV.benchAspen,1,1,{roughness:.7}),sk=mat({color:0xD9C29C,roughness:.75}),blk=mat({color:0x1d1d1d,roughness:.5});
+    slatsX(xL,xR,zF-U,zF,0.936,bm);slatsX(xL,xR,zF-LO,zF-U,0.466,bm);
+    skirtX(xL,xR,zF-U-0.009,0.5,0.92,sk);skirtX(xL,xR,zF-LO-0.009,0.12,0.45,sk);
+    box(0.03,0.95,LO,blk,xL+0.015,0.475,zF-LO/2);box(0.03,0.95,LO,blk,xR-0.015,0.475,zF-LO/2);
+    // backlit vertical slat backrest
+    const n=Math.floor((xR-xL-0.1)/0.07);for(let i=0;i<n;i++)box(0.045,0.95,0.028,bm,xL+0.08+i*0.07,1.45,zF-0.05);
+    const led=ledMat();box(xR-xL-0.1,0.01,0.01,led,0,0.99,zF-0.012);box(xR-xL-0.1,0.01,0.01,led,0,1.93,zF-0.012);
+    box(xR-xL-0.1,0.006,0.01,led,0,0.447,zF-LO+0.06);
+    [[-0.8,1.4,zF-0.15],[0.8,1.4,zF-0.15],[0,0.3,zF-LO-0.1]].forEach(p=>plight(0xFFB06A,0.6,1.8,...p));
+    // stone grazing light
+    [-0.9,0.9].forEach(x=>{plight(0xFFC890,0.55,1.6,x,1.95,zB+0.2);box(0.08,0.02,0.08,blk,x,H-0.01,zB+0.2);});
+    const hx=0,hz=zB+0.475;
+    heater(hx,hz,{a0:0,a1:Math.PI,mat:bm,post:[0.04,0.022],tube:0.016,returns:[[0.475,0,-0.46],[-0.475,0,-0.46]]});
+    bucket(xR-0.35,0.95,zF-0.3,blk);
+    box(0.012,0.28,0.12,blk,xL+0.006,1.45,zF-1.4);
+    vent(0.6,1.45,zB+0.006,'z',blk);vent(xR-0.006,0.16,zF-0.25,'x',blk);
+    label('Pillar IKI 18 kW',[hx,1.1,hz]);label('Split stone feature wall',[-0.95,1.75,zB]);label('Backlit slatted backrest',[0,1.95,zF]);label('Stepped bench, full width',[0.9,0.98,zF-0.6]);
+  }
+},
+c:{
+  kicker:'Concept C · new',name:'Dark lie-down',
+  summary:'A darker, quieter room. The heater moves to the far corner, away from the door. Bathers sit on a two-tier bench facing it, and a full-length upper bench down the west wall lets two people lie flat.',
+  facts:[['6 + 2','seated + lying'],['1.6 m','heater to lie-down bench'],['0.4 m','feed run from UKU']],
+  points:['Pillar IKI 18 kW in the south-east corner, on a dark granite plinth, with a black steel guard rail.','Two-tier bench across the north wall, facing the heater.','A 4.3 m upper bench down the whole west wall for lying down, with two timber headrests.','Dark thermo-aspen on every wall and the ceiling, with pale aspen benches for contrast.','Fibre-optic star ceiling, plus a warm LED strip under the step.','The heater still backs onto the shower room, so the UKU feeds it straight through the east wall.'],
+  swatches:[['#3E281A','Dark thermo-aspen walls and ceiling'],['#E9D6B4','Aspen benches'],['#1F1F1F','Black steel rail'],['#4A4D4F','Dark slate floor']],
+  checks:[['Volume 26.7 m³, inside the 18–28 m³ range',1],['1.09 m clear above the heater on its 60 mm plinth',1],['Rail 250 mm off the mesh on both open sides',1],['Heater 2.6 m from the door, so nobody walks past it',1],['Inlet on the east wall, 1.0 m from the safety sensor',1],['Lie-down bench 1.6 m from the heater mesh, so lying down stays comfortable',1]],
+  views:{bench:{p:[xL+0.85,1.62,zB+0.3],t:[xR-0.5,0.85,zF-0.5]}},
+  build(){
+    const f={floor:CV.floorSlate,north:CV.thermoD,east:CV.thermoD,south:CV.thermoD,west:CV.thermoD,ceil:CV.thermoD,frame:0x1d1d1d};
+    shell(f);
+    const bm=texMat(CV.benchAspen,1,1,{roughness:.7}),sk=mat({color:0x4A3020,roughness:.75}),blk=mat({color:0x1f1f1f,metalness:.2,roughness:.45});
+    slatsX(xL+U,xR,zB,zB+U,0.936,bm);slatsX(xL+U,xR,zB+U,zB+LO,0.466,bm);
+    slatsZ(xL,xL+U,zB,zF,0.936,bm);
+    skirtX(xL+U,xR,zB+U+0.009,0.5,0.92,sk);skirtZ(zB+U,zF,xL+U+0.009,0.5,0.92,sk);skirtX(xL+U,xR,zB+LO+0.009,0.12,0.45,sk);skirtZ(zB+U,zB+LO,xL+U+0.009,0.12,0.45,sk);
+    [1.22,1.42].forEach(y=>box(xR-xL-U-0.1,0.075,0.028,bm,(xL+U+xR)/2,y,zB+0.014));
+    [zF-0.35,0.2].forEach(z=>{const h=box(0.42,0.1,0.2,bm,xL+0.3,1.0,z);h.rotation.x=z>0.5?0.35:-0.35;});
+    const led=ledMat(0xFFB070);box(xR-xL-LO-0.1,0.006,0.01,led,(xL+LO+xR)/2,0.447,zB+LO-0.06);box(0.01,0.006,zF-zB-U-0.1,led,xL+U-0.06,0.9,(zB+U+zF)/2);
+    [[0.3,0.3,zB+LO+0.1],[xL+U+0.1,0.7,1.0],[xL+U+0.1,0.7,-0.6]].forEach(p=>plight(0xFFA860,0.55,1.6,...p));
+    // star ceiling
+    const sr=rng(99),starM=track(new THREE.MeshBasicMaterial({color:0xFFF4DE}));
+    for(let i=0;i<140;i++){const s=new THREE.Mesh(track(new THREE.CircleGeometry(0.006+sr()*0.006,8)),starM);s.rotation.x=Math.PI/2;s.position.set(xL+0.1+sr()*(xR-xL-0.2),H-0.002,zB+0.1+sr()*(zF-zB-0.2));root.add(s);}
+    const hx=xR-0.475,hz=zF-0.475;
+    heater(hx,hz,{a0:Math.PI/2,a1:Math.PI*2,mat:blk,post:[0.025,0.025],tube:0.014,plinth:mat({color:0x2a2b2d,roughness:.5})});
+    bucket(xR-0.4,0.95,zB+0.3,blk);
+    vent(xR-0.006,1.45,hz-0.6,'x',blk);vent(-0.2,0.16,zB+0.006,'z',blk);
+    label('Pillar IKI 18 kW on granite plinth',[hx,1.15,hz]);label('4.3 m lie-down bench',[xL+0.3,1.05,0.9]);label('Fibre-optic star ceiling',[0,H-0.05,0.4]);label('Bench facing the heater',[0.4,1.05,zB+0.5]);
+  }
+}};
+
+/* ---------- views ---------- */
+const VIEWS={
+  door:()=>({p:[xR-0.12,1.6,(DZ0+DZ1)/2],t:CONCEPTS[cur].views.doorT||[xL+0.3,0.95,zF-0.6],fov:66}),
+  bench:()=>Object.assign({fov:66},CONCEPTS[cur].views.bench),
+  cut:()=>({p:[3.4,4.2,4.4],t:[0,0.7,0],fov:42}),
+  plan:()=>({p:[0,7.6,0.02],t:[0,0,0],fov:42})
+};
+let cur='b',view='door',tw=null;
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function go(name,instant){
+  view=name;const v=VIEWS[name]();
+  document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===name?'true':'false'));
+  const p1=new THREE.Vector3(...v.p),t1=new THREE.Vector3(...v.t);
+  if(instant||reduce){camera.position.copy(p1);controls.target.copy(t1);camera.fov=v.fov;camera.updateProjectionMatrix();tw=null;return;}
+  tw={p0:camera.position.clone(),t0:controls.target.clone(),f0:camera.fov,p1,t1,f1:v.fov,s:performance.now(),d:900};
+}
+document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));
+controls.addEventListener('start',()=>{tw=null;});
+let showLabels=false;
+document.getElementById('t-labels').addEventListener('click',e=>{showLabels=!showLabels;e.currentTarget.setAttribute('aria-pressed',showLabels);});
+
+/* ---------- panel ---------- */
+const $=id=>document.getElementById(id);
+function esc(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function select(c,first){
+  cur=c;const C=CONCEPTS[c];
+  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',t.dataset.c===c?'true':'false'));
+  $('c-kicker').textContent=C.kicker;$('c-name').textContent=C.name;$('c-summary').textContent=C.summary;
+  $('c-facts').innerHTML=C.facts.map(f=>'<div><b>'+esc(f[0])+'</b><span>'+esc(f[1])+'</span></div>').join('');
+  $('c-points').innerHTML=C.points.map(p=>'<li><span>'+esc(p)+'</span></li>').join('');
+  $('c-swatches').innerHTML=C.swatches.map(s=>'<div class="swatch"><i style="--c:'+s[0]+'"></i><span>'+esc(s[1])+'</span></div>').join('');
+  $('c-checks').innerHTML=C.checks.map(k=>'<li class="'+(k[1]?'':'warn')+'"><span>'+esc(k[0])+'</span></li>').join('');
+  clear();C.build();
+  amb.intensity=c==='c'?0.42:0.5;
+  go(view,first);
+}
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>select(t.dataset.c)));
+
+/* ---------- loop ---------- */
+let vw=1,vh=1;
+function resize(){const r=viewer.getBoundingClientRect();vw=Math.max(1,r.width);vh=Math.max(1,r.height);renderer.setSize(vw,vh,false);camera.aspect=vw/vh;camera.updateProjectionMatrix();}
+new ResizeObserver(resize).observe(viewer);resize();
+const pv=new THREE.Vector3();
+function frame(now){
+  if(tw){let k=Math.min(1,(now-tw.s)/tw.d);k=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;camera.position.lerpVectors(tw.p0,tw.p1,k);controls.target.lerpVectors(tw.t0,tw.t1,k);camera.fov=tw.f0+(tw.f1-tw.f0)*k;camera.updateProjectionMatrix();if(k>=1)tw=null;}
+  controls.update();
+  const p=camera.position,cut={n:p.z<zB,s:p.z>zF,w:p.x<xL,e:p.x>xR+0.06};
+  walls.forEach(w=>w.mesh.visible=!cut[w.side]);
+  if(ceiling)ceiling.visible=p.y<H;
+  for(const l of labels){
+    if(!showLabels){if(!l.el.hidden)l.el.hidden=true;continue;}
+    pv.copy(l.pos).project(camera);
+    if(pv.z>1||Math.abs(pv.x)>1.05||Math.abs(pv.y)>1.05){if(!l.el.hidden)l.el.hidden=true;continue;}
+    l.el.hidden=false;l.el.style.transform='translate('+((pv.x*.5+.5)*vw).toFixed(1)+'px,'+((-pv.y*.5+.5)*vh).toFixed(1)+'px) translate(-50%,-130%)';
+  }
+  renderer.render(scene,camera);requestAnimationFrame(frame);
+}
+select('b',true);
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>

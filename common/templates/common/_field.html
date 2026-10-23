@@ -1,6 +1,18 @@
-{# One form field with its label and error slot. Usage: {% include "common/_field.html" with field=form.email %} #}
-<div class="field">
-  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-  {{ field }}
-  <p class="field-error" data-error-for="{{ field.html_name }}" id="error-{{ field.html_name }}" role="alert"{% if not field.errors %} hidden{% endif %}>{{ field.errors|join:" " }}</p>
+{% comment %}One form field: label, control, and a feedback line that never shifts the layout.
+Usage: {% include "common/_field.html" with field=form.email hint="We'll send a link." good="Looks right" optional=False toggle=False meter=False %}
+Optional aside (sign-in shell): aside_url, aside_text, aside_label put a quiet link on the label row, after the control in tab order.{% endcomment %}
+<div class="field{% if aside_url %} field--aside{% endif %}">
+  <label for="{{ field.id_for_label }}">{{ field.label }}{% if optional %} <span class="optional">(optional)</span>{% endif %}</label>
+  {% if toggle %}<div class="field-row">{{ field }}<button type="button" class="field-toggle" data-password-toggle aria-controls="{{ field.id_for_label }}" aria-pressed="false">Show</button></div>{% else %}{{ field }}{% endif %}
+  <p class="feedback" data-error-for="{{ field.html_name }}" id="{{ field.auto_id }}_error" aria-live="polite" data-hint="{{ hint }}" data-good="{{ good }}" data-state="{% if field.errors %}error{% else %}hint{% endif %}">{% if field.errors %}{{ field.errors|join:" " }}{% else %}{{ hint }}{% endif %}</p>
+  {% if meter %}
+  <ul class="checklist" data-password-checklist aria-label="Password checks">
+    <li data-check="length">At least 10 characters</li>
+    <li data-check="common">Not a common password</li>
+    <li data-check="similar">Not your name or email</li>
+  </ul>
+  <div class="strength" data-password-strength data-level="0" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+  <p class="strength-word" data-password-word aria-live="polite"></p>
+  {% endif %}
+  {% if aside_url %}<a class="btn-quiet field-aside" href="{{ aside_url }}"{% if aside_label %} aria-label="{{ aside_label }}"{% endif %}>{{ aside_text }}</a>{% endif %}
 </div>

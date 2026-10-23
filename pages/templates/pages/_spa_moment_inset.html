@@ -1,0 +1,12 @@
+{% load content_tags %}{# The quiet amenity moment (slippers): words with one small mount beside them, flowing with the page. Needs m (the moment). #}
+{% with p=m.pictures.0 %}
+<section class="scene sp-sec sp-moment sp-moment--{{ m.key }} sp-moment--inset on-dark" data-scene="moment" aria-labelledby="moment-{{ m.key }}">
+  <div class="container grid sp-inset-grid">
+    <div class="sp-moment-words sp-inset-words">
+      <h2 class="sp-cname" id="moment-{{ m.key }}" data-rise>{{ m.heading }}</h2>
+      {% if m.body %}<p class="small muted sp-moment-line" data-fade>{{ m.body }}</p>{% endif %}
+    </div>
+    {% include "pages/_spa_mount.html" with name=p.name alt=p.alt sizes="(min-width: 64em) 16rem, 60vw" focus=p.focus upload=p.upload depth="8" cls="sp-inset-mount" %}
+  </div>
+</section>
+{% endwith %}

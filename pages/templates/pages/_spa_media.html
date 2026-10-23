@@ -1,0 +1,1 @@
+{% load content_tags %}{% comment %}A room picture: the uploaded file, else the built render, else the swan type tile (docs/design/SPA-PAGE.md 2). Needs f and sizes.{% endcomment %}{% if f.image or f.image_name %}{% photo f.image_name alt=f.alt sizes=sizes override=f.image %}{% else %}<div class="type-tile" aria-hidden="true">{% include "common/_mark.html" %}</div>{% endif %}

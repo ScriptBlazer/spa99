@@ -1,0 +1,20 @@
+{% extends "base_reduced.html" %}
+{% load static %}
+{% block head_title %}{% include "common/_head.html" with title="Tailor your membership | Spa 99" description=meta.meta_description %}{% endblock %}
+{% block head_extra %}<meta name="robots" content="noindex">{% endblock %}
+{% block messages %}{% endblock %}
+{% block main %}
+<div class="journey on-dark" data-journey data-flow="journey">
+  <div class="progress" role="progressbar" aria-label="Your progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-progress><span class="progress-fill" data-progress-fill></span></div>
+  <div class="container">{% include "common/_messages.html" %}</div>
+  <div class="container flow-container">
+    <div class="flow-col" data-flow-root>
+      <p class="muted flow-loading">One moment</p>
+    </div>
+  </div>
+  <div class="container flow-note"><p class="small muted"><a href="{% url 'privacy' %}">How we use your answers</a></p></div>
+  <noscript><div class="container flow-container"><p class="lead">The guided journey needs JavaScript. You can <a href="{% url 'memberships' %}">see the memberships</a> instead.</p></div></noscript>
+</div>
+{{ journey_config|json_script:"journey-config" }}
+{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/journey.js' %}"></script>{% endblock %}

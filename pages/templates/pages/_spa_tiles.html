@@ -1,0 +1,31 @@
+{% load content_tags %}{# One row of small portrait tiles (S2b). Needs s, spa and intro (true for the first row on the page). #}
+{% with n=s.tiles|length %}
+<section class="scene sp-sec sp-tiles sp-tiles--n{{ n }}{% if intro %} sp-tiles--intro{% endif %} on-dark" data-scene="tiles" data-glow{% if intro %} aria-labelledby="tiles-title"{% else %} aria-label="More rooms"{% endif %}>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="container grid sp-tiles-grid">
+    {% if intro %}
+    <div class="sp-tiles-intro">
+      <h2 class="statement" id="tiles-title" data-rise>{{ spa.tiles_intro.heading }}</h2>
+      {% if spa.tiles_intro.body %}<p class="muted" data-fade>{{ spa.tiles_intro.body }}</p>{% endif %}
+    </div>
+    {% endif %}
+    <ul class="sp-tiles-row" data-scroller>
+      {% for t in s.tiles %}
+      <li class="sp-tile">
+        <article id="{{ t.slug }}">
+          <figure class="frame frame--inset sp-tile-frame" data-frame data-depth="{% if forloop.counter == 2 %}10{% elif forloop.counter == 3 %}5{% else %}0{% endif %}" style="--focus: {{ t.focus }}"{% if t.slug == "wet-sauna" %} data-walk="wet-sauna"{% endif %}>
+            <div class="frame-media">{% include "pages/_spa_media.html" with f=t sizes="(min-width: 64em) 24vw, 72vw" %}</div>
+            <div class="frame-tint" aria-hidden="true"></div>
+          </figure>
+          <div class="frame-caption sp-caption" data-caption data-drift="12">
+            <h2>{{ t.name }}</h2>
+            {% if t.line %}<p class="small">{{ t.line }}</p>{% endif %}
+            {% if t.facts %}<ul class="pills sp-pills sp-pills--small" aria-label="{{ t.name }}, at a glance">{% for p in t.facts|slice:":3" %}<li class="pill">{{ p }}</li>{% endfor %}</ul>{% endif %}
+          </div>
+        </article>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endwith %}

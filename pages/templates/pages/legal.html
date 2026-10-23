@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load content_tags %}
+{% block main %}
+{% page_content page_key as doc %}
+<section class="section on-light legal">
+  <div class="container legal-inner">
+    <h1>{{ doc.body.heading|default:meta.title }}</h1>
+    {% if doc.draft_note %}<p class="legal-note panel panel--line"><strong>{{ doc.draft_note.heading }}</strong> {{ doc.draft_note.body }}</p>{% endif %}
+    <div class="legal-body">
+      {% for line in doc.body.body|lines %}<p>{{ line }}</p>{% endfor %}
+      {% for part in doc|parts %}
+      <h2>{{ part.heading }}</h2>
+      {% for line in part.body|lines %}<p>{{ line }}</p>{% endfor %}
+      {% endfor %}
+      {% if doc.contact %}
+      <h2>{{ doc.contact.heading }}</h2><p>{{ doc.contact.body }} <a href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a>.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

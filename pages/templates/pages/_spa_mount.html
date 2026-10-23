@@ -1,0 +1,7 @@
+{% load content_tags %}{% comment %}A small mounted picture: a thin gold line, a narrow margin, the photo (docs/design/AMENITIES.md 2). The caller sets the size and passes extra classes in `cls`. Needs name, alt, sizes, focus; optional upload, depth, cls, plain (true: no settle/depth hooks).{% endcomment %}
+<figure class="frame frame--mount {{ cls }}"{% if not plain %} data-frame{% if depth %} data-depth="{{ depth }}"{% endif %}{% endif %} style="--focus: {{ focus|default:'50% 50%' }}">
+  <div class="mount-window">
+    <div class="frame-media">{% if name or upload %}{% photo name alt=alt sizes=sizes override=upload %}{% else %}<div class="type-tile" aria-hidden="true">{% include "common/_mark.html" %}</div>{% endif %}</div>
+    <div class="frame-tint" aria-hidden="true"></div>
+  </div>
+</figure>
