@@ -3,6 +3,8 @@
 across both tables), `prev_hash` and `hash`."""
 from django.conf import settings
 from django.db import models, transaction
+from datetime import timedelta
+
 from django.utils import timezone
 
 from common.models import UUIDModel
@@ -59,6 +61,28 @@ class AuditHead(models.Model):
         except cls.DoesNotExist:
             cls.objects.get_or_create(pk=1)
             return cls.objects.select_for_update().get(pk=1)
+
+
+class JobStatus(models.Model):
+    """Our own last-run record per background job (name: rollup, snapshot, audit_verify), written by the jobs themselves
+    (common.jobs.tracked) whoever starts them: the worker, a command or a Run now button. Mutable on purpose."""
+
+    name = models.CharField(max_length=40, unique=True)
+    last_started_at = models.DateTimeField(null=True, blank=True)
+    last_finished_at = models.DateTimeField(null=True, blank=True)
+    last_ok = models.BooleanField(null=True, blank=True)
+    last_message = models.CharField(max_length=300, blank=True)
+    duration_ms = models.PositiveIntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def running(self):
+        """Started and not finished (a run that died leaves this on; it is ignored after 10 minutes)."""
+        if not self.last_started_at or (self.last_finished_at and self.last_finished_at >= self.last_started_at):
+            return False
+        return timezone.now() - self.last_started_at < timedelta(minutes=10)
 
 
 class AuditRow(UUIDModel):
@@ -147,13 +171,13 @@ class SystemEvent(AuditRow):
     LOCK_MANUAL, LOCK_IDLE = "lock_manual", "lock_idle"
     SIGN_OUT, SESSION_EXPIRED, ACCESS_DENIED = "sign_out", "session_expired", "access_denied"
     ROLE_CHANGED, USER_DEACTIVATED, USER_REACTIVATED = "role_changed", "user_deactivated", "user_reactivated"
-    UNDO, UNDO_ALL, EXPORT, AUDIT_PRUNED, AUDIT_CHECK = "undo", "undo_all", "export", "audit_pruned", "audit_check"
+    UNDO, UNDO_ALL, EXPORT, AUDIT_PRUNED, AUDIT_CHECK, JOB_RUN = "undo", "undo_all", "export", "audit_pruned", "audit_check", "job_run"
     KIND_CHOICES = [
         (SIGN_IN, "Signed in"), (SIGN_IN_FAILED, "Sign-in failed"), (UNLOCK, "Unlocked"), (UNLOCK_FAILED, "Unlock failed"),
         (UNLOCK_RATE_LIMITED, "Unlock blocked (too many tries)"), (LOCK_MANUAL, "Locked"), (LOCK_IDLE, "Locked (idle)"),
         (SIGN_OUT, "Signed out"), (SESSION_EXPIRED, "Sign-in expired"), (ACCESS_DENIED, "Access refused"),
         (ROLE_CHANGED, "Roles changed"), (USER_DEACTIVATED, "Account deactivated"), (USER_REACTIVATED, "Account reactivated"),
-        (UNDO, "Undo"), (UNDO_ALL, "Undo all"), (EXPORT, "Export"), (AUDIT_PRUNED, "Old log removed"), (AUDIT_CHECK, "Chain checked"),
+        (UNDO, "Undo"), (UNDO_ALL, "Undo all"), (EXPORT, "Export"), (AUDIT_PRUNED, "Old log removed"), (AUDIT_CHECK, "Chain checked"), (JOB_RUN, "Job run now"),
     ]
     OK, FAILED, BLOCKED = "ok", "failed", "blocked"
     OUTCOME_CHOICES = [(OK, "OK"), (FAILED, "Failed"), (BLOCKED, "Blocked")]

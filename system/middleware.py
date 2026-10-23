@@ -3,7 +3,7 @@ from django.http import Http404
 from django.shortcuts import redirect
 from django.views.defaults import page_not_found
 
-from . import audit, services
+from . import audit, changes, services
 
 OPEN_PATHS = ("/login/", "/health/", "/robots.txt")
 # browsers ask for these on their own: still a plain 404, but never written to the audit log as an access attempt
@@ -32,3 +32,22 @@ class SystemGateMiddleware:
                 request.session.flush()  # the 12 hour sign-in is over: signed out, back to the sign-in
                 return redirect("/login/")
         return self.get_response(request)
+
+
+class AuditContextMiddleware:
+    """Staff requests (Django admin included) carry their IP, browser and path into the change log: edits saved anywhere by a
+    signed-in staff member are recorded with where they came from. System views start their own batch over this one.
+    Must sit after AuthenticationMiddleware."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated or not user.is_staff or changes.current_batch():
+            return self.get_response(request)
+        changes.start_batch(request)
+        try:
+            return self.get_response(request)
+        finally:
+            changes.end_batch()

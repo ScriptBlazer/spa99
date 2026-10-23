@@ -189,3 +189,4 @@ body.system.live { --sys-stripe: 3px; }
 }
 @media (pointer: coarse) { .sys-nav a { height: 40px; } }
 @media (prefers-reduced-motion: reduce) { .system *, .system *::before, .system *::after { animation-name: sys-fade !important; transition-property: opacity, background-color, border-color !important; transform: none !important; } @keyframes sys-fade { from { opacity: 0; } } }
+.sys-tile .f { margin-top: auto; padding-top: var(--sys-2); } .sys-tile .f form { margin: 0; }

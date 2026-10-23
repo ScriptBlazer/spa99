@@ -13,7 +13,7 @@ from django.db.models.functions import Cast
 from django.utils import timezone
 
 from . import audit, changes, sentences
-from .models import SystemChange, SystemEvent
+from .models import JobStatus, SystemChange, SystemEvent
 
 ROLES = ("Owner", "Manager", "Viewer", "Approver", "System")
 PAGE_SIZE = 50
@@ -256,14 +256,14 @@ def recent_changes(count=10):
 
 def health_report():
     """DB ok, queue size, last roll-up, snapshot age, and the key counts from the stored dashboard snapshot."""
-    from django_q.models import Failure, OrmQ, Success
+    from django_q.models import Failure, OrmQ
 
     from insights.metrics import K
     from insights.models import OfficeSnapshot
     from office import selectors
 
     report = {"database_ok": True, "queue_size": None, "last_rollup": None, "snapshot_age_seconds": None, "snapshot_stale": True,
-              "counts": {}, "failed_tasks_24h": None, "gold_waiting": 0, "people_total": 0}
+              "counts": {}, "failed_tasks_24h": None, "rollup": None, "snapshot": None, "audit_verify": None, "gold_waiting": 0, "people_total": 0}
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
@@ -272,8 +272,9 @@ def health_report():
         report["database_ok"] = False
         return report
     report["queue_size"] = OrmQ.objects.count()
-    last = Success.objects.filter(func="insights.rollup.scheduled").order_by("-stopped").values_list("stopped", flat=True).first()
-    report["last_rollup"] = last
+    jobs = {j.name: j for j in JobStatus.objects.all()}
+    report["rollup"], report["snapshot"], report["audit_verify"] = jobs.get("rollup"), jobs.get("snapshot"), jobs.get("audit_verify")
+    report["last_rollup"] = report["rollup"].last_finished_at if report["rollup"] else None  # our own record, not django-q's
     report["failed_tasks_24h"] = Failure.objects.filter(stopped__gte=timezone.now() - timedelta(hours=24)).count()
     snapshot = OfficeSnapshot.objects.filter(page=OfficeSnapshot.DASHBOARD, range="7d").first()
     if snapshot is not None:
@@ -333,3 +334,43 @@ def set_active(actor, target, active):
         record_direct(actor, "team", "users.user", target, "is_active", old, active)
         audit.log_event(SystemEvent.USER_REACTIVATED if active else SystemEvent.USER_DEACTIVATED, user=actor,
                         detail={"person": target.email}, sentence=sentences.team_sentence("is_active", target.email, old, active))
+
+
+# ---------- Run now ----------
+
+RUNNABLE = {"rollup": ("insights.rollup.scheduled", "Roll-up"), "snapshot": ("office.snapshots.refresh", "Snapshot refresh")}
+
+
+def cluster_running():
+    """True when a django-q cluster is alive (it reports itself to the Stat table)."""
+    try:
+        from django_q.monitor import Stat
+
+        return bool(Stat.get_all())
+    except Exception:
+        return False
+
+
+def run_job_now(name):
+    """Run a job from a button. Returns (ok, message, seconds). Live with a worker: queued. Otherwise inline; a job that
+    started in the last 10 minutes and has not finished is not started twice."""
+    import time
+
+    from django.conf import settings
+    from django.utils.module_loading import import_string
+
+    path = RUNNABLE[name][0]
+    status = JobStatus.objects.filter(name=name).first()
+    if status and status.running:
+        return False, f"{RUNNABLE[name][1]} is already running.", 0
+    if not settings.DEBUG and cluster_running():
+        from django_q.tasks import async_task
+
+        async_task(path)
+        return True, f"{RUNNABLE[name][1]} queued; the worker will run it shortly.", 0
+    started = time.monotonic()
+    try:
+        result = import_string(path)()
+    except Exception as error:
+        return False, f"{RUNNABLE[name][1]} failed: {type(error).__name__}: {error}"[:300], time.monotonic() - started
+    return True, str(result)[:300], time.monotonic() - started

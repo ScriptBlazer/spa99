@@ -3,6 +3,7 @@ import csv
 from django.contrib import admin
 from django.http import HttpResponse
 
+from . import feed
 from .models import SystemChange, SystemEvent
 
 
@@ -27,7 +28,7 @@ class ReadOnlyAudit(admin.ModelAdmin):
         writer = csv.writer(response)
         writer.writerow(self.list_display)
         for row in queryset:
-            writer.writerow(["'" + str(v) if str(v)[:1] in "=+-@" else v for v in (getattr(row, f) for f in self.list_display)])
+            writer.writerow([feed._safe(getattr(row, f)) for f in self.list_display])
         return response
 
 

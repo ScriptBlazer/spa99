@@ -17,6 +17,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from common.audit import client_ip
+from common.jobs import tracked
 
 from . import changes
 from .models import AuditHead, SystemChange, SystemEvent
@@ -33,7 +34,7 @@ KINDS = {
     SystemEvent.ROLE_CHANGED: ("security", "team", "ok"), SystemEvent.USER_DEACTIVATED: ("security", "team", "ok"),
     SystemEvent.USER_REACTIVATED: ("security", "team", "ok"), SystemEvent.UNDO: ("undo", "changes", "ok"),
     SystemEvent.UNDO_ALL: ("undo", "changes", "ok"), SystemEvent.EXPORT: ("security", "changes", "ok"),
-    SystemEvent.AUDIT_PRUNED: ("security", "changes", "ok"), SystemEvent.AUDIT_CHECK: ("security", "changes", "ok"),
+    SystemEvent.AUDIT_PRUNED: ("security", "changes", "ok"), SystemEvent.AUDIT_CHECK: ("security", "changes", "ok"), SystemEvent.JOB_RUN: ("security", "security", "ok"),
 }
 CATEGORIES = [("change", "Changes"), ("security", "Security"), ("undo", "Undos"), ("failure", "Failures")]
 EVENT_SECTION_LABELS = {"security": "Security", "changes": "Change log"}
@@ -72,9 +73,10 @@ def seal(row):
     AuditHead.objects.filter(pk=1).update(last_seq=row.seq, last_hash=row.hash)
 
 
-def _walk():
-    streams = [SystemChange.objects.filter(seq__isnull=False).order_by("seq").iterator(),
-               SystemEvent.objects.filter(seq__isnull=False).order_by("seq").iterator()]
+def _walk(limit):
+    """Rows with seq up to `limit` (the head as read at the start), so a row written while we walk is not 'unexpected'."""
+    streams = [SystemChange.objects.filter(seq__isnull=False, seq__lte=limit).order_by("seq").iterator(),
+               SystemEvent.objects.filter(seq__isnull=False, seq__lte=limit).order_by("seq").iterator()]
     return heapq.merge(*streams, key=lambda row: row.seq)
 
 
@@ -90,7 +92,8 @@ def verify():
         return {"ok": False, "checked": checked, "legacy": legacy, "broken": (type(row).__name__, str(row.pk), row.seq),
                 "message": f"BROKEN at {type(row).__name__} {row.pk} (number {row.seq}): {why}"}
 
-    for row in _walk():
+    last_seq, last_hash = (head.last_seq, head.last_hash) if head else (anchor_seq, anchor_hash)
+    for row in _walk(last_seq):
         if row.seq < expected_seq:
             return bad(row, "the number appears twice or is out of order")
         if row.seq > expected_seq:
@@ -101,7 +104,6 @@ def verify():
         if digest(row.prev_hash, row.hash_payload()) != row.hash:
             return bad(row, "its content no longer matches its hash (edited)")
         prev, expected_seq, checked = row.hash, expected_seq + 1, checked + 1
-    last_seq, last_hash = (head.last_seq, head.last_hash) if head else (anchor_seq, anchor_hash)
     if expected_seq - 1 != last_seq or prev != last_hash:
         return {"ok": False, "checked": checked, "legacy": legacy, "broken": ("missing", "", expected_seq),
                 "message": f"BROKEN: the newest row(s) are missing (chain ends at {expected_seq - 1}, the log says {last_seq})"}
@@ -110,6 +112,7 @@ def verify():
     return {"ok": True, "checked": checked, "legacy": legacy, "broken": None, "message": f"OK: {checked} row(s) verified.{pruned}{note}"}
 
 
+@tracked("audit_verify")
 def check_and_store():
     """Run the full verify and store the result on the head row. Returns the verify() dict. Never call this on a page load."""
     result = verify()
@@ -206,7 +209,13 @@ def default_sentence(kind, email, detail):
     }.get(kind, f"{who}: {kind}")
 
 
-def log_event(kind, request=None, user=None, email="", outcome=None, detail=None, sentence="", section=None, dedupe_seconds=0):
+def recent_exists(kind, ip, label, seconds):
+    """Was this kind already written from this IP (and person, unless label is None) in the last `seconds`?"""
+    rows = SystemEvent.objects.filter(kind=kind, ip_address=ip, created_at__gte=timezone.now() - timedelta(seconds=seconds))
+    return (rows if label is None else rows.filter(user_label=label)).exists()
+
+
+def log_event(kind, request=None, user=None, email="", outcome=None, detail=None, sentence="", section=None, dedupe_seconds=0, dedupe_any_person=False):
     """Write one security event. Never raises (a broken log must not lock people out); returns the row or None.
     `dedupe_seconds`: skip when the same kind from the same IP and person was already written in that window."""
     detail = dict(detail or {})
@@ -215,8 +224,7 @@ def log_event(kind, request=None, user=None, email="", outcome=None, detail=None
         user = user if user is not None and getattr(user, "pk", None) else None
         label = (getattr(user, "email", "") or email or "")[:254]
         category, default_section, default_outcome = KINDS[kind]
-        if dedupe_seconds and SystemEvent.objects.filter(
-                kind=kind, ip_address=info["ip_address"], user_label=label, created_at__gte=timezone.now() - timedelta(seconds=dedupe_seconds)).exists():
+        if dedupe_seconds and recent_exists(kind, info["ip_address"], None if dedupe_any_person else label, dedupe_seconds):
             return None
         with transaction.atomic():
             return SystemEvent.objects.create(
@@ -232,8 +240,11 @@ def note_access_denied(request):
     scanner cannot flood the log. Coarse on purpose: method and path, no body."""
     from common.ratelimit import hit
 
+    ip = (client_ip(request) or "")[:45]
+    if recent_exists(SystemEvent.ACCESS_DENIED, ip, None, 3600):  # first: a repeat from one IP must not spend the shared budget
+        return None
     if not hit("system-denied-total", "all", 300, 3600):
         return None
     user = getattr(request, "user", None)
     return log_event(SystemEvent.ACCESS_DENIED, request, user=user if user is not None and user.is_authenticated else None,
-                     detail={"method": request.method, "path": request.path[:200]}, dedupe_seconds=3600)
+                     detail={"method": request.method, "path": request.path[:200]})

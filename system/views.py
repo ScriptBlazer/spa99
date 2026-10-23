@@ -7,7 +7,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
-from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
+from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -84,7 +84,7 @@ class SystemLoginView(LoginView):
         response = super().post(request, *args, **kwargs)
         if response.status_code == 429:  # the shared sign-in refused: too many tries from this IP
             audit.log_event(SystemEvent.SIGN_IN_FAILED, request, email=request.POST.get("username", "").strip().lower(),
-                            outcome=SystemEvent.BLOCKED, detail={"rate_limited": True}, dedupe_seconds=300)
+                            outcome=SystemEvent.BLOCKED, detail={"rate_limited": True}, dedupe_seconds=300, dedupe_any_person=True)  # per IP: a typed email cannot multiply rows
         return response
 
 
@@ -179,6 +179,20 @@ def audit_check(request):
                     detail={"ok": result["ok"], "entries": result["checked"]}, sentence=f"{request.user.email} checked the audit chain: {result['message']}"[:1000])
     (messages.success if result["ok"] else messages.error)(request, result["message"])
     return redirect(safe_next(request, "system_changes"))
+
+
+@unlocked
+@require_POST
+def job_run(request, job):
+    """Run now (roll-up or snapshot refresh): runs it, logs a job_run event, toasts the result."""
+    if job not in services.RUNNABLE:
+        raise Http404
+    ok, message, seconds = services.run_job_now(job)
+    audit.log_event(SystemEvent.JOB_RUN, request, user=request.user, outcome=SystemEvent.OK if ok else SystemEvent.FAILED,
+                    detail={"job": job, "ok": ok, "duration_ms": int(seconds * 1000), "message": message},
+                    sentence=f"{request.user.email} ran {services.RUNNABLE[job][1]} now: {'ok' if ok else 'failed'} ({seconds:.1f}s)")
+    (messages.success if ok else messages.error)(request, message)
+    return redirect("system_dashboard")
 
 
 @unlocked

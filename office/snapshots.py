@@ -12,6 +12,7 @@ from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from common.jobs import tracked
 from insights import facts, metrics, people, summaries
 from insights.models import OfficeSnapshot, SnapshotRefresh
 
@@ -55,6 +56,7 @@ def write_snapshots(today, figures, built_at):
     return len(wanted)
 
 
+@tracked("snapshot")
 def build_everything(today=None):
     """Sentences, insights, then snapshots (which read both), all from one load of the source tables, so every figure
     on a page agrees. Returns the number of sentences written."""

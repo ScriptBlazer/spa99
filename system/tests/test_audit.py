@@ -301,3 +301,127 @@ class StoredCheckTests(TestCase):
         client.post("/changes/check/")
         self.assertTrue(audit.stored_status()["ok"])
         self.assertEqual(SystemEvent.objects.filter(kind="audit_check").count(), 1)
+
+
+CACHE = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "audit-tests"}}
+
+
+class ReviewFixTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+
+        cache.clear()
+        self.user = make_user()
+
+    def test_verify_ignores_rows_written_while_it_walks(self):
+        audit.log_event("sign_in", user=self.user)
+        real = audit._walk
+
+        def walk_after_a_write(limit):
+            audit.log_event("sign_out", user=self.user)  # lands between reading the head and walking
+            return real(limit)
+        with mock.patch("system.audit._walk", walk_after_a_write):
+            self.assertTrue(audit.verify()["ok"])
+        self.assertTrue(audit.verify()["ok"])
+
+    def test_a_reordered_row_is_found(self):
+        for n in range(3):
+            audit.log_event("sign_in", user=self.user, email=str(n))
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE system_systemevent SET seq = 99 WHERE seq = 1")
+            cursor.execute("UPDATE system_systemevent SET seq = 1 WHERE seq = 2")
+            cursor.execute("UPDATE system_systemevent SET seq = 2 WHERE seq = 99")
+        self.assertFalse(audit.verify()["ok"])
+
+    @override_settings(CACHES=CACHE)
+    def test_one_scanner_cannot_use_up_the_access_denied_budget(self):
+        a, b = Client(HTTP_HOST=SYSTEM, REMOTE_ADDR="203.0.113.1"), Client(HTTP_HOST=SYSTEM, REMOTE_ADDR="203.0.113.2")
+        for n in range(301):
+            a.get(f"/x{n}/")
+        self.assertEqual(SystemEvent.objects.filter(kind="access_denied", ip_address="203.0.113.1").count(), 1)
+        b.get("/")
+        self.assertEqual(SystemEvent.objects.filter(kind="access_denied", ip_address="203.0.113.2").count(), 1)
+
+    def test_rate_limited_sign_ins_are_one_row_per_ip_whatever_email_is_typed(self):
+        client = Client(HTTP_HOST=SYSTEM, REMOTE_ADDR="203.0.113.5")
+        with mock.patch("users.views._throttled", return_value=True):
+            for n in range(12):
+                client.post("/login/", {"username": f"x{n}@example.com", "password": "x"})
+        self.assertEqual(SystemEvent.objects.filter(kind="sign_in_failed").count(), 1)
+        self.assertNotIn("x0@example.com", feed.people())
+
+    def test_attacker_typed_text_is_escaped_on_the_page_and_neutralised_in_the_csv(self):
+        attacker = Client(HTTP_HOST=SYSTEM)
+        attacker.post("/login/", {"username": "<script>alert(1)</script>", "password": "x"})
+        attacker.post("/login/", {"username": "=HYPERLINK(1)", "password": "x"})
+        client = unlocked_client(self.user)
+        page = client.get("/changes/", {"category": "failure"}).content.decode()
+        self.assertNotIn("<script>alert(1)</script>", page)
+        self.assertIn("&lt;script&gt;alert(1)", page)
+        body = b"".join(client.get("/changes/export.csv", {"category": "failure"}).streaming_content).decode()
+        self.assertIn("'=hyperlink(1)", body)
+
+    def test_admin_csv_uses_the_same_guard(self):
+        from system.feed import _safe
+
+        self.assertEqual((_safe(""), _safe("\t=x"), _safe("=x")), ("", "'\t=x", "'=x"))
+
+    def test_staff_requests_carry_ip_and_browser_into_the_change_log(self):
+        from django.test import RequestFactory
+
+        from system.middleware import AuditContextMiddleware
+
+        request = RequestFactory().post("/admin-x/plans/", HTTP_USER_AGENT=UA, REMOTE_ADDR="203.0.113.7")
+        request.user = self.user
+
+        def save(req):
+            site = SiteSettings.load()
+            site.capacity = 33
+            site._history_user = self.user
+            site.save()
+            from django.http import HttpResponse
+            return HttpResponse()
+        AuditContextMiddleware(save)(request)
+        row = SystemChange.objects.get(field="capacity")
+        self.assertEqual((row.ip_address, row.user_agent, row.path), ("203.0.113.7", UA, "/admin-x/plans/"))
+
+
+class JobStatusTests(TestCase):
+    def test_status_is_written_on_success_and_on_failure(self):
+        from common.jobs import tracked
+        from system.models import JobStatus
+
+        @tracked("demo")
+        def good():
+            return "done"
+
+        @tracked("bad")
+        def bad():
+            raise ValueError("boom")
+        good()
+        with self.assertRaises(ValueError):
+            bad()
+        ok, failed = JobStatus.objects.get(name="demo"), JobStatus.objects.get(name="bad")
+        self.assertEqual((ok.last_ok, ok.last_message), (True, "done"))
+        self.assertTrue(ok.last_finished_at and ok.duration_ms is not None)
+        self.assertEqual((failed.last_ok, failed.last_message), (False, "ValueError: boom"))
+
+    def test_run_now_runs_logs_and_shows_on_the_dashboard(self):
+        from system.models import JobStatus
+
+        client = unlocked_client(make_user())
+        client.post("/jobs/snapshot/run/")
+        event = SystemEvent.objects.get(kind="job_run")
+        self.assertEqual((event.detail["job"], event.detail["ok"]), ("snapshot", True))
+        self.assertTrue(JobStatus.objects.get(name="snapshot").last_ok)
+        client.post("/jobs/rollup/run/")
+        self.assertEqual(SystemEvent.objects.filter(kind="job_run").count(), 2)
+        self.assertContains(client.get("/"), 'data-system-run="rollup"')
+        self.assertEqual(client.post("/jobs/nothing/run/").status_code, 404)
+
+    def test_run_now_is_404_for_non_developers(self):
+        stranger = Client(HTTP_HOST=SYSTEM)
+        self.assertEqual(stranger.post("/jobs/rollup/run/").status_code, 404)
+        office = make_user("office@example.com", system=False)
+        client, _ = sign_in(office)
+        self.assertEqual(client.post("/jobs/rollup/run/").status_code, 404)

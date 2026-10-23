@@ -67,7 +67,8 @@ def section_label(key):
 def people():
     """Everyone who appears in the log (for the person filter): two small queries."""
     names = set(SystemChange.objects.exclude(user_label="").order_by().values_list("user_label", flat=True).distinct())
-    names |= set(SystemEvent.objects.exclude(user_label="").order_by().values_list("user_label", flat=True).distinct())
+    # typed emails of failed sign-ins are not people, so they are left out
+    names |= set(SystemEvent.objects.exclude(user_label="").exclude(kind=SystemEvent.SIGN_IN_FAILED).order_by().values_list("user_label", flat=True).distinct())
     return sorted(names)
 
 

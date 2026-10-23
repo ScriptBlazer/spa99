@@ -58,6 +58,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "system.middleware.AuditContextMiddleware",  # staff edits (admin too) are logged with IP and browser
     # Locked by default: every view needs a login unless marked @login_not_required.
     "django.contrib.auth.middleware.LoginRequiredMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
