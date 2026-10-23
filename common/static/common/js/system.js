@@ -16,7 +16,10 @@ const plural = (n, one, many) => (n === 1 ? one : many);
 
 const forms = () => $$('form[data-system-form]');
 const controlsOf = (form) => [...form.elements].filter((el) => el.name && !['hidden', 'submit', 'button'].includes(el.type) && el.name !== 'csrfmiddlewaretoken');
-const readValue = (el) => (el.type === 'checkbox' || el.type === 'radio' ? (el.checked ? 'on' : 'off') : el.value);
+// money boxes compare and show as amounts (299 and 299.00 are the same price)
+const money = (v) => (v.trim() !== '' && !Number.isNaN(Number(v.replace(/,/g, ''))) ? Number(v.replace(/,/g, '')).toFixed(2) : v);
+const readValue = (el) => (el.type === 'checkbox' || el.type === 'radio' ? (el.checked ? 'on' : 'off') : el.hasAttribute('data-money') ? money(el.value) : el.value);
+document.addEventListener('focusout', (e) => { const el = e.target; if (el.matches?.('input[data-money]')) { el.value = money(el.value); el.dispatchEvent(new Event('input', { bubbles: true })); } });
 const initial = new WeakMap();
 
 function shownValue(el, value) {

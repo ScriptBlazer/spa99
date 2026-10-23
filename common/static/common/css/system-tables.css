@@ -69,3 +69,4 @@ details.sys-panel[open] > summary.sys-add, details[open] > summary.sys-add { bor
 .sys-row .sys-points { flex-wrap: wrap; }
 /* money and other decimal cells: room for 9,999.99 plus the stepper (Moishe 2026-10-23: prices were cut off) */
 .sys-table td input[type=number][step="0.01"], .sys-table td input[type=number][step="any"] { width: 108px; }
+.sys-table td input[data-money] { width: 108px; text-align: right; font-family: var(--sys-mono); }

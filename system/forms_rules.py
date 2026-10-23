@@ -74,6 +74,8 @@ class PlanForm(forms.ModelForm):
         model = Plan
         fields = ["name", "price_ex_vat", "visits_per_month", "hours", "booking_window_days", "upcoming_limit", "cancel_hours",
                   "guests_per_month", "perks", "short_description", "highlight", "visible", "order"]
+        # money: a plain text box (no 1p arrows), shown as 299.00; the DecimalField still validates on the server
+        widgets = {"price_ex_vat": forms.TextInput(attrs={"inputmode": "decimal", "autocomplete": "off", "data-money": ""})}
 
     def clean_perks(self):
         perks = self.cleaned_data.get("perks") or []
