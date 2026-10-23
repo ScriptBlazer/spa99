@@ -186,10 +186,11 @@ html[data-page="marketing"] {
   --mount-gap-sm: 0.375rem;                    /* derived: the mount gap on small mounts (kit tiles), does not grow at 48em */
   --band-h: min(62svh, 36rem);                 /* derived: height of a full-bleed amenity band, desktop */
   --opener-measure: 26rem;                     /* derived: widest the opener words go, keeps them on the solid veil */
-  --opener-pin: 0.6;                           /* derived: pin length of the opener in screens (0.8 from 64em), read by spa.js */
+  --opener-pin: 0.35;                          /* derived: pin length of the opener in screens (0.5 from 64em), read by spa.js. One line now (2026-10-23) */
+  --tracking-launch: 0.3em;                    /* derived (2026-10-23): the "Launching" label above the date, wider than --tracking-engraved */
 }
 @media (min-width: 48em) { :root { --mount-gap: 0.5rem; } }
-@media (min-width: 64em) { :root { --opener-pin: 0.8; } }
+@media (min-width: 64em) { :root { --opener-pin: 0.5; } }
 
 @media (prefers-reduced-motion: reduce) {
   :root {

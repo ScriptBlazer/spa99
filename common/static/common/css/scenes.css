@@ -423,13 +423,12 @@ html.motion .frame-media, html.motion .window-media, html.motion .hero-window, h
 .opener-scene[data-opener="door"] .door-target { --focus: 60% 45%; }
 .opener-scene[data-opener="door-gold"] .door-target { --focus: 50% 45%; }
 
-/* the line stack (docs/design/SPA-OPENER.md 3): static = every line, stacked, a gold hairline above each statement */
-.door-title, .opener-lines, .opener-ticks { max-width: var(--opener-measure); }
+/* the opener line (docs/design/SPA-OPENER.md 3): one statement and its note, a gold hairline above */
+.door-title, .opener-lines { max-width: var(--opener-measure); }
 .opener-lines { display: grid; gap: var(--space-4); margin-top: var(--space-4); }
 .opener-statement { font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--color-text-inverse); }
 .opener-statement::before { content: ""; display: block; width: 1.5rem; height: 1px; margin-bottom: var(--space-2); background: var(--color-gold); }
 .opener-note { margin-top: var(--space-2); font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--color-text-muted-inverse); }
-.opener-ticks { display: none; }
 /* phone: one scrolling line of chips that runs off the right edge, the next chip peeking */
 .chips[data-scroller] { flex-wrap: nowrap; overflow-x: auto; margin-inline: calc(var(--page-margin) * -1); padding-inline: var(--page-margin); scroll-snap-type: x proximity; scroll-padding-inline: var(--page-margin); overscroll-behavior-x: contain; scrollbar-width: none; }
 .chips[data-scroller]::-webkit-scrollbar { display: none; }
@@ -691,18 +690,8 @@ html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .doo
 }
 
 /* ---------- motion layout (html.motion) ---------- */
-/* the opener lines lie in one cell, so nothing jumps when they change; lines 2 to 4 start invisible. Static and failed scenes keep the stacked list. */
-html.motion .opener-scene:not(.scene-failed) .opener-lines { grid-template-areas: "l"; gap: 0; }
-html.motion .opener-scene:not(.scene-failed) .opener-line { grid-area: l; }
-html.motion .opener-scene:not(.scene-failed) .opener-line + .opener-line { opacity: 0; }
-html.motion .opener-scene:not(.scene-failed) .opener-statement::before { display: none; }
-html.motion .opener-scene:not(.scene-failed) .opener-ticks { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
-.opener-tick { width: 1.5rem; height: 1px; background: var(--color-gold); opacity: 0.3; }   /* decoration: the lines themselves are the content */
-.opener-tick:first-child { opacity: 1; }
+/* one opener line since 2026-10-23 (Moishe): no stacking, no ticks; the gold hairline above the statement shows with and without motion */
 html.motion .sp-bandpic .frame-media { will-change: transform; }
-@media (min-width: 64em) {
-  html.motion .opener-scene:not(.scene-failed) .opener-ticks { margin-top: var(--space-4); }
-}
 
 /* Home R4: the lounge photo has a wide tank on the left (2026-10-23); keep the whole tank in the frame. */
 .entry-visual .frame-media img { object-position: 28% 55%; }

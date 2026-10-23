@@ -1,5 +1,7 @@
 # Spa 99: The spa opener (round 3)
 
+> **Update 2026-10-23 (Moishe, later):** the hero keeps **one line only**: "Open 5am to 3am." with "Every day. Closed for Shabbos and Yom Tov.", then straight to the room chips. Lines 2 to 4 (men only, heat and steam, stay as long as you like) and the ticks are gone from the hero; their `opener_2..4` rows stay in the database, unrendered (`OPENER_HERO_LINES = 1` in `pages/services.py`; an empty line 1 is never replaced by a later row). The pin goes back to Home's length (`--opener-pin` 0.35 phone, 0.5 from 64em) so nobody stops mid-scroll. The gold hairline shows above the statement with and without motion. Mentions of four lines, the cross-fade and the ticks below are superseded.
+>
 > **Update 2026-10-23 (Moishe):** the Pause control is removed from The spa opener (and Home). The living still keeps its tab-hidden, out-of-view and reduced-motion stops. Mentions of Pause below are superseded.
 
 For the frontend and backend agents. Date 2026-10-23. Replaces **SPA-PAGE.md section 4 S1** (picture, first-paint words, facts row and motion table). Everything else in SPA-PAGE.md stays. The moments woven through the rest of the page are in `docs/design/AMENITIES.md`; the later door video is in `docs/design/SPA-DOOR-VIDEO.md`. `docs/BRAND.md` wins on any conflict.
