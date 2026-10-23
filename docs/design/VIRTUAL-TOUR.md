@@ -2,7 +2,7 @@
 
 Status: brief, 2026-10-23. Owner: design. Feature: `docs/features/virtual-tour.md`. Decisions: PROJECT.md 2026-10-23 (own page `/tour/`, no fal, rooms built in three.js). Builds on `docs/design/IMMERSIVE.md` 12 and 14 (WebGL palette, loader pattern, kill switch) and `docs/design/GOLD-CARD-3D.md` (canvas maps from the page's own SVG paths, warm PMREM, dispose contract). `docs/BRAND.md` wins.
 
-Look reference per room: `.private/fal-renders/{lounge,dry-sauna,wet-sauna,relaxing-zone,gym}.png` (1400 px copies in `.private/shots/tour/ref-*.jpg`).
+Look reference per room: `.private/fal-renders/{lounge,dry-sauna,wet-sauna,relaxing-zone,gym,kitchenette,massage-room}.png` (1400 px copies in `.private/shots/tour/ref-*.jpg`).
 
 ## 0. In one screen
 
@@ -286,6 +286,7 @@ The relaxing zone and the gym have no ambient animation: render on demand only (
 - **Lounge.** Reception is now a half-round counter (radius 1.0 to 1.6, centre on the west wall at z 0.4) growing out of the west wall, which is plain behind it (the three doorways are gone). Gold cove and lockup follow the desk. Gym passage: north wall, x -5.6, 1.0 x 2.2, marker (-5.6, 1.1, -2.95). Relaxing-zone passage: east wall, z 2.0, past the seating (flutes stop short of it), marker (3.55, 1.1, 2.0). No sauna markers. Tank, seating and look unchanged.
 - **Relaxing zone.** TV on the west wall at z 1.7, 1.44 x 0.81, centre y 1.4, slim `--color-iron` frame, screen a dark canvas with a faint warm diagonal sheen and a small warm glow, no picture, no text. The west doorway to the gym is removed; the only marker is the lounge.
 - **Gym.** Shell is now 7.0 x 8.0 (z -5..3). East: night window and, facing it, 3 treadmills (z -3.7, -2.55, -1.4), 2 bikes, a rower. West: oak panels with the lockup, a rubber zone with a 12-dumbbell rack (heads instanced), a power rack with a loaded barbell, 2 adjustable benches (one inclined), 8 kettlebells and 9 plates (instanced), and a cable machine at the north wall. North: mirrors with a short passage in the middle; its back wall has one door with a marker to the kitchenette. Markers: lounge (south), kitchenette (north). About 30 draw calls.
+- **Kitchenette and massage room (added, 2026-10-23).** `TOUR_ROOMS` order is now lounge, gym, kitchenette, massage-room, dry-sauna, wet-sauna, relaxing-zone. Doorways: gym to kitchenette (south door, x -1.0) to massage room (east door, z -0.9); the massage room's south door goes back to the kitchenette, its west door (z -2.1, left) to the dry sauna and its east door (z -2.4, right) to the wet sauna. Kitchenette (4.4 x 5.0 x 2.7, look from `.private/fal-renders/kitchenette.png`): walnut counter with travertine top and splashback on the north wall, bronze built-in coffee machine and tap, one open oak shelf of 13 cream cups (instanced), the gold swan on the walnut panel above with an LED wash, cream fluted panelling low on the other walls, two low caramel boucle chairs round a round travertine table under a frosted pendant. Massage room (3.6 x 6.4 x 2.7, look from `massage-room.png`): oak slatted north wall with the gold swan, three cream-leather chairs with walnut sides along the east wall facing west with gaps (parts instanced), a stone chimney breast on the west wall with a flush linear fireplace (two additive flame layers scrolling slowly, a flickering floor glow and point light, 30 fps ambient) and a 75 inch dark TV above it, LED coves along both side walls. No fake facts: no amenity promises in the copy.
 
 ## 3. Motion
 
@@ -435,6 +436,8 @@ Page: key `tour`, title "Virtual tour", meta description "Look around the lounge
 | `room_wet_sauna` | | Warm stone under soft steam. | See it on The spa | |
 | `room_relaxing_zone` | | Lie back. Nothing here needs you. | See it on The spa | |
 | `room_gym` | | Free weights and machines, in low warm light. | See it on The spa | |
+| `room_kitchenette` | | A quiet corner for a warm drink and a low chair. | See it on The spa | |
+| `room_massage_room` | | Slatted oak, soft light and a fire to settle beside. | See it on The spa | |
 
 A blank room body falls back to `Facility.short_line`. A room section image overrides the fallback photo. Page `spa` gets `tour_link` with cta_label "Take the tour".
 

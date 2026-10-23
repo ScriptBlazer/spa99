@@ -604,10 +604,12 @@ def signin_shell():
 # The slug is the Facility slug (and the photo name in the image manifest); the lounge has no Facility row.
 TOUR_ROOMS = [
     ("lounge", "Lounge", "The lounge, with the wide reef tank beside a long bench", "28% 55%"),
+    ("gym", "Gym", "The gym, free weights and machines in low warm light", "40% 55%"),
+    ("kitchenette", "Kitchenette", "The kitchenette, a walnut counter and two caramel armchairs", "35% 55%"),
+    ("massage-room", "Massage room", "The massage room, leather chairs beside an oak slatted wall and the swan", "60% 60%"),
     ("dry-sauna", "Dry sauna", "The dry sauna, with pale wood benches in low light", "50% 55%"),
     ("wet-sauna", "Wet sauna", "The wet sauna, travertine walls and a curved bench", "50% 40%"),
     ("relaxing-zone", "Relaxing zone", "The relaxing zone, with loungers and the swan on the wall", "55% 60%"),
-    ("gym", "Gym", "The gym, free weights and machines in low warm light", "40% 55%"),
 ]
 TOUR_LOUNGE = TOUR_ROOMS[0][0]
 TOUR_CANVAS_KEYS = ("intro", "hint", "hint_tilt", "tilt")

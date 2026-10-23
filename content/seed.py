@@ -73,6 +73,8 @@ PAGES = {
         ("room_wet_sauna", "", "Warm stone under soft steam.", "See it on The spa", ""),
         ("room_relaxing_zone", "", "Lie back. Nothing here needs you.", "See it on The spa", ""),
         ("room_gym", "", "Free weights and machines, in low warm light.", "See it on The spa", ""),
+        ("room_kitchenette", "", "A quiet corner for a warm drink and a low chair.", "See it on The spa", ""),
+        ("room_massage_room", "", "Slatted oak, soft light and a fire to settle beside.", "See it on The spa", ""),
     ]),
     "memberships": ("Memberships", "Spa 99 memberships and single visits, with prices ex VAT and inc VAT.", [
         ("intro", "Memberships.", "Choose when you come and how often.", "", ""),
