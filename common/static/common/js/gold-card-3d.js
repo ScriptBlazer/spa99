@@ -13,14 +13,13 @@ import * as THREE from '../vendor/three/three.module.min.js';
 const W = 85.6, H = 54, R = 3.18, BEV = 0.18, DEPTH = 0.44;       // millimetres: ISO ID-1
 const FW = 1024, FH = 646, BW = 1024, BH = 646;                    // face and back map sizes
 const D2R = Math.PI / 180;
-// THE LOOK (one block to tune; 2026-10-23 contrast pass, see docs/design/GOLD-CARD-3D.md 7.5). The metal only shows what the studio gives it:
-// dark walls = the deep bronze reflections, small very bright panels = the crisp highlights that sweep across as the card turns.
-//   wall/floor/fill: the dark parts (multipliers of --color-gold-studio; fill = side, overhead and behind panels). Lower = deeper shadow, never 0 (never black).
-//   key/strip/rim: the highlights (multipliers; the strip is the sweeping glint). Higher = brighter, crisper peaks.
-//   face/edge/back/light: reflection strength per surface and the key light. exposure: tone mapping. mood/period/peak: Home only, the extra dim and brighten with the turn.
+// THE LOOK (one block to tune; 2026-10-23 contrast pass, GOLD-CARD-3D.md 7.5). The metal only shows what the studio gives it. The face mirrors what sits behind the camera (+z):
+//   panel: a broad soft warm panel there that the face always sees (keeps the champagne reading as gold at every angle); wall/floor/fill: everything else, the deep bronze (never black).
+//   key/strip/rim: the hot highlights (the strip is the band that travels across the face; stripW is its width, wide enough to survive the face's roughness). bump: swan and engraving relief strength.
+//   face/edge/back/light: reflection per surface and the key light. exposure. mood/period/peak: Home only, the extra dim and brighten with the turn.
 const LOOK = {
-  hero: { wall: 0.2,  floor: 0.12, fill: 0.55, key: 5, strip: 14, rim: 12, exposure: 1,    face: 0.95, edge: 0.95, back: 0.85, light: 0.4,  mood: 0,    period: 36, peak: 0 },
-  home: { wall: 0.12, floor: 0.08, fill: 0.4,  key: 4, strip: 12, rim: 10, exposure: 0.95, face: 0.9,  edge: 0.9,  back: 0.8,  light: 0.35, mood: 0.35, period: 36, peak: 2 },
+  hero: { panel: 0.9, wall: 0.4,  floor: 0.2,  fill: 0.8, key: 4, strip: 7, stripW: 1.1, rim: 8, exposure: 1,    face: 0.9,  edge: 0.9,  back: 0.8,  light: 0.5, bump: 1.3, mood: 0,    period: 36, peak: 0 },
+  home: { panel: 0.7, wall: 0.28, floor: 0.14, fill: 0.6, key: 3.5, strip: 6.5, stripW: 1.1, rim: 7, exposure: 0.95, face: 0.85, edge: 0.85, back: 0.75, light: 0.45, bump: 1.3, mood: 0.35, period: 36, peak: 2 },
 };
 const idle = (fn) => new Promise((resolve) => (window.requestIdleCallback ? requestIdleCallback(() => resolve(fn()), { timeout: 800 }) : setTimeout(() => resolve(fn()), 0)));
 
@@ -269,8 +268,9 @@ export function create(mount, { gsap, tokens, card }) {
       m.position.set(x, y, z); m.lookAt(0, 0, 0); studio.add(m);
     };
     studio.add(new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshBasicMaterial({ color: tok('--color-gold-studio').multiplyScalar(look.wall), side: THREE.BackSide })));   // warm walls: the face never meets black
-    part(2.6, 0.9, '--color-led', look.key, -2.5, 2.4, 3);        // key softbox
-    part(0.2, 5, '--color-gold-studio', look.strip, 0, 0, 4.5);         // the sheen strip
+    part(6, 4, '--color-gold-studio', look.panel, 0, 0.3, 5.2);   // broad soft panel behind the camera
+    part(3.4, 1.4, '--color-led', look.key, -2.5, 2.4, 3);        // key softbox
+    part(look.stripW, 5, '--color-gold-studio', look.strip, 0, 0, 4.5);         // the sheen strip
     part(0.15, 4, '--color-led', look.rim, 4, 0.5, -1);         // rim strip
     part(1.6, 4, '--color-gold-studio', 1.4 * look.fill, -4.6, 0, 0.5); part(1.6, 4, '--color-gold-studio', 1.4 * look.fill, 4.6, 0, 1);   // side fills: a soft panel is always in reach at grazing angles
     part(5, 5, '--color-gold-studio', 1.1 * look.fill, 0, 2.9, 0.5);  // overhead fill
@@ -329,7 +329,7 @@ export function create(mount, { gsap, tokens, card }) {
     pivot.position.y = -(card.bob / 100) * H;                      // lift and drop move the whole mount in CSS (gc.render), so the canvas moves with the card
     mats.face.emissiveIntensity = card.line * card.draw > 0 ? card.line * 1.15 : 0;
     const k = card.relief;
-    mats.face.normalMap && mats.face.normalScale.set(k, k);
+    mats.face.normalMap && mats.face.normalScale.set(k * look.bump, k * look.bump);
     const sweep = card.sheen * 68 * D2R;
     scene.environmentRotation.y = sweep;
     light.position.set(-30 * Math.cos(sweep) + 120 * Math.sin(sweep), 40, 120 * Math.cos(sweep) + 30 * Math.sin(sweep));
