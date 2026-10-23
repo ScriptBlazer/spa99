@@ -27,4 +27,4 @@ Services in `pages/services.py`, views in `pages/views.py`. Built by the backend
 signin: `intro`, `caption`. spa: `opener_1..4`, `opener_image`, `moment_towel|shower|slippers|tote`, `arrive_kit`, `step_2_pills` (new wording). gold: `holds_lead`, `apply_note`. memberships: `every_visit`.
 
 ## Image names still to be made (fal)
-`robe` (+ `robe-portrait`), `towel-folded`, `toiletries`, `towel-rail`, `slippers` (+ `-portrait`), `tote`, `bottle-gym`, and the kit items. See AMENITIES.md for prompts and sizes.
+`robe` (+ `robe-portrait`), `towel-bench`, `toiletries`, `towel-rail`, `slippers` (+ `-portrait`), `tote`, `bottle-gym`, and the kit items. See AMENITIES.md for prompts and sizes.
