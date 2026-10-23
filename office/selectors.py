@@ -63,6 +63,9 @@ def _text(key, scope):
     return MetricText.objects.filter(key=key, scope=scope).values_list("text", flat=True).first() or ""
 
 
+ANALYTICS_RANK = 6  # Analytics shows up to six options per insight
+
+
 def insights_for(range_name, max_rank):
     """The stored "what people want" facts for a range, one query: [{key, title, top, runner_up, options, sentence}] in
     the fixed order; an insight with no data has no rows and is simply absent."""
@@ -169,7 +172,7 @@ def build_dashboard(range_name="7d", today=None, figures=None):
         "range": range_name, "ranges": list(DASHBOARD_RANGES), "today": today.isoformat(),
         "what_changed": _text("dashboard_changed", range_name),
         "gold_waiting": waiting_count(stored), "rings": rings, "stats": stats, "funnel": funnel, "funnel_note": FUNNEL_NOTE if any(f["partial"] for f in funnel) else "",
-        "insights": insights_for(range_name, 2),
+        "insights": insights_for(range_name, facts.MAX_RANK),  # every option: the closed card shows each one's top and runner-up, the open card lists them all
         "totals": {"registrations": stored.get((K.REGISTRATIONS, ""), 0), "gold_applications": stored.get((K.GOLD_APPLICATIONS, ""), 0)},
     }
 
@@ -263,7 +266,7 @@ def build_analytics(range_name="30d", today=None, figures=None):
               for i, (k, label, v) in enumerate(funnel_def)]
 
     plans = _plan_order()
-    people = insights_for(range_name, facts.MAX_RANK)
+    people = insights_for(range_name, ANALYTICS_RANK)
 
     def by_plan(found):
         out = [{"dimension": slug, "label": name, "value": found.get(slug, 0)} for slug, name in plans]

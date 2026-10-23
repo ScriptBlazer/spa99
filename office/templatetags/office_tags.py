@@ -373,6 +373,16 @@ def ramp_rows(items, hue, key="value"):
     return rows
 
 
+INSIGHT_NAMES = {"facility": "Facilities", "time": "Time of day", "frequency": "How often", "company": "Who with",
+                 "tier_picked": "Tier picked", "tier_suggested": "Tier suggested", "source": "Where people come from"}
+
+
+@register.filter
+def insight_name(key):
+    """The section name of an insight in the open "What people want" card."""
+    return INSIGHT_NAMES.get(key, key)
+
+
 @register.simple_tag
 def insight_of(insights, key):
     """One stored insight by key (or None): {key, title, sentence, top, runner_up, options}. Display only; nothing is computed."""

@@ -247,6 +247,19 @@ class InsightTests(TestCase):
         self.assertTrue(all({"label", "picked", "suggested"} <= set(p) for p in pair))
 
 
+class DashboardInsightShapeTests(TestCase):
+    def test_dashboard_payload_carries_every_option_not_just_the_top_two(self):
+        from office import selectors
+
+        for rank in range(1, 9):
+            Insight.objects.create(range="7d", key="facility", rank=rank, title="Most wanted facility", label=f"Option {rank}", value=9 - rank, of_total=20)
+        facility = next(i for i in selectors.build_dashboard("7d")["insights"] if i["key"] == "facility")
+        self.assertEqual(len(facility["options"]), 8)
+        self.assertEqual((facility["top"]["label"], facility["runner_up"]["label"]), ("Option 1", "Option 2"))
+        analytics = next(i for i in selectors.build_analytics("7d")["insights"] if i["key"] == "facility")
+        self.assertEqual(len(analytics["options"]), 6)  # Analytics keeps its six
+
+
 class VisitorCounterTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()

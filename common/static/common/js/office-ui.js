@@ -5,6 +5,7 @@ export function initOfficeUi() {
   personMenu();
   segmented();
   filterSheet();
+  wants();
 }
 
 function header() {
@@ -52,4 +53,31 @@ function filterSheet() {
   sheet.querySelector('[data-sheet-close]').addEventListener('click', () => sheet.close());
   sheet.addEventListener('click', (event) => { if (event.target === sheet) sheet.close(); }); // the backdrop
   sheet.addEventListener('close', () => open.focus());
+}
+
+/** Dashboard "What people want": the plus is a <details> summary (works without JS); this keeps aria-expanded true and animates the card's height. */
+function wants() {
+  const details = document.querySelector('[data-wants-details]');
+  const stage = document.querySelector('[data-wants-stage]');
+  const summary = details?.querySelector('summary');
+  if (!details || !stage || !summary) return;
+  const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const sync = () => summary.setAttribute('aria-expanded', String(details.open));
+  let running = null;
+  sync();
+  details.addEventListener('toggle', sync);
+  summary.addEventListener('click', (event) => {
+    if (reduced() || !stage.animate) return;          // the browser's own toggle, instantly
+    event.preventDefault();
+    running?.cancel();
+    const from = stage.offsetHeight;
+    details.open = !details.open;                      // CSS swaps the tiles for the full list
+    sync();
+    const to = stage.offsetHeight;
+    stage.style.overflow = 'hidden';
+    running = stage.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: 400, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+    const done = () => { stage.style.overflow = ''; running = null; };
+    running.onfinish = done;
+    running.oncancel = done;
+  });
 }

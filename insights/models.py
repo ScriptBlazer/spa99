@@ -79,7 +79,7 @@ class VisitorHash(models.Model):
 
 class Insight(models.Model):
     """One stored "what people want" fact, written by the roll-up from the daily rows (nothing is worked out when a page
-    loads). Per range and key, rank 1 is the top answer and rank 2 the runner-up (and so on, to rank 6).
+    loads). Per range and key, rank 1 is the top answer and rank 2 the runner-up (and so on, to rank 12).
     value of of_total: e.g. Gym, 5 of 7. The sentence is written on rank 1 only."""
 
     range = models.CharField(max_length=5, help_text="today, 7d, 30d, 90d or all.")
