@@ -153,3 +153,7 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 .o-tip-key { width: 0.625rem; height: 0.625rem; flex: none; border-radius: var(--office-pill); }
 .o-tip-val { margin-left: auto; padding-left: var(--space-3); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--office-text); }
 @media (prefers-reduced-motion: reduce) { .o-pill, .o-pill .o-swatch, .o-tip, .o-rank li::after, .o-bars li::after, .o-kpi { transition: none; } .o-kpi .o-spark svg, .o-kpi .o-spark-area { animation: none !important; } }
+
+/* a chart canvas never sticks out of its box (an empty donut keeps the browser's default 300px canvas): no sideways scroll on phones */
+.o-chartbox { min-width: 0; }
+.o-chartbox canvas { display: block; max-width: 100%; }
