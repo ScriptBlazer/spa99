@@ -1,9 +1,10 @@
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 
-from common.permissions import staff_required
+from common import levels
+from common.permissions import level_required
 
 
-@staff_required  # login enforced by LoginRequiredMiddleware; staff only
+@level_required(levels.ADMIN, deny=Http404)  # Admin and up; anyone else gets a plain 404 (login enforced by LoginRequiredMiddleware)
 def control_index(request):
     """Placeholder until the control app is built."""
     return HttpResponse("Spa 99 Control", content_type="text/plain")

@@ -1,0 +1,9 @@
+{% comment %}One nav, two skins (sidebar on desktop, tab bar on a phone). Current item comes from the URL name, so no view needs to pass it. Param: kind = "rail" or "tabs".{% endcomment %}
+{% with route=request.resolver_match.url_name %}
+<nav class="m-nav m-nav--{{ kind }}" aria-label="My Spa 99" data-member-nav>
+  <a href="{% url 'account' %}"{% if route == 'account' %} aria-current="page"{% endif %} data-tab="home">{% include "common/_icon.html" with name="house-simple" %}<span>Home</span></a>
+  <a href="{% url 'account_book' %}"{% if route == 'account_book' %} aria-current="page"{% endif %} data-tab="book">{% include "common/_icon.html" with name="calendar-blank" %}<span>Book</span></a>
+  <a href="{% url 'account_membership' %}"{% if route == 'account_membership' %} aria-current="page"{% endif %} data-tab="membership">{% include "common/_icon.html" with name="identification-card" %}<span>Membership</span></a>
+  <a href="{% url 'account_you' %}"{% if route == 'account_you' or route == 'password_change' %} aria-current="page"{% endif %} data-tab="you">{% include "common/_icon.html" with name="user-circle" %}<span>You</span></a>
+</nav>
+{% endwith %}

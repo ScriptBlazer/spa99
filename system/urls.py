@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views, views_rules as r
+from .permissions import unlocked
 
 urlpatterns = [
     path("", views.dashboard, name="system_dashboard"),
@@ -15,9 +16,14 @@ urlpatterns = [
     path("changes/batch/<uuid:batch>/undo/", views.undo_all, name="system_undo_batch"),
     path("emails/", views.emails, name="system_emails"),
     path("settings/", views.site_settings, name="system_settings"),
+    path("password/", unlocked(views.SystemPasswordView.as_view()), name="system_password"),
     path("team/", views.team, name="system_team"),
-    path("team/<uuid:pk>/roles/", views.team_roles, name="system_team_roles"),
+    path("team/add/", views.team_add, name="system_team_add"),
+    path("team/merge/", views.team_merge, name="system_team_merge"),
+    path("team/<uuid:pk>/access/", views.team_access, name="system_team_access"),
     path("team/<uuid:pk>/active/", views.team_active, name="system_team_active"),
+    path("team/<uuid:pk>/remove/", views.team_remove, name="system_team_remove"),
+    path("team/<uuid:pk>/invite/", views.team_invite, name="system_team_invite"),
     path("plans/", r.plans, name="system_plans"),
     path("plans/add/", r.plan_save, name="system_plan_add"),
     path("plans/<uuid:pk>/", r.plan_save, name="system_plan_save"),

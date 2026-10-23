@@ -34,6 +34,13 @@ No visible pages. Everything later phases sit on.
 - In the Sentry project settings (Settings > Security & Privacy) switch ON "Prevent storing of IP addresses" and keep "Data scrubber" on (default). Headers are an allowlist (Accept, Accept-Language, User-Agent, Host, Content-Type, Content-Length), local variables are never sent, and query strings are dropped on office/control/system hosts (`q`/`search` are treated as sensitive elsewhere).
 - Ignored: Http404, PermissionDenied, DisallowedHost, client disconnects (`RequestAborted`; `ConnectionResetError`/`BrokenPipeError` only when the event has a request), our own 429 responses. The startup log line ends with `sentry=on(live)` or `sentry=off`. Server side only: no browser SDK, so the CSP needs no change.
 
+## Team levels and commands
+
+- Levels are the groups `Office`, `Admin`, `Developer` (plus the superuser flag) and the extra group `Approver`; the one helper is `common/levels.py` (`level_of`, `can_manage`, `is_approver`). Rules: `docs/features/user-rules.md`. The hidden Django admin is superuser only (`common.admin_site.SuperuserAdminSite`).
+- `manage.py setup_roles [--dry-run]` creates the four groups (no model permissions: the level is the membership) and removes the retired Owner/Manager/Viewer/System groups once everyone in them holds a level.
+- `manage.py migrate_roles [--dry-run]` (a command, never a migration): Owner and Manager to Admin, Viewer to Office, System to Developer, Approver stays (plus Office if no level). Run it before `setup_roles` on an existing database.
+- `manage.py create_team_member --email x --level office|admin|developer [--approver] [--invite]`: asks for a password, or `--invite` sends the set-your-password email. `create_office_user` still works and prints a deprecation note.
+
 ## Known follow-ups
 - (Closed) Public login route: `/login/` now works on both hosts (see `register-interest.md`).
 - Rate limiting uses Django's default cache, which is per process: with 3 gunicorn workers the real limit is about 3x. Move `CACHES` to the database or Redis if a hard limit matters.

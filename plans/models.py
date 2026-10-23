@@ -120,6 +120,8 @@ class SiteSettings(BaseModel):
     register_interest_open = models.BooleanField(default=True, help_text="Stage A: accounts and Gold applications.")
     subscribe_open = models.BooleanField(default=False, help_text="Stage B: checkout (Phase 2).")
     booking_open = models.BooleanField(default=False, help_text="Stage C: bookings (Phase 3).")
+    notify_booking_open = models.BooleanField(
+        default=False, help_text='Turn on only once we really send the "booking is open" email. Changes the line on Book a visit.')
     join_wording = models.CharField(
         "wording", max_length=20, choices=WORDING_CHOICES, default=INTEREST,
         help_text='"Register" now; "Join" when payments open.',

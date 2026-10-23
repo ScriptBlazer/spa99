@@ -23,6 +23,7 @@ RUN SECRET_KEY="build-time-only-Zx81qLw0pVn3Rb5TyUc7Hd2Jf4Kg6Ma9" \
     DATABASE_URL="postgres://build:build@localhost:5432/build" \
     ADMIN_PATH="build-time-only/" \
     DEFAULT_FROM_EMAIL="build@example.com" \
+    SYSTEM_UNLOCK_CODE="000000" \
     python manage.py collectstatic --noinput
 
 EXPOSE 8000

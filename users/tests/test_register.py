@@ -323,15 +323,15 @@ class AccountTests(TestCase):
 
     def test_change_password_needs_the_old_one_and_keeps_the_session(self):
         user = services.register_interest(cleaned()).user
-        self.assertEqual(Client().get("/account/password/").status_code, 302)  # signed in only
+        self.assertEqual(Client().get("/account/you/password/").status_code, 302)  # signed in only
         self.client.force_login(user)
-        bad = self.client.post("/account/password/", {"old_password": "wrong", "new_password1": "a-new-long-password-9", "new_password2": "a-new-long-password-9"})
+        bad = self.client.post("/account/you/password/", {"old_password": "wrong", "new_password1": "a-new-long-password-9", "new_password2": "a-new-long-password-9"})
         self.assertEqual(bad.status_code, 200)
         self.assertTrue(User.objects.get(pk=user.pk).check_password(PASSWORD))
-        weak = self.client.post("/account/password/", {"old_password": PASSWORD, "new_password1": "12345678", "new_password2": "12345678"})
+        weak = self.client.post("/account/you/password/", {"old_password": PASSWORD, "new_password1": "12345678", "new_password2": "12345678"})
         self.assertEqual(weak.status_code, 200)
-        ok = self.client.post("/account/password/", {"old_password": PASSWORD, "new_password1": "a-new-long-password-9", "new_password2": "a-new-long-password-9"})
-        self.assertRedirects(ok, "/account/", fetch_redirect_response=False)
+        ok = self.client.post("/account/you/password/", {"old_password": PASSWORD, "new_password1": "a-new-long-password-9", "new_password2": "a-new-long-password-9"})
+        self.assertRedirects(ok, "/account/you/", fetch_redirect_response=False)
         self.assertTrue(User.objects.get(pk=user.pk).check_password("a-new-long-password-9"))
         self.assertEqual(self.client.get("/account/").status_code, 200)  # still signed in
-        self.assertContains(self.client.get("/account/"), "Change password")
+        self.assertContains(self.client.get("/account/you/"), "Change password")

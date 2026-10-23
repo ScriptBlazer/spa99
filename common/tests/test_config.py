@@ -113,17 +113,21 @@ class ProdSettingsTests(SimpleTestCase):
         "DATABASE_URL": "postgres://u:p@db.example.com:5432/spa99",
         "ADMIN_PATH": "my-own-hidden-door-91x/",
         "DEFAULT_FROM_EMAIL": "Spa 99 <noreply@example.com>",
+        "SYSTEM_UNLOCK_CODE": "493021",
     }
 
     def import_prod(self, environ):
+        return self.import_settings("config.settings.prod", environ)
+
+    def import_settings(self, module, environ):
         tmp = make_tmp(self)
         private = PrivateDir(tmp, using_fallback=True, writable=True, fallback_path=tmp)
         fake_loader = lambda base_dir: Env([("environment", environ)], private, None)  # noqa: E731
-        names = ["config.settings.base", "config.settings.prod"]
+        names = ["config.settings.base", module]
         saved = {name: sys.modules.pop(name, None) for name in names}
         try:
             with mock.patch("common.envloader.load_env", fake_loader):
-                return importlib.import_module("config.settings.prod")
+                return importlib.import_module(module)
         finally:
             for name in names:
                 sys.modules.pop(name, None)
@@ -149,6 +153,22 @@ class ProdSettingsTests(SimpleTestCase):
     def test_refuses_missing_database_url(self):
         with self.assertRaises(ImproperlyConfigured):
             self.import_prod({"SECRET_KEY": self.GOOD["SECRET_KEY"]})
+
+    def test_refuses_a_missing_or_invalid_system_unlock_code(self):
+        environ = {**self.GOOD}
+        environ.pop("SYSTEM_UNLOCK_CODE")
+        with self.assertRaises(ImproperlyConfigured):
+            self.import_prod(environ)
+        for bad in ("12345", "1234567890123", "12ab56", "123 456", "١٢٣٤٥٦"):
+            with self.assertRaises(ImproperlyConfigured, msg=bad):
+                self.import_prod({**self.GOOD, "SYSTEM_UNLOCK_CODE": bad})
+        self.assertEqual(self.import_prod({**self.GOOD, "SYSTEM_UNLOCK_CODE": "123456789012"}).SYSTEM_UNLOCK_CODE, "123456789012")
+
+    def test_dev_never_crashes_over_the_unlock_code_but_falls_back_to_password_only(self):
+        for environ in ({}, {"SYSTEM_UNLOCK_CODE": "12ab"}):
+            module = self.import_settings("config.settings.dev", environ)
+            self.assertEqual(module.SYSTEM_UNLOCK_CODE, "")
+        self.assertEqual(self.import_settings("config.settings.dev", {"SYSTEM_UNLOCK_CODE": "493021"}).SYSTEM_UNLOCK_CODE, "493021")
 
     def test_refuses_missing_default_from_email(self):
         environ = {**self.GOOD}

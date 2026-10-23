@@ -38,7 +38,7 @@ Shown right under the field, calm wording, no red shouting until he leaves the f
 - Submit button: instant "working" state, disabled until done, no double submits (server is idempotent too).
 - Errors keep everything typed.
 
-## Account page (Phase 1)
+## Account page (Phase 1, superseded: now the member dashboard, see `member-dashboard.md`)
 
 - "You're registered for Tier 2 interest" with the option to change interest.
 - Profile: name, email, mobile, change password.
@@ -73,7 +73,7 @@ Shown right under the field, calm wording, no red shouting until he leaves the f
 | `GET/POST /forgot-password/`, `/reset/<uid>/<token>/` | Password reset (1h, single use) |
 | `/login/`, `/logout/` | Public sign-in (10 attempts / 5 min / IP), also on Control |
 | `GET /account/`, `POST /account/interest/`, `GET /account/export/`, `POST /account/delete/` | Account page, change interest, download my data, delete my account (asks for the password) |
-| `GET/POST /account/password/` | Change password (current password, then the sign-up rules; 10 tries an hour per IP; stays signed in) |
+| `GET/POST /account/you/password/` (the old `/account/password/` redirects) | Change password (current password, then the sign-up rules; 10 tries an hour per IP; stays signed in) |
 | `GET /validate/mobile/?mobile=` | `{"valid": true}` or `{"valid": false, "message"}`; the same `phonenumbers` check as sign-up, rate limited (30 a minute). The page calls it debounced |
 | `GET/POST /verify/<token>/` | GET shows a "Confirm my email" button and changes nothing (mail scanners cannot use the link); POST confirms and signs in |
 

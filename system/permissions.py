@@ -1,4 +1,4 @@
-"""System access. Three steps: be allowed (superuser or System group, staff, signed in on THIS host within 12 hours),
+"""System access. Three steps: be allowed (Developer level or superuser, signed in on THIS host within 12 hours),
 be unlocked (password asked again, 15 idle minutes), then the view. Anyone not allowed gets a plain 404, anonymous
 included (system.middleware does the same check before CSRF)."""
 from functools import wraps

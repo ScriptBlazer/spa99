@@ -26,10 +26,17 @@ User = get_user_model()
 OFFICE = "office.localhost"
 
 
-def staff(role=None, email=None, **extra):
+LEVELS = {"Owner": ("Admin", True), "Manager": ("Admin", False), "Viewer": ("Office", False), "Approver": ("Office", True)}  # older test names -> (level group, Approver)
+
+
+def staff(role=None, email=None, approver=False, **extra):
+    """A team member. `role` is a level group (Office, Admin, Developer) or an older name from LEVELS."""
+    group, approves = LEVELS.get(role, (role, False))
     user = User.objects.create_user(email or f"{role or 'norole'}@example.com".lower(), "x", is_staff=True, **extra)
-    if role:
-        user.groups.add(Group.objects.get(name=role))
+    if group:
+        user.groups.add(Group.objects.get(name=group))
+    if approver or approves:
+        user.groups.add(Group.objects.get(name="Approver"))
     return user
 
 
@@ -78,18 +85,18 @@ class RoutingAndRoleTests(OfficeTestCase):
 
     def test_members_and_staff_without_a_role_are_refused_and_roles_can_read(self):
         member = User.objects.create_user("member@example.com", "x")
-        self.assertEqual(get(member, "/").status_code, 403)
-        self.assertEqual(get(staff(), "/").status_code, 403)
-        for role in ("Owner", "Manager", "Viewer"):
+        self.assertEqual(get(member, "/").status_code, 404)
+        self.assertEqual(get(staff(), "/").status_code, 404)
+        for role in ("Office", "Admin", "Developer"):
             user = staff(role)
             for path in ("/", "/analytics/", "/people/", "/gold/", "/dashboard.json", "/analytics/data/", "/analytics/pages/"):
                 self.assertEqual(get(user, path).status_code, 200, f"{role} {path}")
 
     def test_a_member_account_in_a_role_group_is_not_let_in(self):
         member = User.objects.create_user("memberrole@example.com", "x")  # not staff
-        member.groups.add(Group.objects.get(name="Owner"))
+        member.groups.add(Group.objects.get(name="Admin"))
         for path in ("/", "/people/", "/gold/", "/insights/summary/"):
-            self.assertEqual(get(member, path).status_code, 403, path)
+            self.assertEqual(get(member, path).status_code, 404, path)
 
     def test_lists_vary_on_htmx_and_are_not_cached(self):
         response = get(staff("Viewer"), "/people/")
@@ -119,15 +126,30 @@ class RoutingAndRoleTests(OfficeTestCase):
         self.assertNotIn("data-export-csv", get(viewer, "/people/").content.decode())
         self.assertTrue(User.objects.filter(pk=person.pk).exists())
 
-    def test_manager_acts_but_only_an_owner_deletes(self):
-        manager, owner = staff("Manager"), staff("Owner")
+    def test_admin_exports_and_deletes_an_approver_alone_approves(self):
+        office_approver, admin, admin_approver = staff("Approver"), staff("Admin", "a1@example.com"), staff("Owner")
         person = services.register_interest(cleaned()).user
-        self.assertEqual(get(manager, "/people/export.csv").status_code, 200)
-        self.assertEqual(post(manager, f"/people/{person.pk}/delete/").status_code, 403)
-        self.assertEqual(post(owner, f"/people/{person.pk}/delete/").status_code, 302)
+        application = gold_services.submit_application(application_data())[0]
+        self.assertEqual(get(office_approver, "/people/").status_code, 200)  # Office sees everything, view only
+        self.assertEqual(get(office_approver, "/people/export.csv").status_code, 403)
+        self.assertEqual(post(office_approver, f"/people/{person.pk}/delete/").status_code, 403)
+        self.assertEqual(post(admin, f"/gold/{application.pk}/approve/").status_code, 403)  # Admin without Approver cannot approve
+        self.assertEqual(get(admin, "/people/export.csv").status_code, 200)
+        self.assertEqual(get(admin, f"/people/{person.pk}/export/").status_code, 200)
+        self.assertEqual(post(admin_approver, f"/gold/{application.pk}/approve/").status_code, 302)
+        self.assertEqual(post(admin, f"/people/{person.pk}/delete/").status_code, 302)
         self.assertFalse(User.objects.filter(pk=person.pk).exists())
-        post(owner, f"/people/{owner.pk}/delete/")  # never a staff account, never yourself
-        self.assertTrue(User.objects.filter(pk=owner.pk).exists())
+        post(admin, f"/people/{admin.pk}/delete/")  # never a staff account, never yourself
+        self.assertTrue(User.objects.filter(pk=admin.pk).exists())
+
+    def test_the_hidden_django_admin_is_for_superusers_only(self):
+        from django.conf import settings
+
+        path = f"/{settings.ADMIN_PATH}"
+        for user in (staff("Admin", "x1@example.com"), staff("Developer", "x2@example.com")):
+            self.assertNotEqual(get(user, path).status_code, 200, user.email)
+        root = User.objects.create_superuser("root@example.com", "x")
+        self.assertEqual(get(root, path).status_code, 200)
 
 
 class StoredFigureTests(OfficeTestCase):
@@ -278,7 +300,8 @@ class OneTapApprovalTests(OfficeTestCase):
 
     def test_viewer_is_refused_and_get_never_approves(self):
         self.assertEqual(get(staff("Viewer"), self.url).status_code, 403)
-        self.assertEqual(get(staff("Manager"), self.url).status_code, 200)
+        self.assertEqual(get(staff("Manager"), self.url).status_code, 403)  # Admin without Approver
+        self.assertEqual(get(staff("Approver", "ap@example.com"), self.url).status_code, 200)
         self.application.refresh_from_db()
         self.assertEqual(self.application.status, "new")  # a GET (even a mail scanner's) changes nothing
         self.assertEqual(len(mail.outbox), 0)
@@ -296,25 +319,32 @@ class OneTapApprovalTests(OfficeTestCase):
         self.assertContains(again, "Already approved")
         self.assertNotContains(again, "Approve and send invite")
 
-    def test_approver_role_decides_gold_but_sees_nothing_else(self):
+    def test_approver_decides_gold_and_sees_everything_view_only(self):
         approver = staff("Approver")
         self.assertEqual(get(approver, self.url).status_code, 200)
         self.assertEqual(get(approver, "/gold/").status_code, 200)
         self.assertEqual(post(approver, f"/gold/{self.application.pk}/approve/").status_code, 302)
         self.application.refresh_from_db()
         self.assertEqual(self.application.status, "approved")
-        self.assertEqual(get(approver, "/people/").status_code, 403)
-        self.assertEqual(get(approver, "/analytics/").status_code, 403)
-        self.assertEqual(get(approver, "/")["Location"], "/gold/")
+        self.assertEqual(get(approver, "/people/").status_code, 200)
+        self.assertEqual(get(approver, "/analytics/").status_code, 200)
+        self.assertEqual(get(approver, "/people/export.csv").status_code, 403)
 
-    def test_create_office_user_asks_for_the_password_and_sets_the_role(self):
+    def test_create_team_member_sets_the_level_and_the_old_name_still_works(self):
         from unittest import mock
 
-        with mock.patch("users.management.commands.create_office_user.getpass", return_value="a-long-test-password-1"):
-            call_command("create_office_user", email="New.Approver@example.com", role="approver", first_name="Bee", stdout=StringIO())
+        with mock.patch("users.management.commands.create_team_member.getpass", return_value="a-long-test-password-1"):
+            call_command("create_team_member", email="New.Approver@example.com", level="office", approver=True, first_name="Bee", stdout=StringIO())
         user = User.objects.get(email="new.approver@example.com")
         self.assertTrue(user.is_staff and user.check_password("a-long-test-password-1"))
-        self.assertEqual(list(user.groups.values_list("name", flat=True)), ["Approver"])
+        self.assertEqual(sorted(user.groups.values_list("name", flat=True)), ["Approver", "Office"])
+        err = StringIO()
+        call_command("create_office_user", email="old@example.com", role="viewer", invite=True, stdout=StringIO(), stderr=err)
+        old = User.objects.get(email="old@example.com")
+        self.assertIn("deprecated", err.getvalue())
+        self.assertEqual(list(old.groups.values_list("name", flat=True)), ["Office"])
+        self.assertFalse(old.has_usable_password())
+        self.assertEqual(len(mail.outbox), 1)  # the invite
 
     def test_backfill_renames_the_old_email_rows_and_keeps_edits(self):
         from notifications.models import NotificationTemplate
@@ -327,3 +357,16 @@ class OneTapApprovalTests(OfficeTestCase):
         _approver_email_rows()
         self.assertEqual(NotificationTemplate.objects.get(key="gold_approver").subject, "Edited {name}")
         self.assertFalse(NotificationTemplate.objects.filter(key="gold_barry").exists())
+
+
+class TeamPasswordTests(OfficeTestCase):
+    def test_a_team_member_changes_their_password_on_the_office_host_and_lands_back_there(self):
+        user = staff("Viewer", "pw@example.com")
+        user.set_password("a-long-test-password-1")
+        user.save()
+        self.assertEqual(get(user, "/password/").status_code, 200)
+        self.assertEqual(get(User.objects.create_user("m@example.com", "x"), "/password/").status_code, 404)
+        response = post(user, "/password/", old_password="a-long-test-password-1", new_password1="another-long-password-2", new_password2="another-long-password-2")
+        self.assertEqual((response.status_code, response["Location"]), (302, "/password/"))
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("another-long-password-2"))

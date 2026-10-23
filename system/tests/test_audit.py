@@ -85,8 +85,8 @@ class EventTests(TestCase):
     def test_roles_deactivate_undo_and_export_are_recorded(self):
         client = unlocked_client(self.user)
         other = make_user("other@example.com", system=False)
-        Group.objects.get_or_create(name="Manager")
-        client.post(f"/team/{other.pk}/roles/", {"roles": ["Manager"]})
+        Group.objects.get_or_create(name="Admin")
+        client.post(f"/team/{other.pk}/access/", {"level": "admin"})
         client.post(f"/team/{other.pk}/active/", {"active": "0"})
         client.post(f"/team/{other.pk}/active/", {"active": "1"})
         client.post("/settings/", SETTINGS_POST | {"vat_rate": "25.00"})
@@ -94,7 +94,7 @@ class EventTests(TestCase):
         client.post(f"/changes/{change.pk}/undo/")
         client.get("/changes/export.csv")
         self.assertTrue(set(["role_changed", "user_deactivated", "user_reactivated", "undo", "export"]) <= set(kinds()))
-        self.assertIn("Manager", SystemEvent.objects.get(kind="role_changed").sentence)
+        self.assertIn("Admin", SystemEvent.objects.get(kind="role_changed").sentence)
 
 
 class SentenceTests(TestCase):

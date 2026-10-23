@@ -8,7 +8,7 @@ Branch `feature/system`. Decisions: PROJECT.md rows 2026-10-23 (three staff fron
 
 ## Who gets in
 
-- Developers only: superusers, or members of a `System` group (created by `setup_roles`). Everyone else gets a plain 404 (the host does not admit it exists).
+- Developer level or above (the `Developer` group, or a superuser; `common.levels`). Everyone else gets a plain 404 (the host does not admit it exists). The old `System` group is retired.
 - Password asked again on entry ("unlock"), valid 15 minutes of activity, then asked again. Office/public sign-ins never unlock System.
 - Every change is logged: who, when, what, old value, new value, with one-click undo (restores the old value as a new logged change). Uses the existing `django-simple-history` where the model has it; a single `system` change list reads it.
 
@@ -23,7 +23,7 @@ Branch `feature/system`. Decisions: PROJECT.md rows 2026-10-23 (three staff fron
 | **Journey** | Questions and options: labels, order, hidden, plan and Gold points per option |
 | **Emails** | Recipients (Gold approver list, CC, contact email); template wording for each notification. Transport and secrets stay in env |
 | **Settings** | Opening date, stage switches (register interest / subscribe / book), wording |
-| **Team** | Staff users and their roles (Owner, Manager, Viewer, Approver, System) |
+| **Team** | Team members with level (Office, Admin, Developer, Superuser) and Approver; add, change level, deactivate, remove from team, merge duplicate accounts |
 
 Later (own phases): stay periods, RFID and Face ID rules, access windows, sales and offers (need the access hardware), content and images.
 
@@ -58,7 +58,7 @@ Compact, dense and calm: small boxes, small controls, tables you can edit in pla
 | `POST /changes/<id>/undo/` | Undo one entry |
 | `/emails/` | Edit the three recipients |
 | `/settings/` | Opening date and text, stage switches, wording, VAT |
-| `/team/`, `POST /team/<id>/roles/`, `POST /team/<id>/active/` | Staff users and roles (Owner, Manager, Viewer, Approver, System); deactivate or reactivate. Superuser flags are never changed; you cannot deactivate yourself or drop your own System role; only a superuser can change a superuser |
+| `/team/`, `POST /team/add/`, `POST /team/<id>/access/`, `/active/`, `/remove/`, `/invite/`, `/team/merge/` | Team (rule book U4). Add: email + level + Approver; a new email gets an account with no password and a "You've been added to the Spa 99 team" email with the password reset link (1 hour; `Send a new invite` repeats it); an existing account just gains the level and keeps its password. Every change is guarded server side by `common.levels.can_manage`: never yourself; strictly below your own level (a Developer changes Office and Admin; only a superuser changes a Developer); a superuser may change another superuser (changing or removing one clears the superuser flag). Approver needs a level. Remove from team removes levels and Approver, keeps the account and any membership. Logged in the change list and the audit log (`role_changed`). Merge (`/team/merge/`, Developer and up): pick two emails, see what moves, confirm; moves the membership, journey sessions, Gold applications and sign-in records, fills blank profile fields, deletes the other account; refused when both hold different memberships, when a superuser is involved and the actor is not one, or for someone at or above your level. Logic in `system/team.py` and `users/merge.py` |
 | `/health/`, `/robots.txt` | Open |
 
 No CSS yet (design brief: `docs/design/SYSTEM.md`).
@@ -114,4 +114,8 @@ Each page lists rows as small forms (field prefix = the row id; `new...` prefixe
 `system.JobStatus` (one row per job: last_started_at, last_finished_at, last_ok, last_message, duration_ms) is written by the jobs themselves through `common.jobs.tracked`: `rollup` (`insights.rollup.run`), `snapshot` (`office.snapshots.build_everything`) and `audit_verify` (`audit.check_and_store`), whoever starts them. The dashboard tiles read it (`health.rollup`, `health.snapshot`; snapshot age as before), not django-q. `POST /jobs/rollup/run/` and `/jobs/snapshot/run/` (unlocked devs, CSRF): with a live worker and DEBUG off the job is queued, otherwise it runs inline; a job started in the last 10 minutes and unfinished is not started twice. Each press writes a `job_run` event (job, ok, duration) and a toast.
 
 Audit fixes: `verify()` walks only up to the head it read first (a write during the walk is not "broken"); `access_denied` checks the per-IP row before spending the shared hourly budget; a rate-limited sign-in is one row per IP per window whatever email is typed, and typed emails of failed sign-ins are left out of the person filter; the admin CSV uses the same formula guard as the feed export; `system.middleware.AuditContextMiddleware` gives any signed-in staff request (Django admin included) its IP, browser and path in the change log.
+
+### Unlock code (2026-10-23)
+
+Unlocking System asks for the password AND a lock code (digits only, 6 to 12) from the env var `SYSTEM_UNLOCK_CODE`, so a stolen password alone is not enough. Both are always checked (the code with `hmac.compare_digest`); a failure shows one generic message, "Password or code is wrong."; every failure counts against the same rate limit (5 per 5 minutes). The audit event `unlock_failed` records `detail.reason` as `password` or `code`, never the typed values; the code is never logged or printed. Prod refuses to start when the variable is missing or not 6 to 12 digits. Dev and CI: unset or invalid means password only, the code field is hidden and the startup line warns "SYSTEM_UNLOCK_CODE not set: System unlock uses the password only".
 

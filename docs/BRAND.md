@@ -356,6 +356,8 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
 
 **Immersive tokens** (`--color-veil`, `--color-header-solid`, `--color-glow`, `--scene-h`, `--scene-pad-top`, `--scene-centre-top`, `--scene-centre-bottom`, `--color-veil-soft`, `--duration-line`, `--stagger-line`, `--duration-page`, `--color-frame-tint`, `--color-thread`, `--color-thread-light`, `--frame-gap`, `--bleed`) are derived and now live in `tokens.css`. Values and contrast: `docs/design/IMMERSIVE.md` section 12.
 
+**My Spa 99 tokens** (MEMBER.md 8, 2026-10-23, derived, in `tokens.css`): `--member-rail-w` (16rem), `--member-topbar-h` (3.5rem), `--member-tabbar-h` (4rem), `--member-content-max` (52rem), `--color-tabbar` (espresso at 96%).
+
 The designer refines these per task. Frontend uses only tokens, never raw values. Breakpoints are constants (CSS variables can't be used in media queries): `48em` (tablet) and `64em` (desktop).
 
 ### Office tokens

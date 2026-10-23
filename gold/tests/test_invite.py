@@ -135,7 +135,7 @@ class SetupPageTests(TestCase):
         self.assertEqual(InterestRegistration.objects.get(user=user).plan.slug, "gold")
         self.assertEqual(invites.gold_since(user), self.application.approved_at)
         self.assertEqual(self.client.get("/account/").wsgi_request.user, user)  # signed in
-        self.assertContains(self.client.get("/account/"), "Your Gold Card is active since")
+        self.assertContains(self.client.get("/account/membership/"), "Gold member since")
 
     def test_a_used_link_is_refused(self):
         self.assertEqual(self.post().status_code, 302)

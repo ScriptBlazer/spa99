@@ -1,0 +1,43 @@
+# Feature: Member dashboard (My Spa 99)
+
+Branch `feature/member-dashboard`. Spec: `docs/design/MEMBER.md`. Decision: `PROJECT.md` 2026-10-23. Apps: `users` (views, `member.py` context), `pages` (`/book/`, sitemap), `plans` (one new SiteSettings flag).
+
+## Routes (all signed in; staff too)
+
+| Route | Name | Notes |
+|---|---|---|
+| `/account/` | `account` | Home |
+| `/account/book/` | `account_book` | Book a visit |
+| `/account/membership/` | `account_membership` | Membership |
+| `/account/you/` | `account_you` | You |
+| `/account/you/password/` | `password_change` | Change password (GET and POST); success goes to You |
+| `/account/password/` | `password_change_old` | Old address, kept: 307 to the new one |
+| `POST /account/emails/` | `account_emails` | Marketing consent: `marketing=1` on, anything else off. 20 a minute per person. Saves only on change, stamps `marketing_consent_at`, and the User history logs it. `Accept: application/json` gets `{"saved", "marketing"}`; otherwise a "Saved." message and a redirect to You |
+| POST `/account/interest/` | `account_interest` | Redirects to Membership |
+| `/account/export/`, POST `/account/delete/` | | Unchanged; a wrong delete password returns to You |
+
+**Who may open it** (rule book U1/U2): only a person holding a membership (an interest registration, which includes Gold) or a superuser (an empty membership is shown). Team members without a membership get a calm 200 page "No membership on this account" with a link to the website (not a 404); `users.views.member_area` guards every `/account/*` view, and the website menu shows "My Spa 99" only when `has_member_area` (context processor `users.context.member_area`), else "Sign in".
+
+Sign in lands on `/account/` (`LOGIN_REDIRECT_URL`); a safe `next` wins. Verify and register already redirect to `account`.
+
+## Context (users/member.py; every screen also gets the base set)
+
+- Base: `greeting`, `site`, `opening` (SiteSettings.opening_label), `opening_date`, `verified`, `email`, `account_id`, `interest`, `interest_plan`, `is_gold`, `gold_since`, `status` (`gold` / `registered` / `none`), `status_name`.
+- Home: base only.
+- Book: `booking_lines` (their plan's line; Gold or no plan: every plan's), `hours` ([(label, text)]), `hours_summary`, `closure`, `stay_pills` (from `visit_pills()["stay"]`, same as The spa), `notify_booking_open`.
+- Membership: `plan_tiles` (visible monthly plans, plan cards with `price_whole`, `price_inc`), `current_plan`, `vat_rate`, `suggested_plan` (latest finished linked journey, stored only), `suggestion_differs`.
+- You: `full_name`, `mobile`, `marketing_consent`.
+
+Templates are plain markup with stable hooks (`data-screen`, `data-tab`, `data-tile`, `data-status`, `data-verify-banner`, `data-reassurance`) on `users/member_base.html`; the frontend restyles them.
+
+## Book a visit copy flag
+
+`SiteSettings.notify_booking_open` (default off). Off: "Booking opens in {opening}." On: "You're on the list. We'll write to {email} when booking opens." Turn it on only once the "booking is open" email really is sent (Moishe has not confirmed). Unverified members see "Confirm your email so we can tell you when booking opens." either way.
+
+## Website
+
+Book is gone from the header (desktop and menu) and footer. Signed in shows "My Spa 99" (`/account/`), signed out "Sign in". `/book/`: signed in gets 302 to `/account/book/`; signed out keeps the teaser with "Already registered? Sign in" to `/login/?next=/account/book/`. `/book/` is out of the sitemap.
+
+## Tests
+
+`users/tests/test_member_dashboard.py` (screens, context, flag, login redirect, consent, menu, `/book/`, sitemap). Existing tests for the old single account page and password URL were moved to the new routes.

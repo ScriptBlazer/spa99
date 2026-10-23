@@ -53,6 +53,7 @@ Any `<form data-system-form="<section>">` gets the save bar, dirty marks, Cmd/Ct
       <p>{{ request.user.email }}</p>
       <p data-system-timer-mirror></p>
       <p>{% if request.user.is_superuser %}Superuser{% else %}System group{% endif %}</p>
+      <p><a href="{% url 'system_password' %}" data-change-password>Change password</a></p>
       <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit" class="sys-btn sm" style="margin-top:8px">Sign out</button></form>
     </div>
   </nav>

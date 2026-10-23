@@ -15,9 +15,12 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from common.audit import client_ip
 from common.ratelimit import hit
 from plans.models import SiteSettings
-from users.views import LoginView
+from users.views import LoginView, TeamPasswordView
+
+from common import levels
 
 from . import audit, changes, feed, services
+from . import team as team_service
 from .forms import EmailsForm, SettingsForm
 from .forms_rules import RISKY
 from .models import SystemChange, SystemEvent
@@ -96,14 +99,16 @@ def unlock(request):
     if request.method == "POST":
         if not hit("system-unlock", f"{request.user.pk}:{client_ip(request) or 'unknown'}", 5, 300):
             audit.log_event(SystemEvent.UNLOCK_RATE_LIMITED, request, user=request.user, dedupe_seconds=300)
-            return render(request, "system/unlock.html", {"next": target, "error": "Too many attempts. Please wait a few minutes."}, status=429)
-        if request.user.check_password(request.POST.get("password", "")):
+            return render(request, "system/unlock.html", {"next": target, "error": "Too many attempts. Please wait a few minutes.", "code_required": services.code_required()}, status=429)
+        password_ok = request.user.check_password(request.POST.get("password", ""))
+        code_ok = services.code_matches(request.POST.get("code", ""))  # both always checked, one generic answer
+        if password_ok and code_ok:
             services.unlock(request.session)
             audit.log_event(SystemEvent.UNLOCK, request, user=request.user)
             return redirect(target)
-        audit.log_event(SystemEvent.UNLOCK_FAILED, request, user=request.user)
-        error = "That password is not right."
-    return render(request, "system/unlock.html", {"next": target, "error": error})
+        audit.log_event(SystemEvent.UNLOCK_FAILED, request, user=request.user, detail={"reason": "password" if not password_ok else "code"})
+        error = "Password or code is wrong."
+    return render(request, "system/unlock.html", {"next": target, "error": error, "code_required": services.code_required()})
 
 
 @signed_in
@@ -268,28 +273,86 @@ def site_settings(request):
 @unlocked
 @require_GET
 def team(request):
-    return page(request, "system/team.html", "team", {"staff": services.staff_users(), "roles": services.ROLES})
+    context = {"staff": team_service.rows(request.user), "level_choices": team_service.level_choices(request.user), "approver_label": levels.APPROVER_GROUP}
+    return page(request, "system/team.html", "team", context)
 
 
-def _team_action(request, pk, action):
-    from django.contrib.auth import get_user_model
-
-    target = get_object_or_404(get_user_model(), pk=pk, is_staff=True)
+def _team_action(request, action, text="Saved."):
+    """Run a Team change; a refusal is shown as an error toast, never a crash."""
     try:
-        action(target)
-        saved(request)
+        action()
+        saved(request, text)
     except services.ChangeRefused as error:
         messages.error(request, str(error))
     return redirect("system_team")
 
 
+def _person(request, pk):
+    return get_object_or_404(team_service.team_queryset(), pk=pk)  # team members only; members are managed in the Office
+
+
 @unlocked
 @require_POST
-def team_roles(request, pk):
-    return _team_action(request, pk, lambda target: services.set_roles(request.user, target, request.POST.getlist("roles")))
+def team_access(request, pk):
+    target, level, approver = _person(request, pk), request.POST.get("level", ""), request.POST.get("approver") == "1"
+    return _team_action(request, lambda: team_service.set_access(request.user, target, level, approver))
 
 
 @unlocked
 @require_POST
 def team_active(request, pk):
-    return _team_action(request, pk, lambda target: services.set_active(request.user, target, request.POST.get("active") == "1"))
+    target = _person(request, pk)
+    return _team_action(request, lambda: team_service.set_active(request.user, target, request.POST.get("active") == "1"))
+
+
+@unlocked
+@require_POST
+def team_remove(request, pk):
+    target = _person(request, pk)
+    return _team_action(request, lambda: team_service.remove_from_team(request.user, target), "Removed from the team. Their account and any membership stay.")
+
+
+@unlocked
+@require_POST
+def team_invite(request, pk):
+    target = _person(request, pk)
+    return _team_action(request, lambda: team_service.resend_invite(request.user, target), "A new invite is on its way.")
+
+
+@unlocked
+@require_POST
+def team_add(request):
+    email, level, approver = request.POST.get("email", ""), request.POST.get("level", ""), request.POST.get("approver") == "1"
+
+    def run():
+        user, created = team_service.add_member(request.user, email, level, approver)
+        messages.info(request, "An email is on its way for them to choose a password." if created else "They already had an account, so they keep their password.")
+    return _team_action(request, run, "Added to the team.")
+
+
+@unlocked
+@require_http_methods(["GET", "POST"])
+def team_merge(request):
+    """Step 1 (GET with ?keep=&remove=, or POST): choose the two emails and see what would move. Step 2 (POST confirm=1) does it."""
+    keep_email = request.POST.get("keep") or request.GET.get("keep", "")
+    remove_email = request.POST.get("remove") or request.GET.get("remove", "")
+    context = {"keep": keep_email, "remove": remove_email, "preview": None}
+    if keep_email and remove_email:
+        try:
+            if request.method == "POST" and request.POST.get("confirm") == "1":
+                keep, moved = team_service.merge_accounts(request.user, keep_email, remove_email)
+                saved(request, f"Merged into {keep.email}.")
+                return redirect("system_team")
+            context["keep_user"], context["remove_user"], context["preview"] = team_service.merge_preview(request.user, keep_email, remove_email)
+        except services.ChangeRefused as error:
+            messages.error(request, str(error))
+    return page(request, "system/team_merge.html", "team", context)
+
+
+# ---------- change password (behind the unlock) ----------
+
+class SystemPasswordView(TeamPasswordView):
+    template_name = "system/password.html"
+
+    def get_context_data(self, **kwargs):
+        return {**super().get_context_data(**kwargs), "section": "", "nav": NAV, "section_labels": changes.SECTION_LABELS}

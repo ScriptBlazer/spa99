@@ -2,7 +2,7 @@
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F401,F403
-from .base import ADMIN_PATH, DEFAULT_ADMIN_PATH, DEV_SECRET_KEY, DOMAIN, ENV, finish_media_description, PRIVATE_DIR, SECRET_KEY, build_startup_report
+from .base import ADMIN_PATH, DEFAULT_ADMIN_PATH, DEV_SECRET_KEY, DOMAIN, ENV, finish_media_description, PRIVATE_DIR, SECRET_KEY, SYSTEM_UNLOCK_CODE, build_startup_report
 from common.settings_helpers import build_databases, build_media_storage, describe_database
 
 _weak_secret_markers = ("insecure", "change-me", "changeme", "dummy")
@@ -10,6 +10,8 @@ if not SECRET_KEY or SECRET_KEY == DEV_SECRET_KEY or any(m in SECRET_KEY.lower()
     raise ImproperlyConfigured("SECRET_KEY must be set to a real secret in production.")
 if not ENV.get("DEFAULT_FROM_EMAIL"):
     raise ImproperlyConfigured("DEFAULT_FROM_EMAIL must be set in production (the From address of every email).")
+if not SYSTEM_UNLOCK_CODE:  # missing or not 6 to 12 digits
+    raise ImproperlyConfigured("SYSTEM_UNLOCK_CODE must be set in production: digits only, 6 to 12 (asked with the password to unlock System).")
 if not ENV.get("DATABASE_URL"):
     raise ImproperlyConfigured("DATABASE_URL must be set in production (managed PostgreSQL).")
 

@@ -1,0 +1,71 @@
+{% extends "users/member_base.html" %}
+{% load static content_tags pages_tags %}
+{% block head_title %}{% include "common/_head.html" with title="You | My Spa 99" %}{% endblock %}
+{% block main %}
+{% page_content "account" as a %}
+<section class="m-screen" data-screen="you">
+  <div class="m-title" data-reveal="hero"><h1>You</h1></div>
+
+  <div class="m-panel" data-reveal>
+    <h2>Your details</h2>
+    <dl class="m-details">
+      <div><dt>Name</dt><dd>{{ full_name }}</dd></div>
+      <div><dt>Email</dt><dd>{{ email }}</dd></div>
+      <div><dt>Mobile</dt><dd>{{ mobile|default:"Not given" }}</dd></div>
+    </dl>
+    <p class="small muted">To change these, write to <a href="mailto:{{ site.contact_address }}">{{ site.contact_address }}</a>.</p>
+  </div>
+
+  <div class="m-panel" data-reveal>
+    <h2>Account ID</h2>
+    <div class="m-id">
+      <p class="m-id-code num" id="account-id" data-account-id>{{ account_id }}</p>
+      <button type="button" class="btn-quiet" data-copy="#account-id" data-copied-label="Copied" aria-live="polite">Copy</button>
+    </div>
+    <p class="small muted">{{ a.id_note.body }}</p>
+  </div>
+
+  <div class="m-panel" data-reveal>
+    <a class="m-row" href="{% url 'password_change' %}"><span>Change password</span>{% include "common/_icon.html" with name="arrow-right" %}</a>
+  </div>
+
+  <div class="m-panel" data-reveal data-emails>
+    <h2>Emails from Spa 99</h2>
+    <form method="post" action="{% url 'account_emails' %}" data-emails-form>{% csrf_token %}
+      <input type="hidden" name="marketing" value="0">
+      <label class="m-switch">
+        <span class="m-switch-text"><span class="m-switch-label">News and invitations</span><span class="small muted">Now and then, never often.</span></span>
+        <input type="checkbox" name="marketing" value="1" role="switch"{% if marketing_consent %} checked{% endif %}>
+      </label>
+      <noscript><button type="submit" class="btn-quiet">Save</button></noscript>
+    </form>
+    <p class="small muted">We'll always send emails about your account.</p>
+  </div>
+
+  <div class="m-panel" data-reveal>
+    <h2>Privacy</h2>
+    <div class="m-privacy">
+      <a class="btn-quiet" href="{% url 'account_export' %}">Download my data</a>
+      <button type="button" class="btn-quiet m-danger" data-delete-open aria-expanded="false" aria-controls="delete-form">Delete my account</button>
+    </div>
+    <form id="delete-form" method="post" action="{% url 'account_delete' %}" hidden class="delete-form m-delete">
+      {% csrf_token %}
+      <div class="field">
+        <label for="delete-password">Your password</label>
+        <input id="delete-password" name="password" type="password" autocomplete="current-password" aria-describedby="delete-password_error" required>
+        <p class="feedback" id="delete-password_error" data-hint-static>We ask for it to make sure this is you.</p>
+      </div>
+      <button type="submit" class="btn btn-danger" data-confirm data-confirm-title="Delete your account?"
+        data-confirm-message="This removes your details and your interest. It can't be undone."
+        data-confirm-label="Delete" data-confirm-cancel="Keep my account" data-confirm-danger>Delete my account</button>
+    </form>
+  </div>
+
+  <div class="m-panel" data-reveal>
+    <a class="m-row m-row--back" href="{% url 'home' %}"><span>Back to the website</span>{% include "common/_icon.html" with name="arrow-right" %}</a>
+  </div>
+
+  <form method="post" action="{% url 'logout' %}" class="m-signout">{% csrf_token %}<button type="submit" class="btn btn-secondary btn-block-phone" data-working-text="Signing out">Sign out</button></form>
+</section>
+{% endblock %}
+{% block scripts %}{{ block.super }}<script type="module" src="{% static 'common/js/account.js' %}"></script>{% endblock %}

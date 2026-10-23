@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import Facility, Plan
+from users.models import InterestRegistration
 
 PUBLIC_PAGES = [
     "/", "/the-spa/", "/memberships/", "/gold-card/", "/gold-card/apply/", "/gold-card/apply/about-you/", "/book/", "/visit/",
@@ -172,13 +173,14 @@ class PageTests(TestCase):
         user = get_user_model().objects.create_user("daniel@example.com", "a-long-password-1", first_name="Daniel")
         user.email_verified_at = timezone.now()
         user.save()
+        InterestRegistration.objects.create(user=user)  # the member area needs a membership
         self.client.force_login(user)
         html = self.client.get("/account/").content.decode()
         self.assertRegex(html, r"Good (morning|afternoon|evening), Daniel\.")
-        for name in ["Visits", "Bookings", "Membership"]:
+        for name in ["Next visit", "Visits", "Membership"]:
             self.assertIn(name, html)
-        self.assertIn("Opens January 2027", html)
-        self.assertIn("Delete my account", html)
+        self.assertIn("January 2027", html)
+        self.assertIn("Delete my account", self.client.get("/account/you/").content.decode())
 
     def test_control_sign_in_uses_the_bare_layout(self):
         response = self.client.get("/login/", HTTP_HOST="control.localhost")

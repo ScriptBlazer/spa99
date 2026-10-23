@@ -34,7 +34,6 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
   </ul>
   <div class="o-nav-foot">
     <div class="o-who"><span class="o-disc" aria-hidden="true">{{ office_person.initials }}</span><span class="o-who-text"><span class="o-who-name">{{ office_person.name }}</span><span class="o-who-role">{{ office_person.role }}</span></span></div>
-    <form method="post" action="{% url 'logout' %}" data-office-signout>{% csrf_token %}<button type="submit" class="o-quiet">Sign out</button></form>
   </div>
 </nav>
 
@@ -50,6 +49,7 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
         <div class="o-menu">
           <p class="o-menu-name">{{ office_person.name }}</p>
           <p class="o-menu-role">{{ office_person.role }}</p>
+          <a class="o-menu-item" href="{% url 'office_password' %}" data-change-password>Change password</a>
           <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit" class="o-menu-item">Sign out</button></form>
         </div>
       </details>

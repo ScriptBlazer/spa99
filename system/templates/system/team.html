@@ -1,30 +1,55 @@
 {% extends "system/base.html" %}
 {% block main %}
-{% include "system/_page_header.html" with title="Team" description="Staff and their roles. Superuser status is never changed here." %}
-<section class="sys-panel" aria-label="Staff">
+{% include "system/_page_header.html" with title="Team" description="Who works on Spa 99, at what level. Being on the team never makes someone a member. Approver can be given to anyone with a level." %}
+<section class="sys-panel" aria-label="Add a team member">
+  <form method="post" action="{% url 'system_team_add' %}" class="sys-team-add" data-system-add-form>{% csrf_token %}
+    <label>Email <input type="email" name="email" required autocomplete="off" placeholder="name@example.com"></label>
+    <label>Level <select name="level">{% for value, label in level_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+    <label class="sys-toggle"><input type="checkbox" name="approver" value="1"> <span>{{ approver_label }}</span></label>
+    <button type="submit" class="sys-btn primary sm">Add team member</button>
+    <p class="sys-muted">New people get an email to choose their own password. Someone who already has an account keeps theirs.</p>
+  </form>
+</section>
+<section class="sys-panel" aria-label="Team">
   <div class="sys-scroll"><table class="sys-table" data-system-team>
-    <thead><tr><th scope="col">Person</th><th scope="col">Status</th><th scope="col">Roles</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
+    <thead><tr><th scope="col">Person</th><th scope="col">Status</th><th scope="col">Level</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
     <tbody>
     {% for row in staff %}
       <tr data-system-person="{{ row.user.pk }}"{% if not row.user.is_active %} data-hidden{% endif %}>
-        <td><span class="mono">{{ row.user.email }}</span>{% if row.user.is_superuser %} <span class="sys-badge info" data-superuser>Superuser</span>{% endif %}</td>
+        <td><span class="mono">{{ row.user.email }}</span>{% if row.invite_pending %} <span class="sys-badge">Invite sent</span>{% endif %}</td>
         <td>{% if row.user.is_active %}<span class="sys-badge ok">Active</span>{% else %}<span class="sys-badge">Inactive</span>{% endif %}</td>
         <td class="sys-rolesCell">
-          <form method="post" action="{% url 'system_team_roles' row.user.pk %}" class="sys-team-roles" data-system-roles-form data-noun="role" data-plural="roles" data-line="Access changes at once." data-system-person-label="{{ row.user.email }}" data-superuser="{{ row.user.is_superuser|yesno:'1,0' }}">{% csrf_token %}
-            {% for role in roles %}<label class="sys-pill"><input type="checkbox" name="roles" value="{{ role }}" data-risky="roles"{% if role in row.roles %} checked{% endif %}><span>{{ role }}</span></label>{% endfor %}
-            <button type="submit" class="sys-btn sm">Save roles</button>
+          {% if row.can_manage %}
+          <form method="post" action="{% url 'system_team_access' row.user.pk %}" class="sys-team-roles" data-system-access-form data-level="{{ row.level }}" data-approver="{{ row.approver|yesno:'1,0' }}" data-line="Access changes at once." data-system-person-label="{{ row.user.email }}">{% csrf_token %}
+            <select name="level" aria-label="Level for {{ row.user.email }}">
+              {% for value, label in level_choices %}<option value="{{ value }}"{% if value == row.level %} selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+            <label class="sys-toggle"><input type="checkbox" name="approver" value="1"{% if row.approver %} checked{% endif %}> <span>{{ approver_label }}</span></label>
+            <button type="submit" class="sys-btn sm">Save</button>
           </form>
+          {% else %}
+          <span data-system-level="{{ row.level }}">{{ row.level_label }}</span>{% if row.approver %} <span class="sys-badge info">{{ approver_label }}</span>{% endif %}
+          {% endif %}
         </td>
         <td>
-          <form method="post" action="{% url 'system_team_active' row.user.pk %}" data-system-active-form data-noun="account" data-plural="accounts" data-line="Access changes at once." data-system-person-label="{{ row.user.email }}" data-active="{{ row.user.is_active|yesno:'1,0' }}">{% csrf_token %}
+          {% if row.can_manage %}
+          <form method="post" action="{% url 'system_team_active' row.user.pk %}" data-system-active-form data-noun="account" data-plural="accounts" data-line="Access changes at once." data-system-person-label="{{ row.user.email }}" data-active="{{ row.user.is_active|yesno:'1,0' }}" style="display:inline">{% csrf_token %}
             <input type="hidden" name="active" value="{% if row.user.is_active %}0{% else %}1{% endif %}">
             <button type="submit" class="sys-btn sm">{% if row.user.is_active %}Deactivate{% else %}Reactivate{% endif %}</button>
           </form>
+          {% if row.invite_pending and row.user.is_active %}
+          <form method="post" action="{% url 'system_team_invite' row.user.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="sys-btn sm">Send a new invite</button></form>
+          {% endif %}
+          <form method="post" action="{% url 'system_team_remove' row.user.pk %}" data-system-form="team-remove" data-system-confirm="team member" data-system-confirm-label="Remove from team" data-system-confirm-what="{{ row.user.email }}" data-noun="team member" data-plural="team members" data-line="Their level goes. Their account and any membership stay." style="display:inline">{% csrf_token %}
+            <button type="submit" class="sys-btn sm">Remove from team</button>
+          </form>
+          {% endif %}
         </td>
       </tr>
-    {% empty %}<tr><td class="sys-empty" colspan="4">No staff yet.</td></tr>
+    {% empty %}<tr><td class="sys-empty" colspan="4">No team members yet.</td></tr>
     {% endfor %}
     </tbody>
   </table></div>
+  <p class="sys-muted"><a href="{% url 'system_team_merge' %}">Merge two accounts of the same person</a></p>
 </section>
 {% endblock %}

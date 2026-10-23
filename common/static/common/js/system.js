@@ -186,19 +186,16 @@ function riskSpec(changes) {
 
 function specFor(form) {
   if (form.matches('form[data-system-form]') && initial.has(form)) return riskSpec(changesOf(form));
-  if (form.matches('[data-system-roles-form]')) {
-    const boxes = $$('input[name=roles]', form);
-    const was = boxes.filter((b) => b.defaultChecked).map((b) => b.value);
-    const now = boxes.filter((b) => b.checked).map((b) => b.value);
-    if (was.join() === now.join()) return null;
-    const lastSystem = was.includes('System') && !now.includes('System') && onlySystemHolder(form);
-    return { title: `Change roles on ${ENV}?`, rows: [{ label: form.dataset.systemPersonLabel, old: was.join(', ') || 'none', now: now.join(', ') || 'none' }], line: form.dataset.line, action: 'Change 1 role', guard: IS_LIVE && lastSystem };
+  if (form.matches('[data-system-access-form]')) {
+    const select = $('select[name=level]', form), box = $('input[name=approver]', form);
+    const describe = (level, approver) => (select.querySelector(`option[value="${level}"]`)?.textContent || level) + (approver && level !== 'none' ? ' and Approver' : '');
+    const was = describe(form.dataset.level, form.dataset.approver === '1'), now = describe(select.value, box.checked);
+    if (was === now) return null;
+    return { title: `Change access on ${ENV}?`, rows: [{ label: form.dataset.systemPersonLabel, old: was, now }], line: form.dataset.line, action: 'Change 1 access' };
   }
   if (form.matches('[data-system-active-form]')) {
     const active = form.dataset.active === '1';
-    const holder = form.closest('tr');
-    const last = active && holder?.querySelector('input[value=System]')?.checked && onlySystemHolder($('[data-system-roles-form]', holder));
-    return { title: `${active ? 'Deactivate' : 'Reactivate'} account on ${ENV}?`, rows: [{ label: form.dataset.systemPersonLabel, old: active ? 'Active' : 'Inactive', now: active ? 'Inactive' : 'Active' }], line: form.dataset.line, action: `${active ? 'Deactivate' : 'Reactivate'} 1 account`, guard: IS_LIVE && last };
+    return { title: `${active ? 'Deactivate' : 'Reactivate'} account on ${ENV}?`, rows: [{ label: form.dataset.systemPersonLabel, old: active ? 'Active' : 'Inactive', now: active ? 'Inactive' : 'Active' }], line: form.dataset.line, action: `${active ? 'Deactivate' : 'Reactivate'} 1 account` };
   }
   if (form.matches('[data-system-undo-form][data-system-risky]')) {
     const d = form.dataset;
@@ -209,11 +206,6 @@ function specFor(form) {
     return { title: `Remove ${d.systemConfirm} on ${ENV}?`, rows: [{ label: d.systemConfirmWhat || d.systemConfirm, old: 'Present', now: 'Removed' }], line: d.line, action: d.systemConfirmLabel || 'Remove' };
   }
   return null;
-}
-
-/** True when no one else could still sign in to System: no other superuser and no other person holding the System role. */
-function onlySystemHolder(rolesForm) {
-  return !$$('[data-system-roles-form]').some((other) => other !== rolesForm && (other.dataset.superuser === '1' || $('input[value=System]', other)?.defaultChecked));
 }
 
 function initSubmit() {

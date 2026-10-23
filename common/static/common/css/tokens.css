@@ -235,3 +235,12 @@ html[data-page="marketing"] {
     --rise: 0px;
   }
 }
+
+/* My Spa 99 (docs/design/MEMBER.md 8). Derived. */
+:root {
+  --member-rail-w: 16rem;                 /* desktop sidebar */
+  --member-topbar-h: 3.5rem;              /* phone top bar, plus the safe area */
+  --member-tabbar-h: 4rem;                /* phone tab bar, plus the safe area */
+  --member-content-max: 52rem;            /* content column, desktop */
+  --color-tabbar: rgb(73 46 33 / 0.96);   /* tab bar over content; gold 6.0+, muted inverse 6.2+ over cream content */
+}
