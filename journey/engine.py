@@ -151,7 +151,7 @@ def complete(session):
         with transaction.atomic():
             # Read the old state from the row under a lock: two tabs finishing at once must count the journey once
             # (the second waits, then sees it completed and only adjusts what differs).
-            locked = type(session).objects.select_for_update().select_related("suggested_plan").get(pk=session.pk)
+            locked = type(session).objects.select_for_update(of=("self",)).select_related("suggested_plan").get(pk=session.pk)   # lock only this row: Postgres refuses FOR UPDATE on the nullable side of a join
             first = not locked.completed
             old_plan = locked.suggested_plan.slug if locked.suggested_plan_id else None
             old_level = locked.gold_potential
