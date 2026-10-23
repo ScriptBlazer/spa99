@@ -16,3 +16,7 @@ WHITENOISE_USE_FINDERS = True
 WHITENOISE_AUTOREFRESH = True
 
 STARTUP_REPORT = build_startup_report("config.settings.dev")
+
+# Background jobs run inline on Moishe's Mac (no worker to start): emails print straight to the runserver terminal.
+# Set Q_SYNC=0 in .env to test the real queue with `manage.py qcluster`.
+Q_CLUSTER = {**Q_CLUSTER, "sync": ENV.get("Q_SYNC", "1") != "0"}  # noqa: F405
