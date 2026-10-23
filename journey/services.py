@@ -6,6 +6,7 @@ from django.db.models import F, Prefetch
 from django.utils import timezone
 
 from common.useragent import device_type
+from insights import metrics
 
 from .conditions import matches
 from .models import Answer, JourneySession, Option, Question
@@ -29,13 +30,17 @@ class AnswerError(ValueError):
 def create_session(user_agent="", referrer="", utm=None, user=None):
     utm = utm or {}
     kind = device_type(user_agent)
-    return JourneySession.objects.create(
-        device_type=kind,
-        is_bot=kind == "bot",
-        referrer=(referrer or "")[:500],
-        user=user if user is not None and user.is_authenticated else None,
-        **{name: (utm.get(name) or "")[:100] for name in UTM_FIELDS},
-    )
+    with transaction.atomic():
+        session = JourneySession.objects.create(
+            device_type=kind,
+            is_bot=kind == "bot",
+            referrer=(referrer or "")[:500],
+            user=user if user is not None and user.is_authenticated else None,
+            **{name: (utm.get(name) or "")[:100] for name in UTM_FIELDS},
+        )
+        if not session.is_bot:  # bots are never counted
+            metrics.journey_started(session.created_at, screens_between(0, session.furthest_step))
+    return session
 
 
 def touch(session):
@@ -89,6 +94,15 @@ def link_user(session, user):
 
 
 # ---------- questions, visibility, screens ----------
+
+def screens_between(old_step, new_step):
+    """Screen numbers (of all active questions) newly reached when the furthest step goes from old to new. The stored
+    per-screen reach figures use this same definition, and so does `rebuild_metrics`."""
+    if new_step <= old_step:
+        return []
+    numbers = Question.objects.filter(active=True, screen__gt=old_step, screen__lte=new_step).values_list("screen", flat=True)
+    return sorted(set(numbers))
+
 
 def _active_questions():
     options = Option.objects.filter(active=True).order_by("order", "value")
@@ -270,9 +284,13 @@ def set_step(session, step=None, direction=None):
         raise AnswerError("Choose a step.")
     if target > session.current_step:  # moving forward: the screens he leaves must be complete
         require_answers(session, before_step=target)
+    old_furthest = session.furthest_step
     session.current_step = target
     session.furthest_step = max(session.furthest_step, target)
-    session.save(update_fields=["current_step", "furthest_step", "updated_at"])
+    with transaction.atomic():
+        session.save(update_fields=["current_step", "furthest_step", "updated_at"])
+        if not session.is_bot:
+            metrics.journey_screens_reached(session.created_at, screens_between(old_furthest, session.furthest_step))
     return target
 
 

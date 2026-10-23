@@ -1,0 +1,14 @@
+{% extends "office/base.html" %}
+{% block title %}People | Spa 99 Office{% endblock %}
+{% block main %}
+<h1>People</h1><p data-total>{{ total_registered }} people</p>
+<form method="get" data-office-filters>
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="Search">
+  <select name="plan"><option value="">All plans</option>{% for p in plans %}<option value="{{ p.slug }}"{% if filters.plan == p.slug %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select>
+  <select name="verified"><option value="">All</option><option value="yes"{% if filters.verified == "yes" %} selected{% endif %}>Verified</option><option value="no"{% if filters.verified == "no" %} selected{% endif %}>Not yet</option></select>
+  <select name="marketing"><option value="">All</option><option value="yes"{% if filters.marketing == "yes" %} selected{% endif %}>Yes</option><option value="no"{% if filters.marketing == "no" %} selected{% endif %}>No</option></select>
+  <button type="submit">Filter</button>
+  {% if office_can.can_export %}<a href="{% url 'office_people_csv' %}?{{ request.GET.urlencode }}" data-export-csv>Export CSV</a>{% endif %}
+</form>
+<div data-office-list="people">{% include "office/_people_rows.html" %}</div>
+{% endblock %}

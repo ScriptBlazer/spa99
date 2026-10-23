@@ -40,8 +40,10 @@ def _throttled(request, scope, limit, window):
 # ---------- login ----------
 
 def _login_layout(request):
-    """The sign-in template is shared by the public site and Spa 99 Control. Control has no public pages, so it
+    """The sign-in template is shared by the public site, the Office and Spa 99 Control. Control has no public pages, so it
     gets the bare layout (the site header links would not resolve there)."""
+    if getattr(request, "urlconf", "") == "config.urls_office":  # the Office: the same shell, its own words, no public links
+        return {"layout": "base_bare.html", "control": False, "office": True}
     try:
         reverse("home")
     except NoReverseMatch:

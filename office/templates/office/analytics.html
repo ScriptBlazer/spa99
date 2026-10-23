@@ -1,0 +1,14 @@
+{% extends "office/base.html" %}
+{% block title %}Analytics | Spa 99 Office{% endblock %}
+{% block main %}
+<header><h1>Analytics</h1>
+  <div data-office-range-picker>{% for r in data.ranges %}<a href="?range={{ r }}" data-range="{{ r }}"{% if r == data.range %} aria-current="true"{% endif %}>{{ r }}</a>{% endfor %}</div>
+</header>
+{% for chart, text in data.summaries.items %}<p data-chart-summary="{{ chart }}">{{ text }}</p>{% endfor %}
+<canvas id="chart-visitors"></canvas><canvas id="chart-funnel"></canvas><canvas id="chart-registrations-by-plan"></canvas>
+<canvas id="chart-suggested-plan"></canvas><canvas id="chart-drop-off"></canvas><canvas id="chart-gold"></canvas>
+<ol data-top-pages>{% for p in pages.top_pages %}<li>{{ p.page }} <b>{{ p.views }}</b></li>{% endfor %}</ol>
+<ol data-referrers>{% for r in pages.referrers %}<li>{{ r.site }} <b>{{ r.visits }}</b></li>{% endfor %}</ol>
+{{ data|json_script:"office-series" }}
+{{ pages|json_script:"office-pages" }}
+{% endblock %}

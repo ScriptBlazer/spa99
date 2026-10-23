@@ -3,6 +3,7 @@ from django_q.models import Schedule
 
 SCHEDULES = [
     {"name": "heartbeat", "func": "common.tasks.heartbeat", "schedule_type": Schedule.HOURLY},
+    {"name": "metrics-rollup", "func": "insights.rollup.scheduled", "schedule_type": Schedule.HOURLY},
 ]
 
 

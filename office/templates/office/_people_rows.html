@@ -1,0 +1,8 @@
+{% for p in rows %}
+<a href="{% url 'office_person' p.id %}" data-person-row data-journey="{{ p.journey }}">
+  <span data-col="name">{{ p.name }}</span> <span data-col="email">{{ p.email }}</span> <span data-col="plan">{{ p.plan }}</span>
+  <span data-col="verified">{% if p.verified %}Verified{% else %}Not yet{% endif %}</span> <span data-col="marketing">{% if p.marketing %}Yes{% else %}No{% endif %}</span>
+  <span data-col="registered">{{ p.registered }}</span>{% if p.gold_application_id %} <span data-col="gold">Gold</span>{% endif %}
+</a>
+{% empty %}<p data-empty>No one matches that. Try fewer filters.</p>{% endfor %}
+{% if has_next %}<a href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more>Show more</a>{% endif %}

@@ -16,13 +16,15 @@ if not ENV.get("ADMIN_PATH") or ADMIN_PATH.strip("/") == DEFAULT_ADMIN_PATH.stri
 
 DEBUG = False
 CONTROL_HOST = ENV.get("CONTROL_DOMAIN", "control.spa99.uk")
+OFFICE_HOST = ENV.get("OFFICE_DOMAIN", "office.spa99.uk")
 # ALLOWED_HOSTS in the environment ADDS to these. localhost / 127.0.0.1: the container health check.
-ALLOWED_HOSTS = [DOMAIN, CONTROL_HOST, "localhost", "127.0.0.1"] + ENV.list("ALLOWED_HOSTS", [])
+ALLOWED_HOSTS = [DOMAIN, CONTROL_HOST, OFFICE_HOST, "localhost", "127.0.0.1"] + ENV.list("ALLOWED_HOSTS", [])
 
 # Email: SMTP unless EMAIL_BACKEND says otherwise (notifications.backends.SesBackend for SES via the IAM role).
 EMAIL_BACKEND = ENV.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 SITE_URL = ENV.get("SITE_URL", f"https://{DOMAIN}").rstrip("/")
 CONTROL_URL = ENV.get("CONTROL_URL", f"https://{CONTROL_HOST}").rstrip("/")
+OFFICE_URL = ENV.get("OFFICE_URL", f"https://{OFFICE_HOST}").rstrip("/")
 
 DATABASES = build_databases(ENV.get("DATABASE_URL"), None, require_ssl=True)
 
@@ -41,7 +43,7 @@ SECURE_SSL_REDIRECT = True
 SECURE_REDIRECT_EXEMPT = [r"^health/$"]  # the container health check speaks plain http
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-CSRF_TRUSTED_ORIGINS = [f"https://{DOMAIN}", f"https://{CONTROL_HOST}"]
+CSRF_TRUSTED_ORIGINS = [f"https://{DOMAIN}", f"https://{CONTROL_HOST}", f"https://{OFFICE_HOST}"]
 SECURE_HSTS_SECONDS = 0
 TRUST_FORWARDED_FOR = True  # we only ever sit behind Caddy
 CLIENT_IP_HEADER = ENV.get("CLIENT_IP_HEADER", "X-Client-IP")  # set by Caddy from {client_ip}; empty = use X-Forwarded-For

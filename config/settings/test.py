@@ -27,6 +27,7 @@ LOGGING = {  # noqa: F405
     "loggers": {
         "django.request": {"level": "CRITICAL"},
         "spa99.health": {"level": "CRITICAL"},
+        "spa99.visitors": {"level": "CRITICAL"},  # a test breaks the counter on purpose
         "spa99.email": {"level": "CRITICAL"},  # tests that break sending on purpose
     },
 }

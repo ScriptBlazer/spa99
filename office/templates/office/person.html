@@ -1,0 +1,23 @@
+{% extends "office/base.html" %}
+{% block title %}{{ person.name }} | Spa 99 Office{% endblock %}
+{% block main %}
+<h1>{{ person.name }}</h1>
+<section data-person-details>
+  <dl>
+    <dt>Email</dt><dd>{{ person.email }}</dd><dt>Mobile</dt><dd>{{ person.mobile }}</dd><dt>Account ID</dt><dd>{{ person.public_id }}</dd>
+    <dt>Verified</dt><dd>{{ person.verified_at|default:"Not yet" }}</dd><dt>Marketing</dt><dd>{% if person.marketing %}Yes{% else %}No{% endif %}</dd>
+  </dl>
+</section>
+{% if person.interest %}<section data-person-interest>Plan: {{ person.interest.plan }} ({{ person.interest.source }}), registered {{ person.interest.registered }}</section>{% endif %}
+<section data-person-journeys>
+  {% for j in person.journeys %}<div data-journey data-completed="{{ j.completed }}">Started {{ j.started }}{% if j.suggested_plan %}, suggested {{ j.suggested_plan }}{% endif %}
+    <ul>{% for a in j.answers %}<li>{{ a.question }}: {{ a.options|join:", " }}{{ a.text }}{% if a.skipped %}Skipped{% endif %}</li>{% endfor %}</ul></div>{% endfor %}
+</section>
+<section data-person-gold>{% for g in person.gold_applications %}<a href="{% url 'office_gold_application' g.id %}">{{ g.reference }} ({{ g.status }})</a>{% endfor %}</section>
+{% if office_can.can_export or office_can.can_delete %}
+<section data-person-data>
+  {% if office_can.can_export %}<a href="{% url 'office_person_export' person.id %}" data-export-person>Export his data</a>{% endif %}
+  {% if office_can.can_delete and not person.is_staff %}<form method="post" action="{% url 'office_person_delete' person.id %}" data-delete-person>{% csrf_token %}<button type="submit">Delete this person</button></form>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

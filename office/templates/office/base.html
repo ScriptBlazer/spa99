@@ -1,0 +1,26 @@
+{% load static %}<!doctype html>
+{% comment %}Office shell (minimal: the frontend styles it from docs/design/OFFICE.md). Stable hooks: data-office-*.{% endcomment %}
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>{% block title %}Spa 99 Office{% endblock %}</title>
+{% include "common/_assets.html" %}
+{% block head_extra %}{% endblock %}
+</head>
+<body class="office on-dark" data-office-section="{{ section }}">
+<nav data-office-nav aria-label="Office">
+  <a href="{% url 'office_dashboard' %}" data-office-nav-item="dashboard"{% if section == "dashboard" %} aria-current="page"{% endif %}>Dashboard</a>
+  <a href="{% url 'office_analytics' %}" data-office-nav-item="analytics"{% if section == "analytics" %} aria-current="page"{% endif %}>Analytics</a>
+  <a href="{% url 'office_people' %}" data-office-nav-item="people"{% if section == "people" %} aria-current="page"{% endif %}>People</a>
+  <a href="{% url 'office_gold' %}" data-office-nav-item="gold"{% if section == "gold" %} aria-current="page"{% endif %}>Gold{% if office_waiting %} <span data-office-badge="gold">{{ office_waiting }}</span>{% endif %}</a>
+  <form method="post" action="{% url 'logout' %}" data-office-signout>{% csrf_token %}<button type="submit">Sign out</button></form>
+</nav>
+<main id="office-main" tabindex="-1">
+  {% include "common/_messages.html" %}
+  {% block main %}{% endblock %}
+</main>
+{% block scripts %}{% endblock %}
+</body>
+</html>

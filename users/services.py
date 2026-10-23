@@ -12,6 +12,7 @@ from django.utils import timezone
 from common.models import LoginEvent
 from common.tasks import enqueue, erase_task_records
 from gold import services as gold_services
+from insights import metrics
 from journey import services as journey_services
 from journey.models import Answer, JourneySession, new_session_key
 from notifications.models import EmailLog
@@ -117,11 +118,12 @@ def register_interest(data, journey_session=None):
                 marketing_consent=bool(data.get("marketing_opt_in")),
                 marketing_consent_at=now if data.get("marketing_opt_in") else None,
             )
-            InterestRegistration.objects.create(
+            interest = InterestRegistration.objects.create(
                 user=user, plan=plan,
                 source=InterestRegistration.JOURNEY if journey_session else InterestRegistration.DIRECT,
                 journey_session=journey_session,
             )
+            metrics.registered(plan.slug if plan else None, interest.source, interest.created_at, marketing=user.marketing_consent)
             journey_services.link_user(journey_session, user)
             gold_services.link_user_applications(user)
     except IntegrityError:  # two people (or two clicks) raced for the same email or mobile
@@ -132,10 +134,15 @@ def register_interest(data, journey_session=None):
 
 def set_interest(user, plan):
     """Change the plan a person is interested in (account page). History keeps the old one."""
-    interest, _ = InterestRegistration.objects.get_or_create(user=user, defaults={"plan": plan})
-    if interest.plan_id != (plan.pk if plan else None):
-        interest.plan = plan
-        interest.save()
+    with transaction.atomic():
+        interest, created = InterestRegistration.objects.get_or_create(user=user, defaults={"plan": plan})
+        if created:
+            metrics.registered(plan.slug if plan else None, interest.source, interest.created_at, marketing=user.marketing_consent)
+        elif interest.plan_id != (plan.pk if plan else None):
+            old_slug = interest.plan.slug if interest.plan_id else None
+            interest.plan = plan
+            interest.save()
+            metrics.interest_plan_changed(old_slug, plan.slug if plan else None, interest.created_at)
     return interest
 
 
@@ -164,8 +171,10 @@ def verify_email(token):
         return status, None
     if user.email_verified_at:
         return tokens.ALREADY, user
-    user.email_verified_at = timezone.now()
-    user.save(update_fields=["email_verified_at", "updated_at"])
+    with transaction.atomic():
+        user.email_verified_at = timezone.now()
+        user.save(update_fields=["email_verified_at", "updated_at"])
+        metrics.email_verified(user.email_verified_at)
     try:
         enqueue("users.tasks.send_welcome_email", str(user.pk))
     except Exception:  # noqa: BLE001
@@ -302,7 +311,13 @@ def delete_user_data(user):
     removed_emails = _email_logs(email).delete()[0]
     gold = gold_services.delete_applications(email)
     queue = erase_task_records([pk], ["users.tasks."])
-    interest_ids = list(InterestRegistration.objects.filter(user=user).values_list("pk", flat=True))
+    interest = InterestRegistration.objects.filter(user=user).select_related("plan").first()
+    interest_ids = [interest.pk] if interest else []
+    if interest is not None:  # the stored figures describe the data we hold: take this person out of them
+        metrics.registered(interest.plan.slug if interest.plan_id else None, interest.source, interest.created_at,
+                           marketing=user.marketing_consent, amount=-1)
+    if user.email_verified_at:
+        metrics.email_verified(user.email_verified_at, amount=-1)
     user.delete()  # cascades the InterestRegistration
     interest_history = InterestRegistration.history.model.objects.filter(id__in=interest_ids).delete()[0]
     removed_history = User.history.model.objects.filter(id=pk).delete()[0]

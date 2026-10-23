@@ -1,0 +1,19 @@
+{% extends "office/base.html" %}
+{% block title %}Gold | Spa 99 Office{% endblock %}
+{% block main %}
+<h1>Gold</h1><p data-total>{{ total_applications }} applications, {{ waiting }} waiting</p>
+<form method="get" data-office-filters>
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="Search">
+  <select name="status">
+    <option value="waiting"{% if filters.status == "waiting" %} selected{% endif %}>Waiting</option>
+    <option value="approved"{% if filters.status == "approved" %} selected{% endif %}>Approved</option>
+    <option value="declined"{% if filters.status == "declined" %} selected{% endif %}>Declined</option>
+    <option value="all"{% if filters.status == "all" %} selected{% endif %}>All</option></select>
+  <select name="potential"><option value="">All</option>
+    <option value="high"{% if filters.potential == "high" %} selected{% endif %}>High</option>
+    <option value="medium"{% if filters.potential == "medium" %} selected{% endif %}>Medium</option>
+    <option value="low"{% if filters.potential == "low" %} selected{% endif %}>Low</option></select>
+  <button type="submit">Filter</button>
+</form>
+<div data-office-list="gold">{% include "office/_gold_rows.html" %}</div>
+{% endblock %}

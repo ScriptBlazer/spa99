@@ -18,10 +18,11 @@ SECRET_KEY = ENV.get("SECRET_KEY", DEV_SECRET_KEY)
 DEBUG = False  # dev.py switches it on
 
 DOMAIN = ENV.get("DOMAIN", "spa99.uk")
-CONTROL_HOST = ENV.get("CONTROL_DOMAIN", "control.localhost")  # prod: control.spa99.uk
+CONTROL_HOST = ENV.get("CONTROL_DOMAIN", "control.localhost")  # prod: control.spa99.uk (the building control room, parked)
+OFFICE_HOST = ENV.get("OFFICE_DOMAIN", "office.localhost")  # prod: office.spa99.uk (the business back office)
 DEFAULT_ADMIN_PATH = "backstage-7d3f9a/"  # committed, so public: dev only. prod.py refuses it.
 ADMIN_PATH = ENV.get("ADMIN_PATH", DEFAULT_ADMIN_PATH).strip("/") + "/"  # hidden Django admin
-# ALLOWED_HOSTS in the environment ADDS to these defaults (prod.py adds DOMAIN and CONTROL_DOMAIN too).
+# ALLOWED_HOSTS in the environment ADDS to these defaults (prod.py adds DOMAIN, CONTROL_DOMAIN and OFFICE_DOMAIN too).
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".localhost"] + ENV.list("ALLOWED_HOSTS", [])
 CSRF_FAILURE_VIEW = "common.views.csrf_failure"
 
@@ -42,6 +43,7 @@ INSTALLED_APPS = [
     "gold",
     "notifications",
     "insights",
+    "office",
     "pages",
 ]
 
@@ -58,6 +60,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
+    "insights.middleware.VisitorCounterMiddleware",  # last: sees the final response; never slows or breaks a page
 ]
 
 ROOT_URLCONF = "config.urls"  # public site; HostRoutingMiddleware swaps in config.urls_control
@@ -74,6 +77,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "plans.context_processors.site",
+                "office.context.office",
             ],
         },
     },
@@ -117,6 +121,8 @@ AWS_SES_REGION_NAME = ENV.get("AWS_SES_REGION_NAME", "eu-west-2")
 SITE_WEBGL = ENV.bool("SITE_WEBGL", True)  # false = the 3D Gold Card never loads (CSS card only); read by base.html as data-webgl
 SITE_URL = ENV.get("SITE_URL", f"https://{DOMAIN}").rstrip("/")
 CONTROL_URL = ENV.get("CONTROL_URL", f"https://{CONTROL_HOST}").rstrip("/")
+OFFICE_URL = ENV.get("OFFICE_URL", f"https://{OFFICE_HOST}").rstrip("/")
+
 
 LANGUAGE_CODE = "en-gb"
 TIME_ZONE = "Europe/London"

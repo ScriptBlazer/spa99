@@ -1,0 +1,41 @@
+{% extends "office/base.html" %}
+{% block title %}Dashboard | Spa 99 Office{% endblock %}
+{% block main %}
+<header data-office-greeting>
+  <h1>{{ greeting }}</h1>
+  <p data-office-what-changed>{{ data.what_changed }}</p>
+  <div data-office-range-picker>{% for r in data.ranges %}<a href="?range={{ r }}" data-range="{{ r }}"{% if r == data.range %} aria-current="true"{% endif %}>{{ r }}</a>{% endfor %}</div>
+</header>
+<section data-office-rings>
+  {% for ring in data.rings %}
+  <div data-ring="{{ ring.key }}" data-percent="{{ ring.percent|default_if_none:'' }}">
+    <span data-ring-label>{{ ring.label }}</span> <span data-ring-value>{{ ring.value }}</span>
+    {% if ring.goal %}<span data-ring-of>of {{ ring.of }}</span>{% else %}<span data-ring-nogoal>No goal set</span>{% endif %}
+  </div>
+  {% endfor %}
+</section>
+<section data-office-stats>
+  {% for stat in data.stats %}
+  <a href="{% url 'office_analytics' %}#{{ stat.link }}" data-stat="{{ stat.key }}" data-direction="{{ stat.direction }}">
+    <span data-stat-label>{{ stat.label }}</span> <span data-stat-value>{{ stat.value }}</span>
+    {% if stat.percent is not None %}<span data-stat-delta>{{ stat.percent }}%</span>{% endif %}
+    <span data-stat-series="{{ stat.series|join:',' }}"></span>
+  </a>
+  {% endfor %}
+</section>
+<section data-office-funnel>
+  {% for step in data.funnel %}<div data-funnel-step="{{ step.key }}" data-share-bp="{{ step.share_bp }}" data-step-rate-bp="{{ step.step_rate_bp|default_if_none:'' }}">{{ step.label }} <b>{{ step.value }}</b></div>{% endfor %}
+</section>
+<section data-office-waiting>
+  <h2>Waiting for you <span data-waiting-count>{{ data.waiting.count }}</span></h2>
+  {% for item in data.waiting.items %}<a href="{% url 'office_gold_application' item.id %}" data-waiting-item data-potential="{{ item.potential }}">{{ item.name }}</a>
+  {% empty %}<p>Nothing waiting for you.</p>{% endfor %}
+  {% if data.waiting.count > 5 %}<a href="{% url 'office_gold' %}">See all {{ data.waiting.count }}</a>{% endif %}
+</section>
+<section data-office-latest>
+  <h2>Latest registrations</h2>
+  {% for item in data.latest %}<a href="{% url 'office_person' item.id %}" data-latest-item>{{ item.name }} <span>{{ item.plan }}</span></a>{% endfor %}
+  <a href="{% url 'office_people' %}">See everyone</a>
+</section>
+{{ data|json_script:"office-dashboard" }}
+{% endblock %}

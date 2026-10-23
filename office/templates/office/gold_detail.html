@@ -1,0 +1,20 @@
+{% extends "office/base.html" %}
+{% block title %}{{ application.name }} | Spa 99 Office{% endblock %}
+{% block main %}
+<h1>{{ application.name }}</h1>
+<span data-status="{{ application.status }}">{{ application.status }}</span> <span data-potential="{{ application.potential }}">{{ application.potential }}</span>
+{% for section in application.sections %}
+<section data-gold-section="{{ section.title }}"><h2>{{ section.title }}</h2>
+  <dl>{% for row in section.rows %}<dt>{{ row.label }}</dt><dd>{{ row.value|linebreaksbr }}</dd>{% endfor %}</dl>
+</section>
+{% endfor %}
+<aside data-gold-decision data-invite-state="{{ application.invite.state }}">
+  {% if office_can.can_act %}
+  {% if application.can_approve %}<form method="post" action="{% url 'office_gold_approve' application.id %}" data-approve>{% csrf_token %}<button type="submit">Approve and invite</button></form>{% endif %}
+  {% if application.can_decline %}<form method="post" action="{% url 'office_gold_decline' application.id %}" data-decline>{% csrf_token %}<button type="submit">Decline</button></form>{% endif %}
+  {% if application.can_resend %}<form method="post" action="{% url 'office_gold_resend' application.id %}" data-resend>{% csrf_token %}<button type="submit">Resend invite</button></form>{% endif %}
+  {% endif %}
+  {% if application.person_id %}<a href="{% url 'office_person' application.person_id %}">Open his account</a>{% endif %}
+  <ul data-gold-history>{% for h in application.history %}<li>{{ h.at }} · {{ h.text }}</li>{% endfor %}</ul>
+</aside>
+{% endblock %}

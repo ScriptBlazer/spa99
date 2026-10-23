@@ -1,0 +1,10 @@
+{% for g in rows %}
+<div data-gold-row data-status="{{ g.status }}" data-potential="{{ g.potential }}">
+  <a href="{% url 'office_gold_application' g.id %}" data-col="name">{{ g.name }}</a>
+  <span data-col="potential">{{ g.potential }}</span> <span data-col="status">{{ g.status }}</span>
+  <span data-col="invite" data-invite-state="{{ g.invite.state }}">{{ g.invite.state }}</span> <span data-col="applied">{{ g.applied }}</span>
+  {% if office_can.can_act and g.can_approve %}
+  <form method="post" action="{% url 'office_gold_approve' g.id %}" data-approve>{% csrf_token %}<button type="submit">Approve and invite</button></form>{% endif %}
+</div>
+{% empty %}<p data-empty>No applications here.</p>{% endfor %}
+{% if has_next %}<a href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more>Show more</a>{% endif %}
