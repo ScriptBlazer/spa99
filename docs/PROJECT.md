@@ -266,3 +266,6 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-23 | The spa page: the kitchenette is shown much smaller than the gym; give it a proper size. |
 | 2026-10-23 | Gold Card page: the card hero is good, but the rest of the page feels plain and unpremium: redesign below the card. |
 | 2026-10-23 | Memberships: layout is liked, but it needs more freshness and premium detail without breaking it. The plus icon should turn and become an X (not a minus). A stray border sometimes shows around text (possibly a focus outline glitch): find and remove it. |
+| 2026-10-23 | The spa opener: Moishe will make a video like the Home hero: a slow push-in through the gold swan door into the warm corridor, about 10 s, no people (shot brief in docs/design/SPA-DOOR-VIDEO.md). Until then a wider realistic photo of the doorway replaces the zoomed-in door. |
+| 2026-10-23 | The spa: the kitchenette becomes a normal tile (same size as wet sauna, cold plunge, showers), not a small companion. |
+| 2026-10-23 | Review 2026-10-22 should-fix items are done in this round. Exception: the placeholder temperatures and times stay on The spa page for now (overrides the 2026-10-22 "none seeded" entry; still placeholders until Moishe confirms real values). |
