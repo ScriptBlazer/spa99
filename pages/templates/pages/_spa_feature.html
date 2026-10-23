@@ -10,10 +10,8 @@
         <div class="frame-tint" aria-hidden="true"></div>
       </figure>
       {% if f.detail_image or f.detail_image_name %}
-      <figure class="frame frame--inset sp-detail" data-frame data-depth="12" style="--focus: {{ f.focus }}">
-        <div class="frame-media">{% photo f.detail_image_name alt=f.detail_alt sizes="(min-width: 64em) 14vw, 40vw" override=f.detail_image %}</div>
-        <div class="frame-tint" aria-hidden="true"></div>
-      </figure>
+      {# the detail inset (the steel bottle on the gym): a mount, no caption (docs/design/AMENITIES.md M4) #}
+      {% include "pages/_spa_mount.html" with name=f.detail_image_name alt=f.detail_alt sizes="(min-width: 64em) 14vw, 40vw" focus="50% 50%" upload=f.detail_image depth="12" cls="sp-detail" %}
       {% endif %}
     </div>
     <div class="sp-text">

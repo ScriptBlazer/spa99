@@ -2,37 +2,20 @@
  * Loaded only by spa.html, after the vendored GSAP, ScrollTrigger, SplitText and CustomEase. scenes.js (imported) owns the registry,
  * the matchMedia setup, the header and the shared patterns; this file adds the scenes of this page so Home's script stays as small as it was.
  * Same rules as scenes.js: transform and opacity only, scroll-driven tweens use ease "none", a scene that throws shows its static content.
- *   door   S1: the full-screen door shrinks onto .door-target inside a short pin (windowTo), facts and chips arrive, "8" counts once
+ *   door   S1 the opener (docs/design/SPA-OPENER.md): the full-screen picture (the robe, or the door) shrinks onto .door-target inside a short pin
+ *          (windowTo, Home's method), four lines fade one into the next as it goes (text never moves), the chips arrive at the end
+ *   moment AMENITIES.md M1 to M3: a full-bleed band (the picture travels a little and settles) or the overlapping pair of mounts; words rise or fade
  *   feature S2a/c/d: name rises, line and pills fade up, hairline draws (scrubbed), frame settles and drifts, inset and thumbnail travel more
  *   tiles  S2b: intro, staggered tiles settle at their own depth (desktop only), captions lag
  *   steps  S3: the line draws through the three steps (scrubbed), numbers come up as it reaches them
- *   band   S4: heading, line, buttons, the swan pattern drifts
- * Hooks: data-door-window / data-door-media / data-door-target / data-door-pause, data-rule, data-step, data-steps, data-walk (the future room walk).
+ *   band   S4: heading, line, buttons, the tote mount settles, the swan pattern drifts
+ * Hooks: data-door-window / data-door-media / data-door-target / data-door-pause, data-opener-line / data-opener-tick, data-band, data-rule, data-step, data-steps, data-walk (the future room walk).
  */
 import { SCENES, cleanups, lineRise, fadeUp, settle, depth, drift, windowTo, pinnedScene } from './scenes.js';
 
 const { gsap, ScrollTrigger } = window;
 
 if (gsap && ScrollTrigger) {
-  /** A small whole number that counts up once when cued (the cue is a scroll position, not "in view": the number sits in view before it appears). */
-  const countCue = (el) => {
-    const end = parseInt(el.textContent, 10);
-    if (!Number.isFinite(end) || end > 99) return () => {};
-    const label = el.textContent;
-    const sr = Object.assign(document.createElement('span'), { className: 'sr-only', textContent: label });
-    el.after(sr);
-    el.setAttribute('aria-hidden', 'true');
-    el.textContent = '0';
-    cleanups.push(() => { el.textContent = label; el.removeAttribute('aria-hidden'); sr.remove(); });
-    let done = false;
-    return () => {
-      if (done) return;
-      done = true;
-      const n = { v: 0 };
-      gsap.to(n, { v: end, duration: 1.2, snap: { v: 1 }, onUpdate: () => { el.textContent = n.v; } });
-    };
-  };
-
   /** Frames of a scene: settle for all, depth for those that travel (data-depth > 0), caption drift. */
   const frames = (el, { scrub, travel = true }) => {
     el.querySelectorAll('[data-frame]').forEach((f) => settle(f, scrub));
@@ -51,48 +34,109 @@ if (gsap && ScrollTrigger) {
     if (pills.length) fadeUp(pills, { trigger: pills[0].parentElement, start: 'top 90%', delay: 0.2, stagger: desktop ? 0.06 : 0 });
   };
 
-  /* ---------- S1 the door ---------- */
+  /** AMENITIES.md M1/M3: the picture of a band travels a little against the page (transform only, scrubbed). Desktop only. */
+  const bandTravel = (band, scrub) => {
+    gsap.fromTo(band.querySelector('.frame-media'), { yPercent: -4 }, { yPercent: 4, ease: 'none', scrollTrigger: { trigger: band, start: 'top bottom', end: 'bottom top', scrub } });
+  };
+
+  /* ---------- S1 the opener ---------- */
+  // Where the shrinking window centres the picture, per picture (x, y as a share of the screen): the robe sits right of centre, the door a little more; the old zoomed door keeps its ease-back.
+  const OPENER_FOCUS = {
+    robe: { desktop: { x: 0.64, y: 0.47 }, phone: { x: 0.5, y: 0.32 } },
+    door: { desktop: { x: 0.62, y: 0.5 }, phone: { x: 0.58, y: 0.45 } },
+    'door-gold': { desktop: { x: 0.53, y: 0.5 }, phone: { x: 0.51, y: 0.44 } },
+  };
+
   SCENES.door = (el, { desktop }) => {
     const q = (s) => el.querySelector(s);
-    // Same method as Home's arrival: a short pin (+=50% desktop, +=35% phone of a screen) with the same scrub, so the picture never also moves with the page while it shrinks.
-    const per = desktop ? 0.5 : 0.35;
+    const mode = el.dataset.opener in OPENER_FOCUS ? el.dataset.opener : 'robe';
+    // Same method as Home's arrival, a little longer because four lines read inside it: the length in screens is the token --opener-pin (0.8 desktop, 0.6 phone).
+    const per = parseFloat(getComputedStyle(el).getPropertyValue('--opener-pin')) || (desktop ? 0.8 : 0.6);
     const tl = pinnedScene(el, { segments: 2, perSegment: per, scrub: desktop ? 0.5 : 0.3 });
     tl.to({}, { duration: 1 }, 0);
 
-    // on load: the words come in (the picture fades in from espresso in CSS)
+    // on load: the heading rises, then line 1 and the ticks come up as one group (the picture fades in from espresso in CSS)
     lineRise(q('.door-title'), { trigger: false, delay: 0.2 });
-    gsap.fromTo(q('.door-lead'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.9, delay: 0.5 });
+    const lines = [...el.querySelectorAll('[data-opener-line]')], ticks = [...el.querySelectorAll('[data-opener-tick]')];
+    const first = [...(lines[0]?.children || []), q('.opener-ticks')].filter(Boolean);
+    if (first.length) gsap.fromTo(first, { opacity: 0, y: desktop ? 12 : 8 }, { opacity: 1, y: 0, duration: 0.8, delay: 0.6 });
 
-    // on scroll: the window shrinks onto the frame; the veil clears once the picture has left the words; the lights come up
-    tl.to(q('.door-window .hero-veil'), { opacity: 0, duration: 0.25 }, 0.45)
-      .to(q('.door-window .frame-tint'), { opacity: 0.14, duration: 0.25 }, 0.45);
-    const focus = desktop ? { x: 0.53, y: 0.5 } : { x: 0.51, y: 0.44 };
-    windowTo(q('[data-door-window]'), q('[data-door-media]'), q('[data-door-target]'), tl, 0, 0.7, focus);
-    // the picture eases back around the swan while the window shrinks (a pure crop would show only a part of it in the frame)
-    tl.fromTo(q('.door-zoom'), { scale: 1, transformOrigin: `${focus.x * 100}% ${focus.y * 100}%` }, { scale: desktop ? 0.68 : 0.66, duration: 0.7 }, 0);
+    // on scroll: the window shrinks onto the frame (0.15 to 0.85); the veil holds, then clears once the picture has left the words; the lights come up
+    const focus = OPENER_FOCUS[mode][desktop ? 'desktop' : 'phone'];
+    windowTo(q('[data-door-window]'), q('[data-door-media]'), q('[data-door-target]'), tl, 0.15, 0.7, focus);
+    tl.to(q('.door-window .hero-veil'), { opacity: 0, duration: 0.25 }, 0.55)
+      .to(q('.door-window .frame-tint'), { opacity: 0.14, duration: 0.15 }, 0.7);
+    // only the old zoomed-in door eases back around the swan while the window shrinks; the robe and the wide door are already composed
+    if (mode === 'door-gold') tl.fromTo(q('.door-zoom'), { scale: 1, transformOrigin: `${focus.x * 100}% ${focus.y * 100}%` }, { scale: desktop ? 0.68 : 0.66, duration: 0.7 }, 0.15);
 
-    // the facts and the room chips arrive in the last third; "8" counts once
-    const play = countCue(q('[data-count]') || document.createElement('i'));
-    tl.fromTo(q('.door-facts'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3 }, 0.66)
-      .fromTo(q('.door-chips'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.28 }, 0.72);
-    tl.call(play, null, 0.66);
+    // the lines: each one fades out, the next fades in a beat later (never both legible), the ticks follow. Text and ticks only change opacity.
+    // With N lines the changes are spread evenly over 0.14 to 0.68 (SPA-OPENER 5.2); two lines fade over 0.02 of each other at most.
+    const N = lines.length;
+    if (N > 1) {
+      const step = N > 2 ? (0.68 - 0.14 - 0.1) / (N - 2) : 0;
+      for (let k = 0; k < N - 1; k++) {
+        const at = 0.14 + k * step;
+        tl.fromTo(lines[k + 1], { opacity: 0 }, { opacity: 1, duration: 0.06 }, at + 0.04)
+          .fromTo(lines[k], { opacity: 1 }, { opacity: 0, duration: 0.06, immediateRender: false }, at);
+        if (ticks.length === N) {
+          tl.fromTo(ticks[k + 1], { opacity: 0.3 }, { opacity: 1, duration: 0.06 }, at + 0.04)
+            .fromTo(ticks[k], { opacity: 1 }, { opacity: 0.3, duration: 0.06, immediateRender: false }, at);
+        }
+      }
+    }
 
-    // the living still (one cycle per 48s) and its Pause control (the choice is remembered with Home's)
-    const loop = gsap.to(q('.door-still'), { scale: 1.03, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+    // the room chips arrive in the last fifth
+    tl.fromTo(q('.door-chips'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.2 }, 0.8);
+
+    // the living still (one cycle per 48s), the optional door video, and the Pause control (the choice is remembered with Home's)
+    const still = q('.door-still'), media = q('[data-door-media]'), video = q('.door-video');
+    const loops = [gsap.to(still, { scale: 1.03, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' })];
     const button = q('[data-door-pause]');
-    let userPaused = sessionStorage.getItem('spa99-hero-paused') === '1', inView = true;
-    let shrunk = false;   // the living still only runs while the door is the full-screen picture, so the Pause control is only needed then
-    const sync = () => (inView && !shrunk && !userPaused && !document.hidden ? loop.resume() : loop.pause());
+    let userPaused = sessionStorage.getItem('spa99-hero-paused') === '1', inView = true, playing = false;
+    const sync = () => {
+      const run = inView && !userPaused && !document.hidden;
+      loops.forEach((t) => (run && !playing ? t.resume() : t.pause()));
+      if (video && playing) (run ? video.play() : video.pause())?.catch?.(() => {});
+    };
     const label = () => { button.textContent = userPaused ? 'Play' : 'Pause'; button.setAttribute('aria-pressed', String(userPaused)); };
     const toggle = () => { userPaused = !userPaused; sessionStorage.setItem('spa99-hero-paused', userPaused ? '1' : '0'); label(); sync(); };
     button.addEventListener('click', toggle);
     document.addEventListener('visibilitychange', sync);
     cleanups.push(() => { button.removeEventListener('click', toggle); document.removeEventListener('visibilitychange', sync); });
     ScrollTrigger.create({ trigger: el, start: 'top bottom', end: 'bottom top', onToggle: (self) => { inView = self.isActive; sync(); } });
-    tl.to(button, { autoAlpha: 0, duration: 0.2 }, 0.05);
-    ScrollTrigger.create({ trigger: el, start: 'top top', end: () => '+=' + Math.max(1, per * window.innerHeight), onUpdate: (self) => { const next = self.progress > 0.7; if (next !== shrunk) { shrunk = next; sync(); } } });
+    tl.to(button, { autoAlpha: 0, duration: 0.2 }, 0.15);
     label();
     sync();
+
+    // the video (only when the page was built with one, which means the door is the opener): after the page, never on Save-Data, poster only otherwise
+    const loadVideo = () => {
+      if (!video?.dataset.sources || navigator.connection?.saveData) return;
+      const pick = JSON.parse(video.dataset.sources).find((s) => matchMedia(s.media).matches && video.canPlayType(s.type));
+      if (!pick) return;
+      video.addEventListener('playing', () => { playing = true; video.classList.add('is-playing'); media.classList.add('has-video'); sync(); }, { once: true });
+      video.src = pick.src;
+      video.play().catch(() => {});
+    };
+    const idle = () => (window.requestIdleCallback || setTimeout)(loadVideo);
+    if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle, { once: true });
+  };
+
+  /* ---------- the amenity moments (AMENITIES.md M1 to M3) ---------- */
+  SCENES.moment = (el, { desktop }) => {
+    const scrub = desktop ? 0.4 : 0.3;
+    const band = el.querySelector('[data-band]');
+    frames(el, { scrub, travel: desktop });          // the band and the mounts settle; the pair drifts at its own depths (desktop)
+    if (band && desktop) bandTravel(band, scrub);
+    const title = el.querySelector('[data-rise]'), words = el.querySelectorAll('[data-fade]');
+    if (el.classList.contains('sp-moment--over')) {
+      // words on the veil never move: heading and line fade up once, with the band
+      fadeUp([title, ...words].filter(Boolean), { trigger: band, start: 'top 60%', delay: 0.1, stagger: 0.12 });
+    } else {
+      if (title) lineRise(title);
+      fadeUp(words, { trigger: title || el, start: 'top 80%', delay: 0.15 });
+    }
+    const rule = el.querySelector('[data-rule]');
+    if (rule) gsap.fromTo(rule, { scaleX: 0 }, { scaleX: 1, ease: 'none', transformOrigin: '0 50%', scrollTrigger: { trigger: title || el, start: 'top 90%', end: 'top 60%', scrub } });
   };
 
   /* ---------- S2 rooms ---------- */
@@ -134,7 +178,8 @@ if (gsap && ScrollTrigger) {
   };
 
   /* ---------- S4 next ---------- */
-  SCENES.band = (el) => {
+  SCENES.band = (el, { desktop }) => {
+    el.querySelectorAll('[data-frame]').forEach((f) => settle(f, desktop ? 0.4 : 0.3));   // the tote mount, when there is one
     const h = el.querySelector('[data-rise]');
     lineRise(h);
     fadeUp(el.querySelectorAll('[data-fade]'), { trigger: h, start: 'top 90%', delay: 0.3, stagger: 0.12 });

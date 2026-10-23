@@ -409,17 +409,29 @@ html.motion .frame-media, html.motion .window-media, html.motion .hero-window, h
 .door-window, .door-pause { display: none; }
 .door-grid { position: relative; z-index: 1; padding-block: calc(var(--header-h) + var(--space-3)) var(--space-5); row-gap: var(--space-4); }
 .door-words, .door-target { grid-column: 1 / -1; }
-.door-target { grid-row: 1; order: -1; height: clamp(12.5rem, 38svh, 30rem); --focus: 50% 45%; }
+.door-target { grid-row: 1; order: -1; height: clamp(12.5rem, 38svh, 30rem); }
 .door-words { grid-row: 2; }
 .door-title { max-width: none; }
-.door-lead { margin-top: var(--space-2); }
-.door-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-4); }
-.door-facts li { display: grid; align-content: start; gap: var(--space-1); }
-.door-facts .fact-value { font-size: var(--text-lg); white-space: nowrap; }
 .door-chips { margin-top: var(--space-4); }
-.door-zoom { position: absolute; inset: 0; }                       /* scenes: eases the picture back as the door shrinks, so the whole swan fits the frame */
-.door-still { position: absolute; inset: 0 -25%; }                  /* wider than the screen on a phone: room to ease back without showing an edge */
-.door-still .photo { object-fit: cover; object-position: 55% 40%; }
+.door-zoom { position: absolute; inset: 0; }                       /* scenes: eases the old zoomed-in door back as it shrinks, so the whole swan fits the frame */
+.door-still { position: absolute; inset: 0; }
+.door-still .photo, .door-still picture { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.door-still .photo { object-fit: cover; object-position: 64% 40%; }  /* the robe (landscape on a phone: the robe sits right of centre) */
+.opener-scene[data-opener="door"] .door-still .photo { object-position: 58% 40%; }
+.opener-scene[data-opener="door-gold"] .door-still { inset: 0 -25%; }  /* the old zoomed door: wider than a phone screen, room to ease back without showing an edge */
+.opener-scene[data-opener="door-gold"] .door-still .photo { object-position: 55% 40%; }
+@media (max-width: 47.99em) { .opener-scene[data-opener="robe"][data-portrait] .door-still .photo { object-position: 50% 30%; } }   /* the portrait picture on a phone: the robe fills the top 60% */
+.door-target { --focus: 60% 42%; }                                              /* the frame crop: the hook, the collar and the swan on the chest */
+.opener-scene[data-opener="door"] .door-target { --focus: 60% 45%; }
+.opener-scene[data-opener="door-gold"] .door-target { --focus: 50% 45%; }
+
+/* the line stack (docs/design/SPA-OPENER.md 3): static = every line, stacked, a gold hairline above each statement */
+.door-title, .opener-lines, .opener-ticks { max-width: var(--opener-measure); }
+.opener-lines { display: grid; gap: var(--space-4); margin-top: var(--space-4); }
+.opener-statement { font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--color-text-inverse); }
+.opener-statement::before { content: ""; display: block; width: 1.5rem; height: 1px; margin-bottom: var(--space-2); background: var(--color-gold); }
+.opener-note { margin-top: var(--space-2); font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--color-text-muted-inverse); }
+.opener-ticks { display: none; }
 /* phone: one scrolling line of chips that runs off the right edge, the next chip peeking */
 .chips[data-scroller] { flex-wrap: nowrap; overflow-x: auto; margin-inline: calc(var(--page-margin) * -1); padding-inline: var(--page-margin); scroll-snap-type: x proximity; scroll-padding-inline: var(--page-margin); overscroll-behavior-x: contain; scrollbar-width: none; }
 .chips[data-scroller]::-webkit-scrollbar { display: none; }
@@ -428,12 +440,13 @@ html.motion .frame-media, html.motion .window-media, html.motion .hero-window, h
   .door-grid { align-items: center; row-gap: 0; padding-block: calc(var(--header-h) + var(--space-5)) var(--space-6); }
   .door-words { grid-column: 1 / span 7; grid-row: 1; }
   .door-target { grid-column: 9 / -1; grid-row: 1; order: 0; height: min(39rem, 72svh); }
-  .door-lead { margin-top: var(--space-3); }
-  .door-facts { display: flex; gap: var(--space-5); margin-top: var(--space-5); }
-  .door-facts .fact-value { font-size: var(--text-xl); }
+  .opener-lines { margin-top: var(--space-5); }
   .door-chips { margin-top: var(--space-5); }
-  .door-still { inset: -12% 0; }                                      /* taller than the screen on desktop, same reason */
-  .door-still .photo { object-position: 58% 32%; }
+  .opener-note { font-size: var(--text-base); }
+  .door-still .photo { object-position: 64% 40%; }
+  .opener-scene[data-opener="door"] .door-still .photo { object-position: 62% 45%; }
+  .opener-scene[data-opener="door-gold"] .door-still { inset: -12% 0; }   /* taller than the screen on desktop, same reason */
+  .opener-scene[data-opener="door-gold"] .door-still .photo { object-position: 58% 32%; }
   .chips[data-scroller] { flex-wrap: wrap; overflow: visible; margin-inline: 0; padding-inline: 0; }
 }
 
@@ -575,3 +588,126 @@ html.motion .frame-media, html.motion .window-media, html.motion .sp-detail, htm
 /* if the door scene fails: no full-screen picture, the frame shows its own picture */
 html.motion .door-scene.scene-failed .door-window, html.motion .door-scene.scene-failed .door-pause { display: none; }
 html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .door-scene.scene-failed .door-target .frame-tint { display: block; }
+
+
+/* =====================================================================================================
+   ROUND 3 (2026-10-23): the robe opener (docs/design/SPA-OPENER.md), the amenity moments and the mounts (docs/design/AMENITIES.md).
+   Derived tokens proposed by those briefs live here until they move into tokens.css (BRAND section 8).
+   ===================================================================================================== */
+:root {
+  --mount-gap: 0.375rem;                       /* derived: margin between the gold line of a mount and its photo (8px from 48em) */
+  --band-h: min(62svh, 36rem);                 /* derived: height of a full-bleed amenity band, desktop */
+  --opener-measure: 26rem;                     /* derived: widest the opener words go, keeps them on the solid veil */
+  --opener-pin: 0.6;                           /* derived: pin length of the opener in screens (0.8 from 64em), read by spa.js */
+}
+@media (min-width: 48em) { :root { --mount-gap: 0.5rem; } }
+@media (min-width: 64em) { :root { --opener-pin: 0.8; } }
+
+/* ---------- the mount: a thin gold line, a narrow margin, then the photo. For small pictures; big ones stay full or edge bleed ---------- */
+.frame--mount { position: relative; background: var(--color-espresso-raised); border: 1px solid var(--color-tier-edge-gold); border-radius: var(--radius-md); }
+.mount-window { position: absolute; inset: var(--mount-gap); overflow: hidden; border-radius: var(--radius-sm); isolation: isolate; }
+.mount-window .type-tile .mark { width: min(2.5rem, 40%); }
+/* on cream (Memberships): a cream-raised mount with the tier edge and shadow */
+.frame--mount-light { background: var(--color-cream-raised); border-color: var(--color-tier-edge); box-shadow: var(--shadow-tier); }
+
+/* ---------- the opener: the veil is narrower on desktop (the robe is white and sits right of centre) and one step darker everywhere
+   (--color-header-solid, 0.88): the small grey note keeps 4.5:1 even over a pure white wall (0.82 only holds to about 185/255). Measure on the final robe. ---------- */
+.opener-scene .hero-veil {
+  background: linear-gradient(to bottom, var(--color-header-solid) 0, var(--color-header-solid) var(--header-h), transparent calc(var(--header-h) + 4rem)),
+              linear-gradient(to top, var(--color-header-solid) 0, var(--color-header-solid) 54%, transparent 80%);
+}
+@media (min-width: 64em) {
+  .opener-scene .hero-veil {
+    background: linear-gradient(to bottom, var(--color-header-solid) 0, var(--color-header-solid) var(--header-h), transparent calc(var(--header-h) + 4rem)),
+                linear-gradient(to right, var(--color-header-solid) 0, var(--color-header-solid) calc(var(--bleed) + 27rem), transparent calc(var(--bleed) + 38rem));
+  }
+}
+.door-video { z-index: 0; }
+.window-media.has-video .door-zoom { opacity: 0; transition: opacity 1200ms var(--ease-soft); }
+
+/* ---------- the moments ---------- */
+.sp-bandwrap { position: relative; }
+.sp-bandpic { position: relative; aspect-ratio: 4 / 5; overflow: hidden; }
+.sp-bandpic .frame-media .photo, .sp-bandpic .frame-media picture { object-position: var(--focus, 50% 50%); }
+.sp-bandveil { display: none; }
+.sp-bandtext { position: relative; z-index: 2; padding-top: var(--space-4); }
+.sp-moment-words { grid-column: 1 / -1; }
+.sp-moment-title { font-size: var(--text-2xl); }
+.sp-moment-line { margin-top: var(--space-2); }
+/* band moments follow a picture, so they open without the room padding above */
+.sp-moment--towel, .sp-moment--slippers { padding-top: 0; }
+@media (min-width: 48em) {
+  .sp-bandpic { aspect-ratio: auto; height: var(--band-h); }
+}
+@media (min-width: 64em) {
+  .sp-bandpic .frame-media { inset: auto 0 auto 0; top: -6%; height: 112%; }   /* a little taller than the band: room to travel without showing an edge */
+  .sp-moment-words { grid-column: 1 / span 5; }
+  .sp-moment--over .sp-bandwrap { display: grid; }
+  .sp-moment--over .sp-bandwrap > * { grid-area: 1 / 1; }
+  .sp-moment--over .sp-bandtext { align-self: center; padding-top: 0; pointer-events: none; }
+  .sp-moment-words--over { max-width: 22rem; pointer-events: auto; }
+  .sp-bandveil { display: block; z-index: 1;
+    background: linear-gradient(to right, var(--color-veil) 0, var(--color-veil) calc(var(--bleed) + 22rem), transparent calc(var(--bleed) + 34rem)); }
+}
+
+/* the shower pair: two mounts, the second in front and lower */
+.sp-shower-grid { position: relative; z-index: 1; row-gap: var(--space-4); }
+.sp-shower-words, .sp-pair { grid-column: 1 / -1; }
+.sp-pair { display: flex; flex-direction: column; }
+.sp-pair-a { width: min(78%, 27rem); aspect-ratio: 4 / 5; }
+.sp-pair-b { width: min(52%, 18rem); aspect-ratio: 3 / 4; align-self: flex-end; margin-top: calc(var(--space-6) * -1); z-index: 1; }
+.sp-pair > :only-child { margin-top: 0; }
+@media (min-width: 64em) {
+  .sp-shower-grid { align-items: center; row-gap: 0; }
+  .sp-shower-words { grid-column: 1 / span 4; grid-row: 1; }
+  .sp-pair { grid-column: 6 / -1; grid-row: 1; flex-direction: row; align-items: flex-start; padding-bottom: var(--space-7); }
+  .sp-pair-a { flex: 0 1 27rem; width: auto; }
+  .sp-pair-b { flex: 0 1 18rem; width: auto; align-self: flex-start; margin-top: var(--space-7); margin-left: calc(var(--gutter) * -1); }
+  .sp-pair > :only-child { margin-left: 0; }
+}
+
+/* the gym's detail inset is a mount now: no ring (it would be lost on espresso) */
+.sp-detail.frame--mount { box-shadow: none; }
+
+/* "Every visit includes": four small mounts with a label under each, in one row */
+.kit { display: flex; gap: var(--space-3); margin-top: var(--space-3); }
+.kit-item { display: grid; justify-items: center; align-content: start; gap: var(--space-2); min-width: 4rem; }
+.kit-mount { width: 4rem; aspect-ratio: 1; --mount-gap: 0.375rem; }
+.kit-label { color: var(--color-text-inverse); text-align: center; }
+@media (min-width: 48em) {
+  .kit { gap: var(--space-4); }
+  .kit-mount { width: 4.5rem; }
+  .kit-item { min-width: 4.5rem; }
+}
+
+/* the tote on the way out */
+.sp-tote { grid-column: 1 / -1; order: -1; width: 56%; }
+.sp-tote-mount { width: 100%; aspect-ratio: 4 / 5; }
+.sp-tote-caption { margin-top: var(--space-3); }
+@media (min-width: 64em) {
+  .sp-band--tote .sp-band-grid { align-items: center; row-gap: var(--space-4); }
+  .sp-band--tote .sp-band-main { grid-column: 1 / span 8; grid-row: 1; align-self: end; }
+  .sp-band--tote .sp-band-actions { grid-column: 1 / span 8; grid-row: 2; justify-self: start; align-self: start; }
+  .sp-tote { grid-column: 10 / -1; grid-row: 1 / span 2; order: 0; width: 15rem; }
+}
+
+/* Home: the small slippers inset beside the rest frame (only when the picture exists) */
+.home-rest-pic { position: relative; }
+.home-slippers { position: absolute; z-index: 1; right: var(--space-3); bottom: calc(var(--space-3) * -1); width: 7.5rem; aspect-ratio: 4 / 5; }
+@media (min-width: 64em) {
+  .home-slippers { right: auto; left: calc(var(--gutter) * -1); width: 10rem; }
+}
+
+/* ---------- motion layout (html.motion) ---------- */
+/* the opener lines lie in one cell, so nothing jumps when they change; lines 2 to 4 start invisible. Static and failed scenes keep the stacked list. */
+html.motion .opener-scene:not(.scene-failed) .opener-lines { grid-template-areas: "l"; gap: 0; }
+html.motion .opener-scene:not(.scene-failed) .opener-line { grid-area: l; }
+html.motion .opener-scene:not(.scene-failed) .opener-line + .opener-line { opacity: 0; }
+html.motion .opener-scene:not(.scene-failed) .opener-statement::before { display: none; }
+html.motion .opener-scene:not(.scene-failed) .opener-ticks { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+.opener-tick { width: 1.5rem; height: 1px; background: var(--color-gold); opacity: 0.3; }   /* decoration: the lines themselves are the content */
+.opener-tick:first-child { opacity: 1; }
+html.motion .sp-bandpic .frame-media { will-change: transform; }
+@media (min-width: 64em) {
+  html.motion .opener-scene:not(.scene-failed) .opener-ticks { margin-top: var(--space-4); }
+}

@@ -85,10 +85,15 @@
         </div>
       </div>
       <div class="ritual-item ritual-rest">
+        {% has_photo "slippers" as has_slippers %}{% if has_slippers %}<div class="home-rest-pic">{% endif %}
         <figure class="frame frame--right" data-frame data-depth="5">
           <div class="frame-media">{% photo "relax-loungers" alt="Relaxing room with wooden loungers, travertine walls and round moss panels" sizes="(min-width: 64em) 34vw, 95vw" %}</div>
           <div class="frame-tint" aria-hidden="true"></div>
         </figure>
+        {% if has_slippers %}
+        {# One small mounted detail (docs/design/AMENITIES.md 5.1): slippers by the loungers. No words. #}
+        {% include "pages/_spa_mount.html" with name="slippers" alt="" sizes="(min-width: 64em) 12vw, 30vw" focus="62% 60%" depth="12" cls="home-slippers" %}
+        </div>{% endif %}
         <div class="frame-caption" data-caption data-drift="12">
           <h3>{{ home.scene_rest.body }}</h3>
           <p class="small">{{ lines.relaxing_zone }}</p>

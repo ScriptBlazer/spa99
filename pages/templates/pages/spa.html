@@ -1,20 +1,24 @@
 {% extends "base.html" %}
-{% load static content_tags pages_tags %}
+{% load static content_tags pages_tags pages_media %}
 {# The spa (docs/design/SPA-PAGE.md, round 3 house style, with the 2026-10-22 decisions: the door shrinks onto its frame inside a short pin like Home's arrival, the 3D room walk gets the other pin). One espresso walk through the building. Every room section comes from the data (`sections`), nothing about a room is typed here. #}
 {% block html_attrs %} data-page="marketing"{% endblock %}
 {% block body_class %}page-spa{% endblock %}
 {% block header_mode %}overlay{% endblock %}
 {% block head_extra %}
-{% page_content "spa" as spa_head %}{% if not spa_head.intro.image %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(prefers-reduced-motion: no-preference)" imagesrcset="{% photo_srcset "door-gold" %}" imagesizes="100vw">{% endif %}
+{# The opener picture is the LCP image: preloaded (desktop and phone version by width) only when motion shows it full screen. #}
+{% if opener.name and not opener.upload %}{% if opener.portrait %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(min-width: 48em) and (prefers-reduced-motion: no-preference)" imagesrcset="{% photo_srcset opener.name %}" imagesizes="100vw">
+<link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(max-width: 47.99em) and (prefers-reduced-motion: no-preference)" imagesrcset="{% photo_srcset opener.portrait %}" imagesizes="100vw">{% else %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(prefers-reduced-motion: no-preference)" imagesrcset="{% photo_srcset opener.name %}" imagesizes="100vw">{% endif %}{% endif %}
 {% endblock %}
 {% block main %}
 {% page_content "spa" as spa %}
 
-{# S1. The door: full screen with the words on it; inside a short pin it shrinks into the frame on the right. Without motion: just the end state, content height. #}
-<section class="scene door-scene on-dark" data-scene="door" data-glow aria-labelledby="spa-title">
+{# S1. The opener (docs/design/SPA-OPENER.md): the robe full screen with the words on it; inside a short pin the picture shrinks into the frame on the right while four lines change one at a time. Without motion: just the end state, the lines stacked. `opener` says which picture (the robe, or the door when switched, with its video once it exists). #}
+{% if opener.is_door and opener.name != "door-gold" %}{% door_video as dv %}{% endif %}
+<section class="scene door-scene opener-scene on-dark" data-scene="door" data-opener="{% if opener.name == 'door-gold' %}door-gold{% elif opener.is_door %}door{% else %}robe{% endif %}"{% if opener.portrait %} data-portrait{% endif %} data-glow aria-labelledby="spa-title">
   <div class="door-window" data-door-window>
     <div class="window-media" data-door-media>
-      <div class="door-zoom"><div class="door-still">{% photo "door-gold" alt="A frosted glass door etched with a gold swan, between stone jambs" sizes="100vw" override=spa.intro.image %}</div></div>
+      <div class="door-zoom"><div class="door-still">{% include "pages/_spa_opener_pic.html" with o=opener sizes="100vw" %}</div></div>
+      {% if dv %}<video class="hero-video door-video" muted playsinline loop preload="none" aria-hidden="true" tabindex="-1" data-sources="{{ dv.sources }}"></video>{% endif %}
     </div>
     <div class="frame-tint" aria-hidden="true"></div>
     <div class="hero-veil" aria-hidden="true"></div>
@@ -23,18 +27,23 @@
   <div class="container grid door-grid">
     <div class="door-words">
       <h1 class="display door-title" id="spa-title" data-rise>{{ spa.intro.heading }}</h1>
-      <p class="lead door-lead" data-fade>{{ spa.intro.body }}</p>
-      <ul class="door-facts" data-fade-row>
-        <li><b class="fact-value num" data-count>{{ room_count }}</b><span class="fact-label small">{{ spa.facts_rooms.body }}</span></li>
-        {% if hours_facts %}<li><b class="fact-value num">{{ hours_facts.range }}</b><span class="fact-label small">{{ spa.facts_hours.body }}</span></li>{% endif %}
-        <li><b class="fact-value">{{ spa.facts_men.heading }}</b><span class="fact-label small">{{ spa.facts_men.body }}</span></li>
-      </ul>
+      {% if opener_lines %}
+      <ol class="opener-lines" role="list">
+        {% for l in opener_lines %}
+        <li class="opener-line" data-opener-line>
+          <p class="opener-statement"{% if forloop.first %} data-fade{% endif %}>{{ l.statement }}</p>
+          {% if l.note %}<p class="opener-note"{% if forloop.first %} data-fade{% endif %}>{{ l.note }}</p>{% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+      {% if opener_lines|length > 1 %}<div class="opener-ticks" aria-hidden="true" data-fade-row>{% for l in opener_lines %}<span class="opener-tick" data-opener-tick></span>{% endfor %}</div>{% endif %}
+      {% endif %}
       <nav class="door-chips" aria-label="The rooms" data-fade-row>
         <ul class="chips" data-scroller>{% for f in facilities %}<li><a class="chip" href="#{{ f.slug }}">{{ f.name }}</a></li>{% endfor %}</ul>
       </nav>
     </div>
-    <figure class="frame frame--right door-target" data-door-target>
-      <div class="frame-media">{% photo "door-gold" alt="A frosted glass door etched with a gold swan, between stone jambs" sizes="(min-width: 64em) 36vw, 100vw" override=spa.intro.image %}</div>
+    <figure class="frame frame--right door-target opener-target" data-door-target>
+      <div class="frame-media">{% include "pages/_spa_opener_pic.html" with o=opener sizes="(min-width: 64em) 36vw, 100vw" %}</div>
       <div class="frame-tint" aria-hidden="true"></div>
     </figure>
   </div>
@@ -43,7 +52,12 @@
 
 {# S2. The rooms, from the data: feature (with an optional companion) or a row of tiles. Sides alternate, the opening frame is on the right. #}
 {% for s in sections %}
-  {% if s.kind == "feature" %}
+  {% if s.kind == "moment" %}
+    {# the amenity moments, placed by the data (AMENITIES.md): a moment without a built picture never reaches here #}
+    {% if s.moment.key == "shower" %}{% include "pages/_spa_moment_shower.html" with m=s.moment %}
+    {% elif s.moment.key == "slippers" %}{% include "pages/_spa_moment_band.html" with m=s.moment over=True %}
+    {% else %}{% include "pages/_spa_moment_band.html" with m=s.moment over=False %}{% endif %}
+  {% elif s.kind == "feature" %}
     {% cycle "a" "b" "c" as ratio silent %}
     {% include "pages/_spa_feature.html" with s=s ratio=ratio %}
   {% else %}
@@ -60,7 +74,7 @@
     <h2 class="statement sp-visit-head" id="how-title" data-rise>{{ spa.how_it_works.heading }}</h2>
     <ol class="vsteps" role="list" data-steps>
         {% include "pages/_spa_step.html" with n=1 row=spa.step_1 pills=visit_pills.book %}
-        {% include "pages/_spa_step.html" with n=2 row=spa.step_2 pills=visit_pills.arrive %}
+        {% include "pages/_spa_step.html" with n=2 row=spa.step_2 pills=visit_pills.arrive kit=arrive_kit %}
         {% include "pages/_spa_step.html" with n=3 row=spa.step_3 pills=visit_pills.stay last=True %}
       </ol>
     {% if hours %}
@@ -76,8 +90,8 @@
   </div>
 </section>
 
-{# S4. Next: a compact closing band. #}
-<section class="scene sp-band on-dark" data-scene="band" aria-labelledby="next-title">
+{# S4. Next: a compact closing band, with the tote on the way out when its picture exists. #}
+<section class="scene sp-band{% if tote %} sp-band--tote{% endif %} on-dark" data-scene="band" aria-labelledby="next-title">
   <div class="sp-band-pattern" data-pattern aria-hidden="true"></div>
   <div class="container grid sp-band-grid">
     <div class="sp-band-main">
@@ -88,6 +102,12 @@
       <a class="btn btn-primary btn-block-phone" href="{% url 'journey' %}">{{ spa.next.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
       <a class="btn btn-secondary btn-block-phone" href="{% url 'memberships' %}">{{ spa.next_link.cta_label }}</a>
     </div>
+    {% if tote %}{% with t=tote.pictures.0 %}
+    <div class="sp-tote">
+      {% include "pages/_spa_mount.html" with name=t.name alt=t.alt sizes="(min-width: 64em) 20vw, 56vw" focus=t.focus upload=t.upload depth="" cls="sp-tote-mount" %}
+      <div class="frame-caption sp-tote-caption" data-fade><h3>{{ tote.heading }}</h3></div>
+    </div>
+    {% endwith %}{% endif %}
   </div>
 </section>
 {% endblock %}
