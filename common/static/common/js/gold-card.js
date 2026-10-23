@@ -6,32 +6,6 @@ import { cleanups, lineRise, fadeUp, thread } from './scenes.js';
 const { gsap, ScrollTrigger } = window;
 const root = document.documentElement;
 
-/* TEMPORARY (2026-10-23): add ?glcheck to the URL to see whether the 3D card can run here, and if not, why. Remove once diagnosed. */
-if (new URLSearchParams(location.search).has('glcheck')) {
-  const why = [];
-  if (root.dataset.webgl === 'off') why.push('SITE_WEBGL is off');
-  if (!matchMedia('(min-width: 64em)').matches) why.push(`window too narrow (${innerWidth}px, needs 1024)`);
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) why.push('Reduce motion is on');
-  if (navigator.connection?.saveData || matchMedia('(prefers-reduced-data: reduce)').matches) why.push('save data is on');
-  if ((navigator.deviceMemory ?? 8) < 4) why.push(`low memory reported (${navigator.deviceMemory} GB)`);
-  if ((navigator.hardwareConcurrency ?? 8) < 4) why.push(`few CPU cores reported (${navigator.hardwareConcurrency})`);
-  const strict = document.createElement('canvas').getContext('webgl2', { failIfMajorPerformanceCaveat: true });
-  const loose = document.createElement('canvas').getContext('webgl2');
-  if (!strict) why.push(loose ? 'WebGL2 only in slow software mode (graphics acceleration off?)' : 'no WebGL2');
-  const tag = document.createElement('div');
-  tag.textContent = why.length ? `3D card OFF: ${why.join('; ')}` : '3D card ON';
-  tag.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:9999;padding:10px 14px;background:#000;color:#fff;font:14px/1.4 sans-serif;border-radius:6px';
-  document.body.append(tag);
-  const errors = [];
-  addEventListener('error', (e) => errors.push(e.message || String(e.error)));
-  addEventListener('unhandledrejection', (e) => errors.push(String(e.reason?.message || e.reason)));
-  setTimeout(() => {
-    const canvas = document.querySelector('.gc-gl canvas');
-    const mount = document.querySelector('.gold-card');
-    tag.textContent += ` | after 8 s: canvas ${canvas ? `opacity ${(+getComputedStyle(canvas).opacity).toFixed(2)}` : 'missing'}, ${mount?.classList.contains('is-gl') ? '3D showing' : 'flat card showing'}${errors.length ? ` | errors: ${errors.join(' / ')}` : ''}`;
-  }, 8000);
-}
-
 /* ---------- the Gold Card (docs/design/GOLD-CARD-3D.md) ---------- */
 
 const ramp = (pts) => (t) => {                            // piecewise linear through [t, value] points
