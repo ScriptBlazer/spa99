@@ -5,19 +5,22 @@
 {% block body_class %}page-spa{% endblock %}
 {% block header_mode %}overlay{% endblock %}
 {% block head_extra %}
-{# The opener picture is the LCP image: preloaded (desktop and phone version by width) only when motion shows it full screen. #}
-{% if opener.name and not opener.upload %}{% if opener.portrait %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(min-width: 48em) and (prefers-reduced-motion: no-preference)" imagesrcset="{% photo_srcset opener.name %}" imagesizes="100vw">
+{# The opener picture is the LCP image: preloaded (desktop and phone version by width) only when motion shows it full screen. With the opener video, its first-frame posters are that picture. #}
+{% opener_video opener.video as ov %}
+{% if ov.poster %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(min-width: 48em) and (prefers-reduced-motion: no-preference)" href="{{ ov.poster }}">
+<link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(max-width: 47.99em) and (prefers-reduced-motion: no-preference)" href="{{ ov.poster_portrait }}">
+{% elif opener.name and not opener.upload %}{% if opener.portrait %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(min-width: 48em) and (prefers-reduced-motion: no-preference)" imagesrcset="{% photo_srcset opener.name %}" imagesizes="100vw">
 <link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(max-width: 47.99em) and (prefers-reduced-motion: no-preference)" imagesrcset="{% photo_srcset opener.portrait %}" imagesizes="100vw">{% else %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(prefers-reduced-motion: no-preference)" imagesrcset="{% photo_srcset opener.name %}" imagesizes="100vw">{% endif %}{% endif %}
 {% endblock %}
 {% block main %}
 {% page_content "spa" as spa %}
 
-{# S1. The opener (docs/design/SPA-OPENER.md): the robe full screen with the words on it; inside a short pin the picture shrinks into the frame on the right. One line only ("Open 5am to 3am.", Moishe 2026-10-23), then the room chips. Without motion: just the end state. `opener` says which picture (the robe, or the door when switched, with its video once it exists). #}
-{% if opener.is_door and opener.name != "door-gold" %}{% door_video as dv %}{% endif %}
-<section class="scene door-scene opener-scene on-dark" data-scene="door" data-opener="{% if opener.name == 'door-gold' %}door-gold{% elif opener.is_door %}door{% else %}robe{% endif %}"{% if opener.portrait %} data-portrait{% endif %} data-glow aria-labelledby="spa-title">
+{# S1. The opener (docs/design/SPA-OPENER.md): the robe full screen with the words on it; inside a short pin the picture shrinks into the frame on the right. One line only ("Open 5am to 3am.", Moishe 2026-10-23), then the room chips. Without motion: just the end state. `opener` says which picture (the robe, or the door when switched) and which video: the robe has the steam loop (spa-hero-*, 2026-10-23), its first frame is the still and the frame's picture. #}
+{% opener_video opener.video as dv %}
+<section class="scene door-scene opener-scene on-dark" data-scene="door" data-opener="{% if opener.name == 'door-gold' %}door-gold{% elif opener.is_door %}door{% else %}robe{% endif %}"{% if opener.portrait or dv.poster_portrait and dv.poster_portrait != dv.poster %} data-portrait{% endif %} data-glow aria-labelledby="spa-title">
   <div class="door-window" data-door-window>
     <div class="window-media" data-door-media>
-      <div class="door-zoom"><div class="door-still">{% include "pages/_spa_opener_pic.html" with o=opener sizes="100vw" %}</div></div>
+      <div class="door-zoom"><div class="door-still">{% if dv.poster %}{% include "pages/_spa_opener_poster.html" with v=dv alt=opener.alt eager=True %}{% else %}{% include "pages/_spa_opener_pic.html" with o=opener sizes="100vw" %}{% endif %}</div></div>
       {% if dv %}<video class="hero-video door-video" muted playsinline loop preload="none" aria-hidden="true" tabindex="-1" data-sources="{{ dv.sources }}"></video>{% endif %}
     </div>
     <div class="frame-tint" aria-hidden="true"></div>
@@ -42,7 +45,7 @@
       </nav>
     </div>
     <figure class="frame frame--right door-target opener-target" data-door-target>
-      <div class="frame-media">{% include "pages/_spa_opener_pic.html" with o=opener sizes="(min-width: 64em) 36vw, 100vw" %}</div>
+      <div class="frame-media">{% if dv.poster %}{% include "pages/_spa_opener_poster.html" with v=dv alt=opener.alt %}{% else %}{% include "pages/_spa_opener_pic.html" with o=opener sizes="(min-width: 64em) 36vw, 100vw" %}{% endif %}</div>
       <div class="frame-tint" aria-hidden="true"></div>
     </figure>
   </div>

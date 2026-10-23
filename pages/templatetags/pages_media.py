@@ -57,6 +57,13 @@ def door_video():
 
 
 @register.simple_tag
+def opener_video(prefix):
+    """{% opener_video opener.video as dv %}: the video of The spa opener by its prefix (services.opener_picture), None for ''.
+    'spa-hero' = the robe's steam loop (docs/design/SPA-OPENER.md): the file loops itself (the fade is baked in), so the <video> just has `loop`."""
+    return _video(prefix) if prefix in ("spa-hero", "spa-door") else None
+
+
+@register.simple_tag
 def has_photo(name):
     from content import images
 

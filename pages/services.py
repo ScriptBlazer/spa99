@@ -470,7 +470,8 @@ SIGNIN_ALT = "Wooden lockers, each with the swan carved in its door"
 
 def opener_picture(copy=None):
     """Which picture opens The spa. Order: an upload on `intro`, the `opener_image` row's name, `robe`, then the old door.
-    Returns {"upload", "name", "portrait", "is_door", "alt"}; `alt` is the upload's own alt, else one per name, else a
+    Returns {"upload", "name", "portrait", "is_door", "alt", "video"}; `video` is the opener video's file prefix ('spa-hero'
+    for the robe without an upload, 'spa-door' for the wide door, else ''); `alt` is the upload's own alt, else one per name, else a
     generic one. `name` is '' when none of them is built (the template then
     shows the brand tile, never a broken image). `portrait` is `<name>-portrait` when that is built."""
     copy = copy if copy is not None else content.page_content("spa")
@@ -479,7 +480,10 @@ def opener_picture(copy=None):
     portrait = f"{name}-portrait" if name and images.has_image(f"{name}-portrait") else ""
     upload = copy["intro"].image
     alt = (copy["intro"].image_alt if upload else "") or OPENER_ALTS.get(name, OPENER_ALT_FALLBACK)
-    return {"upload": upload, "name": name, "portrait": portrait, "is_door": name.startswith("door"), "alt": alt}
+    is_door = name.startswith("door")
+    # the opener video's file prefix (pages_media.opener_video): the steam loop over the robe (2026-10-23), the door's later
+    video = "spa-hero" if name == "robe" and not upload else ("spa-door" if is_door and name != "door-gold" else "")
+    return {"upload": upload, "name": name, "portrait": portrait, "is_door": is_door, "alt": alt, "video": video}
 
 
 # ---------- the amenity moments (AMENITIES.md sections 3 and 4) ----------
