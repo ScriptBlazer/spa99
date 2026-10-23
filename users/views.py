@@ -245,11 +245,15 @@ def password_change_old(request):
 @require_POST
 def account_emails(request):
     """Marketing emails on or off (UK GDPR consent, logged in the person's history). 20 a minute per person."""
+    wants_json = "application/json" in request.headers.get("accept", "")
     if not hit("account-emails", request.user.pk, 20, 60):
-        return JsonResponse({"saved": False}, status=429)
+        if wants_json:
+            return JsonResponse({"saved": False}, status=429)
+        messages.error(request, "Too many changes. Please try again in a minute.")
+        return redirect("account_you")
     on = request.POST.get("marketing", "") in ("1", "on", "true")
     member.set_marketing_consent(request.user, on)
-    if "application/json" in request.headers.get("accept", ""):
+    if wants_json:
         return JsonResponse({"saved": True, "marketing": on})
     messages.success(request, "Saved.")
     return redirect("account_you")
@@ -262,6 +266,10 @@ class ChangePasswordView(auth_views.PasswordChangeView):
     template_name = "users/password_change.html"
     form_class = ChangePasswordForm
     success_url = reverse_lazy("account_you")
+
+    def get_context_data(self, **kwargs):
+        # the member shell (verify banner, greeting, email) needs the same base context as the other screens
+        return {**member.base_context(self.request.user), **super().get_context_data(**kwargs)}
 
     def post(self, request, *args, **kwargs):
         if _throttled(request, "password-change", 10, 3600):

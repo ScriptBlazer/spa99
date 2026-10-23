@@ -139,3 +139,15 @@ class WebsiteMenuTests(TestCase):
         body = self.client.get("/sitemap.xml").content.decode()
         self.assertNotIn("/book/", body)
         self.assertIn("/memberships/", body)
+
+
+class PasswordScreenShellTests(TestCase):
+    def test_confirmed_member_sees_no_verify_banner_on_password_screen(self):
+        from django.utils import timezone
+        user = User.objects.create_user(email="pw.shell@example.test", password="Correct-horse-9")
+        user.email_verified_at = timezone.now()
+        user.save()
+        self.client.force_login(user)
+        response = self.client.get("/account/you/password/")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "data-verify-banner")
