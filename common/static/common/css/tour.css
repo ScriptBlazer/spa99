@@ -7,8 +7,8 @@
 .tour-photo, .tour-canvas, .tour-snap { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; }
 .tour-photo .photo, .tour-photo picture { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: var(--focus, 50% 50%); }
 /* 3D is on its way (cheap gate passed). boot.js drops html.tour-gl if the probe fails. */
-/* Until the first frame is ready the room photo stays up (never a blank espresso screen on a slow build); it is hidden once the canvas has faded in over it. */
-body.tour-3d .tour-photo { visibility: hidden; transition: visibility 0s linear var(--duration-gl-in); }
+/* While 3D is expected the photo stays hidden (espresso stage until the first frame fades in). It shows only as the fallback: html.tour-gl removed when 3D cannot run, fails or takes over 6 s. */
+html.tour-gl .tour-photo, body.tour-3d .tour-photo { visibility: hidden; }   /* 3D expected: the photo never flashes up first (Moishe 2026-10-23); it is the fallback only */
 /* The tour moves between rooms itself: no cross-document view transition here (it was skipped mid-load and logged "AbortError: Transition was skipped"). */
 @view-transition { navigation: none; }
 html.tour-gl, html.tour-gl body { height: var(--scene-h); overflow: hidden; }

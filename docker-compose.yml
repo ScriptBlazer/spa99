@@ -22,6 +22,8 @@ services:
     image: ${IMAGE}:${APP_TAG}
     restart: unless-stopped
     env_file: .env
+    environment:
+      APP_VERSION: ${APP_TAG}  # Sentry release
     command: ["web"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/', timeout=4)"]
@@ -34,6 +36,8 @@ services:
     image: ${IMAGE}:${APP_TAG}
     restart: unless-stopped
     env_file: .env
+    environment:
+      APP_VERSION: ${APP_TAG}  # Sentry release
     command: ["worker"]
     depends_on:
       web:

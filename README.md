@@ -53,11 +53,11 @@ Nothing in the code is Postgres-only.
 
 ## Configuration
 
-Order, earlier wins: real environment variables, then `$SPA99_PRIVATE_DIR/env/.env`, then the project `.env`,
+Order, earlier wins: real environment variables, then `$SPA99_PRIVATE_DIR/Secrets/.env`, then the project `.env`,
 then dev defaults. If the private folder is missing or unreadable, `.private/` in the project is used instead.
 
 Private folder (default `/Users/moishe/Library/CloudStorage/OneDrive-Personal/BML/Spa 99/Software Files`):
-`env/.env` (secrets), `db-backups/`, `media/`. The working database is never kept there.
+`Secrets/.env` (secrets), `db-backups/`, `media/`. The working database is never kept there.
 
 | Key | What it is for |
 |---|---|

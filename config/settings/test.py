@@ -8,6 +8,7 @@ import os
 # Tests must not depend on a developer's private or project .env files (or write into the private folder):
 # environment variables only. Must be set before base.py loads the environment.
 os.environ["SPA99_SKIP_ENV_FILES"] = "1"
+os.environ.pop("SENTRY_DSN", None)  # tests never report to Sentry
 
 from .dev import *  # noqa: E402,F401,F403
 
