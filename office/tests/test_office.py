@@ -162,9 +162,15 @@ class StoredFigureTests(OfficeTestCase):
         data = get(owner, "/dashboard.json?range=7d").json()
         self.assertEqual(data["waiting"]["count"], 1)
         rings = {r["key"]: r for r in data["rings"]}
-        self.assertEqual((rings["registrations"]["value"], rings["registrations"]["percent"]), (1, 25))
-        self.assertIsNone(rings["journeys_completed"]["percent"])  # no goal row: "No goal set"
-        self.assertEqual([s["key"] for s in data["stats"]], ["registrations", "journeys_completed", "visitors", "conversion"])
+        self.assertEqual(list(rings), ["journeys_started", "journeys_completed", "registrations"])
+        self.assertEqual((rings["registrations"]["value"], rings["registrations"]["goal"], rings["registrations"]["percent"]), (1, 4, 25))
+        self.assertEqual((rings["journeys_started"]["value"], rings["journeys_started"]["previous"], rings["journeys_started"]["change"]), (1, 0, 1))
+        self.assertIsNone(rings["journeys_completed"]["goal"])  # no goal row: "No goal set"
+        self.assertIsNone(rings["journeys_completed"]["percent"])
+        self.assertEqual(data["gold_waiting"], 1)
+        self.assertEqual([s["key"] for s in data["stats"]], ["registrations", "journeys_completed", "visitors", "page_views"])
+        self.assertIn("change", data["stats"][0])
+        self.assertEqual([f["previous_value"] for f in data["funnel"]], [None, 0, 1, 1])
         self.assertEqual(len(data["stats"][0]["series"]), 7)
         self.assertTrue(data["what_changed"])
         analytics = get(owner, "/analytics/data/?range=7d").json()

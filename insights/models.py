@@ -78,13 +78,13 @@ class VisitorHash(models.Model):
 
 class OfficeGoal(models.Model):
     """A goal or target for a dashboard ring, edited in the Django admin. No row = the ring shows "No goal set".
-    registrations: a count for the range. journey_completion and gold_handled: a target in whole percent."""
+    All three are counts for the range."""
 
-    REGISTRATIONS, JOURNEY_COMPLETION, GOLD_HANDLED = "registrations", "journey_completion", "gold_handled"
+    REGISTRATIONS, JOURNEYS_STARTED, JOURNEYS_FINISHED = "registrations", "journeys_started", "journeys_finished"
     KEY_CHOICES = [
+        (JOURNEYS_STARTED, "People who started the journey (count in the range)"),
+        (JOURNEYS_FINISHED, "People who finished the journey (count in the range)"),
         (REGISTRATIONS, "Registrations (count in the range)"),
-        (JOURNEY_COMPLETION, "Journeys completed (target %)"),
-        (GOLD_HANDLED, "Gold applications handled (target %)"),
     ]
     TODAY, WEEK, MONTH, ALL = "today", "7d", "30d", "all"
     RANGE_CHOICES = [(TODAY, "Today"), (WEEK, "7 days"), (MONTH, "30 days"), (ALL, "Any range (used when the range has no row)")]

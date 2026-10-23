@@ -81,42 +81,33 @@ def dashboard(range_name="7d", today=None):
 
     def stat(key, label, link):
         value, previous = total(key, now_days), total(key, before_days)
-        return {"key": key, "label": label, "value": value, "previous": previous, **_direction(value, previous),
-                "series": _series(rows, key, spark_days), "link": link}
+        return {"key": key, "label": label, "value": value, "previous": previous, "change": value - previous,
+                **_direction(value, previous), "series": _series(rows, key, spark_days), "link": link}
 
     started, done = total(K.JOURNEYS_STARTED, now_days), total(K.JOURNEYS_COMPLETED, now_days)
     visitors, registered = total(K.VISITORS, now_days), total(K.REGISTRATIONS, now_days)
-    conversion = basis_points(registered, visitors)
-    before_conversion = basis_points(total(K.REGISTRATIONS, before_days), total(K.VISITORS, before_days))
-    conv_stat = {
-        "key": "conversion", "label": "Conversion", "value": conversion or 0, "unit": "basis_points",
-        "previous": before_conversion or 0, **_direction(conversion or 0, before_conversion or 0),
-        "series": _series(rows, K.RATE_REGISTER, spark_days), "link": "registrations",
-    }
     stats = [stat(K.REGISTRATIONS, "Registrations", "registrations"), stat(K.JOURNEYS_COMPLETED, "Journeys completed", "journeys"),
-             stat(K.VISITORS, "Site visitors", "visitors"), conv_stat]
+             stat(K.VISITORS, "Site visitors", "visitors"), stat(K.PAGE_VIEWS, "Page views", "pages")]
 
     received = stored.get((K.GOLD_APPLICATIONS, ""), 0)
-    handled = stored.get((K.GOLD_BY_STATUS, "approved"), 0) + stored.get((K.GOLD_BY_STATUS, "declined"), 0)
-    finish_bp = basis_points(done, started) or 0
-    reg_goal, fin_goal = _goal(goals, OfficeGoal.REGISTRATIONS, range_name), _goal(goals, OfficeGoal.JOURNEY_COMPLETION, range_name)
-    gold_goal = _goal(goals, OfficeGoal.GOLD_HANDLED, range_name)
-    handled_pct = round(handled * 100 / received) if received else 0
+
+    def ring(key, label, goal_key, value, previous):
+        goal = _goal(goals, goal_key, range_name)
+        return {"key": key, "label": label, "value": value, "goal": goal,
+                "percent": min(200, round(value * 100 / goal)) if goal else None,
+                "previous": previous, "change": value - previous}
+
     rings = [
-        {"key": "registrations", "label": "Registrations", "value": registered, "of": reg_goal, "goal": reg_goal, "unit": "count",
-         "percent": min(200, round(registered * 100 / reg_goal)) if reg_goal else None},
-        {"key": "journeys_completed", "label": "Journeys completed", "value": round(finish_bp / 100), "of": fin_goal, "goal": fin_goal,
-         "unit": "percent", "completed": done, "started": started,
-         "percent": min(200, round(finish_bp / 100 * 100 / fin_goal)) if fin_goal else None},
-        {"key": "gold_handled", "label": "Gold handled", "value": handled, "of": received, "goal": gold_goal, "unit": "count",
-         "handled_percent": handled_pct,
-         "percent": min(200, round(handled_pct * 100 / gold_goal)) if gold_goal else None},
+        ring("journeys_started", "People started", OfficeGoal.JOURNEYS_STARTED, started, total(K.JOURNEYS_STARTED, before_days)),
+        ring("journeys_completed", "Finished it", OfficeGoal.JOURNEYS_FINISHED, done, total(K.JOURNEYS_COMPLETED, before_days)),
+        ring("registrations", "Registered", OfficeGoal.REGISTRATIONS, registered, total(K.REGISTRATIONS, before_days)),
     ]
     funnel_values = [("visitors", "Visitors", visitors), ("started", "Started the journey", started),
                      ("completed", "Completed it", done), ("registered", "Registered", registered)]
     funnel = []
     for i, (key, label, value) in enumerate(funnel_values):
         funnel.append({"key": key, "label": label, "value": value,
+                       "previous_value": funnel_values[i - 1][2] if i else None,
                        "share_bp": min(basis_points(value, visitors) or 0, 10000),
                        "step_rate_bp": _share(value, funnel_values[i - 1][2]) if i else None,
                        "partial": bool(i and value > funnel_values[i - 1][2])})
@@ -128,7 +119,7 @@ def dashboard(range_name="7d", today=None):
     return {
         "range": range_name, "ranges": list(DASHBOARD_RANGES), "today": today.isoformat(),
         "what_changed": _text("dashboard_changed", range_name),
-        "rings": rings, "stats": stats, "funnel": funnel, "funnel_note": FUNNEL_NOTE if any(f["partial"] for f in funnel) else "",
+        "gold_waiting": waiting_count(stored), "rings": rings, "stats": stats, "funnel": funnel, "funnel_note": FUNNEL_NOTE if any(f["partial"] for f in funnel) else "",
         "waiting": {
             "count": waiting_count(stored),
             "items": [{"id": str(a.pk), "name": a.full_name, "potential": a.potential_level, "applied": a.created_at.isoformat()} for a in waiting_rows],

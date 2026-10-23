@@ -15,7 +15,7 @@
 
   <section class="o-card o-rings" data-reveal data-office-rings aria-label="Goals">
     <svg class="o-ring-svg" viewBox="0 0 220 220" role="img" data-morph="rings-svg"
-         aria-label="{% for ring in data.rings %}{% if ring.key == 'registrations' %}Registrations {{ ring.value|num }}{% if ring.goal %} of {{ ring.of|num }}{% else %}, no goal set{% endif %}.{% elif ring.key == 'journeys_completed' %} Journeys completed {{ ring.value }}%{% if ring.goal %}, target {{ ring.of }}%{% else %}, no goal set{% endif %}.{% else %} Gold handled {{ ring.value|num }} of {{ ring.of|num }}.{% endif %}{% endfor %}">
+         aria-label="{% for ring in data.rings %}{{ ring.label }} {{ ring.value|num }}{% if ring.goal %}, goal {{ ring.goal|num }}{% endif %}. {% endfor %}">
       {% for ring in data.rings %}
       {% ring_arcs ring.percent as arc %}
       <g class="o-ring o-ring--{{ forloop.counter }}" style="--i: {{ forloop.counter0 }}" transform="rotate(-90 110 110)">
@@ -33,9 +33,8 @@
       <li class="o-legend-row" data-ring="{{ ring.key }}" data-percent="{{ ring.percent|default_if_none:'' }}">
         <span class="o-dot o-dot--{{ forloop.counter }}" aria-hidden="true"></span>
         <span class="o-legend-label" data-ring-label>{{ ring.label }}</span>
-        <span class="o-legend-value"><span class="o-legend-num" data-ring-value>{% if ring.key == 'journeys_completed' %}{{ ring.value }}%{% else %}{{ ring.value|num }}{% endif %}</span>
-          {% if ring.key == 'gold_handled' %}<span class="o-legend-of" data-ring-of>of {{ ring.of|num }}</span>
-          {% elif ring.goal %}<span class="o-legend-of" data-ring-of>of {{ ring.of|num }}{% if ring.key == 'journeys_completed' %}%{% endif %}</span>
+        <span class="o-legend-value"><span class="o-legend-num" data-ring-value>{{ ring.value|num }}</span>
+          {% if ring.goal %}<span class="o-legend-of" data-ring-of>of {{ ring.goal|num }}</span>
           {% else %}<span class="o-legend-of" data-ring-nogoal>No goal set</span>{% endif %}</span>
       </li>
       {% endfor %}

@@ -25,11 +25,11 @@ def plural(n, one, many=None):
 
 
 def change(now, before):
-    """'up 18%', 'down 6%' or 'unchanged' against the previous window; None when there is nothing to compare."""
+    """'3 more than', '2 fewer than' or 'the same as' the previous window, as a plain count; None with nothing to compare."""
     if not before:
         return None
-    pct = round((now - before) * 100 / before)
-    return "unchanged" if pct == 0 else (f"up {pct}%" if pct > 0 else f"down {-pct}%")
+    diff = now - before
+    return "the same as" if diff == 0 else (f"{diff:,} more than" if diff > 0 else f"{-diff:,} fewer than")
 
 
 def _names():
@@ -57,7 +57,7 @@ def chart_sentences(name, today, plans, options, waiting):
     out = {}
     if visitors:
         trend = change(visitors, total(K.VISITORS, before))
-        out["visitors"] = f"{plural(visitors, 'visitor')} {PERIOD[name]}" + (f", {trend} on {THAN[name]}." if trend else ".")
+        out["visitors"] = f"{plural(visitors, 'visitor')} {PERIOD[name]}" + (f", {trend} {THAN[name]}." if trend else ".")
         out["funnel"] = (f"Of {visitors:,} visitors, {started:,} started the journey, {done:,} completed it and {registered:,} registered.")
     top = _top(sums, K.REGISTRATIONS_BY_PLAN, plans)
     if top:
@@ -89,22 +89,28 @@ def chart_sentences(name, today, plans, options, waiting):
     return {chart: out.get(chart, NOTHING[chart]) for chart in CHARTS}
 
 
+WORDS = ((K.REGISTRATIONS, "registration", "registrations"), (K.JOURNEYS_STARTED, "person started", "people started"),
+         (K.JOURNEYS_COMPLETED, "person finished", "people finished"))
+
+
 def dashboard_sentence(name, today, waiting):
+    """Plain counts only: '5 registrations in the last 7 days, 2 more than last week. 9 people started, 3 fewer than last week.'"""
+    keys = [k for k, _, _ in WORDS]
     start, end = reader.range_dates(name, today)
-    now = reader.totals(start, end, [K.REGISTRATIONS, K.JOURNEYS_COMPLETED]).get((K.REGISTRATIONS, ""), 0)
+    now = reader.totals(start, end, keys)
     prev = reader.previous_dates(name, today)
-    before = reader.totals(*prev, [K.REGISTRATIONS]).get((K.REGISTRATIONS, ""), 0) if prev else 0
-    parts = []
-    trend = change(now, before)
-    if trend and trend != "unchanged":
-        parts.append(f"Registrations are {trend} on {THAN[name]}.")
-    elif trend:
-        parts.append(f"Registrations are unchanged on {THAN[name]}.")
-    elif now:
-        parts.append(f"{plural(now, 'registration')} {PERIOD[name]}.")
+    before = reader.totals(*prev, keys) if prev else {}
+    sentences = []
+    for key, one, many in WORDS:
+        value, was = now.get((key, ""), 0), before.get((key, ""), 0)
+        if not value and not was:
+            continue
+        trend = change(value, was)
+        text = f"{value:,} {one if value == 1 else many}" + (f" {PERIOD[name]}" if not sentences else "")
+        sentences.append(text + (f", {trend} {THAN[name]}." if trend else "."))
     if waiting:
-        parts.append(f"{plural(waiting, 'Gold application')} {'is' if waiting == 1 else 'are'} waiting.")
-    return " ".join(parts) or ("A quiet day so far." if name == "today" else "A quiet spell so far.")
+        sentences.append(f"{plural(waiting, 'Gold application')} {'is' if waiting == 1 else 'are'} waiting.")
+    return " ".join(sentences) or ("A quiet day so far." if name == "today" else "A quiet spell so far.")
 
 
 def _store(wanted):
