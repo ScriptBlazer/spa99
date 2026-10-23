@@ -37,7 +37,7 @@ def permissions_for(role):
             if key in (PEOPLE, GOLD_STATUS):
                 ok = ok and action == "view"
         elif role == "Approver":
-            ok = key == GOLD_STATUS and action in ("view", "change")
+            ok = key == GOLD_STATUS and action == "view"   # decisions only through the Office (locked service, invite); never edited in the admin
         else:  # Viewer
             ok = action == "view" and key in VIEWER_MODELS
         if ok:

@@ -60,9 +60,9 @@ Thresholds for High/Medium/Low are settings. The rating and its reasons are stor
 
 ## Email to the approver (GOLD_APPROVER_EMAILS)
 
-To `barry@bmlgroup.co.uk`, cc `moishe.berkowitz@bmlgroup.co.uk` (recipients editable in Control). Sent on submit.
+To `GOLD_APPROVER_EMAILS`, cc `GOLD_APPROVER_CC` (both from env, never hard-coded; empty = no approver email). Sent on submit.
 
-**Subject:** Gold Card application: {Name} ({Potential} potential). The wording is a row in Notification templates (`gold_barry`, `gold_barry_repeat`, `gold_ack`), editable in Control. Dates in the email are 22/10/2026
+**Subject:** Gold Card application: {Name} ({Potential} potential). The wording is a row in Notification templates (`gold_approver`, `gold_approver_repeat`, `gold_ack`), edited in the hidden admin for now. Dates in the email are 22/10/2026
 
 **1. Personal details:** name, email, mobile, date applied, application reference.
 
