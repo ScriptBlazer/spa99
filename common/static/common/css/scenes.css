@@ -290,6 +290,11 @@ html.motion .gc-card, html.motion .gc-sheen { will-change: transform; }
 .gc-gl { aspect-ratio: 10 / 9; }   /* taller than the old 4:3 so the turn, tilt and float never reach the canvas edge; pointer-events none via .gold-card */
 .gc-gl canvas { display: block; width: 100%; height: 100%; opacity: 0; }
 .gold-card.is-gl .gc-stage { visibility: hidden; }
+/* Gold Card page hero on a capable desktop: the flat card stays hidden until the 3D card has faded in, or until the gate says 3D can't run here
+   (.gl-off, set by gold-gl.js, gold-card.js or gold-hero.js's safety timer), so the flat card never flashes on refresh (Moishe 2026-10-23). */
+@media (min-width: 64em) and (prefers-reduced-motion: no-preference) {
+  html.motion:not([data-webgl="off"]) .gold-card--hero:not(.gl-off) .gc-stage { visibility: hidden; }
+}
 
 /* Gold Card page hero (G1): words left, the card right; phone: card on top */
 .gold-hero-grid > .gold-card { grid-column: 1 / -1; justify-self: center; order: -1; --gc-w: min(82vw, 24rem); }

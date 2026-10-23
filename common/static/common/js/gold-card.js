@@ -102,7 +102,7 @@ export function goldCard(mount, scene, { desktop, fine, ctx }) {
   }
   gc.render();
   // the three.js layer (capable desktops only): the gate and loader are in gold-gl.js, fetched only when this could pass
-  if (desktop && root.dataset.webgl !== 'off' && mount.dataset.webglGate) import(mount.dataset.webglGate).then((m) => m.loadCards(ctx, { mount, gc, gsap, ScrollTrigger, cleanups, root })).catch((e) => console.error('gold card 3d', e));
+  if (desktop && root.dataset.webgl !== 'off' && mount.dataset.webglGate) import(mount.dataset.webglGate).then((m) => m.loadCards(ctx, { mount, gc, gsap, ScrollTrigger, cleanups, root })).catch((e) => { console.error('gold card 3d', e); mount.classList.add('gl-off'); });
   return gc;
 }
 

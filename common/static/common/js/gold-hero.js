@@ -1,6 +1,6 @@
 /* The Gold Card page hero scene (docs/design/GOLD-CARD-3D.md). Loaded only by gold.html; scenes.js (imported) owns the registry and the card.
  * Kept out of scenes.js so Home's script stays under its size cap. */
-import { SCENES, lineRise } from './scenes.js';
+import { SCENES, lineRise, cleanups } from './scenes.js';
 import { goldCard } from './gold-card.js';
 
 const { gsap } = window;
@@ -17,6 +17,9 @@ if (gsap) {
     gc.swan();
     gc.render();
     gsap.to(gc, { fade: 1, duration: 0.4, ease: 'soft', onUpdate: gc.render });
+    // safety net: if the 3D card hasn't appeared in 5 s for any reason, show the flat card (CSS hides it meanwhile on desktop)
+    const safety = setTimeout(() => { if (!mount.classList.contains('is-gl')) mount.classList.add('gl-off'); }, 5000);
+    cleanups.push(() => clearTimeout(safety));
     // The half turn runs over the first 45% of the hero's scroll while the card drifts up 35% slower than the page: the back is fully on screen (under the header, clear of the next section) when it arrives.
     const dropEnd = () => (0.35 * 0.45 * el.offsetHeight) / mount.offsetHeight * 100;
     const turn = gsap.timeline({ defaults: { ease: 'none' }, onUpdate: gc.render, scrollTrigger: { trigger: el, start: 'top top', end: () => '+=' + 0.45 * el.offsetHeight, scrub: desktop ? 0.5 : 0.3, invalidateOnRefresh: true } });

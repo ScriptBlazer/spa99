@@ -16,18 +16,21 @@ function webglGate(root) {
 
 /** Load gold-card-3d.js after `load` + idle, and (Home) only when the mount is within two screens. Teardown goes to cleanups. */
 export function loadCards(ctx, { mount, gc, gsap, ScrollTrigger, cleanups, root }) {
-  if (!ctx.conditions.desktop || !webglGate(root)) return;
+  if (!ctx.conditions.desktop || !webglGate(root)) { mount.classList.add('gl-off'); return; }
+  const off = (e) => { console.error('gold card 3d', e); mount.classList.add('gl-off'); };
   const tokens = (name) => getComputedStyle(root).getPropertyValue(name).trim();
   let inst = null, dead = false, io = null;
   const go = () => import(mount.dataset.webglSrc)
-    .then((m) => { if (!dead) ctx.add(() => { inst = m.create(mount, { gsap, ScrollTrigger, tokens, card: gc }); inst.ready.catch((e) => { console.error('gold card 3d', e); inst.dispose(); }); }); })
-    .catch((e) => console.error('gold card 3d', e));
+    .then((m) => { if (!dead) ctx.add(() => { inst = m.create(mount, { gsap, ScrollTrigger, tokens, card: gc }); inst.ready.catch((e) => { off(e); inst.dispose(); }); }); })
+    .catch(off);
   const near = () => {
     if (mount.dataset.goldCard === 'hero' || !('IntersectionObserver' in window)) return go();
     io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { io.disconnect(); go(); } }, { rootMargin: '200% 0px' });
     io.observe(mount);
   };
   const start = () => (window.requestIdleCallback || setTimeout)(() => { if (!dead) near(); }, { timeout: 2000 });
-  if (document.readyState === 'complete') start(); else window.addEventListener('load', start, { once: true });
+  // the Gold Card page hero loads at once (its flat card is hidden meanwhile); Home waits for load + idle
+  if (mount.dataset.goldCard === 'hero') near();
+  else if (document.readyState === 'complete') start(); else window.addEventListener('load', start, { once: true });
   cleanups.push(() => { dead = true; io?.disconnect(); inst?.dispose(); inst = null; });
 }
