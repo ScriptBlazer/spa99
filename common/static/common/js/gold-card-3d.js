@@ -13,13 +13,14 @@ import * as THREE from '../vendor/three/three.module.min.js';
 const W = 85.6, H = 54, R = 3.18, BEV = 0.18, DEPTH = 0.44;       // millimetres: ISO ID-1
 const FW = 1024, FH = 646, BW = 1024, BH = 646;                    // face and back map sizes
 const D2R = Math.PI / 180;
-// THE LOOK (one block to tune; 2026-10-23 contrast pass, GOLD-CARD-3D.md 7.5). The metal only shows what the studio gives it. The face mirrors what sits behind the camera (+z):
-//   panel: a broad soft warm panel there that the face always sees (keeps the champagne reading as gold at every angle); wall/floor/fill: everything else, the deep bronze (never black).
-//   key/strip/rim: the hot highlights (the strip is the band that travels across the face; stripW is its width, wide enough to survive the face's roughness). bump: swan and engraving relief strength.
-//   face/edge/back/light: reflection per surface and the key light. exposure. mood/period/peak: Home only, the extra dim and brighten with the turn.
+// THE LOOK (one block to tune; 2026-10-23, GOLD-CARD-3D.md 7.5): polished mirror-like gold in a dark studio. A mirror shows only what the studio holds, so:
+//   wall/floor/fill: the dark surroundings (multipliers of --color-gold-studio; fill = side, overhead and behind panels): the deep bronze. Never 0.
+//   boxL/boxR/strip: three defined bright softboxes in front of the card (strengths; stripW the tall strip's width). The face reflects them one after another as it turns. They are what you see as bright.
+//   rim: a hot strip behind (lights edges and the back). rough: multiplies the face roughness map (field 0.21, swan 0.1, text 0.3): lower = sharper mirror. coat: clearcoat. bump: swan and engraving relief.
+//   face/edge/back/light: reflection per surface and the key light. exposure. mood/period/peak: Home only, extra dim and brighten with the turn.
 const LOOK = {
-  hero: { panel: 0.9, wall: 0.4,  floor: 0.2,  fill: 0.8, key: 4, strip: 7, stripW: 1.1, rim: 8, exposure: 1,    face: 0.9,  edge: 0.9,  back: 0.8,  light: 0.5, bump: 1.3, mood: 0,    period: 36, peak: 0 },
-  home: { panel: 0.7, wall: 0.28, floor: 0.14, fill: 0.6, key: 3.5, strip: 6.5, stripW: 1.1, rim: 7, exposure: 0.95, face: 0.85, edge: 0.85, back: 0.75, light: 0.45, bump: 1.3, mood: 0.35, period: 36, peak: 2 },
+  hero: { wall: 0.07, floor: 0.05, fill: 0.2, boxL: 9, boxR: 8, strip: 11, stripW: 0.9, rim: 8, rough: 0.5, coat: 0.9, exposure: 1,    face: 1,    edge: 1,    back: 0.85, light: 0.3,  bump: 1.4, mood: 0,    period: 36, peak: 0 },
+  home: { wall: 0.05, floor: 0.04, fill: 0.15, boxL: 8, boxR: 7, strip: 10, stripW: 0.9, rim: 7, rough: 0.5, coat: 0.9, exposure: 0.95, face: 0.95, edge: 0.95, back: 0.8,  light: 0.25, bump: 1.4, mood: 0.35, period: 36, peak: 2 },
 };
 const idle = (fn) => new Promise((resolve) => (window.requestIdleCallback ? requestIdleCallback(() => resolve(fn()), { timeout: 800 }) : setTimeout(() => resolve(fn()), 0)));
 
@@ -268,9 +269,9 @@ export function create(mount, { gsap, tokens, card }) {
       m.position.set(x, y, z); m.lookAt(0, 0, 0); studio.add(m);
     };
     studio.add(new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshBasicMaterial({ color: tok('--color-gold-studio').multiplyScalar(look.wall), side: THREE.BackSide })));   // warm walls: the face never meets black
-    part(6, 4, '--color-gold-studio', look.panel, 0, 0.3, 5.2);   // broad soft panel behind the camera
-    part(3.4, 1.4, '--color-led', look.key, -2.5, 2.4, 3);        // key softbox
-    part(look.stripW, 5, '--color-gold-studio', look.strip, 0, 0, 4.5);         // the sheen strip
+    part(3.2, 2.2, '--color-gold-studio', look.boxL, -3.2, 1.2, 3.6);   // softbox left, high
+    part(2.4, 3.2, '--color-gold-studio', look.boxR, 3.4, -0.2, 3.2);   // softbox right
+    part(look.stripW, 5.5, '--color-gold-studio', look.strip, 0.2, 0, 4.8);   // tall strip, centre
     part(0.15, 4, '--color-led', look.rim, 4, 0.5, -1);         // rim strip
     part(1.6, 4, '--color-gold-studio', 1.4 * look.fill, -4.6, 0, 0.5); part(1.6, 4, '--color-gold-studio', 1.4 * look.fill, 4.6, 0, 1);   // side fills: a soft panel is always in reach at grazing angles
     part(5, 5, '--color-gold-studio', 1.1 * look.fill, 0, 2.9, 0.5);  // overhead fill
@@ -295,7 +296,7 @@ export function create(mount, { gsap, tokens, card }) {
     maps.draw = own(canvasTexture(drawCanvas, { color: true }));
     mats.edge = own(new THREE.MeshPhysicalMaterial({ color: rim, metalness: 1, roughness: 0.2 }));
     mats.face = own(new THREE.MeshPhysicalMaterial({
-      color: gold, metalness: 1, roughness: 1, anisotropy: 0.55, anisotropyRotation: Math.PI / 2, clearcoat: 0.35, clearcoatRoughness: 0.12,
+      color: gold, metalness: 1, roughness: look.rough, anisotropy: 0.3, anisotropyRotation: Math.PI / 2, clearcoat: look.coat, clearcoatRoughness: 0.05,
       normalMap: maps.faceNormal, roughnessMap: maps.faceRough, metalnessMap: maps.faceRough, emissive: tok('--color-gold-light'), emissiveMap: maps.draw, emissiveIntensity: 0,
     }));
     const bronze = tok('--color-gold-deep').lerp(tok('--color-gold-metal'), 0.22);
