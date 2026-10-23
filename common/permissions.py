@@ -13,6 +13,11 @@ def user_in_groups(user, *group_names):
     )
 
 
+def staff_in_groups(user, *group_names):
+    """Roles for the staff hosts: a member account that happens to be in a role group is not staff and never passes."""
+    return user.is_authenticated and user.is_staff and user_in_groups(user, *group_names)
+
+
 def group_required(*group_names):
     """Function-view decorator: logged-in users in one of the groups (superusers always pass)."""
 

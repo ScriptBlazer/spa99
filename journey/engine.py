@@ -149,12 +149,16 @@ def complete(session):
     )
     if changed:
         with transaction.atomic():
-            # Read under a row lock: two tabs finishing at once must count the journey once.
-            first = not type(session).objects.select_for_update().filter(pk=session.pk, completed=True).exists()
-            old_plan = session.suggested_plan.slug if session.suggested_plan_id else None
-            old_level = session.gold_potential
-            old_counted = session.suggestion_detail.get("counted_answers", [])
-            old_furthest = session.furthest_step
+            # Read the old state from the row under a lock: two tabs finishing at once must count the journey once
+            # (the second waits, then sees it completed and only adjusts what differs).
+            locked = type(session).objects.select_for_update().select_related("suggested_plan").get(pk=session.pk)
+            first = not locked.completed
+            old_plan = locked.suggested_plan.slug if locked.suggested_plan_id else None
+            old_level = locked.gold_potential
+            old_counted = locked.suggestion_detail.get("counted_answers", [])
+            old_furthest = locked.furthest_step
+            if not first:
+                session.completed, session.completed_at = True, locked.completed_at
             last = services.result_step(session)
             session.suggested_plan = plan
             session.suggestion_detail = detail

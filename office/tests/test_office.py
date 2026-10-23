@@ -84,6 +84,18 @@ class RoutingAndRoleTests(OfficeTestCase):
             for path in ("/", "/analytics/", "/people/", "/gold/", "/dashboard.json", "/analytics/data/", "/analytics/pages/"):
                 self.assertEqual(get(user, path).status_code, 200, f"{role} {path}")
 
+    def test_a_member_account_in_a_role_group_is_not_let_in(self):
+        member = User.objects.create_user("memberrole@example.com", "x")  # not staff
+        member.groups.add(Group.objects.get(name="Owner"))
+        for path in ("/", "/people/", "/gold/", "/insights/summary/"):
+            self.assertEqual(get(member, path).status_code, 403, path)
+
+    def test_lists_vary_on_htmx_and_are_not_cached(self):
+        response = get(staff("Viewer"), "/people/")
+        self.assertIn("HX-Request", response["Vary"])
+        self.assertIn("no-cache", response["Cache-Control"])
+        self.assertIn("HX-Request", get(staff("Owner"), "/gold/")["Vary"])
+
     def test_the_office_is_not_on_the_public_or_control_host(self):
         owner = staff("Owner")
         self.assertEqual(get(owner, "/people/", host="localhost").status_code, 404)

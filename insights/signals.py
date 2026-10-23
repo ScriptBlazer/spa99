@@ -61,3 +61,21 @@ def invite_deleted(sender, instance, **kwargs):
         metrics.gold_invite(K.GOLD_INVITES_SENT, instance.sent_at, amount=-1)
     if instance.used_at:
         metrics.gold_invite(K.GOLD_INVITES_USED, instance.used_at, amount=-1)
+
+
+# ---------- plan interest (the Django admin can change the plan; the services save through the same path) ----------
+
+@receiver(pre_save, sender="users.InterestRegistration", dispatch_uid="insights_interest_pre")
+def interest_pre_save(sender, instance, **kwargs):
+    _stash(instance, ["plan_id"])
+
+
+@receiver(post_save, sender="users.InterestRegistration", dispatch_uid="insights_interest_post")
+def interest_post_save(sender, instance, created, **kwargs):
+    old = getattr(instance, "_metrics_before", None)
+    if created or old is None or old["plan_id"] == instance.plan_id:
+        return  # creation is counted by the services (they know the source and marketing choice)
+    from plans.models import Plan
+
+    slugs = dict(Plan.objects.filter(pk__in=[p for p in (old["plan_id"], instance.plan_id) if p]).values_list("pk", "slug"))
+    metrics.interest_plan_changed(slugs.get(old["plan_id"]), slugs.get(instance.plan_id), instance.created_at)

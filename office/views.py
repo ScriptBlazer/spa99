@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.cache import patch_vary_headers
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
@@ -28,6 +29,11 @@ def _greeting(user):
 def _fragment(request, full, rows):
     """HTMX asks for the rows only (search, show more)."""
     return rows if request.headers.get("HX-Request") else full
+
+
+def _varied(response):
+    patch_vary_headers(response, ["HX-Request"])
+    return response
 
 
 # ---------- dashboard and analytics ----------
@@ -80,13 +86,14 @@ def analytics_pages(request):
 
 @reader
 @require_GET
+@never_cache
 def people(request):
     filters, page = lists.people_filters(request), lists.page_number(request)
     rows, has_next = lists.people_page(filters, page)
     total = selectors.counters(K.REGISTRATIONS).get((K.REGISTRATIONS, ""), 0)
     context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "total_registered": total,
                "plans": list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order").values("slug", "name")), "section": "people"}
-    return render(request, _fragment(request, "office/people.html", "office/_people_rows.html"), context)
+    return _varied(render(request, _fragment(request, "office/people.html", "office/_people_rows.html"), context))
 
 
 @writer
@@ -106,7 +113,7 @@ def person(request, pk):
 @require_GET
 def person_export(request, pk):
     """UK GDPR: everything we hold about this person, as a JSON download."""
-    user = get_object_or_404(User, pk=pk)
+    user = get_object_or_404(User, pk=pk, interest__isnull=False)
     response = JsonResponse(user_services.export_user_data(user), json_dumps_params={"indent": 2})
     response["Content-Disposition"] = f'attachment; filename="spa99-person-{user.public_id}.json"'
     return response
@@ -130,13 +137,14 @@ def person_delete(request, pk):
 
 @reader
 @require_GET
+@never_cache
 def gold(request):
     filters, page = lists.gold_filters(request), lists.page_number(request)
     rows, has_next = lists.gold_page(filters, page)
     stored = selectors.counters(K.GOLD_APPLICATIONS, K.GOLD_BY_STATUS)
     context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "section": "gold",
                "total_applications": stored.get((K.GOLD_APPLICATIONS, ""), 0), "waiting": selectors.waiting_count(stored)}
-    return render(request, _fragment(request, "office/gold.html", "office/_gold_rows.html"), context)
+    return _varied(render(request, _fragment(request, "office/gold.html", "office/_gold_rows.html"), context))
 
 
 @reader

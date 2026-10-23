@@ -85,12 +85,13 @@ def should_count(request, response):
 
 def _refresh_sentences(today):
     """Keep the stored visitor sentences close behind the figures: for each of the day's first visitors, then every 25th."""
+    from common.tasks import enqueue
+
     from .models import DailyMetric
-    from . import summaries
 
     count = DailyMetric.objects.filter(date=today, key=K.VISITORS, dimension="").values_list("value", flat=True).first() or 0
     if count <= 5 or count % 25 == 0:
-        summaries.write_visitor_sentences(today)
+        enqueue("insights.summaries.write_visitor_sentences")  # a background job: never in the page request
 
 
 def record_page_view(request):

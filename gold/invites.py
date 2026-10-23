@@ -83,10 +83,8 @@ def activate_gold(user):
     if created:
         metrics.registered(plan.slug, interest.source, interest.created_at, marketing=user.marketing_consent)
     elif interest.plan_id != plan.pk:
-        old_slug = interest.plan.slug if interest.plan_id else None
         interest.plan = plan
-        interest.save()
-        metrics.interest_plan_changed(old_slug, plan.slug, interest.created_at)
+        interest.save()  # the plan split follows this save (insights.signals)
     return True
 
 

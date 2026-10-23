@@ -87,6 +87,31 @@ class EventTests(TestCase):
         self.assertEqual((counter(K.JOURNEYS_COMPLETED), counter(K.JOURNEY_ANSWER, "time:evening"), counter(K.JOURNEY_ANSWER, "time:daytime")), (1, 0, 1))
         self.assertEqual(rebuild.differences(), [])
 
+    def test_two_tabs_finishing_with_stale_copies_count_the_journey_once(self):
+        from journey.models import JourneySession
+        session = journey.create_session(SAFARI)
+        for key, values in {"time": ["evening"], "frequency": ["two_three"], "facilities": ["gym"], "company": ["alone"], "industry": ["finance"]}.items():
+            journey.save_answer(session, key, options=values)
+        other_tab = JourneySession.objects.get(pk=session.pk)  # loaded before either finished
+        engine.complete(session)
+        engine.complete(other_tab)
+        self.assertEqual((counter(K.JOURNEYS_COMPLETED), counter(K.JOURNEY_ANSWER, "time:evening")), (1, 1))
+        self.assertEqual(rebuild.differences(), [])
+
+    def test_admin_style_changes_move_the_figures(self):
+        from plans.models import Plan
+        user = services.register_interest(cleaned()).user
+        interest = user.interest
+        interest.plan = Plan.objects.get(slug="tier-1")
+        interest.save()  # what the admin does
+        self.assertEqual((counter(K.REGISTRATIONS_BY_PLAN, "tier-2"), counter(K.REGISTRATIONS_BY_PLAN, "tier-1")), (0, 1))
+        from django.contrib.admin.sites import site
+        from users.models import User as U
+        user.refresh_from_db()
+        site._registry[U].delete_model(None, user)  # the admin's delete goes through the erasure service
+        self.assertEqual((counter(K.REGISTRATIONS), counter(K.REGISTRATIONS_BY_PLAN, "tier-1")), (0, 0))
+        self.assertEqual(rebuild.differences(), [])
+
     def test_gold_application_approval_invite_use_decline_and_erasure(self):
         barry = User.objects.create_user("barry@example.com", "x", is_staff=True)
         first = gold_services.submit_application(application_data())[0]
@@ -197,6 +222,12 @@ class VisitorCounterTests(TestCase):
         request.urlconf = "config.urls_office"
         VisitorCounterMiddleware(lambda r: HttpResponse("x"))(request)
         self.assertFalse(DailyMetric.objects.filter(key=K.PAGE_VIEWS).exists())
+
+    def test_sentence_refresh_is_queued_not_run_in_the_request(self):
+        with mock.patch("common.tasks.enqueue") as queued, mock.patch("insights.summaries.write_visitor_sentences") as direct:
+            self.count(self.view())
+        queued.assert_called_once_with("insights.summaries.write_visitor_sentences")
+        direct.assert_not_called()
 
     def test_a_failure_never_breaks_the_page(self):
         with mock.patch("insights.visitors.record_page_view", side_effect=RuntimeError("db down")):

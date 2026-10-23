@@ -139,10 +139,8 @@ def set_interest(user, plan):
         if created:
             metrics.registered(plan.slug if plan else None, interest.source, interest.created_at, marketing=user.marketing_consent)
         elif interest.plan_id != (plan.pk if plan else None):
-            old_slug = interest.plan.slug if interest.plan_id else None
             interest.plan = plan
-            interest.save()
-            metrics.interest_plan_changed(old_slug, plan.slug if plan else None, interest.created_at)
+            interest.save()  # the plan split follows this save (insights.signals), so the admin path counts too
     return interest
 
 
