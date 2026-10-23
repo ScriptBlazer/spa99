@@ -1,0 +1,9 @@
+{% comment %}
+A simple read-only table. Context: columns (list of dicts: {"label": "Price", "num": True} for the header), rows (list of lists of cell text), empty (text, optional).
+For richer rows (buttons, badges, inline edit) write your own `<table class="sys-table">` inside `<div class="sys-scroll">` and use `class="sys-num"` on number cells.
+{% endcomment %}
+<div class="sys-scroll"><table class="sys-table">
+  <thead><tr>{% for column in columns %}<th scope="col"{% if column.num %} class="sys-num"{% endif %}>{{ column.label }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for row in rows %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+  {% empty %}<tr><td class="sys-empty" colspan="{{ columns|length }}">{{ empty|default:"Nothing here yet." }}</td></tr>{% endfor %}</tbody>
+</table></div>

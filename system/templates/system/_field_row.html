@@ -1,0 +1,17 @@
+{% load system_ui %}{% comment %}
+One settings-style row (label left, control right). Context: field (a bound form field); optional unit ("£", "%", "min"), unit_before (true puts it before).
+Booleans become the one switch (system_ui.switch) with On/Off beside it. Fields in system_ui.RISKY are confirmed on save (the row carries data-risky, data-noun, data-plural, data-line; your own rows can set the same).
+{% endcomment %}
+<div class="sys-row{% if field.errors %} invalid{% endif %}" data-system-field="{{ field.name }}"{% if field.name|is_wide %} data-wide{% endif %}{% if field.name|is_risky %} data-risky data-noun="{{ field.name|risky_noun }}" data-plural="{{ field.name|risky_plural }}" data-line="{{ field.name|risky_line }}"{% if field.name|is_stage %} data-stage{% endif %}{% endif %}>
+  <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}</label>
+  <div>
+    <div class="sys-ctl">
+      {% if field.field.widget.input_type == "checkbox" %}
+        {% switch field %}
+      {% else %}
+        {% if unit and unit_before %}<span class="sys-unit">{{ unit }}</span>{% endif %}{{ field }}{% if unit and not unit_before %}<span class="sys-unit">{{ unit }}</span>{% endif %}
+      {% endif %}
+    </div>
+    {% if field.errors %}<p class="sys-error" role="alert" id="{{ field.id_for_label }}_error">{{ field.errors|join:" " }}</p>{% endif %}
+  </div>
+</div>

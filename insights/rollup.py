@@ -16,6 +16,8 @@ from datetime import date, timedelta
 from django.db import transaction
 from django.db.models import Sum
 
+from common.jobs import tracked
+
 from . import metrics, visitors
 from .metrics import K, RATE_KEYS
 from .models import DailyMetric, MetricCounter, PeriodMetric, VisitorHash, VisitorSalt
@@ -57,6 +59,7 @@ def window_start(today, window_days=WINDOW_DAYS):
     return week_start(month_start(today - timedelta(days=window_days)))
 
 
+@tracked("rollup")
 def run(today=None, since="window"):
     """Run the roll-up. `since`: "window" (default), a date, or None for all history. Returns a small summary dict."""
     today = today or metrics.day()

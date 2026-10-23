@@ -58,7 +58,7 @@
         <div><dt class="muted">Email</dt><dd>{{ request.user.email }}</dd></div>
         <div><dt class="muted">Mobile</dt><dd>{{ request.user.mobile|default:"Not given" }}</dd></div>
       </dl>
-      <p class="small muted">To change these details, write to <a href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a>.</p>
+      <p class="small muted">To change these details, write to <a href="mailto:{{ site_settings.contact_address }}">{{ site_settings.contact_address }}</a>.</p>
       <p><a class="btn-quiet" href="{% url 'password_change' %}">Change password</a></p>
     </div>
 

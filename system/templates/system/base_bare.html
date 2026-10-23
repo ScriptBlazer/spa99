@@ -1,0 +1,22 @@
+{% load static system_ui %}{% system_env as env %}<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>{{ env|upper }} · {% block title %}Sign in{% endblock %} · System</title>
+<link rel="icon" href="{% static 'common/img/mark-gold.svg' %}" type="image/svg+xml">
+<link rel="stylesheet" href="{% static 'common/css/fonts.css' %}">
+<link rel="stylesheet" href="{% static 'common/css/tokens.css' %}">
+<link rel="stylesheet" href="{% static 'common/css/system.css' %}">
+</head>
+<body class="system system-bare{% if env == 'live' %} live{% endif %}" data-system-section="{% block section %}signin{% endblock %}" data-env="{{ env }}">
+{% if env == "live" %}<div class="sys-stripe" aria-hidden="true"></div>{% endif %}
+<main class="sys-center" data-system-main>
+  <div class="sys-panel">
+    <div class="sys-brand"><img src="{% static 'common/img/mark-gold.svg' %}" alt="" width="11" height="16"><span>System</span><span class="sys-env" data-system-env="{{ env }}" data-env="{{ env }}">{{ env|upper }}</span></div>
+    {% block main %}{% endblock %}
+  </div>
+</main>
+</body>
+</html>

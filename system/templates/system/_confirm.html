@@ -1,0 +1,21 @@
+{# Confirm dialog for risky changes (system.js fills it): title names the environment, a diff of old -> new, one consequence line,
+   a named action button, and an optional "Type LIVE" guard. Included once, by base.html. #}
+<dialog class="sys-dialog" data-system-confirm aria-labelledby="system-confirm-title">
+  <form method="dialog">
+    <div class="sys-body">
+      <h2 id="system-confirm-title" data-system-confirm-title></h2>
+      <div class="sys-diff" data-system-confirm-diff></div>
+      <p data-system-confirm-line class="sys-muted"></p>
+      <label data-system-confirm-guard hidden>Type LIVE to confirm <input type="text" autocomplete="off" spellcheck="false" data-system-confirm-input></label>
+    </div>
+    <footer>
+      <button type="button" class="sys-btn" data-system-confirm-cancel autofocus>Cancel</button>
+      <button type="submit" class="sys-btn primary" data-system-confirm-ok value="ok"></button>
+    </footer>
+  </form>
+</dialog>
+<dialog class="sys-dialog sys-keys" data-system-keys aria-label="Keyboard shortcuts">
+  <form method="dialog"><div class="sys-body"><h2>Keyboard shortcuts</h2>
+    <dl><dt><kbd>/</kbd></dt><dd>Search this page</dd><dt><kbd>Ctrl</kbd> <kbd>S</kbd></dt><dd>Save (Cmd on Mac)</dd><dt><kbd>g</kbd> then <kbd>d</kbd></dt><dd>Go to Dashboard</dd><dt><kbd>g</kbd> then <kbd>a</kbd></dt><dd>Go to Audit log</dd><dt><kbd>j</kbd> <kbd>k</kbd> <kbd>Enter</kbd> <kbd>u</kbd></dt><dd>Audit log: next or previous group, open, undo</dd><dt><kbd>?</kbd></dt><dd>This list</dd><dt><kbd>Esc</kbd></dt><dd>Close a dialog</dd></dl></div>
+    <footer><button type="submit" class="sys-btn">Close</button></footer></form>
+</dialog>

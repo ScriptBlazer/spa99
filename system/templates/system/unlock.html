@@ -1,0 +1,15 @@
+{% extends "system/base_bare.html" %}
+{% block title %}Unlock{% endblock %}
+{% block section %}unlock{% endblock %}
+{% block main %}
+<h1>System is locked</h1>
+<p class="sys-muted" style="color:var(--sys-text-2)">Signed in as <span class="mono">{{ request.user.email }}</span>. Enter your password to continue.</p>
+<form method="post" action="{% url 'system_unlock' %}" data-system-unlock style="display:grid;gap:12px">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <label>Password <input type="password" name="password" autocomplete="current-password" autofocus required{% if error %} aria-invalid="true" aria-describedby="unlock-error"{% endif %}></label>
+  {% if error %}<p class="sys-error" id="unlock-error" data-system-error role="alert">{{ error }}</p>{% endif %}
+  <button type="submit" class="sys-btn primary">Unlock</button>
+</form>
+<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit" class="sys-btn link" style="width:auto;height:auto;padding:0">Not you? Sign out</button></form>
+{% endblock %}

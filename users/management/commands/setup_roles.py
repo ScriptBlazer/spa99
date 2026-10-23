@@ -1,11 +1,13 @@
-"""Create (or refresh) the Control roles as Django Groups: Owner, Manager, Viewer. PROPOSED permissions per
+"""Create (or refresh) the staff roles as Django Groups: Owner, Manager, Viewer, Approver, System. PROPOSED permissions per
 docs/features/admin.md, to be approved by Moishe. Safe to run again; `--dry-run` only prints.
 
   Owner   everything, including Team (users, groups) and Gold status
   Manager everything on the project apps except Team and Gold status (people and Gold applications are view only here;
           Control does the field-level edits)
   Approver Gold only (Office): sees and decides Gold applications (approve, decline, resend); nothing else. Whoever
-          is named in GOLD_APPROVER_EMAILS usually holds this role.
+          is listed under System > Emails usually holds this role.
+  System  developers only: may use the System host (system.spa99.uk) with a staff account. The group holds no model
+          permissions (System is its own app); membership is the permission.
   Viewer  read-only: dashboard (insights), people, Gold applications, journey sessions
 Superusers bypass groups entirely.
 """
@@ -38,6 +40,8 @@ def permissions_for(role):
                 ok = ok and action == "view"
         elif role == "Approver":
             ok = key == GOLD_STATUS and action == "view"   # decisions only through the Office (locked service, invite); never edited in the admin
+        elif role == "System":
+            ok = False  # access to System is the group membership itself (system.services.may_use_system)
         else:  # Viewer
             ok = action == "view" and key in VIEWER_MODELS
         if ok:
@@ -46,7 +50,7 @@ def permissions_for(role):
 
 
 class Command(BaseCommand):
-    help = "Create or refresh the Owner, Manager, Viewer and Approver groups."
+    help = "Create or refresh the Owner, Manager, Viewer, Approver and System groups."
 
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true", help="Show the permission counts; change nothing.")
@@ -54,7 +58,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         with transaction.atomic():
-            for role in ("Owner", "Manager", "Viewer", "Approver"):
+            for role in ("Owner", "Manager", "Viewer", "Approver", "System"):
                 wanted = permissions_for(role)
                 group, created = Group.objects.get_or_create(name=role)
                 lookup = {(p.content_type.app_label, p.codename): p for p in Permission.objects.select_related("content_type")}

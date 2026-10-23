@@ -1,0 +1,64 @@
+{% extends "system/base.html" %}
+{% load static system_ui %}
+{% block head_extra %}<link rel="stylesheet" href="{% static 'common/css/system-audit.css' %}">{% endblock %}
+{% block main %}
+{% comment %}
+The audit log (docs/design/SYSTEM.md 7). Context: feed (days > groups > items, page; see system/feed.py), params, people, section_choices,
+chips, entry_count, link_query, drawer, export_query, filters_set, chain (None until a stored integrity status exists).
+Works without JavaScript: every control is a plain GET form or link; system.js swaps the list in place, adds the drawer, keys and sheets.
+Hooks: data-system-audit, data-system-day, data-system-group (data-type, data-category, data-outcome), data-system-item, data-system-sentence.
+{% endcomment %}
+<div class="sys-head">
+  <div><h1>Audit log</h1><p>Every change and every sign-in, newest first. Undo restores the old value as a new entry.</p></div>
+  <div class="sys-actions">
+    {% if chain %}{% if chain.ok %}<span class="au-chain ok" title="Checked {{ chain.checked_at|date:'H:i' }}">{% include "system/_audit_icon.html" with name="shield-check" %}Chain verified · {{ chain.entries }} entries</span>{% else %}<span class="au-chain bad">Chain broken</span>{% endif %}{% endif %}<form method="post" action="{% url 'system_audit_check' %}" class="au-check">{% csrf_token %}<button type="submit" class="sys-btn">Check now</button></form>
+    <a class="sys-btn au-export" href="{% url 'system_audit_export' %}{% if export_query %}?{{ export_query }}{% endif %}" data-system-export>{% include "system/_audit_icon.html" with name="download-simple" %}Export CSV</a>
+  </div>
+</div>
+{% if chain and not chain.ok %}<div class="au-banner" role="alert"><b>The audit chain is broken at entry {{ chain.broken_seq }}.</b> Entries from there on may have been altered outside System.</div>{% endif %}
+
+<div class="au" data-system-audit>
+  <form method="get" action="{% url 'system_changes' %}" class="au-bar" data-system-filters role="search" aria-label="Filter the audit log">
+    <button type="submit" class="sys-btn au-apply">Filter</button>
+    {% if params.kind %}<input type="hidden" name="kind" value="{{ params.kind }}">{% endif %}
+    <button type="button" class="sys-btn au-filters-btn" data-system-sheet-open aria-expanded="false" aria-controls="au-sheet">Filters<span class="au-n mono" data-system-filter-count{% if not active_filters %} hidden{% endif %}> {{ active_filters }}</span></button>
+    <div class="au-sheet" id="au-sheet" data-system-sheet>
+      <div class="au-sheet-head"><b>Filters</b><button type="button" class="sys-btn sm" data-system-sheet-close>Done</button></div>
+      <label class="au-field-wrap"><span class="sr">Person</span><select name="user" aria-label="Person"><option value="">Everyone</option>{% for email in people %}<option value="{{ email }}"{% if params.user == email %} selected{% endif %}>{{ email }}</option>{% endfor %}</select></label>
+      <label class="au-field-wrap"><span class="sr">Section</span><select name="section" aria-label="Section"><option value="">All sections</option>{% for key, label in section_choices %}<option value="{{ key }}"{% if params.section == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <div class="au-chips" role="group" aria-label="Type" data-system-chips><input type="hidden" name="category" value="{{ params.category }}">{% for chip in chips %}<button type="submit" name="category" value="{{ chip.value }}" class="au-chip-btn" aria-pressed="{{ chip.pressed|yesno:'true,false' }}" data-key="{{ chip.key }}">{{ chip.label }}</button>{% endfor %}</div>
+      <div class="au-range" role="group" aria-label="Date" data-system-range><input type="hidden" name="range" value="{{ params.range }}">
+        <button type="submit" name="range" value="1" class="au-seg" aria-pressed="{% if params.range == '1' %}true{% else %}false{% endif %}">Today</button><button type="submit" name="range" value="7" class="au-seg" aria-pressed="{% if params.range == '7' %}true{% else %}false{% endif %}">7 days</button><button type="submit" name="range" value="30" class="au-seg" aria-pressed="{% if params.range == '30' %}true{% else %}false{% endif %}">30 days</button><button type="button" class="au-seg au-custom-btn" data-system-custom aria-pressed="{% if params.date_from or params.date_to %}true{% else %}false{% endif %}" aria-controls="au-dates">Custom</button>
+      </div>
+      <div class="au-dates" id="au-dates" data-system-dates{% if params.date_from or params.date_to %} data-open{% endif %}><label>From <input type="date" name="date_from" value="{{ params.date_from }}"></label><label>To <input type="date" name="date_to" value="{{ params.date_to }}"></label></div>
+      <a class="sys-btn au-export-phone" href="{% url 'system_audit_export' %}{% if export_query %}?{{ export_query }}{% endif %}" data-system-export>{% include "system/_audit_icon.html" with name="download-simple" %}Export CSV</a>
+    </div>
+    <label class="au-search"><span class="sr">Find a field or value</span><input type="search" name="q" value="{{ params.q }}" placeholder="Find a field or value" aria-label="Find a field or value" data-system-search autocomplete="off"><kbd class="au-slash" aria-hidden="true">/</kbd></label>
+  </form>
+  <div class="au-sheet-scrim" data-system-sheet-scrim hidden></div>
+
+  <div class="au-count" data-system-summary>
+    <p data-system-count-text aria-live="polite"><span class="mono">{{ entry_count }}</span> entr{{ entry_count|pluralize:"y,ies" }} in <span class="mono">{{ feed.page.total }}</span> group{{ feed.page.total|pluralize }}</p>
+    <span class="au-count-tools">{% if filters_set %}<a href="{% url 'system_changes' %}" data-system-clear>Clear filters</a>{% endif %}<button type="button" class="sys-btn link sm" data-system-expand-all hidden>Expand all</button></span>
+  </div>
+  <p class="au-error" data-system-error role="alert" hidden>Could not load entries. Try again. <button type="button" class="sys-btn sm" data-system-retry>Retry</button></p>
+
+  <div class="au-list" data-system-results>
+  {% for day in feed.days %}
+    <section class="au-day" data-system-day="{{ day.date|date:'Y-m-d' }}" aria-label="{{ day.name }} {{ day.date|date:'j F Y' }}">
+      <h2 class="au-dayhead"><span class="au-dayname">{{ day.name }}</span><span class="au-date">{{ day.date|date:"D j M Y" }}</span><span class="au-daycount mono">{{ day.entries }} entr{{ day.entries|pluralize:"y,ies" }}</span></h2>
+      <ul class="au-groups">{% for g in day.groups %}<li>{% include "system/_audit_group.html" %}</li>{% endfor %}</ul>
+    </section>
+  {% empty %}
+    <div class="au-empty" data-system-empty>{% if filters_set %}<p>No entries match these filters.</p><a href="{% url 'system_changes' %}" data-system-clear>Clear filters</a>{% else %}<p>Nothing logged yet.</p>{% endif %}</div>
+  {% endfor %}
+  </div>
+  <nav class="au-pages" data-system-pages aria-label="Pages">
+    {% if feed.page.has_previous %}<a class="sys-btn" href="?{{ export_query }}{% if export_query %}&amp;{% endif %}page={{ feed.page.previous_number }}">Newer entries</a>{% endif %}
+    {% if feed.page.has_next %}<a class="sys-btn au-more-btn" href="?{{ export_query }}{% if export_query %}&amp;{% endif %}page={{ feed.page.next_number }}" data-system-more>Load {% if feed.page.remaining < feed.page.size %}{{ feed.page.remaining }}{% else %}{{ feed.page.size }}{% endif %} more</a>
+    {% elif feed.days %}<p class="au-end">{% if filters_set %}End of the results{% else %}Start of the log{% endif %} · {% with last=feed.days|last %}{{ last.date|date:"j M Y" }}{% endwith %}</p>{% endif %}
+    {% if feed.page.num_pages > 1 %}<span class="au-pageno mono">Page {{ feed.page.number }} of {{ feed.page.num_pages }}</span>{% endif %}
+  </nav>
+</div>
+{% include "system/_audit_drawer.html" %}
+{% endblock %}

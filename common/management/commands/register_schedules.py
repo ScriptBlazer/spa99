@@ -7,6 +7,7 @@ from django_q.models import Schedule
 SCHEDULES = [
     {"name": "heartbeat", "func": "common.tasks.heartbeat", "schedule_type": Schedule.HOURLY},
     {"name": "metrics-rollup", "func": "insights.rollup.scheduled", "schedule_type": Schedule.HOURLY},
+    {"name": "system-audit-verify", "func": "system.audit.scheduled", "schedule_type": Schedule.HOURLY},
     # Daily from the next 00:01 London (`at`): "today" starts empty and the Dashboard must not wait for the next hourly run
     {"name": "metrics-rollup-midnight", "func": "insights.rollup.scheduled", "schedule_type": Schedule.DAILY, "at": (0, 1)},
 ]

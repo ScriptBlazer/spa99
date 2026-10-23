@@ -1,0 +1,3 @@
+{# All fields of a form as field rows, then the non-field errors. Context: form. For groups write your own `<section class="sys-group">` and include _field_row.html per field. #}
+{% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error>{{ form.non_field_errors|join:" " }}</p>{% endif %}
+{% for field in form %}{% include "system/_field_row.html" %}{% endfor %}

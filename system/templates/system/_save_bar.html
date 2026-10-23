@@ -1,0 +1,7 @@
+{# The save bar: hidden until a form[data-system-form] on the page has unsaved edits (system.js). Included once, by base.html. #}
+<div class="sys-savebar" data-system-savebar hidden>
+  <span class="sys-msg" data-system-savebar-msg><span data-system-count>0 unsaved changes</span> <button type="button" class="sys-btn link sm" data-system-show aria-expanded="false">Show</button></span>
+  <button type="button" class="sys-btn" data-system-discard>Discard</button>
+  <button type="button" class="sys-btn primary" data-system-save>Save</button>
+  <ul class="sys-changes-list sys-diff" data-system-list hidden></ul>
+</div>

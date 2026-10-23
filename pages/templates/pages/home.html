@@ -7,7 +7,7 @@
 {% block head_extra %}
 {% hero_video as hv_head %}{% if hv_head.poster %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="{{ hv_head.poster }}" media="(min-width: 48em)">
 <link rel="preload" as="image" type="image/webp" fetchpriority="high" href="{{ hv_head.poster_portrait }}" media="(max-width: 47.99em)">{% endif %}
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"DaySpa","name":"Spa 99","description":"A private spa for men in North London.","url":"{{ request.scheme }}://{{ request.get_host }}/","email":"{{ site_settings.contact_email }}","address":{"@type":"PostalAddress","streetAddress":"{{ site_settings.address_street|default:"99 Vale Road"|escapejs }}","addressLocality":"{{ site_settings.address_town|default:"London"|escapejs }}","postalCode":"{{ site_settings.address_postcode|default:"N4 1PR"|escapejs }}","addressCountry":"GB"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"DaySpa","name":"Spa 99","description":"A private spa for men in North London.","url":"{{ request.scheme }}://{{ request.get_host }}/","email":"{{ site_settings.contact_address }}","address":{"@type":"PostalAddress","streetAddress":"{{ site_settings.address_street|default:"99 Vale Road"|escapejs }}","addressLocality":"{{ site_settings.address_town|default:"London"|escapejs }}","postalCode":"{{ site_settings.address_postcode|default:"N4 1PR"|escapejs }}","addressCountry":"GB"}}</script>
 {% endblock %}
 {% block main %}
 {% page_content "home" as home %}

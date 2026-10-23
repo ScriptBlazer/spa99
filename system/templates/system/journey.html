@@ -1,0 +1,54 @@
+{% extends "system/base.html" %}
+{% load system_ui %}
+{% block title %}Journey{% endblock %}
+{% block main %}
+{% include "system/_page_header.html" with title="Journey" description="Questions, options and suggestion rules. Changes apply at once." %}
+<p class="sys-muted" style="margin:-8px 0 16px">Plan slugs: <span class="mono">{{ plan_slugs|join:", " }}</span></p>
+<ul hidden data-system-risky-fields>{% for name in risky_fields %}<li>{{ name }}</li>{% endfor %}</ul>
+{% for q in questions %}
+<section class="sys-panel" data-system-question="{{ q.obj.key }}" aria-labelledby="q-{{ q.obj.pk }}">
+  <header><h2 id="q-{{ q.obj.pk }}">{{ q.obj.text|truncatechars:80 }}</h2><span class="sys-muted mono">{{ q.obj.key }} · {{ q.obj.get_type_display }}</span></header>
+  <form method="post" action="{% url 'system_question_save' q.obj.pk %}" data-system-form="question" data-system-risky="{{ risky_fields|join:',' }}" data-noun="question setting" data-plural="question settings" data-line="The journey changes at once.">{% csrf_token %}
+    <div class="sys-group">{% include "system/_fields.html" with form=q.form %}</div>
+    <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save question</button></div>
+  </form>
+  <div class="sys-scroll"><table class="sys-table">
+    <thead><tr><th scope="col">Option</th><th scope="col">Label</th><th scope="col" class="sys-num">Order</th><th scope="col">Plan points</th><th scope="col" class="sys-num">Gold points</th><th scope="col" class="sys-num">Weight</th><th scope="col">Active</th><th scope="col"><span class="sr">More settings</span></th></tr></thead>
+    <tbody>
+    {% for row in q.options %}{% with pk=row.obj.pk f=row.form %}
+      <tr data-system-option="{{ row.obj.value }}" data-row-label="{{ row.obj.value }}"{% if not row.obj.active %} data-hidden{% endif %}>
+        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_option_save' pk %}" data-system-form="option" data-system-risky="{{ risky_fields|join:',' }}" data-noun="option setting" data-plural="option settings" data-line="Suggestions change at once.">{% csrf_token %}</form><span class="mono">{{ row.obj.value }}</span></td>
+        <td>{% cell f.label pk "Label" %}</td>
+        <td class="sys-num">{% cell f.order pk "Order" %}</td>
+        <td>{% cell f.plan_points pk "Plan points" %}</td>
+        <td class="sys-num">{% cell f.gold_points pk "Gold points" %}</td>
+        <td class="sys-num">{% cell f.weight pk "Weight" %}</td>
+        <td>{% cell f.active pk "Active" %}</td>
+        <td><button type="button" class="sys-btn sm sys-expand" data-system-expand aria-expanded="{% if f.errors %}true{% else %}false{% endif %}" aria-controls="more-{{ pk }}">More</button><button type="submit" form="f-{{ pk }}" class="sys-btn sm sys-rowsave">Save</button></td>
+      </tr>
+      <tr class="sys-sub" id="more-{{ pk }}" data-row-label="{{ row.obj.value }}"{% if f.errors %} data-open{% endif %}>
+        <td colspan="8"><div class="sys-subgrid"><label class="grow">Reason shown with the suggestion {% cell f.reason pk "Reason" %}</label></div></td>
+      </tr>
+      {% if f.errors %}<tr class="sys-rowerr"><td colspan="8" class="sys-error" role="alert">{{ row.obj.value }}: {{ f|error_text }}</td></tr>{% endif %}
+    {% endwith %}{% empty %}<tr><td class="sys-empty" colspan="8">No options yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  <details{% if q.add_form.errors %} open{% endif %}><summary class="sys-add">Add an option</summary>
+    <form method="post" action="{% url 'system_option_add' q.obj.pk %}" data-system-form="option-add" data-system-add class="sys-group">{% csrf_token %}
+      {% include "system/_fields.html" with form=q.add_form %}
+      <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add option</button></div>
+    </form>
+  </details>
+</section>
+{% endfor %}
+<section class="sys-panel" data-system-suggestions aria-labelledby="sugg-h"><header><h2 id="sugg-h">Suggestion rules</h2></header>
+  {% for row in suggestion_rules %}
+  <form method="post" action="{% url 'system_suggestion_save' row.obj.pk %}" data-system-form="suggestion" data-system-risky="{{ risky_fields|join:',' }}" data-noun="suggestion rule setting" data-plural="suggestion rule settings" data-line="Suggestions change at once." class="sys-group">{% csrf_token %}
+    <h3>{{ row.obj.name }}</h3>
+    {% include "system/_fields.html" with form=row.form %}
+    <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary sys-rowsave">Save rule</button></div>
+  </form>
+  {% empty %}<p class="sys-pad sys-muted">No suggestion rules yet.</p>
+  {% endfor %}
+</section>
+{% endblock %}

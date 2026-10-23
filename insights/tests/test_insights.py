@@ -165,4 +165,4 @@ class PermissionTests(TestCase):
         owner = set(Group.objects.get(name="Owner").permissions.values_list("codename", flat=True))
         self.assertTrue({"change_goldapplication", "change_user", "add_group"} <= owner)
         call_command("setup_roles", stdout=StringIO())  # safe to run again
-        self.assertEqual(Group.objects.count(), 4)
+        self.assertEqual(Group.objects.count(), 5)

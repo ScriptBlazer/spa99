@@ -13,7 +13,7 @@
       {% for line in part.body|lines %}<p>{{ line }}</p>{% endfor %}
       {% endfor %}
       {% if doc.contact %}
-      <h2>{{ doc.contact.heading }}</h2><p>{{ doc.contact.body }} <a href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a>.</p>
+      <h2>{{ doc.contact.heading }}</h2><p>{{ doc.contact.body }} <a href="mailto:{{ site_settings.contact_address }}">{{ site_settings.contact_address }}</a>.</p>
       {% endif %}
     </div>
   </div>

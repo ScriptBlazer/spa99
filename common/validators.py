@@ -54,6 +54,20 @@ def validate_adult(dob, today=None):
     return dob
 
 
+def split_emails(value):
+    """'a@x.com, b@y.com' -> ['a@x.com', 'b@y.com'] (commas or semicolons or new lines; blanks dropped)."""
+    return [part.strip() for part in (value or "").replace(";", ",").replace("\n", ",").split(",") if part.strip()]
+
+
+def validate_email_list(value):
+    """A comma separated list of email addresses; blank is allowed."""
+    for address in split_emails(value):
+        try:
+            validate_email(address)
+        except ValidationError:
+            raise ValidationError(f"{address} is not a valid email address.") from None
+
+
 def normalise_email(value):
     """Trim and lowercase, then check the format. Returns the clean address or raises ValidationError."""
     cleaned = (value or "").strip().lower()

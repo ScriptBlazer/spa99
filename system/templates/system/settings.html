@@ -1,0 +1,19 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Settings" description="Opening date, stage switches and wording. Changes apply at once." %}
+<form method="post" data-system-form="settings" data-system-risky="{{ risky_fields|join:',' }}">{% csrf_token %}
+  <section class="sys-panel">
+    {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error>{{ form.non_field_errors|join:" " }}</p>{% endif %}
+    <div class="sys-group"><h3>Stages</h3>
+      {% for field in form %}{% if field.name == "register_interest_open" or field.name == "subscribe_open" or field.name == "booking_open" or field.name == "opening_date" or field.name == "opening_text" %}{% include "system/_field_row.html" %}{% endif %}{% endfor %}
+    </div>
+    <div class="sys-group"><h3>Wording and tax</h3>
+      {% for field in form %}{% if field.name == "join_wording" %}{% include "system/_field_row.html" %}{% elif field.name == "vat_rate" %}{% include "system/_field_row.html" with unit="%" %}{% endif %}{% endfor %}
+    </div>
+    <div class="sys-group" data-system-security><h3>Security</h3>
+      {% for field in form %}{% if field.name == "lock_idle_minutes" %}{% include "system/_field_row.html" with unit="minutes" %}{% elif field.name == "max_sign_in_hours" %}{% include "system/_field_row.html" with unit="hours" %}{% endif %}{% endfor %}
+    </div>
+  </section>
+  <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>
+</form>
+{% endblock %}

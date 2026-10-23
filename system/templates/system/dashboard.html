@@ -1,0 +1,34 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Dashboard" description="Stored figures only. Nothing here is counted when the page loads." %}
+<section class="sys-tiles" data-system-health aria-label="Health">
+  <div class="sys-tile" data-system-tile="health"><div class="l">Health {% if health.database_ok %}<span class="sys-badge ok">OK</span>{% else %}<span class="sys-badge danger">Failing</span>{% endif %}</div>
+    <div class="v" data-system-health-db="{{ health.database_ok|yesno:'ok,error' }}">{{ health.database_ok|yesno:"OK,Failing" }}</div><div class="m">Checked {% now "H:i" %}</div></div>
+  <div class="sys-tile" data-system-tile="queue"><div class="l">Queue {% if health.queue_size is None %}<span class="sys-badge warn">Unknown</span>{% endif %}</div>
+    <div class="v" data-system-health-queue>{% if health.queue_size is None %}Unknown{% else %}{{ health.queue_size }}{% endif %}</div><div class="m">pending jobs</div></div>
+  <div class="sys-tile" data-system-tile="rollup"><div class="l">Last roll-up {% if not health.rollup %}<span class="sys-badge warn">None yet</span>{% elif health.rollup.last_ok is False %}<span class="sys-badge danger">Failed</span>{% endif %}</div>
+    <div class="v" data-system-health-rollup>{% if health.rollup.last_finished_at %}{{ health.rollup.last_finished_at|date:"H:i" }}{% else %}Unknown{% endif %}</div><div class="m" data-system-job-message title="{{ health.rollup.last_message }}">{% if health.rollup.last_finished_at %}{{ health.rollup.last_finished_at|timesince }} ago{% if health.rollup.duration_ms is not None %} · {{ health.rollup.duration_ms }} ms{% endif %}{% else %}Not recorded{% endif %}</div>
+    <div class="f"><form method="post" action="{% url 'system_job_run' 'rollup' %}" data-system-run="rollup">{% csrf_token %}<button type="submit" class="sys-btn sm">Run now</button></form></div></div>
+  <div class="sys-tile" data-system-tile="snapshot"><div class="l">Snapshot {% if health.snapshot_age_seconds is None %}<span class="sys-badge warn">Unknown</span>{% elif health.snapshot_stale %}<span class="sys-badge warn">Stale</span>{% endif %}{% if health.snapshot.last_ok is False %} <span class="sys-badge danger">Failed</span>{% endif %}</div>
+    <div class="v" data-system-health-snapshot="{{ health.snapshot_age_seconds|default_if_none:'' }}">{% if health.snapshot_age_seconds is None %}Unknown{% elif health.snapshot_age_seconds < 90 %}{{ health.snapshot_age_seconds }} s{% else %}{% widthratio health.snapshot_age_seconds 60 1 %} min{% endif %}</div><div class="m" data-system-job-message title="{{ health.snapshot.last_message }}">Office figures{% if health.snapshot.last_finished_at %} · last run {{ health.snapshot.last_finished_at|timesince }} ago{% endif %}</div>
+    <div class="f"><form method="post" action="{% url 'system_job_run' 'snapshot' %}" data-system-run="snapshot">{% csrf_token %}<button type="submit" class="sys-btn sm">Run now</button></form></div></div>
+  <div class="sys-tile" data-system-tile="people"><div class="l">People</div><div class="v" data-system-count="registrations">{{ health.people_total }}</div><div class="m">registered</div></div>
+  <div class="sys-tile" data-system-tile="failed"><div class="l">Failed jobs {% if health.failed_tasks_24h %}<span class="sys-badge danger">Check</span>{% endif %}</div><div class="v" data-system-failed-tasks>{{ health.failed_tasks_24h|default_if_none:"Unknown" }}</div><div class="m">last 24 hours</div></div>
+  <div class="sys-tile" data-system-tile="gold-waiting"><div class="l">Gold waiting</div><div class="v" data-system-gold-waiting>{{ health.gold_waiting }}</div><div class="m">new or contacted</div></div>
+  <div class="sys-tile" data-system-tile="gold"><div class="l">Gold applications</div><div class="v" data-system-count="gold_applications">{{ health.counts.gold_applications|default:0 }}</div><div class="m">all time</div></div>
+</section>
+<div class="sys-cols">
+  <section class="sys-panel" data-system-recent aria-labelledby="dash-recent">
+    <header><h2 id="dash-recent">Recent changes</h2><a href="{% url 'system_changes' %}">Open change log</a></header>
+    {% include "system/_changes_table.html" with entries=recent compact=True %}
+  </section>
+  <section class="sys-panel" data-system-stages aria-labelledby="dash-stages">
+    <header><h2 id="dash-stages">Stage switches</h2></header>
+    <div class="sys-pad">
+      {% for label, on in stages %}<div class="sys-state" data-system-stage="{{ label }}"><span>{{ label }}</span><span class="sys-badge {% if on %}ok{% endif %}">{{ on|yesno:"On,Off" }}</span></div>{% endfor %}
+      {% if site.opening_date %}<div class="sys-state"><span>Opening date</span><span class="mono">{{ site.opening_date|date:"j M Y" }}</span></div>{% endif %}
+      <p class="sys-muted" style="margin-top:8px"><a href="{% url 'system_settings' %}">Change in Settings</a>. Switches change only there, behind a confirm.</p>
+    </div>
+  </section>
+</div>
+{% endblock %}

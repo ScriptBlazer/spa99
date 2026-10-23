@@ -1,4 +1,1 @@
-{% extends "base_reduced.html" %}
-{% block head_title %}{% include "common/_head.html" with title="This page isn't here. | Spa 99" %}{% endblock %}
-{% block messages %}{% endblock %}
-{% block main %}{% include "common/_error.html" with heading="This page isn't here." line="It may have moved. Everything else is where you left it." %}{% endblock %}
+{# The System host answers 404 anonymously (no brand, no CSS: docs/design/SYSTEM.md 5); every other host keeps the branded page. #}{% if request.urlconf == "config.urls_system" %}{% include "system/404.html" %}{% else %}{% include "common/_404_public.html" %}{% endif %}

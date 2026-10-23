@@ -4,6 +4,7 @@ import logging
 from django.conf import settings
 from django.utils import timezone
 
+from plans.models import SiteSettings
 from notifications.services import send_templated, subject_for
 
 from . import services
@@ -17,15 +18,16 @@ _warned = []
 def _warn_no_approver_once():
     if not _warned:
         _warned.append(True)
-        logger.warning("GOLD_APPROVER_EMAILS is empty: Gold application emails are not sent to anyone.")
+        logger.warning("The Gold approver list is empty (System > Emails): Gold application emails are not sent to anyone.")
 
 
 def send_gold_emails(application_id, acknowledge=True):
-    """Email the approver (GOLD_APPROVER_EMAILS and GOLD_APPROVER_CC from the environment), then thank the applicant. The result is stored on the application
+    """Email the approver (the lists set in System > Emails), then thank the applicant. The result is stored on the application
     so Control can show 'email not sent' with a resend button. Returns a status string, never the EmailLog (django-q
     would keep the applicant's details in its result table)."""
     application = GoldApplication.objects.select_related("repeat_of").get(pk=application_id)
-    recipients, cc = list(settings.GOLD_APPROVER_EMAILS), list(settings.GOLD_APPROVER_CC)
+    site = SiteSettings.load()  # recipients are edited in System, not env
+    recipients, cc = site.approver_list, site.approver_cc_list
     if recipients:
         log = send_templated(
             "gold_approver", recipients, services.approver_subject(application),
@@ -39,7 +41,7 @@ def send_gold_emails(application_id, acknowledge=True):
     else:  # nobody to send to: record it (Control shows 'email not sent'), warn once, carry on
         _warn_no_approver_once()
         status = "no_recipients"
-        application.email_error = "No approver email is set (GOLD_APPROVER_EMAILS)."
+        application.email_error = "No approver email is set (System > Emails)."
     application.save(update_fields=["email_sent_at", "email_error", "updated_at"])
     if acknowledge and application.email:
         send_templated(

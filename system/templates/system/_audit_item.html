@@ -1,0 +1,6 @@
+{# One change inside a group. Context: c, link_query. #}
+{% load system_ui %}<li class="au-item" data-system-item="{{ c.pk }}">
+  <span class="au-path" data-system-sentence>{% if c.kind == "created" or c.kind == "deleted" %}<span class="au-obj">{{ c.object_repr|default:"A row" }}</span> <span class="au-obj">{{ c.get_kind_display|lower }}</span>{% else %}<span class="au-obj">{{ c.object_repr }}</span>{% if c.object_repr and c.field %} · {% endif %}<b class="au-field">{{ c.field|human }}</b>{% endif %}</span>
+  {% include "system/_audit_diff.html" %}
+  <span class="au-acts">{% include "system/_audit_undo.html" %}<a class="au-info" href="?{{ link_query }}{% if link_query %}&amp;{% endif %}entry={{ c.pk }}" data-system-entry="{{ c.pk }}" aria-label="Details: {{ c.sentence|default:c.object_repr }}">{% include "system/_audit_icon.html" with name="info" %}</a></span>
+</li>

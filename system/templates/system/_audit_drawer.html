@@ -1,0 +1,54 @@
+{# The detail drawer (docs/design/SYSTEM.md 7.6). Context: drawer (feed.entry_detail or None), link_query, request. Always rendered; empty when closed. #}
+{% load system_ui %}<aside class="au-drawer" data-system-drawer role="dialog" aria-modal="true" aria-labelledby="au-drawer-title" tabindex="-1"{% if not drawer %} hidden{% endif %}>
+{% if drawer %}{% with r=drawer.row %}
+  <header class="au-dhead"><h2 id="au-drawer-title" data-system-sentence>{{ drawer.title }}</h2><a class="sys-btn sm" href="?{{ link_query }}" data-system-drawer-close>Close</a></header>
+  <div class="au-dbody">
+    <dl class="au-dl">
+      <dt>When</dt><dd class="mono"><time datetime="{{ r.created_at|date:'c' }}">{{ r.created_at|date:"Y-m-d H:i:s T" }}</time></dd>
+      <dt>Who</dt><dd>{% if r.user_label %}{{ drawer.who }} <span class="mono">{{ r.user_label }}</span>{% if r.user_id %} <span class="mono au-muted">#{{ r.user_id|stringformat:"s"|slice:":8" }}</span>{% endif %}{% else %}A script{% endif %}</dd>
+      <dt>Section</dt><dd>{{ drawer.section_label }}</dd>
+      {% if drawer.is_change %}
+      <dt>Object</dt><dd class="mono">{{ r.model_label }}{% if r.object_pk %} #{{ r.object_pk|slice:":8" }}{% endif %}{% if r.object_repr %} · {{ r.object_repr }}{% endif %}</dd>
+      {% if r.field %}<dt>Field</dt><dd class="mono">{{ r.field }}</dd>{% endif %}
+      <dt>Kind</dt><dd>{{ r.get_kind_display }}</dd>
+      {% else %}
+      <dt>Kind</dt><dd>{{ r.get_kind_display }}</dd>
+      {% endif %}
+      {% if r.batch_id %}<dt>Request id</dt><dd class="mono">{{ r.batch_id }}</dd>{% endif %}
+      <dt>IP</dt><dd class="mono">{{ r.ip_address|default:"Unknown" }}</dd>
+      <dt>Browser</dt><dd>{{ r.user_agent|browser|default:"Unknown" }}{% if r.user_agent %}<span class="au-ua mono">{{ r.user_agent }}</span>{% endif %}</dd>
+      <dt>Path</dt><dd class="mono">{{ r.path|default:"None" }}</dd>
+      <dt>Outcome</dt><dd>{% if drawer.is_change %}Saved{% else %}{{ r.get_outcome_display }}{% if drawer.outcome_word %} · {{ drawer.outcome_word }}{% endif %}{% endif %}</dd>
+    </dl>
+    {% if drawer.is_change and drawer.has_values %}
+    <section class="au-values" aria-label="Old and new value">
+      {% include "system/_audit_diff.html" with c=r %}
+      <div class="au-vblock"><div class="au-vhead"><h3 id="au-old-label">Old value</h3><button type="button" class="sys-btn sm au-copy" data-system-copy="#au-old-json">Copy</button></div><pre class="au-json mono" id="au-old-json" tabindex="0" aria-labelledby="au-old-label">{{ drawer.old_json }}</pre></div>
+      <div class="au-vblock"><div class="au-vhead"><h3 id="au-new-label">New value</h3><button type="button" class="sys-btn sm au-copy" data-system-copy="#au-new-json">Copy</button></div><pre class="au-json mono" id="au-new-json" tabindex="0" aria-labelledby="au-new-label">{{ drawer.new_json }}</pre></div>
+    </section>
+    {% elif not drawer.is_change and r.detail %}
+    <section class="au-values" aria-label="Details"><div class="au-vblock"><div class="au-vhead"><h3 id="au-detail-label">Details</h3><button type="button" class="sys-btn sm au-copy" data-system-copy="#au-detail-json">Copy</button></div><pre class="au-json mono" id="au-detail-json" tabindex="0" aria-labelledby="au-detail-label">{{ drawer.detail_json }}</pre></div></section>
+    {% endif %}
+    <section class="au-integrity" aria-label="Integrity">
+      <h3>Integrity</h3>
+      {% if r.seq is None %}<p class="au-muted">Not covered: this entry is older than the hash chain.</p>
+      {% else %}
+      <dl class="au-dl">
+        <dt>Number</dt><dd class="mono">{{ r.seq }}</dd>
+        <dt>Entry hash</dt><dd><code title="{{ r.hash }}">{{ r.hash|short_hash }}</code> <button type="button" class="sys-btn sm au-copy" data-system-copy-text="{{ r.hash }}" aria-label="Copy entry hash">Copy</button></dd>
+        <dt>Previous hash</dt><dd>{% if r.prev_hash %}<code title="{{ r.prev_hash }}">{{ r.prev_hash|short_hash }}</code> <button type="button" class="sys-btn sm au-copy" data-system-copy-text="{{ r.prev_hash }}" aria-label="Copy previous hash">Copy</button>{% else %}<span class="au-muted">First entry</span>{% endif %}</dd>
+        <dt>Check</dt><dd>{% if drawer.hash_status == "ok" %}<b class="au-ok" data-system-hash="ok">Verified</b> <span class="au-muted">this entry matches its hash</span>{% else %}<b class="au-bad" data-system-hash="bad">Does not match</b>{% endif %}</dd>
+      </dl>
+      {% endif %}
+    </section>
+    <nav class="au-links" aria-label="Related">
+      {% if drawer.undo_of %}<p><a href="{% url 'system_changes' %}?focus={{ drawer.undo_of.pk }}#g-{{ drawer.undo_of_key }}" data-system-jump>Undo of {{ drawer.undo_of.created_at|date:"H:i" }} change</a></p>{% endif %}
+      {% if drawer.is_change %}{% with c=r %}{% if c.undone_label or c.blocked_at or c.can_undo %}<p class="au-acts">{% include "system/_audit_undo.html" %}</p>{% endif %}{% endwith %}
+      {% if drawer.why_not %}<p class="au-muted">Cannot be undone: {{ drawer.why_not|lower }}</p>{% endif %}{% endif %}
+      {% if drawer.section_url %}<p><a href="{{ drawer.section_url }}">Open {{ drawer.section_label }}</a></p>{% endif %}
+    </nav>
+    <p class="sr" role="status" aria-live="polite" data-system-copied></p>
+  </div>
+{% endwith %}{% endif %}
+</aside>
+<div class="au-scrim" data-system-drawer-scrim{% if not drawer %} hidden{% endif %}></div>

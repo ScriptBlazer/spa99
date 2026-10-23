@@ -1,0 +1,25 @@
+{# One group (a save batch or a security event). Context: g, link_query, request. See docs/design/SYSTEM.md 7. #}
+{% load system_ui %}<article class="au-group" id="g-{{ g.key }}" tabindex="-1" data-system-group="{{ g.key }}" data-type="{{ g.type }}" data-category="{{ g.category }}" data-outcome="{{ g.outcome }}" data-count="{{ g.count }}">
+  <div class="au-row">
+    <span class="au-icon" data-category="{{ g.category }}">{% include "system/_audit_icon.html" with name=g.icon %}</span>
+    <div class="au-main">
+      <p class="au-line"><span class="sr">{{ g.category_word }}: {{ g.summary }}</span><span class="au-sum" aria-hidden="true">{% if g.type == "batch" %}<b title="{{ g.user_label }}">{{ g.who }}</b> <span class="au-verb">{{ g.verb }}</span> <b>{{ g.what }}</b> <span class="au-verb au-in">in {{ g.section_label }}</span>{% else %}{% if g.rest %}<b title="{{ g.user_label }}">{{ g.who }}</b><span class="au-verb">{{ g.rest }}</span>{% else %}<span class="au-verb">{{ g.summary }}</span>{% endif %}{% endif %}</span>{% if g.origin %}<span class="au-verb">from <a href="{% url 'system_changes' %}?focus={{ g.origin.pk }}#g-{{ g.origin.key }}" data-system-jump>{{ g.origin.time|date:"H:i" }}</a></span>{% endif %}
+        {% if g.roles %}<span class="au-diff mono" aria-hidden="true"><span class="au-chip del">{{ g.roles.0 }}</span><span class="au-arrow">→</span><span class="au-chip add">{{ g.roles.1 }}</span></span>{% endif %}
+        {% if g.type == "batch" and g.count == 1 %}{% with c=g.items.0 %}{% include "system/_audit_diff.html" %}{% endwith %}{% endif %}
+        {% if g.outcome_word %}<b class="au-outcome">{{ g.outcome_word }}</b>{% endif %}{% if g.denied_count %}<span class="au-reason">{{ g.denied_count }} times</span>{% endif %}</p>
+      {% if g.type == "batch" and g.count > 1 %}
+        {% if g.count <= 3 %}<ul class="au-items">{% for c in g.items %}{% include "system/_audit_item.html" %}{% endfor %}</ul>
+        {% else %}<details class="au-more" data-system-more-items><summary><span class="au-caret">{% include "system/_audit_icon.html" with name="caret-right" %}</span><span class="au-show">Show {{ g.count }} changes</span><span class="au-hide">Hide {{ g.count }} changes</span></summary><ul class="au-items">{% for c in g.items %}{% include "system/_audit_item.html" %}{% endfor %}</ul></details>
+        {% endif %}
+      {% endif %}
+      {% if g.meta %}<p class="au-meta mono" data-system-source>{{ g.meta|join:" · " }}</p>{% endif %}
+    </div>
+    <div class="au-side">
+      <span class="au-where">{{ g.section_label }}</span>
+      {% if g.undo_all_url %}<form method="post" action="{{ g.undo_all_url }}" class="au-undo" data-system-undo-form>{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="sys-btn sm" data-system-undo-all>Undo all {% if g.open_count < g.undo_total %}{{ g.open_count }} of {{ g.undo_total }}{% else %}{{ g.open_count }}{% endif %}</button></form>{% endif %}
+      {% if g.type == "batch" and g.count == 1 %}{% with c=g.items.0 %}<span class="au-acts">{% include "system/_audit_undo.html" %}<a class="au-info" href="?{{ link_query }}{% if link_query %}&amp;{% endif %}entry={{ c.pk }}" data-system-entry="{{ c.pk }}" aria-label="Details: {{ c.sentence|default:c.object_repr }}">{% include "system/_audit_icon.html" with name="info" %}</a></span>{% endwith %}
+      {% elif g.type == "event" %}<a class="au-info" href="?{{ link_query }}{% if link_query %}&amp;{% endif %}entry={{ g.key }}" data-system-entry="{{ g.key }}" aria-label="Details: {{ g.summary }}">{% include "system/_audit_icon.html" with name="info" %}</a>{% endif %}
+      <time class="au-time mono" datetime="{{ g.time|date:'c' }}" title="{{ g.time|date:'Y-m-d H:i:s T' }}">{{ g.time|date:"H:i" }}</time>
+    </div>
+  </div>
+</article>
