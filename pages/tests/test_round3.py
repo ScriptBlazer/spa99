@@ -66,16 +66,20 @@ class OpenerTests(TestCase):
     def setUpTestData(cls):
         seed_all()
 
-    def test_lines_fill_hours_closure_and_room_count(self):
-        lines = pages.opener_lines()
-        self.assertEqual(lines[0], {"statement": "Open 5am to 3am.", "note": "Every day. Closed for Shabbos and Yom Tov."})
+    def test_hero_shows_only_the_first_line(self):
+        # Moishe 2026-10-23: only "Open 5am to 3am." in the hero; the other rows stay in the database
+        self.assertEqual(pages.opener_lines(), [{"statement": "Open 5am to 3am.", "note": "Every day. Closed for Shabbos and Yom Tov."}])
+        self.assertTrue(Section.objects.filter(page__key="spa", key="opener_4").exists())
+
+    def test_full_set_fills_hours_closure_and_room_count(self):
+        lines = pages.opener_lines(count=pages.OPENER_MAX_LINES)
         self.assertEqual(lines[2]["note"], "Eight rooms, all part of the same visit.")
         self.assertEqual(len(lines), 4)
 
     def test_hiding_a_room_or_changing_hours_changes_the_lines(self):
         Facility.objects.filter(slug="gym").update(visible=False)
         OpeningRule.objects.filter(key="evening").update(end_time="02:00")
-        lines = pages.opener_lines()
+        lines = pages.opener_lines(count=pages.OPENER_MAX_LINES)
         self.assertEqual(lines[0]["statement"], "Open 5am to 2am.")
         self.assertEqual(lines[2]["note"], "Seven rooms, all part of the same visit.")
 
@@ -83,11 +87,11 @@ class OpenerTests(TestCase):
         OpeningRule.objects.filter(kind=OpeningRule.CLOSE_BEFORE_CANDLES).update(public_title="")
         self.assertEqual(pages.opener_lines()[0]["note"], "Every day.")
         OpeningRule.objects.filter(kind=OpeningRule.PERIOD).update(active=False)
-        self.assertEqual([l["statement"] for l in pages.opener_lines()][0], "For men only.")  # line 1 skipped, not "Open ."
+        self.assertEqual(pages.opener_lines(), [])  # line 1 skipped, not "Open .", and no later line takes its place
 
     def test_empty_heading_skips_a_line(self):
         Section.objects.filter(page__key="spa", key="opener_2").update(heading="")
-        self.assertEqual([l["statement"] for l in pages.opener_lines()][1], "Heat, steam, cold and rest.")
+        self.assertEqual([l["statement"] for l in pages.opener_lines(count=pages.OPENER_MAX_LINES)][1], "Heat, steam, cold and rest.")
 
     def test_picture_falls_back_to_a_built_one(self):
         with mock.patch("pages.services.images.has_image", side_effect=lambda n: n == "door-gold"):
@@ -237,7 +241,7 @@ class ViewContextTests(TestCase):
         spa = self.client.get("/the-spa/").context
         for key in ("opener_lines", "opener", "arrive_kit", "tote", "sections"):
             self.assertIn(key, spa)
-        self.assertEqual(len(spa["opener_lines"]), 4)
+        self.assertEqual(len(spa["opener_lines"]), 1)
         gold = self.client.get("/gold-card/").context
         self.assertEqual(len(gold["gold"]["figures"]), 4)
         self.assertIn("every_visit", self.client.get("/memberships/").context)

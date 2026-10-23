@@ -413,6 +413,7 @@ def journey_facility_images():
 # ---------- the spa opener (SPA-OPENER.md section 2) ----------
 
 OPENER_MAX_LINES = 5
+OPENER_HERO_LINES = 1  # Moishe 2026-10-23: only "Open 5am to 3am." in the hero; rows 2 to 5 stay in the database, unrendered
 OPENER_PICTURES = ["robe", "door-gold"]  # the design picture, then the picture that exists today (until the robe is built)
 
 
@@ -441,13 +442,14 @@ def _fill_note(text, values):
     return _PLACEHOLDER.sub(lambda m: values[m.group(1)], "".join(kept)).strip()
 
 
-def opener_lines(copy=None):
-    """The line stack on The spa opener: [{statement, note}] from the `opener_1..5` rows of the `spa` page, placeholders
-    {hours} {closure} {rooms} {Rooms} filled from the opening rules and the visible rooms. Rows with an empty heading
-    (or a statement that needs a value we do not have) are skipped. Never more than 5."""
+def opener_lines(copy=None, count=OPENER_HERO_LINES):
+    """The opener words: [{statement, note}] from the first `count` `opener_n` rows of the `spa` page (the hero shows
+    row 1 only; `count` up to 5 for the full set), placeholders {hours} {closure} {rooms} {Rooms} filled from the
+    opening rules and the visible rooms. Rows with an empty heading (or a statement that needs a value we do not have)
+    are skipped, never replaced by a later row."""
     copy = copy if copy is not None else content.page_content("spa")
     values, lines = _opener_values(), []
-    for n in range(1, OPENER_MAX_LINES + 1):
+    for n in range(1, min(count, OPENER_MAX_LINES) + 1):
         row = copy[f"opener_{n}"]
         statement = _fill_statement(row.heading, values) if row.heading else None
         if statement:

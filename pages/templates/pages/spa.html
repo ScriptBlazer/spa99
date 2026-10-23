@@ -12,7 +12,7 @@
 {% block main %}
 {% page_content "spa" as spa %}
 
-{# S1. The opener (docs/design/SPA-OPENER.md): the robe full screen with the words on it; inside a short pin the picture shrinks into the frame on the right while four lines change one at a time. Without motion: just the end state, the lines stacked. `opener` says which picture (the robe, or the door when switched, with its video once it exists). #}
+{# S1. The opener (docs/design/SPA-OPENER.md): the robe full screen with the words on it; inside a short pin the picture shrinks into the frame on the right. One line only ("Open 5am to 3am.", Moishe 2026-10-23), then the room chips. Without motion: just the end state. `opener` says which picture (the robe, or the door when switched, with its video once it exists). #}
 {% if opener.is_door and opener.name != "door-gold" %}{% door_video as dv %}{% endif %}
 <section class="scene door-scene opener-scene on-dark" data-scene="door" data-opener="{% if opener.name == 'door-gold' %}door-gold{% elif opener.is_door %}door{% else %}robe{% endif %}"{% if opener.portrait %} data-portrait{% endif %} data-glow aria-labelledby="spa-title">
   <div class="door-window" data-door-window>
@@ -28,15 +28,14 @@
     <div class="door-words">
       <h1 class="display door-title" id="spa-title" data-rise>{{ spa.intro.heading }}</h1>
       {% if opener_lines %}
-      <ol class="opener-lines" role="list">
-        {% for l in opener_lines %}
-        <li class="opener-line" data-opener-line>
-          <p class="opener-statement"{% if forloop.first %} data-fade{% endif %}>{{ l.statement }}</p>
-          {% if l.note %}<p class="opener-note"{% if forloop.first %} data-fade{% endif %}>{{ l.note }}</p>{% endif %}
-        </li>
-        {% endfor %}
-      </ol>
-      {% if opener_lines|length > 1 %}<div class="opener-ticks" aria-hidden="true" data-fade-row>{% for l in opener_lines %}<span class="opener-tick" data-opener-tick></span>{% endfor %}</div>{% endif %}
+      {% with l=opener_lines.0 %}
+      <div class="opener-lines">
+        <div class="opener-line" data-opener-line>
+          <p class="opener-statement" data-fade>{{ l.statement }}</p>
+          {% if l.note %}<p class="opener-note" data-fade>{{ l.note }}</p>{% endif %}
+        </div>
+      </div>
+      {% endwith %}
       {% endif %}
       <nav class="door-chips" aria-label="The rooms" data-fade-row>
         <ul class="chips" data-scroller>{% for f in facilities %}<li><a class="chip" href="#{{ f.slug }}">{{ f.name }}</a></li>{% endfor %}</ul>
