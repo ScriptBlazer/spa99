@@ -610,13 +610,20 @@ html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .doo
 @media (min-width: 64em) {
   .opener-scene .hero-veil {
     background: linear-gradient(to bottom, var(--color-header-solid) 0, var(--color-header-solid) var(--header-h), transparent calc(var(--header-h) + 4rem)),
-                /* Moishe 2026-10-23: a long, eased fade (like Home), no visible edge; solid under the words up to bleed + 27rem */
-                linear-gradient(to right, var(--color-header-solid) 0, var(--color-header-solid) calc(var(--bleed) + 27rem),
-                  color-mix(in srgb, var(--color-header-solid) 82%, transparent) calc(var(--bleed) + 31rem),
-                  color-mix(in srgb, var(--color-header-solid) 58%, transparent) calc(var(--bleed) + 36rem),
-                  color-mix(in srgb, var(--color-header-solid) 34%, transparent) calc(var(--bleed) + 41rem),
-                  color-mix(in srgb, var(--color-header-solid) 14%, transparent) calc(var(--bleed) + 46rem),
-                  transparent calc(var(--bleed) + 51rem));
+                /* Moishe 2026-10-23: dark brown pushed left, a long smootherstep fade (no visible edge) */
+                linear-gradient(to right, var(--color-header-solid) 0, var(--color-header-solid) calc(var(--bleed) + 14rem),
+                  color-mix(in srgb, var(--color-header-solid) 99%, transparent) calc(var(--bleed) + 17.2rem),
+                  color-mix(in srgb, var(--color-header-solid) 96%, transparent) calc(var(--bleed) + 20.3rem),
+                  color-mix(in srgb, var(--color-header-solid) 90%, transparent) calc(var(--bleed) + 23.5rem),
+                  color-mix(in srgb, var(--color-header-solid) 79%, transparent) calc(var(--bleed) + 26.7rem),
+                  color-mix(in srgb, var(--color-header-solid) 65%, transparent) calc(var(--bleed) + 29.8rem),
+                  color-mix(in srgb, var(--color-header-solid) 50%, transparent) calc(var(--bleed) + 33.0rem),
+                  color-mix(in srgb, var(--color-header-solid) 35%, transparent) calc(var(--bleed) + 36.2rem),
+                  color-mix(in srgb, var(--color-header-solid) 21%, transparent) calc(var(--bleed) + 39.3rem),
+                  color-mix(in srgb, var(--color-header-solid) 10%, transparent) calc(var(--bleed) + 42.5rem),
+                  color-mix(in srgb, var(--color-header-solid) 4%, transparent) calc(var(--bleed) + 45.7rem),
+                  color-mix(in srgb, var(--color-header-solid) 1%, transparent) calc(var(--bleed) + 48.8rem),
+                  transparent calc(var(--bleed) + 52rem));
   }
 }
 .door-video { z-index: 0; }
