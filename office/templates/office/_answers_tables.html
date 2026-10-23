@@ -1,0 +1,9 @@
+{% load office_tags %}
+<table><caption class="sr-only">Time of day</caption><thead><tr><th scope="col">Time of day</th><th scope="col">Answers</th><th scope="col">Share</th></tr></thead>
+  <tbody>{% for a in data.journey_answers.time %}<tr><th scope="row">{{ a.label }}</th><td>{{ a.count|num }}</td><td>{{ a.share_bp|bp_rate }}</td></tr>{% endfor %}</tbody></table>
+<table><caption class="sr-only">How often</caption><thead><tr><th scope="col">How often</th><th scope="col">Answers</th><th scope="col">Share</th></tr></thead>
+  <tbody>{% for a in data.journey_answers.frequency %}<tr><th scope="row">{{ a.label }}</th><td>{{ a.count|num }}</td><td>{{ a.share_bp|bp_rate }}</td></tr>{% endfor %}</tbody></table>
+<table><caption class="sr-only">Facilities (members could choose more than one)</caption><thead><tr><th scope="col">Facilities</th><th scope="col">Answers</th><th scope="col">Share</th></tr></thead>
+  <tbody>{% for a in data.journey_answers.facilities %}<tr><th scope="row">{{ a.label }}</th><td>{{ a.count|num }}</td><td>{{ a.share_bp|bp_rate }}</td></tr>{% endfor %}</tbody></table>
+<table><caption class="sr-only">Company</caption><thead><tr><th scope="col">Company</th><th scope="col">Answers</th><th scope="col">Share</th></tr></thead>
+  <tbody>{% for a in data.journey_answers.company %}<tr><th scope="row">{{ a.label }}</th><td>{{ a.count|num }}</td><td>{{ a.share_bp|bp_rate }}</td></tr>{% endfor %}</tbody></table>

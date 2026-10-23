@@ -31,10 +31,21 @@ def _fragment(request, full, rows):
 
 # ---------- dashboard and analytics ----------
 
+def _remembered_range(request, key, allowed, default):
+    """?range= wins and is remembered in the session for the next visit; otherwise the remembered one."""
+    asked = request.GET.get("range")
+    if asked in allowed:
+        if request.session.get(key) != asked:
+            request.session[key] = asked
+        return asked
+    remembered = request.session.get(key)
+    return remembered if remembered in allowed else default
+
+
 @reader
 @require_GET
 def dashboard(request):
-    data = selectors.dashboard(request.GET.get("range", "7d"))
+    data = selectors.dashboard(_remembered_range(request, "office_range_dashboard", selectors.DASHBOARD_RANGES, "7d"))
     return render(request, "office/dashboard.html", {"data": data, "greeting": _greeting(request.user), "section": "dashboard"})
 
 
@@ -47,7 +58,7 @@ def dashboard_json(request):
 @reader
 @require_GET
 def analytics(request):
-    name = request.GET.get("range", "30d")
+    name = _remembered_range(request, "office_range_analytics", selectors.ANALYTICS_RANGES, "30d")
     context = {"data": selectors.analytics(name), "pages": selectors.pages(name), "section": "analytics"}
     return render(request, "office/analytics.html", context)
 
@@ -146,7 +157,9 @@ def _act(request, pk, action):
 def gold_approve(request, pk):
     def run(request, application):
         result = invites.approve_and_invite(application, request.user)
-        text = {invites.INVITED: "Approved. An invite is on its way.", invites.ACTIVATED: "Approved. Gold was added to his existing account.",
+        first = application.first_name or "He"
+        text = {invites.INVITED: f"{first} is approved. His invite is on its way.",
+                invites.ACTIVATED: f"{first} is approved. Gold was added to his existing account.",
                 invites.SKIPPED: "Nothing changed: it was already decided, or Gold could not be activated."}[result]
         messages.success(request, text) if result != invites.SKIPPED else messages.warning(request, text)
     return _act(request, pk, run)

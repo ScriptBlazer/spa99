@@ -1,19 +1,51 @@
 {% extends "office/base.html" %}
+{% load office_tags %}
 {% block title %}Gold | Spa 99 Office{% endblock %}
 {% block main %}
-<h1>Gold</h1><p data-total>{{ total_applications }} applications, {{ waiting }} waiting</p>
-<form method="get" data-office-filters>
-  <input type="search" name="q" value="{{ filters.q }}" placeholder="Search">
-  <select name="status">
-    <option value="waiting"{% if filters.status == "waiting" %} selected{% endif %}>Waiting</option>
-    <option value="approved"{% if filters.status == "approved" %} selected{% endif %}>Approved</option>
-    <option value="declined"{% if filters.status == "declined" %} selected{% endif %}>Declined</option>
-    <option value="all"{% if filters.status == "all" %} selected{% endif %}>All</option></select>
-  <select name="potential"><option value="">All</option>
-    <option value="high"{% if filters.potential == "high" %} selected{% endif %}>High</option>
-    <option value="medium"{% if filters.potential == "medium" %} selected{% endif %}>Medium</option>
-    <option value="low"{% if filters.potential == "low" %} selected{% endif %}>Low</option></select>
-  <button type="submit">Filter</button>
+<h1 class="sr-only">Gold</h1>
+<form class="o-filters" method="get" action="{% url 'office_gold' %}" data-filter-form data-list="gold" role="search" aria-label="Find applications">
+  <div class="o-filters-bar">
+    <div class="o-search">
+      <label for="f-q" class="sr-only">Search applications</label>
+      {% include "office/_icon.html" with name="search" %}
+      <input id="f-q" type="search" name="q" value="{{ filters.q }}" placeholder="Search name, email or reference" autocomplete="off" enterkeyhint="search" data-search>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm o-filters-open" data-filters-open hidden>{% include "office/_icon.html" with name="sliders" %}Filters</button>
+    <div class="o-filters-slot" data-filters-slot>
+      <div class="o-filters-body" data-filter-body>
+        <div class="o-filter-group"><span class="o-filter-label" id="l-status">Status</span>
+          <fieldset class="o-seg" aria-labelledby="l-status" style="--n: 4; --i: {% if filters.status == 'approved' %}1{% elif filters.status == 'declined' %}2{% elif filters.status == 'all' %}3{% else %}0{% endif %}" data-default="waiting">
+            <span class="o-seg-thumb" aria-hidden="true"></span>
+            <label class="o-seg-item"><input type="radio" name="status" value="waiting"{% if filters.status == "waiting" %} checked{% endif %}><span>Waiting</span></label>
+            <label class="o-seg-item"><input type="radio" name="status" value="approved"{% if filters.status == "approved" %} checked{% endif %}><span>Approved</span></label>
+            <label class="o-seg-item"><input type="radio" name="status" value="declined"{% if filters.status == "declined" %} checked{% endif %}><span>Declined</span></label>
+            <label class="o-seg-item"><input type="radio" name="status" value="all"{% if filters.status == "all" %} checked{% endif %}><span>All</span></label>
+          </fieldset></div>
+        <div class="o-filter-group"><span class="o-filter-label" id="l-potential">Potential</span>
+          <fieldset class="o-seg" aria-labelledby="l-potential" style="--n: 4; --i: {% if filters.potential == 'high' %}1{% elif filters.potential == 'medium' %}2{% elif filters.potential == 'low' %}3{% else %}0{% endif %}" data-default="">
+            <span class="o-seg-thumb" aria-hidden="true"></span>
+            <label class="o-seg-item"><input type="radio" name="potential" value=""{% if not filters.potential %} checked{% endif %}><span>All</span></label>
+            <label class="o-seg-item"><input type="radio" name="potential" value="high"{% if filters.potential == "high" %} checked{% endif %}><span>High</span></label>
+            <label class="o-seg-item"><input type="radio" name="potential" value="medium"{% if filters.potential == "medium" %} checked{% endif %}><span>Medium</span></label>
+            <label class="o-seg-item"><input type="radio" name="potential" value="low"{% if filters.potential == "low" %} checked{% endif %}><span>Low</span></label>
+          </fieldset></div>
+      </div>
+    </div>
+  </div>
+  <p class="o-totalline"><span data-total data-region="total">{{ total_applications|num }} application{{ total_applications|pluralize }}, {{ waiting|num }} waiting</span>
+    <a class="o-quiet" href="{% url 'office_gold' %}" data-clear{% if not filters.q and not filters.potential and filters.status == "waiting" %} hidden{% endif %}>Clear</a>
+    <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button></p>
+  <dialog class="o-sheet" data-filter-sheet aria-labelledby="sheet-h">
+    <div class="o-sheet-head"><h2 id="sheet-h">Filters</h2></div>
+    <div data-sheet-slot></div>
+    <button type="button" class="btn btn-primary btn-block" data-sheet-close>Show results</button>
+  </dialog>
 </form>
-<div data-office-list="gold">{% include "office/_gold_rows.html" %}</div>
+<div class="o-card o-tablecard" data-list-card>
+  <table class="o-list o-list--gold">
+    <caption class="sr-only">Gold applications</caption>
+    <thead><tr><th scope="col">Name</th><th scope="col">Potential</th><th scope="col">Status</th><th scope="col">Invite</th><th scope="col" class="num">Applied</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead>
+    <tbody data-region="list" data-office-list="gold">{% include "office/_gold_rows.html" %}</tbody>
+  </table>
+</div>
 {% endblock %}

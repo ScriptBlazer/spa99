@@ -1,10 +1,16 @@
-{% for g in rows %}
-<div data-gold-row data-status="{{ g.status }}" data-potential="{{ g.potential }}">
-  <a href="{% url 'office_gold_application' g.id %}" data-col="name">{{ g.name }}</a>
-  <span data-col="potential">{{ g.potential }}</span> <span data-col="status">{{ g.status }}</span>
-  <span data-col="invite" data-invite-state="{{ g.invite.state }}">{{ g.invite.state }}</span> <span data-col="applied">{{ g.applied }}</span>
-  {% if office_can.can_act and g.can_approve %}
-  <form method="post" action="{% url 'office_gold_approve' g.id %}" data-approve>{% csrf_token %}<button type="submit">Approve and invite</button></form>{% endif %}
-</div>
-{% empty %}<p data-empty>No applications here.</p>{% endfor %}
-{% if has_next %}<a href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more>Show more</a>{% endif %}
+{% load office_tags %}{% for g in rows %}
+<tr class="o-row" data-gold-row data-status="{{ g.status }}" data-potential="{{ g.potential }}">
+  <td class="c-name" data-col="name"><a class="o-rowlink" href="{% url 'office_gold_application' g.id %}">{{ g.name }}</a></td>
+  <td class="c-potential" data-col="potential">{% include "office/_badge.html" with potential=g.potential %}</td>
+  <td class="c-status" data-col="status">{% include "office/_badge.html" with status=g.status %}</td>
+  <td class="c-invite" data-col="invite" data-invite-state="{{ g.invite.state }}">{% include "office/_invite_state.html" with invite=g.invite %}</td>
+  <td class="c-date num" data-col="applied"><span class="o-only-wide">{{ g.applied|dt }}</span><span class="o-only-narrow">{{ g.applied|relative }}</span></td>
+  <td class="c-action" data-col="action">{% if office_can.can_act and g.can_approve %}
+    <form method="post" action="{% url 'office_gold_approve' g.id %}" data-office-action data-approve>{% csrf_token %}
+      <button type="submit" class="btn btn-primary btn-sm" data-working-text="Approving" data-confirm
+              data-confirm-title="Approve {{ g.name }} for Gold?" data-confirm-message="He gets an invite to set up his account. His Gold month starts today, {% now 'j F' %}."
+              data-confirm-label="Approve and invite" data-confirm-cancel="Not now">Approve and invite<span class="sr-only"> {{ g.name }}</span></button>
+    </form>{% endif %}</td>
+</tr>
+{% empty %}<tr class="o-empty-row" data-empty><td colspan="6"><p>No applications here.</p></td></tr>{% endfor %}
+{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="6"><a class="btn btn-secondary btn-sm" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}

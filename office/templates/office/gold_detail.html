@@ -1,20 +1,46 @@
 {% extends "office/base.html" %}
+{% load office_tags %}
 {% block title %}{{ application.name }} | Spa 99 Office{% endblock %}
+{% block body_attrs %}data-office-detail{% if office_can.can_act %} data-has-bar{% endif %}{% endblock %}
+{% block header_left %}<a class="o-back" href="{% url 'office_gold' %}">{% include "office/_icon.html" with name="chevron-left" %}<span>Gold</span></a>{% endblock %}
 {% block main %}
-<h1>{{ application.name }}</h1>
-<span data-status="{{ application.status }}">{{ application.status }}</span> <span data-potential="{{ application.potential }}">{{ application.potential }}</span>
-{% for section in application.sections %}
-<section data-gold-section="{{ section.title }}"><h2>{{ section.title }}</h2>
-  <dl>{% for row in section.rows %}<dt>{{ row.label }}</dt><dd>{{ row.value|linebreaksbr }}</dd>{% endfor %}</dl>
-</section>
-{% endfor %}
-<aside data-gold-decision data-invite-state="{{ application.invite.state }}">
-  {% if office_can.can_act %}
-  {% if application.can_approve %}<form method="post" action="{% url 'office_gold_approve' application.id %}" data-approve>{% csrf_token %}<button type="submit">Approve and invite</button></form>{% endif %}
-  {% if application.can_decline %}<form method="post" action="{% url 'office_gold_decline' application.id %}" data-decline>{% csrf_token %}<button type="submit">Decline</button></form>{% endif %}
-  {% if application.can_resend %}<form method="post" action="{% url 'office_gold_resend' application.id %}" data-resend>{% csrf_token %}<button type="submit">Resend invite</button></form>{% endif %}
-  {% endif %}
-  {% if application.person_id %}<a href="{% url 'office_person' application.person_id %}">Open his account</a>{% endif %}
-  <ul data-gold-history>{% for h in application.history %}<li>{{ h.at }} · {{ h.text }}</li>{% endfor %}</ul>
-</aside>
+{% with a=application %}
+<header class="o-detail-head">
+  <h1>{{ a.name }}</h1>
+  <p class="o-badges" data-region="gold-head">{% include "office/_badge.html" with status=a.status %} {% include "office/_badge.html" with potential=a.potential %}</p>
+</header>
+<div class="o-detail">
+  <div class="o-detail-main">
+    {% for section in a.sections %}
+    <section class="o-card" data-gold-section="{{ section.title }}" aria-labelledby="gs-{{ forloop.counter }}"><h2 id="gs-{{ forloop.counter }}" class="o-h3">{{ section.title }}</h2>
+      <dl class="o-rows">{% for row in section.rows %}<div><dt>{{ row.label }}</dt><dd>{{ row.value|linebreaksbr }}</dd></div>{% endfor %}</dl>
+    </section>
+    {% endfor %}
+  </div>
+  <aside class="o-detail-rail o-detail-rail--sticky" data-gold-decision data-invite-state="{{ a.invite.state }}">
+    <section class="o-card" aria-labelledby="decision-h" data-region="decision" data-fade>
+      <h2 id="decision-h" class="o-h3">Decision</h2>
+      <p class="o-badges">{% include "office/_badge.html" with status=a.status %} {% include "office/_badge.html" with potential=a.potential %}</p>
+      {% if a.status == "approved" %}
+        <p class="o-state">Approved {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>
+        <p class="o-sub">{% include "office/_invite_state.html" with invite=a.invite %}</p>
+      {% elif a.status == "declined" %}
+        <p class="o-state">Declined {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>
+      {% endif %}
+      <div class="o-actions-rail">{% include "office/_gold_actions.html" %}</div>
+      {% if office_can.can_act and a.can_approve %}<p class="o-sub">He gets an email to set up his account. The link lasts 14 days.</p>{% endif %}
+      {% if a.person_id %}<a class="o-quiet" href="{% url 'office_person' a.person_id %}">Open his account</a>{% endif %}
+      <h3 class="o-h4">History</h3>
+      <ul class="o-history" data-gold-history>{% for h in a.history %}<li>{{ h.at|dt }} &middot; {{ h.text }}</li>{% endfor %}</ul>
+    </section>
+  </aside>
+</div>
+{% if office_can.can_act %}
+<div class="o-bar" data-region="decision-bar" data-office-bar>
+  {% if a.status == "approved" %}<p class="o-state">Approved {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>
+  {% elif a.status == "declined" %}<p class="o-state">Declined {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>{% endif %}
+  <div class="o-bar-actions">{% include "office/_gold_actions.html" with bar=True %}</div>
+</div>
+{% endif %}
+{% endwith %}
 {% endblock %}

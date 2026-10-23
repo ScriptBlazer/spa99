@@ -177,9 +177,10 @@ def gold_history(application):
     for record in application.history.select_related("history_user").order_by("history_date"):
         who = (record.history_user.get_full_name() or record.history_user.email) if record.history_user_id else ""
         if previous is None:
-            entries.append({"at": record.history_date.isoformat(), "text": "Applied"})
+            entries.append({"at": record.history_date.isoformat(), "text": "Applied", "status": record.status, "who": ""})
         elif record.status != previous:
-            entries.append({"at": record.history_date.isoformat(), "text": f"{record.get_status_display()}" + (f" by {who}" if who else "")})
+            entries.append({"at": record.history_date.isoformat(), "text": f"{record.get_status_display()}" + (f" by {who}" if who else ""),
+                            "status": record.status, "who": who})
         previous = record.status
     return entries
 
@@ -189,9 +190,12 @@ def gold_detail(application):
                 for s in gold_services.application_sections(application)]
     application = GoldApplication.objects.prefetch_related("invites").get(pk=application.pk)
     state = invite_state(application)
+    history = gold_history(application)
+    decided = next((h for h in reversed(history) if h["status"] == application.status and h["text"] != "Applied"), None)
     return {
         "id": str(application.pk), "reference": application.reference, "name": application.full_name, "status": application.status,
-        "potential": application.potential_level, "invite": state, "sections": sections, "history": gold_history(application),
+        "potential": application.potential_level, "invite": state, "sections": sections, "history": history,
+        "decided_at": decided["at"] if decided else "", "decided_by": decided["who"] if decided else "",
         "approved_at": application.approved_at.isoformat() if application.approved_at else "",
         "approved_by": (application.approved_by.get_full_name() or application.approved_by.email) if application.approved_by_id else "",
         "person_id": str(application.user_id) if application.user_id else "",

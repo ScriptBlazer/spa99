@@ -1,0 +1,3 @@
+{% load office_tags %}{% comment %}A potential or status badge. Text first, colour second. Usage: include with potential="high" or status="new".{% endcomment %}
+{% if potential %}<span class="o-badge o-badge--p-{{ potential }}">{{ potential|capfirst }}<span class="o-badge-ctx"> potential</span></span>{% endif %}
+{% if status %}<span class="o-badge o-badge--s-{% if status == 'new' or status == 'contacted' %}waiting{% else %}{{ status }}{% endif %}">{{ status|status_label }}</span>{% endif %}

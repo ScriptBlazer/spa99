@@ -195,7 +195,8 @@ def analytics(range_name="30d", today=None):
 
     funnel_def = [("visitors", "Visitors", total(K.VISITORS)), ("started", "Started the journey", total(K.JOURNEYS_STARTED)),
                   ("completed", "Completed it", total(K.JOURNEYS_COMPLETED)), ("registered", "Registered", total(K.REGISTRATIONS))]
-    funnel = [{"key": k, "label": label, "value": v, "step_rate_bp": basis_points(v, funnel_def[i - 1][2]) if i else None}
+    funnel = [{"key": k, "label": label, "value": v, "share_bp": basis_points(v, funnel_def[0][2]) or 0,
+               "step_rate_bp": basis_points(v, funnel_def[i - 1][2]) if i else None}
               for i, (k, label, v) in enumerate(funnel_def)]
 
     plans = _plan_order()
@@ -205,13 +206,18 @@ def analytics(range_name="30d", today=None):
         out = [{"dimension": slug, "label": name, "value": found.get(slug, 0)} for slug, name in plans]
         if found.get("none"):
             out.append({"dimension": "none", "label": "No plan chosen", "value": found["none"]})
-        return out
+        whole = sum(item["value"] for item in out)
+        return [{**item, "share_bp": basis_points(item["value"], whole) or 0} for item in out]
 
     option_labels = {(q, v): (label, order) for q, v, label, order in Option.objects.filter(question__key__in=JOURNEY_QUESTIONS, active=True)
                      .order_by("order").values_list("question__key", "value", "label", "order")}
     answers_found = _by_dimension(rows, K.JOURNEY_ANSWER, labels)
-    answers = {q: [{"value": v, "label": label, "count": answers_found.get(f"{q}:{v}", 0)}
-                   for (qk, v), (label, _) in option_labels.items() if qk == q] for q in JOURNEY_QUESTIONS}
+    answers = {}
+    for q in JOURNEY_QUESTIONS:
+        items = [{"value": v, "label": label, "count": answers_found.get(f"{q}:{v}", 0)}
+                 for (qk, v), (label, _) in option_labels.items() if qk == q]
+        whole = sum(item["count"] for item in items)
+        answers[q] = [{**item, "share_bp": basis_points(item["count"], whole) or 0} for item in items]
 
     reach = _by_dimension(rows, K.JOURNEY_SCREEN, labels)
     screen_text = {}
@@ -230,8 +236,10 @@ def analytics(range_name="30d", today=None):
     potential = _by_dimension(rows, K.GOLD_BY_POTENTIAL, labels)
     gold = {
         "by_potential": [{"dimension": p, "label": p.title(), "value": potential.get(p, 0)} for p in ("high", "medium", "low")],
-        "by_status_now": [{"dimension": s, "label": label, "value": status.get((K.GOLD_BY_STATUS, s), 0)}
-                          for s, label in (("approved", "Approved"), ("new", "Waiting"), ("contacted", "Contacted"), ("declined", "Declined"))],
+        "by_status_now": [{"dimension": s, "label": label, "value": value} for s, label, value in (
+            ("approved", "Approved", status.get((K.GOLD_BY_STATUS, "approved"), 0)),
+            ("waiting", "Waiting", waiting_count(status)),  # new and contacted: both are waiting for Barry
+            ("declined", "Declined", status.get((K.GOLD_BY_STATUS, "declined"), 0)))],
     }
     return {
         "range": range_name, "ranges": list(ANALYTICS_RANGES), "granularity": granularity,

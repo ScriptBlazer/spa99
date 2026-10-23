@@ -1,41 +1,130 @@
 {% extends "office/base.html" %}
+{% load office_tags %}
 {% block title %}Dashboard | Spa 99 Office{% endblock %}
+{% block header_range %}{% include "office/_range.html" with place="header" ranges=data.ranges current=data.range %}{% endblock %}
 {% block main %}
-<header data-office-greeting>
-  <h1>{{ greeting }}</h1>
-  <p data-office-what-changed>{{ data.what_changed }}</p>
-  <div data-office-range-picker>{% for r in data.ranges %}<a href="?range={{ r }}" data-range="{{ r }}"{% if r == data.range %} aria-current="true"{% endif %}>{{ r }}</a>{% endfor %}</div>
-</header>
-<section data-office-rings>
-  {% for ring in data.rings %}
-  <div data-ring="{{ ring.key }}" data-percent="{{ ring.percent|default_if_none:'' }}">
-    <span data-ring-label>{{ ring.label }}</span> <span data-ring-value>{{ ring.value }}</span>
-    {% if ring.goal %}<span data-ring-of>of {{ ring.of }}</span>{% else %}<span data-ring-nogoal>No goal set</span>{% endif %}
+{# DOM order is the phone order; the desktop grid places the cards (css). Everything is server-rendered: rings, sparklines, numbers. #}
+{% include "office/_range.html" with place="page" ranges=data.ranges current=data.range %}
+<p class="o-error" data-error hidden role="status"><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+<div class="o-dash" data-office-dashboard>
+
+  <header class="o-greeting" data-office-greeting>
+    <h1>{{ greeting }}</h1>
+    <p class="o-lead" data-office-what-changed data-region="what-changed" data-fade>{{ data.what_changed|default:"A quiet day so far." }}</p>
+  </header>
+
+  <section class="o-card o-rings" data-reveal data-office-rings aria-label="Goals">
+    <svg class="o-ring-svg" viewBox="0 0 220 220" role="img" data-morph="rings-svg"
+         aria-label="{% for ring in data.rings %}{% if ring.key == 'registrations' %}Registrations {{ ring.value|num }}{% if ring.goal %} of {{ ring.of|num }}{% else %}, no goal set{% endif %}.{% elif ring.key == 'journeys_completed' %} Journeys completed {{ ring.value }}%{% if ring.goal %}, target {{ ring.of }}%{% else %}, no goal set{% endif %}.{% else %} Gold handled {{ ring.value|num }} of {{ ring.of|num }}.{% endif %}{% endfor %}">
+      {% for ring in data.rings %}
+      {% ring_arcs ring.percent as arc %}
+      <g class="o-ring o-ring--{{ forloop.counter }}" style="--i: {{ forloop.counter0 }}" transform="rotate(-90 110 110)">
+        <circle class="o-ring-track" cx="110" cy="110" r="{% if forloop.first %}101{% elif forloop.counter == 2 %}79{% else %}57{% endif %}"/>
+        {% if arc.has %}
+        <circle class="o-ring-cap" data-morph="ring-{{ ring.key }}-cap" cx="110" cy="110" r="{% if forloop.first %}101{% elif forloop.counter == 2 %}79{% else %}57{% endif %}" pathLength="100" style="--arc: {{ arc.second }}"/>
+        <circle class="o-ring-arc" data-morph="ring-{{ ring.key }}-1" cx="110" cy="110" r="{% if forloop.first %}101{% elif forloop.counter == 2 %}79{% else %}57{% endif %}" pathLength="100" style="--arc: {{ arc.first }}"/>
+        <circle class="o-ring-arc o-ring-arc--lap2" data-morph="ring-{{ ring.key }}-2" cx="110" cy="110" r="{% if forloop.first %}101{% elif forloop.counter == 2 %}79{% else %}57{% endif %}" pathLength="100" style="--arc: {{ arc.second }}"/>
+        {% endif %}
+      </g>
+      {% endfor %}
+    </svg>
+    <ul class="o-legend-rows" data-region="ring-legend" data-fade>
+      {% for ring in data.rings %}
+      <li class="o-legend-row" data-ring="{{ ring.key }}" data-percent="{{ ring.percent|default_if_none:'' }}">
+        <span class="o-dot o-dot--{{ forloop.counter }}" aria-hidden="true"></span>
+        <span class="o-legend-label" data-ring-label>{{ ring.label }}</span>
+        <span class="o-legend-value"><span class="o-legend-num" data-ring-value>{% if ring.key == 'journeys_completed' %}{{ ring.value }}%{% else %}{{ ring.value|num }}{% endif %}</span>
+          {% if ring.key == 'gold_handled' %}<span class="o-legend-of" data-ring-of>of {{ ring.of|num }}</span>
+          {% elif ring.goal %}<span class="o-legend-of" data-ring-of>of {{ ring.of|num }}{% if ring.key == 'journeys_completed' %}%{% endif %}</span>
+          {% else %}<span class="o-legend-of" data-ring-nogoal>No goal set</span>{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="o-card o-waiting" data-reveal data-office-waiting aria-labelledby="waiting-h">
+    <header class="o-card-head">
+      <h2 id="waiting-h">Waiting for you</h2>
+      <span class="o-count" data-region="waiting-count" data-waiting-count>{{ data.waiting.count|num }}</span>
+    </header>
+    <div data-region="waiting-list">
+      {% for item in data.waiting.items %}
+      <div class="o-wait-row">
+        <a class="o-wait-link" href="{% url 'office_gold_application' item.id %}" data-waiting-item data-potential="{{ item.potential }}">
+          <span class="o-wait-name">{{ item.name }}</span>
+          {% include "office/_badge.html" with potential=item.potential %}
+          <span class="o-wait-when">Applied {{ item.applied|relative:True }}</span>
+          <span class="o-wait-go" aria-hidden="true">{% include "office/_icon.html" with name="chevron-right" %}</span>
+        </a>
+        {% if office_can.can_act %}
+        <form method="post" action="{% url 'office_gold_approve' item.id %}" class="o-wait-action" data-office-action data-approve>{% csrf_token %}
+          <button type="submit" class="btn btn-primary btn-sm" data-working-text="Approving" data-confirm
+                  data-confirm-title="Approve {{ item.name }} for Gold?" data-confirm-message="He gets an invite to set up his account. His Gold month starts today, {% now 'j F' %}."
+                  data-confirm-label="Approve and invite" data-confirm-cancel="Not now">Approve and invite<span class="sr-only"> {{ item.name }}</span></button>
+        </form>
+        {% endif %}
+      </div>
+      {% empty %}<p class="o-empty-line">Nothing waiting for you.</p>{% endfor %}
+      {% if data.waiting.count > 5 %}<a class="o-quiet o-more" href="{% url 'office_gold' %}">See all {{ data.waiting.count|num }}</a>{% endif %}
+    </div>
+  </section>
+
+  <div class="o-stats" data-reveal="stagger" data-office-stats>
+    {% for stat in data.stats %}
+    <div class="o-stat-wrap">
+      <a class="o-card o-stat" href="{% url 'office_analytics' %}#{{ stat.link }}" data-stat="{{ stat.key }}" data-direction="{{ stat.direction }}">
+        <span class="o-stat-label" data-stat-label>{{ stat.label }}</span>
+        <span class="o-stat-body" data-region="stat-{{ stat.key }}" data-fade>
+          {% if stat.unit == "basis_points" %}<span class="o-stat-value" data-stat-value data-count="{{ stat.value|bp_rate_value }}" data-decimals="{% if stat.value < 1000 %}1{% else %}0{% endif %}" data-suffix="%">{{ stat.value|bp_rate }}</span>
+          {% else %}<span class="o-stat-value" data-stat-value{% if stat.value < 10000 %} data-count="{{ stat.value }}"{% endif %}>{{ stat.value|compact }}</span>{% endif %}
+          <span class="o-delta o-delta--{% if stat.direction == 'none' and stat.value %}new{% else %}{{ stat.direction }}{% endif %}" data-stat-delta>
+            {% if stat.direction == "up" %}<span aria-hidden="true">&#9650; {{ stat.percent }}%</span><span class="sr-only">Up {{ stat.percent }}%</span>
+            {% elif stat.direction == "down" %}<span aria-hidden="true">&#9660; {{ stat.percent }}%</span><span class="sr-only">Down {{ stat.percent }}%</span>
+            {% elif stat.direction == "none" and stat.value %}New
+            {% else %}No change{% endif %}
+            <span class="o-delta-vs">{% if data.range == "today" %}vs yesterday{% elif data.range == "30d" %}vs the 30 days before{% else %}vs last week{% endif %}</span>
+          </span>
+        </span>
+        {% sparkline stat.series as spark %}
+        <span class="o-spark" data-spark aria-hidden="true">
+          <svg viewBox="0 0 100 40" preserveAspectRatio="none" focusable="false">
+            <defs><linearGradient id="spark-{{ stat.key }}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="o-spark-top"/><stop offset="1" class="o-spark-end"/></linearGradient></defs>
+            <path class="o-spark-area" data-morph="spark-{{ stat.key }}-area" d="{{ spark.area }}" fill="url(#spark-{{ stat.key }})"/>
+            <path class="o-spark-line" data-morph="spark-{{ stat.key }}-line" d="{{ spark.line }}" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <span class="o-spark-dot" data-morph="spark-{{ stat.key }}-dot" style="left: {{ spark.x }}%; top: {{ spark.y }}%"></span>
+        </span>
+      </a>
+    </div>
+    {% endfor %}
   </div>
-  {% endfor %}
-</section>
-<section data-office-stats>
-  {% for stat in data.stats %}
-  <a href="{% url 'office_analytics' %}#{{ stat.link }}" data-stat="{{ stat.key }}" data-direction="{{ stat.direction }}">
-    <span data-stat-label>{{ stat.label }}</span> <span data-stat-value>{{ stat.value }}</span>
-    {% if stat.percent is not None %}<span data-stat-delta>{{ stat.percent }}%</span>{% endif %}
-    <span data-stat-series="{{ stat.series|join:',' }}"></span>
-  </a>
-  {% endfor %}
-</section>
-<section data-office-funnel>
-  {% for step in data.funnel %}<div data-funnel-step="{{ step.key }}" data-share-bp="{{ step.share_bp }}" data-step-rate-bp="{{ step.step_rate_bp|default_if_none:'' }}">{{ step.label }} <b>{{ step.value }}</b></div>{% endfor %}
-</section>
-<section data-office-waiting>
-  <h2>Waiting for you <span data-waiting-count>{{ data.waiting.count }}</span></h2>
-  {% for item in data.waiting.items %}<a href="{% url 'office_gold_application' item.id %}" data-waiting-item data-potential="{{ item.potential }}">{{ item.name }}</a>
-  {% empty %}<p>Nothing waiting for you.</p>{% endfor %}
-  {% if data.waiting.count > 5 %}<a href="{% url 'office_gold' %}">See all {{ data.waiting.count }}</a>{% endif %}
-</section>
-<section data-office-latest>
-  <h2>Latest registrations</h2>
-  {% for item in data.latest %}<a href="{% url 'office_person' item.id %}" data-latest-item>{{ item.name }} <span>{{ item.plan }}</span></a>{% endfor %}
-  <a href="{% url 'office_people' %}">See everyone</a>
-</section>
+
+  <section class="o-card o-funnel" data-reveal data-office-funnel aria-label="From visitor to registered">
+    <ol class="o-funnel-steps" data-region="funnel" data-fade>
+      {% for step in data.funnel %}
+      <li class="o-funnel-step" data-funnel-step="{{ step.key }}" data-share-bp="{{ step.share_bp }}" data-step-rate-bp="{{ step.step_rate_bp|default_if_none:'' }}" style="--i: {{ forloop.counter0 }}">
+        <span class="o-funnel-label">{{ step.label }}</span>
+        <span class="o-funnel-num">{{ step.value|num }}</span>
+        <span class="o-funnel-bar" role="presentation"><span class="o-funnel-fill" data-morph="funnel-{{ step.key }}" style="--share: {{ step.share_bp|bp_ratio }}"></span></span>
+        {% if step.step_rate_bp is not None %}<span class="o-funnel-rate">{{ step.step_rate_bp|bp_rate }} <span aria-hidden="true">&rsaquo;</span><span class="sr-only">of the step before</span></span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <section class="o-card o-latest" data-reveal data-office-latest aria-labelledby="latest-h">
+    <header class="o-card-head"><h2 id="latest-h">Latest registrations</h2></header>
+    <div data-region="latest">
+      {% for item in data.latest %}
+      <a class="o-latest-row" href="{% url 'office_person' item.id %}" data-latest-item>
+        <span class="o-latest-name">{{ item.name }}</span>
+        <span class="o-latest-plan">{{ item.plan }}</span>
+        <span class="o-latest-when">{{ item.registered|relative }}</span>
+      </a>
+      {% empty %}<p class="o-empty-line">No one has registered yet.</p>{% endfor %}
+    </div>
+    <a class="o-quiet o-more" href="{% url 'office_people' %}">See everyone</a>
+  </section>
+</div>
 {{ data|json_script:"office-dashboard" }}
 {% endblock %}

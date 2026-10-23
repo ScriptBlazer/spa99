@@ -1,0 +1,9 @@
+{% load office_tags %}{% comment %}The range picker: real radios in a GET form (works without JS through Apply), a sliding thumb. Usage: include with place="header"|"page", ranges, current.{% endcomment %}
+<form class="o-range o-range--{{ place }}" method="get" data-range-form aria-label="Date range">
+  <fieldset class="o-seg" style="--n: {{ ranges|length }}; --i: {% index_of ranges current %}">
+    <legend class="sr-only">Range</legend>
+    <span class="o-seg-thumb" aria-hidden="true"></span>
+    {% for r in ranges %}<label class="o-seg-item"><input type="radio" name="range" value="{{ r }}"{% if r == current %} checked{% endif %}><span>{{ r|range_label }}</span></label>{% endfor %}
+  </fieldset>
+  <noscript><button type="submit" class="btn btn-secondary btn-sm">Apply</button></noscript>
+</form>

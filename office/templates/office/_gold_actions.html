@@ -1,0 +1,14 @@
+{% load office_tags %}{% comment %}Decision buttons for one application. Owner and Manager only (never rendered for a Viewer). bar=True is the phone's sticky bar variant.{% endcomment %}
+{% if office_can.can_act %}
+{% if a.can_decline %}<form method="post" action="{% url 'office_gold_decline' a.id %}" data-office-action data-decline class="o-act o-act--decline">{% csrf_token %}
+  <button type="submit" class="btn btn-secondary{% if bar %}{% else %} btn-block{% endif %}" data-working-text="Declining" data-confirm data-confirm-danger
+          data-confirm-title="Decline {{ a.name }}?" data-confirm-message="He will not be invited. This cannot be changed here." data-confirm-label="Decline" data-confirm-cancel="Keep waiting">Decline</button></form>{% endif %}
+{% if a.can_approve %}<form method="post" action="{% url 'office_gold_approve' a.id %}" data-office-action data-approve class="o-act o-act--approve">{% csrf_token %}
+  <button type="submit" class="btn btn-primary{% if not bar %} btn-block{% endif %}" data-working-text="Approving" data-confirm
+          data-confirm-title="Approve {{ a.name }} for Gold?" data-confirm-message="He gets an invite to set up his account. His Gold month starts today, {% now 'j F' %}."
+          data-confirm-label="Approve and invite" data-confirm-cancel="Not now">Approve and invite</button></form>{% endif %}
+{% if a.can_resend %}<form method="post" action="{% url 'office_gold_resend' a.id %}" data-office-action data-resend class="o-act o-act--resend">{% csrf_token %}
+  <button type="submit" class="btn btn-secondary{% if not bar %} btn-block{% endif %}" data-working-text="Sending" data-confirm
+          data-confirm-title="Send {{ a.name|first_word }} a new invite?" data-confirm-message="A new link replaces the old one and lasts 14 days."
+          data-confirm-label="Send invite" data-confirm-cancel="Cancel">Resend invite</button></form>{% endif %}
+{% endif %}
