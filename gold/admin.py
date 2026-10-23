@@ -6,7 +6,7 @@ from common.admin import ExportCsvMixin
 
 from . import invites
 from .models import GoldApplication, GoldChoice, GoldInvite, GoldRule, GoldSignalSource
-from .services import resend_barry_email
+from .services import resend_approver_email
 
 
 class GoldInviteInline(admin.TabularInline):
@@ -62,10 +62,10 @@ class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
         self.message_user(request, f"New invite sent: {sent}. Skipped: {len(queryset) - sent} (only approved applicants without an account get one).",
                           messages.SUCCESS if sent else messages.WARNING)
 
-    @admin.action(description="Resend the email to Barry")
+    @admin.action(description="Resend the approver email")
     def resend_email(self, request, queryset):
         for application in queryset:
-            resend_barry_email(application)
+            resend_approver_email(application)
 
 
 @admin.register(GoldRule)

@@ -58,7 +58,7 @@ Automatic **High / Medium / Low**, points-based, weights editable in Control.
 
 Thresholds for High/Medium/Low are settings. The rating and its reasons are stored with the application.
 
-## Email to Barry
+## Email to the approver (GOLD_APPROVER_EMAILS)
 
 To `barry@bmlgroup.co.uk`, cc `moishe.berkowitz@bmlgroup.co.uk` (recipients editable in Control). Sent on submit.
 
@@ -70,7 +70,11 @@ To `barry@bmlgroup.co.uk`, cc `moishe.berkowitz@bmlgroup.co.uk` (recipients edit
 
 **3. What the site collected:** when he'd come, how often, facilities, company/guests, suggested tier, how he heard, journey timing (e.g. "completed in 3 min, visited twice before applying").
 
-Button: **Open in Control**, NOT in the email yet. Control has no Gold page, so a link would 404 (review 2026-10-22). TODO: when Control gets `/gold/<id>/`, add `control_url` back to `gold.services.barry_email_context()` and the button to `gold_barry.html` / `.txt`. Until then Barry finds the application by its reference.
+Buttons (2026-10-23): **Approve** and **View application** (secondary), both absolute links to the Office host (`OFFICE_URL`) holding only the application id: Approve opens `/gold/<id>/approve/confirm/`, View opens `/gold/<id>/`. Text version has plain links. Nothing changes on a GET: the confirm page needs Office sign-in (the person returns to it after sign-in) and the Owner, Manager or Approver role (Viewer gets 403), shows name, potential, a property line and the applied date, and one big "Approve and send invite" button that POSTs (CSRF) to the existing `gold_approve`. Already decided applications show their state instead of the button; `approve_and_invite` stays idempotent (row lock, second approval is SKIPPED). After the tap the person lands on the detail page with the success message. Office sign-ins last 30 days (set on the session at Office sign-in only; the public site keeps Django's 14 days).
+
+Recipients and senders come only from the environment: `GOLD_APPROVER_EMAILS` (comma separated; whoever is listed acts as Barry), `GOLD_APPROVER_CC` (optional), `DEFAULT_FROM_EMAIL`, `CONTACT_EMAIL`. The Site settings fields `gold_alert_to`, `gold_alert_cc` and `contact_email` were removed (schema-only migration `plans.0006`; `SiteSettings.contact_email` is now a read-only property). If `GOLD_APPROVER_EMAILS` is empty nothing is sent to the approver, a warning is logged once and the application shows "email not sent"; the applicant's thank-you still goes. Email template key `gold_barry` is now `gold_approver` (`gold_approver_repeat`); old rows keep working until `manage.py backfill_site_data` renames them (`--dry-run` first).
+
+**Barry's Office account** (Moishe creates it; no password is ever in a command or file): `manage.py setup_roles`, then `manage.py create_office_user --email <barry's email> --role approver --first-name Barry` (prompts for the password twice). Or in the hidden admin: add a user with "Staff status" ticked and put him in the Approver group. Add his email to `GOLD_APPROVER_EMAILS`.
 
 Clean, branded, readable on a phone. Applicant receives a short, calm acknowledgement ("Thank you. We'll be in touch.").
 
@@ -87,7 +91,7 @@ Clean, branded, readable on a phone. Applicant receives a short, calm acknowledg
 - Engine: `gold/rating.py` `rate_potential(signals)`, shared by the application and the journey result (the journey passes `property_link` and `size`).
 - Defaults (seeded, editable): owner/investor, developer, manager 5; works at a firm, agent, property lawyer 3; size 10-49 +1, 50-199 +2, 200+ +3; North London +1; works with BML +3; referred +1. High needs 6, Medium 3. So a bare owner is Medium and an owner with a portfolio of 10+ is High (matches journey.md "property link with scale").
 - Endpoints (public, CSRF + honeypot `website`; 10 *valid* applications per hour per IP (a form mistake does not use one up) plus a generous cap of 120 posts an hour of any kind): `GET /gold/options/` (choices, plus prefill from the journey cookie / signed-in user; `industry` `{question, options: [{value, label}], other_value, other_label}`; `property_when` `{question: "industry", any_of: ["property"]}` says when to show `property_link` and `size_range`; prefill has `industry`, `industry_other` and, only for Property, `property_link` / `size_range`), `POST /gold/apply/` (JSON or form post; 201 `{"reference"}` or 400 `{"errors"}`).
-- Emails are queued (django-q2) as `gold.tasks.send_gold_emails(application_id)`: Barry (to + cc from Site settings, subject `Gold Card application: Name (High potential)`, suffix ` - repeat application` for repeats), then the applicant's acknowledgement. The three sections come from `gold.services.application_sections()` so Control can show the same. The email has no "Open in Control" link until Control has a Gold page (see the TODO above). Resend (Barry only): `gold.services.resend_barry_email()`, also an action in the hidden admin.
+- Emails are queued (django-q2) as `gold.tasks.send_gold_emails(application_id)`: the approver (`GOLD_APPROVER_EMAILS` + `GOLD_APPROVER_CC`, subject `Gold Card application: Name (High potential)`, suffix ` - repeat application` for repeats), then the applicant's acknowledgement. The three sections come from `gold.services.application_sections()` so Control can show the same. Resend (approver only): `gold.services.resend_approver_email()`, also an action in the hidden admin.
 - A second submit within 2 minutes with the same email returns the first application and sends nothing new.
 - Stage switch `register_interest_open` also closes Gold applications.
 

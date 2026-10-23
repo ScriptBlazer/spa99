@@ -250,3 +250,80 @@ class FreshSentenceTests(OfficeTestCase):
         funnel = selectors.dashboard("7d")["funnel"]
         self.assertTrue(all((s["step_rate_bp"] or 0) <= 10000 for s in funnel))
         self.assertTrue(funnel[3]["partial"] and funnel[3]["step_rate_bp"] is None)
+
+
+class OneTapApprovalTests(OfficeTestCase):
+    def setUp(self):
+        self.application = gold_services.submit_application(application_data())[0]
+        mail.outbox.clear()
+        self.url = f"/gold/{self.application.pk}/approve/confirm/"
+
+    def test_sign_in_is_required_and_the_person_lands_back_on_the_page(self):
+        response = get(None, self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/?next=", response["Location"])
+        owner = staff("Owner")
+        owner.set_password("a-long-test-password-1")
+        owner.save()
+        client = Client(HTTP_HOST=OFFICE)
+        login = client.post(response["Location"], {"username": owner.email, "password": "a-long-test-password-1"})
+        self.assertEqual((login.status_code, login["Location"]), (302, self.url))
+        self.assertEqual(client.session.get_expiry_age(), 30 * 24 * 60 * 60)  # Office sign-ins last 30 days
+
+    def test_public_site_sessions_keep_the_default_age(self):
+        member = User.objects.create_user("m@example.com", "a-long-test-password-1")
+        client = Client(HTTP_HOST="localhost")
+        client.post("/login/", {"username": member.email, "password": "a-long-test-password-1"})
+        self.assertEqual(client.session.get_expiry_age(), 1209600)  # Django's two weeks
+
+    def test_viewer_is_refused_and_get_never_approves(self):
+        self.assertEqual(get(staff("Viewer"), self.url).status_code, 403)
+        self.assertEqual(get(staff("Manager"), self.url).status_code, 200)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status, "new")  # a GET (even a mail scanner's) changes nothing
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_post_approves_once_and_the_page_then_shows_the_state(self):
+        owner = staff("Owner")
+        page = get(owner, self.url)
+        self.assertContains(page, "Approve and send invite")
+        self.assertContains(page, "Dan Cohen")
+        post(owner, f"/gold/{self.application.pk}/approve/")
+        post(owner, f"/gold/{self.application.pk}/approve/")  # a second tap
+        self.application.refresh_from_db()
+        self.assertEqual((self.application.status, self.application.invites.count()), ("approved", 1))
+        again = get(owner, self.url)
+        self.assertContains(again, "Already approved")
+        self.assertNotContains(again, "Approve and send invite")
+
+    def test_approver_role_decides_gold_but_sees_nothing_else(self):
+        approver = staff("Approver")
+        self.assertEqual(get(approver, self.url).status_code, 200)
+        self.assertEqual(get(approver, "/gold/").status_code, 200)
+        self.assertEqual(post(approver, f"/gold/{self.application.pk}/approve/").status_code, 302)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status, "approved")
+        self.assertEqual(get(approver, "/people/").status_code, 403)
+        self.assertEqual(get(approver, "/analytics/").status_code, 403)
+        self.assertEqual(get(approver, "/")["Location"], "/gold/")
+
+    def test_create_office_user_asks_for_the_password_and_sets_the_role(self):
+        from unittest import mock
+
+        with mock.patch("users.management.commands.create_office_user.getpass", return_value="a-long-test-password-1"):
+            call_command("create_office_user", email="New.Approver@example.com", role="approver", first_name="Bee", stdout=StringIO())
+        user = User.objects.get(email="new.approver@example.com")
+        self.assertTrue(user.is_staff and user.check_password("a-long-test-password-1"))
+        self.assertEqual(list(user.groups.values_list("name", flat=True)), ["Approver"])
+
+    def test_backfill_renames_the_old_email_rows_and_keeps_edits(self):
+        from notifications.models import NotificationTemplate
+        from notifications.services import subject_for
+        from plans.management.commands.backfill_site_data import _approver_email_rows
+
+        NotificationTemplate.objects.filter(key="gold_approver").delete()
+        NotificationTemplate.objects.create(key="gold_barry", subject="Edited {name}")
+        self.assertEqual(subject_for("gold_approver", name="X"), "Edited X")  # works before the backfill
+        _approver_email_rows()
+        self.assertEqual(NotificationTemplate.objects.get(key="gold_approver").subject, "Edited {name}")
+        self.assertFalse(NotificationTemplate.objects.filter(key="gold_barry").exists())

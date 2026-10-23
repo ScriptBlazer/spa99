@@ -15,6 +15,7 @@ urlpatterns = [
     path("people/<uuid:pk>/delete/", views.person_delete, name="office_person_delete"),
     path("gold/", views.gold, name="office_gold"),
     path("gold/<uuid:pk>/", views.gold_application, name="office_gold_application"),
+    path("gold/<uuid:pk>/approve/confirm/", views.gold_approve_confirm, name="office_gold_approve_confirm"),
     path("gold/<uuid:pk>/approve/", views.gold_approve, name="office_gold_approve"),
     path("gold/<uuid:pk>/resend/", views.gold_resend, name="office_gold_resend"),
     path("gold/<uuid:pk>/decline/", views.gold_decline, name="office_gold_decline"),

@@ -16,7 +16,8 @@ from users import services as user_services
 from users.models import User
 
 from . import lists, selectors
-from .permissions import owner, reader, writer
+from . import permissions as office_permissions
+from .permissions import gold_reader, gold_writer, owner, reader, writer
 
 
 def _greeting(user):
@@ -49,9 +50,11 @@ def _remembered_range(request, key, allowed, default):
     return remembered if remembered in allowed else default
 
 
-@reader
+@gold_reader
 @require_GET
 def dashboard(request):
+    if not office_permissions.abilities(request.user)["can_see_all"]:  # an Approver's home is the Gold list
+        return redirect("office_gold")
     data = selectors.dashboard(_remembered_range(request, "office_range_dashboard", selectors.DASHBOARD_RANGES, "7d"))
     return render(request, "office/dashboard.html", {"data": data, "greeting": _greeting(request.user), "section": "dashboard"})
 
@@ -135,7 +138,7 @@ def person_delete(request, pk):
 
 # ---------- gold ----------
 
-@reader
+@gold_reader
 @require_GET
 @never_cache
 def gold(request):
@@ -147,12 +150,22 @@ def gold(request):
     return _varied(render(request, _fragment(request, "office/gold.html", "office/_gold_rows.html"), context))
 
 
-@reader
+@gold_reader
 @require_GET
 @never_cache
 def gold_application(request, pk):
     application = get_object_or_404(GoldApplication, pk=pk)
     return render(request, "office/gold_detail.html", {"application": lists.gold_detail(application), "section": "gold"})
+
+
+@gold_writer
+@require_GET
+@never_cache
+def gold_approve_confirm(request, pk):
+    """The page Barry's email button opens: sign-in and Owner/Manager come first (middleware, then @writer). GET only
+    shows the application; the tap POSTs to gold_approve, which holds the approval logic."""
+    application = get_object_or_404(GoldApplication, pk=pk)
+    return render(request, "office/gold_confirm.html", {"application": lists.gold_confirm(application), "section": "gold"})
 
 
 def _act(request, pk, action):
@@ -161,7 +174,7 @@ def _act(request, pk, action):
     return redirect("office_gold_application", pk=application.pk)
 
 
-@writer
+@gold_writer
 @require_POST
 def gold_approve(request, pk):
     def run(request, application):
@@ -174,7 +187,7 @@ def gold_approve(request, pk):
     return _act(request, pk, run)
 
 
-@writer
+@gold_writer
 @require_POST
 def gold_resend(request, pk):
     def run(request, application):
@@ -185,7 +198,7 @@ def gold_resend(request, pk):
     return _act(request, pk, run)
 
 
-@writer
+@gold_writer
 @require_POST
 def gold_decline(request, pk):
     def run(request, application):

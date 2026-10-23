@@ -2,6 +2,7 @@
 import logging
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
@@ -182,8 +183,8 @@ def queue_emails(application, acknowledge=True):
         GoldApplication.objects.filter(pk=application.pk).update(email_error="Could not be queued")
 
 
-def resend_barry_email(application):
-    """Control's 'resend' button: only Barry's email goes again."""
+def resend_approver_email(application):
+    """Control's 'resend' button: only the approver's email goes again."""
     queue_emails(application, acknowledge=False)
 
 
@@ -194,20 +195,21 @@ def link_user_applications(user):
     return GoldApplication.objects.filter(email__iexact=user.email, user__isnull=True).update(user=user)
 
 
-def barry_email_context(application):
-    site = SiteSettings.load()
+def approver_email_context(application):
+    office = settings.OFFICE_URL  # links hold only the application id: the Office asks for sign-in and checks the role
     return {
+        "approve_url": f"{office}/gold/{application.pk}/approve/confirm/",
+        "view_url": f"{office}/gold/{application.pk}/",
         "name": application.full_name,
         "potential_label": POTENTIAL_LABELS.get(application.potential_level, ""),
         "sections": application_sections(application),
         "is_repeat": application.is_repeat,
         "repeat_reference": application.repeat_of.reference if application.repeat_of_id else "",
-        "recipients": site.gold_alert_to_list,
     }
 
 
-def barry_subject(application):
-    key = "gold_barry_repeat" if application.is_repeat else "gold_barry"
+def approver_subject(application):
+    key = "gold_approver_repeat" if application.is_repeat else "gold_approver"
     return subject_for(key, name=application.full_name, potential=POTENTIAL_LABELS.get(application.potential_level, ""))
 
 

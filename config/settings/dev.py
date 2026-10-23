@@ -3,6 +3,9 @@ from .base import *  # noqa: F401,F403
 from .base import ENV, build_startup_report
 
 DEBUG = ENV.bool("DEBUG", True)
+# Dev-only mail defaults (emails print to the console; .invalid can never deliver).
+DEFAULT_FROM_EMAIL = ENV.get("DEFAULT_FROM_EMAIL", "Spa 99 <dev@spa99.invalid>")
+SERVER_EMAIL = ENV.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 ALLOWED_HOSTS = ALLOWED_HOSTS + ["control.localhost", "office.localhost", "testserver"]  # noqa: F405
 SITE_URL = ENV.get("SITE_URL", "http://localhost:8000").rstrip("/")
 CONTROL_URL = ENV.get("CONTROL_URL", "http://control.localhost:8000").rstrip("/")

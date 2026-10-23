@@ -8,6 +8,8 @@ from common.settings_helpers import build_databases, build_media_storage, descri
 _weak_secret_markers = ("insecure", "change-me", "changeme", "dummy")
 if not SECRET_KEY or SECRET_KEY == DEV_SECRET_KEY or any(m in SECRET_KEY.lower() for m in _weak_secret_markers):
     raise ImproperlyConfigured("SECRET_KEY must be set to a real secret in production.")
+if not ENV.get("DEFAULT_FROM_EMAIL"):
+    raise ImproperlyConfigured("DEFAULT_FROM_EMAIL must be set in production (the From address of every email).")
 if not ENV.get("DATABASE_URL"):
     raise ImproperlyConfigured("DATABASE_URL must be set in production (managed PostgreSQL).")
 

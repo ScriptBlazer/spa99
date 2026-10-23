@@ -4,6 +4,8 @@ docs/features/admin.md, to be approved by Moishe. Safe to run again; `--dry-run`
   Owner   everything, including Team (users, groups) and Gold status
   Manager everything on the project apps except Team and Gold status (people and Gold applications are view only here;
           Control does the field-level edits)
+  Approver Gold only (Office): sees and decides Gold applications (approve, decline, resend); nothing else. Whoever
+          is named in GOLD_APPROVER_EMAILS usually holds this role.
   Viewer  read-only: dashboard (insights), people, Gold applications, journey sessions
 Superusers bypass groups entirely.
 """
@@ -34,6 +36,8 @@ def permissions_for(role):
             ok = key[0] != "auth"  # no groups / permissions (Team)
             if key in (PEOPLE, GOLD_STATUS):
                 ok = ok and action == "view"
+        elif role == "Approver":
+            ok = key == GOLD_STATUS and action in ("view", "change")
         else:  # Viewer
             ok = action == "view" and key in VIEWER_MODELS
         if ok:
@@ -42,7 +46,7 @@ def permissions_for(role):
 
 
 class Command(BaseCommand):
-    help = "Create or refresh the Owner, Manager and Viewer groups."
+    help = "Create or refresh the Owner, Manager, Viewer and Approver groups."
 
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true", help="Show the permission counts; change nothing.")
@@ -50,7 +54,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         with transaction.atomic():
-            for role in ("Owner", "Manager", "Viewer"):
+            for role in ("Owner", "Manager", "Viewer", "Approver"):
                 wanted = permissions_for(role)
                 group, created = Group.objects.get_or_create(name=role)
                 lookup = {(p.content_type.app_label, p.codename): p for p in Permission.objects.select_related("content_type")}

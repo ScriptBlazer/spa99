@@ -112,6 +112,7 @@ class ProdSettingsTests(SimpleTestCase):
         "SECRET_KEY": "k8s-Zq3!xv9Lm2Pw7Tn5Rb4Hc6Jd1Fg0Ya8Ue3Oi5Kp7Ws9Qx2Mz4Vb6Nc1Ld",
         "DATABASE_URL": "postgres://u:p@db.example.com:5432/spa99",
         "ADMIN_PATH": "my-own-hidden-door-91x/",
+        "DEFAULT_FROM_EMAIL": "Spa 99 <noreply@example.com>",
     }
 
     def import_prod(self, environ):
@@ -148,6 +149,18 @@ class ProdSettingsTests(SimpleTestCase):
     def test_refuses_missing_database_url(self):
         with self.assertRaises(ImproperlyConfigured):
             self.import_prod({"SECRET_KEY": self.GOOD["SECRET_KEY"]})
+
+    def test_refuses_missing_default_from_email(self):
+        environ = {**self.GOOD}
+        environ.pop("DEFAULT_FROM_EMAIL")
+        with self.assertRaises(ImproperlyConfigured):
+            self.import_prod(environ)
+
+    def test_mail_settings_and_approvers_come_from_env(self):
+        settings = self.import_prod({**self.GOOD, "GOLD_APPROVER_EMAILS": "a@example.com, b@example.com", "GOLD_APPROVER_CC": "c@example.com",
+                                     "CONTACT_EMAIL": "hi@example.com"})
+        self.assertEqual((settings.GOLD_APPROVER_EMAILS, settings.GOLD_APPROVER_CC), (["a@example.com", "b@example.com"], ["c@example.com"]))
+        self.assertEqual((settings.CONTACT_EMAIL, settings.SERVER_EMAIL), ("hi@example.com", "Spa 99 <noreply@example.com>"))
 
     def test_refuses_missing_or_default_admin_path(self):
         for admin_path in (None, "backstage-7d3f9a/", "/backstage-7d3f9a"):

@@ -29,7 +29,7 @@
       {% endif %}
       <div class="o-actions-rail">{% include "office/_gold_actions.html" %}</div>
       {% if office_can.can_act and a.can_approve %}<p class="o-sub">He gets an email to set up his account. The link lasts 14 days.</p>{% endif %}
-      {% if a.person_id %}<a class="o-quiet" href="{% url 'office_person' a.person_id %}">Open his account</a>{% endif %}
+      {% if a.person_id and office_can.can_see_all %}<a class="o-quiet" href="{% url 'office_person' a.person_id %}">Open his account</a>{% endif %}
       <h3 class="o-h4">History</h3>
       <ul class="o-history" data-gold-history>{% for h in a.history %}<li>{{ h.at|dt }} &middot; {{ h.text }}</li>{% endfor %}</ul>
     </section>

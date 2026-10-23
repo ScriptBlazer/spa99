@@ -94,7 +94,7 @@ class RegisterInterestTests(TestCase):
 
         self.assertEqual(len(mail.outbox), 1)  # ordinary sign-ups email only the person
         self.assertEqual(mail.outbox[0].to, ["hugo@example.com"])
-        self.assertEqual(mail.outbox[0].reply_to, ["hello@spa99.uk"])
+        self.assertEqual(mail.outbox[0].reply_to, ["hello@example.test"])
         self.assertRegex(mail.outbox[0].body, r"http://localhost:8000/verify/[^/\s]+/")
         self.assertEqual(EmailLog.objects.get().template, "verify")
 
