@@ -243,7 +243,7 @@ def analytics(range_name="30d", today=None):
         whole = sum(item["value"] for item in out)
         return [{**item, "share_bp": basis_points(item["value"], whole) or 0} for item in out]
 
-    option_labels = {(q, v): (label, order) for q, v, label, order in Option.objects.filter(question__key__in=JOURNEY_QUESTIONS, active=True)
+    option_labels = {(q, v): (facts.clean_label(label), order) for q, v, label, order in Option.objects.filter(question__key__in=JOURNEY_QUESTIONS, active=True)
                      .order_by("order").values_list("question__key", "value", "label", "order")}
     answers_found = _by_dimension(rows, K.JOURNEY_ANSWER, labels)
     answers = {}

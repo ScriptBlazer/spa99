@@ -367,6 +367,12 @@ def ramp_rows(items, hue, key="value"):
 
 
 @register.simple_tag
+def insight_of(insights, key):
+    """One stored insight by key (or None): {key, title, sentence, top, runner_up, options}. Display only; nothing is computed."""
+    return next((i for i in (insights or []) if i.get("key") == key), None)
+
+
+@register.simple_tag
 def has_data(items, key="value"):
     """True when any item has a figure above zero (decides between a chart and its empty line)."""
     return any(_int(item.get(key)) > 0 for item in (items or []))

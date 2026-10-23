@@ -20,7 +20,7 @@ function start() {
   const created = new Set();  // cards whose charts exist or are wanted
   const SERIES = [   // back to front; each metric keeps its colour everywhere
     { key: 'visitors', name: 'Visitors', unit: 'visitors' },
-    { key: 'journeys_started', name: 'People started', unit: 'people started' },
+    { key: 'journeys_started', name: 'Started the journey', unit: 'started the journey' },
     { key: 'people_registered', name: 'Registered', unit: 'registered' },
     { key: 'page_views', name: 'Page views', unit: 'page views' },
   ];
@@ -125,6 +125,16 @@ function start() {
         ctx.textAlign = 'left'; ctx.fillStyle = T.text;
         ctx.fillText(ctx.measureText(full).width <= room ? full : short, x1 + 10, bar.y);
       });
+      ctx.restore();
+    },
+  };
+  const barValues = {   // the count above each paired bar, so nothing lives only in a tooltip
+    id: 'barValues',
+    afterDatasetsDraw(chart, _args, opts) {
+      if (!opts?.on) return;
+      const { ctx } = chart;
+      ctx.save(); ctx.font = `600 12px ${T.font}`; ctx.fillStyle = T.text; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      chart.data.datasets.forEach((set, n) => chart.getDatasetMeta(n).data.forEach((bar, i) => ctx.fillText(nf.format(set.data[i]), bar.x, bar.y - 5)));
       ctx.restore();
     },
   };
@@ -246,7 +256,7 @@ function start() {
         const ink = [T.surface, T.iron, T.surface, T.surface];   // AA on each bar: cream on slate, teal and clay; iron on the lighter sage
         const text = steps.map((s, i) => (i && !s.partial && s.step_rate_bp !== null ? `${nf.format(s.value)} · ${rate(s.step_rate_bp)} carried on` : nf.format(s.value)));
         const short = steps.map((s, i) => (i && !s.partial && s.step_rate_bp !== null ? `${nf.format(s.value)} · ${rate(s.step_rate_bp)}` : nf.format(s.value)));
-        const names = steps.map((s) => (s.key === 'completed' ? 'Finished it' : s.label));
+        const names = steps.map((s) => s.label);
         const top = Math.max(...steps.map((s) => s.value), 1);
         const narrow = (charts.get('funnel')?.box || root.querySelector('[data-chart="funnel"]')).clientWidth < 520;
         return {
@@ -263,6 +273,27 @@ function start() {
             const i = pts[0].dataIndex; const s = steps[i];
             return { title: names[i], rows: [{ label: 'People', value: nf.format(s.value), color: colours[i] }, ...(i && s.step_rate_bp !== null && !s.partial ? [{ label: 'Of the step before', value: rate(s.step_rate_bp), color: colours[i] }] : []), { label: 'Of visitors', value: rate(s.share_bp), color: colours[i] }] };
           },
+        };
+      },
+    },
+    tiers: {
+      empty: (d) => !(d.tier_pair || []).some((r) => r.picked || r.suggested),
+      make(d) {
+        const rows = d.tier_pair; const picked = T.clay; const suggested = T.clayRamp[1];
+        return {
+          type: 'bar',
+          data: { labels: rows.map((r) => r.label), datasets: [
+            { label: 'Picked', data: rows.map((r) => r.picked), backgroundColor: picked, borderRadius: 8, borderSkipped: 'start', maxBarThickness: 36, categoryPercentage: 0.7, barPercentage: 0.95 },
+            { label: 'Suggested', data: rows.map((r) => r.suggested), backgroundColor: suggested, borderRadius: 8, borderSkipped: 'start', maxBarThickness: 36, categoryPercentage: 0.7, barPercentage: 0.95 },
+          ] },
+          options: base('tiers', {
+            layout: { padding: { top: 24 } }, interaction: { mode: 'index', intersect: false },
+            scales: { x: xScale({ ticks: { color: T.muted, maxRotation: 0, autoSkip: false, padding: 10, callback(_v, i) { return wrap(rows[i]?.label || '', 14); } } }), y: yScale({ ticks: { color: T.muted, padding: 10, maxTicksLimit: 4, precision: 0, callback: (v) => compact(v) }, suggestedMax: 3 }) },
+            plugins: { legend: { display: false }, tooltip: { enabled: false, external: externalTip('tiers') }, barValues: { on: true } },
+          }),
+          plugins: [barValues],
+          legend: [{ text: 'Picked', color: picked }, { text: 'Suggested', color: suggested }],
+          tip: (pts) => ({ title: rows[pts[0].dataIndex].label, rows: pts.map((p) => ({ label: p.dataset.label, value: nf.format(p.parsed.y), color: p.dataset.backgroundColor })) }),
         };
       },
     },
@@ -335,7 +366,7 @@ function start() {
   }
 
   function summaryFor(card, d) {
-    const map = { visitors: 'visitors', funnel: 'funnel', plan: 'registrations_by_plan', suggested: 'suggested_plan', answers: 'journey_answers', dropoff: 'drop_off', gold: 'gold' };
+    const map = { visitors: 'visitors', funnel: 'funnel', tiers: '', plan: 'registrations_by_plan', suggested: 'suggested_plan', answers: 'journey_answers', dropoff: 'drop_off', gold: 'gold' };
     return d.summaries?.[map[card]] || '';
   }
 

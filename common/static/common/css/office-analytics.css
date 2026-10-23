@@ -38,7 +38,7 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 .o-pills { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
 .o-pill { --sw: var(--office-slate); --tint: var(--office-slate-tint); display: inline-flex; align-items: center; gap: var(--space-2); min-height: 2.5rem; padding: 0 var(--space-3); border: 0; border-radius: var(--office-pill); background: var(--office-sunken); color: var(--office-muted); font-size: var(--text-sm); font-weight: 500; cursor: pointer; transition: background-color var(--office-dur-lift) var(--ease-soft), color var(--office-dur-lift) var(--ease-soft); }
 .o-pill[data-series="journeys_started"] { --sw: var(--office-sage); --tint: var(--office-sage-tint); }
-.o-pill[data-series="registrations"] { --sw: var(--office-clay); --tint: var(--office-clay-tint); }
+.o-pill[data-series="people_registered"] { --sw: var(--office-clay); --tint: var(--office-clay-tint); }
 .o-pill[data-series="page_views"] { --sw: var(--office-plum); --tint: var(--office-plum-tint); }
 .o-pill .o-swatch { background: var(--sw); opacity: 0.35; transition: opacity var(--office-dur-lift) var(--ease-soft); }
 .o-pill[aria-pressed="true"] { background: var(--tint); color: var(--office-text); }
@@ -94,6 +94,12 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 .o-multiple h3 { align-self: flex-start; font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; letter-spacing: 0; color: var(--office-text); }
 .o-multiple .o-note { align-self: flex-start; margin-top: calc(var(--space-2) * -1); }
 .o-multiple .o-bars { width: 100%; }
+
+/* the stored top answer above a chart: "Dry sauna  4 of 5" */
+.o-headline { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--office-muted); max-width: none; }
+.o-headline:empty { display: none; }
+.o-headline strong { color: var(--office-text); font-weight: 600; margin-right: var(--space-1); }
+.o-multiple .o-headline { align-self: flex-start; margin: calc(var(--space-2) * -1) 0 0; }
 
 /* ---------- bar lists: label above a pill bar, the count right (facilities, Gold by potential) ---------- */
 .o-bars, .o-rank { display: grid; gap: var(--space-3); list-style: none; padding: 0; }

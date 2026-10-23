@@ -20,7 +20,7 @@
           <p class="o-hero-change">{{ c_visitors }}{% if r_visitors %} <span class="o-hero-rate">{{ r_visitors }}</span>{% endif %}</p>
         </div>
         <div class="o-hero-fig" data-hero-fig="journeys_started" hidden>
-          <p class="o-hero-main"><span class="o-hero-num">{{ data.series.journeys_started.total|num }}</span><span class="o-hero-unit">people started</span></p>
+          <p class="o-hero-main"><span class="o-hero-num">{{ data.series.journeys_started.total|num }}</span><span class="o-hero-unit">started the journey</span></p>
           {% change_ana data.series.journeys_started.total data.series.journeys_started.previous data.range as c_journeys_started %}{% change_rate data.series.journeys_started.total data.series.journeys_started.previous as r_journeys_started %}
           <p class="o-hero-change">{{ c_journeys_started }}{% if r_journeys_started %} <span class="o-hero-rate">{{ r_journeys_started }}</span>{% endif %}</p>
         </div>
@@ -38,8 +38,8 @@
     </div>
     <div class="o-pills" data-series-pills hidden role="group" aria-label="Series shown">
       <button type="button" class="o-pill" data-series="visitors" aria-pressed="true"><span class="o-swatch" aria-hidden="true"></span>Visitors</button>
-      <button type="button" class="o-pill" data-series="journeys_started" aria-pressed="true"><span class="o-swatch" aria-hidden="true"></span>People started</button>
-      <button type="button" class="o-pill" data-series="people_registered" aria-pressed="true"><span class="o-swatch" aria-hidden="true"></span>Registered</button>
+      <button type="button" class="o-pill" data-series="journeys_started" aria-pressed="true"><span class="o-swatch" aria-hidden="true"></span>Started the journey</button>
+      <button type="button" class="o-pill" data-series="people_registered" aria-pressed="true"><span class="o-swatch" aria-hidden="true"></span>Registered interest</button>
       <button type="button" class="o-pill" data-series="page_views" aria-pressed="false"><span class="o-swatch" aria-hidden="true"></span>Page views</button>
     </div>
     <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
@@ -52,7 +52,7 @@
     <details class="o-table" data-table="visitors"{% if not data.series.visitors.total and not data.series.page_views.total and not data.series.journeys_started.total and not data.series.people_registered.total %} hidden{% endif %}><summary>View as table</summary>
       <div class="o-table-wrap" data-region="table-visitors" data-fade>
         <table><caption class="sr-only">Visitors, page views, people started and registrations, {{ data.range|range_label }}</caption>
-          <thead><tr><th scope="col">{% if data.granularity == "week" %}Week{% else %}Date{% endif %}</th><th scope="col">Visitors</th><th scope="col">Page views</th><th scope="col">People started</th><th scope="col">Registrations</th>{% if data.previous_labels %}<th scope="col">Previous visitors</th>{% endif %}</tr></thead>
+          <thead><tr><th scope="col">{% if data.granularity == "week" %}Week{% else %}Date{% endif %}</th><th scope="col">Visitors</th><th scope="col">Page views</th><th scope="col">People started</th><th scope="col">Registered interest</th>{% if data.previous_labels %}<th scope="col">Previous visitors</th>{% endif %}</tr></thead>
           <tbody>{% zip_lists data.labels data.series.visitors.values data.series.page_views.values data.series.visitors.previous data.series.journeys_started.values data.series.people_registered.values as vrows %}{% for r in vrows %}
             <tr><th scope="row">{% if data.granularity == "week" %}{{ r.0|week_label }}{% else %}{{ r.0|day_label }}{% endif %}</th><td>{{ r.1|num }}</td><td>{{ r.2|num }}</td><td>{{ r.4|num }}</td><td>{{ r.5|num }}</td>{% if data.previous_labels %}<td>{{ r.3|num }}</td>{% endif %}</tr>{% endfor %}
           </tbody></table>
@@ -63,8 +63,8 @@
   {# 2 Four tinted KPI tiles #}
   <div class="o-kpis o-span-12" data-office-kpis>
     {% include "office/_kpi.html" with key="visitors" label="Visitors" hue="slate" anchor="visitors" %}
-    {% include "office/_kpi.html" with key="journeys_started" label="People who started" hue="sage" anchor="journeys" %}
-    {% include "office/_kpi.html" with key="registrations" label="Registrations" hue="clay" anchor="registrations" %}
+    {% include "office/_kpi.html" with key="journeys_started" label="Started the journey" hue="sage" anchor="journeys" %}
+    {% include "office/_kpi.html" with key="people_registered" label="Registered interest" hue="clay" anchor="registrations" %}
     {% include "office/_kpi.html" with key="gold_applications" label="Gold applications" hue="ochre" anchor="gold" %}
   </div>
 
@@ -92,6 +92,7 @@
     <header class="o-card-head"><h2 id="h-plan">Registrations by plan</h2></header>
     <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
     <p class="o-summary" data-region="summary-plan" data-fade>{{ data.summaries.registrations_by_plan }}</p>
+    {% insight_of data.insights "tier_picked" as ins_tier_picked %}<p class="o-headline" data-region="head-tier-picked" data-fade>{% if ins_tier_picked %}<strong>{{ ins_tier_picked.top.label }}</strong> <span>{{ ins_tier_picked.top.value|num }} of {{ ins_tier_picked.top.of_total|num }}</span>{% endif %}</p>
     {% has_data data.registrations_by_plan as p_any %}
     <div class="o-donut">
       <div class="o-chartbox o-chartbox--donut" data-chart="plan" data-empty-text="No registrations in this range yet."{% if not p_any %} data-empty{% endif %}>
@@ -117,6 +118,7 @@
     <header class="o-card-head"><h2 id="h-suggested">Suggested plan</h2></header>
     <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
     <p class="o-summary" data-region="summary-suggested" data-fade>{{ data.summaries.suggested_plan }}</p>
+    {% insight_of data.insights "tier_suggested" as ins_tier_suggested %}<p class="o-headline" data-region="head-tier-suggested" data-fade>{% if ins_tier_suggested %}<strong>{{ ins_tier_suggested.top.label }}</strong> <span>{{ ins_tier_suggested.top.value|num }} of {{ ins_tier_suggested.top.of_total|num }}</span>{% endif %}</p>
     {% has_data data.suggested_plan as s_any %}
     <div class="o-donut">
       <div class="o-chartbox o-chartbox--donut" data-chart="suggested" data-empty-text="No suggestions in this range yet."{% if not s_any %} data-empty{% endif %}>
@@ -137,6 +139,26 @@
     </details>
   </section>
 
+  {# 4c Picked vs suggested tier #}
+  <section class="o-card o-chartcard o-span-12" id="tiers" data-reveal data-chart-card="tiers" aria-labelledby="h-tiers">
+    <header class="o-card-head"><h2 id="h-tiers">Picked vs suggested tier</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    {% has_data data.tier_pair "picked" as t_picked %}{% has_data data.tier_pair "suggested" as t_sugg %}
+    <p class="o-summary">What people picked when they registered, next to the tier the journey suggested.</p>
+    <div class="o-legend" data-legend="tiers"></div>
+    <div class="o-chartbox" data-chart="tiers" data-empty-text="No picks or suggestions in this range yet."{% if not t_picked and not t_sugg %} data-empty{% endif %}>
+      <canvas id="chart-tiers" role="img" aria-label="Picked and suggested tier, side by side for each tier" tabindex="-1"></canvas>
+      <p class="o-empty-chart">No picks or suggestions in this range yet.</p>
+    </div>
+    <details class="o-table" data-table="tiers"{% if not t_picked and not t_sugg %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="table-tiers" data-fade>
+        <table><caption class="sr-only">Picked and suggested tier, {{ data.range|range_label }}</caption>
+          <thead><tr><th scope="col">Tier</th><th scope="col">Picked</th><th scope="col">Suggested</th></tr></thead>
+          <tbody>{% for r in data.tier_pair %}<tr><th scope="row">{{ r.label }}</th><td>{{ r.picked|num }}</td><td>{{ r.suggested|num }}</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </details>
+  </section>
+
   {# 5 Journey answers: three donuts and one bar list (teal) #}
   <section class="o-card o-chartcard o-span-12" id="answers" data-reveal data-chart-card="answers" aria-labelledby="h-answers">
     <header class="o-card-head"><h2 id="h-answers">Journey answers</h2></header>
@@ -144,25 +166,25 @@
     <p class="o-summary" data-region="summary-answers" data-fade>{{ data.summaries.journey_answers }}</p>
     <div class="o-multiples">
       {% has_data data.journey_answers.time "count" as a1 %}
-      <div class="o-multiple"><h3>Time of day</h3>
+      <div class="o-multiple"><h3>Time of day</h3>{% insight_of data.insights "time" as ins_ans_time %}<p class="o-headline" data-region="head-ans-time" data-fade>{% if ins_ans_time %}<strong>{{ ins_ans_time.top.label }}</strong> <span>{{ ins_ans_time.top.value|num }} of {{ ins_ans_time.top.of_total|num }}</span>{% endif %}</p>
         <div class="o-chartbox o-chartbox--donut" data-chart="answers-time" data-empty-text="No answers in this range yet."{% if not a1 %} data-empty{% endif %}><canvas id="chart-answers-time" role="img" aria-label="{{ data.summaries.journey_answers }}" tabindex="-1"></canvas>
           <p class="o-donut-centre" data-region="centre-answers-time" data-fade>{% sum_key data.journey_answers.time "count" as t1 %}<span class="o-donut-total">{{ t1|num }}</span><span class="o-donut-word">answers</span></p><p class="o-empty-chart">No answers in this range yet.</p></div>
         <ul class="o-keylist" data-region="keylist-answers-time" data-fade>{% if a1 %}{% ramp_rows data.journey_answers.time "teal" "count" as r1 %}{% for r in r1 %}<li><span class="o-swatch" style="--sw: {{ r.swatch }}" aria-hidden="true"></span><span class="o-key-name">{{ r.label }}</span><span class="o-key-num">{{ r.value|num }}</span><span class="o-key-share">{{ r.share_bp|bp_rate }}</span></li>{% endfor %}{% endif %}</ul>
       </div>
       {% has_data data.journey_answers.frequency "count" as a2 %}
-      <div class="o-multiple"><h3>How often</h3>
+      <div class="o-multiple"><h3>How often</h3>{% insight_of data.insights "frequency" as ins_ans_frequency %}<p class="o-headline" data-region="head-ans-frequency" data-fade>{% if ins_ans_frequency %}<strong>{{ ins_ans_frequency.top.label }}</strong> <span>{{ ins_ans_frequency.top.value|num }} of {{ ins_ans_frequency.top.of_total|num }}</span>{% endif %}</p>
         <div class="o-chartbox o-chartbox--donut" data-chart="answers-frequency" data-empty-text="No answers in this range yet."{% if not a2 %} data-empty{% endif %}><canvas id="chart-answers-frequency" role="img" aria-label="{{ data.summaries.journey_answers }}" tabindex="-1"></canvas>
           <p class="o-donut-centre" data-region="centre-answers-frequency" data-fade>{% sum_key data.journey_answers.frequency "count" as t2 %}<span class="o-donut-total">{{ t2|num }}</span><span class="o-donut-word">answers</span></p><p class="o-empty-chart">No answers in this range yet.</p></div>
         <ul class="o-keylist" data-region="keylist-answers-frequency" data-fade>{% if a2 %}{% ramp_rows data.journey_answers.frequency "teal" "count" as r2 %}{% for r in r2 %}<li><span class="o-swatch" style="--sw: {{ r.swatch }}" aria-hidden="true"></span><span class="o-key-name">{{ r.label }}</span><span class="o-key-num">{{ r.value|num }}</span><span class="o-key-share">{{ r.share_bp|bp_rate }}</span></li>{% endfor %}{% endif %}</ul>
       </div>
       {% has_data data.journey_answers.company "count" as a4 %}
-      <div class="o-multiple"><h3>Company</h3>
+      <div class="o-multiple"><h3>Company</h3>{% insight_of data.insights "company" as ins_ans_company %}<p class="o-headline" data-region="head-ans-company" data-fade>{% if ins_ans_company %}<strong>{{ ins_ans_company.top.label }}</strong> <span>{{ ins_ans_company.top.value|num }} of {{ ins_ans_company.top.of_total|num }}</span>{% endif %}</p>
         <div class="o-chartbox o-chartbox--donut" data-chart="answers-company" data-empty-text="No answers in this range yet."{% if not a4 %} data-empty{% endif %}><canvas id="chart-answers-company" role="img" aria-label="{{ data.summaries.journey_answers }}" tabindex="-1"></canvas>
           <p class="o-donut-centre" data-region="centre-answers-company" data-fade>{% sum_key data.journey_answers.company "count" as t4 %}<span class="o-donut-total">{{ t4|num }}</span><span class="o-donut-word">answers</span></p><p class="o-empty-chart">No answers in this range yet.</p></div>
         <ul class="o-keylist" data-region="keylist-answers-company" data-fade>{% if a4 %}{% ramp_rows data.journey_answers.company "teal" "count" as r4 %}{% for r in r4 %}<li><span class="o-swatch" style="--sw: {{ r.swatch }}" aria-hidden="true"></span><span class="o-key-name">{{ r.label }}</span><span class="o-key-num">{{ r.value|num }}</span><span class="o-key-share">{{ r.share_bp|bp_rate }}</span></li>{% endfor %}{% endif %}</ul>
       </div>
       {% has_data data.journey_answers.facilities "count" as a3 %}
-      <div class="o-multiple"><h3>Facilities</h3><p class="o-note">Members could choose more than one.</p>
+      <div class="o-multiple"><h3>Facilities</h3>{% insight_of data.insights "facility" as ins_ans_facility %}<p class="o-headline" data-region="head-ans-facility" data-fade>{% if ins_ans_facility %}<strong>{{ ins_ans_facility.top.label }}</strong> <span>{{ ins_ans_facility.top.value|num }} of {{ ins_ans_facility.top.of_total|num }}</span>{% endif %}</p><p class="o-note">Members could choose more than one.</p>
         {% top_of data.journey_answers.facilities "count" as f_top %}
         <ul class="o-bars o-bars--teal" data-region="bars-facilities" data-fade data-facilities>
           {% if a3 %}{% for a in data.journey_answers.facilities %}<li style="--share: {% ratio a.count f_top %}"><span class="o-bar-name">{{ a.label }}</span><span class="o-bar-num">{{ a.count|num }}</span></li>{% endfor %}

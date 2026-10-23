@@ -3,6 +3,7 @@ rows (journey answers, registrations by plan, suggested plan, referrers). Pages 
 the roll-up (and by rebuild_metrics, which runs the roll-up): recomputing five ranges is too much for a request, so no
 event refreshes it. Referrers come from visitors, so they are only as rebuildable as visitors are (not at all)."""
 import logging
+import re
 
 from django.db import transaction
 
@@ -28,11 +29,20 @@ TITLES = {key: title for key, title, _, _ in INSIGHTS}
 ORDER = [key for key, _, _, _ in INSIGHTS]
 
 
+_HINT = re.compile(r"\s*\([^()]*\.\)\s*$")
+
+
+def clean_label(label):
+    """An option's name without its hint: 'Often with someone (Most visits.)' is 'Often with someone'. A parenthesis that is part of the
+    name ('Early morning (5 to 9am)') has no full stop inside, so it stays."""
+    return _HINT.sub("", label or "").strip()
+
+
 def _lookups():
     from journey.models import Option, Question
     from plans.models import Plan
 
-    options = {f"{q}:{v}": label for q, v, label in Option.objects.values_list("question__key", "value", "label")}
+    options = {f"{q}:{v}": clean_label(label) for q, v, label in Option.objects.values_list("question__key", "value", "label")}
     multi = set(Question.objects.filter(type=Question.MULTI).values_list("key", flat=True))
     return dict(Plan.objects.values_list("slug", "name")), options, multi
 
