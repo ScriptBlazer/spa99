@@ -16,11 +16,21 @@ if (form) {
   const picker = [...document.querySelectorAll('input[name="compare"]')];
   const button = form.querySelector('[data-continue]');
 
-  const sync = () => {
+  // The pound sign is set small and raised, as on a price tag (.cur); the sentence still reads "£399 a month".
+  const setPrice = (node, text) => {
+    node.textContent = '';
+    if (text.startsWith('£')) node.append(Object.assign(document.createElement('span'), { className: 'cur', textContent: '£' }), text.slice(1));
+    else node.append(text);
+  };
+  // The tag fades its new words in once (opacity only; restarting the CSS animation), never on arrival.
+  const acknowledge = () => [nameEl, priceEl, incEl].forEach((n) => { n.classList.remove('is-ack'); void n.offsetWidth; n.classList.add('is-ack'); });
+
+  const sync = (ack = false) => {
     const on = radios.find((r) => r.checked);
     nameEl.textContent = on ? on.dataset.name : form.dataset.emptyText;
-    priceEl.textContent = on ? on.dataset.price : '';
-    incEl.textContent = on ? on.dataset.inc : '';
+    setPrice(priceEl, on ? on.dataset.price : '');
+    setPrice(incEl, on ? on.dataset.inc : '');
+    if (ack) acknowledge();
     button.setAttribute('aria-disabled', on ? 'false' : 'true');
     cells.forEach((c) => c.classList.toggle('is-selected', !!on && c.dataset.slug === on.value));
     const view = on && picker.find((p) => p.dataset.slug === on.value);
@@ -28,8 +38,8 @@ if (form) {
   };
   const tiers = form.querySelector('.tiers');
   // After the first change a new choice plays its sheen at once (the arrival pass is delayed in CSS).
-  radios.forEach((r) => r.addEventListener('change', () => { tiers?.classList.add('is-settled'); sync(); }));
-  window.addEventListener('pageshow', sync); // back/forward restores the checked radio
+  radios.forEach((r) => r.addEventListener('change', () => { tiers?.classList.add('is-settled'); sync(true); }));
+  window.addEventListener('pageshow', () => sync()); // back/forward restores the checked radio
   sync();
 
   // Nothing chosen: Continue moves focus to the choice instead of submitting.
@@ -63,5 +73,26 @@ if (form) {
       if (e.isIntersecting && (e.intersectionRatio >= 0.15 || form.offsetHeight > innerHeight)) { io.disconnect(); run(); }
     }, { threshold: [0, 0.15] });
     io.observe(form);
+  }
+
+  // The pointer light inside the chosen card (desktop, fine pointer, motion allowed): --px / --py on that card only, one write per frame.
+  if (matchMedia('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)').matches && tiers) {
+    let frame = 0, point = null;
+    const chosen = () => radios.find((r) => r.checked)?.closest('.tier');
+    const clear = () => { cancelAnimationFrame(frame); frame = 0; tiers.querySelectorAll('.tier').forEach((t) => { t.style.removeProperty('--px'); t.style.removeProperty('--py'); }); };
+    tiers.addEventListener('pointermove', (e) => {
+      const card = chosen();
+      if (!card || !card.contains(e.target)) { if (point) { point = null; clear(); } return; }
+      point = e;
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const box = card.getBoundingClientRect();
+        card.style.setProperty('--px', `${point.clientX - box.left}px`);
+        card.style.setProperty('--py', `${point.clientY - box.top}px`);
+      });
+    });
+    tiers.addEventListener('pointerleave', () => { point = null; clear(); });
+    radios.forEach((r) => r.addEventListener('change', clear));
   }
 }

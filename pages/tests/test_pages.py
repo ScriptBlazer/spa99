@@ -104,6 +104,12 @@ class PageTests(TestCase):
         Plan.objects.filter(slug="tier-3").update(visible=False)
         self.assertNotIn("Tier 3", self.client.get("/memberships/").content.decode())
 
+    def test_memberships_round_3_details(self):
+        html = self.client.get("/memberships/").content.decode()
+        self.assertIn('<span class="cur">&pound;</span>299', html)  # the raised pound sign, still one price
+        self.assertIn("Every visit: towels, robe, slippers and toiletries, and every room.", html)
+        self.assertIn('href="/the-spa/">See the spa', html)
+
     def test_spa_page_lists_every_facility_with_a_finished_image_or_placeholder(self):
         Facility.objects.filter(slug="wet-sauna").update(image_name="")
         html = self.client.get("/the-spa/").content.decode()

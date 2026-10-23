@@ -34,7 +34,7 @@
         </span>
         <ul class="tier-list" role="list">{% for p in t.pills %}<li>{{ p }}</li>{% endfor %}</ul>
         <span class="tier-price-group" id="tp-{{ t.slug }}">
-          <span class="tier-price num">&pound;{{ t.price_whole }}</span> <span class="tier-per">{{ t.period }}, ex VAT</span>
+          <span class="tier-price num"><span class="cur">&pound;</span>{{ t.price_whole }}</span> <span class="tier-per">{{ t.period }}, ex VAT</span>
           <span class="tier-inc num">&pound;{{ t.price_inc }} inc VAT</span>
         </span>
         <span class="tier-sheen" aria-hidden="true"></span>
@@ -57,12 +57,21 @@
 
 <div class="container">
   <div class="mem-also">
+    {% if every_visit %}{% url 'spa' as spa_url %}
+    <div class="every-visit" data-reveal>
+      {% if every_visit.pictured %}<ul class="every-mounts" role="list">{% for item in every_visit.pictured|slice:":4" %}<li class="every-mount"><span class="every-mount-media" style="--focus: {{ item.focus }}">{% photo item.name alt="" sizes="2.5rem" %}</span></li>{% endfor %}</ul>{% endif %}
+      <div class="every-visit-text">
+        <p>{{ every_visit.text }}</p>
+        {% if every_visit.cta_label %}<a class="btn-quiet small" href="{{ every_visit.cta_url|default:spa_url }}">{{ every_visit.cta_label }}</a>{% endif %}
+      </div>
+    </div>
+    {% endif %}
     {% if single %}
     <div class="plan-aside" data-reveal>
       <span class="plan-aside-media">{% photo single.render alt=single.image_alt sizes="4.5rem" override=single.image %}</span>
       <div class="plan-aside-body">
         <h2>{{ single.name }}</h2>
-        <p class="small num">&pound;{{ single.price_whole }} {{ single.period }}, ex VAT </p>
+        <p class="small num"><span class="cur">&pound;</span>{{ single.price_whole }} {{ single.period }}, ex VAT </p>
         <p class="small muted num">&pound;{{ single.price_inc }} inc VAT</p>
         <p class="plan-aside-meta">{% if single.pills %}<span class="small">{{ single.pills.0 }}</span>{% endif %}<span class="small muted">{{ m.single_note.body }}</span></p>
       </div>

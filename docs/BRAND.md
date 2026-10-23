@@ -115,6 +115,7 @@ Smooth and restrained. Built with CSS and one small shared script (IntersectionO
 **Interaction feedback** (separate from entrances)
 - Buttons and clickable cards without their own feedback: scale 1.01 on hover, 0.99 on press, 0.25s, same easing.
 - Tall selectable cards (the Memberships key cards) lift instead of scale, because scaling a tall card blurs its type: 4px up on hover (`--tier-hover-lift`), 2px up on press. The selected card sits up (`--tier-lift`, 8px from 64em); its colour and check change instantly, the lift eases over `--duration-tier` (0.6s). Off under reduced motion.
+- The selected Memberships card also lights its room (veil off, photo settles 1.03 to 1, 1.2s) and casts a warm pool on the cream (600ms with the lift). The colour, check, inlay and gold numeral still change instantly.
 - The one-off sheen: the selected Memberships card gets one band of light across it on selection (`--color-sheen`, 1.6s, once, CSS only). Same family as the Gold Card sheen. Not on hover, never looping, off under reduced motion; the band is not text, so the ban on sideways travel of text does not apply.
 - If scale is already used on that element, use opacity 0.9 on hover and 0.8 on press instead.
 - Inline links and non-interactive elements don't scale. Scaled elements must never clip.
@@ -258,6 +259,12 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --tier-lift: 0px;                            /* derived: how far the selected card sits up; -8px from 64em */
   --tier-hover-lift: -4px;                     /* derived */
   --duration-tier: 600ms;                      /* derived: the selected card's rise */
+  /* Memberships round 3 (docs/design/MEMBERSHIPS-R3.md section 4). Proposed, round 3: derived, decoration only. */
+  --color-pool: rgb(229 172 110 / 0.35);       /* proposed, round 3: warm light pool on the cream under the selected card */
+  --color-room-veil: rgb(251 249 236 / 0.24);  /* proposed, round 3: cream veil over an unselected card's picture */
+  --duration-ack: 240ms;                       /* proposed, round 3: the tag's acknowledgement fade */
+  --signin-w: 26rem;                           /* derived (round 3): the sign-in form column */
+  --tracking-engraved: 0.2em;                  /* derived (round 3): the engraved brand line on the Gold panel */
   --bar-h: 4.5rem;                             /* derived: Continue bar; 4rem from 64em */
   /* The Gold Card (docs/design/GOLD-CARD-3D.md 7.3). Derived, decoration only: the metal of one object. Brand gold is hue 31 degrees; nothing here goes brass (45+). */
   --color-gold-metal: #D9A46C;                 /* derived: card base metal (hue 31) */
