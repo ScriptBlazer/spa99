@@ -126,3 +126,24 @@ class LegalBackfillTests(TestCase):
         site.save()
         call_command("backfill_site_data", stdout=StringIO())
         self.assertEqual(SiteSettings.load().privacy_version, "2027-01-01")
+
+
+class LegalReviewRoundTests(TestCase):
+    def test_first_text_is_corrected_but_edited_rows_are_kept(self):
+        seed_all()
+        rows = Section.objects.filter(page__key="privacy")
+        rows.filter(key="part_2").update(body=legal.ROUND_1_PRIVACY_BODIES["part_2"])
+        rows.filter(key="part_6").update(body="Edited by hand.")
+        call_command("backfill_site_data", stdout=StringIO())
+        self.assertIn("Change history", rows.get(key="part_2").body)
+        self.assertEqual(rows.get(key="part_6").body, "Edited by hand.")
+        out = StringIO()
+        call_command("backfill_site_data", stdout=out)
+        self.assertNotIn("review corrections", out.getvalue())
+
+    def test_privacy_mentions_the_corrections(self):
+        seed_all()
+        html = self.client.get("/privacy/").content.decode()
+        for text in ("account&#x27;s internal number", "change history", "The guided journey is optional",
+                     "virtual tour also remembers", "up to 30 days", "which version of this notice you accepted"):
+            self.assertIn(text, html)

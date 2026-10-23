@@ -37,6 +37,8 @@ written by hand:
   created, the "To be supplied." placeholder rows, the empty title row and the "Write to us at" contact row are replaced
   only while they still have exactly that wording, the "Draft." note is hidden while unchanged, and the privacy version
   in Site settings goes from "draft-1" to the dated version (people who accepted "draft-1" keep that record)
+  (review round, same day) privacy parts still exactly as first written get the corrected text (Sentry wording, change
+  history, Gold consents, optional details, tour storage, team sign-ins)
 
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 from collections import Counter
@@ -182,6 +184,13 @@ def _legal_pages():
                 section.heading, section.body, section.order = heading, body, order
                 section.save()
                 changed["content.Section (legal placeholder text replaced)"] += 1
+        if page_key == "privacy":  # review round (2026-10-23): rows still exactly the first text get the corrected text
+            bodies = {key: body for key, _, body, _, _ in sections}
+            for key, old_body in legal.ROUND_1_PRIVACY_BODIES.items():
+                for section in Section.objects.filter(page=page, key=key, body=old_body):
+                    section.body = bodies[key]
+                    section.save()
+                    changed["content.Section (privacy notice review corrections)"] += 1
         for note in Section.objects.filter(page=page, key="draft_note", body=legal.OLD_DRAFT_NOTE, visible=True):
             note.visible = False
             note.save()

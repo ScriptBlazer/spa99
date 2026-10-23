@@ -83,3 +83,50 @@ class ErasureTests(TestCase):
         self.assertEqual(erase_task_records(["abc-123"], ["users.tasks."]), 1)
         self.assertEqual(OrmQ.objects.count(), 1)
         self.assertEqual(Task.objects.count(), 1)  # another function, never touched
+
+
+class ExportCompletenessTests(TestCase):
+    """The privacy notice says Download my data gives everything we hold about the account (docs/features/legal.md)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+        set_recipients()
+
+    def test_export_includes_gold_rating_consents_and_journey_details(self):
+        from django.utils import timezone
+
+        from journey.models import JourneySession
+
+        user = sign_up()
+        application = apply_for_gold()
+        GoldApplication.objects.filter(pk=application.pk).update(internal_notes="Met at the event.")
+        now = timezone.now()
+        JourneySession.objects.create(user=user, utm_term="sauna", utm_content="ad-2", completed=True, completed_at=now,
+                                      suggestion_detail={"points": {"tier-2": 3}}, gold_score=4)
+        data = services.export_user_data(user)
+        self.assertIn("marketing_consent", data["profile"])
+        self.assertTrue(data["profile"]["privacy_accepted_version"])
+        gold = data["gold_applications"][0]
+        for key in ("potential_score", "potential_reasons", "marketing_consent", "privacy_accepted_version"):
+            self.assertIn(key, gold)
+        self.assertEqual(gold["internal_notes"], "Met at the event.")
+        session = data["journey_sessions"][-1]
+        self.assertEqual((session["utm_term"], session["utm_content"], session["gold_score"]), ("sauna", "ad-2", 4))
+        self.assertEqual(session["suggestion_detail"], {"points": {"tier-2": 3}})
+        self.assertEqual(session["completed_at"], now.isoformat())
+
+    def test_internal_notes_left_out_when_empty(self):
+        sign_up()
+        apply_for_gold()
+        self.assertNotIn("internal_notes", gold_services.export_applications(EMAIL)[0])
+
+    def test_delete_clears_the_person_key_of_kept_journeys(self):
+        from journey.models import JourneySession
+
+        user = sign_up()
+        session = JourneySession.objects.create(user=user, person_key="person-abc")
+        services.delete_user_data(user)
+        session.refresh_from_db()
+        self.assertEqual((session.user_id, session.person_key), (None, ""))
+        self.assertFalse(JourneySession.history.model.objects.filter(id=session.pk).exclude(person_key="").exists())

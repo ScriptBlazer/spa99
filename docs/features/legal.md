@@ -34,9 +34,15 @@ Not legal advice: a solicitor must review both texts before launch (see Launch b
 | Gold form kept in the browser tab (sessionStorage) | `common/static/common/js/gold-apply.js` |
 | No analytics or marketing cookies, no browser Sentry | grep of the codebase; `foundation.md` ("Server side only: no browser SDK") |
 | Processors: AWS S3 + SES (London, `eu-west-2`), Sentry (no PII by design), Microsoft 365 mailbox | `README.md` env table, `AWS_SES_REGION_NAME`, `foundation.md` Sentry section, PROJECT.md 2026-10-23 email decision |
+| Sentry reports: no names, emails or IPs (scrubbed, `send_default_pii=False`), but the user id (account's internal number) and the User-Agent header are sent | `common/observability.py`, `foundation.md` Errors and Sentry |
+| Change history (earlier versions of account, registration, Gold application; password excluded) | `django-simple-history` on every model (PROJECT.md stack); `users/models.py` `excluded_fields=["password"]` |
+| Erasure removes the change history: User, InterestRegistration and GoldApplication history rows are deleted; JourneySession and Answer history are anonymised (user, key, person key, referrer, typed text cleared) | `users/services.py` `delete_user_data`, `_anonymise_sessions`; `gold/services.py` `delete_applications` |
+| What happens without the details (Art. 13(2)(e)): journey optional, registration and Gold need the form's fields, news optional | `users/forms.py`, `gold/forms.py` |
+| Tour display choices in sessionStorage (`tour-low`, `tour-tilt-no`, `tour-hint`) | `common/static/common/js/tour/engine.js` |
+| Team sign-ins up to 30 days | `OFFICE_SESSION_AGE` (System: 12 hours) |
 | Sentry stores in the EU | Brief from Moishe (foundation: EU region). Confirm the Sentry organisation was created in the EU region |
 | Gold applications emailed to the approver list (may work for BML Group) | `SiteSettings.gold_approver_emails`, `gold/tasks.py` |
-| Self-service export and delete, what delete removes, journeys anonymised | `users/services.py` `export_user_data`, `delete_user_data`; `account_you.html` |
+| Self-service export (includes Gold score, reasons, consents, internal notes when present; journey suggestion detail, all UTM tags, Gold score, finish time) and delete, what delete removes, journeys anonymised | `users/services.py` `export_user_data`, `delete_user_data`; `account_you.html` |
 | ICO contact (ico.org.uk/make-a-complaint, 0303 123 1113) | ICO public details |
 
 Terms of use: company facts as above; men-only and 18+ (`MINIMUM_AGE`, ACC-08/09; the register form's "Our policy" link points here); no payment in Phase 1 (PROJECT.md section 3); Gold by approval, no account until approved, 14-day single-use link (`gold/invites.py`); images are renders and the tour is illustrative (BRAND.md section 5); liability wording is standard UK consumer wording (Consumer Rights Act 2015 does not allow excluding death/injury by negligence or fraud).
@@ -56,6 +62,7 @@ Retention periods in the notice are **proposals**. Nothing deletes on these sche
 | Emails in the Microsoft 365 mailbox | 2 years after last contact | Mailbox policy not set |
 | Visitor counter hashes and salt | Next day | Built (roll-up) |
 | Sentry error reports | 90 days | Sentry plan default; set it in Sentry |
+| Change history (simple-history rows) | 2 years, or until the account is deleted | Kept forever; erased with the account. Needs a pruning job (e.g. `django-simple-history`'s `clean_old_history --days 730`) |
 | Team activity (`SystemChange`, `SystemEvent`) | 2 years | `SYSTEM_AUDIT_RETENTION_DAYS=0` keeps forever; set `730` and schedule `prune_audit_log` |
 | Backups | Replaced within 35 days | Live backups not set up yet (local script keeps 30) |
 
@@ -71,6 +78,6 @@ Other proposals:
 1. **ICO registration number:** register with the ICO (data protection fee) and put the number in the privacy `ico` row in Control. Until then dev shows the marker and live leaves the sentence out.
 2. **Hosting provider name:** fill the privacy `hosting` row once chosen.
 3. **Solicitor review** of both texts, the lawful bases and the retention periods.
-4. **Retention:** build the clean-up jobs for the proposed periods, or change the text to what is true.
+4. **Retention:** build the clean-up jobs for the proposed periods (including the change history), or change the text to what is true.
 5. **Sentry:** confirm the EU region, "Prevent storing of IP addresses" on, and 90-day retention.
 6. Run `backfill_site_data` on live after deploy (writes the text and the privacy version).

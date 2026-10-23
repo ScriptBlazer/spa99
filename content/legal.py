@@ -34,7 +34,8 @@ PRIVACY_PARTS = [
         "We collect only what we need, and only when you do something on the site.",
         "### When you browse",
         "- Nothing that identifies you. We count visits without cookies (see Cookies, below).",
-        "- If a page breaks, an error report is made. It is set up to leave out personal details.",
+        "- If a page breaks, an error report is made. It leaves out names, email addresses and IP addresses, but can "
+        "include your account's internal number and the type of browser.",
         "### When you take the guided journey",
         "- Your answers: when you would come, how often, what you would use, whether you come alone, what you do (and, "
         "for property, your link to property and roughly how many properties), how you heard about us, and anything "
@@ -56,7 +57,12 @@ PRIVACY_PARTS = [
         "based in, your company and role, whether you work with BML, who referred you, and any note you add.",
         "- Your journey answers, if you took the journey.",
         "- A potential rating (High, Medium or Low) worked out from your answers, with its reasons.",
+        "- Whether you would like news from us by email, and which version of this notice you accepted.",
         "- Our decision and, if we approve, the date and the invitation we send you.",
+        "### Change history",
+        "- Earlier versions of your details (a change history): when your account, registration or Gold Card "
+        "application changes, we keep the previous version, so we can see what changed and put mistakes right. "
+        "Passwords are never kept in it.",
         "### Emails",
         "- A record of each email we send you: which email, when, and whether it went out.",
         "- Emails you send us, kept in our mailbox.",
@@ -86,6 +92,10 @@ PRIVACY_PARTS = [
         "legitimate interests.",
         "### When the law requires it",
         "Keeping records we must keep, and answering lawful requests. Basis: legal obligation.",
+        "### If you do not give us your details",
+        "The guided journey is optional. To register or apply for the Gold Card, we need the details the form asks "
+        "for; without them we cannot create your account or consider your application. News by email is always "
+        "optional.",
         "We do not sell your information, and we do not use it for advertising.",
     ])),
     ("part_4", "Men only, 18 and over", "\n".join([
@@ -97,12 +107,14 @@ PRIVACY_PARTS = [
         "We use only cookies the site needs to work. No analytics, advertising or tracking cookies. That is why there "
         "is no cookie banner.",
         "- csrftoken: protects our forms from misuse. Lasts one year.",
-        "- sessionid: keeps you signed in, or remembers a step while you use the site. Lasts up to two weeks.",
+        "- sessionid: keeps you signed in, or remembers a step while you use the site. Lasts up to two weeks. Our team's "
+        "sign-ins to our own tools last up to 30 days.",
         "- messages: shows a short note, such as \"Saved\", on the next page. Gone when you close the browser.",
         "- spa99_journey: remembers your place in the guided journey, so you can come back to it. Lasts one year, and is "
         "removed when you sign out.",
         "While you fill in the Gold Card application, your browser keeps what you have typed in that tab, so a refresh "
-        "does not lose it. It stays on your device, and is cleared when you close the tab.",
+        "does not lose it. The virtual tour also remembers a few display choices in that tab, such as the simpler view. "
+        "Both stay on your device and are cleared when you close the tab.",
         "### The visitor counter",
         "To know how many people visit, we count without cookies. For each visit, our server mixes your IP address and "
         "browser details with a random value that changes every day, and turns them into a one-way code. The code lets "
@@ -116,7 +128,8 @@ PRIVACY_PARTS = [
         "your information for anything else.",
         "- Website hosting ({hosting}): the servers and database the site runs on.",
         "- Amazon Web Services: stores the site's files and images (Amazon S3) and sends our emails (Amazon SES).",
-        "- Sentry: receives error reports when something breaks. Reports are set up to leave out personal details.",
+        "- Sentry: receives error reports when something breaks. Reports leave out names, email addresses and IP "
+        "addresses, but can include your account's internal number and the type of browser.",
         "- Microsoft 365: our mailbox, where emails you send us are kept.",
         "Gold Card applications are emailed to the people who decide on them for us. They may work for BML Group. "
         "Applications are not shared more widely.",
@@ -141,6 +154,7 @@ PRIVACY_PARTS = [
         "- Emails you send us: two years after we last hear from you.",
         "- Visitor counter codes: deleted the next day.",
         "- Error reports: 90 days.",
+        "- Change history: two years, or until you delete your account, whichever comes first.",
         "- Our team's activity records: two years.",
         "- Backups: replaced within 35 days.",
         "Where the law asks us to keep something longer, such as payment records once memberships begin, we keep it for "
@@ -158,7 +172,7 @@ PRIVACY_PARTS = [
         "### Do it yourself in My Spa 99",
         "Under You, Download my data gives you a file of everything we hold about your account. Delete my account erases "
         "your account, your registration, any Gold Card applications made with your email, our records of emails about "
-        "you, and your sign-in records. Your journey answers stay only as anonymous figures, no longer linked to you.",
+        "you, your sign-in records, and the change history of all of these. Your journey answers stay only as anonymous figures, no longer linked to you.",
         "For anything else, write to {contact}. We reply within one month, and there is no charge.",
     ])),
     ("part_10", "Complaints", "\n".join([
@@ -273,3 +287,13 @@ OLD_PAGE_TEXT = {  # page key -> {field: (old, new)}
     "terms": {"title": ("Terms", TERMS[0]), "meta_description": ("Spa 99 terms.", TERMS[1])},
 }
 OLD_BODY_HEADINGS = {"privacy": "Privacy notice.", "terms": "Terms."}
+
+# Bodies as first written on 2026-10-23 (round 1). backfill_site_data replaces a row only while it is exactly this.
+ROUND_1_PRIVACY_BODIES = {
+    'part_2': 'We collect only what we need, and only when you do something on the site.\n### When you browse\n- Nothing that identifies you. We count visits without cookies (see Cookies, below).\n- If a page breaks, an error report is made. It is set up to leave out personal details.\n### When you take the guided journey\n- Your answers: when you would come, how often, what you would use, whether you come alone, what you do (and, for property, your link to property and roughly how many properties), how you heard about us, and anything you type in the short text boxes.\n- The membership we suggest, and why.\n- About the visit: the page that linked to us (if any), campaign tags in the link, the kind of device (phone, tablet or computer), and when you started and finished.\nAnswers are saved as you go, even if you stop part way. They carry no name unless you register.\n### When you register\n- Your name, email address, UK mobile number, date of birth and password. The password is stored scrambled (hashed), so nobody can read it, including us.\n- That you accepted the men-only policy and this notice (which version), with the dates.\n- Whether you would like news from us by email, and when you told us.\n- The membership you registered for, your account ID, and whether you have confirmed your email.\n- Sign-in records: when you sign in and out, failed attempts, and the IP address and browser used.\n### When you apply for the Gold Card\n- Your name, email address and mobile number.\n- What you do. For property: your link to property and roughly how many properties. Also the area you are based in, your company and role, whether you work with BML, who referred you, and any note you add.\n- Your journey answers, if you took the journey.\n- A potential rating (High, Medium or Low) worked out from your answers, with its reasons.\n- Our decision and, if we approve, the date and the invitation we send you.\n### Emails\n- A record of each email we send you: which email, when, and whether it went out.\n- Emails you send us, kept in our mailbox.\n### Our team\n- When our team use our own tools, we record what they do, with their IP address and browser, to keep the system secure. This covers team accounts only.',
+    'part_3': "The law asks us to name a lawful basis for each use. Here they are.\n### To run your account and registration\nCreating your account, keeping your registered membership, confirming your email, resetting your password and writing to you about opening. Basis: a contract with you, or steps you asked us to take before one.\n### To check you can join\nSpa 99 is for men aged 18 and over. We use your date of birth and your acceptance of the men-only policy to check this. Basis: steps before a contract, and our legitimate interest in running the spa as described.\n### To suggest a membership and plan the spa\nYour journey answers give you a suggestion. Added together with everyone else's, they show us which times and rooms matter most. Those figures are totals, never decisions about you. Basis: legitimate interests.\n### To consider a Gold Card application\nWe read your application, and the potential rating helps us. The rating never decides on its own: a person does. Basis: steps before a contract, and legitimate interests.\n### To send news, only if you ask\nWe send news by email only if you said yes. You can stop it at any time in My Spa 99, or by writing to {contact}. Basis: your consent.\n### To keep the site and your account safe\nSign-in records, limits on repeated attempts, error reports and our team's activity records. Basis: legitimate interests.\n### When the law requires it\nKeeping records we must keep, and answering lawful requests. Basis: legal obligation.\nWe do not sell your information, and we do not use it for advertising.",
+    'part_5': 'We use only cookies the site needs to work. No analytics, advertising or tracking cookies. That is why there is no cookie banner.\n- csrftoken: protects our forms from misuse. Lasts one year.\n- sessionid: keeps you signed in, or remembers a step while you use the site. Lasts up to two weeks.\n- messages: shows a short note, such as "Saved", on the next page. Gone when you close the browser.\n- spa99_journey: remembers your place in the guided journey, so you can come back to it. Lasts one year, and is removed when you sign out.\nWhile you fill in the Gold Card application, your browser keeps what you have typed in that tab, so a refresh does not lose it. It stays on your device, and is cleared when you close the tab.\n### The visitor counter\nTo know how many people visit, we count without cookies. For each visit, our server mixes your IP address and browser details with a random value that changes every day, and turns them into a one-way code. The code lets us count you once a day. Your IP address and browser details are never stored. Each day\'s codes and random value are deleted the next day, so they cannot be traced back to you.\nWe also note the name of the website that sent you, such as a search engine. Only the name, never the full address.',
+    'part_6': "Only with companies that help us run the site. They work under contract, on our instructions, and may not use your information for anything else.\n- Website hosting ({hosting}): the servers and database the site runs on.\n- Amazon Web Services: stores the site's files and images (Amazon S3) and sends our emails (Amazon SES).\n- Sentry: receives error reports when something breaks. Reports are set up to leave out personal details.\n- Microsoft 365: our mailbox, where emails you send us are kept.\nGold Card applications are emailed to the people who decide on them for us. They may work for BML Group. Applications are not shared more widely.\nWe may also share information when the law requires it, or to protect someone's safety. If the business is ever sold or reorganised, your information may pass to the new owner, who must respect this notice.",
+    'part_8': "No longer than we need to.\n- Your account: while you keep it. You can delete it at any time. If an account is not used for three years, we write to you, then delete it.\n- Accounts whose email is never confirmed: 90 days.\n- Journey answers with no account: two years, then deleted.\n- Gold Card applications we do not approve: one year after our decision.\n- Sign-in records: one year.\n- Records of emails we send: two years.\n- Emails you send us: two years after we last hear from you.\n- Visitor counter codes: deleted the next day.\n- Error reports: 90 days.\n- Our team's activity records: two years.\n- Backups: replaced within 35 days.\nWhere the law asks us to keep something longer, such as payment records once memberships begin, we keep it for the time the law requires.",
+    'part_9': 'You can ask us to:\n- show you the information we hold about you (access)\n- correct anything that is wrong (rectification)\n- delete your information (erasure)\n- hold your information but stop using it for a while (restriction)\n- stop using it where we rely on legitimate interests, and always for news (objection)\n- give it to you in a file you can take elsewhere (portability)\nWhere we rely on your consent, you can withdraw it at any time.\n### Do it yourself in My Spa 99\nUnder You, Download my data gives you a file of everything we hold about your account. Delete my account erases your account, your registration, any Gold Card applications made with your email, our records of emails about you, and your sign-in records. Your journey answers stay only as anonymous figures, no longer linked to you.\nFor anything else, write to {contact}. We reply within one month, and there is no charge.',
+}

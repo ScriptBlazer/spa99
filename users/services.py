@@ -274,9 +274,11 @@ def _export_sessions(user):
         result.append({
             "started_at": session.created_at.isoformat(), "device": session.device_type, "referrer": session.referrer,
             "utm_source": session.utm_source, "utm_medium": session.utm_medium, "utm_campaign": session.utm_campaign,
-            "completed": session.completed,
+            "utm_term": session.utm_term, "utm_content": session.utm_content,
+            "completed": session.completed, "completed_at": _plain(session.completed_at),
             "suggested_plan": session.suggested_plan.name if session.suggested_plan else None,
-            "gold_potential": session.gold_potential, "answers": answers,
+            "suggestion_detail": session.suggestion_detail,
+            "gold_potential": session.gold_potential, "gold_score": session.gold_score, "answers": answers,
         })
     return result
 
@@ -288,12 +290,12 @@ def _login_events(user):
 
 def _anonymise_sessions(user):
     """Journey sessions are kept for the statistics but stop being about this person: unlinked, cookie value
-    replaced, referrer and any typed text removed (also in the history rows)."""
+    replaced, person key cleared, referrer and any typed text removed (also in the history rows)."""
     ids = list(JourneySession.objects.filter(user=user).values_list("pk", flat=True))
     for session_id in ids:
-        JourneySession.objects.filter(pk=session_id).update(user=None, key=new_session_key(), referrer="")
+        JourneySession.objects.filter(pk=session_id).update(user=None, key=new_session_key(), person_key="", referrer="")
     Answer.objects.filter(session_id__in=ids).update(text_value="")
-    JourneySession.history.model.objects.filter(id__in=ids).update(user=None, key="", referrer="")
+    JourneySession.history.model.objects.filter(id__in=ids).update(user=None, key="", person_key="", referrer="")
     Answer.history.model.objects.filter(session_id__in=ids).update(text_value="")
     return len(ids)
 
