@@ -10,8 +10,10 @@ from content import images
 from plans import services as plan_services
 from plans.models import Facility, OpeningRule, Plan, SiteSettings
 
-# Home "What's inside" preview: the render shown for a room (IMMERSIVE-R2 section 3, R3). Rooms not listed keep the current picture.
-HOME_PREVIEW_IMAGES = {"dry-sauna": "dry-sauna", "showers": "showers", "relaxing-zone": "relax-loungers", "gym": "gym", "kitchenette": "lounge"}
+# Home "What's inside" preview: the photo shown for a room (IMMERSIVE-R2 section 3, R3). Rooms not listed keep the current picture.
+# No photo here may appear elsewhere on Home: dry-sauna (Heat, slowly), cold-plunge, relax-loungers (the ritual) and lounge
+# (the journey entry) are already used above, so those rooms are not listed.
+HOME_PREVIEW_IMAGES = {"wet-sauna": "wet-sauna", "showers": "showers", "massage-room": "massage-room", "gym": "gym", "kitchenette": "kitchenette"}
 
 
 def split_label(label):

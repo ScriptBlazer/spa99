@@ -13,6 +13,11 @@ written by hand:
   `spa` copy rows are created; the exact old wording "Eight spaces, one quiet visit.", "Explore your membership" (spa
   closing button) and the massage line "by appointment" (OPS-06) are replaced
 
+- (2026-10-23) facts are filled only on a never-touched row (cleared facts stay cleared); the three picture
+  descriptions that no longer match the new photos (cold plunge, showers, massage room) are replaced only while they
+  still have the exact old wording; the kitchenette goes from companion to tile only while it still has its seeded
+  image and facts
+
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 from collections import Counter
 
@@ -25,6 +30,12 @@ from plans import seed as plans_seed
 from plans.models import Facility, OpeningRule, Plan
 
 OLD_OPENING = "January 2027"
+# Seeded picture descriptions that no longer match the realistic photos (2026-10-23): replaced only while exactly this.
+OLD_FACILITY_ALTS = {
+    "cold-plunge": "Cold plunge pool set into a travertine floor",
+    "showers": "Rain showers behind walnut slatted screens",
+    "massage-room": "Massage room with a walnut table",
+}
 
 
 def _swap(text):
@@ -48,8 +59,10 @@ def backfill():
             changed["content.Page (opening placeholder)"] += 1
 
     alts = {row[0]: row[4] for row in plans_seed.FACILITIES}
-    for facility in Facility.objects.filter(image_alt=""):
-        if facility.slug in alts:
+    for facility in Facility.objects.all():
+        if facility.slug not in alts:
+            continue
+        if facility.image_alt == "" or OLD_FACILITY_ALTS.get(facility.slug) == facility.image_alt:  # exact old wording only
             facility.image_alt = alts[facility.slug]
             facility.save()
             changed["plans.Facility (picture description)"] += 1
@@ -116,16 +129,19 @@ def _spa_page():
         seed = plans_seed.FACILITY_SPA_PAGE.get(facility.slug)
         touched = False
         if seed is not None:
-            if not facility.facts and not facility.image_name:  # not backfilled or edited yet
-                if facility.display != seed["display"]:
-                    facility.display, touched = seed["display"], True
+            untouched = not facility.facts and not facility.image_name  # never backfilled or edited
+            if untouched and facility.display != seed["display"]:
+                facility.display, touched = seed["display"], True
+            elif (facility.slug == "kitchenette" and facility.display == Facility.COMPANION and seed["display"] == Facility.TILE
+                  and facility.image_name == seed["image_name"] and facility.facts == seed["facts"]):
+                facility.display, touched = Facility.TILE, True  # 2026-10-23: kitchenette is a normal tile now
             if seed["image_name"] and not facility.image_name:
                 facility.image_name, touched = seed["image_name"], True
             elif OLD_FACILITY_IMAGES.get(facility.slug) == facility.image_name:
                 facility.image_name, touched = seed["image_name"], True
             if seed["image_focus"] != "50% 50%" and facility.image_focus in ("", "50% 50%"):
                 facility.image_focus, touched = seed["image_focus"], True
-            if not facility.facts:
+            if untouched:  # empty facts can mean "show none" after an admin cleared them
                 facility.facts, touched = list(seed["facts"]), True
         if facility.short_line == OLD_MASSAGE_LINE:
             facility.short_line, touched = "A quiet room for massage, part of your visit.", True

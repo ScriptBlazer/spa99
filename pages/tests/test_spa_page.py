@@ -25,10 +25,10 @@ class SpaSectionsTests(TestCase):
     def sections(self):
         return pages.spa_sections(pages.facility_cards())
 
-    def test_seed_gives_the_four_compositions_with_alternating_sides(self):
+    def test_seed_gives_the_compositions_with_alternating_sides(self):
         self.assertEqual(layout(self.sections()), [
             ("dry-sauna", None, "left"), ["wet-sauna", "cold-plunge", "showers"],
-            ("relaxing-zone", "massage-room", "right"), ("gym", "kitchenette", "left")])
+            ("relaxing-zone", "massage-room", "right"), ("gym", None, "left"), ["kitchenette"]])
 
     def test_hiding_rooms_never_breaks_the_layout(self):
         Facility.objects.filter(slug__in=["dry-sauna", "gym", "wet-sauna"]).update(visible=False)
@@ -127,3 +127,25 @@ class BackfillTests(TestCase):
         call_command("backfill_site_data", stdout=StringIO())
         self.assertEqual(Facility.objects.get(slug="cold-plunge").image_name, "cold-plunge")
         self.assertEqual(Facility.objects.get(slug="kitchenette").image_name, "gym")
+
+    def test_backfill_keeps_cleared_facts_fixes_old_alts_and_tiles_the_kitchenette(self):
+        seed_all()
+        Facility.objects.filter(slug="gym").update(facts=[])  # an admin chose "show none"
+        Facility.objects.filter(slug="kitchenette").update(display="companion")  # how it was seeded before
+        Facility.objects.filter(slug="showers").update(image_alt="Rain showers behind walnut slatted screens")
+        Facility.objects.filter(slug="cold-plunge").update(image_alt="My own wording")  # hand edit
+        out = StringIO()
+        call_command("backfill_site_data", "--dry-run", stdout=out)
+        self.assertIn("picture description", out.getvalue())
+        self.assertEqual(Facility.objects.get(slug="kitchenette").display, "companion")  # dry run saved nothing
+        call_command("backfill_site_data", stdout=StringIO())
+        self.assertEqual(Facility.objects.get(slug="gym").facts, [])
+        self.assertEqual(Facility.objects.get(slug="kitchenette").display, "tile")
+        self.assertIn("black-framed", Facility.objects.get(slug="showers").image_alt)
+        self.assertEqual(Facility.objects.get(slug="cold-plunge").image_alt, "My own wording")
+
+    def test_backfill_leaves_a_hand_edited_kitchenette_companion(self):
+        seed_all()
+        Facility.objects.filter(slug="kitchenette").update(display="companion", facts=["Mine"])
+        call_command("backfill_site_data", stdout=StringIO())
+        self.assertEqual(Facility.objects.get(slug="kitchenette").display, "companion")
