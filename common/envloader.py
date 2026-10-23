@@ -128,18 +128,20 @@ def example_keys(example_path):
     """Required keys in .env.example (a key is optional if the comment above it says so)."""
     if not example_path or not Path(example_path).is_file():
         return []
-    keys, comment = [], ""
+    # A comment block covers every key directly under it (until a blank line or the next comment).
+    keys, comment, after_key = [], "", False
     for line in Path(example_path).read_text().splitlines():
         stripped = line.strip()
         if stripped.startswith("#"):
-            comment += " " + stripped.lower()
+            comment = ("" if after_key else comment) + " " + stripped.lower()
+            after_key = False
         elif stripped == "":
-            comment = ""
+            comment, after_key = "", False
         else:
             match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)=", stripped)
             if match and "optional" not in comment:
                 keys.append(match.group(1))
-            comment = ""
+            after_key = True
     return keys
 
 
