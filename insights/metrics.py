@@ -40,10 +40,13 @@ class K:
     VISITORS = "visitors"                                    # daily unique visitors (one per anonymous hash per day)
     PAGE_VIEWS = "page_views"                                # dimension "" = all pages, else path group
     REFERRERS = "referrers"                                  # dimension: referring site host
+    PEOPLE_STARTED = "people_started"                        # daily people (anonymous hash) who started the journey; nests inside visitors
+    PEOPLE_FINISHED = "people_finished"                      # ... who finished it; nests inside people_started
+    PEOPLE_REGISTERED = "people_registered"                  # ... who registered; nests inside people_finished
 
-    RATE_JOURNEY_START = "rate_journey_start"                # journeys started / visitors, basis points
-    RATE_JOURNEY_FINISH = "rate_journey_finish"              # journeys completed / started
-    RATE_REGISTER = "rate_register"                          # registrations / visitors
+    RATE_JOURNEY_START = "rate_journey_start"                # people started / visitors, basis points
+    RATE_JOURNEY_FINISH = "rate_journey_finish"              # people finished / people started
+    RATE_REGISTER = "rate_register"                          # people registered / visitors
 
 
 # Rebuilt from the source tables by `rebuild_metrics`.

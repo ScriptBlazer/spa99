@@ -17,7 +17,7 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 /* ---------- chart boxes ---------- */
 .o-chartbox { position: relative; height: var(--office-chart-h); }
 .o-chartbox--hero { height: var(--office-chart-hero-h); }
-.o-chartbox--funnel { height: 18rem; }
+.o-chartbox--funnel { height: 13.5rem; }
 .o-chartbox--donut { width: var(--office-donut); height: var(--office-donut); flex: none; }
 .o-chartbox canvas { display: block; }
 .o-empty-chart { display: none; margin: 0; }
@@ -34,8 +34,17 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 .o-hero-change { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--office-muted); max-width: none; }
 .o-hero-change:empty { display: none; }
 .o-hero-rate { margin-left: var(--space-1); font-variant-numeric: tabular-nums; }
-.o-hero-toggle { width: 14rem; flex: none; }
-@media (max-width: 47.99em) { .o-hero-toggle { width: 100%; order: -1; } }
+/* legend pills: each toggles a series; pressed = the metric's tint and colour dot, unpressed = a quiet tonal pill */
+.o-pills { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.o-pill { --sw: var(--office-slate); --tint: var(--office-slate-tint); display: inline-flex; align-items: center; gap: var(--space-2); min-height: 2.5rem; padding: 0 var(--space-3); border: 0; border-radius: var(--office-pill); background: var(--office-sunken); color: var(--office-muted); font-size: var(--text-sm); font-weight: 500; cursor: pointer; transition: background-color var(--office-dur-lift) var(--ease-soft), color var(--office-dur-lift) var(--ease-soft); }
+.o-pill[data-series="journeys_started"] { --sw: var(--office-sage); --tint: var(--office-sage-tint); }
+.o-pill[data-series="registrations"] { --sw: var(--office-clay); --tint: var(--office-clay-tint); }
+.o-pill[data-series="page_views"] { --sw: var(--office-plum); --tint: var(--office-plum-tint); }
+.o-pill .o-swatch { background: var(--sw); opacity: 0.35; transition: opacity var(--office-dur-lift) var(--ease-soft); }
+.o-pill[aria-pressed="true"] { background: var(--tint); color: var(--office-text); }
+.o-pill[aria-pressed="true"] .o-swatch { opacity: 1; }
+@media (hover: hover) and (pointer: fine) { .o-pill:hover { color: var(--office-text); } }
+@media (pointer: coarse) { .o-pill { min-height: 2.75rem; } }
 .o-hero .o-summary { margin-top: var(--space-3); }
 
 /* the HTML legend above the plot, and the swatches shared by every legend */
@@ -43,7 +52,7 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 .o-legend:empty { display: none; }
 .o-legend-item { display: inline-flex; align-items: center; gap: var(--space-2); }
 .o-legend-num { font-variant-numeric: tabular-nums; color: var(--office-text); font-weight: 600; }
-.o-swatch { --sw: var(--office-taupe); display: inline-block; flex: none; width: 0.625rem; height: 0.625rem; border-radius: var(--office-pill); background: var(--sw); }
+.o-swatch { display: inline-block; flex: none; width: 0.625rem; height: 0.625rem; border-radius: var(--office-pill); background: var(--sw, var(--office-taupe)); }   /* inherits --sw from its pill, taupe otherwise */
 .o-swatch--approved { background: var(--office-ochre); }
 .o-swatch--waiting { background: repeating-linear-gradient(45deg, var(--office-ochre) 0 2px, color-mix(in oklab, var(--office-ochre) 48%, var(--office-surface)) 2px 4px); }
 .o-swatch--declined { background: var(--office-taupe); }
@@ -137,4 +146,4 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 .o-tip-row { display: flex; align-items: center; gap: var(--space-2); color: var(--office-muted); }
 .o-tip-key { width: 0.625rem; height: 0.625rem; flex: none; border-radius: var(--office-pill); }
 .o-tip-val { margin-left: auto; padding-left: var(--space-3); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--office-text); }
-@media (prefers-reduced-motion: reduce) { .o-tip, .o-rank li::after, .o-bars li::after, .o-kpi { transition: none; } .o-kpi .o-spark svg, .o-kpi .o-spark-area { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .o-pill, .o-pill .o-swatch, .o-tip, .o-rank li::after, .o-bars li::after, .o-kpi { transition: none; } .o-kpi .o-spark svg, .o-kpi .o-spark-area { animation: none !important; } }

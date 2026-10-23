@@ -1,5 +1,5 @@
 """Recompute the event figures from the source tables (the repair tool behind `rebuild_metrics`, also the one-off
-backfill). Never run from a migration. Visitor and page-view figures have no source table, so they are left alone."""
+backfill). Never run from a migration. Visitor, page-view and people_* figures have no source table (anonymous hashes are wiped daily), so they are left alone."""
 from collections import defaultdict
 
 from django.db import transaction

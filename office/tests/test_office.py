@@ -14,7 +14,8 @@ from gold import invites
 from gold import services as gold_services
 from gold.models import GoldApplication
 from gold.tests.test_gold import application_data
-from insights import rollup
+from insights import metrics, rollup
+from insights.metrics import K
 from insights.models import OfficeGoal
 from insights.tests.test_metrics import finished_journey
 from plans.management.commands.seed_phase1 import seed_all
@@ -156,6 +157,8 @@ class StoredFigureTests(OfficeTestCase):
         finished_journey()
         services.register_interest(cleaned())
         gold_services.submit_application(application_data())
+        for key in (K.PEOPLE_STARTED, K.PEOPLE_FINISHED, K.PEOPLE_REGISTERED):  # counted per request by visitors.record_step
+            metrics.count(key, "", 1, metrics.day(), counter=False)
         OfficeGoal.objects.create(key="registrations", range="7d", target=4)
         rollup.run()
         owner = staff("Owner")
@@ -240,7 +243,7 @@ class FreshSentenceTests(OfficeTestCase):
         client = Client(HTTP_HOST="localhost", HTTP_USER_AGENT="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1")
         client.get("/")
         self.assertNotIn("No visitors", MetricText.objects.get(key="chart_visitors", scope="30d").text)
-        metrics.count(K.JOURNEYS_STARTED, "", 7, metrics.day())
+        metrics.count(K.PEOPLE_STARTED, "", 7, metrics.day())
         funnel = selectors.dashboard("7d")["funnel"]
         self.assertTrue(all((s["step_rate_bp"] or 0) <= 10000 for s in funnel))
         self.assertTrue(funnel[1]["partial"] and funnel[1]["step_rate_bp"] is None)

@@ -357,3 +357,19 @@ class RequiredAndReopenTests(TestCase):
         old.refresh_from_db()
         self.assertTrue(old.completed)  # statistics and Gold links on the old one stay
         self.assertEqual(old.answers.count(), 2)
+
+
+class PeopleCountTests(TestCase):
+    """2026-10-23: several journey windows from one browser count as one person started that day."""
+
+    def test_restarting_counts_one_person_not_one_per_session(self):
+        from insights.metrics import K
+        from insights.models import DailyMetric
+
+        seed_all()
+        client = Client(HTTP_HOST="localhost", HTTP_USER_AGENT="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1")
+        client.get("/journey/state/")
+        client.post("/journey/restart/")
+        client.post("/journey/restart/")
+        value = lambda key: DailyMetric.objects.filter(key=key).values_list("value", flat=True).first() or 0  # noqa: E731
+        self.assertEqual((value(K.JOURNEYS_STARTED), value(K.PEOPLE_STARTED), value(K.VISITORS)), (3, 1, 1))

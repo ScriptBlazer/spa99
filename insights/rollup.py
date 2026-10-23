@@ -8,7 +8,7 @@
 Everything is recomputed from the daily rows in the window, so a second run changes nothing. The window is the last
 `WINDOW_DAYS` days, widened to whole weeks and months; `since=None` recomputes all history (used by rebuild_metrics).
 Weekly and monthly "visitors" are sums of daily unique visitors (visitor-days): the daily hashes are wiped, so a person
-who returns on two days counts on both."""
+who returns on two days counts on both. The daily people_started / people_finished / people_registered work the same way."""
 import logging
 from collections import defaultdict
 from datetime import date, timedelta
@@ -45,9 +45,9 @@ def rates_for(totals):
     def total(key):
         return totals.get((key, ""), 0)
     rates = {
-        K.RATE_JOURNEY_START: basis_points(total(K.JOURNEYS_STARTED), total(K.VISITORS)),
-        K.RATE_JOURNEY_FINISH: basis_points(total(K.JOURNEYS_COMPLETED), total(K.JOURNEYS_STARTED)),
-        K.RATE_REGISTER: basis_points(total(K.REGISTRATIONS), total(K.VISITORS)),
+        K.RATE_JOURNEY_START: basis_points(total(K.PEOPLE_STARTED), total(K.VISITORS)),
+        K.RATE_JOURNEY_FINISH: basis_points(total(K.PEOPLE_FINISHED), total(K.PEOPLE_STARTED)),
+        K.RATE_REGISTER: basis_points(total(K.PEOPLE_REGISTERED), total(K.VISITORS)),
     }
     return {key: value for key, value in rates.items() if value is not None}
 

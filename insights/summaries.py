@@ -53,7 +53,7 @@ def chart_sentences(name, today, plans, options, waiting):
     prev = reader.previous_dates(name, today)
     before = reader.totals(*prev) if prev else {}
     total = lambda k, s=sums: s.get((k, ""), 0)  # noqa: E731
-    visitors, started, done, registered = total(K.VISITORS), total(K.JOURNEYS_STARTED), total(K.JOURNEYS_COMPLETED), total(K.REGISTRATIONS)
+    visitors, started, done, registered = total(K.VISITORS), total(K.PEOPLE_STARTED), total(K.PEOPLE_FINISHED), total(K.PEOPLE_REGISTERED)
     out = {}
     if visitors:
         trend = change(visitors, total(K.VISITORS, before))
@@ -89,8 +89,8 @@ def chart_sentences(name, today, plans, options, waiting):
     return {chart: out.get(chart, NOTHING[chart]) for chart in CHARTS}
 
 
-WORDS = ((K.REGISTRATIONS, "registration", "registrations"), (K.JOURNEYS_STARTED, "person started", "people started"),
-         (K.JOURNEYS_COMPLETED, "person finished", "people finished"))
+WORDS = ((K.REGISTRATIONS, "registration", "registrations"), (K.PEOPLE_STARTED, "person started", "people started"),
+         (K.PEOPLE_FINISHED, "person finished", "people finished"))
 
 
 def dashboard_sentence(name, today, waiting):

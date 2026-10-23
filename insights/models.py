@@ -71,6 +71,10 @@ class VisitorHash(models.Model):
 
     date = models.DateField()
     hash = models.CharField(max_length=64)
+    # Funnel steps this anonymous person reached today (each counted once a day; a later step implies the earlier ones).
+    started = models.BooleanField(default=False)
+    finished = models.BooleanField(default=False)
+    registered = models.BooleanField(default=False)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["date", "hash"], name="visitor_hash_unique")]

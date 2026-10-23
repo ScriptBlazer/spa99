@@ -114,3 +114,53 @@ def record_page_view(request):
     source = referrer_source(request)
     if source:
         metrics.count(K.REFERRERS, source, 1, today, counter=False)
+
+
+STEPS = (("started", K.PEOPLE_STARTED), ("finished", K.PEOPLE_FINISHED), ("registered", K.PEOPLE_REGISTERED))
+
+
+def counts_here(request):
+    """The step counters follow the visitor counter's rules: counter on, public host, not a bot, not a prefetch."""
+    from django.conf import settings
+
+    if not getattr(settings, "VISITOR_COUNTER", True):
+        return False
+    if getattr(request, "urlconf", "config.urls") != "config.urls":
+        return False
+    if request.META.get("HTTP_SEC_PURPOSE", "").startswith("prefetch") or request.META.get("HTTP_PURPOSE") == "prefetch":
+        return False
+    return device_type(request.META.get("HTTP_USER_AGENT", "")) not in ("bot", "unknown")
+
+
+def record_step(request, step):
+    """Count this person once today at `step` ("started", "finished" or "registered") through the same anonymous daily
+    hash as the visitor counter (no IP or user agent stored). A later step also counts the earlier ones, and a person
+    not yet counted as a visitor today is counted as one, so visitors >= started >= finished >= registered always
+    holds. Never raises: counting must not break the journey or a registration."""
+    try:
+        if not counts_here(request):
+            return
+        today = metrics.day()
+        digest = visitor_hash(todays_salt(today), client_ip(request) or "", request.META.get("HTTP_USER_AGENT", ""))
+        new_visitor = False
+        with transaction.atomic():
+            row = VisitorHash.objects.filter(date=today, hash=digest).first()
+            if row is None:
+                try:
+                    with transaction.atomic():
+                        row = VisitorHash.objects.create(date=today, hash=digest)
+                    new_visitor = True
+                except IntegrityError:
+                    row = VisitorHash.objects.get(date=today, hash=digest)
+            if new_visitor:
+                metrics.count(K.VISITORS, "", 1, today, counter=False)
+            for flag, key in STEPS:
+                # the conditional update lets two parallel requests flip the flag (and count) only once
+                if VisitorHash.objects.filter(pk=row.pk, **{flag: False}).update(**{flag: True}):
+                    metrics.count(key, "", 1, today, counter=False)
+                if flag == step:
+                    break
+        if new_visitor:
+            _refresh_sentences(today)
+    except Exception:  # noqa: BLE001
+        logger.warning("Visitor counter skipped a funnel step", exc_info=True)

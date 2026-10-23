@@ -18,7 +18,14 @@ function start() {
   const coarse = window.matchMedia('(pointer: coarse)');
   const charts = new Map();   // key -> { chart, box, spec }
   const created = new Set();  // cards whose charts exist or are wanted
-  const state = { metric: 'visitors' };
+  const SERIES = [   // back to front; each metric keeps its colour everywhere
+    { key: 'visitors', name: 'Visitors', unit: 'visitors' },
+    { key: 'journeys_started', name: 'People started', unit: 'people started' },
+    { key: 'people_registered', name: 'Registered', unit: 'registered' },
+    { key: 'page_views', name: 'Page views', unit: 'page views' },
+  ];
+  const state = { on: new Set(['visitors', 'journeys_started', 'people_registered']) };
+  const primary = () => (SERIES.find((x) => state.on.has(x.key)) || SERIES[0]).key; // the headline number and the ghost follow the back-most series shown
 
   // ---------- tokens (read from the body, where the Office tokens live) ----------
   const probe = document.createElement('canvas').getContext('2d');
@@ -43,7 +50,7 @@ function start() {
       clay: norm(cssVar('--office-clay')), taupe: norm(cssVar('--office-taupe')),
       clayRamp: ['--office-clay', '--office-clay-2', '--office-clay-3', '--office-clay-4'].map((n) => norm(cssVar(n))),
       tealRamp: ['--office-teal', '--office-teal-2', '--office-teal-3', '--office-teal-4'].map((n) => norm(cssVar(n))),
-      surface: norm(cssVar('--office-surface')), muted: norm(cssVar('--office-muted')), text: norm(cssVar('--office-text')),
+      surface: norm(cssVar('--office-surface')), iron: norm(cssVar('--color-iron')), muted: norm(cssVar('--office-muted')), text: norm(cssVar('--office-text')),
       grid: norm(cssVar('--office-grid')), crosshair: norm(cssVar('--office-crosshair')),
       font: cssVar('--font-body').split(',')[0].replace(/["']/g, '') || 'Figtree',
       display: cssVar('--font-display').split(',')[0].replace(/["']/g, '') || 'Signika',
@@ -96,28 +103,27 @@ function start() {
       ctx.save(); ctx.strokeStyle = T.crosshair; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, chartArea.top); ctx.lineTo(x, chartArea.bottom); ctx.stroke(); ctx.restore();
     },
   };
-  const funnelText = {   // a label left of each pill, its count right, and "74% carried on" between pills
+  const funnelText = {   // the step name left of each slim pill; the count and "71% carried on" inside it (just after it when it is too short)
     id: 'funnelText',
     afterDatasetsDraw(chart, _args, opts) {
       if (!opts?.steps) return;
-      const { ctx, chartArea, width } = chart; const meta = chart.getDatasetMeta(0);
-      const narrow = width < 520; const mid = (chartArea.left + chartArea.right) / 2;
+      const { ctx, width } = chart; const meta = chart.getDatasetMeta(0);
+      const narrow = width < 520;
       ctx.save(); ctx.textBaseline = 'middle';
       meta.data.forEach((bar, i) => {
         const step = opts.steps[i]; if (!step) return;
         ctx.textAlign = 'left'; ctx.fillStyle = T.muted; ctx.font = `500 12px ${T.font}`;
         const lines = wrap(step.name, narrow ? 11 : 26);
         lines.forEach((line, n) => ctx.fillText(line, 0, bar.y + (n - (lines.length - 1) / 2) * 14));
-        ctx.textAlign = 'right'; ctx.fillStyle = T.text; ctx.font = `500 ${narrow ? 17 : 20}px ${T.display}`;
-        ctx.fillText(nf.format(step.value), width, bar.y);
-      });
-      ctx.textAlign = 'center'; ctx.font = `500 12px ${T.font}`;
-      meta.data.slice(0, -1).forEach((bar, i) => {
-        const text = opts.between[i]; if (!text) return;
-        const y = (bar.y + meta.data[i + 1].y) / 2;
-        ctx.fillStyle = i === opts.drop ? T.text : T.muted;
-        ctx.font = `${i === opts.drop ? 600 : 500} 12px ${T.font}`;
-        ctx.fillText(text, mid, y);
+        const weight = i === opts.drop + 1 ? 700 : 600;
+        ctx.font = `${weight} 13px ${T.font}`;
+        const x0 = Math.min(bar.x, bar.base); const x1 = Math.max(bar.x, bar.base); const w = x1 - x0;
+        const full = step.text; const short = step.short;
+        if (ctx.measureText(full).width + 20 <= w) { ctx.textAlign = 'center'; ctx.fillStyle = step.ink; ctx.fillText(full, (x0 + x1) / 2, bar.y); return; }
+        if (ctx.measureText(short).width + 20 <= w) { ctx.textAlign = 'center'; ctx.fillStyle = step.ink; ctx.fillText(short, (x0 + x1) / 2, bar.y); return; }
+        const room = width - x1 - 10;   // too short: the text sits just after the bar, same line, in the page's text colour
+        ctx.textAlign = 'left'; ctx.fillStyle = T.text;
+        ctx.fillText(ctx.measureText(full).width <= room ? full : short, x1 + 10, bar.y);
       });
       ctx.restore();
     },
@@ -188,33 +194,45 @@ function start() {
   // ---------- chart specs: make(data) gives the Chart.js config; tip(points) the tooltip; empty(data) the empty test ----------
   const specs = {
     visitors: {
-      empty: (d) => !d.series.visitors.total && !d.series.page_views.total,
+      empty: (d) => !SERIES.some((x) => d.series[x.key].total),
       make(d) {
-        const weekly = d.granularity === 'week'; const s = d.series[state.metric];
-        const metric = state.metric === 'visitors' ? { name: 'Visitors', color: T.slate } : { name: 'Page views', color: T.plum };
-        const days = d.labels.length;
-        const datasets = [{
-          label: metric.name, data: s.values, borderColor: metric.color, borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 6, pointHoverBackgroundColor: metric.color,
-          pointHoverBorderColor: T.surface, pointHoverBorderWidth: 2, cubicInterpolationMode: 'monotone', fill: 'origin',
-          backgroundColor: (ctx) => {
-            const { chart } = ctx; const a = chart.chartArea; if (!a) return 'transparent';
-            const g = chart.ctx.createLinearGradient(0, a.top, 0, a.bottom);
-            g.addColorStop(0, alpha(metric.color, 0.28)); g.addColorStop(1, alpha(metric.color, 0)); return g;
-          },
-        }];
-        if (s.previous?.length) datasets.push({ label: `Previous ${days} days`, data: s.previous, borderColor: T.taupe, borderWidth: 1.5, borderDash: [4, 4], pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: T.taupe, pointHoverBorderColor: T.surface, pointHoverBorderWidth: 2, cubicInterpolationMode: 'monotone', fill: false });
+        const weekly = d.granularity === 'week'; const days = d.labels.length;
+        const colour = { visitors: T.slate, journeys_started: T.sage, people_registered: T.clay, page_views: T.plum };
+        const shown = SERIES.filter((x) => state.on.has(x.key));
+        const top = primary();
+        let peak = 0;
+        const datasets = shown.map((x, i) => {
+          const s = d.series[x.key]; const c = colour[x.key];
+          const filled = s.values.filter((v) => v > 0).length;
+          peak = Math.max(peak, ...s.values);
+          return {
+            label: x.name, data: s.values, key: x.key, borderColor: c, borderWidth: 2, borderCapStyle: 'round', borderJoinStyle: 'round', cubicInterpolationMode: 'monotone',
+            order: shown.length - i,   // lower order draws on top: the first series sits at the back
+            pointRadius: (p) => (filled && filled <= 8 && p.raw > 0 ? 3.5 : 0), pointBackgroundColor: c, pointBorderColor: T.surface, pointBorderWidth: 2,   // dots only on real values, never along the zero floor
+            pointHoverRadius: 6, pointHoverBackgroundColor: c, pointHoverBorderColor: T.surface, pointHoverBorderWidth: 2,
+            fill: 'origin',
+            backgroundColor: (ctx) => {
+              const { chart } = ctx; const a = chart.chartArea; if (!a) return 'transparent';
+              const g = chart.ctx.createLinearGradient(0, a.top, 0, a.bottom);
+              g.addColorStop(0, alpha(c, 0.34)); g.addColorStop(1, alpha(c, 0.02)); return g;
+            },
+          };
+        });
+        const ghost = d.series[top];
+        if (ghost.previous?.length) datasets.push({ label: `Previous ${days} days`, data: ghost.previous, key: 'previous', borderColor: alpha(T.taupe, 0.75), borderWidth: 1.5, borderDash: [4, 4], pointRadius: 0, pointHoverRadius: 3, pointHoverBackgroundColor: T.taupe, pointHoverBorderColor: T.surface, pointHoverBorderWidth: 2, cubicInterpolationMode: 'monotone', fill: false, order: 0 });
         return {
           type: 'line',
           data: { labels: d.labels.map((l) => label(l, weekly)), datasets },
           options: base('visitors', {
             interaction: { mode: 'index', intersect: false },
-            layout: { padding: { top: 8, right: 8 } },
-            scales: { x: xScale({ ticks: { color: T.muted, maxRotation: 0, autoSkip: true, maxTicksLimit: coarse.matches ? 4 : 7, padding: 10 } }), y: yScale() },
+            layout: { padding: { top: 8, right: 12, left: 4 } },
+            scales: { x: xScale({ offset: true, ticks: { color: T.muted, maxRotation: 0, autoSkip: true, maxTicksLimit: coarse.matches ? 4 : 7, padding: 10 } }), y: yScale({ suggestedMax: Math.max(5, Math.ceil(peak * 1.2)), grace: '5%' }) },
           }),
-          legend: datasets.length > 1 ? [{ text: metric.name, color: metric.color }, { text: datasets[1].label, color: T.taupe, dashed: true }] : [],
+          legend: ghost.previous?.length ? [{ text: `Previous ${days} days, ${SERIES.find((x) => x.key === top).name.toLowerCase()}`, color: T.taupe, dashed: true }] : [],
           tip: (pts) => ({
             title: weekly ? `w/c ${tipDay(d.labels[pts[0].dataIndex])}` : tipDay(d.labels[pts[0].dataIndex]),
-            rows: pts.map((p) => ({ label: p.dataset.label, value: nf.format(p.parsed.y), color: p.dataset.borderColor })),
+            rows: [...pts].sort((p, q) => SERIES.findIndex((x) => x.key === p.dataset.key) - SERIES.findIndex((x) => x.key === q.dataset.key))
+              .map((p) => ({ label: p.dataset.label, value: nf.format(p.parsed.y), color: p.dataset.borderColor })),
           }),
         };
       },
@@ -225,18 +243,20 @@ function start() {
         const steps = d.funnel; const colours = [T.slate, T.sage, T.teal, T.clay];
         let drop = -1; let low = Infinity;   // the largest drop is the step that carried on the smallest share
         steps.forEach((s, i) => { if (i && !s.partial && s.step_rate_bp !== null && s.step_rate_bp < low) { low = s.step_rate_bp; drop = i - 1; } });
-        const between = steps.slice(1).map((s) => (s.partial || s.step_rate_bp === null ? '' : `${rate(s.step_rate_bp)} carried on`));
+        const ink = [T.surface, T.iron, T.surface, T.surface];   // AA on each bar: cream on slate, teal and clay; iron on the lighter sage
+        const text = steps.map((s, i) => (i && !s.partial && s.step_rate_bp !== null ? `${nf.format(s.value)} · ${rate(s.step_rate_bp)} carried on` : nf.format(s.value)));
+        const short = steps.map((s, i) => (i && !s.partial && s.step_rate_bp !== null ? `${nf.format(s.value)} · ${rate(s.step_rate_bp)}` : nf.format(s.value)));
         const names = steps.map((s) => (s.key === 'completed' ? 'Finished it' : s.label));
         const top = Math.max(...steps.map((s) => s.value), 1);
         const narrow = (charts.get('funnel')?.box || root.querySelector('[data-chart="funnel"]')).clientWidth < 520;
         return {
           type: 'bar',
-          data: { labels: names, datasets: [{ data: steps.map((s) => [-s.value / 2, s.value / 2]), backgroundColor: colours, borderRadius: 999, borderSkipped: false, barPercentage: 0.78, categoryPercentage: 1, minBarLength: 10 }] },
+          data: { labels: names, datasets: [{ data: steps.map((s) => [-s.value / 2, s.value / 2]), backgroundColor: colours, borderRadius: 999, borderSkipped: false, barPercentage: 0.6, categoryPercentage: 1, minBarLength: 10 }] },
           options: base('funnel', {
-            indexAxis: 'y', layout: { padding: { top: 0, left: narrow ? 84 : 170, right: narrow ? 56 : 80 } },
+            indexAxis: 'y', layout: { padding: { top: 0, left: narrow ? 84 : 170, right: 0 } },
             interaction: { mode: 'nearest', intersect: true },
             scales: { x: { display: false, min: -top / 2, max: top / 2 }, y: { display: false } },
-            plugins: { legend: { display: false }, tooltip: { enabled: false, external: externalTip('funnel') }, funnelText: { steps: steps.map((s, i) => ({ name: names[i], value: s.value })), between, drop } },
+            plugins: { legend: { display: false }, tooltip: { enabled: false, external: externalTip('funnel') }, funnelText: { steps: steps.map((s, i) => ({ name: names[i], value: s.value, text: text[i], short: short[i], ink: ink[i] })), drop } },
           }),
           plugins: [funnelText],
           tip: (pts) => {
@@ -319,17 +339,13 @@ function start() {
     return d.summaries?.[map[card]] || '';
   }
 
-  /** The hero's big number follows the toggle (both figures are rendered by the server; this only shows one). */
+  /** The hero's headline follows the back-most series shown (the server renders every figure; this only shows one) and the pills reflect the state. */
   function hero() {
     const card = root.querySelector('[data-chart-card="visitors"]'); if (!card) return;
-    card.dataset.metric = state.metric;
-    card.querySelectorAll('[data-hero-fig]').forEach((fig) => { fig.hidden = fig.dataset.heroFig !== state.metric; });
-    const group = card.querySelector('[data-chart-toggle]');
-    if (group) {
-      const inputs = [...group.querySelectorAll('input[type="radio"]')];
-      inputs.forEach((input) => { input.checked = input.value === state.metric; });
-      group.style.setProperty('--i', String(Math.max(inputs.findIndex((i) => i.checked), 0)));
-    }
+    const top = primary();
+    card.dataset.metric = top;
+    card.querySelectorAll('[data-hero-fig]').forEach((fig) => { fig.hidden = fig.dataset.heroFig !== top; });
+    card.querySelectorAll('[data-series]').forEach((pill) => pill.setAttribute('aria-pressed', String(state.on.has(pill.dataset.series))));
   }
 
   /** Cards with no chart of their own keep their "View as table" in step with their data. */
@@ -376,11 +392,17 @@ function start() {
   }
   const keysIn = (card) => [...card.querySelectorAll('[data-chart]')].map((el) => el.dataset.chart);
 
-  // visitors toggle (Visitors / Page views): the colour switches slate to plum with a morph
-  const toggle = root.querySelector('[data-chart-toggle="visitors"]');
-  if (toggle) {
-    toggle.hidden = false;
-    toggle.addEventListener('change', (event) => { state.metric = event.target.value; hero(); sync('visitors', readData()); });
+  // legend pills: each toggles its series; at least one stays on
+  const pills = root.querySelector('[data-series-pills]');
+  if (pills) {
+    pills.hidden = false;
+    hero();
+    pills.addEventListener('click', (event) => {
+      const pill = event.target.closest('[data-series]'); if (!pill) return;
+      const key = pill.dataset.series;
+      if (state.on.has(key)) { if (state.on.size > 1) state.on.delete(key); } else state.on.add(key);
+      hero(); sync('visitors', readData());
+    });
   }
 
   document.addEventListener('office:series', () => {

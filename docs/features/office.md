@@ -33,6 +33,7 @@ Our own counter, no cookies, no personal data:
 
 - Each public page view adds to `DailyMetric` (page views, by path group) in a cheap way (a single upsert, or a small buffered write) and never blocks the page.
 - Daily unique visitors use an anonymous hash of (salt of the day, IP, user agent); the salt rotates daily and is discarded, the raw IP and user agent are never stored; only the hash for today is kept (to dedupe) and wiped by the roll-up.
+- **The funnel counts people, not sessions.** When a journey starts or is restarted, is finished (`POST /journey/result/`), or a registration is saved on the public site, `insights.visitors.record_step` computes today's same anonymous hash and flips a `started`, `finished` or `registered` flag on that `VisitorHash` row, counting each once per person per day (`people_started`, `people_finished`, `people_registered` daily metrics). A later step also counts the earlier ones, and a person not yet seen as a visitor is counted as one, so visitors >= started >= finished >= registered always holds. Same gates as the visitor counter (public host, no bots, no prefetch, `VISITOR_COUNTER`); errors are logged and swallowed. Flags are wiped with the hashes. The Dashboard rings, both funnels, the Analytics hero (`journeys_started` series = people started, `people_registered`), the rates and the summary sentences use these. The session-based `journeys_started` / `journeys_completed` stay for drop-off per screen and the answer charts.
 - Bots and staff hosts are excluded. Referrer is stored as the site name only (no full URL, no query string).
 - No cookie banner is needed for this.
 
@@ -73,7 +74,7 @@ The frontend styles the templates from `docs/design/OFFICE.md`; the templates ar
 
 **Command.** `python manage.py rebuild_metrics [--dry-run]` shows differences between stored figures and the source tables, or replaces them and re-runs the whole roll-up. Run once after deploy to backfill; never in a migration.
 
-**Visitor counter.** `insights.middleware.VisitorCounterMiddleware` (last in MIDDLEWARE): counts GET 200 HTML pages on the public host only, not bots or empty user agents, static, media or prefetch. Page views by path group (first segment; `home`), one unique per sha256(day salt, IP, user agent), referrer host only (`direct` when none). Errors are logged and swallowed. Setting `VISITOR_COUNTER = False` switches it off.
+**Visitor counter.** `insights.middleware.VisitorCounterMiddleware` (last in MIDDLEWARE): counts GET 200 HTML pages on the public host only, not bots or empty user agents, static, media or prefetch. Page views by path group (first segment; `home`), one unique per sha256(day salt, IP, user agent), referrer host only (`direct` when none). Errors are logged and swallowed. Setting `VISITOR_COUNTER = False` switches it off. The same middleware file's helper `record_step` (called from the journey and register views) feeds the people metrics; like visitors they have no source table, so `rebuild_metrics` never rebuilds them, and weekly/monthly figures are sums of daily people. Registrations through other routes (Gold invite, admin) are not counted as people.
 
 New env vars: `OFFICE_DOMAIN`, `OFFICE_URL` (optional). Nothing is Postgres-only (ORM only, `select_for_update` is ignored by SQLite).
 

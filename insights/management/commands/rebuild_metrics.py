@@ -20,7 +20,7 @@ class Command(BaseCommand):
         if len(diffs) > options["limit"]:
             self.stdout.write(f"  ... and {len(diffs) - options['limit']} more")
         if options["dry_run"]:
-            self.stdout.write("Dry run: nothing changed. (Visitor and page-view figures have no source and are never rebuilt.)")
+            self.stdout.write("Dry run: nothing changed. (Visitor, page-view and people (started, finished, registered) figures have no source and are never rebuilt.)")
             return
         summary = rebuild.apply()
         self.stdout.write(self.style.SUCCESS(f"Rebuilt. Roll-up: {summary}"))

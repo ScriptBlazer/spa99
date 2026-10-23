@@ -143,8 +143,8 @@ class RollupAndRebuildTests(TestCase):
     def test_rollup_is_idempotent_writes_rates_weeks_months_and_sentences(self):
         today = metrics.day()
         DailyMetric.objects.bulk_create([
-            DailyMetric(date=today, key=K.VISITORS, value=200), DailyMetric(date=today, key=K.JOURNEYS_STARTED, value=50),
-            DailyMetric(date=today, key=K.JOURNEYS_COMPLETED, value=25), DailyMetric(date=today, key=K.REGISTRATIONS, value=10),
+            DailyMetric(date=today, key=K.VISITORS, value=200), DailyMetric(date=today, key=K.PEOPLE_STARTED, value=50),
+            DailyMetric(date=today, key=K.PEOPLE_FINISHED, value=25), DailyMetric(date=today, key=K.PEOPLE_REGISTERED, value=10), DailyMetric(date=today, key=K.REGISTRATIONS, value=10),
             DailyMetric(date=today - timedelta(days=1), key=K.VISITORS, value=100),
         ])
         rollup.run()
@@ -209,6 +209,39 @@ class VisitorCounterTests(TestCase):
         for secret in ("203.0.113.7", "198.51.100.9", "Safari", "Macintosh", "secret", "utm=1"):
             self.assertNotIn(secret, everything)
         self.assertEqual(VisitorHash.objects.count(), 2)
+
+    def test_people_steps_count_once_a_day_nest_and_store_no_ip(self):
+        request = self.view()
+        request.urlconf = "config.urls"
+        visitors.record_step(request, "started")
+        visitors.record_step(request, "started")  # a second window, same person: still one
+        self.assertEqual((today_row(K.VISITORS), today_row(K.PEOPLE_STARTED), today_row(K.PEOPLE_FINISHED)), (1, 1, 0))  # never seen as a page view: still a visitor
+        visitors.record_step(request, "registered")  # skipping a step still counts the earlier ones
+        visitors.record_step(request, "finished")
+        self.assertEqual([today_row(k) for k in (K.VISITORS, K.PEOPLE_STARTED, K.PEOPLE_FINISHED, K.PEOPLE_REGISTERED)], [1, 1, 1, 1])
+        self.count(request)  # the page view of the same person adds no second visitor
+        self.assertEqual(today_row(K.VISITORS), 1)
+        other = self.view(addr="198.51.100.9")
+        other.urlconf = "config.urls"
+        visitors.record_step(other, "started")
+        self.assertEqual([today_row(K.VISITORS), today_row(K.PEOPLE_STARTED), today_row(K.PEOPLE_REGISTERED)], [2, 2, 1])
+        everything = " ".join(str(v) for model in (VisitorHash, VisitorSalt, DailyMetric) for v in model.objects.values_list())
+        for secret in ("203.0.113.7", "198.51.100.9", "Safari", "Macintosh"):
+            self.assertNotIn(secret, everything)
+
+    def test_people_steps_skip_bots_staff_hosts_and_never_raise(self):
+        bot = self.view(agent="Googlebot/2.1")
+        bot.urlconf = "config.urls"
+        staff = self.view(host="office.localhost")
+        staff.urlconf = "config.urls_office"
+        for request in (bot, staff):
+            visitors.record_step(request, "started")
+        self.assertEqual((VisitorHash.objects.count(), today_row(K.PEOPLE_STARTED)), (0, 0))
+        request = self.view()
+        request.urlconf = "config.urls"
+        with mock.patch("insights.visitors.todays_salt", side_effect=RuntimeError("boom")):
+            visitors.record_step(request, "started")  # logged and swallowed
+        self.assertEqual(today_row(K.PEOPLE_STARTED), 0)
 
     def test_bots_staff_hosts_static_and_non_pages_are_not_counted(self):
         self.count(self.view(agent="Googlebot/2.1"))

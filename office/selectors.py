@@ -42,7 +42,7 @@ def _direction(now, before):
     return {"percent": abs(pct), "direction": "flat" if pct == 0 else ("up" if pct > 0 else "down")}
 
 
-FUNNEL_NOTE = "Some earlier figures are lower than later steps because visitor counting started recently."
+FUNNEL_NOTE = "Some earlier figures are lower than later steps because people counting started recently."
 
 
 def _share(value, whole):
@@ -84,8 +84,9 @@ def dashboard(range_name="7d", today=None):
         return {"key": key, "label": label, "value": value, "previous": previous, "change": value - previous,
                 **_direction(value, previous), "series": _series(rows, key, spark_days), "link": link}
 
-    started, done = total(K.JOURNEYS_STARTED, now_days), total(K.JOURNEYS_COMPLETED, now_days)
-    visitors, registered = total(K.VISITORS, now_days), total(K.REGISTRATIONS, now_days)
+    # People (one per anonymous daily hash), so every step nests: visitors >= started >= finished >= registered.
+    started, done = total(K.PEOPLE_STARTED, now_days), total(K.PEOPLE_FINISHED, now_days)
+    visitors, registered = total(K.VISITORS, now_days), total(K.PEOPLE_REGISTERED, now_days)
     stats = [stat(K.REGISTRATIONS, "Registrations", "registrations"), stat(K.JOURNEYS_COMPLETED, "Journeys completed", "journeys"),
              stat(K.VISITORS, "Site visitors", "visitors"), stat(K.PAGE_VIEWS, "Page views", "pages")]
 
@@ -98,9 +99,9 @@ def dashboard(range_name="7d", today=None):
                 "previous": previous, "change": value - previous}
 
     rings = [
-        ring("journeys_started", "People started", OfficeGoal.JOURNEYS_STARTED, started, total(K.JOURNEYS_STARTED, before_days)),
-        ring("journeys_completed", "Finished it", OfficeGoal.JOURNEYS_FINISHED, done, total(K.JOURNEYS_COMPLETED, before_days)),
-        ring("registrations", "Registered", OfficeGoal.REGISTRATIONS, registered, total(K.REGISTRATIONS, before_days)),
+        ring("journeys_started", "People started", OfficeGoal.JOURNEYS_STARTED, started, total(K.PEOPLE_STARTED, before_days)),
+        ring("journeys_completed", "Finished it", OfficeGoal.JOURNEYS_FINISHED, done, total(K.PEOPLE_FINISHED, before_days)),
+        ring("registrations", "Registered", OfficeGoal.REGISTRATIONS, registered, total(K.PEOPLE_REGISTERED, before_days)),
     ]
     funnel_values = [("visitors", "Visitors", visitors), ("started", "Started the journey", started),
                      ("completed", "Completed it", done), ("registered", "Registered", registered)]
@@ -160,7 +161,7 @@ def _fetch(range_name, granularity, labels, key_list):
     return list(rows.values_list("date", "key", "dimension", "value"))
 
 
-SERIES_KEYS = (K.VISITORS, K.JOURNEYS_STARTED, K.JOURNEYS_COMPLETED, K.REGISTRATIONS, K.EMAIL_VERIFIED, K.GOLD_APPLICATIONS, K.GOLD_APPROVED)
+SERIES_KEYS = (K.VISITORS, K.PEOPLE_STARTED, K.JOURNEYS_COMPLETED, K.REGISTRATIONS, K.PEOPLE_FINISHED, K.PEOPLE_REGISTERED, K.EMAIL_VERIFIED, K.GOLD_APPLICATIONS, K.GOLD_APPROVED)
 BREAKDOWN_KEYS = (K.REGISTRATIONS_BY_PLAN, K.REGISTRATIONS_BY_SOURCE, K.SUGGESTED_PLAN, K.JOURNEY_GOLD_POTENTIAL,
                   K.GOLD_BY_POTENTIAL, K.JOURNEY_ANSWER, K.JOURNEY_SCREEN)
 PAGE_KEYS = (K.PAGE_VIEWS, K.VISITORS, K.REFERRERS)
@@ -193,10 +194,11 @@ def analytics(range_name="30d", today=None):
     for key in SERIES_KEYS + (K.PAGE_VIEWS,):
         values = _series(rows, key, labels)
         series[key] = {"total": sum(values), "values": values, "previous": _series(rows, key, previous) if previous else []}
+    series[K.JOURNEYS_STARTED] = series[K.PEOPLE_STARTED]  # the hero/KPI read the key "journeys_started": it is people now
     total = lambda key: series[key]["total"]  # noqa: E731
 
-    funnel_def = [("visitors", "Visitors", total(K.VISITORS)), ("started", "Started the journey", total(K.JOURNEYS_STARTED)),
-                  ("completed", "Completed it", total(K.JOURNEYS_COMPLETED)), ("registered", "Registered", total(K.REGISTRATIONS))]
+    funnel_def = [("visitors", "Visitors", total(K.VISITORS)), ("started", "Started the journey", total(K.PEOPLE_STARTED)),
+                  ("completed", "Completed it", total(K.PEOPLE_FINISHED)), ("registered", "Registered", total(K.PEOPLE_REGISTERED))]
     funnel = [{"key": k, "label": label, "value": v, "share_bp": min(basis_points(v, funnel_def[0][2]) or 0, 10000),
                "step_rate_bp": _share(v, funnel_def[i - 1][2]) if i else None,
                "partial": bool(i and v > funnel_def[i - 1][2])}
