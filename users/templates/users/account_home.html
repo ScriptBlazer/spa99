@@ -1,0 +1,13 @@
+{% extends "users/member_base.html" %}
+{% block head_title %}{% include "common/_head.html" with title="Home | My Spa 99" %}{% endblock %}
+{% block main %}
+{% with member_tab="home" %}
+<section class="member-screen" data-screen="home">
+  <h1>{{ greeting }}</h1>
+  <p class="lead" data-status="{{ status }}">{% if status == "gold" %}Gold member. We open in {{ opening }}.{% elif status == "registered" %}{{ status_name }} interest. We open in {{ opening }}.{% else %}No membership chosen yet. <a href="{% url 'account_membership' %}">Choose one</a>{% endif %}</p>
+  <a class="tile tile--next" href="{% url 'account_book' %}" data-tile="next-visit"><span class="small">Next visit</span> Your first visit, in {{ opening }}. Booking opens when the doors do.</a>
+  <a class="tile" href="{% url 'account_membership' %}" data-tile="membership"><span class="small">Membership</span> {% if is_gold %}Gold member{% elif interest_plan %}{{ interest_plan.name }} interest{% else %}Not chosen yet{% endif %}</a>
+  <div class="tile" data-tile="visits"><span class="small">Visits</span> Your visits will show here from {{ opening }}.</div>
+</section>
+{% endwith %}
+{% endblock %}

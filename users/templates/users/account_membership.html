@@ -1,0 +1,28 @@
+{% extends "users/member_base.html" %}
+{% load pages_tags %}
+{% block head_title %}{% include "common/_head.html" with title="Membership | My Spa 99" %}{% endblock %}
+{% block main %}
+<section class="member-screen" data-screen="membership">
+  {% if is_gold %}
+  <h1>Gold Card</h1>
+  {% include "common/_gold_card.html" %}
+  <p class="lead">Gold member{% if gold_since %} since {{ gold_since|date:"j F Y" }}{% endif %}.</p>
+  <p>Your Gold Card perks start when we open in {{ opening }}. <a href="{% url 'gold_card' %}">What Gold includes</a></p>
+  <p class="small muted">To change anything, write to <a href="mailto:{{ site.contact_address }}">{{ site.contact_address }}</a>.</p>
+  {% else %}
+  <h1>{% if current_plan %}{{ current_plan.name }}{% else %}Choose your membership{% endif %}</h1>
+  {% if current_plan %}<p class="num" data-price>&pound;{{ current_plan.price_whole }} a month, ex VAT (&pound;{{ current_plan.price_inc }} inc VAT)</p>
+  <p>Nothing to pay now. Billing opens in {{ opening }}.</p>{% endif %}
+  {% if suggested_plan %}<p data-suggestion>Your journey suggested {{ suggested_plan.name }}.</p>
+  {% if suggestion_differs %}<form method="post" action="{% url 'account_interest' %}">{% csrf_token %}<input type="hidden" name="plan" value="{{ suggested_plan.slug }}"><button type="submit" class="btn-quiet">Switch to {{ suggested_plan.name }}</button></form>{% endif %}{% endif %}
+  <form id="interest-form" method="post" action="{% url 'account_interest' %}" data-interest>
+    {% csrf_token %}
+    <div role="radiogroup" aria-label="Membership you're interested in">
+      {% for tile in plan_tiles %}<label data-plan-tile="{{ tile.slug }}"><input type="radio" name="plan" value="{{ tile.slug }}"{% if interest_plan.slug == tile.slug %} checked{% endif %}><span>{{ tile.name }}</span> <span class="small">{{ tile.tagline }}</span> <span class="num">&pound;{{ tile.price_whole }} ex VAT (&pound;{{ tile.price_inc }} inc VAT)</span></label>{% endfor %}
+    </div>
+    <button type="submit" class="btn btn-primary" data-working-text="Saving">Keep my choice</button>
+  </form>
+  <a class="btn-quiet" href="{% url 'memberships' %}">Compare memberships</a>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "users/member_base.html" %}
+{% block head_title %}{% include "common/_head.html" with title="Book a visit | My Spa 99" %}{% endblock %}
+{% block main %}
+<section class="member-screen" data-screen="book">
+  <h1>Your first visit, in January.</h1>
+  <p>Booking opens when the doors do. You'll choose your time here.</p>
+  <p class="soon-month">{{ opening }}</p>
+  <h2>How it will work</h2>
+  <ul data-booking-lines>{% for line in booking_lines %}<li>{{ line }}</li>{% endfor %}</ul>
+  <ul data-hours>{% for label, text in hours %}<li>{{ label }}: {{ text }}</li>{% endfor %}</ul>
+  <ul data-stay>{% for pill in stay_pills %}<li>{{ pill }}</li>{% endfor %}</ul>
+  <p data-reassurance>{% if not verified %}Confirm your email so we can tell you when booking opens.{% elif notify_booking_open %}You're on the list. We'll write to {{ email }} when booking opens.{% else %}Booking opens in {{ opening }}.{% endif %}</p>
+  <a class="btn-quiet" href="{% url 'spa' %}">See the spa</a>
+</section>
+{% endblock %}

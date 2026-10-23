@@ -83,9 +83,11 @@ def gold_card(request):
                  hours_facts=services.hours_facts())
 
 
-@login_not_required  # PUBLIC placeholder: booking opens later
+@login_not_required  # PUBLIC teaser for visitors; signed-in members go to Book a visit inside My Spa 99
 @require_GET
 def book(request):
+    if request.user.is_authenticated:
+        return redirect("account_book")
     cards = services.purchasable_plans()
     return _page(request, "pages/book.html", "book", booking_lines=services.booking_lines(cards))
 
@@ -187,7 +189,7 @@ def robots(request):
     return HttpResponse("\n".join(lines) + "\n", content_type="text/plain")
 
 
-SITEMAP_NAMES = ["home", "spa", "tour", "memberships", "gold_card", "book", "visit", "privacy", "terms"]
+SITEMAP_NAMES = ["home", "spa", "tour", "memberships", "gold_card", "visit", "privacy", "terms"]
 
 
 @login_not_required  # PUBLIC

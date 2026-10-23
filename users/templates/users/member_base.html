@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% comment %}Minimal shell for the member dashboard (My Spa 99). The frontend replaces the layout; keep the blocks, the nav hooks and the context names.{% endcomment %}
+{% block head_title %}{% include "common/_head.html" with title=member_title|add:" | My Spa 99" %}{% endblock %}
+{% block body_class %}member{% endblock %}
+{% block header %}{% endblock %}
+{% block footer %}{% endblock %}
+{% block messages %}
+<div class="container member-wrap">
+  <nav aria-label="My Spa 99" data-member-nav>
+    <a href="{% url 'account' %}"{% if member_tab == 'home' %} aria-current="page"{% endif %} data-tab="home">Home</a>
+    <a href="{% url 'account_book' %}"{% if member_tab == 'book' %} aria-current="page"{% endif %} data-tab="book">Book</a>
+    <a href="{% url 'account_membership' %}"{% if member_tab == 'membership' %} aria-current="page"{% endif %} data-tab="membership">Membership</a>
+    <a href="{% url 'account_you' %}"{% if member_tab == 'you' %} aria-current="page"{% endif %} data-tab="you">You</a>
+    <a href="{% url 'home' %}" data-member-website>Back to the website</a>
+  </nav>
+  {% include "common/_messages.html" %}
+  {% if not verified %}
+  <div class="message message-info" role="status" data-verify-banner>
+    <span>Please confirm your email. We sent a link to {{ email }}.</span>
+    <form method="post" action="{% url 'resend_verification' %}" data-resend>{% csrf_token %}<button type="submit" class="message-close" data-working-text="Sending">Send it again</button></form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

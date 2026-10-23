@@ -8,7 +8,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_not_required
 from django.core.exceptions import ValidationError
-from django.http import JsonResponse
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -16,11 +16,10 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from common.audit import client_ip
 from common.ratelimit import hit, rate_limited_json
 from common.validators import normalise_email
-from gold import invites as gold_invites
 from journey import services as journey_services
 from plans.models import SiteSettings
 
-from . import services, tokens
+from . import member, services, tokens
 from .forms import ChangePasswordForm, ForgotPasswordForm, ResetPasswordForm, SignUpForm
 from .models import User
 
@@ -222,14 +221,38 @@ def reset_password(request, uidb64, token):
 
 # ---------- account (signed in; the default login lock applies) ----------
 
-@require_http_methods(["GET"])
-def account(request):
-    interest = getattr(request.user, "interest", None)
-    gold = interest is not None and interest.plan is not None and interest.plan.slug == "gold"
-    return render(request, "users/account.html", {
-        "interest": interest, "plans": services.interest_plans(), "verified": bool(request.user.email_verified_at),
-        "gold_since": gold_invites.gold_since(request.user) if gold else None, "is_gold": gold,
-    })
+def _screen(template, build):
+    """A signed-in member screen: GET only, the login lock applies. `build(user)` returns the context."""
+
+    @require_GET
+    def view(request):
+        return render(request, template, build(request.user))
+
+    return view
+
+
+account = _screen("users/account_home.html", member.home_context)
+account_book = _screen("users/account_book.html", member.book_context)
+account_membership = _screen("users/account_membership.html", member.membership_context)
+account_you = _screen("users/account_you.html", member.you_context)
+
+
+@login_not_required  # PUBLIC: only redirects (the old password address); the new one is behind the login lock
+def password_change_old(request):
+    return HttpResponseRedirect(reverse("password_change"), status=307)  # 307 keeps the method, so an old form post still lands
+
+
+@require_POST
+def account_emails(request):
+    """Marketing emails on or off (UK GDPR consent, logged in the person's history). 20 a minute per person."""
+    if not hit("account-emails", request.user.pk, 20, 60):
+        return JsonResponse({"saved": False}, status=429)
+    on = request.POST.get("marketing", "") in ("1", "on", "true")
+    member.set_marketing_consent(request.user, on)
+    if "application/json" in request.headers.get("accept", ""):
+        return JsonResponse({"saved": True, "marketing": on})
+    messages.success(request, "Saved.")
+    return redirect("account_you")
 
 
 class ChangePasswordView(auth_views.PasswordChangeView):
@@ -238,7 +261,7 @@ class ChangePasswordView(auth_views.PasswordChangeView):
 
     template_name = "users/password_change.html"
     form_class = ChangePasswordForm
-    success_url = reverse_lazy("account")
+    success_url = reverse_lazy("account_you")
 
     def post(self, request, *args, **kwargs):
         if _throttled(request, "password-change", 10, 3600):
@@ -261,7 +284,7 @@ def account_interest(request):
     else:
         services.set_interest(request.user, plan)
         messages.success(request, "Your interest is updated.")
-    return redirect("account")
+    return redirect("account_membership")
 
 
 @require_GET
@@ -278,7 +301,7 @@ def account_delete(request):
     user = request.user
     if authenticate(request, username=user.email, password=request.POST.get("password", "")) is None:
         messages.error(request, "That password is not right.")
-        return redirect("account")
+        return redirect("account_you")
     logout(request)
     services.delete_user_data(user)
     return _forget_journey_cookie(_message(request, "Account deleted", "Your account and data have been deleted."))

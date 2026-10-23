@@ -175,10 +175,10 @@ class PageTests(TestCase):
         self.client.force_login(user)
         html = self.client.get("/account/").content.decode()
         self.assertRegex(html, r"Good (morning|afternoon|evening), Daniel\.")
-        for name in ["Visits", "Bookings", "Membership"]:
+        for name in ["Next visit", "Visits", "Membership"]:
             self.assertIn(name, html)
-        self.assertIn("Opens January 2027", html)
-        self.assertIn("Delete my account", html)
+        self.assertIn("January 2027", html)
+        self.assertIn("Delete my account", self.client.get("/account/you/").content.decode())
 
     def test_control_sign_in_uses_the_bare_layout(self):
         response = self.client.get("/login/", HTTP_HOST="control.localhost")

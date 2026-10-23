@@ -102,7 +102,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "users.User"
 OFFICE_SESSION_AGE = 30 * 24 * 60 * 60  # staff sign-ins on the Office host last 30 days (SESSION_COOKIE_AGE stays Django's default for the public site)
 LOGIN_URL = "/login/"
-LOGIN_REDIRECT_URL = "/"
+LOGIN_REDIRECT_URL = "/account/"
 LOGOUT_REDIRECT_URL = "/login/"
 
 AUTH_PASSWORD_VALIDATORS = [
