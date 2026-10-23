@@ -131,12 +131,13 @@ def register_sent(request):
     return render(request, "users/register_sent.html", {"email": request.session.get(PENDING_EMAIL_KEY, "")})
 
 
-@login_not_required  # PUBLIC on purpose: live 'already registered' check; answers yes/no only, rate limited
-@require_GET
+@login_not_required  # PUBLIC on purpose: live 'already registered' check; answers yes/no only, rate limited.
+# POST (with the CSRF token) so the address never appears in a URL or an access log
+@require_POST
 @rate_limited_json("check-email", 30, 60)
 def check_email(request):
     try:
-        email = normalise_email(request.GET.get("email", ""))
+        email = normalise_email(request.POST.get("email", ""))
     except ValidationError:
         return JsonResponse({"registered": False})  # the format message comes from the field check
     return JsonResponse({"registered": services.email_is_registered(email)})

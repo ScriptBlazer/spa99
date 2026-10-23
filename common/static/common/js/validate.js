@@ -218,6 +218,19 @@ function localMessages(field, form) {
 
 const REMOTE_DELAY_MS = 450;
 
+/** Live checks are POSTs (never GET) so an email or mobile number does not end up in a URL or an access log. The CSRF
+ *  token is the one already on the page's forms. Returns the parsed JSON, or null if the check could not be made. */
+async function postCheck(url, field, value) {
+  const token = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
+  if (!token) return null; // no token on the page: the server checks again on submit
+  const response = await fetch(url, {
+    method: 'POST', credentials: 'same-origin',
+    headers: { Accept: 'application/json', 'X-CSRFToken': token, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ [field]: value.trim() }),
+  });
+  return response.ok ? response.json() : null; // busy or offline
+}
+
 /** The mobile number is checked by the server too (debounced like the email check): it uses the same phone number
  *  library as the sign-up, so the page and the server cannot disagree. Returns the server's message if not valid. */
 function mobileCheck() {
@@ -225,9 +238,8 @@ function mobileCheck() {
   if (!url) return {};
   return {
     mobile: async (value) => {
-      const response = await fetch(`${url}?mobile=${encodeURIComponent(value.trim())}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
-      if (!response.ok) return null; // busy or offline: the server checks again on submit
-      const data = await response.json();
+      const data = await postCheck(url, 'mobile', value);
+      if (!data) return null; // the server checks again on submit
       return data.valid ? null : (data.message || MESSAGES.mobileInvalid);
     },
   };
@@ -320,10 +332,8 @@ function emailCheck(form) {
   if (!url) return {};
   return {
     email: async (value) => {
-      const response = await fetch(`${url}?email=${encodeURIComponent(value.trim())}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
-      if (!response.ok) return null;
-      const data = await response.json();
-      if (!data.registered) return null;
+      const data = await postCheck(url, 'email', value);
+      if (!data || !data.registered) return null;
       return { state: 'info', text: 'You already have an account.', link: { href: form.dataset.loginUrl || '/login/', label: 'Sign in' } };
     },
   };

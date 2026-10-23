@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import OperationalError
 from django.http import HttpResponse
-from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
+from django.test import Client, RequestFactory, SimpleTestCase, TestCase, override_settings
 from django_q.models import Success
 
 from common.middleware import HostRoutingMiddleware
@@ -196,14 +196,16 @@ class ClientIpTests(SimpleTestCase):
 
 class SharedValidationTests(TestCase):
     def test_the_server_check_agrees_with_the_signup_rules(self):
-        good = self.client.get("/validate/mobile/", {"mobile": "07912 345678"}).json()
+        good = self.client.post("/validate/mobile/", {"mobile": "07912 345678"}).json()
         self.assertEqual(good, {"valid": True})
         for number in ("07911 654321", "07700 900123", "020 7946 0958", "nonsense"):  # the numbers the page used to accept
             with self.subTest(number=number):
-                bad = self.client.get("/validate/mobile/", {"mobile": number}).json()
+                bad = self.client.post("/validate/mobile/", {"mobile": number}).json()
                 self.assertFalse(bad["valid"])
                 self.assertEqual(bad["message"], MESSAGES["mobile_invalid"])
-        self.assertEqual(self.client.post("/validate/mobile/").status_code, 405)
+        self.assertEqual(self.client.get("/validate/mobile/", {"mobile": "07912 345678"}).status_code, 405)  # never in a URL
+        strict = Client(enforce_csrf_checks=True)
+        self.assertEqual(strict.post("/validate/mobile/", {"mobile": "07912 345678"}).status_code, 403)  # needs the token
 
     def test_the_browser_gets_the_python_wording_and_limits(self):
         config = client_config({"mobile": "/validate/mobile/"})

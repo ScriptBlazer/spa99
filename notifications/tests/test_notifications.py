@@ -19,10 +19,14 @@ class SendTemplatedTests(TestCase):
         self.assertEqual(EmailLog.objects.get().subject, "Confirm")
 
     def test_failure_is_logged_not_raised(self):
-        with mock.patch("notifications.services.EmailMultiAlternatives.send", side_effect=OSError("down")):
-            log = send_templated("verify", ["a@example.com"], "Confirm", {"first_name": "A", "url": "u"})
+        with mock.patch("notifications.services.EmailMultiAlternatives.send", side_effect=OSError("a@example.com refused")):
+            with self.assertLogs("spa99.email", level="ERROR") as captured:
+                log = send_templated("verify", ["a@example.com"], "Confirm", {"first_name": "A", "url": "u"})
         self.assertEqual((log.status, log.sent_at), (EmailLog.FAILED, None))
-        self.assertIn("down", log.error)
+        self.assertIn("refused", log.error)
+        output = "\n".join(captured.output)
+        self.assertIn(f"email log {log.pk}", output)
+        self.assertNotIn("a@example.com", output)  # personal data stays out of the logs
 
 
 class SesBackendTests(SimpleTestCase):

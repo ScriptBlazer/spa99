@@ -153,9 +153,10 @@ class RegisterInterestTests(TestCase):
     def test_email_check_answers_yes_or_no_only(self):
         services.register_interest(cleaned())
         client = Client()
-        self.assertEqual(client.get("/register/check-email/", {"email": "HUGO@example.com"}).json(), {"registered": True})
-        self.assertEqual(client.get("/register/check-email/", {"email": "free@example.com"}).json(), {"registered": False})
-        self.assertEqual(client.get("/register/check-email/", {"email": "nonsense"}).json(), {"registered": False})
+        self.assertEqual(client.post("/register/check-email/", {"email": "HUGO@example.com"}).json(), {"registered": True})
+        self.assertEqual(client.post("/register/check-email/", {"email": "free@example.com"}).json(), {"registered": False})
+        self.assertEqual(client.post("/register/check-email/", {"email": "nonsense"}).json(), {"registered": False})
+        self.assertEqual(client.get("/register/check-email/", {"email": "hugo@example.com"}).status_code, 405)  # never in a URL
 
 
 class VerificationTests(TestCase):

@@ -61,7 +61,8 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
         message.send(fail_silently=False)
         log.status, log.sent_at = EmailLog.SENT, timezone.now()
     except Exception as error:  # noqa: BLE001 - any failure is recorded, then the caller carries on
-        logger.exception("Email %s to %s failed", template, to)
         log.status, log.error = EmailLog.FAILED, f"{type(error).__name__}: {error}"[:1000]
     log.save()
+    if log.status == EmailLog.FAILED:  # no address, no traceback (SMTP errors repeat the address): the log row has the detail
+        logger.error("Email %s failed (email log %s, %s)", template, log.pk, log.error.split(":")[0])
     return log

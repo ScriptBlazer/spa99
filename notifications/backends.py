@@ -36,8 +36,8 @@ class SesBackend(BaseEmailBackend):
                     Content={"Raw": {"Data": message.message().as_bytes()}},
                 )
                 sent += 1
-            except Exception:
-                logger.exception("SES send failed")
+            except Exception as error:  # the message can repeat the address, so only the type is logged
+                logger.error("SES send failed (%s)", type(error).__name__)
                 if not self.fail_silently:
                     raise
         return sent
