@@ -6,6 +6,8 @@ from django.views.defaults import page_not_found
 from . import audit, services
 
 OPEN_PATHS = ("/login/", "/health/", "/robots.txt")
+# browsers ask for these on their own: still a plain 404, but never written to the audit log as an access attempt
+QUIET_PATHS = ("/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png")
 
 
 class SystemGateMiddleware:
@@ -22,7 +24,8 @@ class SystemGateMiddleware:
             user = get_user(request)
             if not services.may_use_system(user) or not request.session.get(services.SIGNED_IN_KEY):
                 request.user = user  # for the log row (CSRF and auth middleware have not set it yet)
-                audit.note_access_denied(request)
+                if request.path not in QUIET_PATHS:
+                    audit.note_access_denied(request)
                 return page_not_found(request, Http404())
             if not services.sign_in_valid(request.session):
                 audit.log_event(audit.SystemEvent.SESSION_EXPIRED, request, user=user, detail={"max_hours": services.session_age_seconds() // 3600})
