@@ -37,7 +37,7 @@ One login per person (the email address). The same login can be a team member an
 
 - Only **Developers and the superuser** add team members and set levels, in **System > Team** (behind the System unlock, every change in the audit log).
 - Adding someone: email, level, Approver yes/no. They get an email to set their own password; nobody types a password for someone else.
-- **Nobody can delete or change someone at their own level or higher.** A Developer can change Office and Admin people; only the superuser can change a Developer; nobody changes the superuser from System.
+- **Nobody can delete or edit someone higher than them**, and below superuser nobody can delete or edit someone at their own level either. A Developer can change Office and Admin people; only a superuser can change a Developer. **Superusers are the exception: a superuser can delete or edit another superuser** (so a lost or departed superuser can always be removed).
 - Nobody can remove their own access or deactivate themselves.
 
 ## U5. Sign-in
