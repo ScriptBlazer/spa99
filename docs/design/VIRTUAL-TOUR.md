@@ -278,6 +278,15 @@ The relaxing zone and the gym have no ambient animation: render on demand only (
 
 ---
 
+
+### 2.7 Round 2 notes (2026-10-23, Moishe)
+
+**Doorway graph, round 2 (replaces the graph in 6.1 and the doorway tables above).** Chain: lounge, gym, kitchenette, massage room, then dry sauna (left) and wet sauna (right). Lounge to Gym (passage beside reception) and Relaxing zone (passage past the seating); Relaxing zone to Lounge; Gym to Lounge and Kitchenette. The saunas, kitchenette and massage room are other rooms in the same chain (not in these three files). The room list reaches any room.
+
+- **Lounge.** Reception is now a half-round counter (radius 1.0 to 1.6, centre on the west wall at z 0.4) growing out of the west wall, which is plain behind it (the three doorways are gone). Gold cove and lockup follow the desk. Gym passage: north wall, x -5.6, 1.0 x 2.2, marker (-5.6, 1.1, -2.95). Relaxing-zone passage: east wall, z 2.0, past the seating (flutes stop short of it), marker (3.55, 1.1, 2.0). No sauna markers. Tank, seating and look unchanged.
+- **Relaxing zone.** TV on the west wall at z 1.7, 1.44 x 0.81, centre y 1.4, slim `--color-iron` frame, screen a dark canvas with a faint warm diagonal sheen and a small warm glow, no picture, no text. The west doorway to the gym is removed; the only marker is the lounge.
+- **Gym.** Shell is now 7.0 x 8.0 (z -5..3). East: night window and, facing it, 3 treadmills (z -3.7, -2.55, -1.4), 2 bikes, a rower. West: oak panels with the lockup, a rubber zone with a 12-dumbbell rack (heads instanced), a power rack with a loaded barbell, 2 adjustable benches (one inclined), 8 kettlebells and 9 plates (instanced), and a cable machine at the north wall. North: mirrors with a short passage in the middle; its back wall has one door with a marker to the kitchenette. Markers: lounge (south), kitchenette (north). About 30 draw calls.
+
 ## 3. Motion
 
 ### 3.1 Tokens and curves
@@ -408,7 +417,7 @@ Same page, same layout, same text, same list. Only the stage changes.
 - `/tour/` is the Lounge (canonical). `/tour/lounge/` redirects 301 to `/tour/`.
 - `/tour/<slug>/` for `dry-sauna`, `wet-sauna`, `relaxing-zone`, `gym` (the `Facility` slugs). The room must be in the tour list and its `Facility` must be visible; anything else is a 404 (including real facilities not in the tour, such as `cold-plunge`).
 - Tour order and the list: `TOUR_ROOMS = ["lounge", "dry-sauna", "wet-sauna", "relaxing-zone", "gym"]` in code. Names come from `Facility.name`; the lounge is not a `Facility` today (see question 1), so its name comes from its content row.
-- Doorway graph (in code, with the room modules): Lounge to Dry sauna, Relaxing zone, Gym; Dry sauna to Wet sauna; Wet sauna to Relaxing zone; Relaxing zone to Lounge, Gym; Gym to Lounge, Relaxing zone. It follows the ritual (heat, steam, rest); the list reaches any room.
+- Doorway graph (superseded by 2.7, round 2): Lounge to Dry sauna, Relaxing zone, Gym; Dry sauna to Wet sauna; Wet sauna to Relaxing zone; Relaxing zone to Lounge, Gym; Gym to Lounge, Relaxing zone. It follows the ritual (heat, steam, rest); the list reaches any room.
 - The spa: each toured room gets a "Take the tour" link to `/tour/<slug>/`. Header and menu: "Virtual tour" after The spa, `aria-current` on all `/tour/` pages.
 
 ### 6.2 Content rows (page `tour`)

@@ -1,7 +1,8 @@
 /* Lounge (docs/design/VIRTUAL-TOUR.md 2.1, with the 2026-10-23 layout correction). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
  * Shell 10.6 x 6.0 x 3.0 (x -7..3.6, z -3..3). North: the reef tank flush in a travertine slab, its long bench and the curved sofa, armchairs and table to the
- * RIGHT (east) of it, a frosted window and fluted panelling beyond. To the LEFT (west): the reception desk (curved cream stone, backlit gold lockup on its front)
- * under a gold ceiling cove. Past reception, in the west wall, the three ways on: dry sauna, relaxing zone, gym. */
+ * RIGHT (east) of it, a frosted window and fluted panelling beyond, then a passage to the relaxing zone (east wall, z 2.0). To the LEFT (west): the reception
+ * desk, a half-round counter growing out of the plain west wall (curved cream stone, backlit gold lockup on its front) under a gold ceiling cove; beside it,
+ * in the north wall (x -5.6), the passage to the gym. Round 2: the dry and wet saunas are at the far end of the gym, not off the lounge. */
 
 const VS_REEF = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
 const FS_REEF = `uniform sampler2D map; uniform sampler2D caus; uniform float uTime; uniform float uAmt; uniform float uGain; varying vec2 vUv;
@@ -54,14 +55,14 @@ export async function build(scene, ctx) {
 
   /* ----- shell ----- */
   K.plane(XW, 6, floor, XC, 0, 0, 'up', { tile: 2.4 });
-  K.plane(3.6, 3, wall, -5.2, 1.5, -3, 's', { tile: 3 }); K.plane(2.2, 3, wall, 2.5, 1.5, -3, 's', { tile: 3 });            // north, either side of the tank slab
+  K.plane(0.9, 3, wall, -6.55, 1.5, -3, 's', { tile: 3 }); K.plane(1.7, 3, wall, -4.25, 1.5, -3, 's', { tile: 3 }); K.plane(1.0, 0.8, wall, -5.6, 2.6, -3, 's', { tile: 3 });   // north, left of the tank slab: the gym passage at x -5.6
+  K.plane(2.2, 3, wall, 2.5, 1.5, -3, 's', { tile: 3 });                                                                   // north, right of the tank slab
   K.plane(XW, 3, wall, XC, 1.5, 3, 'n', { tile: 3 });                                                                      // south
-  K.plane(6, 3, wall, 3.6, 1.5, 0, 'w', { tile: 3 });                                                                      // east
-  [[-2.7, 0.6], [-0.95, 0.9], [0.95, 0.9], [2.7, 0.6]].forEach(([z, w]) => K.plane(w, 3, wall, X0, 1.5, z, 'e', { tile: 3 })); // west, three door openings
-  [-1.9, 0, 1.9].forEach((z) => K.plane(1.0, 0.8, wall, X0, 2.6, z, 'e', { tile: 3 }));
+  K.plane(4.5, 3, wall, 3.6, 1.5, -0.75, 'w', { tile: 3 }); K.plane(0.5, 3, wall, 3.6, 1.5, 2.75, 'w', { tile: 3 }); K.plane(1.0, 0.8, wall, 3.6, 2.6, 2.0, 'w', { tile: 3 });   // east, with the relaxing-zone passage at z 2.0
+  K.plane(6, 3, wall, X0, 1.5, 0, 'e', { tile: 3 });                                                                       // west: plain wall behind reception
 
   /* ceiling: dropped to 2.75 with a round recess (the gold cove) over reception, clipped by the walls, its roof gold leaf at 3.0 */
-  const C = [-4.6, -0.6], R = 2.6, arc = [];
+  const C = [-5.2, 0.4], R = 2.6, arc = [];
   for (let i = 0; i < 56; i++) { const a = i / 56 * PI * 2; arc.push([Math.min(3.58, Math.max(-6.98, C[0] + R * Math.cos(a))), Math.min(2.98, Math.max(-2.98, C[1] + R * Math.sin(a)))]); }
   const v2 = (pts) => pts.map((p) => new THREE.Vector2(p[0], p[1]));
   const outer = new THREE.Shape(v2([[X0, -3], [3.6, -3], [3.6, 3], [X0, 3]]));
@@ -132,7 +133,7 @@ export async function build(scene, ctx) {
   K.glowPlane(1.2, 1.2, 1.4, 2.2, -0.3, 'down', 0.3);
 
   /* east wall: fluted panelling (real flutes, merged), sconce, frosted window in a walnut frame (a window, no door) */
-  for (let i = 0; i < 24; i++) K.box(0.04, 1.0, 0.07, oak, 3.57, 0.5, 0.38 + i * 0.11);
+  for (let i = 0; i < 24; i++) { const z = 0.38 + i * 0.11; if (z < 1.45 || z > 2.55) K.box(0.04, 1.0, 0.07, oak, 3.57, 0.5, z); }   // flutes stop short of the passage
   K.put(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 12), led, { x: 3.55, y: 1.7, z: 1.2 }); K.glowPlane(0.7, 1.0, 3.585, 1.7, 1.2, 'w', 0.35);
   K.plane(2.6, 1.7, frost, 3.59, 1.3, -1.2, 'w');
   K.glowPlane(3.6, 2.6, 3.5, 1.3, -1.2, 'w', 0.2, '--color-cream');
@@ -140,12 +141,12 @@ export async function build(scene, ctx) {
   K.box(0.06, 0.05, 2.65, walnut, 3.57, 2.17, -1.2); K.box(0.06, 0.05, 2.65, walnut, 3.57, 0.43, -1.2);
 
   /* ----- reception (left of the tank): a curved cream stone desk, the backlit gold lockup on its front ----- */
-  const DC = [-6.4, -0.6], DR0 = 1.9, DR1 = 2.5, front = DC[0] + DR1;
-  K.put(K.sector(DR0, DR1, -50, 50, 1.0, DC[0], DC[1], 0, 0.02), stone);
-  K.put(K.sector(DR0 - 0.05, DR1 + 0.05, -50, 50, 0.05, DC[0], DC[1], 1.0, 0.01), stone);
-  K.put(K.sector(DR1, DR1 + 0.02, -50, 50, 0.02, DC[0], DC[1], 0.04), led);                   // the LED line under the desk's lip
-  K.glowPlane(0.9, 4.2, front + 0.3, 0.006, DC[1], 'up', 0.4);
-  K.shadow(1.6, 4.4, front + 0.1, DC[1], 0.35);
+  const DC = [-7, 0.4], DR0 = 1.0, DR1 = 1.6, front = DC[0] + DR1;
+  K.put(K.sector(DR0, DR1, -90, 90, 1.0, DC[0], DC[1], 0, 0.02), stone);
+  K.put(K.sector(DR0 - 0.05, DR1 + 0.05, -90, 90, 0.05, DC[0], DC[1], 1.0, 0.01), stone);
+  K.put(K.sector(DR1, DR1 + 0.02, -90, 90, 0.02, DC[0], DC[1], 0.04), led);                   // the LED line under the desk's lip
+  K.glowPlane(0.9, 3.0, front + 0.3, 0.006, DC[1], 'up', 0.4);
+  K.shadow(1.6, 3.4, front + 0.1, DC[1], 0.35);
   if (lock) {                                                                  // the backlit lockup: a dark bronze inset on the curved front, the gold glowing on it
     /* root cause of "not visible": the old plane sat 1 cm in front of the unbent radius, i.e. inside the desk (bevel + curve). Now it follows the arc, 4 cm proud. */
     const Rf = DR1 + 0.04, lh = 0.8, lw = lh * lock.aspect, tx = (c) => T.tex(c, { color: false });
@@ -157,10 +158,9 @@ export async function build(scene, ctx) {
     K.glowPlane(lw * 1.9, lh * 1.8, at.x + 0.03, 0.58, DC[1], 'e', 0.7, '--color-led-warm');   // the halo round it
   }
 
-  /* doorways seen through, in the west wall past reception: dry sauna (cedar), relaxing zone (travertine), gym (oak) */
-  K.vista('--color-cedar', [X0, -1.9], 'w', 1.0, 2.2, 1.0);
-  K.vista('--color-travertine', [X0, 0], 'w', 1.0, 2.2, 1.0);
-  K.vista('--color-caramel', [X0, 1.9], 'w', 1.0, 2.2, 1.0);
+  /* doorways seen through: gym (oak, north wall beside reception), relaxing zone (travertine, east wall past the seating) */
+  K.vista('--color-caramel', [-5.6, -3], 'n', 1.0, 2.2, 1.0);              // gym, beside reception
+  K.vista('--color-travertine', [3.6, 2.0], 'e', 1.0, 2.2, 1.0);           // relaxing zone, past the seating
   /* grounding: the dark line where floor meets wall, and under the bench */
   K.edge(X0, -3, 1, 0, XW, 0, 1, 0.55, 0.55); K.edge(X0, 3, 1, 0, XW, 0, -1, 0.55, 0.5); K.edge(3.6, -3, 0, 1, 6, -1, 0, 0.55, 0.5); K.edge(X0, -3, 0, 1, 6, 1, 0, 0.55, 0.5);
   K.shadow(4.0, 1.1, -1.0, -2.2, 0.55); K.shadow(2.2, 2.2, 1.9, -1.3, 0.35);
@@ -169,11 +169,11 @@ export async function build(scene, ctx) {
 
   /* ----- light (2700K) ----- */
   K.baseLight();                                                             // low, dark-footed ambient: the practicals do the lighting
-  K.light('--color-light-warm', 3.4, 6, -4.6, 2.55, -0.6);                   // the cove over reception: pools on desk and floor
+  K.light('--color-light-warm', 3.4, 6, -5.2, 2.55, 0.4);                   // the cove over reception: pools on desk and floor
   K.light(new THREE.Color(T.REEF.top), 3.2, 4.5, -1.0, 1.4, -2.2);          // the tank's spill: blue on the bench, pillows and floor in front
   K.glowPlane(4.2, 2.6, -1.0, 0.007, -1.5, 'up', 0.22, new THREE.Color(T.REEF.mid));
   K.light('--color-light-warm', 1.6, 3, 3.4, 1.7, 1.2, true);                // east sconce, dropped on the mobile tier (the self-lit sconce stays)
-  K.light('--color-light-warm', 1.8, 2.2, -3.6, 0.9, -0.6, true);            // lockup backlight
+  K.light('--color-light-warm', 1.8, 2.2, -5.0, 0.9, 0.4, true);            // lockup backlight
 
   /* ----- life: fish and caustics, 30 fps at rest ----- */
   let frozen = tier === 'low';
@@ -194,7 +194,7 @@ export async function build(scene, ctx) {
   return {
     view: { pos: [1.6, 1.6, 2.0], yaw: -29, pitch: -4 },
     exposure: 0.8, ambient: true, update,
-    markers: [{ to: 'dry-sauna', at: [-6.95, 1.1, -1.9] }, { to: 'relaxing-zone', at: [-6.95, 1.1, 0] }, { to: 'gym', at: [-6.95, 1.1, 1.9] }],
+    markers: [{ to: 'gym', at: [-5.6, 1.1, -2.95] }, { to: 'relaxing-zone', at: [3.55, 1.1, 2.0] }],
     tier(name) { if (name === 'low') { frozen = true; school.count = Math.min(school.count, 6); } },
   };
 }
