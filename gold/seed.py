@@ -49,7 +49,6 @@ CHOICES = [
     (W, "abroad", "Abroad"),
     (B, "yes", "Yes"),
     (B, "not_yet", "Not yet"),
-    (B, "no", "No"),
 ]
 
 # signal, journey question key, answer value ("" = pass the option through), value it gives ("" = the option's own)
