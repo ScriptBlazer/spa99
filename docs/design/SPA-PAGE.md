@@ -2,6 +2,8 @@
 
 For the frontend and backend agents. Date 2026-10-22. This file **replaces IMMERSIVE.md section 4 (S1 to S4)** and the The spa rows of IMMERSIVE 8.4 and 9. IMMERSIVE section 0 (text centred, one size smaller), IMMERSIVE-R2 sections 2.0, 2 (frames, captions, tint) and 4 (settle, depth, drift helpers) and section 8 (round 3) all apply. IMMERSIVE 14.2 (dry sauna walk) stays, re-homed in section 5 below. `docs/BRAND.md` wins on any conflict.
 
+> **Round 3 (2026-10-23):** S1 is replaced by `docs/design/SPA-OPENER.md` (the robe opener with the changing lines). The amenity moments between the rooms, the gym's bottle inset, "every visit includes" in S3 and the tote in S4 are in `docs/design/AMENITIES.md`. The rest of this file stands.
+
 Design read: luxury hospitality marketing for men in London, dark editorial magazine in the Home round 3 style, with more facts in small type. Dials for this page: variance 7, motion 6, density 5 (Home is 4; Moishe asked for "way more info", neatly placed).
 
 ---
