@@ -101,8 +101,8 @@ export function goldCard(mount, scene, { desktop, fine, ctx }) {
     cleanups.push(() => { scene.removeEventListener('pointermove', move); scene.removeEventListener('pointerleave', leave); gsap.ticker.remove(follow); });
   }
   gc.render();
-  // the three.js layer (capable desktops only): the gate and loader are in gold-gl.js, fetched only when this could pass
-  if (desktop && root.dataset.webgl !== 'off' && mount.dataset.webglGate) import(mount.dataset.webglGate).then((m) => m.loadCards(ctx, { mount, gc, gsap, ScrollTrigger, cleanups, root })).catch((e) => { console.error('gold card 3d', e); mount.classList.add('gl-off'); });
+  // the three.js layer (capable desktops, tablets and phones): the gate and loader are in gold-gl.js, fetched only when this could pass
+  if (root.dataset.webgl !== 'off' && mount.dataset.webglGate) import(mount.dataset.webglGate).then((m) => m.loadCards(ctx, { mount, gc, gsap, ScrollTrigger, cleanups, root })).catch((e) => { console.error('gold card 3d', e); mount.classList.add('gl-off'); });
   return gc;
 }
 

@@ -1,4 +1,4 @@
-/* The Gold Card in three.js (docs/design/GOLD-CARD-3D.md). Loaded lazily by scenes.js, only on capable desktops, over the CSS card.
+/* The Gold Card in three.js (docs/design/GOLD-CARD-3D.md). Loaded lazily by scenes.js, on capable desktops, tablets and phones (gold-gl.js gate), over the CSS card.
  * Contract (IMMERSIVE 14.3): create(mount, { gsap, ScrollTrigger, tokens, card }) -> { ready, start, stop, dispose }.
  *  - `card` is the shared pose proxy that scenes.js tweens (ry, rx, turn, tiltX, tiltY, roll, bob, lift, drop, sheen, draw, line, relief, fade).
  *    This file only reads it, so the CSS card and the canvas are always in the same pose.
@@ -398,7 +398,7 @@ export function create(mount, { gsap, tokens, card }) {
     canvas = renderer.domElement;
     renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure; renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setClearColor(0x000000, 0);
-    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    dpr = Math.min(window.devicePixelRatio || 1, matchMedia('(min-width: 64em)').matches ? 1.5 : 2);   // the render size is the card box only; the loop drops to 1 if frames run slow
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(20, 4 / 3, 100, 600);
     camera.position.set(0, 0, camDistance());

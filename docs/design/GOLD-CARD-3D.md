@@ -9,7 +9,7 @@ Moishe: "For the gold card itself create a 3D floating gold card. The card rotat
 - One object: a real metal membership card, soft warm gold, the swan polished into a brushed face, "SPA 99" and "GOLD" engraved small. No name, no number.
 - It floats (one breath every 18s) and turns slowly as the section passes: -25° to +25°.
 - The swan Moishe loved still draws itself, now **on the card face**: a fine light-gold line traces the swan while the face is still in shade, the line becomes polished metal, then a band of light sweeps across the swan and the edge catches the light as the card leaves.
-- Three tiers, same pose and timing everywhere: **three.js** on capable desktops, a **CSS 3D card** (layered divs) on phones and everything else, a **rendered still** under reduced motion and without JS.
+- Three tiers, same pose and timing everywhere: **three.js** on every capable screen (desktop, tablet, phone; phones use the same LOOK and the CSS card's k = 18/25 pose numbers), a **CSS 3D card** (layered divs) on everything else, a **rendered still** under reduced motion and without JS.
 - Home Gold section (R6) and the Gold Card page hero (G1). No pin anywhere.
 - Rule overrides (decision log): the card may rotate (BRAND 7 "no rotation" lifted for this object only). Text never rotates and never lives in WebGL. Animation gate: rare, marketing, purpose "explanation and delight": the card is the product.
 
@@ -183,8 +183,8 @@ As 2.4. The `photo "gold-card"` placeholder in `gold.html` goes; the hero image 
 
 | Visitor | Tier |
 |---|---|
-| Passes `webglGate()` (IMMERSIVE 14.0: ≥ 64em, motion allowed, no Save-Data, ≥ 4 GB and ≥ 4 cores, WebGL2 without a performance caveat, `data-webgl` not `off`) | three.js, over the CSS card |
-| Everyone else with JS and motion (all phones, tablets, weaker laptops, gate failed, three.js still loading or failed, context lost) | **CSS 3D card** |
+| Passes `webglGate()` (IMMERSIVE 14.0, updated 2026-10-23: any width, motion allowed, no Save-Data, ≥ 4 GB and ≥ 4 cores when the browser reports them (iOS Safari reports neither: counted as fine), WebGL2 without a performance caveat, `data-webgl` not `off`) | three.js, over the CSS card |
+| Everyone else with JS and motion (weaker phones and laptops, gate failed, three.js still loading or failed, context lost) | **CSS 3D card** |
 | `prefers-reduced-motion`, no JS, GSAP failed (no `html.motion`) | **Still image** |
 
 The CSS card is always in the markup under the canvas. three.js is a layer on top, never a replacement: if it never arrives, nothing is missing.
@@ -240,7 +240,7 @@ Shown with `{% photo "gold-card" alt="" %}` inside the mount, only in the static
 | three.js | The same vendored custom build as IMMERSIVE 14.3, entry extended with: `MeshPhysicalMaterial`, `PMREMGenerator`, `ExtrudeGeometry`, `ShapeGeometry`, `Shape`, `DirectionalLight`, `BackSide`, `NeutralToneMapping`. Re-measure after the build; cap **≤ 155 KB gzip** (was 145) |
 | `gold-card-3d.js` | **≤ 9 KB gzip** |
 | CSS card motion | In `scenes.js` (one shared `goldCard()` helper, about 1.5 KB); `scenes.js` stays ≤ 10 KB, Home motion JS ≤ 75 KB |
-| Home on a capable desktop | 73 + 155 + 9 ≈ **237 KB** gzip, of which 164 KB load only near the Gold section. Phones: unchanged, three.js never requested |
+| Home on a capable desktop | 73 + 155 + 9 ≈ **237 KB** gzip, of which 164 KB load only near the Gold section. Phones that pass the gate load the same files (about 237 KB gzip near the Gold section on Home, at once on the Gold page), so the phone budget "Home motion JS on phones ≤ 75 KB" now covers only the first script; three.js is a deferred extra, never in the first load, and is not requested on phones that fail the gate. Phone render: dpr cap 2 (1.5 desktop), size = the card box only, drops to 1 after three slow frames, zero frames off screen or in a hidden tab, no pointer tilt on coarse pointers. The Gold page hero keeps the flat card hidden until 3D or `.gl-off` on every screen |
 | When it loads | Never in `<head>`, never preloaded. After `load` + idle, and only when the mount is within **two screens** (IntersectionObserver `rootMargin: 200% 0px`). Gold page: after `load` + idle (the card is in the hero). Build in separate idle slots: maps, then PMREM, then `renderer.compile()` and one frame |
 | Hand-over | When ready, the canvas fades in over the CSS card (`--duration-gl-in`, 1.2s); same proxy, so the poses match and it may happen in view |
 | Renderer | `antialias: true`, `alpha: true`, `powerPreference: 'high-performance'`, pixel ratio `min(devicePixelRatio, 1.5)`, dropped to 1 if three frames exceed 20 ms |
@@ -327,12 +327,12 @@ Frontend, before review; reviewer repeats 1, 3, 4, 7, 9 with screenshots at 375 
 3. **Size.** Home Gold section 680 ± 40 px tall at 1440 × 800; card 640 px wide, about 404 px tall; text, pills and link visible without scrolling inside the section. At 375: card about 322 px wide, no horizontal scroll, nothing clipped at ±18°.
 4. **Fallbacks never blank.** 375 px (no three.js or `gold-card-3d.js` request in the network panel), reduced motion (still image, or the unmoved CSS card until the export exists), no JS, `data-webgl="off"`, WebGL disabled, forced `WEBGL_lose_context` (CSS card back within one frame).
 5. **Loading.** On Home, no three.js request until the Gold section is within two screens; build and compile finish before it is in view on an M1 Air; no long task over 50 ms during scroll.
-6. **Frame rate.** 60 fps scrolling the section on an M1 Air and ≥ 50 fps on an Intel integrated-graphics laptop (three.js); 60 fps on a 2021 iPhone and a mid Android (CSS tier). GPU ≤ 3 ms per frame. Idle in view drops to 30 fps; off screen and hidden tab do zero frames.
+6. **Frame rate.** 60 fps scrolling the section on an M1 Air and ≥ 50 fps on an Intel integrated-graphics laptop (three.js); 60 fps on a 2021 iPhone and a mid Android (three.js where the gate passes, CSS tier elsewhere). GPU ≤ 3 ms per frame. Idle in view drops to 30 fps; off screen and hidden tab do zero frames.
 7. **Colour.** In a 1440 screenshot at p 0.3, 0.6, 0.9: card face pixels with saturation over 0.25 have hue between **24° and 38°** (brand gold 31°; nothing brass-yellow), no pixel with blue above red, highlights reach `--color-gold-light`/cream, never pure white over more than the sheen band.
 8. **Detail.** At 1440, the swan's outline is crisp (no stair-stepping on the relief), "SPA 99" and "GOLD" are legible as engraving, the bevel shows as one bright line at p 0.9, the back's pattern is visible on the Gold page turn. No name, no number on the card.
 9. **Calm.** No bounce, no overshoot on pointer tilt (max 6°), float cycle 18s and roll 23s measured, text never rotates or moves with the card, no flashing on fast scroll up and down (one bright pass per direction).
 10. **Clean revert.** Turning on reduced motion or resizing below 64em while on the page removes the canvas, `renderer.info.memory` geometries and textures read 0 after `dispose()`, and the static or CSS layout is correct. Never more than one WebGL context per page.
-11. **Budget.** `three.module.min.js` ≤ 155 KB gzip, `gold-card-3d.js` ≤ 9 KB, `scenes.js` ≤ 10 KB, Home motion JS on phones ≤ 75 KB, still 1280w ≤ 70 KB. Lighthouse mobile ≥ 90 unchanged; LCP on Home is still the hero image, on the Gold page the heading.
+11. **Budget.** `three.module.min.js` ≤ 155 KB gzip, `gold-card-3d.js` ≤ 9 KB, `scenes.js` ≤ 10 KB, Home motion JS on phones ≤ 75 KB (first script; the deferred three.js on phones is counted separately), still 1280w ≤ 70 KB. Lighthouse mobile ≥ 90 unchanged; LCP on Home is still the hero image, on the Gold page the heading.
 12. **Accessibility.** The mount and everything in it are `aria-hidden`; axe shows no new issues; tab order skips the card.
 
 ### 7.6 Retune by eye (2026-10-23, coordinator, real WebGL render)

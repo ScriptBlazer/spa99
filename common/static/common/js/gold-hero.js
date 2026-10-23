@@ -17,8 +17,8 @@ if (gsap) {
     gc.swan();
     gc.render();
     gsap.to(gc, { fade: 1, duration: 0.4, ease: 'soft', onUpdate: gc.render });
-    // safety net: if the 3D card hasn't appeared in 5 s for any reason, show the flat card (CSS hides it meanwhile on desktop)
-    const safety = setTimeout(() => { if (!mount.classList.contains('is-gl')) mount.classList.add('gl-off'); }, 5000);
+    // safety net: if the 3D card hasn't appeared in 5 s for any reason, show the flat card (CSS hides it meanwhile)
+    const safety = setTimeout(() => { if (!mount.classList.contains('is-gl') && !mount.classList.contains('has-gl')) mount.classList.add('gl-off'); }, 5000);   // only if 3D never started; once its canvas exists it fades in itself
     cleanups.push(() => clearTimeout(safety));
     // The half turn runs over the first 45% of the hero's scroll while the card drifts up 35% slower than the page: the back is fully on screen (under the header, clear of the next section) when it arrives.
     const dropEnd = () => (0.35 * 0.45 * el.offsetHeight) / mount.offsetHeight * 100;
