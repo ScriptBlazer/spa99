@@ -4,6 +4,7 @@
     <a class="brand" href="{% url 'home' %}" aria-label="Spa 99, home">{% include "common/_logo.html" %}</a>
     <nav class="nav-desktop" aria-label="Main">
       <a href="{% url 'spa' %}"{% if current == 'spa' %} aria-current="page"{% endif %}>The spa</a>
+      <a href="{% url 'tour' %}"{% if current == 'tour' or current == 'tour_room' %} aria-current="page"{% endif %}>Virtual tour</a>
       <a href="{% url 'memberships' %}"{% if current == 'memberships' %} aria-current="page"{% endif %}>Memberships</a>
       <a href="{% url 'gold_card' %}"{% if current == 'gold_card' %} aria-current="page"{% endif %}>Gold Card</a>
       <a href="{% url 'book' %}"{% if current == 'book' %} aria-current="page"{% endif %}>Book</a>
@@ -23,6 +24,7 @@
   <div class="menu-body container">
     <nav aria-label="Main">
       <a href="{% url 'spa' %}"{% if current == 'spa' %} aria-current="page"{% endif %}>The spa</a>
+      <a href="{% url 'tour' %}"{% if current == 'tour' or current == 'tour_room' %} aria-current="page"{% endif %}>Virtual tour</a>
       <a href="{% url 'memberships' %}"{% if current == 'memberships' %} aria-current="page"{% endif %}>Memberships</a>
       <a href="{% url 'gold_card' %}"{% if current == 'gold_card' %} aria-current="page"{% endif %}>Gold Card</a>
       <a href="{% url 'book' %}"{% if current == 'book' %} aria-current="page"{% endif %}>Book</a>

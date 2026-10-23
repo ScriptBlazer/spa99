@@ -1,0 +1,119 @@
+/* Virtual tour (docs/design/VIRTUAL-TOUR.md 1, 3, 4.3). Linked on /tour/ pages only. Tokens only.
+   One page, two stages: the room photo (no JS, reduced motion, no WebGL, Save-Data) or the three.js canvas over it (html.tour-gl, body.tour-3d). Same text, same list. */
+
+/* ---------- stage ---------- */
+.tour { position: relative; min-height: var(--scene-h); display: grid; align-items: end; isolation: isolate; background: var(--color-espresso); }
+.tour-stage { position: fixed; inset: 0; height: var(--scene-h); overflow: hidden; background: var(--color-espresso); z-index: 0; }
+.tour-photo, .tour-canvas, .tour-snap { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; }
+.tour-photo .photo, .tour-photo picture { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: var(--focus, 50% 50%); }
+/* 3D is on its way (cheap gate passed). boot.js drops html.tour-gl if the probe fails. */
+/* Until the first frame is ready the room photo stays up (never a blank espresso screen on a slow build); it is hidden once the canvas has faded in over it. */
+body.tour-3d .tour-photo { visibility: hidden; transition: visibility 0s linear var(--duration-gl-in); }
+/* The tour moves between rooms itself: no cross-document view transition here (it was skipped mid-load and logged "AbortError: Transition was skipped"). */
+@view-transition { navigation: none; }
+html.tour-gl, html.tour-gl body { height: var(--scene-h); overflow: hidden; }
+html.tour-gl .site-footer { display: none; }
+
+.tour-canvas { display: block; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; opacity: 0; transition: opacity var(--duration-gl-in) var(--ease-soft); }
+body.tour-3d .tour-canvas { opacity: 1; }
+.tour-canvas:focus-visible { outline: 2px solid var(--color-focus-inverse); outline-offset: -5px; }
+@media (hover: hover) and (pointer: fine) { .tour-canvas { cursor: grab; } .tour-canvas.is-drag { cursor: grabbing; } }
+.tour-snap { opacity: 0; pointer-events: none; }
+.tour-snap.is-fading { transition: opacity var(--duration-glide-fade) var(--ease-soft); }
+/* waiting for a room that is not built yet (3.2): the held frame dims toward espresso, a gold line runs across the top of the words */
+.tour-stage::after { content: ""; position: absolute; inset: 0; background: var(--color-espresso); opacity: 0; pointer-events: none; transition: opacity 1200ms var(--ease-soft); }
+.tour.is-wait .tour-stage::after { opacity: 0.4; }
+
+/* veil: top under the header, bottom under the words (solid where the text sits) */
+.tour-veil {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(to bottom, var(--color-veil), transparent) top / 100% calc(var(--header-h) + 3rem) no-repeat,
+    linear-gradient(to bottom, transparent 40%, var(--color-veil) 64%);
+}
+@media (min-width: 64em) { .tour-veil { background: linear-gradient(to bottom, var(--color-veil), transparent) top / 100% calc(var(--header-h) + 3rem) no-repeat, linear-gradient(to bottom, transparent 52%, var(--color-veil) 78%); } }
+
+/* the header never goes solid here (nothing scrolls): the top veil carries it */
+html[data-page="marketing"] body.page-tour .site-header::before { opacity: 0; }
+
+/* ---------- words and list ---------- */
+.tour-ui { position: relative; z-index: 3; width: 100%; display: grid; gap: var(--space-3); padding: 0 var(--page-margin) calc(var(--space-3) + env(safe-area-inset-bottom)); pointer-events: none; }
+.tour-ui a, .tour-ui button { pointer-events: auto; }
+.tour-ui::before { content: ""; position: absolute; left: var(--page-margin); width: var(--tour-caption-w); max-width: calc(100% - var(--page-margin) * 2); top: calc(var(--space-2) * -1); height: 1px; background: var(--color-gold); transform: scaleX(0); transform-origin: left; transition: transform 0s; }
+.tour.is-wait .tour-ui::before { transform: scaleX(1); transition: transform 8s linear; }
+.tour-caption { max-width: var(--tour-caption-w); transition: opacity 240ms var(--ease-soft); }
+.tour-caption.is-out { opacity: 0; }
+.tour-caption.is-in { animation: tour-caption-in 800ms var(--ease-soft) both; }
+@keyframes tour-caption-in { from { opacity: 0; transform: translateY(var(--rise)); } to { opacity: 1; transform: none; } }
+.tour-label { max-width: none; margin-bottom: var(--space-2); color: var(--color-gold); font-size: var(--text-sm); font-weight: 500; line-height: 1.2; text-transform: uppercase; letter-spacing: var(--tracking-engraved); }
+.tour-caption h1 { color: var(--color-text-inverse); }
+.tour-caption .tour-line {
+  margin-top: var(--space-1); color: var(--color-text-muted-inverse); font-size: var(--text-base); line-height: var(--leading-snug);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.tour-spa-link { gap: var(--space-2); margin-top: var(--space-1); color: var(--color-text-inverse); }
+.tour-spa-link .icon { transition: transform 250ms var(--ease-soft); }
+@media (hover: hover) and (pointer: fine) { .tour-spa-link:hover .icon { transform: translateX(3px); } }
+
+.tour-rooms { display: flex; gap: var(--space-4); }
+.tour-rooms a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--color-text-muted-inverse); text-decoration: none; white-space: nowrap; transition: color 250ms var(--ease-soft); }
+.tour-rooms a[aria-current="page"] { color: var(--color-text-inverse); text-decoration: underline; text-decoration-color: var(--color-gold); text-decoration-thickness: 1px; text-underline-offset: 6px; }
+@media (hover: hover) and (pointer: fine) { .tour-rooms a:hover { color: var(--color-text-inverse); } }
+
+@media (min-width: 64em) {
+  .tour-ui { grid-template-columns: minmax(0, var(--tour-caption-w)) 1fr; align-items: end; column-gap: var(--space-5); padding-bottom: var(--space-6); }
+  .tour-caption .tour-line { font-size: var(--text-lg); }
+  .tour-rooms { justify-self: end; }
+}
+/* phone: one row of chips, scrolls sideways, the current one in view */
+@media (max-width: 63.99em) {
+  .tour-rooms { gap: var(--space-2); overflow-x: auto; scroll-snap-type: x proximity; scroll-padding-inline: var(--page-margin); margin-inline: calc(var(--page-margin) * -1); padding-inline: var(--page-margin); scrollbar-width: none; overscroll-behavior-x: contain; }
+  .tour-rooms::-webkit-scrollbar { display: none; }
+  .tour-rooms a { flex: none; scroll-snap-align: start; min-height: var(--chip-h); padding: 0 var(--space-3); border: 1px solid var(--color-hairline-inverse); border-radius: var(--radius-sm); color: var(--color-text-inverse); }
+  .tour-rooms a[aria-current="page"] { border-color: var(--color-gold); text-decoration: none; }
+}
+
+/* ---------- doorway markers ---------- */
+.tour-markers { position: fixed; inset: 0; height: var(--scene-h); z-index: 2; overflow: hidden; pointer-events: none; }
+.tour-marker {
+  position: absolute; left: 0; top: 0; width: 2.75rem; height: 2.75rem; margin: -1.375rem 0 0 -1.375rem; padding: 0; border: 0; background: none; color: var(--color-text-inverse);
+  display: grid; place-items: center; opacity: 0; pointer-events: none; touch-action: manipulation; will-change: transform; transition: opacity 300ms var(--ease-soft);
+}
+.tour-marker.is-on { opacity: 1; pointer-events: auto; }
+.tour-markers[data-state="away"] .tour-marker { opacity: 0; pointer-events: none; transition-duration: 200ms; }
+.tour-marker:focus-visible { outline: none; }
+.tour-marker:focus-visible .tour-ring { outline: 2px solid var(--color-focus-inverse); outline-offset: 3px; }
+.tour-ring { position: relative; display: grid; place-items: center; width: var(--tour-ring); height: var(--tour-ring); border-radius: 50%; background: var(--color-veil); box-shadow: inset 0 0 0 1.5px var(--color-gold); transition: transform 250ms var(--ease-soft), background-color 120ms linear; }
+.tour-ring::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--color-gold); }
+.tour-ring::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--color-gold); opacity: 0; pointer-events: none; }
+.tour-markers.is-pulse .tour-marker.is-on .tour-ring::after { animation: tour-pulse 1.6s var(--ease-soft) 1 both; }
+@keyframes tour-pulse { from { transform: scale(1); opacity: 0.5; } to { transform: scale(1.6); opacity: 0; } }
+.tour-marker.is-press .tour-ring { background: var(--color-gold); }
+.tour-marker-label {
+  position: absolute; top: calc(50% + var(--tour-ring) / 2 + 0.5rem); left: 50%; transform: translateX(-50%); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm);
+  background: var(--color-veil); color: var(--color-text-inverse); font-size: var(--text-sm); line-height: 1.3; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 250ms var(--ease-soft);
+}
+@media (hover: hover) and (pointer: fine) {
+  .tour-marker:hover .tour-ring { transform: scale(1.06); }
+  .tour-marker:hover .tour-marker-label, .tour-marker:focus-visible .tour-marker-label { opacity: 1; }
+}
+@media (hover: none), (pointer: coarse) { .tour-marker-label { opacity: 1; } }
+
+/* ---------- hint and tilt ---------- */
+.tour-hint {
+  position: fixed; left: 50%; top: 45%; z-index: 3; transform: translate(-50%, -50%); display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3);
+  background: var(--color-veil); border-radius: var(--radius-sm); color: var(--color-text-inverse); font-size: var(--text-sm); white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 300ms var(--ease-soft);
+}
+.tour-hint.is-in { opacity: 1; transition-duration: 800ms; }
+.tour-hint .icon, .tour-tilt .icon { color: var(--color-gold); }
+@media (min-width: 48em) { .tour-hint { top: 62%; } }
+.tour-tilt {
+  position: fixed; z-index: 3; top: calc(var(--header-h) + var(--space-3)); right: var(--space-3); display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--chip-h); padding: 0 var(--space-3);
+  border: 1px solid var(--color-hairline-inverse); border-radius: var(--radius-sm); background: var(--color-veil); color: var(--color-text-inverse); font-size: var(--text-sm); font-weight: 500; touch-action: manipulation;
+}
+.tour-tilt.is-on { border-color: var(--color-gold); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-canvas, .tour-caption, .tour-marker, .tour-ring, .tour-hint { transition: none; }
+  .tour-caption.is-in { animation: none; }
+}

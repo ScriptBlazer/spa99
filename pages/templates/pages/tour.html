@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load content_tags pages_tags static %}
+{% block html_attrs %} data-page="marketing"{% endblock %}
+{% block body_class %}page-tour{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{% static 'common/css/tour.css' %}">
+{# Cheap half of the 3D gate, before first paint, so the photo is not shown for a frame first. boot.js does the WebGL2 probe and removes the class if it fails. #}
+<script>(function(d){if(d.dataset.webgl==="off"||matchMedia("(prefers-reduced-motion: reduce)").matches||matchMedia("(prefers-reduced-data: reduce)").matches||(navigator.connection&&navigator.connection.saveData))return;d.classList.add("tour-gl");setTimeout(function(){if(!document.body.classList.contains("tour-3d"))d.classList.remove("tour-gl")},6000)})(document.documentElement)</script>
+{% endblock %}
+{% block header_mode %}overlay{% endblock %}
+{% block main %}
+{# The virtual tour (docs/design/VIRTUAL-TOUR.md). This server-rendered page is the full fallback (no JS, reduced motion, no WebGL, Save-Data): the room photo, its name and line, the room list. The 3D script (frontend) layers a canvas into #tour-stage and needs nothing the page does not already carry. #}
+<div class="tour on-dark" id="tour" data-tour data-room="{{ room.slug }}" data-engine="{% static 'common/js/tour/engine.js' %}" data-icons="{% static 'common/img/icons.svg' %}">
+  <div class="tour-stage" id="tour-stage">
+    <figure class="tour-photo" id="tour-photo" style="--focus: {{ room.focus }}">
+      {% if room.photo %}<img class="photo" src="{{ room.photo }}" alt="{{ room.alt }}" fetchpriority="high" decoding="async">{% else %}{% photo room.slug alt=room.alt eager=True %}{% endif %}
+    </figure>
+    {# 3D layer mounts here: canvas, snapshot canvas and markers are added by the script. #}
+    <div class="tour-veil" aria-hidden="true"></div>
+  </div>
+  <div class="tour-ui">
+    <div class="tour-caption" id="tour-caption">
+      <p class="tour-label">{{ copy.intro.heading|default:"Virtual tour" }}</p>
+      <h1 id="tour-title" tabindex="-1">{{ room.name }}</h1>
+      {% if room.line %}<p class="tour-line" id="tour-line">{{ room.line }}</p>{% endif %}
+      <a class="tour-spa-link btn-quiet" id="tour-spa-link" href="{{ room.spa_url }}"><span>{{ room.spa_label }}</span>{% include "common/_icon.html" with name="arrow-right" %}</a>
+    </div>
+    <nav class="tour-rooms" id="tour-rooms" aria-label="Rooms">
+      {% for r in rooms %}<a href="{{ r.tour_url }}" data-room-link="{{ r.slug }}"{% if r.slug == room.slug %} aria-current="page"{% endif %}>{{ r.name }}</a>{% endfor %}
+    </nav>
+  </div>
+  <p class="sr-only" id="tour-live" role="status" aria-live="polite"></p>
+  {# The real logo, never redrawn: the script reads these paths into canvas masks. Hidden, not in the accessibility tree. #}
+  <div id="tour-logos" hidden aria-hidden="true">
+    <div id="tour-mark">{% include "common/_mark.html" %}</div>
+    <div id="tour-logo">{% include "common/_logo.html" %}</div>
+    <div id="tour-logo-stacked" data-src="{% static 'common/img/logo-stacked-gold.svg' %}">{{ stacked_logo }}</div>
+  </div>
+  {{ tour_config|json_script:"tour-config" }}
+  {% tour_modules as tour_mods %}{{ tour_mods|json_script:"tour-modules" }}
+</div>
+{% endblock %}
+{% block scripts %}
+{# The only script on this page until the gate passes: it loads three.js and the engine itself (VIRTUAL-TOUR 4.2). #}
+<script type="module" src="{% static 'common/js/tour/boot.js' %}"></script>
+{% endblock %}

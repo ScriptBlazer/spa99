@@ -287,6 +287,7 @@ def facility_cards():
             "slug": f.slug,
             "name": f.name,
             "line": f.short_line,
+            "tour_url": tour_url(f.slug) if f.slug in tour_slugs() and f.slug != TOUR_LOUNGE else "",
             "description": f.description,
             "display": f.display,
             "facts": [x for x in (f.facts or []) if isinstance(x, str) and x.strip()][: Facility.FACTS_MAX],
@@ -592,3 +593,95 @@ def signin_shell():
         "has_image": bool(copy["intro"].image) or images.has_image("lockers"),
         "address_line": [part for part in (site.address_one_line, site.opening_text) if part],
     }
+
+
+# ---------- the virtual tour (docs/design/VIRTUAL-TOUR.md 6) ----------
+
+# The toured rooms, in tour order. Adding a room later is one line: (slug, fallback name, photo alt, photo focus).
+# The slug is the Facility slug (and the photo name in the image manifest); the lounge has no Facility row.
+TOUR_ROOMS = [
+    ("lounge", "Lounge", "The lounge, with the wide reef tank beside a long bench", "28% 55%"),
+    ("dry-sauna", "Dry sauna", "The dry sauna, with pale wood benches in low light", "50% 55%"),
+    ("wet-sauna", "Wet sauna", "The wet sauna, travertine walls and a curved bench", "50% 40%"),
+    ("relaxing-zone", "Relaxing zone", "The relaxing zone, with loungers and the swan on the wall", "55% 60%"),
+    ("gym", "Gym", "The gym, free weights and machines in low warm light", "40% 55%"),
+]
+TOUR_LOUNGE = TOUR_ROOMS[0][0]
+TOUR_CANVAS_KEYS = ("intro", "hint", "hint_tilt", "tilt")
+
+
+def tour_slugs():
+    return [room[0] for room in TOUR_ROOMS]
+
+
+def tour_url(slug):
+    from django.urls import reverse
+
+    return reverse("tour") if slug == TOUR_LOUNGE else reverse("tour_room", args=[slug])
+
+
+def spa_room_url(slug):
+    from django.urls import reverse
+
+    return reverse("spa") + ("" if slug == TOUR_LOUNGE else f"#{slug}")
+
+
+def _tour_photo(slug, image):
+    """URL of the room photo: the `room_<slug>` section image wins, then the manifest render, else ''."""
+    if image:
+        try:
+            return image.url
+        except ValueError:
+            pass
+    return images.src(slug, 1600) if images.has_image(slug) else ""
+
+
+def tour_rooms(copy=None):
+    """The visible toured rooms in order, as plain dicts (also the JSON the 3D script reads).
+    A room whose Facility is hidden in Control leaves the tour; the lounge (no Facility) is always in."""
+    copy = copy if copy is not None else content.page_content("tour")
+    facilities = {f.slug: f for f in Facility.objects.filter(slug__in=tour_slugs())}
+    rooms = []
+    for slug, fallback_name, alt, focus in TOUR_ROOMS:
+        facility = facilities.get(slug)
+        if facility is not None and not facility.visible:
+            continue
+        row = copy[f"room_{slug.replace('-', '_')}"]
+        rooms.append({
+            "slug": slug,
+            "name": row.heading or (facility.name if facility else fallback_name),
+            "line": row.body or (facility.short_line if facility else ""),
+            "photo": _tour_photo(slug, row.image),
+            "alt": row.image_alt or alt,
+            "focus": focus,
+            "spa_url": row.cta_url or spa_room_url(slug),
+            "spa_label": row.cta_label or "See it on The spa",
+            "tour_url": tour_url(slug),
+            "order": len(rooms) + 1,
+        })
+    return rooms
+
+
+def tour_config(rooms, current, copy):
+    """Everything the 3D script needs, for json_script."""
+    return {
+        "current": current,
+        "rooms": rooms,
+        "copy": {key: {"heading": copy[key].heading, "body": copy[key].body, "cta_label": copy[key].cta_label}
+                 for key in TOUR_CANVAS_KEYS},
+    }
+
+
+_STACKED_LOGO = "common/img/logo-stacked-gold.svg"
+
+
+def stacked_logo_svg():
+    """The stacked gold lockup, inline, for the hidden logo holder the 3D script reads its paths from."""
+    from django.contrib.staticfiles import finders
+    from django.utils.safestring import mark_safe
+
+    path = finders.find(_STACKED_LOGO)
+    if not path:
+        return ""
+    with open(path, encoding="utf-8") as handle:
+        return mark_safe(handle.read())  # our own file in the repo, never user input

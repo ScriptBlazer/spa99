@@ -191,6 +191,35 @@ html[data-page="marketing"] {
 @media (min-width: 48em) { :root { --mount-gap: 0.5rem; } }
 @media (min-width: 64em) { :root { --opener-pin: 0.8; } }
 
+/* Virtual tour (docs/design/VIRTUAL-TOUR.md 7.2). Derived, decoration only, never text. The WebGL palette (IMMERSIVE 12) is read by the 3D script with getComputedStyle. */
+:root {
+  --color-light-warm: #FFA957;                 /* derived: 2700K, every point light */
+  --color-led-warm: #FFC48A;                   /* derived: self-lit LED strips, downlights, halos (--color-led stays the Gold Card's) */
+  --color-heater-glow: #FF8A3D;                /* derived: the low light in the heater stones */
+  --color-aspen: #E3CCA6;                      /* derived: sauna bench seats and slats */
+  --color-aspen-shade: #CDB48C;                /* derived: bench skirts */
+  --color-cedar: #7E5236;                      /* derived: sauna walls and ceiling */
+  --color-walnut: #3B271B;                     /* derived: frames, bench ends, gym panels */
+  --color-stone: #7A604C;                      /* derived: heater stones, light */
+  --color-stone-dark: #4A372B;                 /* derived: heater stones, dark */
+  --color-floor-stone: #3A2B22;                /* derived: sauna floor */
+  --color-glass-bronze: rgb(107 74 48 / 0.28); /* derived: bronze glass */
+  --color-travertine: #E4D2B1;                 /* derived: cream 70% + caramel 30% */
+  --color-travertine-vein: #CCA87C;            /* derived: cream 30% + caramel 70%; also the wet sauna fog */
+  --color-iron: #2C1C14;                       /* derived: espresso at 60%; the darkest value anywhere */
+  --color-sage: #A3A98A;                       /* derived, outside the brand hues: lounge pillows */
+  --color-moss: #5F6B3C;                       /* derived, outside the brand hues: green wall, moss discs */
+  --color-reef-water: #2E6E86;                 /* derived, outside the brand hues: inside the lounge tank only */
+  --color-reef-deep: #17465A;                  /* derived, inside the tank only: deep water and rock shade */
+  --color-reef-coral: #D9805F;                 /* derived, inside the tank only: coral and clownfish */
+  --tour-caption-w: 26rem;                     /* derived: caption width */
+  --tour-ring: 1.75rem;                        /* derived: marker ring (the tap target stays 2.75rem) */
+  --ease-glide: cubic-bezier(0.65, 0, 0.35, 1); /* proposed: camera travel toward a doorway only */
+  --duration-glide-fade: 700ms;                /* derived: room cross-fade */
+  --duration-settle: 1400ms;                   /* derived: arrival settle */
+  --duration-gl-in: 1200ms;                    /* derived: the canvas fading in */
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --duration-slow: 0ms;

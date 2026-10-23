@@ -25,6 +25,8 @@ written by hand:
   The last two run only on the first round 3 run (while the `signin` page does not exist), so clearing the gym's picture
   name or removing a note by hand stays cleared
 
+- (virtual tour, 2026-10-23) the `tour` page and its rows, and the `spa` `tour_link` row, are created when missing
+
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 from collections import Counter
 
@@ -125,7 +127,24 @@ def backfill():
     changed.update(_home_opening_label())
     changed.update(_round_3())
     changed.update(_journey_and_gold_2026_10_23())
+    changed.update(_virtual_tour())
     return changed
+
+
+def _virtual_tour():
+    """2026-10-23: the `tour` page and its rows are created when missing (the spa `tour_link` row is created by
+    `_spa_page`, which creates every missing spa row). Existing rows are never touched."""
+    changed = Counter()
+    title, description, sections = content_seed.PAGES["tour"]
+    page, made = Page.objects.get_or_create(key="tour", defaults={
+        "title": title, "meta_description": description, "order": list(content_seed.PAGES).index("tour") + 1})
+    if made:
+        changed["content.Page (virtual tour)"] += 1
+    for order, (key, heading, body, cta_label, cta_url) in enumerate(sections, start=1):
+        _, made = Section.objects.get_or_create(page=page, key=key, defaults={
+            "heading": heading, "body": body, "cta_label": cta_label, "cta_url": cta_url, "order": order})
+        changed["content.Section (virtual tour rows)"] += made
+    return +changed
 
 
 # (2026-10-23) exact old wording only; anything an admin has edited is left alone.
