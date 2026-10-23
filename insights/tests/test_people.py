@@ -144,3 +144,46 @@ class BackfillTests(TestCase):
         call_command("backfill_person_key", stdout=StringIO())
         session.refresh_from_db()
         self.assertEqual(session.person_key, session.key)
+
+
+class FreshnessTests(OfficeTestCase):
+    def test_a_snapshot_from_before_midnight_shows_updating_and_asks_for_a_refresh(self):
+        snapshots.build_everything()
+        OfficeSnapshot.objects.filter(page="dashboard", range="7d").update(payload={**OfficeSnapshot.objects.get(page="dashboard", range="7d").payload, "today": "2000-01-01"})
+        with mock.patch("office.snapshots.request_refresh") as ask:
+            data = selectors.dashboard("7d")
+        self.assertTrue(data["updating"])
+        self.assertEqual(data["what_changed"], selectors.UPDATING)
+        ask.assert_called_once()
+        self.assertNotIn("updating", selectors.dashboard("30d"))
+
+    def test_older_job_never_overwrites_a_newer_snapshot_and_queue_skips_when_one_is_waiting(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        figures = people.load()
+        newer = timezone.now()
+        snapshots.write_snapshots(metrics.day(), figures, newer)
+        finished_journey()
+        snapshots.write_snapshots(metrics.day(), people.load(), newer - timedelta(minutes=5))  # a slow, older job
+        self.assertEqual(selectors.dashboard("7d")["rings"][0]["value"], 0)
+        snapshots.write_snapshots(metrics.day(), people.load(), timezone.now())
+        self.assertEqual(selectors.dashboard("7d")["rings"][0]["value"], 1)
+        with mock.patch("office.snapshots._already_waiting", return_value=True), mock.patch("common.tasks.enqueue") as queued:
+            snapshots._queue()
+        queued.assert_not_called()
+
+    def test_previous_total_is_distinct_people_and_a_browser_linked_twice_takes_the_latest_account(self):
+        first = finished_journey()
+        user_a = User.objects.create_user("a@example.com", "a-long-password-1")
+        user_b = User.objects.create_user("b@example.com", "a-long-password-1")
+        journey.link_user(first, user_a)
+        middle = journey.create_session("Mozilla/5.0 (iPhone) Safari/604.1", previous=first)  # not linked itself
+        last = journey.create_session("Mozilla/5.0 (iPhone) Safari/604.1", previous=middle)
+        journey.link_user(last, user_b)
+        figures = people.load()
+        self.assertEqual(figures.started(None, metrics.day()), 2)  # accounts a and b; the unlinked one follows the latest link (b)
+        data = selectors.build_analytics("7d", metrics.day(), figures)
+        self.assertEqual(data["series"]["journeys_started"]["previous_total"], 0)
+        self.assertIsNone(selectors.build_analytics("all", metrics.day(), figures)["series"]["journeys_started"]["previous_total"])

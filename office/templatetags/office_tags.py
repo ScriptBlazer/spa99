@@ -211,13 +211,18 @@ def change_line(value, previous, range_name):
     return f"{-diff:,} fewer than {ref}"
 
 
+def _prev(previous):
+    """The previous period's total: the stored `previous_total` (distinct people for people series), or a list to sum."""
+    return sum(_int(v) for v in previous) if isinstance(previous, (list, tuple)) else _int(previous)
+
+
 @register.simple_tag
 def change_ana(value, previous_values, range_name):
     """Analytics: '+1,204 on the previous 30 days' (empty for All, which has no previous period)."""
     ref = ANALYTICS_PERIODS.get(range_name)
-    if not ref or not previous_values:
+    if not ref or previous_values is None:
         return ""
-    value, previous = _int(value), sum(_int(v) for v in previous_values)
+    value, previous = _int(value), _prev(previous_values)
     diff = value - previous
     if diff == 0:
         return f"Same as {ref}"
@@ -229,7 +234,7 @@ def change_ana(value, previous_values, range_name):
 @register.simple_tag
 def change_rate(value, previous_values):
     """Analytics only: the change as a rate after the count ('▲ 18%'), empty when there is no earlier figure."""
-    previous = sum(_int(v) for v in (previous_values or []))
+    previous = _prev(previous_values)
     if not previous:
         return ""
     pct = round((_int(value) - previous) * 100 / previous)

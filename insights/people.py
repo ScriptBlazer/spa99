@@ -4,9 +4,12 @@ C1 to C4). Never called while a page loads: the job turns this into stored snaps
 A person is the account if the journey is linked to one (also when the same browser's earlier journeys were not linked
 themselves: the browser's `person_key` maps to the account), otherwise the browser (`person_key`). Bots and staff
 accounts are never counted. A person who finishes in a range also counts as started in it, so started >= finished."""
+import logging
 from collections import Counter, defaultdict
 
 from . import metrics
+
+logger = logging.getLogger("spa99.people")
 
 # Keys of the figures laid over the stored daily sums when the sentences are written (not stored metric keys).
 STARTED, FINISHED, REGISTERED, VOTERS = "people_started", "people_finished", "people_registered", "people_voters"
@@ -91,37 +94,37 @@ class Figures:
 
 
 def load():
-    """Read the source tables once (journey sessions and registrations) into a Figures. Job only."""
-    from journey import engine
+    """Read the source tables once (journey sessions and registrations) into a Figures. Job only. Sessions are streamed in
+    chunks with only the fields needed, so memory holds the small result (people per day, votes), not the sessions."""
     from journey.models import JourneySession
     from users.models import InterestRegistration, User
 
     staff = set(User.objects.filter(is_staff=True).values_list("pk", flat=True))
-    sessions = list(JourneySession.objects.filter(is_bot=False).select_related("suggested_plan"))
-    account_of = {}  # browser person_key -> account, from any of its linked journeys
-    for s in sessions:
-        if s.user_id:
-            account_of.setdefault(s.person_key or s.key, s.user_id)
+    real = JourneySession.objects.filter(is_bot=False)
+    account_of = {}  # browser person_key -> account; oldest first, so when a browser was linked to two accounts the latest link wins
+    for key, person_key, user_id in real.filter(user__isnull=False).order_by("created_at").values_list("key", "person_key", "user_id").iterator(chunk_size=2000):
+        account_of[person_key or key] = user_id
 
-    def person(s):
-        account = s.user_id or account_of.get(s.person_key or s.key)
-        return ("account", account) if account else ("browser", s.person_key or s.key)
-
-    started, finished, votes = defaultdict(set), defaultdict(set), []
-    for s in sessions:
-        who = person(s)
-        if who[0] == "account" and who[1] in staff:
+    started, finished, votes, uncounted = defaultdict(set), defaultdict(set), [], 0
+    fields = ("key", "person_key", "user_id", "created_at", "completed", "completed_at", "updated_at", "suggested_plan__slug", "suggestion_detail")
+    for key, person_key, user_id, created_at, completed, completed_at, updated_at, plan, detail in real.values_list(*fields).iterator(chunk_size=2000):
+        account = user_id or account_of.get(person_key or key)
+        who = ("account", account) if account else ("browser", person_key or key)
+        if account in staff:
             continue
-        started[metrics.day(s.created_at)].add(who)
-        if not s.completed:
+        started[metrics.day(created_at)].add(who)
+        if not completed:
             continue
-        done = s.completed_at or s.updated_at
+        done = completed_at or updated_at
         day = metrics.day(done)
         started[day].add(who)
         finished[day].add(who)
-        counted = s.suggestion_detail.get("counted_answers")
-        answers = counted if counted is not None else engine.counted_answers(s)
-        votes.append((who, day, done, list(answers), s.suggested_plan.slug if s.suggested_plan_id else ""))
+        counted = (detail or {}).get("counted_answers")
+        if counted is None:  # finished before answers were recorded on the session: no vote on answers (counted below)
+            uncounted += 1
+        votes.append((who, day, done, list(counted or []), plan or ""))
+    if uncounted:
+        logger.info("%s finished journeys have no stored answers and give no answer vote", uncounted)
 
     registrations = [
         (metrics.day(created), slug or "none", source)

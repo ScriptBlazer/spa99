@@ -8,7 +8,7 @@ import json
 import logging
 from datetime import timedelta
 
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -34,26 +34,36 @@ def payloads(today, figures):
     return out
 
 
-def write_snapshots(today, figures):
-    """Upsert only the snapshots whose payload changed. Overlapping runs are safe (unique key upsert, no delete)."""
+def write_snapshots(today, figures, built_at):
+    """Save the snapshots whose payload changed, but only over an older one: `built_at` (when this job started loading)
+    must be newer than the stored row's, so a slow overlapping job never overwrites a newer snapshot. Each save is one
+    conditional UPDATE (or a first INSERT), safe on SQLite and Postgres."""
     wanted = {ident: json.loads(json.dumps(payload)) for ident, payload in payloads(today, figures).items()}
     now = timezone.now()
-    with transaction.atomic():
-        existing = {(r.page, r.range): r.payload for r in OfficeSnapshot.objects.all()}
-        changed = [OfficeSnapshot(page=page, range=name, payload=payload, updated_at=now)
-                   for (page, name), payload in wanted.items() if existing.get((page, name)) != payload]
-        OfficeSnapshot.objects.bulk_create(changed, update_conflicts=True, unique_fields=["page", "range"], update_fields=["payload", "updated_at"])
+    existing = {(r.page, r.range): r.payload for r in OfficeSnapshot.objects.all()}
+    for (page, name), payload in wanted.items():
+        if existing.get((page, name)) == payload:
+            continue
+        rows = OfficeSnapshot.objects.filter(page=page, range=name)
+        if rows.filter(built_at__lt=built_at).update(payload=payload, built_at=built_at, updated_at=now) or rows.exists():
+            continue  # updated, or a newer snapshot is already there
+        try:
+            with transaction.atomic():
+                OfficeSnapshot.objects.create(page=page, range=name, payload=payload, built_at=built_at)
+        except IntegrityError:  # another job inserted it first
+            rows.filter(built_at__lt=built_at).update(payload=payload, built_at=built_at, updated_at=now)
     return len(wanted)
 
 
 def build_everything(today=None):
     """Sentences, insights, then snapshots (which read both), all from one load of the source tables, so every figure
     on a page agrees. Returns the number of sentences written."""
+    built_at = timezone.now()  # before the load: anything saved after this is newer than what the load saw
     today = today or metrics.day()
     figures = people.load()
     sentences = summaries.write_all(today, figures)
     facts.write_all(today, figures)
-    write_snapshots(today, figures)
+    write_snapshots(today, figures, built_at)
     return sentences
 
 
@@ -64,11 +74,20 @@ def refresh():
     return "snapshots refreshed"
 
 
+def _already_waiting():
+    """True when a refresh job is already sitting in the queue (django-q's OrmQ table)."""
+    from django_q.models import OrmQ
+
+    return any(row.task.get("func") == TASK for row in OrmQ.objects.all().iterator())
+
+
 def _queue():
     """Queue one refresh unless one is already waiting. Never raises."""
     from common.tasks import enqueue
 
     try:
+        if _already_waiting():
+            return  # a down worker must not pile up jobs
         row, _ = SnapshotRefresh.objects.get_or_create(key="snapshots")
         cutoff = timezone.now() - STALE_AFTER
         won = SnapshotRefresh.objects.filter(pk=row.pk).filter(Q(queued_at__isnull=True) | Q(queued_at__lt=cutoff)).update(queued_at=timezone.now())

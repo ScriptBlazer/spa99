@@ -239,7 +239,8 @@ def build_analytics(range_name="30d", today=None, figures=None):
     series = {}
     for key in SERIES_KEYS + (K.PAGE_VIEWS,):
         values = _series(rows, key, labels)
-        series[key] = {"total": sum(values), "values": values, "previous": _series(rows, key, previous) if previous else []}
+        series[key] = {"total": sum(values), "values": values, "previous": _series(rows, key, previous) if previous else [],
+                     "previous_total": sum(_series(rows, key, previous)) if previous else None}
     # People and registrations per the counting rules: the total is distinct people (or registrations) in the whole range,
     # the points are per day (per week for a long All).
     def buckets(days):
@@ -249,7 +250,8 @@ def build_analytics(range_name="30d", today=None, figures=None):
     here, before = buckets(labels), buckets(previous)
     for key, count, values in (("journeys_started", figures.started, figures.started_series), ("journeys_completed", figures.finished, figures.finished_series),
                                ("registrations", figures.registered, figures.registered_series)):
-        series[key] = {"total": count(start, end), "values": values(here), "previous": values(before) if before else []}
+        series[key] = {"total": count(start, end), "values": values(here), "previous": values(before) if before else [],
+                     "previous_total": count(previous[0], previous[-1]) if previous else None}  # distinct people in the previous window
     series["people_registered"] = series["registrations"]  # the hero reads this key
     total = lambda key: series[key]["total"]  # noqa: E731
 
@@ -303,7 +305,7 @@ def build_analytics(range_name="30d", today=None, figures=None):
             ("declined", "Declined", status.get((K.GOLD_BY_STATUS, "declined"), 0)))],
     }
     return {
-        "range": range_name, "ranges": list(ANALYTICS_RANGES), "granularity": granularity,
+        "range": range_name, "ranges": list(ANALYTICS_RANGES), "granularity": granularity, "today": today.isoformat(),
         "labels": [d.isoformat() for d in labels], "previous_labels": [d.isoformat() for d in previous],
         "series": series, "funnel": funnel, "funnel_note": FUNNEL_NOTE if any(f["partial"] for f in funnel) else "",
         "registrations_by_plan": by_plan(figures.registered_by(start, end, 1)), "suggested_plan": by_plan(suggested_found),
@@ -325,7 +327,7 @@ def build_pages(range_name="30d", today=None, limit=10):
     refs = sorted(_by_dimension(rows, K.REFERRERS, labels).items(), key=lambda i: (-i[1], i[0]))[:limit]
     texts = {t.key: t.text for t in MetricText.objects.filter(scope=range_name, key__in=("chart_top_pages", "chart_referrers"))}
     return {
-        "range": range_name, "granularity": granularity, "labels": [d.isoformat() for d in labels],
+        "range": range_name, "granularity": granularity, "today": today.isoformat(), "labels": [d.isoformat() for d in labels],
         "page_views": _series(rows, K.PAGE_VIEWS, labels), "visitors": _series(rows, K.VISITORS, labels),
         "top_pages": [{"page": p, "views": v} for p, v in top], "referrers": [{"site": s, "visits": v} for s, v in refs],
         "summaries": {"top_pages": texts.get("chart_top_pages", ""), "referrers": texts.get("chart_referrers", "")},
@@ -335,7 +337,18 @@ def build_pages(range_name="30d", today=None, limit=10):
 # ---------- reading the stored snapshots ----------
 
 def _snapshot(page, range_name):
-    return OfficeSnapshot.objects.filter(page=page, range=range_name).values_list("payload", flat=True).first()
+    """The stored payload, or None when there is none yet or it is from before London midnight (then a refresh is asked
+    for in the background and the caller shows an "Updating" state; nothing is computed here)."""
+    from office import snapshots
+
+    payload = OfficeSnapshot.objects.filter(page=page, range=range_name).values_list("payload", flat=True).first()
+    if payload is None or payload.get("today") != metrics.day().isoformat():
+        snapshots.request_refresh()
+        return None
+    return payload
+
+
+UPDATING = "Updating\u2026"
 
 
 def _empty_funnel():
@@ -360,7 +373,7 @@ def empty_dashboard(range_name):
 
 
 def empty_analytics(range_name):
-    series = {key: {"total": 0, "values": [], "previous": []} for key in SERIES_KEYS + PEOPLE_SERIES + (K.PAGE_VIEWS,)}
+    series = {key: {"total": 0, "values": [], "previous": [], "previous_total": None} for key in SERIES_KEYS + PEOPLE_SERIES + (K.PAGE_VIEWS,)}
     return {"range": range_name, "ranges": list(ANALYTICS_RANGES), "granularity": "day", "labels": [], "previous_labels": [],
             "series": series, "funnel": _empty_funnel(), "funnel_note": "", "registrations_by_plan": [], "suggested_plan": [],
             "registrations_by_source": [], "journey_answers": {q: [] for q in JOURNEY_QUESTIONS}, "drop_off": [],
@@ -380,7 +393,7 @@ def dashboard(range_name="7d"):
     from users.models import InterestRegistration
 
     range_name = range_name if range_name in DASHBOARD_RANGES else "7d"
-    data = _snapshot(OfficeSnapshot.DASHBOARD, range_name) or empty_dashboard(range_name)
+    data = _snapshot(OfficeSnapshot.DASHBOARD, range_name) or {**empty_dashboard(range_name), "what_changed": UPDATING, "updating": True}
     waiting_rows = GoldApplication.objects.filter(status__in=[GoldApplication.NEW, GoldApplication.CONTACTED]).order_by("-created_at")[:5]
     latest = InterestRegistration.objects.select_related("user", "plan").order_by("-created_at")[:5]
     return {**data,
@@ -392,9 +405,9 @@ def dashboard(range_name="7d"):
 
 def analytics(range_name="30d"):
     range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
-    return _snapshot(OfficeSnapshot.ANALYTICS, range_name) or empty_analytics(range_name)
+    return _snapshot(OfficeSnapshot.ANALYTICS, range_name) or {**empty_analytics(range_name), "updating": True}
 
 
 def pages(range_name="30d"):
     range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
-    return _snapshot(OfficeSnapshot.PAGES, range_name) or empty_pages(range_name)
+    return _snapshot(OfficeSnapshot.PAGES, range_name) or {**empty_pages(range_name), "updating": True}

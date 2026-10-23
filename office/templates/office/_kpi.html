@@ -4,7 +4,7 @@
   <span class="o-kpi-label">{{ label }}</span>
   <span class="o-kpi-body" data-region="kpi-{{ key }}" data-fade>
     <span class="o-kpi-value">{{ s.total|compact }}</span>
-    {% change_ana s.total s.previous data.range as chg %}<span class="o-delta">{{ chg|default:"&nbsp;" }}</span>
+    {% change_ana s.total s.previous_total data.range as chg %}<span class="o-delta">{{ chg|default:"&nbsp;" }}</span>
   </span>
   {% sparkline s.values as spark %}
   <span class="o-spark o-spark--kpi" aria-hidden="true">

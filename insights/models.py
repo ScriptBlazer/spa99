@@ -4,6 +4,7 @@ hourly roll-up write them. No personal data in any of them.
 Keys are plain strings (see insights.metrics.K). `dimension` is "" for a total, or a slug / bucket for a breakdown
 (plan slug, page group, referrer host, "question:option"). Rates are stored in basis points (1234 = 12.34%)."""
 from django.db import models
+from django.utils import timezone
 
 
 class MetricCounter(models.Model):
@@ -107,6 +108,7 @@ class OfficeSnapshot(models.Model):
     page = models.CharField(max_length=12)
     range = models.CharField(max_length=5)
     payload = models.JSONField(default=dict)
+    built_at = models.DateTimeField(default=timezone.now, help_text="When the job that wrote this started loading its figures; an older job never overwrites a newer one.")
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

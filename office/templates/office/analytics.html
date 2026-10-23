@@ -7,6 +7,7 @@
 {% block main %}
 <h1 class="sr-only">Analytics</h1>
 {% include "office/_range.html" with place="page" ranges=data.ranges current=data.range %}
+{% if data.updating %}<p class="o-sub" data-updating>Updating…</p>{% endif %}
 <div class="o-charts" data-office-charts>
 
   {# 1 Visitors: the hero, a big number over a gradient area chart #}
@@ -16,22 +17,22 @@
       <div class="o-hero-figs" data-region="hero-figs" data-fade>
         <div class="o-hero-fig" data-hero-fig="visitors">
           <p class="o-hero-main"><span class="o-hero-num">{{ data.series.visitors.total|num }}</span><span class="o-hero-unit">visitors</span></p>
-          {% change_ana data.series.visitors.total data.series.visitors.previous data.range as c_visitors %}{% change_rate data.series.visitors.total data.series.visitors.previous as r_visitors %}
+          {% change_ana data.series.visitors.total data.series.visitors.previous_total data.range as c_visitors %}{% change_rate data.series.visitors.total data.series.visitors.previous_total as r_visitors %}
           <p class="o-hero-change">{{ c_visitors }}{% if r_visitors %} <span class="o-hero-rate">{{ r_visitors }}</span>{% endif %}</p>
         </div>
         <div class="o-hero-fig" data-hero-fig="journeys_started" hidden>
           <p class="o-hero-main"><span class="o-hero-num">{{ data.series.journeys_started.total|num }}</span><span class="o-hero-unit">started the journey</span></p>
-          {% change_ana data.series.journeys_started.total data.series.journeys_started.previous data.range as c_journeys_started %}{% change_rate data.series.journeys_started.total data.series.journeys_started.previous as r_journeys_started %}
+          {% change_ana data.series.journeys_started.total data.series.journeys_started.previous_total data.range as c_journeys_started %}{% change_rate data.series.journeys_started.total data.series.journeys_started.previous_total as r_journeys_started %}
           <p class="o-hero-change">{{ c_journeys_started }}{% if r_journeys_started %} <span class="o-hero-rate">{{ r_journeys_started }}</span>{% endif %}</p>
         </div>
         <div class="o-hero-fig" data-hero-fig="people_registered" hidden>
           <p class="o-hero-main"><span class="o-hero-num">{{ data.series.people_registered.total|num }}</span><span class="o-hero-unit">registered</span></p>
-          {% change_ana data.series.people_registered.total data.series.people_registered.previous data.range as c_people_registered %}{% change_rate data.series.people_registered.total data.series.people_registered.previous as r_people_registered %}
+          {% change_ana data.series.people_registered.total data.series.people_registered.previous_total data.range as c_people_registered %}{% change_rate data.series.people_registered.total data.series.people_registered.previous_total as r_people_registered %}
           <p class="o-hero-change">{{ c_people_registered }}{% if r_people_registered %} <span class="o-hero-rate">{{ r_people_registered }}</span>{% endif %}</p>
         </div>
         <div class="o-hero-fig" data-hero-fig="page_views" hidden>
           <p class="o-hero-main"><span class="o-hero-num">{{ data.series.page_views.total|num }}</span><span class="o-hero-unit">page views</span></p>
-          {% change_ana data.series.page_views.total data.series.page_views.previous data.range as c_page_views %}{% change_rate data.series.page_views.total data.series.page_views.previous as r_page_views %}
+          {% change_ana data.series.page_views.total data.series.page_views.previous_total data.range as c_page_views %}{% change_rate data.series.page_views.total data.series.page_views.previous_total as r_page_views %}
           <p class="o-hero-change">{{ c_page_views }}{% if r_page_views %} <span class="o-hero-rate">{{ r_page_views }}</span>{% endif %}</p>
         </div>
       </div>
