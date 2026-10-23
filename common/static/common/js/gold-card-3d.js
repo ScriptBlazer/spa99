@@ -188,13 +188,20 @@ export function create(mount, { gsap, tokens, card }) {
       for (let i = 0; i < lines.length; i++) lines[i] *= wing(((i % FW) / ppm), 0);
       return { lines, edge, micro };
     });
+    // Two normal maps. The swan and the engraved words grow with `relief` (normalScale); the fine detail (edge groove, guilloche, micro text)
+    // is the card's own finish, in the CSS card from the first frame, so it has its own map at a fixed strength (added in the shader, see buildScene).
     const height = await idle(() => {
-      const raw = new Float32Array(swanMask.length), thin = new Float32Array(swanMask.length);
-      for (let i = 0; i < raw.length; i++) { raw[i] = swanMask[i] - 0.22 * textMask[i] - 0.1 * fine.micro[i]; thin[i] = -0.3 * fine.edge[i] - 0.1 * fine.lines[i]; }   // engraved words: a shallow cut; the read comes from the ink (metalness) map, so no lit outline
-      const soft = blur(raw, FW, FH, 2), crisp = blur(thin, FW, FH, 1);
-      for (let i = 0; i < soft.length; i++) soft[i] += crisp[i];
-      return soft;
+      const raw = new Float32Array(swanMask.length);
+      for (let i = 0; i < raw.length; i++) raw[i] = swanMask[i] - 0.22 * textMask[i];   // engraved words: a shallow cut; the read comes from the ink (metalness) map, so no lit outline
+      return blur(raw, FW, FH, 2);
     });
+    const fineHeight = await idle(() => {
+      const thin = new Float32Array(swanMask.length);
+      for (let i = 0; i < thin.length; i++) thin[i] = -0.3 * fine.edge[i] - 0.1 * fine.lines[i] - 0.1 * fine.micro[i];
+      return blur(thin, FW, FH, 1);
+    });
+    maps.faceFine = canvasTexture(await idle(() => normalCanvas(fineHeight, FW, FH, 4.2)));
+    own(maps.faceFine);
     maps.faceNormal = canvasTexture(await idle(() => normalCanvas(height, FW, FH, 4.2)));
     const rc = await idle(() => roughCanvas(FW, FH, 0.21, { smooth: blur(swanMask, FW, FH, 1), smoothV: 0.1, rough: blur(textMask.map((v, i) => Math.max(v, fine.micro[i])), FW, FH, 1), roughV: 0.3, dark: 0.95 }));
     maps.faceRough = canvasTexture(rc);
@@ -287,6 +294,11 @@ export function create(mount, { gsap, tokens, card }) {
     mats.back = own(new THREE.MeshPhysicalMaterial({
       color: bronze, metalness: 1, roughness: 1, envMapIntensity: 0.62, clearcoat: 0.2, clearcoatRoughness: 0.3, normalMap: maps.backNormal, roughnessMap: maps.backRough, metalnessMap: maps.backRough,
     }));
+    mats.face.onBeforeCompile = (shader) => {   // the fine detail is added on top of the relief map, whatever `relief` is
+      shader.uniforms.fineMap = { value: maps.faceFine };
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', 'uniform sampler2D fineMap;\n#include <common>')
+        .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n#ifdef USE_NORMALMAP_TANGENTSPACE\n\tvec3 fineN = texture2D( fineMap, vNormalMapUv ).xyz * 2.0 - 1.0;\n\tnormal = normalize( normal + tbn * vec3( fineN.xy / fineN.z, 0.0 ) );\n#endif');
+    };
     Object.assign(mats.face, { envMap: scene.environment, envMapIntensity: 0.5 }); mats.back.envMap = mats.edge.envMap = scene.environment; mats.edge.envMapIntensity = 0.6;   // per-material intensity needs the map set on the material (three r163+)
     const faceGeo = own(faceGeometry());
     const front = new THREE.Mesh(faceGeo, mats.face); front.position.z = zf;
