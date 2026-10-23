@@ -6,14 +6,25 @@
 {% include "users/_shell_top.html" %}
       <h1 class="signin-title-sm">Your Gold Card is approved.</h1>
       <p class="signin-lead">Choose a password to set up your account. Your details are filled in.</p>
-      <form method="post" data-live-validate class="signin-fields" novalidate>{% csrf_token %}
+      <form method="post" id="register-form" data-live-validate class="signin-fields" novalidate>{% csrf_token %}
         {% if form.non_field_errors %}<p class="form-error signin-alert" role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
         <div class="field-pair">
           <div class="field"><label for="setup-first">First name</label><input id="setup-first" class="input" value="{{ application.first_name }}" readonly></div>
           <div class="field"><label for="setup-last">Last name</label><input id="setup-last" class="input" value="{{ application.last_name }}" readonly></div>
         </div>
         <div class="field"><label for="setup-email">Email</label><input id="setup-email" class="input" value="{{ application.email }}" readonly></div>
-        {% if application.mobile %}<div class="field"><label for="setup-mobile">Mobile</label><input id="setup-mobile" class="input" value="{{ application.mobile }}" readonly></div>{% endif %}
+        {% if form.mobile %}{% include "common/_field.html" with field=form.mobile hint="Another account uses the mobile we have. Enter yours." good="Looks right" %}
+        {% elif application.mobile %}<div class="field"><label for="setup-mobile">Mobile</label><input id="setup-mobile" class="input" value="{{ application.mobile }}" readonly></div>{% endif %}
+        <div class="field" data-dob>
+          <p class="label">Date of birth</p>
+          <div class="dob" data-dob-fields hidden role="group" aria-label="Date of birth">
+            <div class="field"><label for="dob-day">Day</label><input id="dob-day" class="input" inputmode="numeric" autocomplete="bday-day" maxlength="2" placeholder="DD"></div>
+            <div class="field"><label for="dob-month">Month</label><input id="dob-month" class="input" inputmode="numeric" autocomplete="bday-month" maxlength="2" placeholder="MM"></div>
+            <div class="field"><label for="dob-year">Year</label><input id="dob-year" class="input" inputmode="numeric" autocomplete="bday-year" maxlength="4" placeholder="YYYY"></div>
+          </div>
+          <div data-dob-native>{{ form.date_of_birth }}</div>
+          <p class="feedback" data-error-for="date_of_birth" id="{{ form.date_of_birth.auto_id }}_error" aria-live="polite" data-hint="Spa 99 is for 18 and over." data-good="Looks right" data-state="{% if form.date_of_birth.errors %}error{% else %}hint{% endif %}">{% if form.date_of_birth.errors %}{{ form.date_of_birth.errors|join:" " }}{% else %}Spa 99 is for 18 and over.{% endif %}</p>
+        </div>
         {% include "common/_field.html" with field=form.password toggle=True meter=True hint="At least 10 characters." %}
         <div class="field">
           <label class="check">{{ form.men_only_accepted }}<span>I understand Spa 99 is a men-only spa. <a href="{% url 'terms' %}">Our policy</a></span></label>
@@ -28,4 +39,4 @@
       </form>
 {% include "users/_shell_bottom.html" %}
 {% endblock %}
-{% block scripts %}{% validation_config %}<script type="module" src="{% static 'common/js/forms.js' %}"></script>{% endblock %}
+{% block scripts %}{% validation_config %}<script type="module" src="{% static 'common/js/register.js' %}"></script>{% endblock %}

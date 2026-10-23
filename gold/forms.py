@@ -1,8 +1,12 @@
 """Gold application form. Validation reuses common/validators.py (same rules as sign-up and the JS mirror)."""
+import copy
+
 from django import forms
 from django.core.exceptions import ValidationError
 
-from common.validators import normalise_email, normalise_uk_mobile, password_problems, validate_person_name
+from common.validators import normalise_email, normalise_uk_mobile, password_problems, validate_adult, validate_person_name
+
+from users.forms import SignUpForm
 
 from . import rating
 from .models import BML, PROPERTY_LINK, SIZE, WHERE
@@ -98,9 +102,33 @@ class GoldSetupForm(forms.Form):
     )
     marketing_opt_in = forms.BooleanField(label="Send me news from Spa 99", required=False)
 
-    def __init__(self, *args, application=None, **kwargs):
+    # Same field and 18+ rule as registration (users.forms.SignUpForm), so there is one definition of both.
+    date_of_birth = copy.deepcopy(SignUpForm.base_fields["date_of_birth"])
+    mobile = forms.CharField(
+        max_length=40, required=False,
+        widget=forms.TextInput(attrs={"data-validate": "required mobile", "autocomplete": "tel", "inputmode": "tel"}),
+    )
+
+    def __init__(self, *args, application=None, mobile_editable=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.application = application
+        self.mobile_editable = mobile_editable
+        if mobile_editable:
+            self.fields["mobile"].required = True
+            self.initial.setdefault("mobile", application.mobile)
+        else:
+            del self.fields["mobile"]
+
+    def clean_date_of_birth(self):
+        return validate_adult(self.cleaned_data["date_of_birth"])
+
+    def clean_mobile(self):
+        mobile = normalise_uk_mobile(self.cleaned_data["mobile"])
+        from users.models import User
+
+        if User.objects.filter(mobile=mobile).exists():
+            raise ValidationError("That mobile number is already registered.")
+        return mobile
 
     def clean_password(self):
         a = self.application

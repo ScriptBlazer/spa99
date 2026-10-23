@@ -56,6 +56,11 @@ def read_invite(token):
     return (OK, invite) if invite is not None and invite.is_usable else (INVALID, None)
 
 
+def mobile_in_use(application):
+    """True when the application's mobile is already on an account (the setup form then lets him change it)."""
+    return bool(application.mobile) and get_user_model().objects.filter(mobile=application.mobile).exists()
+
+
 # ---------- gold on the account ----------
 
 def activate_gold(user):
@@ -140,9 +145,7 @@ def accept_invite(token, cleaned):
     application = invite.application
     User = get_user_model()
     now = timezone.now()
-    mobile = application.mobile or None
-    if mobile and User.objects.filter(mobile=mobile).exists():
-        mobile = None  # held by another account: never say so, he can add it later by writing to us
+    mobile = cleaned.get("mobile") or application.mobile or None
     try:
         with transaction.atomic():
             invite = GoldInvite.objects.select_for_update().get(pk=invite.pk)
@@ -152,7 +155,7 @@ def accept_invite(token, cleaned):
                 raise InviteError("There is already an account for this email. Please sign in.")
             user = User.objects.create_user(
                 application.email, cleaned["password"], first_name=application.first_name, last_name=application.last_name,
-                mobile=mobile, email_verified_at=now, men_only_accepted_at=now,
+                mobile=mobile, date_of_birth=cleaned["date_of_birth"], email_verified_at=now, men_only_accepted_at=now,
                 privacy_accepted_version=SiteSettings.load().privacy_version, privacy_accepted_at=now,
                 marketing_consent=bool(cleaned.get("marketing_opt_in")),
                 marketing_consent_at=now if cleaned.get("marketing_opt_in") else None,

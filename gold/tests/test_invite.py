@@ -114,7 +114,7 @@ class SetupPageTests(TestCase):
 
     def post(self, **over):
         self.client.get("/login/")  # sets the CSRF cookie
-        data = {"password": PASSWORD, "men_only_accepted": "on", "privacy_accepted": "on",
+        data = {"password": PASSWORD, "date_of_birth": "1985-03-04", "men_only_accepted": "on", "privacy_accepted": "on",
                 "csrfmiddlewaretoken": self.client.cookies["csrftoken"].value}
         data.update(over)
         return self.client.post(self.url, data)
@@ -151,6 +151,21 @@ class SetupPageTests(TestCase):
         self.assertContains(expired, "This link can't be used", status_code=410)
         self.assertEqual(self.post().status_code, 410)
         self.assertFalse(User.objects.filter(email="dan@example.com").exists())
+
+    def test_under_18_is_refused_and_dob_is_stored(self):
+        under = (timezone.now().date() - timedelta(days=365 * 17)).isoformat()
+        self.assertEqual(self.post(date_of_birth=under).status_code, 400)
+        self.assertFalse(User.objects.filter(email="dan@example.com").exists())
+        self.assertEqual(self.post().status_code, 302)
+        self.assertEqual(str(User.objects.get(email="dan@example.com").date_of_birth), "1985-03-04")
+
+    def test_a_mobile_used_by_another_account_becomes_editable_with_the_usual_message(self):
+        User.objects.create_user("other@example.com", PASSWORD, mobile="+447912345678")
+        self.assertContains(self.client.get(self.url), 'name="mobile"')
+        response = self.post(mobile="07912 345678")
+        self.assertContains(response, "already registered", status_code=400)
+        self.assertEqual(self.post(mobile="07911 111222").status_code, 302)
+        self.assertEqual(User.objects.get(email="dan@example.com").mobile, "+447911111222")
 
     def test_weak_password_and_missing_acceptance_are_refused(self):
         self.assertEqual(self.post(password="short").status_code, 400)
