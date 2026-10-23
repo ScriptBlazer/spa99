@@ -120,3 +120,228 @@
 @media (min-width: 64em) {
   .result-grid.has-gold { grid-template-areas: "main gold" "others ."; }
 }
+
+/* ---------- Gold application, round 5 (docs/design/GOLD-APPLY-ROUND5.md) ---------- */
+/* The private room: the whole page stays espresso. The stage holds the Gold Card and a ledger of the three parts; the form sits on a panel in the colour of the card's back. */
+html:has(.gold-apply) { scroll-padding-top: calc(var(--header-h) + var(--space-4)); scroll-padding-bottom: calc(var(--bar-h) + var(--space-3)); }
+.gold-apply { position: relative; isolation: isolate; overflow-x: clip; padding-bottom: var(--space-6); }
+.gold-apply::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0.6;
+  background: url("../img/swan-pattern.svg");
+}
+.gold-apply-grid { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+
+/* the stage */
+.gold-apply-stage { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) 0 calc(var(--space-4) + var(--panel-overlap)); }
+.gold-apply-card {
+  position: relative; flex: none; width: 7.5rem; aspect-ratio: 4 / 3; overflow: hidden;
+  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 60%, transparent 100%); mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 60%, transparent 100%);
+}
+.gold-apply-card .photo, .gold-apply-card picture { display: block; width: 100%; height: 100%; object-fit: contain; }
+.gold-apply-card::after {   /* the one sheen, on arrival at Sent */
+  content: ""; position: absolute; inset: 0; pointer-events: none; transform: translateX(-110%);
+  background: linear-gradient(105deg, transparent 35%, var(--color-sheen) 50%, transparent 65%);
+}
+@keyframes ga-sheen { to { transform: translateX(110%); } }
+@media (prefers-reduced-motion: no-preference) { .gold-apply[data-step="4"] .gold-apply-card::after { animation: ga-sheen 1.6s var(--ease-soft) both; } }
+.gold-apply-stage-copy { min-width: 0; max-width: var(--signin-w); }
+.gold-apply-label { font-size: var(--text-sm); font-weight: 500; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--color-gold-light); }
+.gold-apply-note { display: none; }
+
+/* the ledger: three parts, numerals on a phone, named on a desktop */
+.gold-apply-ledger { display: flex; align-items: center; margin-top: var(--space-3); counter-reset: gl; }
+.gold-apply .gl-1, .gold-apply .gl-2, .gold-apply .gl-3 { position: relative; counter-increment: gl; display: flex; align-items: center; }
+.gold-apply .gl-1, .gold-apply .gl-2 { margin-right: 1.5rem; }
+.gold-apply .gl-1::before, .gold-apply .gl-2::before { content: ""; position: absolute; left: 100%; top: 50%; width: 1.5rem; height: 1px; background: var(--color-hairline-inverse); }
+.gold-apply .gl-1::after, .gold-apply .gl-2::after { content: ""; position: absolute; left: 100%; top: 50%; width: 1.5rem; height: 1px; background: var(--color-thread); transform: scaleX(0); transform-origin: left; transition: transform var(--duration-slow) var(--ease-soft); }
+.gold-apply .gl-name { display: none; }
+.gold-apply .gl-ring {
+  position: relative; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border: 1px solid var(--color-control-line); border-radius: 50%;
+  font-family: var(--font-display); font-size: var(--text-sm); font-weight: 500; line-height: 1; color: var(--color-text-muted-inverse);
+}
+.gold-apply .gl-ring::before { content: counter(gl); }
+.gold-apply .gl-1 .gl-name, .gold-apply .gl-2 .gl-name, .gold-apply .gl-3 .gl-name { color: var(--color-text-muted-inverse); }
+.gold-apply[data-step="1"] .gl-1 .gl-ring, .gold-apply[data-step="2"] .gl-2 .gl-ring, .gold-apply[data-step="3"] .gl-3 .gl-ring { border-color: var(--color-gold); color: var(--color-gold); }
+.gold-apply[data-step="1"] .gl-1 .gl-name, .gold-apply[data-step="2"] .gl-2 .gl-name, .gold-apply[data-step="3"] .gl-3 .gl-name { color: var(--color-text-inverse); font-weight: 500; }
+.gold-apply[data-step="2"] .gl-1 .gl-ring, .gold-apply[data-step="3"] :is(.gl-1, .gold-apply .gl-2) .gl-ring, .gold-apply[data-step="4"] :is(.gl-1, .gold-apply .gl-2, .gold-apply .gl-3) .gl-ring { background: var(--color-gold); border-color: var(--color-gold); }
+.gold-apply[data-step="2"] .gl-1 .gl-ring::before, .gold-apply[data-step="3"] :is(.gl-1, .gold-apply .gl-2) .gl-ring::before, .gold-apply[data-step="4"] :is(.gl-1, .gold-apply .gl-2, .gold-apply .gl-3) .gl-ring::before {
+  content: ""; width: 0.875rem; height: 0.875rem; background: var(--color-espresso);
+  -webkit-mask: url("../img/icon-check.svg") center / contain no-repeat; mask: url("../img/icon-check.svg") center / contain no-repeat;
+}
+.gold-apply[data-step="2"] .gl-1 .gl-name, .gold-apply[data-step="3"] :is(.gl-1, .gold-apply .gl-2) .gl-name, .gold-apply[data-step="4"] :is(.gl-1, .gold-apply .gl-2, .gold-apply .gl-3) .gl-name { color: var(--color-text-inverse); }
+.gold-apply[data-step="2"] .gl-1::after, .gold-apply[data-step="3"] :is(.gl-1, .gold-apply .gl-2)::after, .gold-apply[data-step="4"] :is(.gl-1, .gold-apply .gl-2)::after { transform: scaleX(1); }
+
+/* the panel: the colour of the back of the card, with its inset gold border */
+.gold-apply-panel {
+  position: relative; isolation: isolate; grid-column: 1 / -1; margin-top: calc(var(--panel-overlap) * -1); padding: var(--space-4) var(--space-4) 0;
+  background: var(--color-gold-deep); border: 1px solid var(--color-tier-edge-gold); border-radius: var(--radius-md);
+}
+.gold-apply-panel::after { content: ""; position: absolute; inset: 8px; z-index: 0; border: 1px solid var(--color-tier-edge-gold); border-radius: calc(var(--radius-md) - 6px); pointer-events: none; }
+.gold-apply-panel > * { position: relative; z-index: 1; }
+.gold-apply-panel .flow-col { min-height: 20rem; }
+.gold-apply-panel .flow-loading { color: var(--color-text-muted-inverse); padding-top: var(--space-4); }
+
+/* the gold line along the panel's top edge is the real progress bar */
+.gold-apply .progress { position: absolute; z-index: 2; top: 0; left: var(--space-4); right: var(--space-4); height: 2px; background: var(--color-hairline-inverse); }
+
+/* one column inside the panel at every size */
+.gold-apply .screen:not(.gold-sent) { display: flex; flex-direction: column; padding-top: var(--space-2); }
+.gold-apply .screen-head { position: static; }
+.gold-apply .screen-title { max-width: none; color: var(--color-text-inverse); }
+.gold-apply .screen-head .lead { margin-top: var(--space-2); color: var(--color-text-muted-inverse); }
+.gold-apply .screen-body { flex: none; }
+
+/* questions: the gold hairline before each legend */
+.gold-apply .question { margin-top: var(--space-5); }
+.gold-apply .screen-body > .question:first-child { margin-top: var(--space-5); }
+.gold-apply .question > legend, .gold-apply .question-title { display: flex; align-items: center; gap: var(--space-3); font-family: var(--font-display); font-weight: 400; font-size: var(--text-lg); color: var(--color-text-inverse); }
+.gold-apply .question > legend::before, .gold-apply .question-title::before { content: ""; flex: none; width: 1.5rem; height: 1px; background: var(--color-gold); }
+.gold-apply .question-help { padding-left: calc(1.5rem + var(--space-3)); color: var(--color-text-muted-inverse); }
+.gold-apply .question .tiles, .gold-apply .question .segmented, .gold-apply .question .field { margin-top: var(--space-3); }
+.gold-apply .question-title + .field-pair { margin-top: var(--space-3); }
+
+/* follow-ups on a gold thread; the Other text sits straight under the industry tiles */
+.gold-apply .sub-question { margin-top: var(--space-5); }
+.gold-apply [data-group="property_link"], .gold-apply [data-group="size_range"] { padding-left: var(--space-4); border-left: 1px solid var(--color-thread); }
+.gold-apply [data-group="property_link"] > legend::before, .gold-apply [data-group="size_range"] > legend::before { display: none; }
+.gold-apply [data-group="property_link"] .question-help, .gold-apply [data-group="size_range"] .question-help { padding-left: 0; }
+.gold-apply .sub-question[data-sub="industry_other"] { margin-top: var(--space-3); }
+.gold-apply .sub-question[data-sub="industry_other"] .field { margin-top: 0; }
+
+/* choice tiles: espresso wells set into the panel */
+.gold-apply .tile { background: var(--color-espresso); border-color: var(--color-hairline-inverse); }
+.gold-apply .tile-label { font-size: var(--text-base); }
+.gold-apply .tiles--4 .tile:not(.tile-image) { padding: var(--space-3) var(--space-4); }
+.gold-apply .tile-mark { border-color: var(--color-control-line); }
+.gold-apply .tiles--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.gold-apply .tile:has(input:checked) { border-color: var(--color-gold); background: linear-gradient(var(--color-chosen-wash), var(--color-chosen-wash)), var(--color-espresso); }
+.gold-apply .tile:has(input:checked) .tile-mark { border-color: var(--color-gold); }
+.gold-apply .tile-multi:has(input:checked) .tile-mark { background: var(--color-gold); }
+.gold-apply .tile-multi:not(:has(input:checked)) .tile-mark { background: none; }
+.gold-apply .tile:has(input:focus-visible) { outline: 2px solid var(--color-gold); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .gold-apply .tile:hover:not(:has(input:checked)) { border-color: var(--color-control-line); } }
+.gold-apply .tiles--1.tiles-company { grid-template-columns: minmax(0, 1fr); }
+.gold-apply .tile[aria-disabled="true"] { opacity: 1; border-color: var(--color-hairline-inverse); color: var(--color-text-muted-inverse); pointer-events: none; }
+.gold-apply .question:has([data-error-slot][data-state="error"]) .tile { border-color: var(--color-danger-inverse); }
+
+/* segmented */
+.gold-apply .segmented { background: var(--color-hairline-inverse); border-color: var(--color-hairline-inverse); }
+.gold-apply .seg { background: var(--color-espresso); }
+.gold-apply .seg:has(input:checked) { background: var(--color-gold); color: var(--color-espresso); }
+@media (hover: hover) and (pointer: fine) { .gold-apply .seg:hover:not(:has(input:checked)) { background: var(--color-espresso-raised); } }
+
+/* text fields: the register well, in the dark */
+.gold-apply .field { position: relative; gap: var(--space-1); }
+.gold-apply .field > label:not(.check) {
+  position: absolute; top: 0.5rem; left: var(--space-3); z-index: 1; max-width: calc(100% - var(--space-4)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--text-sm); font-weight: 500; line-height: 1.2; color: var(--color-text-muted-inverse); pointer-events: none;
+}
+.gold-apply .field .optional { color: inherit; }
+.gold-apply .field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .gold-apply .field textarea {
+  min-height: var(--control-h-label); padding: 1.5rem var(--space-3) 0.375rem; background: var(--color-espresso); color: var(--color-text-inverse);
+  border: 0; border-bottom: 1px solid var(--color-control-line); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.gold-apply .field textarea { min-height: 7.5rem; padding-top: 1.75rem; }
+.gold-apply .field input:not([type="checkbox"]):focus-visible, .gold-apply .field textarea:focus-visible { outline: none; }
+.gold-apply .field input:not([type="checkbox"]):focus, .gold-apply .field textarea:focus { border-bottom-color: var(--color-gold); box-shadow: inset 0 -2px 0 var(--color-gold); }
+.gold-apply .field:has(input:not([type="checkbox"]):focus) > label:not(.check), .gold-apply .field:has(textarea:focus) > label { color: var(--color-text-inverse); }
+.gold-apply .field input[aria-invalid="true"]:not([type="checkbox"]), .gold-apply .field textarea[aria-invalid="true"] { border-bottom-color: var(--color-danger-inverse); box-shadow: inset 0 -2px 0 var(--color-danger-inverse); }
+.gold-apply .field:has(input[aria-invalid="true"]:not([type="checkbox"])) > label:not(.check), .gold-apply .field:has(textarea[aria-invalid="true"]) > label { color: var(--color-danger-inverse); }
+@media (hover: hover) and (pointer: fine) { .gold-apply .field input:not([type="checkbox"]):hover, .gold-apply .field textarea:hover { border-bottom-color: var(--color-text-inverse); } }
+.gold-apply .feedback { margin-top: var(--space-1); color: var(--color-text-muted-inverse); }
+.gold-apply .feedback[data-state="error"] { color: var(--color-danger-inverse); }
+.gold-apply .field-pair { display: grid; gap: var(--space-3); }
+.gold-apply .field-pair .field { margin-top: 0; }
+.gold-apply .fieldset-gap { margin-top: var(--space-3); }
+
+/* consents: choosing, not ticking */
+.gold-apply .question > .field:has(.check) { margin-top: var(--space-3); }
+.gold-apply .check {
+  align-items: center; min-height: var(--tile-min-h); padding: var(--space-3) var(--space-4); background: var(--color-espresso);
+  border: 1px solid var(--color-hairline-inverse); border-radius: var(--radius-md);
+}
+.gold-apply .check input { background: none; border-color: var(--color-control-line); }
+.gold-apply .check input:checked { background: var(--color-gold); border-color: var(--color-gold); }
+.gold-apply .check span a { color: inherit; text-decoration: underline; text-underline-offset: 0.2em; }
+.gold-apply .check:has(input:checked) { border-color: var(--color-gold); box-shadow: inset 0 0 0 1px var(--color-gold); }
+.gold-apply .check:has(input[aria-invalid="true"]) { border-color: var(--color-danger-inverse); box-shadow: inset 0 0 0 1px var(--color-danger-inverse); }
+.gold-apply .check:has(input:focus-visible) { outline: 2px solid var(--color-gold); outline-offset: 3px; }
+.gold-apply .check input:focus-visible { outline: none; }
+@media (hover: hover) and (pointer: fine) { .gold-apply .check:hover:not(:has(input:checked)):not(:has(input[aria-invalid="true"])) { border-color: var(--color-control-line); } }
+
+/* "From your earlier answers" */
+.gold-apply .summary-panel { margin-top: var(--space-5); padding: var(--space-4); background: var(--color-espresso); border: 1px solid var(--color-tier-edge-gold); border-radius: var(--radius-md); }
+.gold-apply .summary-panel h2 { color: var(--color-text-muted-inverse); font-size: var(--text-base); }
+.gold-apply .summary-panel ul { gap: var(--space-3); }
+.gold-apply .summary-panel li { color: var(--color-text-inverse); }
+.gold-apply .summary-panel li::before { content: ""; display: block; width: 1.5rem; height: 1px; margin-bottom: var(--space-2); background: var(--color-gold); }
+.gold-apply .summary-panel .btn-quiet { display: inline-flex; align-items: center; min-height: 2.75rem; margin-top: var(--space-3); }
+
+/* buttons and the bar: sticky on a phone, inside the panel */
+.gold-apply .action-bar {
+  margin: var(--space-5) calc(var(--space-4) * -1) 0; padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+  background: var(--color-gold-deep); border-top: 1px solid var(--color-hairline-inverse); border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+.gold-apply .action-bar .btn-quiet { display: inline-flex; align-items: center; min-height: 2.75rem; }
+.gold-apply .btn-quiet { color: var(--color-text-inverse); }
+
+/* sent and closed */
+.gold-apply .gold-sent { min-height: 20rem; padding-block: var(--space-5); }
+.gold-apply .gold-sent .lead { color: var(--color-text-muted-inverse); }
+.gold-apply .gold-sent .reference {
+  display: flex; align-items: center; justify-content: center; gap: var(--space-3); font-size: var(--text-sm); font-weight: 500; text-transform: uppercase;
+  letter-spacing: var(--tracking-engraved); font-variant-numeric: tabular-nums; color: var(--color-gold-light);
+}
+.gold-apply .gold-sent .reference::before, .gold-apply .gold-sent .reference::after { content: ""; flex: none; width: 1.5rem; height: 1px; background: var(--color-gold); }
+.gold-apply .gold-sent .actions .btn-quiet { display: inline-flex; align-items: center; min-height: 2.75rem; }
+
+/* tablet: stacked as the phone, a larger card, a panel at reading width */
+@media (min-width: 48em) {
+  .gold-apply-card { width: 10rem; }
+  .gold-apply-panel { max-width: 40rem; padding: var(--space-5) var(--space-5) 0; }
+  .gold-apply-panel::after { inset: 12px; }
+  .gold-apply .progress { left: var(--space-5); right: var(--space-5); }
+  .gold-apply .action-bar { margin-inline: calc(var(--space-5) * -1); padding-inline: var(--space-5); }
+  .gold-apply .field-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gold-apply .tiles--1.tiles-company { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* desktop: the stage stays, the panel scrolls */
+@media (min-width: 64em) {
+  .gold-apply { padding-bottom: var(--space-7); }
+  .gold-apply::before { left: 45%; }
+  .gold-apply-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+  .gold-apply-stage {
+    grid-column: 1 / span 5; grid-row: 1; display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 0;
+    padding: var(--space-5) var(--space-5) var(--space-5) 0;
+    background: radial-gradient(50% 40% at 40% 32%, var(--color-glow), transparent 70%);
+  }
+  .gold-apply-card { width: auto; max-width: 100%; height: var(--register-photo-h); }
+  .gold-apply-stage-copy { margin-top: var(--space-5); }
+  .gold-apply-label { letter-spacing: var(--tracking-engraved); }
+  .gold-apply-note { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-5); font-size: var(--text-sm); color: var(--color-text-muted-inverse); }
+  .gold-apply-note::before { content: ""; flex: none; width: 1.5rem; height: 1px; background: var(--color-gold); }
+  .gold-apply-panel { grid-column: 7 / span 6; grid-row: 1; margin: var(--space-6) 0; padding: var(--space-6) var(--space-6) 0; }
+  .gold-apply .progress { left: var(--space-5); right: var(--space-5); }
+  .gold-apply .question { margin-top: var(--space-6); }
+  .gold-apply .sub-question { margin-top: var(--space-5); }
+  .gold-apply .sub-question[data-sub="industry_other"] { margin-top: var(--space-3); }
+  .gold-apply .summary-panel { padding: var(--space-5); }
+  .gold-apply .action-bar { position: static; margin: var(--space-5) 0 0; padding: var(--space-5) 0 var(--space-6); border-top: 1px solid var(--color-hairline-inverse); background: none; border-radius: 0; }
+  .gold-apply .action-bar .btn-primary { margin-left: auto; order: 0; }
+  .gold-apply .gold-sent { min-height: 24rem; }
+  .gold-apply .flow-col { min-height: 0; }
+  .gold-apply-ledger { display: grid; margin-top: var(--space-5); }
+  .gold-apply .gl-1, .gold-apply .gl-2, .gold-apply .gl-3 { display: grid; grid-template-columns: 2rem 1fr; gap: var(--space-3); height: 3.25rem; margin-right: 0; }
+  .gold-apply .gl-1::before, .gold-apply .gl-2::before, .gold-apply .gl-1::after, .gold-apply .gl-2::after { left: calc(1rem - 0.5px); top: 2.625rem; width: 1px; height: 1.25rem; }
+  .gold-apply .gl-1::after, .gold-apply .gl-2::after { transform: scaleY(0); transform-origin: top; }
+  .gold-apply[data-step="2"] .gl-1::after, .gold-apply[data-step="3"] :is(.gl-1, .gold-apply .gl-2)::after, .gold-apply[data-step="4"] :is(.gl-1, .gold-apply .gl-2)::after { transform: scaleY(1); }
+  .gold-apply .gl-ring { width: 2rem; height: 2rem; }
+  .gold-apply .gl-name { display: block; font-size: var(--text-base); }
+  .gold-apply-panel .progress-fill { transition-duration: var(--duration-slow); }
+}
+/* desktop, tall enough: the stage sticks; on short screens it scrolls with the page */
+@media (min-width: 64em) and (min-height: 42em) {
+  .gold-apply-stage { position: sticky; top: var(--header-h); height: calc(100svh - var(--header-h)); align-self: start; }
+}
+@media (prefers-reduced-motion: reduce) { .gl-1::after, .gold-apply .gl-2::after { transition: none; } }

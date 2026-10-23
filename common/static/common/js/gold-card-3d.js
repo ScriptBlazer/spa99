@@ -14,6 +14,14 @@ const W = 85.6, H = 54, R = 3.18, BEV = 0.18, DEPTH = 0.44;       // millimetres
 const FW = 1024, FH = 646, BW = 1024, BH = 646;                    // face and back map sizes
 const D2R = Math.PI / 180;
 const WALL = 0.9;                                                // brightness of the studio walls (the floor of the card's light)
+// The look per page (2026-10-23, Moishe): on Home the card read as if a bright light was always on it. There the studio walls are darker,
+// the exposure a touch lower, and the reflections dim and brighten as the card turns (`mood`: how far they dim at the darkest angle, never
+// to black). The Gold Card page hero keeps the bright studio it had. `period` is the turn in degrees from one bright angle to the next.
+const LOOK = {
+  home: { wall: 0.55, exposure: 0.9, mood: 0.45, period: 36, peak: 2 },
+  hero: { wall: WALL, exposure: 1, mood: 0, period: 36, peak: 0 },
+};
+const BASE = { face: 0.5, edge: 0.6, back: 0.62, light: 0.6 };   // reflection and key light strengths at the brightest moment
 const idle = (fn) => new Promise((resolve) => (window.requestIdleCallback ? requestIdleCallback(() => resolve(fn()), { timeout: 800 }) : setTimeout(() => resolve(fn()), 0)));
 
 function roundedRect(w, h, r) {
@@ -155,6 +163,7 @@ function detail(ctx, ppm, { wings, groove, micro }) {
 
 export function create(mount, { gsap, tokens, card }) {
   const tok = (name) => new THREE.Color(tokens(name));
+  const look = LOOK[mount.dataset.goldCard] || LOOK.hero;
   const exporting = new URLSearchParams(location.search).has('gc-export') && mount.hasAttribute('data-gc-export');
   const box = mount.querySelector('.gc-gl');
   const disposables = [];
@@ -259,7 +268,7 @@ export function create(mount, { gsap, tokens, card }) {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: tok(hex).multiplyScalar(k) }));
       m.position.set(x, y, z); m.lookAt(0, 0, 0); studio.add(m);
     };
-    studio.add(new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshBasicMaterial({ color: tok('--color-gold-studio').multiplyScalar(WALL), side: THREE.BackSide })));   // warm walls: the face never meets black
+    studio.add(new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshBasicMaterial({ color: tok('--color-gold-studio').multiplyScalar(look.wall), side: THREE.BackSide })));   // warm walls: the face never meets black
     part(2.6, 0.9, '--color-led', 1.5, -2.5, 2.4, 3);        // key softbox
     part(0.2, 5, '--color-gold-studio', 3.5, 0, 0, 4.5);         // the sheen strip
     part(0.15, 4, '--color-led', 5, 4, 0.5, -1);         // rim strip
@@ -292,14 +301,14 @@ export function create(mount, { gsap, tokens, card }) {
     const bronze = tok('--color-gold-deep').lerp(tok('--color-gold-metal'), 0.22);
     bronze.g += 0.03; bronze.b += 0.075;                                              // NeutralToneMapping takes ~0.04 off the weakest channel: a dark metal would go orange without this
     mats.back = own(new THREE.MeshPhysicalMaterial({
-      color: bronze, metalness: 1, roughness: 1, envMapIntensity: 0.62, clearcoat: 0.2, clearcoatRoughness: 0.3, normalMap: maps.backNormal, roughnessMap: maps.backRough, metalnessMap: maps.backRough,
+      color: bronze, metalness: 1, roughness: 1, envMapIntensity: BASE.back, clearcoat: 0.2, clearcoatRoughness: 0.3, normalMap: maps.backNormal, roughnessMap: maps.backRough, metalnessMap: maps.backRough,
     }));
     mats.face.onBeforeCompile = (shader) => {   // the fine detail is added on top of the relief map, whatever `relief` is
       shader.uniforms.fineMap = { value: maps.faceFine };
       shader.fragmentShader = shader.fragmentShader.replace('#include <common>', 'uniform sampler2D fineMap;\n#include <common>')
         .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n#ifdef USE_NORMALMAP_TANGENTSPACE\n\tvec3 fineN = texture2D( fineMap, vNormalMapUv ).xyz * 2.0 - 1.0;\n\tnormal = normalize( normal + tbn * vec3( fineN.xy / fineN.z, 0.0 ) );\n#endif');
     };
-    Object.assign(mats.face, { envMap: scene.environment, envMapIntensity: 0.5 }); mats.back.envMap = mats.edge.envMap = scene.environment; mats.edge.envMapIntensity = 0.6;   // per-material intensity needs the map set on the material (three r163+)
+    Object.assign(mats.face, { envMap: scene.environment, envMapIntensity: BASE.face }); mats.back.envMap = mats.edge.envMap = scene.environment; mats.edge.envMapIntensity = BASE.edge;   // per-material intensity needs the map set on the material (three r163+)
     const faceGeo = own(faceGeometry());
     const front = new THREE.Mesh(faceGeo, mats.face); front.position.z = zf;
     const back = new THREE.Mesh(faceGeo, mats.back); back.rotation.y = Math.PI; back.position.z = -zf;
@@ -307,7 +316,7 @@ export function create(mount, { gsap, tokens, card }) {
     group = new THREE.Group(); group.add(body, front, back);
     pivot = new THREE.Group(); pivot.add(group);
     scene.add(pivot);
-    light = new THREE.DirectionalLight(tok('--color-led'), 0.6);
+    light = new THREE.DirectionalLight(tok('--color-led'), BASE.light);
     light.position.set(-30, 40, 120);
     scene.add(light);
   }
@@ -324,6 +333,13 @@ export function create(mount, { gsap, tokens, card }) {
     const sweep = card.sheen * 68 * D2R;
     scene.environmentRotation.y = sweep;
     light.position.set(-30 * Math.cos(sweep) + 120 * Math.sin(sweep), 40, 120 * Math.cos(sweep) + 30 * Math.sin(sweep));
+    if (look.mood) {
+      // shadow and highlight: bright at `peak` degrees and every `period` after, darkest halfway between (Home: mid at rest, dark near -16 and 20, bright near 2)
+      const glint = 0.5 + 0.5 * Math.cos(((turn - look.peak) * 2 * Math.PI) / look.period);
+      const m = 1 - look.mood * (1 - glint);
+      mats.face.envMapIntensity = BASE.face * m; mats.edge.envMapIntensity = BASE.edge * m; mats.back.envMapIntensity = BASE.back * m;
+      light.intensity = BASE.light * m;
+    }
     drawLine();
   }
 
@@ -376,7 +392,7 @@ export function create(mount, { gsap, tokens, card }) {
   const ready = (async () => {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance', preserveDrawingBuffer: exporting });
     canvas = renderer.domElement;
-    renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1; renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure; renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setClearColor(0x000000, 0);
     dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     scene = new THREE.Scene();

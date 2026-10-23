@@ -276,7 +276,8 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --color-field-well: var(--color-cream);      /* derived (round 4): alias, no new colour. The filled field on the raised cream panel */
   --register-photo-h: clamp(10rem, 100svh - var(--header-h) - 28rem, 24rem); /* derived (round 4): the register stage picture, desktop */
   --panel-overlap: var(--space-5);             /* derived (round 4): how far the cream panel rises over the espresso stage, below 64em */
-  --tracking-engraved: 0.2em;                  /* derived (round 3): the engraved brand line on the Gold panel; also the small caps "Launching" label (Home opening band, register caption), round 5 */
+  --tracking-engraved: 0.2em;                  /* derived (round 3): the engraved brand line on the Gold panel; the "Launching" label used it in round 5, now --tracking-launch */
+  --tracking-launch: 0.3em;                    /* derived (2026-10-23): the "Launching" label (Home opening band, register caption): all caps, --text-base, weight 600 */
   --bar-h: 4.5rem;                             /* derived: Continue bar; 4rem from 64em */
   /* The Gold Card (docs/design/GOLD-CARD-3D.md 7.3). Derived, decoration only: the metal of one object. Brand gold is hue 31 degrees; nothing here goes brass (45+). */
   --color-gold-metal: #D9A46C;                 /* derived: card base metal (hue 31) */
@@ -360,4 +361,4 @@ The designer refines these per task. Frontend uses only tokens, never raw values
 - `--mount-gap-sm` 0.375rem: the same gap on small mounts (the kit tiles); does not grow at 48em.
 - `--band-h` min(62svh, 36rem): height of a full-bleed amenity band.
 - `--opener-measure` 26rem: widest the opener words go.
-- `--opener-pin` 0.6 (0.8 from 64em): opener pin length in screens.
+- `--opener-pin` 0.35 (0.5 from 64em): opener pin length in screens (shortened 2026-10-23: one line in the hero).

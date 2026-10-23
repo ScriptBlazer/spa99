@@ -244,6 +244,7 @@ function stepForSlug(slug) {
 function updateProgress() {
   const p = current === SENT_STEP ? 1 : current / (STEPS.length + 1);
   fill.style.setProperty('--p', String(p));
+  if (config.open) wrapper.dataset.step = String(current); else delete wrapper.dataset.step;
   progress.setAttribute('aria-valuenow', String(Math.round(p * 100)));
   progress.setAttribute('aria-valuetext', current === SENT_STEP ? 'Sent' : `${c(`screen_${current}`).heading.replace(/\.$/, '')}, part ${current} of ${STEPS.length}`);
 }

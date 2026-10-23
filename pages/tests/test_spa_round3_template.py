@@ -37,7 +37,9 @@ class SpaRound3TemplateTests(TestCase):
         for hook in ("sp-moment", "sp-tote", "sp-detail", "home-slippers"):
             self.assertNotIn(hook, html)
         self.assertEqual(html.count('class="kit-item"'), 4)  # the kit keeps its labels on swan tiles
-        self.assertEqual(html.count("data-opener-line"), 4)
+        self.assertEqual(html.count("data-opener-line"), 1)  # one line in the hero (2026-10-23)
+        self.assertNotIn("For men only.", html)
+        self.assertNotIn("opener-tick", html)
         self.assertNotIn("Eight spaces, one quiet visit", html)
 
     def test_robe_opener_with_a_phone_picture(self):

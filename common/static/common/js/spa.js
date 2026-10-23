@@ -3,13 +3,13 @@
  * the matchMedia setup, the header and the shared patterns; this file adds the scenes of this page so Home's script stays as small as it was.
  * Same rules as scenes.js: transform and opacity only, scroll-driven tweens use ease "none", a scene that throws shows its static content.
  *   door   S1 the opener (docs/design/SPA-OPENER.md): the full-screen picture (the robe, or the door) shrinks onto .door-target inside a short pin
- *          (windowTo, Home's method), four lines fade one into the next as it goes (text never moves), the chips arrive at the end
+ *          (windowTo, Home's method), one line ("Open 5am to 3am.") sits still, the chips arrive at the end
  *   moment AMENITIES.md M1 to M3: a full-bleed band (the picture travels a little and settles) or the overlapping pair of mounts; words rise or fade
  *   feature S2a/c/d: name rises, line and pills fade up, hairline draws (scrubbed), frame settles and drifts, inset and thumbnail travel more
  *   tiles  S2b: intro, staggered tiles settle at their own depth (desktop only), captions lag
  *   steps  S3: the line draws through the three steps (scrubbed), numbers come up as it reaches them
  *   band   S4: heading, line, buttons, the tote mount settles, the swan pattern drifts
- * Hooks: data-door-window / data-door-media / data-door-target, data-opener-line / data-opener-tick, data-band, data-rule, data-step, data-steps, data-walk (the future room walk).
+ * Hooks: data-door-window / data-door-media / data-door-target, data-opener-line, data-band, data-rule, data-step, data-steps, data-walk (the future room walk).
  */
 import { SCENES, cleanups, lineRise, fadeUp, settle, depth, drift, windowTo, pinnedScene } from './scenes.js';
 
@@ -50,15 +50,14 @@ if (gsap && ScrollTrigger) {
   SCENES.door = (el, { desktop }) => {
     const q = (s) => el.querySelector(s);
     const mode = el.dataset.opener in OPENER_FOCUS ? el.dataset.opener : 'robe';
-    // Same method as Home's arrival, a little longer because four lines read inside it: the length in screens is the token --opener-pin (0.8 desktop, 0.6 phone).
-    const per = parseFloat(getComputedStyle(el).getPropertyValue('--opener-pin')) || (desktop ? 0.8 : 0.6);
+    // Same method and length as Home's arrival (one line only since 2026-10-23, so nobody stops mid-scroll): the token --opener-pin (0.5 desktop, 0.35 phone).
+    const per = parseFloat(getComputedStyle(el).getPropertyValue('--opener-pin')) || (desktop ? 0.5 : 0.35);
     const tl = pinnedScene(el, { segments: 2, perSegment: per, scrub: desktop ? 0.5 : 0.3 });
     tl.to({}, { duration: 1 }, 0);
 
-    // on load: the heading rises, then line 1 and the ticks come up as one group (the picture fades in from espresso in CSS)
+    // on load: the heading rises, then the line comes up (the picture fades in from espresso in CSS)
     lineRise(q('.door-title'), { trigger: false, delay: 0.2 });
-    const lines = [...el.querySelectorAll('[data-opener-line]')], ticks = [...el.querySelectorAll('[data-opener-tick]')];
-    const first = [...(lines[0]?.children || []), q('.opener-ticks')].filter(Boolean);
+    const first = [...(q('[data-opener-line]')?.children || [])];
     if (first.length) gsap.fromTo(first, { opacity: 0, y: desktop ? 12 : 8 }, { opacity: 1, y: 0, duration: 0.8, delay: 0.6 });
 
     // on scroll: the window shrinks onto the frame (0.15 to 0.85); the veil holds, then clears once the picture has left the words; the lights come up
@@ -68,22 +67,6 @@ if (gsap && ScrollTrigger) {
       .to(q('.door-window .frame-tint'), { opacity: 0.14, duration: 0.15 }, 0.7);
     // only the old zoomed-in door eases back around the swan while the window shrinks; the robe and the wide door are already composed
     if (mode === 'door-gold') tl.fromTo(q('.door-zoom'), { scale: 1, transformOrigin: `${focus.x * 100}% ${focus.y * 100}%` }, { scale: desktop ? 0.68 : 0.66, duration: 0.7 }, 0.15);
-
-    // the lines: each one fades out, the next fades in a beat later (never both legible), the ticks follow. Text and ticks only change opacity.
-    // With N lines the changes are spread evenly over 0.14 to 0.68 (SPA-OPENER 5.2); two lines fade over 0.02 of each other at most.
-    const N = lines.length;
-    if (N > 1) {
-      const step = N > 2 ? (0.68 - 0.14 - 0.1) / (N - 2) : 0;
-      for (let k = 0; k < N - 1; k++) {
-        const at = 0.14 + k * step;
-        tl.fromTo(lines[k + 1], { opacity: 0 }, { opacity: 1, duration: 0.06 }, at + 0.04)
-          .fromTo(lines[k], { opacity: 1 }, { opacity: 0, duration: 0.06, immediateRender: false }, at);
-        if (ticks.length === N) {
-          tl.fromTo(ticks[k + 1], { opacity: 0.3 }, { opacity: 1, duration: 0.06 }, at + 0.04)
-            .fromTo(ticks[k], { opacity: 1 }, { opacity: 0.3, duration: 0.06, immediateRender: false }, at);
-        }
-      }
-    }
 
     // the room chips arrive in the last fifth
     tl.fromTo(q('.door-chips'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.2 }, 0.8);

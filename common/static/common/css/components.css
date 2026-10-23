@@ -286,4 +286,4 @@ body:has(dialog[open]) { overflow: hidden; }
 .hours dd { margin: 0; }
 
 /* the small caps "Launching" label above an opening date (Home band, register caption) */
-.launch-label { display: block; margin-bottom: var(--space-1); font-size: var(--text-sm); font-weight: 500; text-transform: uppercase; letter-spacing: var(--tracking-engraved); color: var(--color-text-muted-inverse); }
+.launch-label { display: block; margin-bottom: var(--space-2); font-size: var(--text-base); font-weight: 600; text-transform: uppercase; letter-spacing: var(--tracking-launch); color: var(--color-text-muted-inverse); }
