@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import DailyMetric, MetricCounter, MetricText, OfficeGoal, PeriodMetric
+from .models import DailyMetric, Insight, MetricCounter, MetricText, OfficeGoal, PeriodMetric
 
 
 @admin.register(OfficeGoal)
@@ -46,3 +46,9 @@ class PeriodMetricAdmin(ReadOnlyAdmin):
 @admin.register(MetricText)
 class MetricTextAdmin(ReadOnlyAdmin):
     list_display = ("key", "scope", "text", "updated_at")
+
+
+@admin.register(Insight)
+class InsightAdmin(ReadOnlyAdmin):
+    list_display = ("range", "key", "rank", "label", "value", "of_total", "updated_at")
+    list_filter = ("range", "key")

@@ -16,7 +16,7 @@ from datetime import date, timedelta
 from django.db import transaction
 from django.db.models import Sum
 
-from . import metrics, summaries, visitors
+from . import facts, metrics, summaries, visitors
 from .metrics import K, RATE_KEYS
 from .models import DailyMetric, MetricCounter, PeriodMetric, VisitorHash, VisitorSalt
 
@@ -67,6 +67,7 @@ def run(today=None, since="window"):
         periods = _write_periods(start)
         _refresh_counters()
         sentences = summaries.write_all(today)
+        facts.write_all(today)
     return {"wiped_visitor_rows": wiped, "daily_rates": daily_rates, "period_rows": periods, "sentences": sentences}
 
 

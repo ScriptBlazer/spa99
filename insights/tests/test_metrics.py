@@ -15,7 +15,7 @@ from gold.tests.test_gold import application_data
 from gold import services as gold_services
 from insights import metrics, rebuild, rollup, visitors
 from insights.metrics import K
-from insights.models import DailyMetric, MetricCounter, MetricText, PeriodMetric, VisitorHash, VisitorSalt
+from insights.models import DailyMetric, Insight, MetricCounter, MetricText, PeriodMetric, VisitorHash, VisitorSalt
 from journey import engine
 from journey import services as journey
 from plans.management.commands.seed_phase1 import seed_all
@@ -179,6 +179,64 @@ class RollupAndRebuildTests(TestCase):
         call_command("rebuild_metrics", stdout=StringIO())
         self.assertEqual(rebuild.differences(), [])
         self.assertEqual(counter(K.REGISTRATIONS), 1)
+
+
+class InsightTests(TestCase):
+    """The stored "what people want" table: written by the roll-up from the daily rows, never on a page load."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def snapshot(self):
+        return sorted(Insight.objects.values_list("range", "key", "rank", "label", "value", "of_total", "sentence"))
+
+    def test_nothing_is_written_without_data(self):
+        rollup.run()
+        self.assertEqual(Insight.objects.count(), 0)  # no "0 of 0"
+
+    def test_roll_up_writes_insights_matching_the_daily_rows_and_is_idempotent(self):
+        from journey.models import Option
+
+        finished_journey(time="evening")
+        finished_journey(time="evening")
+        finished_journey(time="daytime")
+        services.register_interest(cleaned())
+        rollup.run()
+        first = self.snapshot()
+        rollup.run()
+        self.assertEqual(first, self.snapshot())
+        top, second = (Insight.objects.get(range="7d", key="time", rank=r) for r in (1, 2))
+        label = lambda value: Option.objects.get(question__key="time", value=value).label  # noqa: E731
+        self.assertEqual((top.label, top.value, top.of_total), (label("evening"), 2, 3))
+        self.assertEqual((second.label, second.value), (label("daytime"), 1))
+        self.assertIn("2 of 3", top.sentence)
+        self.assertEqual(top.value, DailyMetric.objects.get(key=K.JOURNEY_ANSWER, dimension="time:evening").value)
+        picked = Insight.objects.get(range="all", key="tier_picked", rank=1)
+        self.assertEqual((picked.value, picked.of_total), (1, 1))
+        self.assertFalse(Insight.objects.filter(key="source").exists())  # no referrer data: skipped
+        DailyMetric.objects.filter(key=K.JOURNEY_ANSWER).delete()  # data gone: the rows go too
+        rollup.run()
+        self.assertFalse(Insight.objects.filter(key="time").exists())
+
+    def test_rebuild_restores_insights_and_pages_read_them_in_one_query(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        from office import selectors
+
+        finished_journey(time="evening")
+        rollup.run()
+        before = self.snapshot()
+        Insight.objects.all().delete()
+        call_command("rebuild_metrics", stdout=StringIO())
+        self.assertEqual(before, self.snapshot())
+        with CaptureQueriesContext(connection) as ctx:
+            data = selectors.insights_for("7d", 2)
+        self.assertEqual(len(ctx), 1)
+        self.assertIn("time", [i["key"] for i in data])
+        pair = selectors.tier_pair(selectors.insights_for("all", 6))
+        self.assertTrue(all({"label", "picked", "suggested"} <= set(p) for p in pair))
 
 
 class VisitorCounterTests(TestCase):

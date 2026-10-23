@@ -80,6 +80,28 @@ class VisitorHash(models.Model):
         constraints = [models.UniqueConstraint(fields=["date", "hash"], name="visitor_hash_unique")]
 
 
+class Insight(models.Model):
+    """One stored "what people want" fact, written by the roll-up from the daily rows (nothing is worked out when a page
+    loads). Per range and key, rank 1 is the top answer and rank 2 the runner-up (and so on, to rank 6).
+    value of of_total: e.g. Gym, 5 of 7. The sentence is written on rank 1 only."""
+
+    range = models.CharField(max_length=5, help_text="today, 7d, 30d, 90d or all.")
+    key = models.CharField(max_length=30)
+    rank = models.PositiveSmallIntegerField()
+    title = models.CharField(max_length=60)
+    label = models.CharField(max_length=120)
+    value = models.PositiveIntegerField()
+    of_total = models.PositiveIntegerField()
+    sentence = models.CharField(max_length=300, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["range", "key", "rank"], name="insight_unique")]
+
+    def __str__(self):
+        return f"{self.key}[{self.range}] #{self.rank} {self.label}"
+
+
 class OfficeGoal(models.Model):
     """A goal or target for a dashboard ring, edited in the Django admin. No row = the ring shows "No goal set".
     All three are counts for the range."""

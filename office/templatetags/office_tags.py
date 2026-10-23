@@ -263,8 +263,8 @@ def ring_name(key):
 
 @register.filter
 def step_label(step):
-    """Funnel step names as the brief words them (the stored label says 'Completed it')."""
-    return "Finished it" if step.get("key") == "completed" else step.get("label", "")
+    """Funnel step names: the label the selector stored."""
+    return step.get("label", "")
 
 
 FUNNEL_FROM = {"visitors": "visitors", "started": "who started", "completed": "who finished"}

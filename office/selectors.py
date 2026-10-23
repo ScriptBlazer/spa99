@@ -5,7 +5,8 @@ from datetime import timedelta
 
 from insights import metrics, reader
 from insights.metrics import K
-from insights.models import DailyMetric, MetricCounter, MetricText, OfficeGoal, PeriodMetric
+from insights import facts
+from insights.models import DailyMetric, Insight, MetricCounter, MetricText, OfficeGoal, PeriodMetric
 from insights.rollup import basis_points
 from journey.models import Option, Question
 from plans.models import Plan
@@ -60,6 +61,32 @@ def _text(key, scope):
     return MetricText.objects.filter(key=key, scope=scope).values_list("text", flat=True).first() or ""
 
 
+def insights_for(range_name, max_rank):
+    """The stored "what people want" facts for a range, one query: [{key, title, top, runner_up, options, sentence}] in
+    the fixed order; an insight with no data has no rows and is simply absent."""
+    grouped = {}
+    for row in Insight.objects.filter(range=range_name, rank__lte=max_rank).order_by("key", "rank"):
+        grouped.setdefault(row.key, []).append(row)
+    out = []
+    for key in facts.ORDER:
+        rows = grouped.get(key)
+        if not rows:
+            continue
+        options = [{"rank": r.rank, "label": r.label, "value": r.value, "of_total": r.of_total,
+                    "share_bp": basis_points(r.value, r.of_total) or 0} for r in rows]
+        out.append({"key": key, "title": rows[0].title, "sentence": rows[0].sentence, "top": options[0],
+                    "runner_up": options[1] if len(options) > 1 else None, "options": options})
+    return out
+
+
+def tier_pair(insights):
+    """Picked vs suggested tier side by side, from the stored insight rows: [{label, picked, suggested}] (counts)."""
+    by_key = {i["key"]: {o["label"]: o["value"] for o in i["options"]} for i in insights if i["key"] in ("tier_picked", "tier_suggested")}
+    picked, suggested = by_key.get("tier_picked", {}), by_key.get("tier_suggested", {})
+    labels = sorted(set(picked) | set(suggested), key=lambda x: (-(picked.get(x, 0) + suggested.get(x, 0)), x))
+    return [{"label": x, "picked": picked.get(x, 0), "suggested": suggested.get(x, 0)} for x in labels]
+
+
 # ---------- dashboard ----------
 
 def dashboard(range_name="7d", today=None):
@@ -99,12 +126,12 @@ def dashboard(range_name="7d", today=None):
                 "previous": previous, "change": value - previous}
 
     rings = [
-        ring("journeys_started", "People started", OfficeGoal.JOURNEYS_STARTED, started, total(K.PEOPLE_STARTED, before_days)),
-        ring("journeys_completed", "Finished it", OfficeGoal.JOURNEYS_FINISHED, done, total(K.PEOPLE_FINISHED, before_days)),
-        ring("registrations", "Registered", OfficeGoal.REGISTRATIONS, registered, total(K.PEOPLE_REGISTERED, before_days)),
+        ring("journeys_started", "Started the journey", OfficeGoal.JOURNEYS_STARTED, started, total(K.PEOPLE_STARTED, before_days)),
+        ring("journeys_completed", "Finished the journey", OfficeGoal.JOURNEYS_FINISHED, done, total(K.PEOPLE_FINISHED, before_days)),
+        ring("registrations", "Registered interest", OfficeGoal.REGISTRATIONS, registered, total(K.PEOPLE_REGISTERED, before_days)),
     ]
     funnel_values = [("visitors", "Visitors", visitors), ("started", "Started the journey", started),
-                     ("completed", "Completed it", done), ("registered", "Registered", registered)]
+                     ("completed", "Finished the journey", done), ("registered", "Registered interest", registered)]
     funnel = []
     for i, (key, label, value) in enumerate(funnel_values):
         funnel.append({"key": key, "label": label, "value": value,
@@ -121,6 +148,7 @@ def dashboard(range_name="7d", today=None):
         "range": range_name, "ranges": list(DASHBOARD_RANGES), "today": today.isoformat(),
         "what_changed": _text("dashboard_changed", range_name),
         "gold_waiting": waiting_count(stored), "rings": rings, "stats": stats, "funnel": funnel, "funnel_note": FUNNEL_NOTE if any(f["partial"] for f in funnel) else "",
+        "insights": insights_for(range_name, 2),
         "waiting": {
             "count": waiting_count(stored),
             "items": [{"id": str(a.pk), "name": a.full_name, "potential": a.potential_level, "applied": a.created_at.isoformat()} for a in waiting_rows],
@@ -198,13 +226,14 @@ def analytics(range_name="30d", today=None):
     total = lambda key: series[key]["total"]  # noqa: E731
 
     funnel_def = [("visitors", "Visitors", total(K.VISITORS)), ("started", "Started the journey", total(K.PEOPLE_STARTED)),
-                  ("completed", "Completed it", total(K.PEOPLE_FINISHED)), ("registered", "Registered", total(K.PEOPLE_REGISTERED))]
+                  ("completed", "Finished the journey", total(K.PEOPLE_FINISHED)), ("registered", "Registered interest", total(K.PEOPLE_REGISTERED))]
     funnel = [{"key": k, "label": label, "value": v, "share_bp": min(basis_points(v, funnel_def[0][2]) or 0, 10000),
                "step_rate_bp": _share(v, funnel_def[i - 1][2]) if i else None,
                "partial": bool(i and v > funnel_def[i - 1][2])}
               for i, (k, label, v) in enumerate(funnel_def)]
 
     plans = _plan_order()
+    people = insights_for(range_name, facts.MAX_RANK)
 
     def by_plan(key):
         found = _by_dimension(rows, key, labels)
@@ -253,6 +282,7 @@ def analytics(range_name="30d", today=None):
         "registrations_by_plan": by_plan(K.REGISTRATIONS_BY_PLAN), "suggested_plan": by_plan(K.SUGGESTED_PLAN),
         "registrations_by_source": [{"dimension": d, "value": v} for d, v in sorted(_by_dimension(rows, K.REGISTRATIONS_BY_SOURCE, labels).items())],
         "journey_answers": answers, "drop_off": screens, "gold": gold,
+        "insights": people, "tier_pair": tier_pair(people),
         "summaries": {chart: texts.get(f"chart_{chart}", "") for chart in
                       ("visitors", "funnel", "registrations_by_plan", "suggested_plan", "journey_answers", "drop_off", "gold", "top_pages", "referrers")},
     }
