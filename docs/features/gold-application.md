@@ -39,6 +39,8 @@ Answers already given in the journey are reused, never asked twice.
 
 Privacy notice link and marketing opt-in as in sign-up.
 
+**Look** (2026-10-23, `docs/design/GOLD-APPLY-ROUND5.md`): espresso stage (card still, "Apply for the Gold Card", ledger About you / Your visits / You) beside a raised gold-deep panel. `gold-apply.js` sets `data-step` on the wrapper so the ledger follows the current screen; nothing else in the flow changed.
+
 ## Potential rating
 
 Automatic **High / Medium / Low**, points-based, weights editable in Control.
