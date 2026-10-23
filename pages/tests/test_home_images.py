@@ -36,7 +36,10 @@ class HomeImageTests(TestCase):
         self.assertIn("hero-poster-portrait", html)
         names = re.findall(r"img/([a-z0-9-]+)-480\.webp", html)
         self.assertIn("cold-plunge", names)
-        self.assertEqual(len(names), len(set(names)), names)
+        # One allowed repeat: the dry sauna has a single photo, used in its scene and again as its hover preview
+        # in What's inside (shown only while hovered). Every other photo appears once (2026-10-23).
+        repeats = sorted({n for n in names if names.count(n) > 1})
+        self.assertEqual(repeats, ["dry-sauna"], names)
 
 
 class SmallFixTests(TestCase):

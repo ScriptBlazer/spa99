@@ -16,7 +16,7 @@ from plans.models import Facility, OpeningRule, Plan, SiteSettings
 # No photo here may appear elsewhere on Home: dry-sauna (Heat, slowly), cold-plunge, relax-loungers (the ritual) and lounge
 # (the journey entry) are already used above, so those rooms are not listed.
 # Home-specific preview crops; any room not listed uses its own Facility.image_name.
-HOME_PREVIEW_IMAGES = {"wet-sauna": "wet-sauna", "showers": "showers", "massage-room": "massage-room", "gym": "gym", "kitchenette": "kitchenette"}
+HOME_PREVIEW_IMAGES = {"cold-plunge": "cold-tub", "wet-sauna": "wet-sauna", "showers": "showers", "massage-room": "massage-room", "gym": "gym", "kitchenette": "kitchenette"}
 
 
 def split_label(label):
