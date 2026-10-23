@@ -365,3 +365,4 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-23 | System audit log: every change and security event (sign-in, failures, unlock, lock, roles, undo, export) with who, IP, browser and a plain sentence; append-only and hash-chained (verify_audit_log); grouped, filterable, exportable. |
 | 2026-10-23 | System dashboard: Run now for roll-up and snapshot; own last-run times. |
 
+| 2026-10-23 | Moishe: the private secrets file moves to `SPA99_PRIVATE_DIR/Secrets/.env` (OneDrive, `Software Files/Secrets/.env`). The older `env/.env` is still read if Secrets/.env is missing. Load order unchanged. The project `.env` copy is removed so OneDrive is the one source on his Mac. |

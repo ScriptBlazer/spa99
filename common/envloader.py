@@ -4,7 +4,7 @@ Pure Python (no Django imports) because settings import it before Django is set 
 
 Load order, earlier wins:
     1. real environment variables
-    2. $SPA99_PRIVATE_DIR/env/.env
+    2. $SPA99_PRIVATE_DIR/Secrets/.env (Moishe 2026-10-23; the older env/.env is still read if Secrets/.env is missing)
     3. project .env
     4. defaults passed in the settings files (dev defaults)
 
@@ -143,6 +143,15 @@ def example_keys(example_path):
     return keys
 
 
+def _private_env_file(private_path):
+    """The secrets file in the private folder: Secrets/.env, else the older env/.env."""
+    for rel in (("Secrets", ".env"), ("env", ".env")):
+        found = _read_env_file(private_path.joinpath(*rel))
+        if found:
+            return found
+    return {}
+
+
 def load_env(base_dir, environ=None):
     base_dir = Path(base_dir)
     environ = os.environ if environ is None else environ
@@ -152,7 +161,7 @@ def load_env(base_dir, environ=None):
         return Env([("environment", environ)], PrivateDir(fallback, True, True, fallback), base_dir / ".env.example")
     project_env = _read_env_file(base_dir / ".env")
     private = resolve_private_dir(base_dir, environ, project_env)
-    private_env = {} if private.using_fallback else _read_env_file(private.path / "env" / ".env")
+    private_env = {} if private.using_fallback else _private_env_file(private.path)
     sources = [("environment", environ), ("private .env", private_env), ("project .env", project_env)]
     return Env(sources, private, base_dir / ".env.example")
 
