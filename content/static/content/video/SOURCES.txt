@@ -2,3 +2,9 @@ hero-*: from Moishe's clip "Software Files/media/fish-tank-loop-v2.mp4" (16s, 19
 Plays ONCE, then holds on the last frame (no loop, no baked-in cross-fade). Audio removed.
 Landscape scaled to 1920x1080. Portrait = crop x 470-1078 (608 wide), scaled to 608x1080.
 H.264 High two-pass (1.7 Mbps / 0.82 Mbps), keyframe every 24 frames, faststart. AV1 SVT preset 5 (1.1 Mbps / 0.52 Mbps). Posters = first frame, cwebp q72.
+
+spa-hero-*: The spa opener (the robe with steam), from Moishe's clip "Software Files/media/Vapour.mp4" (16.04 s, 385 frames, 1928x1076, HEVC yuvj420p, 24 fps, audio). Original kept untouched. (2026-10-23.)
+LOOPS with the fade baked in: frames 36-384 of the source, with the last 36 frames (1.5 s) cross-faded (xfade fade) into source frames 0-35,
+so the file (349 frames, 14.54 s) ends on source frame 35 and the native loop restarts on frame 36. Seam step checked (PSNR 43 dB, a normal frame step is 48).
+Full range converted to TV range. Audio removed. Landscape scaled to 1920x1080. Portrait = crop x 1040-1648 (608 wide, the robe with steam on its left), 608x1080.
+H.264 High two-pass (1.7 Mbps / 0.82 Mbps), keyframe every 24 frames, faststart. AV1 SVT preset 5 (1.1 Mbps / 0.52 Mbps), keyframe every 24. Posters = first frame of the loop, cwebp q72.

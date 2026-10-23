@@ -611,6 +611,9 @@ html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .doo
   }
 }
 .door-video { z-index: 0; }
+/* the robe's steam video (2026-10-23): framed exactly like its poster (the still under it), so the hand-over is invisible */
+.opener-scene[data-opener="robe"] .door-video { object-position: 64% 40%; }
+@media (max-width: 47.99em) { .opener-scene[data-opener="robe"][data-portrait] .door-video { object-position: 50% 30%; } }
 .window-media.has-video .door-zoom { opacity: 0; transition: opacity 1200ms var(--ease-soft); }
 
 /* ---------- the moments ---------- */
