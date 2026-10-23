@@ -19,6 +19,7 @@ from system import team
 from system.models import SystemChange, SystemEvent
 from system.services import ChangeRefused
 from system.tests.test_system import PASSWORD, SYSTEM, make_user, sign_in, unlocked_client
+from django.db.models import Q
 from users.models import InterestRegistration
 
 User = get_user_model()
@@ -183,3 +184,61 @@ class SystemPasswordTests(TestCase):
         self.assertTrue(dev.check_password("another-long-password-2"))
         admin_client, _ = sign_in(at("admin", "a@example.com"))
         self.assertEqual(admin_client.get("/password/").status_code, 404)
+
+
+class ReviewFixTests(TestCase):
+    def setUp(self):
+        seed_all()
+        call_command("setup_roles", stdout=StringIO())
+        self.dev = at("developer", "dev@example.com")
+
+    def test_after_a_merge_an_erasure_of_the_kept_account_leaves_nothing_of_either_person(self):
+        from common.models import LoginEvent
+        from notifications.models import EmailLog
+        from users import services as user_services
+
+        keep = User.objects.create_user("keep@example.com", "x", first_name="Kay")
+        gone = User.objects.create_user("gone@example.com", "x", first_name="Gil")
+        application = gold_services.submit_application(application_data(email="gone@example.com"))[0]
+        EmailLog.objects.create(to="gone@example.com", subject="Hello", template="welcome", subject_email="gone@example.com")
+        LoginEvent.objects.create(attempted_email="gone@example.com", event="failed")
+        gone.save()
+        team.merge_accounts(self.dev, "keep@example.com", "gone@example.com")
+        user_services.delete_user_data(keep)
+        for email in ("keep@example.com", "gone@example.com"):
+            self.assertFalse(GoldApplication.objects.filter(email__iexact=email).exists(), email)
+            self.assertFalse(EmailLog.objects.filter(Q(to__iexact=email) | Q(subject_email__iexact=email)).exists(), email)
+            self.assertFalse(LoginEvent.objects.filter(attempted_email__iexact=email).exists(), email)
+        self.assertFalse(GoldApplication.history.model.objects.filter(id=application.pk).exists())
+        self.assertFalse(User.history.model.objects.filter(email__in=["gone@example.com", "keep@example.com"]).exists())
+
+    def test_a_developer_cannot_merge_into_themselves_or_a_peer(self):
+        peer, other = at("developer", "peer@example.com"), User.objects.create_user("other@example.com", "x")
+        for keep in (self.dev, peer):
+            with self.assertRaises(ChangeRefused):
+                team.merge_accounts(self.dev, keep.email, "other@example.com")
+        root = at(None, "root@example.com", superuser=True)
+        team.merge_accounts(root, "peer@example.com", "other@example.com")  # a superuser may
+        self.assertFalse(User.objects.filter(email="other@example.com").exists())
+
+    def test_old_groups_on_a_non_staff_account_are_not_promoted(self):
+        member = User.objects.create_user("member@example.com", "x")
+        member.groups.add(Group.objects.create(name="Owner"))
+        out = StringIO()
+        call_command("migrate_roles", stdout=out)
+        member.refresh_from_db()
+        self.assertEqual((levels.held_level(member), member.is_staff), ("none", False))
+        self.assertIn("SKIPPED", out.getvalue())
+
+    def test_team_actions_only_reach_team_members(self):
+        member = User.objects.create_user("plain@example.com", "x")
+        client = unlocked_client(self.dev)
+        self.assertEqual(client.post(f"/team/{member.pk}/active/", {"active": "0"}).status_code, 404)
+        member.refresh_from_db()
+        self.assertTrue(member.is_active)
+        with self.assertRaises(ChangeRefused):
+            team.set_active(self.dev, member, False)
+
+    def test_create_team_member_is_written_to_the_audit_log(self):
+        call_command("create_team_member", email="cli@example.com", level="admin", invite=True, stdout=StringIO())
+        self.assertTrue(SystemEvent.objects.filter(kind="role_changed", sentence__contains="cli@example.com").exists())

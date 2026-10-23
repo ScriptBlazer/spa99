@@ -288,9 +288,7 @@ def _team_action(request, action, text="Saved."):
 
 
 def _person(request, pk):
-    from django.contrib.auth import get_user_model
-
-    return get_object_or_404(get_user_model(), pk=pk)
+    return get_object_or_404(team_service.team_queryset(), pk=pk)  # team members only; members are managed in the Office
 
 
 @unlocked

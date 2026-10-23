@@ -27,11 +27,13 @@ def describe(level, approver):
     return levels.LABELS[level] + (" and Approver" if approver and level != levels.NONE else "")
 
 
+def team_queryset():
+    """Everyone with a team level, a staff flag or an Approver group. Members without any of these are managed in the Office."""
+    return User.objects.filter(Q(is_staff=True) | Q(is_superuser=True) | Q(groups__name__in=levels.TEAM_GROUPS)).distinct()
+
+
 def members():
-    """Everyone with a team level, a staff flag or an Approver group, lowest email first."""
-    users = (User.objects.filter(Q(is_staff=True) | Q(is_superuser=True) | Q(groups__name__in=levels.TEAM_GROUPS))
-             .distinct().prefetch_related("groups").order_by("email"))
-    return list(users)
+    return list(team_queryset().prefetch_related("groups").order_by("email"))
 
 
 def rows(actor):
@@ -48,7 +50,9 @@ def level_choices(actor):
     return [(level, levels.LABELS[level]) for level in ASSIGNABLE if levels.can_assign(actor, level)]
 
 
-def _guard(actor, target):
+def _guard(actor, target, team_only=False):
+    if team_only and not team_queryset().filter(pk=target.pk).exists():
+        raise ChangeRefused("That person is not on the team. Members are managed in the Office.")
     if actor.pk == target.pk:
         raise ChangeRefused("You cannot change your own access.")
     if not levels.can_manage(actor, target):
@@ -92,7 +96,7 @@ def set_access(actor, target, level, approver=False, added=False):
 @transaction.atomic
 def remove_from_team(actor, target):
     """Takes away every level and the Approver permission. The account, its password and any membership stay."""
-    _guard(actor, target)
+    _guard(actor, target, team_only=True)
     old_level, old_approver = levels.held(target)
     if old_level == levels.NONE and not old_approver and not target.is_staff:
         return False
@@ -104,7 +108,7 @@ def remove_from_team(actor, target):
 
 @transaction.atomic
 def set_active(actor, target, active):
-    _guard(actor, target)
+    _guard(actor, target, team_only=True)
     if target.is_active == active:
         return False
     target.is_active = active
@@ -145,7 +149,7 @@ def add_member(actor, email, level, approver=False):
 
 
 def resend_invite(actor, target):
-    _guard(actor, target)
+    _guard(actor, target, team_only=True)
     if target.has_usable_password() or not target.is_active:
         raise ChangeRefused("Only someone who has not chosen a password yet can be sent a new invite.")
     _send_invite(target)
@@ -172,7 +176,9 @@ def merge_preview(actor, keep_email, remove_email):
         raise ChangeRefused(str(error)) from error
 
 
+@transaction.atomic
 def merge_accounts(actor, keep_email, remove_email):
+    """The merge, its change-list row and its audit event succeed or fail together."""
     keep, remove = find_user(keep_email), find_user(remove_email)
     try:
         moved = user_merge.merge(actor, keep, remove)

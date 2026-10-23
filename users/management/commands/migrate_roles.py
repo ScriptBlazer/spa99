@@ -31,6 +31,9 @@ class Command(BaseCommand):
             changed = 0
             for user in people:
                 names = set(user.groups.values_list("name", flat=True))
+                if not user.is_staff and not user.is_superuser:  # an old group on a non-staff account is never a promotion
+                    self.stdout.write(f"{user.email}: {sorted(names)} -> SKIPPED (not a staff account; left as it is)")
+                    continue
                 before = levels.held(user)
                 target = max((OLD_TO_LEVEL[n] for n in names if n in OLD_TO_LEVEL), key=levels.rank, default=levels.NONE)
                 if levels.rank(before[0]) > levels.rank(target) and before[0] != levels.SUPERUSER:

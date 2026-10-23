@@ -14,6 +14,7 @@ from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 from django.core.validators import validate_email
 
 from common import levels
@@ -31,6 +32,8 @@ class Command(BaseCommand):
         parser.add_argument("--last-name", default="")
 
     def handle(self, *args, **options):
+        from system import audit
+        from system.models import SystemEvent
         from system.team import apply_level
         from system.services import ChangeRefused
 
@@ -40,15 +43,19 @@ class Command(BaseCommand):
         except ValidationError as error:
             raise CommandError("That is not a valid email address.") from error
         User = get_user_model()
-        user = User.objects.filter(email__iexact=email).first()
-        created = user is None
-        if created:
-            password = None if options["invite"] else self._ask_password(email)
-            user = User.objects.create_user(email, password, first_name=options["first_name"], last_name=options["last_name"])
-        try:
-            apply_level(user, options["level"], options["approver"], actor=None)
-        except ChangeRefused as error:
-            raise CommandError(str(error)) from error
+        with transaction.atomic():
+            user = User.objects.filter(email__iexact=email).first()
+            created = user is None
+            if created:
+                password = None if options["invite"] else self._ask_password(email)
+                user = User.objects.create_user(email, password, first_name=options["first_name"], last_name=options["last_name"])
+            try:
+                apply_level(user, options["level"], options["approver"], actor=None)
+            except ChangeRefused as error:
+                raise CommandError(str(error)) from error
+            label = levels.LABELS[options["level"]] + (" and Approver" if options["approver"] else "")
+            audit.log_event(SystemEvent.ROLE_CHANGED, detail={"person": user.email, "new": label, "via": "create_team_member"}, email="command line",
+                            sentence=f"{'Added' if created else 'Set'} {user.email} {'to the team as' if created else 'to'} {label} (command line)")
         if created and options["invite"]:
             from users.tasks import send_team_invite_email
 
