@@ -361,3 +361,5 @@ html:has(.register) { scroll-padding-top: calc(var(--header-h) + var(--space-4))
 
 /* ---------- errors ---------- */
 .error-page { min-height: calc(100dvh - var(--header-h)); display: grid; place-items: center; padding: var(--space-7) var(--page-margin); }
+
+/* Virtual tour: see tour.css (linked on the tour pages only). */

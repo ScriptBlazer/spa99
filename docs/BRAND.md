@@ -317,6 +317,41 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
 }
 ```
 
+**Virtual tour tokens** (VIRTUAL-TOUR 7.2, added 2026-10-23; the four brand colours are untouched, everything below is derived and decoration only, never text; sage and moss are outside the brand hues and live inside the lounge only; the tank colours (water, deep water, coral) live in the lounge room code, not as tokens):
+
+```css
+/* Virtual tour (docs/design/VIRTUAL-TOUR.md 7.2). Derived, decoration only, never text. The WebGL palette (IMMERSIVE 12) is read by the 3D script with getComputedStyle. */
+:root {
+  --color-light-warm: #FFA957;                 /* derived: 2700K, every point light */
+  --color-led-warm: #FFC48A;                   /* derived: self-lit LED strips, downlights, halos (--color-led stays the Gold Card's) */
+  --color-heater-glow: #FF8A3D;                /* derived: the low light in the heater stones */
+  --color-aspen: #E3CCA6;                      /* derived: sauna bench seats and slats */
+  --color-aspen-shade: #CDB48C;                /* derived: bench skirts */
+  --color-cedar: #7E5236;                      /* derived: sauna walls and ceiling */
+  --color-walnut: #3B271B;                     /* derived: frames, bench ends, gym panels */
+  --color-stone: #7A604C;                      /* derived: heater stones, light */
+  --color-stone-dark: #4A372B;                 /* derived: heater stones, dark */
+  --color-floor-stone: #3A2B22;                /* derived: sauna floor */
+  --color-glass-bronze: rgb(107 74 48 / 0.28); /* derived: bronze glass */
+  --color-travertine: #E4D2B1;                 /* derived: cream 70% + caramel 30% */
+  --color-travertine-vein: #CCA87C;            /* derived: cream 30% + caramel 70%; also the wet sauna fog */
+  --color-iron: #2C1C14;                       /* derived: espresso at 60%; the darkest value anywhere */
+  --color-sage: #A3A98A;                       /* derived, outside the brand hues: lounge pillows */
+  --color-moss: #5F6B3C;                       /* derived, outside the brand hues: green wall, moss discs */
+  --tour-caption-w: 26rem;                     /* derived: caption width */
+  --tour-ring: 1.75rem;                        /* derived: marker ring (the tap target stays 2.75rem) */
+  --ease-glide: cubic-bezier(0.65, 0, 0.35, 1); /* proposed: camera travel toward a doorway only */
+  --duration-glide-fade: 700ms;                /* derived: room cross-fade */
+  --duration-settle: 1400ms;                   /* derived: arrival settle */
+  --duration-gl-in: 1200ms;                    /* derived: the canvas fading in */
+  --duration-tour-fade: 300ms;                 /* derived: marker and hint fade */
+  --duration-tour-quick: 200ms;                /* derived: markers leaving */
+  --duration-tour-tap: 120ms;                  /* derived: ring press colour */
+  --duration-tour-pulse: 1600ms;               /* derived: the one marker pulse */
+  --duration-tour-wait: 8s;                    /* derived: the waiting line; matches the 8 s give-up in engine.js */
+}
+```
+
 **Marketing type scale** (one step down, IMMERSIVE section 0): under `html[data-page="marketing"]` in `tokens.css`, `--text-2xl: clamp(2rem, 2.5vw + 1rem, 3rem)` (32px phone, 48px desktop) and `--text-hero: clamp(2.75rem, 5vw + 1rem, 6rem)` (44px phone, about 88px at 1440). The journey, forms, account and legal pages keep the larger scale above.
 
 **Immersive tokens** (`--color-veil`, `--color-header-solid`, `--color-glow`, `--scene-h`, `--scene-pad-top`, `--scene-centre-top`, `--scene-centre-bottom`, `--color-veil-soft`, `--duration-line`, `--stagger-line`, `--duration-page`, `--color-frame-tint`, `--color-thread`, `--color-thread-light`, `--frame-gap`, `--bleed`) are derived and now live in `tokens.css`. Values and contrast: `docs/design/IMMERSIVE.md` section 12.

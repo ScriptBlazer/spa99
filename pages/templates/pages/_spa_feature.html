@@ -20,6 +20,7 @@
         <h2 class="sp-name" data-rise>{{ f.name }}</h2>
         {% if f.line %}<p class="lead sp-line" data-fade>{{ f.line }}</p>{% endif %}
         {% if f.description %}<p class="muted sp-desc" data-fade>{{ f.description }}</p>{% endif %}
+        {% if f.tour_url %}<a class="sp-tour" href="{{ f.tour_url }}">{{ spa.tour_link.cta_label|default:"Take the tour" }}</a>{% endif %}
         {% if f.facts %}<ul class="pills sp-pills" aria-label="{{ f.name }}, at a glance">{% for p in f.facts %}<li class="pill" data-pill>{{ p }}</li>{% endfor %}</ul>{% endif %}
       </div>
       {% if c %}

@@ -37,3 +37,18 @@ def account_greeting(context):
 def signin_shell():
     """{% signin_shell as shell %}: heading, lead, caption, picture and address line for the sign-in shell (SIGN-IN.md)."""
     return services.signin_shell()
+
+
+@register.simple_tag
+def tour_modules():
+    """{% tour_modules as mods %}: slug -> hashed static URL of each 3D room module that exists (common/js/tour/rooms/<slug>.js).
+    Rooms without a module are simply absent, so the tour opens their photo page instead (docs/features/virtual-tour.md)."""
+    from django.contrib.staticfiles import finders
+    from django.templatetags.static import static
+
+    mods = {}
+    for slug in services.tour_slugs():
+        rel = f"common/js/tour/rooms/{slug}.js"
+        if finders.find(rel):
+            mods[slug] = static(rel)
+    return mods

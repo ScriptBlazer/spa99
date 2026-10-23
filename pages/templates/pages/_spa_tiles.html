@@ -20,6 +20,7 @@
           <div class="frame-caption sp-caption" data-caption data-drift="12">
             <h2>{{ t.name }}</h2>
             {% if t.line %}<p class="small">{{ t.line }}</p>{% endif %}
+            {% if t.tour_url %}<a class="sp-tour small" href="{{ t.tour_url }}">{{ spa.tour_link.cta_label|default:"Take the tour" }}</a>{% endif %}
             {% if t.facts %}<ul class="pills sp-pills sp-pills--small" aria-label="{{ t.name }}, at a glance">{% for p in t.facts|slice:":3" %}<li class="pill">{{ p }}</li>{% endfor %}</ul>{% endif %}
           </div>
         </article>

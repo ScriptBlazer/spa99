@@ -108,6 +108,23 @@ def terms(request):
     return _page(request, "pages/legal.html", "terms")
 
 
+@login_not_required  # PUBLIC virtual tour (server-rendered fallback; the 3D layer is progressive)
+@require_GET
+def tour(request, slug=services.TOUR_LOUNGE):
+    if slug == services.TOUR_LOUNGE and request.resolver_match.url_name == "tour_room":
+        return redirect("tour", permanent=True)
+    copy = content.page_content("tour")
+    rooms = services.tour_rooms(copy)
+    room = next((r for r in rooms if r["slug"] == slug), None)
+    if room is None:
+        raise Http404("No such room")
+    meta = content.page_meta("tour")
+    meta = {**meta, "title": f"{room['name']}, virtual tour"}
+    return render(request, "pages/tour.html", {
+        "meta": meta, "page_key": "tour", "room": room, "rooms": rooms, "copy": copy,
+        "tour_config": services.tour_config(rooms, slug, copy), "stacked_logo": services.stacked_logo_svg()})
+
+
 def _check_slug(slug, known):
     """Unknown screen names are a 404 (screen-N is allowed: the screens are data and can grow)."""
     if slug and slug not in known and not re.fullmatch(r"screen-\d+", slug):
@@ -170,7 +187,7 @@ def robots(request):
     return HttpResponse("\n".join(lines) + "\n", content_type="text/plain")
 
 
-SITEMAP_NAMES = ["home", "spa", "memberships", "gold_card", "book", "visit", "privacy", "terms"]
+SITEMAP_NAMES = ["home", "spa", "tour", "memberships", "gold_card", "book", "visit", "privacy", "terms"]
 
 
 @login_not_required  # PUBLIC

@@ -61,6 +61,18 @@ PAGES = {
         ("next", "Find the right way to visit.", "", "Tailor your membership", "/journey/"),
         ("next_from", "", "Memberships from {price} a month, {price_inc} inc VAT.", "", ""),
         ("next_link", "", "", "See memberships", "/memberships/"),
+        ("tour_link", "", "", "Take the tour", ""),  # 2026-10-23: the link on each toured room (cta_url is built in code)
+    ]),
+    "tour": ("Virtual tour", "Look around the lounge, the saunas, the relaxing zone and the gym at Spa 99, 99 Vale Road, London N4.", [
+        ("intro", "Virtual tour", "Look around the rooms, then walk through.", "", ""),
+        ("hint", "", "Drag to look around.", "", ""),
+        ("hint_tilt", "", "Tilt or drag to look around.", "", ""),
+        ("tilt", "", "Tilt is off in your settings. Drag to look around.", "Tilt", ""),
+        ("room_lounge", "Lounge", "The reef, the long bench and no reason to hurry.", "See it on The spa", "/the-spa/"),
+        ("room_dry_sauna", "", "Pale wood, low light and a slow, dry heat.", "See it on The spa", ""),
+        ("room_wet_sauna", "", "Warm stone under soft steam.", "See it on The spa", ""),
+        ("room_relaxing_zone", "", "Lie back. Nothing here needs you.", "See it on The spa", ""),
+        ("room_gym", "", "Free weights and machines, in low warm light.", "See it on The spa", ""),
     ]),
     "memberships": ("Memberships", "Spa 99 memberships and single visits, with prices ex VAT and inc VAT.", [
         ("intro", "Memberships.", "Choose when you come and how often.", "", ""),
