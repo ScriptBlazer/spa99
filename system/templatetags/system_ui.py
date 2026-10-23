@@ -188,3 +188,48 @@ def error_text(form):
         label = form.fields[name].label if name in form.fields else ""
         parts.append(f"{label}: {' '.join(errors)}" if label else " ".join(errors))
     return " ".join(parts)
+
+
+# ---------- audit log helpers ----------
+
+@register.filter
+def person(label):
+    """'moishe@x.com' -> 'Moishe' (the short name; the full email is in the title and the drawer)."""
+    name = (label or "").split("@")[0].replace(".", " ").replace("_", " ").strip()
+    return name.title() if name else "A script"
+
+
+_OS = (("iPhone", "iOS"), ("iPad", "iPadOS"), ("Android", "Android"), ("CrOS", "ChromeOS"), ("Windows", "Windows"), ("Mac OS X", "macOS"),
+       ("Macintosh", "macOS"), ("Linux", "Linux"))
+_BROWSERS = (("Edg", "Edge"), ("OPR", "Opera"), ("Firefox", "Firefox"), ("FxiOS", "Firefox"), ("CriOS", "Chrome"), ("Chrome", "Chrome"), ("Version", "Safari"))
+
+
+@register.filter
+def browser(ua):
+    """A user agent as 'Safari 18 on macOS' (the full text stays in the drawer). Unknown agents show their first words."""
+    ua = ua or ""
+    if not ua:
+        return ""
+    system = next((name for key, name in _OS if key in ua), "")
+    name = version = ""
+    for key, label in _BROWSERS:
+        found = re.search(rf"\b{key}/(\d+)", ua)
+        if found:
+            name, version = label, found.group(1)
+            break
+    if not name:
+        found = re.match(r"([A-Za-z][\w.\- ]*?)/(\d+)", ua)
+        if found:
+            name, version = found.group(1), found.group(2)
+    if not name:
+        return ua[:40]
+    text = f"{name} {version}".strip()
+    return f"{text} on {system}" if system else text
+
+
+@register.filter
+def short_hash(value):
+    """a3f91c…e209bc: the first and last six characters."""
+    value = value or ""
+    return f"{value[:6]}…{value[-6:]}" if len(value) > 14 else value
+

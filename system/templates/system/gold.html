@@ -24,7 +24,7 @@
   </table></div>
 </section>
 <details class="sys-panel" data-system-add="gold-rule"{% if add_form.errors %} open{% endif %}><summary class="sys-add">Add a rule</summary>
-  <form method="post" action="{% url 'system_gold_add' %}" data-system-form="gold-rule-add" class="sys-group">{% csrf_token %}
+  <form method="post" action="{% url 'system_gold_add' %}" data-system-form="gold-rule-add" data-system-add class="sys-group">{% csrf_token %}
     {% include "system/_fields.html" with form=add_form %}
     <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add rule</button></div>
   </form>

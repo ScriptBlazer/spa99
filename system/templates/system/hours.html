@@ -37,7 +37,7 @@
   </table></div>
 </section>
 <details class="sys-panel" data-system-add="rule"{% if rule_add_form.errors %} open{% endif %}><summary class="sys-add">Add a rule</summary>
-  <form method="post" action="{% url 'system_rule_add' %}" data-system-form="rule-add" class="sys-group">{% csrf_token %}
+  <form method="post" action="{% url 'system_rule_add' %}" data-system-form="rule-add" data-system-add class="sys-group">{% csrf_token %}
     {% include "system/_fields.html" with form=rule_add_form %}
     <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add rule</button></div>
   </form>
@@ -64,7 +64,7 @@
   </table></div>
 </section>
 <details class="sys-panel" data-system-add="closure"{% if closure_add_form.errors %} open{% endif %}><summary class="sys-add">Add closure</summary>
-  <form method="post" action="{% url 'system_closure_add' %}" data-system-form="closure-add" class="sys-group">{% csrf_token %}
+  <form method="post" action="{% url 'system_closure_add' %}" data-system-form="closure-add" data-system-add class="sys-group">{% csrf_token %}
     {% include "system/_fields.html" with form=closure_add_form %}
     <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add closure</button></div>
   </form>

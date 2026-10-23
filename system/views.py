@@ -25,7 +25,7 @@ from .permissions import signed_in, unlocked
 
 NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", "system_plans"), ("hours", "Hours and closures", "system_hours"),
        ("gold", "Gold rules", "system_gold"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"),
-       ("settings", "Settings", "system_settings"), ("team", "Team", "system_team"), ("changes", "Change log", "system_changes")]
+       ("settings", "Settings", "system_settings"), ("team", "Team", "system_team"), ("changes", "Audit log", "system_changes")]
 
 
 def saved(request, text="Saved."):
@@ -151,10 +151,22 @@ def dashboard(request):
 @unlocked
 @require_GET
 def change_log(request):
+    """The audit log. `?entry=<id>` opens the detail drawer (and shows the page that holds it); `?focus=<id>` only jumps to it."""
     params = feed.params_from(request.GET)
-    context = {"feed": feed.audit_feed(params, request.GET.get("page")), "params": params, "people": feed.people(),
-               "section_choices": feed.section_choices(), "category_choices": audit.CATEGORIES,
-               "kind_choices": SystemEvent.KIND_CHOICES, "export_query": feed.query_string(params)}
+    entry = request.GET.get("entry", "").strip()
+    page_number = request.GET.get("page")
+    if not page_number and (entry or request.GET.get("focus")):
+        page_number = feed.page_of(params, entry or request.GET["focus"])
+    result = feed.audit_feed(params, page_number)
+    filters = feed.query_string(params)
+    number = result["page"]["number"]
+    context = {"feed": result, "params": params, "people": feed.people(), "section_choices": feed.section_choices(),
+               "category_choices": audit.CATEGORIES, "kind_choices": SystemEvent.KIND_CHOICES, "export_query": filters,
+               "chips": feed.chips(params), "entry_count": feed.export_count(params),
+               "link_query": "&".join(part for part in (filters, f"page={number}" if number > 1 else "") if part),
+               "drawer": feed.entry_detail(entry) if entry else None, "filters_set": bool(filters),
+               "active_filters": sum(bool(v) for v in (params["user"], params["section"], params["category"], params["range"] or params["date_from"] or params["date_to"])),
+               "chain": None}  # no stored "last verified" status exists yet; a full verify per page load is too costly
     return page(request, "system/changes.html", "changes", context)
 
 

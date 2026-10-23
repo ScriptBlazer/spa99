@@ -34,7 +34,7 @@
     </tbody>
   </table></div>
   <details{% if q.add_form.errors %} open{% endif %}><summary class="sys-add">Add an option</summary>
-    <form method="post" action="{% url 'system_option_add' q.obj.pk %}" data-system-form="option-add" class="sys-group">{% csrf_token %}
+    <form method="post" action="{% url 'system_option_add' q.obj.pk %}" data-system-form="option-add" data-system-add class="sys-group">{% csrf_token %}
       {% include "system/_fields.html" with form=q.add_form %}
       <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add option</button></div>
     </form>

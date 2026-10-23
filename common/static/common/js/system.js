@@ -1,5 +1,5 @@
 /* Spa 99 System behaviour (docs/design/SYSTEM.md). Everything here is an enhancement: every page works as plain forms.
-   Sections: helpers, dirty state and save bar, confirm dialog, submit interception, toasts, lock countdown, keyboard, change log, menu. */
+   Sections: helpers, dirty state and save bar, confirm dialog, submit interception, toasts, lock countdown, keyboard, audit log, menu. */
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -14,7 +14,9 @@ const plural = (n, one, many) => (n === 1 ? one : many);
 
 /* ---------- dirty state and the save bar ---------- */
 
-const forms = () => $$('form[data-system-form]');
+const allForms = () => $$('form[data-system-form]');
+// "Add" forms (data-system-add) have their own Add button: they never count as unsaved changes or show the save bar
+const forms = () => allForms().filter((f) => !f.hasAttribute('data-system-add'));
 const controlsOf = (form) => [...form.elements].filter((el) => el.name && !['hidden', 'submit', 'button'].includes(el.type) && el.name !== 'csrfmiddlewaretoken');
 // money boxes compare and show as amounts (299 and 299.00 are the same price)
 const money = (v) => (v.trim() !== '' && !Number.isNaN(Number(v.replace(/,/g, ''))) ? Number(v.replace(/,/g, '')).toFixed(2) : v);
@@ -93,10 +95,10 @@ function diffLine(label, old, now, tag = 'div') {
 }
 
 function initForms() {
-  forms().forEach(snapshot);
+  allForms().forEach(snapshot); // add forms too: a risky value in them still gets the confirm
   const onEdit = (event) => {
     const form = event.target.form;
-    if (!form || !initial.has(form)) return;
+    if (!form || !initial.has(form) || form.hasAttribute('data-system-add')) return;
     mark(form); refreshBar();
   };
   document.addEventListener('input', onEdit);
@@ -232,7 +234,7 @@ function initSubmit() {
 function begin(form) {
   submitting = true;
   const button = $('[data-system-save]', bar || document);
-  if (button && form.matches('[data-system-form]')) { button.disabled = true; button.textContent = 'Saving...'; }
+  if (button && form.matches('[data-system-form]:not([data-system-add])')) { button.disabled = true; button.textContent = 'Saving...'; }
 }
 
 /* ---------- toasts ---------- */
@@ -340,60 +342,247 @@ function initKeys() {
       if (search) { event.preventDefault(); search.focus(); }
     } else if (event.key === '?') { $('[data-system-keys]')?.showModal(); }
     else if (event.key === 'g') { g = Date.now(); }
-    else if (Date.now() - g < 1500 && (event.key === 'd' || event.key === 'c')) {
+    else if (Date.now() - g < 1500 && (event.key === 'd' || event.key === 'a' || event.key === 'c')) {
       g = 0; submitting = isDirty() ? submitting : true;
       location.href = $(`[data-system-nav-item=${event.key === 'd' ? 'dashboard' : 'changes'}]`)?.href || location.href;
     }
   });
 }
 
-/* ---------- change log: filters in the URL, swapped in place; search; load more ---------- */
+/* ---------- audit log: filters in the URL swapped in place, load more, expand, drawer, jump links, keys, phone sheet ---------- */
 
-function initChangeLog() {
-  const form = $('[data-system-filters]');
-  if (!form) return;
-  const search = $('[data-system-search]'); const range = $('[data-system-range]');
-  search.hidden = false; range.hidden = false; $('button[type=submit]', form)?.remove();
-  const rows = () => $$('[data-system-changes] tbody tr[data-system-searchable]');
-  const applySearch = () => { const q = search.value.trim().toLowerCase(); rows().forEach((tr) => { tr.hidden = !!q && !tr.textContent.toLowerCase().includes(q); }); };
-  search.addEventListener('input', applySearch);
-  const iso = (date) => date.toLocaleDateString('en-CA');
-  const days = (n) => { const d = new Date(); d.setDate(d.getDate() - (n - 1)); return iso(d); };
-  const from = form.elements.date_from; const to = form.elements.date_to;
-  const syncRange = () => { const hit = [1, 7, 30].find((n) => from.value === days(n) && to.value === iso(new Date()) || (n > 1 && from.value === days(n) && !to.value)); $$('input[name=range]', form).forEach((r) => { r.checked = r.value === String(hit || ''); }); };
-  syncRange();
-  async function swap(url, push = true) {
+function initAudit() {
+  const root = $('[data-system-audit]');
+  if (!root) return;
+  const form = $('[data-system-filters]', root);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let expandAll = false; let lastUrl = location.href; let opener = null;
+  const results = () => $('[data-system-results]', root);
+
+  // sticky offsets: the day header sticks under the filter bar, whatever height the bar has
+  const fit = () => root.style.setProperty('--au-bar-h', `${form.offsetHeight}px`);
+  fit(); new ResizeObserver(fit).observe(form);
+
+  const fetchDoc = async (url) => {
+    const response = await fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } });
+    if (!response.ok) throw new Error(String(response.status));
     resetIdle();
-    const html = await (await fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })).text();
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    for (const sel of ['[data-system-results]', '[data-system-pages]']) $(sel).replaceWith($(sel, doc));
-    const clear = $('[data-system-clear]', doc); $('[data-system-clear]', form)?.remove();
-    if (clear) form.append(clear);
-    if (push) history.pushState(null, '', url);
-    applySearch();
-  }
-  const go = () => {
-    const query = new URLSearchParams(new FormData(form)); query.delete('range');
-    [...query.keys()].forEach((k) => { if (!query.get(k)) query.delete(k); });
-    swap(`${location.pathname}${query.toString() ? `?${query}` : ''}`);
+    return new DOMParser().parseFromString(await response.text(), 'text/html');
   };
-  form.addEventListener('submit', (event) => { event.preventDefault(); go(); });
-  form.addEventListener('change', (event) => {
-    if (event.target.name === 'range') { const n = Number(event.target.value); if (n) { from.value = days(n); to.value = n === 1 ? iso(new Date()) : ''; } else return; }
-    else if (event.target.name === 'date_from' || event.target.name === 'date_to') syncRange();
-    go();
+  const showError = (on) => { $('[data-system-error]', root).hidden = !on; };
+
+  /* expand all / collapse all */
+  const folds = () => $$('details[data-system-more-items]', root);
+  function syncExpand() {
+    const any = folds().length > 0;
+    const button = $('[data-system-expand-all]', root);
+    button.hidden = !any;
+    if (expandAll) folds().forEach((d) => { d.open = true; });
+    button.textContent = expandAll ? 'Collapse all' : 'Expand all';
+  }
+  root.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-system-expand-all]')) return;
+    expandAll = !expandAll;
+    folds().forEach((d) => { d.open = expandAll; });
+    syncExpand();
   });
-  let timer; form.elements.user.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(go, 300); });
+
+  /* swapping the list after a filter change */
+  const parts = ['[data-system-results]', '[data-system-pages]', '[data-system-summary] [data-system-clear]', '[data-system-chips]', '[data-system-range]', '[data-system-filter-count]', '[data-system-drawer]', '[data-system-drawer-scrim]'];
+  const state = { timer: 0 };
+  async function swap(url, { push = true, keepExpand = false } = {}) {
+    lastUrl = url;
+    const list = results();
+    clearTimeout(state.timer);
+    state.timer = setTimeout(() => list.setAttribute('data-loading', ''), 150); // under 150ms nothing changes
+    try {
+      const doc = await fetchDoc(url);
+      showError(false);
+      for (const selector of parts) {
+        const fresh = $(selector, doc); const old = $(selector, document);
+        if (fresh && old) old.replaceWith(fresh);
+        else if (!fresh && old && selector.includes('clear')) old.remove();
+        else if (fresh && !old && selector.includes('clear')) $('[data-system-expand-all]', root).before(fresh);
+      }
+      $('[data-system-count-text]', root).innerHTML = $('[data-system-count-text]', doc).innerHTML;
+      $$('[data-system-export]').forEach((a, i) => { a.href = $$('[data-system-export]', doc)[i]?.href || a.href; });
+      if (!keepExpand) expandAll = false;
+      if (push) history.pushState(null, '', url);
+      syncExpand(); fit(); syncDrawer();
+    } catch { showError(true); }
+    finally { clearTimeout(state.timer); results().removeAttribute('data-loading'); }
+  }
+  $('[data-system-retry]', root).addEventListener('click', () => swap(lastUrl, { push: false }));
+
+  /* filters */
+  const cleanQuery = (query) => { [...query.keys()].forEach((k) => { if (!query.get(k)) query.delete(k); }); return query; };
+  const go = (submitter) => {
+    const query = new URLSearchParams(new FormData(form));
+    query.delete('page'); query.delete('entry');
+    if (submitter?.name === 'category') query.set('category', submitter.value);
+    if (submitter?.name === 'range') {
+      const same = submitter.getAttribute('aria-pressed') === 'true';
+      query.set('range', same ? '' : submitter.value);
+      if (!same) { query.set('date_from', ''); query.set('date_to', ''); form.elements.date_from.value = ''; form.elements.date_to.value = ''; }
+    }
+    if ((submitter?.name === undefined || submitter?.name === '') && (form.elements.date_from.value || form.elements.date_to.value)) query.set('range', '');
+    const text = cleanQuery(query).toString();
+    swap(`${location.pathname}${text ? `?${text}` : ''}`);
+  };
+  form.addEventListener('submit', (event) => { event.preventDefault(); go(event.submitter); });
+  form.addEventListener('change', (event) => { if (event.target.matches('select, input[type=date]')) go(); });
+  let timer; form.elements.q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => go(), 300); });
+  root.addEventListener('click', (event) => {
+    const clear = event.target.closest('[data-system-clear]');
+    if (!clear) return;
+    event.preventDefault();
+    for (const el of form.elements) { if (el.name === 'q' || el.name === 'user' || el.name === 'section' || el.name.startsWith('date_')) el.value = ''; }
+    swap(clear.getAttribute('href'));
+  });
+  form.addEventListener('click', (event) => { // Custom date range: show the two date boxes
+    const custom = event.target.closest('[data-system-custom]');
+    if (!custom) return;
+    const open = $('[data-system-dates]', form).toggleAttribute('data-open');
+    custom.setAttribute('aria-pressed', String(open));
+    if (open) form.elements.date_from.focus();
+  });
+
+  /* load more: append groups, merging a day that continues */
   document.addEventListener('click', async (event) => {
     const more = event.target.closest('[data-system-more]');
-    if (!more) return;
+    if (!more || more.getAttribute('aria-disabled') === 'true') return;
     event.preventDefault();
-    const doc = new DOMParser().parseFromString(await (await fetch(more.href, { credentials: 'same-origin' })).text(), 'text/html');
-    $('[data-system-changes] tbody').append(...$$('[data-system-changes] tbody tr', doc));
-    $('[data-system-pages]').replaceChildren(...$('[data-system-pages]', doc).childNodes);
-    resetIdle(); applySearch();
+    const label = more.textContent; more.textContent = 'Loading'; more.setAttribute('aria-disabled', 'true');
+    try {
+      const doc = await fetchDoc(more.href);
+      const list = results();
+      for (const day of $$('[data-system-day]', doc)) {
+        const same = $(`[data-system-day="${day.dataset.systemDay}"]`, list);
+        if (same) { $('.au-groups', same).append(...$$('.au-groups > li', day)); $('.au-daycount', same).replaceWith($('.au-daycount', day)); }
+        else list.append(day);
+      }
+      $('[data-system-pages]').replaceWith($('[data-system-pages]', doc));
+      showError(false); syncExpand();
+    } catch { more.textContent = label; more.removeAttribute('aria-disabled'); showError(true); lastUrl = more.href; }
   });
-  window.addEventListener('popstate', () => location.reload());
+
+  /* back and forward: the URL is the state */
+  window.addEventListener('popstate', () => {
+    const query = new URLSearchParams(location.search);
+    for (const el of form.elements) { if (['q', 'user', 'section', 'date_from', 'date_to'].includes(el.name)) el.value = query.get(el.name) || ''; }
+    $('[data-system-dates]', form).toggleAttribute('data-open', !!(query.get('date_from') || query.get('date_to')));
+    swap(location.href, { push: false });
+  });
+
+  /* detail drawer */
+  const drawer = () => $('[data-system-drawer]');
+  const inertTargets = () => $$('.sys-head, [data-system-audit], .sys-top, [data-system-nav]');
+  function syncDrawer() {
+    const open = !!drawer() && !drawer().hidden;
+    inertTargets().forEach((el) => { el.inert = open; });
+    if (open) { const title = $('#au-drawer-title'); drawer().focus({ preventScroll: true }); title?.setAttribute('tabindex', '-1'); }
+  }
+  async function openEntry(href, from) {
+    opener = from || opener;
+    try {
+      const doc = await fetchDoc(href);
+      for (const selector of ['[data-system-drawer]', '[data-system-drawer-scrim]']) $(selector).replaceWith($(selector, doc));
+      history.pushState(null, '', href); lastUrl = href;
+      syncDrawer();
+    } catch { showError(true); }
+  }
+  function closeDrawer(push = true) {
+    const url = new URL(location.href); url.searchParams.delete('entry');
+    const aside = drawer(); aside.hidden = true; aside.replaceChildren(); $('[data-system-drawer-scrim]').hidden = true;
+    if (push) history.pushState(null, '', url);
+    syncDrawer();
+    if (opener?.isConnected) opener.focus(); else $('.au-group', root)?.focus();
+  }
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[data-system-entry]');
+    if (link) { event.preventDefault(); openEntry(link.href, link); return; }
+    if (event.target.closest('[data-system-drawer-close]')) { event.preventDefault(); closeDrawer(); return; }
+    if (event.target.closest('[data-system-drawer-scrim]')) { closeDrawer(); return; }
+    const copy = event.target.closest('[data-system-copy], [data-system-copy-text]');
+    if (copy) copyText(copy);
+  });
+  async function copyText(button) {
+    const text = button.dataset.systemCopyText ?? $(button.dataset.systemCopy)?.textContent ?? '';
+    try { await navigator.clipboard.writeText(text); } catch {
+      const area = document.createElement('textarea'); area.value = text; area.style.position = 'fixed'; area.style.opacity = '0';
+      document.body.append(area); area.select(); document.execCommand('copy'); area.remove();
+    }
+    const old = button.textContent; button.textContent = 'Copied';
+    const live = $('[data-system-copied]'); if (live) live.textContent = 'Copied';
+    setTimeout(() => { button.textContent = old; if (live) live.textContent = ''; }, 1500);
+  }
+  document.addEventListener('keydown', (event) => { // keep Tab inside the drawer while it is open
+    if (event.key !== 'Tab' || !drawer() || drawer().hidden) return;
+    const items = $$('a[href], button:not([disabled]), pre[tabindex], [tabindex="0"]', drawer()).filter((el) => !el.hidden && el.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0]; const last = items[items.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === drawer())) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
+  syncDrawer();
+
+  /* links that jump to a group on this page */
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[data-system-jump]');
+    if (!link) return;
+    const target = document.getElementById(new URL(link.href).hash.slice(1));
+    if (!target) return; // another page: let the server find it (?focus=)
+    event.preventDefault();
+    if (link.closest('[data-system-drawer]')) closeDrawer();
+    const fold = target.closest('details'); if (fold) fold.open = true;
+    target.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
+    target.focus({ preventScroll: true });
+    target.removeAttribute('data-flash'); void target.offsetWidth; target.setAttribute('data-flash', '');
+    setTimeout(() => target.removeAttribute('data-flash'), 1600);
+  });
+
+  /* phone: the filters sheet */
+  const sheet = $('[data-system-sheet]', root); const sheetScrim = $('[data-system-sheet-scrim]', root);
+  const setSheet = (open) => {
+    sheet.toggleAttribute('data-open', open); sheetScrim.hidden = !open;
+    const button = $('[data-system-sheet-open]', root); button.setAttribute('aria-expanded', String(open));
+    if (open) $('select', sheet)?.focus(); else button.focus();
+  };
+  $('[data-system-sheet-open]', root).addEventListener('click', () => setSheet(true));
+  $('[data-system-sheet-close]', root).addEventListener('click', () => setSheet(false));
+  sheetScrim.addEventListener('click', () => setSheet(false));
+
+  /* keys: j / k move between groups, Enter opens or expands, u undoes, Esc closes the drawer or sheet */
+  const groups = () => $$('.au-group', root);
+  const current = () => document.activeElement?.closest?.('.au-group');
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      if (drawer() && !drawer().hidden) { event.preventDefault(); closeDrawer(); }
+      else if (sheet.hasAttribute('data-open')) setSheet(false);
+      return;
+    }
+    if (event.metaKey || event.ctrlKey || event.altKey || typing(event.target) || $('dialog[open]') || (drawer() && !drawer().hidden)) return;
+    const list = groups();
+    if (event.key === 'j' || event.key === 'k') {
+      if (!list.length) return;
+      event.preventDefault();
+      const at = list.indexOf(current());
+      const next = list[Math.min(list.length - 1, Math.max(0, at + (event.key === 'j' ? 1 : -1)))];
+      next.focus();
+    } else if (event.key === 'Enter' && event.target.matches?.('.au-group')) {
+      const fold = $('details[data-system-more-items]', event.target);
+      if (fold && !fold.open) { fold.open = true; return; }
+      $('a[data-system-entry]', event.target)?.click();
+    } else if (event.key === 'u') {
+      const group = current(); if (!group) return;
+      const item = document.activeElement.closest('.au-item');
+      const form = $('form[data-system-undo-form]', item || group) || $('form[data-system-undo-form]', group);
+      if (form) { event.preventDefault(); form.requestSubmit(); } else toast('Nothing to undo here.', { kind: 'error' });
+    }
+  });
+
+  syncExpand();
+  if (location.hash.startsWith('#g-')) document.getElementById(location.hash.slice(1))?.focus({ preventScroll: true });
 }
 
 /* ---------- menu sheet, person menu ---------- */
@@ -422,4 +611,4 @@ function initExpand() {
   $$('[data-system-expand][aria-expanded=true]').forEach((b) => { b.textContent = 'Less'; });
 }
 
-initForms(); initExpand(); initSubmit(); initMessages(); initTimer(); initKeys(); initChangeLog(); initMenu(); refreshBar();
+initForms(); initExpand(); initSubmit(); initMessages(); initTimer(); initKeys(); initAudit(); initMenu(); refreshBar();

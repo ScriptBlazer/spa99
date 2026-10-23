@@ -1,0 +1,2 @@
+{# Old -> new chips for one change. Context: c. Screen readers hear "was X, now Y" (never colour alone). #}
+{% load system_ui %}{% if c.kind == "updated" or c.kind == "direct" %}<span class="au-diff mono" data-system-diff><span class="au-chip del"><span class="sr">was </span>{{ c.old_value|shown:c.field }}</span><span class="au-arrow" aria-hidden="true">→</span><span class="au-chip add"><span class="sr">, now </span>{{ c.new_value|shown:c.field }}</span></span>{% endif %}

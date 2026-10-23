@@ -20,7 +20,7 @@ from urllib.parse import urlencode
 
 from django.db.models import Count, Max, Q, UUIDField
 from django.db.models.functions import Coalesce
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
 from . import audit
@@ -30,6 +30,22 @@ from .models import SystemChange, SystemEvent
 PAGE_SIZE = 25
 PARAMS = ("section", "user", "category", "kind", "q", "range", "date_from", "date_to")
 CHANGE_KINDS = {"created", "updated", "deleted", "direct"}
+
+
+def categories(params):
+    """The chosen categories (the `category` value is one or several, comma separated)."""
+    valid = [key for key, _label in audit.CATEGORIES]
+    return [c for c in (params.get("category") or "").split(",") if c in valid]
+
+
+def chips(params):
+    """The type chips: [{key, label, pressed, value}]. `value` is the `category` the chip sets when pressed (toggles it)."""
+    chosen = categories(params)
+    out = [{"key": "", "label": "All", "pressed": not chosen, "value": ""}]
+    for key, label in (("change", "Changes"), ("security", "Security"), ("undo", "Undo"), ("failure", "Failures")):
+        now = [c for c in chosen if c != key] if key in chosen else [*chosen, key]
+        out.append({"key": key, "label": label, "pressed": key in chosen, "value": ",".join(now)})
+    return out
 
 
 def params_from(get):
@@ -58,13 +74,16 @@ def people():
 def filtered(params):
     """(changes queryset, events queryset) with the filters applied."""
     changes, events = SystemChange.objects.all(), SystemEvent.objects.all()
-    category, kind = params.get("category"), params.get("kind")
-    if category == "change":
-        changes, events = changes.filter(undo_of__isnull=True), events.none()
-    elif category == "undo":
-        changes, events = changes.filter(undo_of__isnull=False), events.filter(kind__in=audit.kinds_in("undo"))
-    elif category in ("security", "failure"):
-        changes, events = changes.none(), events.filter(kind__in=audit.kinds_in(category))
+    kind, cats = params.get("kind"), categories(params)
+    if cats:
+        edits = Q()
+        if "change" in cats:
+            edits |= Q(undo_of__isnull=True)
+        if "undo" in cats:
+            edits |= Q(undo_of__isnull=False)
+        kinds = [k for c in cats if c != "change" for k in audit.kinds_in(c)]
+        changes = changes.filter(edits) if edits else changes.none()
+        events = events.filter(kind__in=kinds) if kinds else events.none()
     if kind:
         if kind in CHANGE_KINDS:
             changes, events = changes.filter(kind=kind), events.none()
@@ -122,15 +141,11 @@ def audit_feed(params, page=1):
 
     items = {}
     if batch_keys:
-        rows = changes.annotate(gk=_group_key()).filter(gk__in=batch_keys).order_by("created_at", "seq")
+        rows = changes.annotate(gk=_group_key()).filter(gk__in=batch_keys).select_related("undo_of").order_by("created_at", "seq")
         for row in rows:
             items.setdefault(str(row.gk), []).append(row)
     event_rows = {str(e.pk): e for e in events.filter(pk__in=event_ids)} if event_ids else {}
-    undone = {}
-    ids = [c.pk for rows in items.values() for c in rows if c.undoable]
-    if ids:
-        for original, label, when in SystemChange.objects.filter(undo_of_id__in=ids).order_by("created_at").values_list("undo_of_id", "user_label", "created_at"):
-            undone.setdefault(original, (label or "a script", when))
+    _decorate([c for rows in items.values() for c in rows])
 
     groups = []
     for latest, key, kind in chosen:
@@ -141,29 +156,123 @@ def audit_feed(params, page=1):
             event.can_undo, event.undone_label = False, ""
             groups.append(_event_group(event))
         elif key in items:
-            groups.append(_batch_group(key, latest, items[key], undone))
-    return {"days": _by_day(groups), "page": {
+            groups.append(_batch_group(key, latest, items[key]))
+    days = _by_day(groups)
+    totals = _day_totals(changes, events, [d["date"] for d in days])
+    for day in days:
+        day["entries"] = totals.get(day["date"], 0)
+    return {"days": days, "page": {
         "number": number, "num_pages": num_pages, "total": total, "has_next": number < num_pages, "has_previous": number > 1,
-        "next_number": number + 1, "previous_number": number - 1}}
+        "next_number": number + 1, "previous_number": number - 1, "size": PAGE_SIZE,
+        "remaining": max(0, total - number * PAGE_SIZE)}}
+
+
+def _day_totals(changes, events, dates):
+    """{date: entries logged that day (with the filters)}: two small queries, whatever the number of groups."""
+    out = {}
+    if not dates:
+        return out
+    for queryset in (changes, events):
+        for row in queryset.filter(created_at__date__in=dates).order_by().values("created_at__date").annotate(n=Count("id")):
+            out[row["created_at__date"]] = out.get(row["created_at__date"], 0) + row["n"]
+    return out
+
+
+def _key_of(change):
+    return str(change.batch_id or change.pk)
+
+
+def _decorate(rows):
+    """Give changes the facts the page needs, in two queries for any number of rows: `undone_label`, `undone_at`,
+    `undone_key`, `undone_pk` (who put it back, when, and where to jump), `blocked_at`, `blocked_key`, `blocked_pk` (a newer
+    change to the same field: Undo would be refused) and `can_undo`."""
+    for row in rows:
+        row.undone_at = row.undone_key = row.undone_pk = row.blocked_at = row.blocked_key = row.blocked_pk = None
+        row.undone_label = ""
+    candidates = [c for c in rows if c.undoable and not c.undo_of_id]
+    undone = {}
+    if candidates:
+        for undo in SystemChange.objects.filter(undo_of_id__in=[c.pk for c in candidates]).order_by("created_at").only("pk", "undo_of_id", "user_label", "created_at", "batch_id"):
+            undone.setdefault(undo.undo_of_id, undo)
+        for row in candidates:
+            undo = undone.get(row.pk)
+            if undo:
+                row.undone_label, row.undone_at, row.undone_key, row.undone_pk = undo.user_label or "a script", undo.created_at, _key_of(undo), undo.pk
+        open_rows = [c for c in candidates if c.pk not in undone]
+        if open_rows:
+            newer = {}
+            later = SystemChange.objects.filter(
+                field__in={c.field for c in open_rows}, object_pk__in={c.object_pk for c in open_rows}, model_label__in={c.model_label for c in open_rows},
+                created_at__gt=min(c.created_at for c in open_rows)).order_by("created_at").only("pk", "model_label", "object_pk", "field", "created_at", "batch_id")
+            for row in later:
+                newer.setdefault((row.model_label, row.object_pk, row.field), []).append(row)
+            for row in open_rows:
+                nxt = next((n for n in newer.get((row.model_label, row.object_pk, row.field), []) if n.created_at > row.created_at and n.pk != row.pk), None)
+                if nxt:
+                    row.blocked_at, row.blocked_key, row.blocked_pk = nxt.created_at, _key_of(nxt), nxt.pk
+    for row in rows:
+        row.can_undo = bool(row.undoable and not row.undo_of_id and not row.undone_label and not row.blocked_at)
+
+
+def person(label):
+    """'moishe.berko@x.com' -> 'Moishe Berko' (the short name shown in the log; the drawer has the full email)."""
+    name = (label or "").split("@")[0].replace(".", " ").replace("_", " ").strip()
+    return name.title() if name else ""
 
 
 def _plural(n, word):
     return f"{n} {word}{'' if n == 1 else 's'}"
 
 
+EVENT_ICONS = {
+    SystemEvent.SIGN_IN: "sign-in", SystemEvent.UNLOCK: "lock-key-open", SystemEvent.LOCK_MANUAL: "lock-key", SystemEvent.LOCK_IDLE: "timer",
+    SystemEvent.SIGN_OUT: "sign-out", SystemEvent.SESSION_EXPIRED: "timer", SystemEvent.EXPORT: "download-simple",
+    SystemEvent.ROLE_CHANGED: "user-gear", SystemEvent.USER_DEACTIVATED: "user-gear", SystemEvent.USER_REACTIVATED: "user-gear",
+    SystemEvent.UNDO: "arrow-counter-clockwise", SystemEvent.UNDO_ALL: "arrow-counter-clockwise", SystemEvent.AUDIT_PRUNED: "minus",
+}
+CATEGORY_WORDS = {"change": "Change", "security": "Security", "undo": "Undo", "failure": "Failure"}
+OUTCOME_WORDS = {SystemEvent.SIGN_IN_FAILED: "wrong password", SystemEvent.UNLOCK_FAILED: "wrong password",
+                 SystemEvent.UNLOCK_RATE_LIMITED: "rate limited", SystemEvent.ACCESS_DENIED: "denied"}
+
+
+def _meta(group_ip, ua, tail):
+    from .templatetags.system_ui import browser
+
+    return [part for part in (group_ip, browser(ua), tail) if part]
+
+
 def _event_group(event):
-    return {"type": "event", "key": str(event.pk), "time": event.created_at, "user_label": event.user_label,
+    detail = event.detail if isinstance(event.detail, dict) else {}
+    word = OUTCOME_WORDS.get(event.kind, "") if event.outcome != SystemEvent.OK else ""
+    if event.outcome == SystemEvent.BLOCKED and event.kind == SystemEvent.SIGN_IN_FAILED:
+        word = "rate limited"
+    summary = event.sentence or event.get_kind_display()
+    who = person(event.user_label)
+    rest = ""
+    for lead in (event.user_label, who):
+        if lead and summary.startswith(lead):
+            who, rest = (person(event.user_label), summary[len(lead):])
+            break
+    else:
+        who = ""
+    try:
+        denied = int(detail.get("count", 0))
+    except (TypeError, ValueError):
+        denied = 0
+    category = audit.category_of_event(event.kind)
+    roles = ([", ".join(detail.get("old") or []) or "none", ", ".join(detail.get("new") or []) or "none"]
+             if event.kind == SystemEvent.ROLE_CHANGED and isinstance(detail.get("old"), list) and isinstance(detail.get("new"), list) else None)
+    return {"type": "event", "key": str(event.pk), "time": event.created_at, "user_label": event.user_label, "who": who, "rest": rest,
+            "icon": "warning-octagon" if category == "failure" else EVENT_ICONS.get(event.kind, "sign-in"), "category_word": CATEGORY_WORDS[category],
+            "roles": roles, "meta": _meta(event.ip_address, event.user_agent, event.path),
             "sections": [section_label(event.section)], "section_label": section_label(event.section), "count": 1,
-            "summary": event.sentence or event.get_kind_display(), "category": audit.category_of_event(event.kind),
-            "ip_address": event.ip_address, "user_agent": event.user_agent, "path": event.path,
-            "batch_id": event.batch_id, "outcome": event.outcome, "open_count": 0, "undo_all_url": "", "items": [event]}
+            "summary": summary, "category": category,
+            "ip_address": event.ip_address, "user_agent": event.user_agent, "path": event.path, "kind": event.kind,
+            "batch_id": event.batch_id, "outcome": event.outcome, "outcome_word": word, "denied_count": denied if denied > 1 else 0,
+            "open_count": 0, "undo_total": 0, "undo_all_url": "", "items": [event]}
 
 
-def _batch_group(key, latest, rows, undone):
-    for row in rows:
-        stamp = undone.get(row.pk)
-        row.undone_label = stamp[0] if stamp else ""
-        row.can_undo = row.undoable and not row.undo_of_id and not stamp
+def _batch_group(key, latest, rows):
     first = rows[0]
     sections = list(dict.fromkeys(section_label(r.section) for r in rows))
     who = first.user_label or "A script"
@@ -171,27 +280,119 @@ def _batch_group(key, latest, rows, undone):
     undoing = all(r.undo_of_id for r in rows)
     only_edits = all(r.kind in ("updated", "direct") for r in rows)
     if undoing:
-        summary = f"{who} put back {_plural(len(rows), 'field')} in {where}"
+        summary, verb = f"{who} put back {_plural(len(rows), 'field')} in {where}", "put back"
     elif only_edits:
-        summary = f"{who} changed {_plural(len(rows), 'field')} in {where}"
+        summary, verb = f"{who} changed {_plural(len(rows), 'field')} in {where}", "changed"
     else:
-        summary = f"{who} made {_plural(len(rows), 'change')} in {where}"
+        summary, verb = f"{who} made {_plural(len(rows), 'change')} in {where}", "made"
+    if len(rows) == 1:
+        from .templatetags.system_ui import what as what_of
+
+        row = rows[0]
+        what = what_of(row)
+        if row.kind == SystemChange.CREATED:
+            verb, what = "added", row.object_repr or "a row"
+        elif row.kind == SystemChange.DELETED:
+            verb, what = "removed", row.object_repr or "a row"
+    elif verb == "made":
+        what = _plural(len(rows), "change")
+    else:
+        what = _plural(len(rows), "field")
     open_rows = [r for r in rows if r.can_undo]
+    waiting = [r for r in rows if r.undoable and not r.undo_of_id and not r.undone_label]
     batch_id = first.batch_id
-    return {"type": "batch", "key": key, "time": latest, "user_label": first.user_label, "sections": sections, "section_label": where,
-            "count": len(rows), "summary": summary, "category": "undo" if undoing else "change", "ip_address": first.ip_address,
-            "user_agent": first.user_agent, "path": first.path, "batch_id": batch_id, "outcome": "ok", "open_count": len(open_rows),
+    origin = None
+    if undoing and first.undo_of_id and first.undo_of:
+        original = first.undo_of
+        origin = {"time": original.created_at, "key": _key_of(original), "pk": original.pk}
+    category = "undo" if undoing else "change"
+    request_id = f"req {str(first.batch_id)[:6]}" if first.batch_id else ""
+    icon = "arrow-counter-clockwise" if undoing else "plus" if verb == "added" else "minus" if verb == "removed" else "pencil-simple"
+    return {"type": "batch", "key": key, "time": latest, "icon": icon, "category_word": CATEGORY_WORDS[category], "meta": _meta(first.ip_address, first.user_agent, request_id), "user_label": first.user_label, "who": person(first.user_label) or "A script",
+            "verb": verb, "what": what, "sections": sections, "section_label": where, "count": len(rows), "summary": summary,
+            "category": category, "ip_address": first.ip_address, "user_agent": first.user_agent, "path": first.path,
+            "batch_id": batch_id, "outcome": "ok", "outcome_word": "", "open_count": len(open_rows), "undo_total": len(waiting), "origin": origin,
             "undo_all_url": reverse("system_undo_batch", args=[batch_id]) if batch_id and len(open_rows) > 1 else "", "items": rows}
 
 
 def _by_day(groups):
     days = []
+    today = timezone.localdate()
     for group in groups:
         day = timezone.localtime(group["time"]).date()
         if not days or days[-1]["date"] != day:
-            days.append({"date": day, "groups": []})
+            name = "Today" if day == today else "Yesterday" if day == today - timedelta(days=1) else f"{day:%A}"
+            days.append({"date": day, "name": name, "groups": []})
         days[-1]["groups"].append(group)
     return days
+
+
+def page_of(params, entry_id):
+    """The page of the feed that holds this entry's group (1 when unknown): groups newer than it, divided by the page size."""
+    import uuid
+
+    try:
+        entry_id = uuid.UUID(str(entry_id))
+    except ValueError:
+        return 1
+    changes, events = filtered(params)
+    row = SystemChange.objects.filter(pk=entry_id).first()
+    if row is not None:
+        moment = SystemChange.objects.filter(batch_id=row.batch_id).aggregate(m=Max("created_at"))["m"] if row.batch_id else row.created_at
+    else:
+        row = SystemEvent.objects.filter(pk=entry_id).first()
+        if row is None:
+            return 1
+        moment = row.created_at
+    ahead = (changes.annotate(gk=_group_key()).order_by().values("gk").annotate(latest=Max("created_at")).filter(latest__gt=moment).count()
+             + events.filter(created_at__gt=moment).count())
+    return ahead // PAGE_SIZE + 1
+
+
+def entry_detail(raw_id):
+    """Everything the detail drawer shows for one entry (a change or a security event), or None. Reads one row (plus its
+    undo links); the hash check recomputes this row's own hash, it does not walk the chain."""
+    import json
+    import uuid
+
+    from .templatetags.system_ui import shown, what as what_of
+
+    try:
+        entry_id = uuid.UUID(str(raw_id))
+    except (TypeError, ValueError):
+        return None
+    row = SystemChange.objects.select_related("undo_of").filter(pk=entry_id).first()
+    is_change = row is not None
+    if row is None:
+        row = SystemEvent.objects.filter(pk=entry_id).first()
+        if row is None:
+            return None
+    if row.seq is None:
+        status = "legacy"
+    else:
+        from .audit import digest
+
+        status = "ok" if digest(row.prev_hash, row.hash_payload()) == row.hash else "bad"
+    pretty = lambda value: json.dumps(value, indent=2, ensure_ascii=False, sort_keys=True, default=str)  # noqa: E731
+    try:
+        section_url = reverse(f"system_{row.section}") if row.section in SECTION_LABELS else ""
+    except NoReverseMatch:  # a section without its own page
+        section_url = ""
+    info = {"section_url": section_url, "is_change": is_change, "row": row, "title": row.sentence or str(row), "section_label": section_label(row.section), "hash_status": status,
+            "who": person(row.user_label), "key": _key_of(row) if is_change else str(row.pk)}
+    if is_change:
+        _decorate([row])
+        info.update(what=what_of(row), old_shown=shown(row.old_value, row.field), new_shown=shown(row.new_value, row.field),
+                    old_json=pretty(row.old_value), new_json=pretty(row.new_value),
+                    has_values=row.kind in ("updated", "direct"), undo_of=row.undo_of if row.undo_of_id else None,
+                    undo_of_key=_key_of(row.undo_of) if row.undo_of_id and row.undo_of else "",
+                    batch_url_ok=bool(row.batch_id))
+        if not row.undoable:
+            info["why_not"] = ("Removals are permanent." if row.kind == SystemChange.DELETED else "Created rows are not undone here." if row.kind == SystemChange.CREATED
+                               else "This entry cannot be undone." if not row.undo_of_id else "")
+    else:
+        info.update(detail_json=pretty(row.detail), outcome_word=OUTCOME_WORDS.get(row.kind, ""))
+    return info
 
 
 # ---------- CSV ----------

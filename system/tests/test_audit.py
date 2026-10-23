@@ -246,3 +246,32 @@ class FeedTests(TestCase):
         self.assertEqual(len(rows), 1 + 4)
         export = SystemEvent.objects.get(kind="export")
         self.assertEqual(export.detail["rows"], 4)
+
+
+class AuditPageTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.client = unlocked_client(self.user)
+
+    def test_page_has_filters_chips_groups_and_the_drawer_for_an_entry(self):
+        audit.log_event("sign_in_failed", email="x@y.com", outcome="failed")
+        change = SystemChange.objects.create(section="plans", model_label="plans.plan", object_repr="Gold", field="price_ex_vat", kind="updated",
+                                             user=self.user, user_label=self.user.email, history_id=1, old_value="95.00", new_value="110.00")
+        page = self.client.get("/changes/")
+        for hook in ("data-system-chips", "data-system-range", "data-system-day", "au-outcome", "wrong password", "Audit log", "was </span>£95.00", "now </span>£110.00"):
+            self.assertContains(page, hook)
+        self.assertNotContains(page, "data-system-hash")
+        drawer = self.client.get("/changes/", {"entry": str(change.pk)})
+        self.assertContains(drawer, 'data-system-hash="ok"')
+        self.assertContains(drawer, "au-json")
+        self.assertEqual(self.client.get("/changes/", {"entry": "not-an-id"}).status_code, 200)
+
+    def test_several_categories_and_a_changed_since_reason(self):
+        audit.log_event("sign_in_failed", email="x@y.com", outcome="failed")
+        audit.log_event("sign_in", user=self.user)
+        old = SystemChange.objects.create(section="plans", model_label="plans.plan", object_pk="1", field="price_ex_vat", kind="updated", history_id=1, user_label="a@b.c", old_value="1", new_value="2")
+        SystemChange.objects.create(section="plans", model_label="plans.plan", object_pk="1", field="price_ex_vat", kind="updated", history_id=2, user_label="a@b.c", old_value="2", new_value="3")
+        groups = feed.audit_feed({"category": "failure,change"})["days"][0]["groups"]
+        self.assertEqual(sorted(g["category"] for g in groups), ["change", "change", "failure"])
+        self.assertContains(self.client.get("/changes/"), "Changed since")
+        self.assertEqual(feed.entry_detail(old.pk)["row"].blocked_pk is not None, True)
