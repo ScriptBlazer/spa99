@@ -19,10 +19,10 @@
   </div>
   <aside class="o-detail-rail o-detail-rail--sticky" data-gold-decision data-invite-state="{{ a.invite.state }}">
     <section class="o-card" aria-labelledby="decision-h" data-region="decision" data-fade>
+      {% if a.status == "approved" %}<p class="o-state o-state--approved">Approved {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>{% endif %}
       <h2 id="decision-h" class="o-h3">Decision</h2>
       <p class="o-badges">{% include "office/_badge.html" with status=a.status %} {% include "office/_badge.html" with potential=a.potential %}</p>
       {% if a.status == "approved" %}
-        <p class="o-state">Approved {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>
         <p class="o-sub">{% include "office/_invite_state.html" with invite=a.invite %}</p>
       {% elif a.status == "declined" %}
         <p class="o-state">Declined {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>

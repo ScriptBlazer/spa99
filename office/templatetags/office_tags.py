@@ -48,21 +48,17 @@ def bp_rate(value):
 
 
 @register.filter
-def bp_rate_value(value):
-    """The rate without its sign, for the count-up: 4.6 or 38."""
-    pct = _int(value) / 100
-    return f"{pct:.1f}" if pct < 10 else f"{round(pct)}"
-
-
-@register.filter
-def pct(value):
-    return f"{_int(value)}%"
-
-
-@register.filter
 def bp_ratio(value):
     """Basis points as 0 to 1 for a bar's scaleX."""
     return f"{max(0, min(_int(value), 10000)) / 10000:.4f}"
+
+
+@register.simple_tag
+def bar_share(value, share_bp):
+    """A funnel bar's length as 0 to 1. A step with people in it never draws shorter than a sliver (3%), so it still shows."""
+    if not _int(value):
+        return "0.0000"
+    return f"{max(max(0, min(_int(share_bp), 10000)) / 10000, 0.03):.4f}"
 
 
 @register.simple_tag
@@ -185,12 +181,104 @@ def journey_label(value):
 
 @register.simple_tag
 def ring_arcs(percent):
-    """Offsets for one ring in pathLength units (0 = full lap). Up to two laps; None means no goal (track only)."""
+    """Offsets for one ring in pathLength units (0 = full lap), up to two laps. `goal` is 0 when no goal is set (the ring is then
+    a calm closed circle); `on` and `on2` are 0 for an arc that has nothing to draw (a round cap would still leave a dot)."""
     if percent is None:
-        return {"has": False}
+        return {"goal": 0, "first": "100", "second": "100", "on": 0, "on2": 0}
     p = max(0, min(_int(percent), 200))
     first, second = min(p, 100), max(p - 100, 0)
-    return {"has": True, "first": f"{100 - first:g}", "second": f"{100 - second:g}", "laps": 2 if second else 1, "any": p > 0}
+    return {"goal": 1, "first": f"{100 - first:g}", "second": f"{100 - second:g}", "on": 1 if first else 0, "on2": 1 if second else 0}
+
+
+PERIODS = {   # how a change line names the period before: (reference, the word for "new")
+    "today": ("yesterday", "today"), "7d": ("last week", "this week"), "30d": ("the 30 days before", "this month"),
+}
+ANALYTICS_PERIODS = {"7d": "the previous 7 days", "30d": "the previous 30 days", "90d": "the previous 90 days"}
+
+
+@register.simple_tag
+def change_line(value, previous, range_name):
+    """A change as a count, in words (OFFICE section 10): +12 on last week · 6 fewer than last week · Same as last week · New this week."""
+    value, previous = _int(value), _int(previous)
+    ref, fresh = PERIODS.get(range_name, PERIODS["7d"])
+    diff = value - previous
+    if diff == 0:
+        return f"Same as {ref}"
+    if diff > 0:
+        return f"New {fresh}" if previous == 0 else f"+{diff:,} on {ref}"
+    return f"{-diff:,} fewer than {ref}"
+
+
+@register.simple_tag
+def change_ana(value, previous_values, range_name):
+    """Analytics: '+1,204 on the previous 30 days' (empty for All, which has no previous period)."""
+    ref = ANALYTICS_PERIODS.get(range_name)
+    if not ref or not previous_values:
+        return ""
+    value, previous = _int(value), sum(_int(v) for v in previous_values)
+    diff = value - previous
+    if diff == 0:
+        return f"Same as {ref}"
+    if diff > 0:
+        return f"New in the last {ref.split()[-2]} days" if previous == 0 else f"+{diff:,} on {ref}"
+    return f"{-diff:,} fewer than {ref}"
+
+
+@register.simple_tag
+def change_rate(value, previous_values):
+    """Analytics only: the change as a rate after the count ('▲ 18%'), empty when there is no earlier figure."""
+    previous = sum(_int(v) for v in (previous_values or []))
+    if not previous:
+        return ""
+    pct = round((_int(value) - previous) * 100 / previous)
+    return "" if pct == 0 else (f"▲ {pct}%" if pct > 0 else f"▼ {-pct}%")
+
+
+@register.filter
+def sum_of(values):
+    """The sum of a stored series (the previous period's total for a change line)."""
+    return sum(_int(v) for v in (values or []))
+
+
+GOAL_WORDS = {"journeys_started": ("people started the journey", "people started"), "journeys_completed": ("finished it", "finished it"),
+              "registrations": ("registered", "registered")}
+
+
+@register.simple_tag
+def ring_sentence(rings):
+    """One sentence for the three rings: '42 people started the journey, goal 60. 31 finished it, goal 40. 18 registered, goal 25.'"""
+    parts = []
+    for ring in rings or []:
+        words = GOAL_WORDS.get(ring.get("key"), (ring.get("label", ""), ring.get("label", "")))[0]
+        goal = f", goal {_int(ring.get('goal')):,}" if ring.get("goal") else ""
+        parts.append(f"{_int(ring.get('value')):,} {words}{goal}.")
+    return " ".join(parts)
+
+
+@register.filter
+def ring_name(key):
+    """The words under a ring."""
+    return GOAL_WORDS.get(key, ("", str(key)))[1]
+
+
+@register.filter
+def step_label(step):
+    """Funnel step names as the brief words them (the stored label says 'Completed it')."""
+    return "Finished it" if step.get("key") == "completed" else step.get("label", "")
+
+
+FUNNEL_FROM = {"visitors": "visitors", "started": "who started", "completed": "who finished"}
+
+
+@register.simple_tag
+def funnel_of(funnel, index):
+    """'31 of 42 who started': the count of the step before, never a rate. Empty for the first step."""
+    if not index:
+        return ""
+    step, before = funnel[index], funnel[index - 1]
+    if step.get("partial") or not _int(step.get("previous_value", before.get("value"))):
+        return ""
+    return f"{_int(step.get('value')):,} of {_int(before.get('value')):,} {FUNNEL_FROM.get(before.get('key'), 'before')}"
 
 
 @register.simple_tag
@@ -238,6 +326,44 @@ def index_of(items, value):
 @register.filter
 def range_label(value):
     return {"today": "Today", "7d": "7 days", "30d": "30 days", "90d": "90 days", "all": "All"}.get(value, value)
+
+
+@register.simple_tag
+def sum_key(items, key="value"):
+    """The total of one field across a list (the number in the middle of a donut)."""
+    return sum(_int(item.get(key)) for item in (items or []))
+
+
+@register.simple_tag
+def top_of(items, key="value"):
+    """The biggest value in a list, for bar lengths."""
+    return max((_int(item.get(key)) for item in (items or [])), default=0)
+
+
+RAMP = {"clay": ("clay", "clay-2", "clay-3", "clay-4"), "teal": ("teal", "teal-2", "teal-3", "teal-4")}
+
+
+@register.simple_tag
+def ramp_rows(items, hue, key="value"):
+    """Ordered categories as legend rows in a ramp of the metric's own hue (full, 72%, 48%, 28%). 'No plan chosen' is taupe and last;
+    a fifth or later category folds into 'Other' (taupe). The chart script folds the same way, so swatch and arc always match."""
+    steps, rows, other, none = RAMP.get(hue, RAMP["clay"]), [], None, None
+    for item in items or []:
+        row = {"label": item.get("label", ""), "value": _int(item.get(key)), "share_bp": _int(item.get("share_bp"))}
+        if item.get("dimension") == "none":
+            none = row
+        elif len(rows) < len(steps):
+            row["swatch"] = f"var(--office-{steps[len(rows)]})"
+            rows.append(row)
+        else:
+            other = other or {"label": "Other", "value": 0, "share_bp": 0}
+            other["value"] += row["value"]
+            other["share_bp"] += row["share_bp"]
+    for extra in (other, none):
+        if extra:
+            extra["swatch"] = "var(--office-taupe)"
+            rows.append(extra)
+    return rows
 
 
 @register.simple_tag

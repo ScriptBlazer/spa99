@@ -1,4 +1,4 @@
-/* Small shell behaviours: header hairline once scrolled, the person menu, segmented thumbs, and the phone's filter sheet. */
+/* Small shell behaviours: header shadow once scrolled, the person menu, segmented thumbs, and the phone's filter sheet. */
 
 export function initOfficeUi() {
   header();

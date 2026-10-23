@@ -34,7 +34,7 @@ function copyAttrs(to, from) {
 }
 
 function apply(doc) {
-  document.querySelectorAll('.o-rings, .o-stats, .o-funnel').forEach((card) => card.classList.add('is-settled')); // intro is over
+  document.querySelectorAll('.o-rings, .o-stat, .o-funnel, .o-kpi').forEach((card) => card.classList.add('is-settled')); // intro is over
   doc.querySelectorAll('[data-region]').forEach((next) => {
     const old = document.querySelector(`[data-region="${next.dataset.region}"]`);
     if (!old) return;

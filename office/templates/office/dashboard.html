@@ -3,7 +3,7 @@
 {% block title %}Dashboard | Spa 99 Office{% endblock %}
 {% block header_range %}{% include "office/_range.html" with place="header" ranges=data.ranges current=data.range %}{% endblock %}
 {% block main %}
-{# DOM order is the phone order; the desktop grid places the cards (css). Everything is server-rendered: rings, sparklines, numbers. #}
+{# DOM order is the phone order; the desktop grid places the cards (css). Everything is server-rendered: rings, sparklines, numbers. Plain counts, no percent. #}
 {% include "office/_range.html" with place="page" ranges=data.ranges current=data.range %}
 <p class="o-error" data-error hidden role="status"><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
 <div class="o-dash" data-office-dashboard>
@@ -13,32 +13,47 @@
     <p class="o-lead" data-office-what-changed data-region="what-changed" data-fade>{{ data.what_changed|default:"A quiet day so far." }}</p>
   </header>
 
-  <section class="o-card o-rings" data-reveal data-office-rings aria-label="Goals">
-    <svg class="o-ring-svg" viewBox="0 0 220 220" role="img" data-morph="rings-svg"
-         aria-label="{% for ring in data.rings %}{{ ring.label }} {{ ring.value|num }}{% if ring.goal %}, goal {{ ring.goal|num }}{% endif %}. {% endfor %}">
+  {# The journey: three rings, plain counts #}
+  <section class="o-card o-rings" data-reveal data-office-rings aria-labelledby="journey-h">
+    <h2 id="journey-h" class="o-h3">The journey</h2>
+    {% ring_sentence data.rings as sentence %}
+    <div class="o-ring-row" role="group" data-morph="rings-label" aria-label="{{ sentence }}">
       {% for ring in data.rings %}
       {% ring_arcs ring.percent as arc %}
-      <g class="o-ring o-ring--{{ forloop.counter }}" style="--i: {{ forloop.counter0 }}" transform="rotate(-90 110 110)">
-        <circle class="o-ring-track" cx="110" cy="110" r="{% if forloop.first %}101{% elif forloop.counter == 2 %}79{% else %}57{% endif %}"/>
-        {% if arc.has %}
-        <circle class="o-ring-cap" data-morph="ring-{{ ring.key }}-cap" cx="110" cy="110" r="{% if forloop.first %}101{% elif forloop.counter == 2 %}79{% else %}57{% endif %}" pathLength="100" style="--arc: {{ arc.second }}"/>
-        <circle class="o-ring-arc" data-morph="ring-{{ ring.key }}-1" cx="110" cy="110" r="{% if forloop.first %}101{% elif forloop.counter == 2 %}79{% else %}57{% endif %}" pathLength="100" style="--arc: {{ arc.first }}"/>
-        <circle class="o-ring-arc o-ring-arc--lap2" data-morph="ring-{{ ring.key }}-2" cx="110" cy="110" r="{% if forloop.first %}101{% elif forloop.counter == 2 %}79{% else %}57{% endif %}" pathLength="100" style="--arc: {{ arc.second }}"/>
-        {% endif %}
-      </g>
+      <a class="o-ring-item" href="{% url 'office_analytics' %}#{% if ring.key == 'registrations' %}registrations{% else %}journeys{% endif %}" data-ring="{{ ring.key }}" data-percent="{{ ring.percent|default_if_none:'' }}">
+        <span class="o-ring-fig">
+          <svg class="o-ring-svg" viewBox="0 0 100 100" aria-hidden="true" focusable="false" data-morph="ring-{{ ring.key }}-svg" style="--has: {{ arc.goal }}">
+            <g transform="rotate(-90 50 50)">
+              <circle class="o-ring-track" cx="50" cy="50" r="45"/>
+              <circle class="o-ring-open" cx="50" cy="50" r="45"/>
+              <circle class="o-ring-arc" data-morph="ring-{{ ring.key }}-1" cx="50" cy="50" r="45" pathLength="100" style="--arc: {{ arc.first }}; --on: {{ arc.on }}"/>
+              <circle class="o-ring-cap" data-morph="ring-{{ ring.key }}-cap" cx="50" cy="50" r="45" pathLength="100" style="--arc: {{ arc.second }}; --on: {{ arc.on2 }}"/>
+              <circle class="o-ring-arc o-ring-arc--lap2" data-morph="ring-{{ ring.key }}-2" cx="50" cy="50" r="45" pathLength="100" style="--arc: {{ arc.second }}; --on: {{ arc.on2 }}"/>
+            </g>
+          </svg>
+          <span class="o-ring-num{% if ring.value >= 1000 %} o-ring-num--long{% endif %}" data-ring-value data-count="{{ ring.value }}" data-region="ring-num-{{ ring.key }}" data-fade>{{ ring.value|num }}</span>
+        </span>
+        <span class="o-ring-text" data-region="ring-text-{{ ring.key }}" data-fade>
+          <span class="o-ring-label" data-ring-label>{{ ring.key|ring_name }}</span>
+          {% if ring.goal %}<span class="o-ring-line" data-ring-of>Goal {{ ring.goal|num }}</span>{% endif %}
+          {% change_line ring.value ring.previous data.range as change %}
+          <span class="o-ring-line" data-ring-change>{{ change }}</span>
+        </span>
+      </a>
       {% endfor %}
-    </svg>
-    <ul class="o-legend-rows" data-region="ring-legend" data-fade>
-      {% for ring in data.rings %}
-      <li class="o-legend-row" data-ring="{{ ring.key }}" data-percent="{{ ring.percent|default_if_none:'' }}">
-        <span class="o-dot o-dot--{{ forloop.counter }}" aria-hidden="true"></span>
-        <span class="o-legend-label" data-ring-label>{{ ring.label }}</span>
-        <span class="o-legend-value"><span class="o-legend-num" data-ring-value>{{ ring.value|num }}</span>
-          {% if ring.goal %}<span class="o-legend-of" data-ring-of>of {{ ring.goal|num }}</span>
-          {% else %}<span class="o-legend-of" data-ring-nogoal>No goal set</span>{% endif %}</span>
-      </li>
-      {% endfor %}
-    </ul>
+    </div>
+  </section>
+
+  {# Gold waiting #}
+  <section class="o-gold-tile" data-reveal data-office-gold-waiting aria-labelledby="gold-tile-h">
+    <p class="o-gold-label"><span class="o-gold-dot" aria-hidden="true"></span><span id="gold-tile-h">Gold applications</span></p>
+    <p class="o-gold-num" data-gold-waiting>{{ data.gold_waiting|num }}</p>
+    {% if data.gold_waiting %}
+    <p class="o-gold-line">waiting for you</p>
+    <a class="btn btn-primary btn-sm o-gold-go" href="{% url 'office_gold' %}?status=waiting">Review</a>
+    {% else %}
+    <p class="o-gold-line">Nothing waiting.</p>
+    {% endif %}
   </section>
 
   <section class="o-card o-waiting" data-reveal data-office-waiting aria-labelledby="waiting-h">
@@ -46,7 +61,7 @@
       <h2 id="waiting-h">Waiting for you</h2>
       <span class="o-count" data-region="waiting-count" data-waiting-count>{{ data.waiting.count|num }}</span>
     </header>
-    <div data-region="waiting-list">
+    <div class="o-rowlist" data-region="waiting-list">
       {% for item in data.waiting.items %}
       <div class="o-wait-row">
         <a class="o-wait-link" href="{% url 'office_gold_application' item.id %}" data-waiting-item data-potential="{{ item.potential }}">
@@ -68,54 +83,47 @@
     </div>
   </section>
 
-  <div class="o-stats" data-reveal="stagger" data-office-stats>
-    {% for stat in data.stats %}
-    <div class="o-stat-wrap">
-      <a class="o-card o-stat" href="{% url 'office_analytics' %}#{{ stat.link }}" data-stat="{{ stat.key }}" data-direction="{{ stat.direction }}">
-        <span class="o-stat-label" data-stat-label>{{ stat.label }}</span>
-        <span class="o-stat-body" data-region="stat-{{ stat.key }}" data-fade>
-          {% if stat.unit == "basis_points" %}<span class="o-stat-value" data-stat-value data-count="{{ stat.value|bp_rate_value }}" data-decimals="{% if stat.value < 1000 %}1{% else %}0{% endif %}" data-suffix="%">{{ stat.value|bp_rate }}</span>
-          {% else %}<span class="o-stat-value" data-stat-value{% if stat.value < 10000 %} data-count="{{ stat.value }}"{% endif %}>{{ stat.value|compact }}</span>{% endif %}
-          <span class="o-delta o-delta--{% if stat.direction == 'none' and stat.value %}new{% else %}{{ stat.direction }}{% endif %}" data-stat-delta>
-            {% if stat.direction == "up" %}<span aria-hidden="true">&#9650; {{ stat.percent }}%</span><span class="sr-only">Up {{ stat.percent }}%</span>
-            {% elif stat.direction == "down" %}<span aria-hidden="true">&#9660; {{ stat.percent }}%</span><span class="sr-only">Down {{ stat.percent }}%</span>
-            {% elif stat.direction == "none" and stat.value %}New
-            {% else %}No change{% endif %}
-            <span class="o-delta-vs">{% if data.range == "today" %}vs yesterday{% elif data.range == "30d" %}vs the 30 days before{% else %}vs last week{% endif %}</span>
-          </span>
-        </span>
-        {% sparkline stat.series as spark %}
-        <span class="o-spark" data-spark aria-hidden="true">
-          <svg viewBox="0 0 100 40" preserveAspectRatio="none" focusable="false">
-            <defs><linearGradient id="spark-{{ stat.key }}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="o-spark-top"/><stop offset="1" class="o-spark-end"/></linearGradient></defs>
-            <path class="o-spark-area" data-morph="spark-{{ stat.key }}-area" d="{{ spark.area }}" fill="url(#spark-{{ stat.key }})"/>
-            <path class="o-spark-line" data-morph="spark-{{ stat.key }}-line" d="{{ spark.line }}" vector-effect="non-scaling-stroke"/>
-          </svg>
-          <span class="o-spark-dot" data-morph="spark-{{ stat.key }}-dot" style="left: {{ spark.x }}%; top: {{ spark.y }}%"></span>
-        </span>
-      </a>
-    </div>
-    {% endfor %}
-  </div>
-
-  <section class="o-card o-funnel" data-reveal data-office-funnel aria-label="From visitor to registered">
+  {# From visit to registration #}
+  <section class="o-card o-funnel" data-reveal data-office-funnel aria-labelledby="funnel-h">
+    <h2 id="funnel-h" class="o-h3">From visit to registration</h2>
     <ol class="o-funnel-steps" data-region="funnel" data-fade>
       {% for step in data.funnel %}
-      <li class="o-funnel-step" data-funnel-step="{{ step.key }}" data-share-bp="{{ step.share_bp }}" data-step-rate-bp="{{ step.step_rate_bp|default_if_none:'' }}" style="--i: {{ forloop.counter0 }}">
-        <span class="o-funnel-label">{{ step.label }}</span>
+      {% funnel_of data.funnel forloop.counter0 as of_line %}
+      <li class="o-funnel-step o-funnel-step--{{ step.key }}" data-funnel-step="{{ step.key }}" data-share-bp="{{ step.share_bp }}" data-step-rate-bp="{{ step.step_rate_bp|default_if_none:'' }}" style="--i: {{ forloop.counter0 }}">
+        <span class="o-funnel-label">{{ step|step_label }}</span>
         <span class="o-funnel-num">{{ step.value|num }}</span>
-        <span class="o-funnel-bar" role="presentation"><span class="o-funnel-fill" data-morph="funnel-{{ step.key }}" style="--share: {{ step.share_bp|bp_ratio }}"></span></span>
-        {% if step.step_rate_bp is not None %}<span class="o-funnel-rate">{{ step.step_rate_bp|bp_rate }} <span aria-hidden="true">&rsaquo;</span><span class="sr-only">of the step before</span></span>
-        {% elif step.partial %}<span class="o-funnel-rate"><span aria-hidden="true">&mdash;</span><span class="sr-only">no rate, earlier step counted from later</span></span>{% endif %}
+        <span class="o-funnel-bar" role="presentation">{% bar_share step.value step.share_bp as share %}<span class="o-funnel-fill" data-morph="funnel-{{ step.key }}" style="--share: {{ share }}"></span></span>
+        <span class="o-funnel-of">{{ of_line }}</span>
       </li>
       {% endfor %}
     </ol>
     <p class="o-sub o-funnel-note" data-region="funnel-note" data-fade>{{ data.funnel_note }}</p>
   </section>
 
+  {# Site visitors and Page views #}
+  {% for stat in data.stats %}{% if stat.key == "visitors" or stat.key == "page_views" %}
+  <a class="o-card o-card--link o-stat" href="{% url 'office_analytics' %}#{{ stat.link }}" data-reveal data-stat="{{ stat.key }}" data-direction="{{ stat.direction }}">
+    <span class="o-stat-label" data-stat-label>{{ stat.label }}</span>
+    <span class="o-stat-body" data-region="stat-{{ stat.key }}" data-fade>
+      <span class="o-stat-value" data-stat-value{% if stat.value < 10000 %} data-count="{{ stat.value }}"{% endif %}>{{ stat.value|compact }}</span>
+      {% change_line stat.value stat.previous data.range as change %}
+      <span class="o-delta" data-stat-delta>{{ change }}</span>
+    </span>
+    {% sparkline stat.series as spark %}
+    <span class="o-spark" data-spark aria-hidden="true">
+      <svg viewBox="0 0 100 40" preserveAspectRatio="none" focusable="false">
+        <defs><linearGradient id="spark-{{ stat.key }}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="o-spark-top"/><stop offset="1" class="o-spark-end"/></linearGradient></defs>
+        <path class="o-spark-area" data-morph="spark-{{ stat.key }}-area" d="{{ spark.area }}" fill="url(#spark-{{ stat.key }})"/>
+        <path class="o-spark-line" data-morph="spark-{{ stat.key }}-line" d="{{ spark.line }}" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <span class="o-spark-dot" data-morph="spark-{{ stat.key }}-dot" style="left: {{ spark.x }}%; top: {{ spark.y }}%"></span>
+    </span>
+  </a>
+  {% endif %}{% endfor %}
+
   <section class="o-card o-latest" data-reveal data-office-latest aria-labelledby="latest-h">
     <header class="o-card-head"><h2 id="latest-h">Latest registrations</h2></header>
-    <div data-region="latest">
+    <div class="o-rowlist" data-region="latest">
       {% for item in data.latest %}
       <a class="o-latest-row" href="{% url 'office_person' item.id %}" data-latest-item>
         <span class="o-latest-name">{{ item.name }}</span>

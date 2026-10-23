@@ -1,0 +1,107 @@
+/* Spa 99 Office tokens (docs/design/OFFICE.md section 2, light, round 2).
+   Office only: every token is scoped to `.office` (the Office <body>, also the Office sign-in), never :root, so the public site cannot pick one up.
+   Brand tokens (espresso, gold, caramel, cream, fonts, spacing, easing) are read from tokens.css, never redefined.
+   Imported by office.css and office-signin.css. JS reads every colour from the body with getComputedStyle. */
+.office {
+  /* ---------- shell (2.1) ---------- */
+  --office-page: #F4F2ED;                        /* page, desktop sidebar, sign-in page: espresso 11.07, muted 5.88 */
+  --office-surface: #FFFDF9;                     /* cards, tables, tooltip, modal, tab bar: espresso 12.19, muted 6.47, deep gold 5.77 */
+  --office-sunken: #ECE8E0;                      /* tonal fills: segmented track, table head, hover, secondary button: espresso 10.13, muted 5.38 */
+  --office-row-alt: #FAF7F2;                     /* zebra rows */
+  --office-text: var(--color-espresso);          /* all primary text, numbers, active nav, icons */
+  --office-muted: #6B5A4D;                       /* labels, secondary lines, axis ticks: 5.38 or more on every surface */
+  --office-gold-text: #8A5A2E;                   /* the only gold text on light: 4.80 to 5.77 */
+  --office-danger: var(--color-danger);          /* 8.15 or more */
+  --office-header: rgb(244 242 237 / 0.82);      /* sticky header, with blur */
+  --office-bar: rgb(255 253 249 / 0.92);         /* phone tab bar */
+  --office-bar-strong: rgb(255 253 249 / 0.94);  /* phone decision bar */
+  --office-overlay: rgb(73 46 33 / 0.32);        /* modal and sheet backdrop */
+  --office-caramel-tint: #F3E8DB;                /* caramel at 18%: "Medium" badge, espresso 10.25 */
+
+  --office-shadow-1: 0 1px 2px rgb(73 46 33 / 0.04), 0 8px 24px -12px rgb(73 46 33 / 0.10);   /* every card at rest */
+  --office-shadow-2: 0 2px 4px rgb(73 46 33 / 0.05), 0 18px 40px -16px rgb(73 46 33 / 0.16);  /* hover on clickable cards, menus, tooltip */
+  --office-shadow-3: 0 4px 8px rgb(73 46 33 / 0.06), 0 32px 64px -24px rgb(73 46 33 / 0.24);  /* modal, sheet, sign-in card */
+  --office-shadow-scrolled: 0 12px 24px -20px rgb(73 46 33 / 0.18);                           /* header once scrolled */
+  --office-shadow-bar: 0 -12px 28px -20px rgb(73 46 33 / 0.22);                               /* phone bars, upward */
+
+  --office-radius-lg: 20px;                      /* cards */
+  --office-radius: 14px;                         /* tiles, inner panels, rows */
+  --office-pill: 999px;                          /* segmented controls, badges, bars, active nav item */
+
+  /* ---------- data palette (2.2): Dashboard and Analytics only. A metric keeps its colour everywhere. ---------- */
+  --office-slate: #3F6290;   --office-slate-tint: #E8EAEC;   --office-slate-track: #D1D8E0;   /* site visitors, top pages, referrers */
+  --office-plum: #7A4A72;    --office-plum-tint: #EFE8E9;    --office-plum-track: #DFD2D9;    /* page views */
+  --office-sage: #7BA374;    --office-sage-tint: #EFF2E9;    --office-sage-track: #DFE7D9;    /* people who started the journey */
+  --office-teal: #2C7773;    --office-teal-tint: #E6EDE9;    --office-teal-track: #CCDDD9;    /* people who finished, journey answers, where people stop */
+  --office-clay: #B4583A;    --office-clay-tint: #F6E9E2;    --office-clay-track: #EDD5CB;    /* registrations, plans */
+  --office-ochre: #C0913A;   --office-ochre-tint: #F7F0E2;   --office-ochre-track: #F0E3CB;   /* Gold applications */
+  --office-taupe: #9B8B7B;   --office-taupe-tint: #F3EFEA;   --office-taupe-track: #E7E2DB;   /* neutral: previous period, Other, No plan chosen, Declined */
+  /* Ordered categories: a ramp of the metric's own hue (full, 72%, 48%, 28% over the surface). */
+  --office-clay-2: #C9866F;  --office-clay-3: #DBAE9D;  --office-clay-4: #EACFC4;
+  --office-teal-2: #679D99;  --office-teal-3: #9ABDB9;  --office-teal-4: #C4D7D3;
+  --office-grid: rgb(73 46 33 / 0.06);           /* gridlines, decoration */
+  --office-crosshair: rgb(73 46 33 / 0.18);
+
+  /* ---------- type and layout (2.3) ---------- */
+  --office-stat: clamp(2.25rem, 1.5vw + 1.75rem, 3.5rem);     /* big numbers: 36px phone, 56px at 1440 */
+  --office-stat-lg: clamp(3rem, 3vw + 2rem, 4.5rem);          /* the Analytics hero number */
+  --office-text-xs: 0.75rem;                                  /* ticks, badges, tab labels, table heads only */
+  --office-nav-w: 15.5rem;
+  --office-header-h: 3.5rem;
+  --office-tabbar-h: 4rem;
+  --office-ring: 6rem;
+  --office-ring-stroke: 10px;
+  --office-spark-h: 3rem;
+  --office-chart-h: 15rem;
+  --office-chart-hero-h: 18rem;
+  --office-donut: 10rem;
+
+  /* ---------- motion (6): the accepted Office timings ---------- */
+  --office-dur-ring: 1400ms;
+  --office-stagger-ring: 120ms;
+  --office-dur-spark: 900ms;
+  --office-dur-chart: 900ms;
+  --office-dur-count: 900ms;
+  --office-dur-morph: 600ms;
+  --office-dur-swap: 240ms;
+  --office-dur-thumb: 400ms;
+  --office-dur-lift: 250ms;
+
+  /* ---------- surface names: the shared components (buttons, fields, messages) follow these (below) ---------- */
+}
+/* .on-dark inside the Office (the sign-in section) stays light */
+.office, .office .on-dark {
+  --s-bg: var(--office-page);
+  --s-text: var(--office-text);
+  --s-muted: var(--office-muted);
+  --s-line: var(--color-control-line);
+  --s-hair: transparent;
+  --s-raised: var(--office-surface);
+  --s-field: var(--office-surface);
+  --s-well: var(--office-surface);
+  --s-well-line: var(--color-control-line);
+  --s-label: var(--office-muted);
+  --s-edge: var(--color-espresso);
+  --s-focus: var(--color-espresso);
+  --s-danger: var(--office-danger);
+  --s-accent: var(--color-espresso);
+  --s-on-accent: var(--color-cream);
+  --s-tile-line: transparent;
+  --s-seg: var(--office-surface);
+}
+@media (min-width: 64em) {
+  .office {
+    --office-header-h: 4.5rem;
+    --office-ring: 9.5rem;
+    --office-ring-stroke: 14px;
+    --office-chart-h: 20rem;
+    --office-chart-hero-h: 24rem;
+    --office-donut: 11.5rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .office {
+    --office-dur-ring: 0ms; --office-stagger-ring: 0ms; --office-dur-spark: 0ms; --office-dur-chart: 0ms; --office-dur-count: 0ms;
+    --office-dur-morph: 0ms; --office-dur-swap: 0ms; --office-dur-thumb: 0ms; --office-dur-lift: 0ms;
+  }
+}

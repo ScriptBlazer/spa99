@@ -38,7 +38,7 @@ Our own counter, no cookies, no personal data:
 
 ## Look
 
-Premium, calm, dark and gold like the site, with an Apple Watch feel: activity rings for goals, crisp sparklines, smooth animated charts, big numbers in the brand numerals. One self-hosted chart library (chosen in the design brief, pinned version), plus SVG rings. Mobile usable (Barry will look on his phone).
+Premium, calm and light (see `docs/design/OFFICE.md`: warm surfaces, soft shadows, no ruled boxes, a muted data palette), with an Apple Health feel: activity rings for goals, crisp sparklines, smooth animated charts, big numbers in the brand numerals. One self-hosted chart library (chosen in the design brief, pinned version), plus SVG rings. Mobile usable (Barry will look on his phone).
 
 ## Acceptance checks
 

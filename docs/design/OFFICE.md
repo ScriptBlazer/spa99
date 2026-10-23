@@ -238,6 +238,11 @@ As before, restyled: empty = no axes, the card keeps its height, centred muted s
 
 ---
 
+### 5.6 Built deviations (frontend, 2026-10-23)
+
+- **Gold applications (5.2.7):** the backend stores counts by potential and counts by status now, not potential by status, so the stacked-per-potential chart is not built. The card shows "By potential" as three ochre pill bars and "Where they stand now" as one stacked pill (Approved ochre, Waiting ochre 48% hatched, Declined taupe). Both are server-rendered HTML. Revisit if the roll-up ever stores potential by status.
+- Facilities, Gold, top pages and referrers are HTML bar lists (same colours, same rounded bars), not Chart.js.
+
 ## 6. Motion
 
 Unchanged from the accepted Office motion (PROJECT 2026-10-23): cards rise in once (1000ms, 8px/12px), rings draw (1400ms, 120ms apart), sparklines draw (900ms), funnel bars `scaleX` (900ms), numbers count on the first Dashboard load in a session (900ms), charts draw in when 15% visible (900ms, `easeOutQuint`) and morph on range switch (600ms), HTMX text cross-fades (240ms), picker thumb 400ms, tooltip 120ms, hover lift 250ms. New: donuts sweep in clockwise (`animateRotate: true`, `animateScale: false`, 900ms). Reduced motion: everything final and instant, Chart.js `animation: false`.

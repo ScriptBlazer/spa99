@@ -1,13 +1,13 @@
 {% load static office_tags %}<!doctype html>
-{% comment %}The Office shell (docs/design/OFFICE.md section 2): left navigation on desktop, bottom tabs on phone, header with title, range and person.
+{% comment %}The Office shell (docs/design/OFFICE.md section 3, light): left navigation on desktop, bottom tabs on phone, header with title, range and person.
 Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main, head_extra, scripts. Set body_attrs="data-office-detail" on detail pages.{% endcomment %}
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#2C1C14">
-<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#F4F2ED">
+<meta name="color-scheme" content="light">
 <script>var d=document.documentElement;d.classList.add("js");setTimeout(function(){if(!d.dataset.reveal)d.classList.add("no-reveal")},4000)</script>
 <title>{% block title %}Spa 99 Office{% endblock %}</title>
 <link rel="icon" href="{% static 'common/img/mark-gold.svg' %}" type="image/svg+xml">
@@ -17,7 +17,7 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
 <script type="module" src="{% static 'common/js/office.js' %}"></script>
 {% block head_extra %}{% endblock %}
 </head>
-<body class="office on-dark" data-office-section="{{ section }}" {% block body_attrs %}{% endblock %}>
+<body class="office" data-office-section="{{ section }}" {% block body_attrs %}{% endblock %}>
 {% include "office/_icons.html" %}
 <a class="skip-link" href="#office-main">Skip to content</a>
 <span class="o-sentinel" data-office-sentinel aria-hidden="true"></span>
