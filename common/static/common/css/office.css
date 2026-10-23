@@ -7,6 +7,9 @@
 @import "office-analytics.css";
 @import "office-lists.css";
 
+/* The site-wide cross-document view transition is off in the Office (it threw "Transition was skipped"). */
+@view-transition { navigation: none; }
+
 /* ---------- surfaces: the Office is dark, three layers (OFFICE section 2). Same surface names as the site, so shared components follow ---------- */
 .office {
   --s-bg: var(--color-office-bg);

@@ -107,18 +107,9 @@ def dashboard_sentence(name, today, waiting):
     return " ".join(parts) or ("A quiet day so far." if name == "today" else "A quiet spell so far.")
 
 
-def write_all(today=None):
-    """Rewrite every sentence (idempotent: same stored rows, same text). Returns the number of rows written."""
-    today = today or metrics.day()
-    counters = {(c.key, c.dimension): c.value for c in MetricCounter.objects.filter(key=K.GOLD_BY_STATUS)}
-    waiting = counters.get((K.GOLD_BY_STATUS, "new"), 0) + counters.get((K.GOLD_BY_STATUS, "contacted"), 0)
-    plans, options = _names()
-    wanted = {("dashboard_changed", name): dashboard_sentence(name, today, waiting) for name in DASHBOARD_RANGES}
-    for name in CHART_RANGES:
-        for chart, text in chart_sentences(name, today, plans, options, waiting).items():
-            wanted[(f"chart_{chart}", name)] = text
+def _store(wanted):
     with transaction.atomic():
-        existing = {(t.key, t.scope): t for t in MetricText.objects.all()}
+        existing = {(t.key, t.scope): t for t in MetricText.objects.filter(key__in={k for k, _ in wanted})}
         for (key, scope), text in wanted.items():
             row = existing.get((key, scope))
             if row is None:
@@ -126,4 +117,37 @@ def write_all(today=None):
             elif row.text != text[:300]:
                 row.text = text[:300]
                 row.save(update_fields=["text", "updated_at"])
+
+
+def _waiting():
+    counters = {(c.key, c.dimension): c.value for c in MetricCounter.objects.filter(key=K.GOLD_BY_STATUS)}
+    return counters.get((K.GOLD_BY_STATUS, "new"), 0) + counters.get((K.GOLD_BY_STATUS, "contacted"), 0)
+
+
+def write_all(today=None):
+    """Rewrite every sentence (idempotent: same stored rows, same text). Returns the number of rows written."""
+    today = today or metrics.day()
+    waiting = _waiting()
+    plans, options = _names()
+    wanted = {("dashboard_changed", name): dashboard_sentence(name, today, waiting) for name in DASHBOARD_RANGES}
+    for name in CHART_RANGES:
+        for chart, text in chart_sentences(name, today, plans, options, waiting).items():
+            wanted[(f"chart_{chart}", name)] = text
+    _store(wanted)
     return len(wanted)
+
+
+VISITOR_CHARTS = ("visitors", "funnel", "top_pages", "referrers")
+
+
+def write_visitor_sentences(today=None):
+    """Only the sentences that depend on visitor figures. Called when visitors arrive (throttled there), so the Analytics
+    summaries do not wait for the hourly roll-up; same stored rows in, same text out."""
+    today = today or metrics.day()
+    plans, options = _names()
+    wanted = {}
+    for name in CHART_RANGES:
+        texts = chart_sentences(name, today, plans, options, _waiting())
+        for chart in VISITOR_CHARTS:
+            wanted[(f"chart_{chart}", name)] = texts[chart]
+    _store(wanted)

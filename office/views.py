@@ -21,7 +21,8 @@ from .permissions import owner, reader, writer
 def _greeting(user):
     hour = timezone.localtime().hour
     part = "morning" if hour < 12 else ("afternoon" if hour < 18 else "evening")
-    return f"Good {part}, {user.first_name or 'there'}."
+    name = user.first_name or ""
+    return f"Good {part}, {name}." if name else f"Good {part}."
 
 
 def _fragment(request, full, rows):

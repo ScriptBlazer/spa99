@@ -106,10 +106,12 @@
         <span class="o-funnel-label">{{ step.label }}</span>
         <span class="o-funnel-num">{{ step.value|num }}</span>
         <span class="o-funnel-bar" role="presentation"><span class="o-funnel-fill" data-morph="funnel-{{ step.key }}" style="--share: {{ step.share_bp|bp_ratio }}"></span></span>
-        {% if step.step_rate_bp is not None %}<span class="o-funnel-rate">{{ step.step_rate_bp|bp_rate }} <span aria-hidden="true">&rsaquo;</span><span class="sr-only">of the step before</span></span>{% endif %}
+        {% if step.step_rate_bp is not None %}<span class="o-funnel-rate">{{ step.step_rate_bp|bp_rate }} <span aria-hidden="true">&rsaquo;</span><span class="sr-only">of the step before</span></span>
+        {% elif step.partial %}<span class="o-funnel-rate"><span aria-hidden="true">&mdash;</span><span class="sr-only">no rate, earlier step counted from later</span></span>{% endif %}
       </li>
       {% endfor %}
     </ol>
+    <p class="o-sub o-funnel-note" data-region="funnel-note" data-fade>{{ data.funnel_note }}</p>
   </section>
 
   <section class="o-card o-latest" data-reveal data-office-latest aria-labelledby="latest-h">

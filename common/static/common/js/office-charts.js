@@ -208,7 +208,7 @@ function start() {
       make(d) {
         const steps = d.funnel; let drop = -1; let low = Infinity;
         steps.forEach((s, i) => { if (i && s.step_rate_bp !== null && s.step_rate_bp < low) { low = s.step_rate_bp; drop = i; } });
-        const texts = steps.map((s, i) => (i ? `${nf.format(s.value)} · ${rate(s.step_rate_bp ?? 0)}` : nf.format(s.value)));
+        const texts = steps.map((s, i) => (i && s.step_rate_bp !== null ? `${nf.format(s.value)} · ${rate(s.step_rate_bp)}` : nf.format(s.value)));
         const data = { labels: steps.map((s) => s.label), max: steps[0].value || undefined, tracks: true };
         return {
           type: 'bar',

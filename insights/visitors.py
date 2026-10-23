@@ -83,6 +83,16 @@ def should_count(request, response):
     return device_type(agent) not in ("bot", "unknown")
 
 
+def _refresh_sentences(today):
+    """Keep the stored visitor sentences close behind the figures: for each of the day's first visitors, then every 25th."""
+    from .models import DailyMetric
+    from . import summaries
+
+    count = DailyMetric.objects.filter(date=today, key=K.VISITORS, dimension="").values_list("value", flat=True).first() or 0
+    if count <= 5 or count % 25 == 0:
+        summaries.write_visitor_sentences(today)
+
+
 def record_page_view(request):
     """Count one page view (and the visitor, once a day). Never raises."""
     today = metrics.day()
@@ -99,6 +109,7 @@ def record_page_view(request):
     metrics.count(K.PAGE_VIEWS, group, 1, today, counter=False)
     if new_visitor:
         metrics.count(K.VISITORS, "", 1, today, counter=False)
+        _refresh_sentences(today)
     source = referrer_source(request)
     if source:
         metrics.count(K.REFERRERS, source, 1, today, counter=False)

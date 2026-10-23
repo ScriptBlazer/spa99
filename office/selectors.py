@@ -42,6 +42,16 @@ def _direction(now, before):
     return {"percent": abs(pct), "direction": "flat" if pct == 0 else ("up" if pct > 0 else "down")}
 
 
+FUNNEL_NOTE = "Some earlier figures are lower than later steps because visitor counting started recently."
+
+
+def _share(value, whole):
+    """A funnel share in basis points, never above 100%: None when the earlier step is smaller (its counting started later)."""
+    if not whole:
+        return None
+    return basis_points(value, whole) if value <= whole else None
+
+
 def _goal(goals, key, range_name):
     return goals.get((key, range_name)) or goals.get((key, OfficeGoal.ALL))
 
@@ -107,8 +117,9 @@ def dashboard(range_name="7d", today=None):
     funnel = []
     for i, (key, label, value) in enumerate(funnel_values):
         funnel.append({"key": key, "label": label, "value": value,
-                       "share_bp": basis_points(value, visitors) or 0,
-                       "step_rate_bp": basis_points(value, funnel_values[i - 1][2]) if i else None})
+                       "share_bp": min(basis_points(value, visitors) or 0, 10000),
+                       "step_rate_bp": _share(value, funnel_values[i - 1][2]) if i else None,
+                       "partial": bool(i and value > funnel_values[i - 1][2])})
     from gold.models import GoldApplication
     from users.models import InterestRegistration
 
@@ -117,7 +128,7 @@ def dashboard(range_name="7d", today=None):
     return {
         "range": range_name, "ranges": list(DASHBOARD_RANGES), "today": today.isoformat(),
         "what_changed": _text("dashboard_changed", range_name),
-        "rings": rings, "stats": stats, "funnel": funnel,
+        "rings": rings, "stats": stats, "funnel": funnel, "funnel_note": FUNNEL_NOTE if any(f["partial"] for f in funnel) else "",
         "waiting": {
             "count": waiting_count(stored),
             "items": [{"id": str(a.pk), "name": a.full_name, "potential": a.potential_level, "applied": a.created_at.isoformat()} for a in waiting_rows],
@@ -195,8 +206,9 @@ def analytics(range_name="30d", today=None):
 
     funnel_def = [("visitors", "Visitors", total(K.VISITORS)), ("started", "Started the journey", total(K.JOURNEYS_STARTED)),
                   ("completed", "Completed it", total(K.JOURNEYS_COMPLETED)), ("registered", "Registered", total(K.REGISTRATIONS))]
-    funnel = [{"key": k, "label": label, "value": v, "share_bp": basis_points(v, funnel_def[0][2]) or 0,
-               "step_rate_bp": basis_points(v, funnel_def[i - 1][2]) if i else None}
+    funnel = [{"key": k, "label": label, "value": v, "share_bp": min(basis_points(v, funnel_def[0][2]) or 0, 10000),
+               "step_rate_bp": _share(v, funnel_def[i - 1][2]) if i else None,
+               "partial": bool(i and v > funnel_def[i - 1][2])}
               for i, (k, label, v) in enumerate(funnel_def)]
 
     plans = _plan_order()
@@ -244,7 +256,7 @@ def analytics(range_name="30d", today=None):
     return {
         "range": range_name, "ranges": list(ANALYTICS_RANGES), "granularity": granularity,
         "labels": [d.isoformat() for d in labels], "previous_labels": [d.isoformat() for d in previous],
-        "series": series, "funnel": funnel,
+        "series": series, "funnel": funnel, "funnel_note": FUNNEL_NOTE if any(f["partial"] for f in funnel) else "",
         "registrations_by_plan": by_plan(K.REGISTRATIONS_BY_PLAN), "suggested_plan": by_plan(K.SUGGESTED_PLAN),
         "registrations_by_source": [{"dimension": d, "value": v} for d, v in sorted(_by_dimension(rows, K.REGISTRATIONS_BY_SOURCE, labels).items())],
         "journey_answers": answers, "drop_off": screens, "gold": gold,

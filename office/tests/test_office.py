@@ -208,3 +208,21 @@ class PeopleAndGoldTests(OfficeTestCase):
         self.assertEqual(len(get(owner, "/gold/?status=all").context["rows"]), 2)
         history = get(owner, f"/gold/{a.pk}/").context["application"]["history"]
         self.assertEqual([h["text"] for h in history], ["Applied", "Approved by " + (owner.get_full_name() or owner.email)])
+
+
+class FreshSentenceTests(OfficeTestCase):
+    def test_first_visitors_refresh_the_visitor_summary_and_funnel_never_exceeds_100(self):
+        from insights import metrics, summaries
+        from insights.metrics import K
+        from insights.models import MetricText
+        from office import selectors
+
+        summaries.write_all()
+        self.assertIn("No visitors", MetricText.objects.get(key="chart_visitors", scope="30d").text)
+        client = Client(HTTP_HOST="localhost", HTTP_USER_AGENT="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1")
+        client.get("/")
+        self.assertNotIn("No visitors", MetricText.objects.get(key="chart_visitors", scope="30d").text)
+        metrics.count(K.JOURNEYS_STARTED, "", 7, metrics.day())
+        funnel = selectors.dashboard("7d")["funnel"]
+        self.assertTrue(all((s["step_rate_bp"] or 0) <= 10000 for s in funnel))
+        self.assertTrue(funnel[1]["partial"] and funnel[1]["step_rate_bp"] is None)

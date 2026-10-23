@@ -46,11 +46,12 @@
       <canvas id="chart-funnel" role="img" aria-label="{{ data.summaries.funnel }}" tabindex="-1"></canvas>
       <p class="o-empty-chart">No journeys in this range yet.</p>
     </div>
+    <p class="o-sub" data-region="funnel-note" data-fade>{{ data.funnel_note }}</p>
     <details class="o-table" data-table="funnel"{% if not f_any %} hidden{% endif %}><summary>View as table</summary>
       <div class="o-table-wrap" data-region="table-funnel" data-fade>
         <table><caption class="sr-only">The funnel, {{ data.range|range_label }}</caption>
           <thead><tr><th scope="col">Step</th><th scope="col">People</th><th scope="col">Of visitors</th><th scope="col">Of the step before</th></tr></thead>
-          <tbody>{% for s in data.funnel %}<tr><th scope="row">{{ s.label }}</th><td>{{ s.value|num }}</td><td>{{ s.share_bp|bp_rate }}</td><td>{{ s.step_rate_bp|bp_rate|default:"" }}</td></tr>{% endfor %}</tbody></table>
+          <tbody>{% for s in data.funnel %}<tr><th scope="row">{{ s.label }}</th><td>{{ s.value|num }}</td><td>{{ s.share_bp|bp_rate }}</td><td>{% if s.partial %}&mdash;{% else %}{{ s.step_rate_bp|bp_rate }}{% endif %}</td></tr>{% endfor %}</tbody></table>
       </div>
     </details>
   </section>
