@@ -97,7 +97,19 @@ class OpenerTests(TestCase):
             picture = pages.opener_picture()
         self.assertEqual((picture["name"], picture["portrait"], picture["is_door"]), ("robe", "robe-portrait", False))
         with mock.patch("pages.services.images.has_image", return_value=False):
-            self.assertEqual(pages.opener_picture()["name"], "")
+            empty = pages.opener_picture()
+        self.assertEqual((empty["name"], empty["alt"]), ("", "A quiet corner of Spa 99"))
+
+    def test_opener_and_signin_alt_use_the_upload_alt_first(self):
+        with mock.patch("pages.services.images.has_image", side_effect=lambda n: n == "door-gold"):
+            self.assertIn("gold swan, between stone jambs", pages.opener_picture()["alt"])
+        with mock.patch("pages.services.images.has_image", side_effect=lambda n: n == "robe"):
+            self.assertIn("white robe", pages.opener_picture()["alt"])
+        self.assertIn("lockers", pages.signin_shell()["alt"])
+        Section.objects.filter(page__key="spa", key="intro").update(image="x/y.jpg", image_alt="Our own words")
+        Section.objects.filter(page__key="signin", key="intro").update(image="x/z.jpg", image_alt="Signin words")
+        self.assertEqual(pages.opener_picture()["alt"], "Our own words")
+        self.assertEqual(pages.signin_shell()["alt"], "Signin words")
 
 
 class MomentTests(TestCase):

@@ -4,7 +4,7 @@
     {% if shell.has_image %}
     <figure class="signin-pic" data-reveal="hero-image">
       <div class="frame frame--right signin-frame">
-        <div class="frame-media">{% photo shell.name alt="Wooden lockers, each with the swan carved in its door" sizes="(min-width: 64em) 50vw, 100vw" eager=True override=shell.upload %}</div>
+        <div class="frame-media">{% photo shell.name alt=shell.alt sizes="(min-width: 64em) 50vw, 100vw" eager=True override=shell.upload %}</div>
         <div class="frame-tint" aria-hidden="true"></div>
       </div>
       <figcaption class="signin-caption">{{ shell.caption }}</figcaption>

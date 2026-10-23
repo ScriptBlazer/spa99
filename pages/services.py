@@ -455,15 +455,27 @@ def opener_lines(copy=None):
     return lines
 
 
+OPENER_ALTS = {
+    "robe": "A white robe with the gold swan hanging on a bronze hook",
+    "door-gold": "A frosted glass door etched with a gold swan, between stone jambs",
+    "door-wide": "The entrance to the spa: a frosted glass door etched with a gold swan, a little open, warm light beyond",
+}
+OPENER_ALT_FALLBACK = "A quiet corner of Spa 99"
+SIGNIN_ALT = "Wooden lockers, each with the swan carved in its door"
+
+
 def opener_picture(copy=None):
     """Which picture opens The spa. Order: an upload on `intro`, the `opener_image` row's name, `robe`, then the old door.
-    Returns {"upload", "name", "portrait", "is_door"}; `name` is '' when none of them is built (the template then
+    Returns {"upload", "name", "portrait", "is_door", "alt"}; `alt` is the upload's own alt, else one per name, else a
+    generic one. `name` is '' when none of them is built (the template then
     shows the brand tile, never a broken image). `portrait` is `<name>-portrait` when that is built."""
     copy = copy if copy is not None else content.page_content("spa")
     chosen = copy["opener_image"].body.strip()
     name = next((n for n in [chosen, *OPENER_PICTURES] if n and images.has_image(n)), "")
     portrait = f"{name}-portrait" if name and images.has_image(f"{name}-portrait") else ""
-    return {"upload": copy["intro"].image, "name": name, "portrait": portrait, "is_door": name.startswith("door")}
+    upload = copy["intro"].image
+    alt = (copy["intro"].image_alt if upload else "") or OPENER_ALTS.get(name, OPENER_ALT_FALLBACK)
+    return {"upload": upload, "name": name, "portrait": portrait, "is_door": name.startswith("door"), "alt": alt}
 
 
 # ---------- the amenity moments (AMENITIES.md sections 3 and 4) ----------
@@ -567,7 +579,7 @@ def every_visit():
 
 def signin_shell():
     """Words and picture for the public sign-in and the pages that share its shell:
-    {"heading", "lead", "caption", "upload", "name", "has_image", "address_line": [str]}. Falls back to the words in the
+    {"heading", "lead", "caption", "upload", "name", "alt", "has_image", "address_line": [str]}. Falls back to the words in the
     brief when the rows are missing. `name` is the default picture; an upload overrides it."""
     copy = content.page_content("signin")
     site = SiteSettings.load()
@@ -576,6 +588,7 @@ def signin_shell():
         "lead": copy["intro"].body or "Sign in to your Spa 99 account.",
         "caption": copy["caption"].body or "Your own locker, every visit.",
         "upload": copy["intro"].image, "name": "lockers",
+        "alt": (copy["intro"].image_alt if copy["intro"].image else "") or SIGNIN_ALT,
         "has_image": bool(copy["intro"].image) or images.has_image("lockers"),
         "address_line": [part for part in (site.address_one_line, site.opening_text) if part],
     }
