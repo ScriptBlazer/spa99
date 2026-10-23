@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load static validation_tags pages_tags %}
+{% block head_title %}{% include "common/_head.html" with title="Set up your account | Spa 99" %}{% endblock %}
+{% block main %}
+{% signin_shell as shell %}
+{% include "users/_shell_top.html" %}
+      <h1 class="signin-title-sm">Your Gold Card is approved.</h1>
+      <p class="signin-lead">Choose a password to set up your account. Your details are filled in.</p>
+      <form method="post" data-live-validate class="signin-fields" novalidate>{% csrf_token %}
+        {% if form.non_field_errors %}<p class="form-error signin-alert" role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+        <div class="field-pair">
+          <div class="field"><label for="setup-first">First name</label><input id="setup-first" class="input" value="{{ application.first_name }}" readonly></div>
+          <div class="field"><label for="setup-last">Last name</label><input id="setup-last" class="input" value="{{ application.last_name }}" readonly></div>
+        </div>
+        <div class="field"><label for="setup-email">Email</label><input id="setup-email" class="input" value="{{ application.email }}" readonly></div>
+        {% if application.mobile %}<div class="field"><label for="setup-mobile">Mobile</label><input id="setup-mobile" class="input" value="{{ application.mobile }}" readonly></div>{% endif %}
+        {% include "common/_field.html" with field=form.password toggle=True meter=True hint="At least 10 characters." %}
+        <div class="field">
+          <label class="check">{{ form.men_only_accepted }}<span>I understand Spa 99 is a men-only spa. <a href="{% url 'terms' %}">Our policy</a></span></label>
+          <p class="feedback" data-error-for="men_only_accepted" id="{{ form.men_only_accepted.auto_id }}_error" aria-live="polite" data-state="{% if form.men_only_accepted.errors %}error{% else %}hint{% endif %}">{{ form.men_only_accepted.errors|join:" " }}</p>
+        </div>
+        <div class="field">
+          <label class="check">{{ form.privacy_accepted }}<span>Read how we use your details in our <a href="{% url 'privacy' %}">privacy notice</a>, and tick to accept it.</span></label>
+          <p class="feedback" data-error-for="privacy_accepted" id="{{ form.privacy_accepted.auto_id }}_error" aria-live="polite" data-state="{% if form.privacy_accepted.errors %}error{% else %}hint{% endif %}">{{ form.privacy_accepted.errors|join:" " }}</p>
+        </div>
+        <div class="field"><label class="check">{{ form.marketing_opt_in }}<span>Send me occasional news from Spa 99.</span></label></div>
+        <button type="submit" class="btn btn-primary btn-block" data-working-text="One moment">Set up my account</button>
+      </form>
+{% include "users/_shell_bottom.html" %}
+{% endblock %}
+{% block scripts %}{% validation_config %}<script type="module" src="{% static 'common/js/forms.js' %}"></script>{% endblock %}

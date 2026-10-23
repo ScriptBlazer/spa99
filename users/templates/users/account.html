@@ -20,20 +20,22 @@
     <h1>{% account_greeting %}</h1>
 
     <div class="panel panel--line interest" data-interest>
-      {% if interest and interest.plan %}
+      {% if is_gold %}
+      <p class="lead">Your Gold Card is active{% if gold_since %} since {{ gold_since|date:"j F Y" }}{% endif %}.</p>
+      {% elif interest and interest.plan %}
       <p class="lead">You're registered for {{ interest.plan.name }}.</p>
       {% for card in cards %}{% if card.slug == interest.plan.slug %}<p class="muted num">&pound;{{ card.price_whole }} a month, ex VAT (&pound;{{ card.price_inc }} inc VAT)</p>{% endif %}{% endfor %}
       {% else %}
       <p class="lead">No membership chosen yet.</p>
       {% endif %}
-      <button type="button" class="btn-quiet" data-interest-change aria-expanded="false" aria-controls="interest-form">Change</button>
+      {% if not is_gold %}<button type="button" class="btn-quiet" data-interest-change aria-expanded="false" aria-controls="interest-form">Change</button>
       <form id="interest-form" method="post" action="{% url 'account_interest' %}" hidden class="interest-form">
         {% csrf_token %}
         <div class="segmented segmented--wrap" role="radiogroup" aria-label="Membership you are interested in">
           {% for card in cards %}<label class="seg"><input type="radio" name="plan" value="{{ card.slug }}"{% if interest.plan.slug == card.slug %} checked{% endif %}><span>{{ card.name }}</span></label>{% endfor %}
         </div>
         <div class="actions"><button type="submit" class="btn btn-primary" data-working-text="Saving">Save</button></div>
-      </form>
+      </form>{% endif %}
     </div>
 
     <div class="soon-cards">

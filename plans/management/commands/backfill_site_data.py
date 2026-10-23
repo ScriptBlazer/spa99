@@ -25,6 +25,8 @@ written by hand:
   The last two run only on the first round 3 run (while the `signin` page does not exist), so clearing the gym's picture
   name or removing a note by hand stays cleared
 
+- (Gold approval, 2026-10-23) the `gold_invite` and `gold_active` email rows are created when missing
+
 - (virtual tour, 2026-10-23) the `tour` page and its rows, and the `spa` `tour_link` row, are created when missing
 
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
@@ -128,6 +130,21 @@ def backfill():
     changed.update(_round_3())
     changed.update(_journey_and_gold_2026_10_23())
     changed.update(_virtual_tour())
+    changed.update(_gold_invite_emails())
+    return changed
+
+
+def _gold_invite_emails():
+    """2026-10-23 (Gold approval): the two email rows are created when missing, never overwritten."""
+    from notifications.models import NotificationTemplate
+    from notifications.seed import DEFAULT_SUBJECTS
+
+    changed = Counter()
+    for key in ("gold_invite", "gold_active"):
+        subject, note = DEFAULT_SUBJECTS[key]
+        _, created = NotificationTemplate.objects.get_or_create(key=key, defaults={"subject": subject, "note": note})
+        if created:
+            changed["notifications.NotificationTemplate (Gold approval emails)"] += 1
     return changed
 
 

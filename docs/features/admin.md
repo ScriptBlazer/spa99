@@ -29,7 +29,7 @@ Mobile-usable, fast, calm. Same shared buttons, modal, messages and validation a
 |---|---|
 | **Dashboard** | Today's key numbers and the statistics below |
 | **People** | Registrations: search, filter, open a person (details, interest tier, journey answers, history). Export CSV. GDPR export and delete |
-| **Gold** | Applications list with potential, status, notes; open one to see the same three sections Barry gets; change status; resend email |
+| **Gold** | (Built now in the Django admin: actions "Approve and invite" and "Resend invite" on applications, invite status shown read-only; see `gold-application.md`.) Applications list with potential, status, notes; open one to see the same three sections Barry gets; change status; resend email |
 | **Journey** | Questions and options: add, edit, reorder, hide. Plan points and Gold points per option. Suggestion rules and tie-break. Preview the journey |
 | **Plans** | Tiers and single visit: name, price ex VAT, visits, hours (daytime/any), booking window, upcoming limit, cancel hours, guests, perks, shown on site yes/no, order. VAT rate setting |
 | **Hours** | Daytime/evening times, daily closure, Shabbos/Yom Tov rule offsets, one-off closures, capacity. (Used by the site now, by bookings later) |
