@@ -1,6 +1,11 @@
 /* Memberships: keeps the choice tag, the compare table and the phone picker in step with the radio group,
    and counts the visits up once. The form itself is a plain GET and works without this file. */
 
+// Which input was used last: a mouse or touch click must not leave a focus ring (a stray border round a card or a heading); the keyboard keeps it.
+const mode = (kind) => () => { document.documentElement.dataset.input = kind; };
+document.addEventListener('pointerdown', mode('pointer'), true);
+document.addEventListener('keydown', mode('keyboard'), true);
+
 const form = document.querySelector('[data-mem-form]');
 if (form) {
   const radios = [...form.querySelectorAll('input[name="plan"]')];
