@@ -1,8 +1,9 @@
-/* Lounge (docs/design/VIRTUAL-TOUR.md 2.1, with the 2026-10-23 layout correction). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
+/* Lounge (docs/design/VIRTUAL-TOUR.md 2.1, with the 2026-10-23 layout corrections). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
  * Shell 10.6 x 6.0 x 3.0 (x -7..3.6, z -3..3). North: the reef tank flush in a travertine slab, its long bench and the curved sofa, armchairs and table to the
  * RIGHT (east) of it, a frosted window and fluted panelling beyond, then a passage to the relaxing zone (east wall, z 2.0). To the LEFT (west): the reception
- * desk, a half-round counter growing out of the plain west wall (curved cream stone, backlit gold lockup on its front) under a gold ceiling cove; beside it,
- * in the north wall (x -5.6), the passage to the gym. Round 2: the dry and wet saunas are at the far end of the gym, not off the lounge. */
+ * desk, curved cream stone that grows out of the west wall and runs straight down to the south wall (it sits in the south-west corner, the corner opposite the tank),
+ * its front carrying the backlit gold stacked lockup, under a gold ceiling cove. Beside it, in the SOUTH wall (x -4.9..-3.3), a long straight corridor (6 m, warm cove,
+ * travertine, bench, doors) leads to the rooms; the gym marker sits in it. The north (tank) wall has no passage. */
 
 const VS_REEF = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
 const FS_REEF = `uniform sampler2D map; uniform sampler2D caus; uniform float uTime; uniform float uAmt; uniform float uGain; varying vec2 vUv;
@@ -55,14 +56,14 @@ export async function build(scene, ctx) {
 
   /* ----- shell ----- */
   K.plane(XW, 6, floor, XC, 0, 0, 'up', { tile: 2.4 });
-  K.plane(0.9, 3, wall, -6.55, 1.5, -3, 's', { tile: 3 }); K.plane(1.7, 3, wall, -4.25, 1.5, -3, 's', { tile: 3 }); K.plane(1.0, 0.8, wall, -5.6, 2.6, -3, 's', { tile: 3 });   // north, left of the tank slab: the gym passage at x -5.6
+  K.plane(3.6, 3, wall, -5.2, 1.5, -3, 's', { tile: 3 });                                                                  // north, left of the tank slab: plain (no passage in the tank wall)
   K.plane(2.2, 3, wall, 2.5, 1.5, -3, 's', { tile: 3 });                                                                   // north, right of the tank slab
-  K.plane(XW, 3, wall, XC, 1.5, 3, 'n', { tile: 3 });                                                                      // south
+  K.plane(2.1, 3, wall, -5.95, 1.5, 3, 'n', { tile: 3 }); K.plane(6.9, 3, wall, 0.15, 1.5, 3, 'n', { tile: 3 }); K.plane(1.6, 0.6, wall, -4.1, 2.7, 3, 'n', { tile: 3 });   // south, with the corridor opening at x -4.9..-3.3, 2.4 high
   K.plane(4.5, 3, wall, 3.6, 1.5, -0.75, 'w', { tile: 3 }); K.plane(0.5, 3, wall, 3.6, 1.5, 2.75, 'w', { tile: 3 }); K.plane(1.0, 0.8, wall, 3.6, 2.6, 2.0, 'w', { tile: 3 });   // east, with the relaxing-zone passage at z 2.0
   K.plane(6, 3, wall, X0, 1.5, 0, 'e', { tile: 3 });                                                                       // west: plain wall behind reception
 
   /* ceiling: dropped to 2.75 with a round recess (the gold cove) over reception, clipped by the walls, its roof gold leaf at 3.0 */
-  const C = [-5.2, 0.4], R = 2.6, arc = [];
+  const C = [-5.0, 1.0], R = 2.6, arc = [];
   for (let i = 0; i < 56; i++) { const a = i / 56 * PI * 2; arc.push([Math.min(3.58, Math.max(-6.98, C[0] + R * Math.cos(a))), Math.min(2.98, Math.max(-2.98, C[1] + R * Math.sin(a)))]); }
   const v2 = (pts) => pts.map((p) => new THREE.Vector2(p[0], p[1]));
   const outer = new THREE.Shape(v2([[X0, -3], [3.6, -3], [3.6, 3], [X0, 3]]));
@@ -140,40 +141,58 @@ export async function build(scene, ctx) {
   [-2.5, -1.2, 0.1].forEach((z) => K.box(0.06, 1.8, 0.05, walnut, 3.57, 1.3, z));
   K.box(0.06, 0.05, 2.65, walnut, 3.57, 2.17, -1.2); K.box(0.06, 0.05, 2.65, walnut, 3.57, 0.43, -1.2);
 
-  /* ----- reception (left of the tank): a curved cream stone desk, the backlit gold lockup on its front ----- */
-  const DC = [-7, 0.4], DR0 = 1.0, DR1 = 1.6, front = DC[0] + DR1;
-  K.put(K.sector(DR0, DR1, -90, 90, 1.0, DC[0], DC[1], 0, 0.02), stone);
-  K.put(K.sector(DR0 - 0.05, DR1 + 0.05, -90, 90, 0.05, DC[0], DC[1], 1.0, 0.01), stone);
-  K.put(K.sector(DR1, DR1 + 0.02, -90, 90, 0.02, DC[0], DC[1], 0.04), led);                   // the LED line under the desk's lip
-  K.glowPlane(0.9, 3.0, front + 0.3, 0.006, DC[1], 'up', 0.4);
-  K.shadow(1.6, 3.4, front + 0.1, DC[1], 0.35);
-  if (lock) {                                                                  // the backlit lockup: a dark bronze inset on the curved front, the gold glowing on it
-    /* root cause of "not visible": the old plane sat 1 cm in front of the unbent radius, i.e. inside the desk (bevel + curve). Now it follows the arc, 4 cm proud. */
-    const Rf = DR1 + 0.04, lh = 0.8, lw = lh * lock.aspect, tx = (c) => T.tex(c, { color: false });
-    const arcPlane = (w, h, off) => { const g = new THREE.PlaneGeometry(w, h, 24, 1), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const u = p.getX(i); p.setZ(i, Math.sqrt(Rf * Rf - u * u) - Rf + off); } g.computeVertexNormals(); return g; };
-    const at = { x: DC[0] + Rf, y: 0.58, z: DC[1], ry: PI / 2 };
-    K.put(arcPlane(lw + 0.5, lh + 0.4, 0), K.std('--color-iron', { r: 0.6, side: THREE.DoubleSide }), at);
+  /* ----- reception (west, in the south-west corner): a quarter-round end curving out of the west wall, then a straight run to the south wall; the backlit gold lockup on its front ----- */
+  const DC = [-7, 0.4], DR0 = 1.0, DR1 = 1.6, front = DC[0] + DR1, DL = 3 - DC[1], DZ = DC[1] + DL / 2;   // straight run z 0.4..3
+  K.put(K.sector(DR0, DR1, -90, 0, 1.0, DC[0], DC[1], 0, 0.02), stone); K.box(DR1 - DR0, 1.0, DL, stone, front - (DR1 - DR0) / 2, 0.5, DZ);
+  K.put(K.sector(DR0 - 0.05, DR1 + 0.05, -90, 0, 0.05, DC[0], DC[1], 1.0, 0.01), stone); K.box(DR1 - DR0 + 0.1, 0.05, DL, stone, front - (DR1 - DR0) / 2, 1.025, DZ);
+  K.put(K.sector(DR1, DR1 + 0.02, -90, 0, 0.02, DC[0], DC[1], 0.04), led); K.box(0.02, 0.02, DL, led, front + 0.01, 0.05, DZ);   // the LED line under the desk's lip
+  K.glowPlane(0.9, DL + 0.6, front + 0.3, 0.006, DZ, 'up', 0.4);
+  K.shadow(1.6, DL + 0.8, front + 0.1, DZ, 0.35);
+  if (lock) {                                                                  // the backlit lockup: a dark bronze inset on the straight front, the gold glowing on it
+    const lh = 0.8, lw = lh * lock.aspect, tx = (c) => T.tex(c, { color: false }), at = { x: front + 0.04, y: 0.58, z: DZ, ry: PI / 2 };
+    K.put(new THREE.PlaneGeometry(lw + 0.5, lh + 0.4), K.std('--color-iron', { r: 0.6, side: THREE.DoubleSide }), at);
     const mark = K.basic(K.col('--color-gold-metal').clone().multiplyScalar(2.2), { alphaMap: tx(lock.alpha), transparent: true, depthWrite: false, side: THREE.DoubleSide });
-    const m = new THREE.Mesh(arcPlane(lw, lh, 0.012), mark); m.position.set(at.x, at.y, at.z); m.rotation.y = at.ry; m.renderOrder = 3; scene.add(m);
-    K.glowPlane(lw * 1.9, lh * 1.8, at.x + 0.03, 0.58, DC[1], 'e', 0.7, '--color-led-warm');   // the halo round it
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(lw, lh), mark); m.position.set(at.x + 0.012, at.y, at.z); m.rotation.y = at.ry; m.renderOrder = 3; scene.add(m);
+    K.glowPlane(lw * 1.9, lh * 1.8, at.x + 0.03, 0.58, DZ, 'e', 0.7, '--color-led-warm');   // the halo round it
   }
 
-  /* doorways seen through: gym (oak, north wall beside reception), relaxing zone (travertine, east wall past the seating) */
-  K.vista('--color-caramel', [-5.6, -3], 'n', 1.0, 2.2, 1.0);              // gym, beside reception
+  /* ----- the corridor (south wall, beside the desk): 1.6 wide, 2.4 high, 6 m long (z 3..9). Travertine, gold-leaf ceiling with warm cove lines, bench, doors, lit door at the end ----- */
+  const CX = -4.1, CW = 1.6, CH = 2.4, CZ0 = 3, CL = 6, CZ = CZ0 + CL / 2, gl = CX - CW / 2, gr = CX + CW / 2;
+  K.plane(CW, CL, wall, CX, 0, CZ, 'up', { tile: 3 });                                                       // travertine floor
+  K.plane(CL, CH, wall, gl, CH / 2, CZ, 'e', { tile: 3 }); K.plane(CL, CH, wall, gr, CH / 2, CZ, 'w', { tile: 3 });
+  K.plane(CW, CH, wall, CX, CH / 2, CZ0 + CL, 'n', { tile: 3 });
+  K.plane(CW, CL, gold, CX, CH, CZ, 'down');                                                                  // gold-leaf ceiling
+  K.led(0.05, 0.03, CL, gl + 0.04, CH - 0.03, CZ, null, ledD); K.led(0.05, 0.03, CL, gr - 0.04, CH - 0.03, CZ, null, ledD);   // cove lines along both sides
+  K.glowPlane(CW, CL, CX, CH - 0.01, CZ, 'down', 0.4);
+  K.led(0.02, 0.02, CL, gl + 0.01, 0.03, CZ, { w: 0.5, h: CL, x: gl + 0.25, y: 0.006, z: CZ, face: 'up', a: 0.35 }, led);   // floor-level LED lines
+  K.led(0.02, 0.02, CL, gr - 0.01, 0.03, CZ, { w: 0.5, h: CL, x: gr - 0.25, y: 0.006, z: CZ, face: 'up', a: 0.35 }, led);
+  K.edge(gl, CZ0, 0, 1, CL, 1, 0, 0.4, 0.45); K.edge(gr, CZ0, 0, 1, CL, -1, 0, 0.4, 0.45);
+  [-0.07, 0, 0.07].forEach((d) => { K.box(0.025, 2.75, 0.045, gold, gl - 0.14 + d, 1.375, CZ0 - 0.04); K.box(0.025, 2.75, 0.045, gold, gr + 0.14 + d, 1.375, CZ0 - 0.04); });   // gold vertical fins at the mouth
+  K.box(0.4, 0.42, 1.6, stone, gr - 0.2, 0.21, 4.3); K.put(K.rbox(0.38, 1.5, 0.1, 0.06, 0.03), sofa, { x: gr - 0.2, y: 0.46, z: 4.3, rx: -PI / 2 });   // the bench and its cushion
+  K.put(new THREE.SphereGeometry(0.15, 16, 12), stone, { x: gr - 0.2, y: 0.15, z: 3.6 }); K.shadow(0.9, 2.2, gr - 0.3, 4.3, 0.45);
+  [[gl + 0.02, 'e', 4.9, walnut], [gl + 0.02, 'e', 7.3, walnut], [gr - 0.02, 'w', 6.5, oak]].forEach(([x, f, z, m]) => {                  // doors: panel, frame, a gold pull
+    const s = f === 'e' ? 1 : -1;
+    K.plane(0.9, 2.1, m, x, 1.05, z, f); K.box(0.03, 2.16, 0.06, oak, x + 0.005 * s, 1.08, z - 0.48); K.box(0.03, 2.16, 0.06, oak, x + 0.005 * s, 1.08, z + 0.48); K.box(0.03, 0.06, 1.02, oak, x + 0.005 * s, 2.14, z);
+    K.box(0.03, 0.22, 0.03, gold, x + 0.03 * s, 1.0, z + 0.34);
+  });
+  K.plane(0.9, 2.2, K.basic(K.col('--color-caramel').clone().multiplyScalar(1.15)), CX, 1.1, CZ0 + CL - 0.02, 'n');   // the lit door at the far end
+  K.glowPlane(1.6, 2.4, CX, 1.2, CZ0 + CL - 0.05, 'n', 0.3, '--color-led-warm');
+
+  /* doorway seen through: relaxing zone (travertine, east wall past the seating) */
   K.vista('--color-travertine', [3.6, 2.0], 'e', 1.0, 2.2, 1.0);           // relaxing zone, past the seating
   /* grounding: the dark line where floor meets wall, and under the bench */
-  K.edge(X0, -3, 1, 0, XW, 0, 1, 0.55, 0.55); K.edge(X0, 3, 1, 0, XW, 0, -1, 0.55, 0.5); K.edge(3.6, -3, 0, 1, 6, -1, 0, 0.55, 0.5); K.edge(X0, -3, 0, 1, 6, 1, 0, 0.55, 0.5);
+  K.edge(X0, -3, 1, 0, XW, 0, 1, 0.55, 0.55); K.edge(X0, 3, 1, 0, 2.1, 0, -1, 0.55, 0.5); K.edge(gr, 3, 1, 0, 3.6 - gr, 0, -1, 0.55, 0.5); K.edge(3.6, -3, 0, 1, 6, -1, 0, 0.55, 0.5); K.edge(X0, -3, 0, 1, 6, 1, 0, 0.55, 0.5);
   K.shadow(4.0, 1.1, -1.0, -2.2, 0.55); K.shadow(2.2, 2.2, 1.9, -1.3, 0.35);
   [[1.4, 2.2], [-0.4, -0.9], [-1.5, 2.2]].forEach(([x, z]) => K.glowPlane(2.2, 2.2, x, 0.008, z, 'up', 0.16));   // downlight pools on the floor
   K.flush();
 
   /* ----- light (2700K) ----- */
   K.baseLight();                                                             // low, dark-footed ambient: the practicals do the lighting
-  K.light('--color-light-warm', 3.4, 6, -5.2, 2.55, 0.4);                   // the cove over reception: pools on desk and floor
+  K.light('--color-light-warm', 3.4, 6, -5.0, 2.55, 1.0);                   // the cove over reception: pools on desk and floor
   K.light(new THREE.Color(T.REEF.top), 3.2, 4.5, -1.0, 1.4, -2.2);          // the tank's spill: blue on the bench, pillows and floor in front
   K.glowPlane(4.2, 2.6, -1.0, 0.007, -1.5, 'up', 0.22, new THREE.Color(T.REEF.mid));
+  K.light('--color-light-warm', 2.4, 5, CX, 2.1, 5.4);                       // the corridor's cove: warms the travertine, bench and doors (the lockup is self-lit, no separate backlight light: 4-light cap)
   K.light('--color-light-warm', 1.6, 3, 3.4, 1.7, 1.2, true);                // east sconce, dropped on the mobile tier (the self-lit sconce stays)
-  K.light('--color-light-warm', 1.8, 2.2, -5.0, 0.9, 0.4, true);            // lockup backlight
 
   /* ----- life: fish and caustics, 30 fps at rest ----- */
   let frozen = tier === 'low';
@@ -192,9 +211,10 @@ export async function build(scene, ctx) {
   update(0, 0);
 
   return {
-    view: { pos: [1.6, 1.6, 2.0], yaw: -29, pitch: -4 },
+    view: { pos: [2.9, 1.6, -0.8], yaw: -106, pitch: -5 },     // looks across the room to the desk in the corner and the corridor beside it
+    arrive: { pos: [3.3, 1.6, -0.5], yaw: -100, pitch: -8, ms: 1400 },
     exposure: 0.8, ambient: true, update,
-    markers: [{ to: 'gym', at: [-5.6, 1.1, -2.95] }, { to: 'relaxing-zone', at: [3.55, 1.1, 2.0] }],
+    markers: [{ to: 'gym', at: [CX, 1.1, 6.0] }, { to: 'relaxing-zone', at: [3.55, 1.1, 2.0] }],
     tier(name) { if (name === 'low') { frozen = true; school.count = Math.min(school.count, 6); } },
   };
 }
