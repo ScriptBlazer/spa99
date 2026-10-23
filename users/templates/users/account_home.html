@@ -1,13 +1,32 @@
 {% extends "users/member_base.html" %}
 {% block head_title %}{% include "common/_head.html" with title="Home | My Spa 99" %}{% endblock %}
 {% block main %}
-{% with member_tab="home" %}
-<section class="member-screen" data-screen="home">
-  <h1>{{ greeting }}</h1>
-  <p class="lead" data-status="{{ status }}">{% if status == "gold" %}Gold member. We open in {{ opening }}.{% elif status == "registered" %}{{ status_name }} interest. We open in {{ opening }}.{% else %}No membership chosen yet. <a href="{% url 'account_membership' %}">Choose one</a>{% endif %}</p>
-  <a class="tile tile--next" href="{% url 'account_book' %}" data-tile="next-visit"><span class="small">Next visit</span> Your first visit, in {{ opening }}. Booking opens when the doors do.</a>
-  <a class="tile" href="{% url 'account_membership' %}" data-tile="membership"><span class="small">Membership</span> {% if is_gold %}Gold member{% elif interest_plan %}{{ interest_plan.name }} interest{% else %}Not chosen yet{% endif %}</a>
-  <div class="tile" data-tile="visits"><span class="small">Visits</span> Your visits will show here from {{ opening }}.</div>
+<section class="m-screen" data-screen="home">
+  <div class="m-title" data-reveal="hero">
+    <h1>{{ greeting }}</h1>
+    <p class="lead muted" data-status="{{ status }}">{% if status == "gold" %}Gold member. We open in {{ opening }}.{% elif status == "registered" %}{{ status_name }} interest. We open in {{ opening }}.{% else %}No membership chosen yet. <a href="{% url 'account_membership' %}">Choose one</a>{% endif %}</p>
+  </div>
+  <div class="m-tiles" data-reveal="stagger">
+    <div class="m-cell m-cell--next">
+      <a class="m-tile m-tile--next on-dark" href="{% url 'account_book' %}" data-tile="next-visit">
+        <span class="m-tile-label">Next visit</span>
+        <span class="m-tile-title">Your first visit, in {{ opening }}.</span>
+        <span class="m-tile-body">Booking opens when the doors do.</span>
+        {% include "common/_icon.html" with name="arrow-right" %}
+      </a>
+    </div>
+    <div class="m-cell">
+      <a class="m-tile" href="{% url 'account_membership' %}" data-tile="membership">
+        <span class="m-tile-label">Membership</span>
+        <span class="m-tile-value">{% if is_gold %}Gold member{% elif interest_plan %}{{ interest_plan.name }} interest{% else %}Not chosen yet{% endif %}</span>
+      </a>
+    </div>
+    <div class="m-cell">
+      <div class="m-tile" data-tile="visits">
+        <span class="m-tile-label">Visits</span>
+        <span class="m-tile-body">Your visits will show here from {{ opening }}.</span>
+      </div>
+    </div>
+  </div>
 </section>
-{% endwith %}
 {% endblock %}
