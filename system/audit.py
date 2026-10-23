@@ -196,7 +196,7 @@ def default_sentence(kind, email, detail):
         SystemEvent.SIGN_IN: f"{who} signed in",
         SystemEvent.SIGN_IN_FAILED: f"Sign-in failed for {email or 'an unknown email'}" + (" (too many tries, blocked)" if detail.get("rate_limited") else ""),
         SystemEvent.UNLOCK: f"{who} unlocked System",
-        SystemEvent.UNLOCK_FAILED: f"{who} typed the wrong password to unlock",
+        SystemEvent.UNLOCK_FAILED: f"{who} typed the wrong {'code' if detail.get('reason') == 'code' else 'password'} to unlock",
         SystemEvent.UNLOCK_RATE_LIMITED: f"{who} was blocked from unlocking (too many wrong passwords)",
         SystemEvent.LOCK_MANUAL: f"{who} locked System",
         SystemEvent.LOCK_IDLE: f"System locked after {int(detail.get('idle_seconds', 0)) // 60} idle minutes ({who})",

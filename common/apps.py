@@ -67,5 +67,9 @@ class CommonConfig(AppConfig):
                 "PRODUCTION MEDIA IS ON LOCAL DISK, NOT S3: uploaded files will be lost when the container is "
                 "replaced. Set AWS_STORAGE_BUCKET_NAME."
             )
+        if report.get("unlock_code_invalid"):
+            logger.warning("SYSTEM_UNLOCK_CODE is not 6 to 12 digits: System unlock uses the password only")
+        elif not report.get("unlock_code_set", True):
+            logger.warning("SYSTEM_UNLOCK_CODE not set: System unlock uses the password only")
         for key in report["missing_keys"]:
             logger.warning("%s is missing from the environment / .env (see .env.example)", key)

@@ -3,6 +3,7 @@
 Config comes from common.envloader (env vars -> private .env -> project .env -> defaults).
 """
 import os
+import re
 from datetime import time
 from pathlib import Path
 
@@ -140,6 +141,11 @@ SITE_URL = ENV.get("SITE_URL", f"https://{DOMAIN}").rstrip("/")
 CONTROL_URL = ENV.get("CONTROL_URL", f"https://{CONTROL_HOST}").rstrip("/")
 OFFICE_URL = ENV.get("OFFICE_URL", f"https://{OFFICE_HOST}").rstrip("/")
 SYSTEM_URL = ENV.get("SYSTEM_URL", f"https://{SYSTEM_HOST}").rstrip("/")
+# The lock code asked with the password to unlock System: digits only, 6 to 12. A secret: never logged or printed.
+# Unset or invalid = password only in dev/CI (a startup warning says so); prod.py refuses to start without a valid one.
+SYSTEM_UNLOCK_CODE_RAW = (ENV.get("SYSTEM_UNLOCK_CODE", "") or "").strip()
+SYSTEM_UNLOCK_CODE_VALID = bool(re.fullmatch(r"[0-9]{6,12}", SYSTEM_UNLOCK_CODE_RAW))
+SYSTEM_UNLOCK_CODE = SYSTEM_UNLOCK_CODE_RAW if SYSTEM_UNLOCK_CODE_VALID else ""
 SYSTEM_ENV_LABEL = ENV.get("SYSTEM_ENV_LABEL", "DEV").upper()  # DEV or LIVE: the label System shows in the title bar and stripe (prod default LIVE)
 SYSTEM_UNLOCK_SECONDS = 15 * 60  # System asks for the password again after this much idle time
 SYSTEM_AUDIT_RETENTION_DAYS = int(ENV.get("SYSTEM_AUDIT_RETENTION_DAYS", "0") or 0)  # 0 = keep the audit log forever; used only by `manage.py prune_audit_log`
@@ -220,6 +226,8 @@ def build_startup_report(settings_module):
         "hosts": f"office={OFFICE_HOST} control={CONTROL_HOST} system={SYSTEM_HOST}",
         "media": MEDIA_DESCRIPTION,
         "sentry": SENTRY_STATE,
+        "unlock_code_set": bool(SYSTEM_UNLOCK_CODE),
+        "unlock_code_invalid": bool(SYSTEM_UNLOCK_CODE_RAW) and not SYSTEM_UNLOCK_CODE_VALID,
         "media_is_local": MEDIA_IS_LOCAL,
         "missing_keys": ENV.missing_example_keys(),
     }

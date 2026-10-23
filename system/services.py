@@ -81,6 +81,23 @@ def is_unlocked(session, now=None, idle_seconds=None):
     return remaining_seconds(session, now, idle_seconds) > 0
 
 
+def code_required():
+    from django.conf import settings
+
+    return bool(settings.SYSTEM_UNLOCK_CODE)
+
+
+def code_matches(typed):
+    """The typed lock code against SYSTEM_UNLOCK_CODE (constant time). True when no code is configured (dev/CI)."""
+    import hmac
+
+    from django.conf import settings
+
+    if not settings.SYSTEM_UNLOCK_CODE:
+        return True
+    return hmac.compare_digest((typed or "").strip().encode(), settings.SYSTEM_UNLOCK_CODE.encode())
+
+
 def unlock(session):
     session[UNLOCK_KEY] = time.time()
 

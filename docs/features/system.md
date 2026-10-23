@@ -115,3 +115,7 @@ Each page lists rows as small forms (field prefix = the row id; `new...` prefixe
 
 Audit fixes: `verify()` walks only up to the head it read first (a write during the walk is not "broken"); `access_denied` checks the per-IP row before spending the shared hourly budget; a rate-limited sign-in is one row per IP per window whatever email is typed, and typed emails of failed sign-ins are left out of the person filter; the admin CSV uses the same formula guard as the feed export; `system.middleware.AuditContextMiddleware` gives any signed-in staff request (Django admin included) its IP, browser and path in the change log.
 
+### Unlock code (2026-10-23)
+
+Unlocking System asks for the password AND a lock code (digits only, 6 to 12) from the env var `SYSTEM_UNLOCK_CODE`, so a stolen password alone is not enough. Both are always checked (the code with `hmac.compare_digest`); a failure shows one generic message, "Password or code is wrong."; every failure counts against the same rate limit (5 per 5 minutes). The audit event `unlock_failed` records `detail.reason` as `password` or `code`, never the typed values; the code is never logged or printed. Prod refuses to start when the variable is missing or not 6 to 12 digits. Dev and CI: unset or invalid means password only, the code field is hidden and the startup line warns "SYSTEM_UNLOCK_CODE not set: System unlock uses the password only".
+

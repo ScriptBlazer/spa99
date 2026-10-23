@@ -96,14 +96,16 @@ def unlock(request):
     if request.method == "POST":
         if not hit("system-unlock", f"{request.user.pk}:{client_ip(request) or 'unknown'}", 5, 300):
             audit.log_event(SystemEvent.UNLOCK_RATE_LIMITED, request, user=request.user, dedupe_seconds=300)
-            return render(request, "system/unlock.html", {"next": target, "error": "Too many attempts. Please wait a few minutes."}, status=429)
-        if request.user.check_password(request.POST.get("password", "")):
+            return render(request, "system/unlock.html", {"next": target, "error": "Too many attempts. Please wait a few minutes.", "code_required": services.code_required()}, status=429)
+        password_ok = request.user.check_password(request.POST.get("password", ""))
+        code_ok = services.code_matches(request.POST.get("code", ""))  # both always checked, one generic answer
+        if password_ok and code_ok:
             services.unlock(request.session)
             audit.log_event(SystemEvent.UNLOCK, request, user=request.user)
             return redirect(target)
-        audit.log_event(SystemEvent.UNLOCK_FAILED, request, user=request.user)
-        error = "That password is not right."
-    return render(request, "system/unlock.html", {"next": target, "error": error})
+        audit.log_event(SystemEvent.UNLOCK_FAILED, request, user=request.user, detail={"reason": "password" if not password_ok else "code"})
+        error = "Password or code is wrong."
+    return render(request, "system/unlock.html", {"next": target, "error": error, "code_required": services.code_required()})
 
 
 @signed_in
