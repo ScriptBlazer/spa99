@@ -74,6 +74,8 @@ If `anisotropy` is unsupported (it is in three r153+, so only a build error woul
 
 ### 1.6 Light: a warm studio, built in code
 
+> **Update 2026-10-23 (Moishe):** on Home the card looked too shiny at every point of the scroll, as if a bright light was always on it. The light is now set per page (`LOOK` in `gold-card-3d.js`, keyed by `data-gold-card`). **Home:** studio walls 0.55 (was 0.9), exposure 0.9, and the reflections and key light dim and brighten with the turn (cosine, bright every 36°, brightest near 2°, at most 45% dimmer: mid at rest, darker near -16° and 20°, never black), so the gold reads as metal with shadow and highlight. **Gold Card page hero:** unchanged (walls 0.9, exposure 1, no dimming). The CSS card tier is unchanged.
+
 **Environment, 0 KB download.** A tiny procedural studio scene rendered once to a PMREM (`PMREMGenerator.fromScene(studio, 0.02)`, 256 px cube), then the studio scene and generator are disposed. Not `RoomEnvironment` (cool white, and an addon import); ours is warm and sized for a card.
 
 | Studio part (inside a 10 × 6 × 10 box) | Colour (token) | Brightness | Position | Job |
