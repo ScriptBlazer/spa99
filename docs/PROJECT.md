@@ -354,3 +354,4 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-23 | Barry's one-tap Gold approval built: Approve and View buttons in his email open a confirm page in the Office (sign-in, Owner/Manager/Approver), one tap approves and sends the invite; Office sign-ins last 30 days. |
 | 2026-10-23 | Dev: background jobs run inline on Moishe's Mac (Q_CLUSTER sync, `Q_SYNC=0` to test the real queue), so emails print straight to the runserver terminal with no worker to start. Live keeps the real worker. |
 | 2026-10-23 | Email recipients, senders and mail settings come only from env (GOLD_APPROVER_EMAILS, GOLD_APPROVER_CC, CONTACT_EMAIL, DEFAULT_FROM_EMAIL, SERVER_EMAIL, EMAIL_*); nothing hard-coded; prod refuses to start without DEFAULT_FROM_EMAIL. An Approver role in the Office (Gold only). |
+| 2026-10-23 | Moishe: on the account page, a Gold holder's Membership tile reads "Gold member" (others keep "Opens January 2027"). |
