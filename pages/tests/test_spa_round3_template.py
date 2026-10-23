@@ -10,10 +10,16 @@ from pages.templatetags import pages_media
 from plans.management.commands.seed_phase1 import seed_all
 
 
+NEW = ["robe", "robe-portrait", "towel-bench", "towel-bench-portrait", "slippers", "slippers-portrait", "toiletries", "towel-rail",
+       "tote", "bottle-gym", "door-wide", "door-wide-portrait"]
+
+
 def built(*names):
-    """Pretend these new renders have been built (copies of an existing manifest entry). Nothing is written to disk."""
+    """The image set for a test: the real manifest minus every round 3 render, plus exactly these names (copies of an existing
+    entry). Each test states which images exist; the real manifest never decides. Nothing is written to disk."""
     base = images.manifest()
-    return mock.patch.object(images, "manifest", lambda: {**base, **{n: dict(base["dry-sauna"]) for n in names}})
+    kept = {k: v for k, v in base.items() if k not in NEW}
+    return mock.patch.object(images, "manifest", lambda: {**kept, **{n: dict(base["dry-sauna"]) for n in names}})
 
 
 class SpaRound3TemplateTests(TestCase):
@@ -25,7 +31,8 @@ class SpaRound3TemplateTests(TestCase):
         return self.client.get("/the-spa/").content.decode()
 
     def test_without_the_new_pictures_the_page_has_no_holes(self):
-        html = self.spa()
+        with built():
+            html = self.spa()
         self.assertIn('data-opener="door-gold"', html)  # the robe is not built yet: the old door stands in
         for hook in ("sp-moment", "sp-tote", "sp-detail", "home-slippers"):
             self.assertNotIn(hook, html)
@@ -72,6 +79,7 @@ class SpaRound3TemplateTests(TestCase):
                 self.assertIn("door-video", self.spa())
 
     def test_home_gets_the_slippers_inset_only_when_the_picture_exists(self):
-        self.assertNotIn("home-slippers", self.client.get("/").content.decode())
+        with built():
+            self.assertNotIn("home-slippers", self.client.get("/").content.decode())
         with built("slippers"):
             self.assertIn("home-slippers", self.client.get("/").content.decode())
