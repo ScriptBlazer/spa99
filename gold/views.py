@@ -10,6 +10,7 @@ from common.audit import client_ip
 from common.ratelimit import hit, rate_limited_json, too_many_response
 from journey import engine as journey_engine
 from journey import services as journey_services
+from journey.models import Question
 
 from . import services
 from .forms import GoldApplicationForm
@@ -35,6 +36,19 @@ def _payload(request):
     return request.POST.dict()
 
 
+def _question_text(key, default):
+    question = Question.objects.filter(key=key).first()
+    return question.text if question else default
+
+
+def _industry_question_text():
+    return _question_text(rating.INDUSTRY_QUESTION, "What do you do?")
+
+
+def _industry_other_text():
+    return _question_text(rating.INDUSTRY_OTHER_QUESTION, "In a few words")
+
+
 @login_not_required  # PUBLIC: Gold applications need no account (CSRF cookie set here, rate limited)
 @ensure_csrf_cookie
 @require_GET
@@ -44,17 +58,31 @@ def options(request):
     session = journey_services.session_from_cookies(request.COOKIES, request.user)
     prefill = {}
     if session is not None:
-        signals, _ = journey_engine.gold_signals(session)
-        if signals.get("property_link"):
-            prefill["property_link"] = signals["property_link"]
-        if signals.get("size"):
-            prefill["size_range"] = signals["size"]
+        answers = journey_services.effective_answers(session)
+        industry = answers.get(rating.INDUSTRY_QUESTION)
+        if industry is not None and industry.values():
+            prefill["industry"] = industry.values()[0]
+        other = answers.get(rating.INDUSTRY_OTHER_QUESTION)
+        if other is not None and other.text_value and prefill.get("industry") == rating.OTHER_INDUSTRY:
+            prefill["industry_other"] = other.text_value
+        if prefill.get("industry") == rating.PROPERTY_INDUSTRY:  # the property questions are only for Property
+            signals, _ = journey_engine.gold_signals(session)
+            if signals.get("property_link"):
+                prefill["property_link"] = signals["property_link"]
+            if signals.get("size"):
+                prefill["size_range"] = signals["size"]
     if request.user.is_authenticated:
         prefill.update(
             first_name=request.user.first_name, last_name=request.user.last_name,
             email=request.user.email, mobile=request.user.mobile or "",
         )
     return JsonResponse({
+        "industry": {
+            "question": _industry_question_text(), "options": _choices(rating.industry_choices()),
+            "other_value": rating.OTHER_INDUSTRY, "other_label": _industry_other_text(),
+        },
+        # Show property_link and size_range only while the industry answer is one of these (the server enforces it).
+        "property_when": {"question": "industry", "any_of": [rating.PROPERTY_INDUSTRY]},
         "property_link": _choices(rating.choices(PROPERTY_LINK)), "size_range": _choices(rating.choices(SIZE)),
         "location": _choices(rating.choices(WHERE)), "bml_relationship": _choices(rating.choices(BML)),
         "prefill": prefill, "spa_interest": services.interest_snapshot(session),

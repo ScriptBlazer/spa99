@@ -7,7 +7,7 @@
  */
 import { el, getJson, postJson, postWithRetry } from './api.js';
 import { observeReveals } from './reveal.js';
-import { arrowIcon as makeArrow, segmentedEl, tileEl } from './choices.js';
+import { arrowIcon as makeArrow, clearableTiles, companyGlyphs, reducedMotion, segmentedEl, settle, tileEl } from './choices.js';
 import { dismiss, showMessage } from './messages.js';
 
 const config = JSON.parse(document.getElementById('journey-config').textContent);
@@ -30,6 +30,8 @@ let visibleKeys = new Set();
 let current = 1;
 let resultStep = 5;
 let saveErrorMessage = null;
+let lastSuggestion = config.lastSuggestion || null; // { plan_name, plan_slug, url } once a journey was finished
+let pendingNudge = false;
 
 const questions = () => state.screens.flatMap((screen) => screen.questions);
 const questionByKey = (key) => questions().find((q) => q.key === key);
@@ -123,7 +125,13 @@ function saveAnswer(key) {
     // A 400 means the server does not know the question any more (for example a follow-up that was hidden): nothing to keep.
   });
 }
-const saveStep = (step) => enqueue(() => postWithRetry('/journey/step/', { step }));
+const screenOfKey = (key) => state.screens.find((sc) => sc.questions.some((q) => q.key === key))?.number || 0;
+const saveStep = (step) => enqueue(async () => {
+  const reply = await postWithRetry('/journey/step/', { step });
+  // A required answer is missing on an earlier screen (a stale page): go back there and say so.
+  const missing = reply.status === 400 ? reply.data?.missing : null;
+  if (missing?.length && step === current && missing.some((k) => screenOfKey(k) && screenOfKey(k) < step)) bounce(missing);
+});
 
 /* ---------- building screens ---------- */
 
@@ -133,6 +141,7 @@ function tile(q, option, kind) {
   return tileEl({
     name: q.key, value: option.value, label: option.label, multi: q.type === 'multi', kind,
     checked: isChecked(q)(option.value), image: config.facilityImages[option.value] || {}, dataset: { q: q.key },
+    glyphs: q.key === 'company' ? companyGlyphs(option.value) : [],
   });
 }
 
@@ -156,7 +165,9 @@ function questionBlock(q) {
   }
 
   const title = el('span', { id: `l-${q.key}`, text: q.text });
-  const help = q.help ? el('span', { class: 'question-help', text: q.help }) : null;
+  const needs = (q.min_choices || 0) > 0;
+  const helpText = q.help || (needs ? 'Choose at least one.' : '');
+  const help = helpText ? el('span', { class: 'question-help', id: `hint-${q.key}`, text: helpText }) : null;
   const legend = el('legend', {}, title);
   if (PREFER_NOT_SAY.has(q.key)) {
     legend.append(' ', el('button', { type: 'button', class: 'btn-quiet prefer-not', 'data-skip': q.key, text: copyOf('prefer_not').cta }));
@@ -195,18 +206,54 @@ const screenAnswered = (number) => {
   return screen.questions.some((q) => visibleKeys.has(q.key) && answers[q.key] && (answers[q.key].skipped || answers[q.key].options.length || answers[q.key].text));
 };
 
+/** Visible questions on a screen that still need more choices than they have (the "at least one" rule). */
+function unmetQuestions(number) {
+  const screen = state.screens.find((sc) => sc.number === number);
+  return screen.questions.filter((q) => visibleKeys.has(q.key) && (q.min_choices || 0) > 0 && (answers[q.key]?.options.length || 0) < q.min_choices);
+}
+
 function actionLabel(number) {
+  if (unmetQuestions(number).length) return { text: copyOf('continue').cta, arrow: false, unmet: true };
   const last = screenNumbers().slice(-1)[0] === number;
   if (last) return { text: copyOf('last').cta, arrow: true };
   return screenAnswered(number) ? { text: copyOf('continue').cta, arrow: true } : { text: copyOf('skip').cta, arrow: false };
 }
 
+function applyActionState(button, label) {
+  if (label.unmet) {
+    button.setAttribute('aria-disabled', 'true');
+    button.setAttribute('aria-describedby', `hint-${unmetQuestions(current)[0].key}`);
+  } else {
+    button.removeAttribute('aria-disabled');
+    button.removeAttribute('aria-describedby');
+    root.querySelectorAll('.question-help[data-state]').forEach((h) => h.removeAttribute('data-state'));
+  }
+}
+
 function updateAction() {
   const button = root.querySelector('[data-primary]');
   if (!button) return;
-  const { text, arrow } = actionLabel(current);
-  button.textContent = text;
-  if (arrow) button.append(' ', arrowIcon());
+  const label = actionLabel(current);
+  button.textContent = label.text;
+  if (label.arrow) button.append(' ', arrowIcon());
+  applyActionState(button, label);
+}
+
+/** Pressing the inactive Continue (or arriving without the required answer): say why, never move on. */
+function nudge() {
+  const unmet = unmetQuestions(current);
+  if (!unmet.length) return;
+  unmet.forEach((q) => root.querySelector(`#hint-${q.key}`)?.setAttribute('data-state', 'nudge'));
+  const live = root.querySelector('[data-live-msg]');
+  if (live) {
+    live.textContent = '';
+    requestAnimationFrame(() => { live.textContent = copyOf('need_one').body || 'Choose at least one to continue.'; });
+  }
+  const legend = root.querySelector(`[data-question="${unmet[0].key}"] legend`);
+  if (legend) {
+    const r = legend.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > window.innerHeight) legend.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  }
 }
 
 const arrowIcon = () => makeArrow(config.iconSprite);
@@ -221,11 +268,16 @@ function renderQuestionScreen(number) {
   const label = actionLabel(number);
   const primary = el('button', { type: 'button', class: 'btn btn-primary', 'data-primary': '', text: label.text });
   if (label.arrow) primary.append(' ', arrowIcon());
+  if (label.unmet) applyActionState(primary, label);
   const bar = el('div', { class: 'action-bar' }, isFirst ? null : el('button', { type: 'button', class: 'btn-quiet', 'data-back': '', text: copyOf('back').cta }), primary);
   const anyAnswers = Object.values(answers).some((a) => a.options.length || a.text);
   const again = isFirst && anyAnswers ? el('p', { class: 'start-again' }, el('button', { type: 'button', class: 'btn-quiet', 'data-restart': '', text: copyOf('start_again').cta })) : null;
-  return el('section', { class: 'screen', 'aria-label': head.heading, 'data-reveal': '' },
-    el('div', { class: 'screen-head' }, title, head.body ? el('p', { class: 'lead muted', text: head.body }) : null), body, bar, again);
+  const suggestion = isFirst && lastSuggestion
+    ? el('p', { class: 'last-suggestion' }, el('a', { href: lastSuggestion.url || urlFor(resultStep), 'data-last-suggestion': '', text: copyOf('last_suggestion').cta }))
+    : null;
+  return el('section', { class: 'screen', 'aria-label': head.heading, 'data-reveal': 'hero' },
+    el('div', { class: 'screen-head' }, title, head.body ? el('p', { class: 'lead muted', text: head.body }) : null, suggestion),
+    body, bar, again, el('p', { class: 'sr-only', 'aria-live': 'polite', 'data-live-msg': '' }));
 }
 
 /* ---------- result ---------- */
@@ -256,7 +308,7 @@ function renderResult(data) {
     el('div', { class: 'why' }, el('h2', { text: copyOf('why').heading }), el('ul', { class: 'reasons' }, (s.reasons || []).map((r) => el('li', { text: r })))),
     el('div', { class: 'result-actions' },
       el('a', { class: 'btn btn-primary btn-block-phone', href: registerUrl(s.slug) }, ctaText, ' ', arrowIcon()),
-      el('button', { type: 'button', class: 'btn-quiet', 'data-change-answers': '', text: copyOf('change_answers').cta })),
+      el('button', { type: 'button', class: 'btn-quiet', 'data-restart': '', text: copyOf('start_again').cta })),
     presentation === 'line'
       ? el('p', { class: 'gold-line-note' }, `${goldLineCopy.body} `, el('a', { href: config.urls.goldApply, text: goldLineCopy.cta }))
       : null);
@@ -323,7 +375,9 @@ async function show(step) {
     try {
       // POST: arriving at the result is what stores the suggestion and marks the journey finished (a GET changes nothing).
       const reply = await postWithRetry('/journey/result/', {});
+      if (reply.status === 400 && reply.data?.missing?.length) { bounce(reply.data.missing); return; }
       if (!reply.ok) throw new Error('result');
+      if (reply.data?.suggested) lastSuggestion = { plan_name: reply.data.suggested.name, plan_slug: reply.data.suggested.slug, url: urlFor(resultStep) };
       node = renderResult(reply.data);
     } catch {
       const failed = copyOf('result_error');
@@ -338,6 +392,16 @@ async function show(step) {
   window.scrollTo(0, 0); // instant
   (node.querySelector('h1') || node).focus?.({ preventScroll: true });
   observeReveals(root);
+  if (!onResult) settle(node);
+  if (pendingNudge && !onResult) { pendingNudge = false; nudge(); }
+}
+
+/** The server says a required answer is missing (stale page, deep link): take him to that screen and show the hint. */
+function bounce(missing) {
+  const screen = state.screens.find((sc) => sc.questions.some((q) => missing.includes(q.key)));
+  if (!screen) { go(screenNumbers()[0] || 1, { replace: true }); return Promise.resolve(); }
+  pendingNudge = true;
+  return go(screen.number, { replace: true });
 }
 
 function go(step, { replace = false } = {}) {
@@ -358,6 +422,7 @@ function goBack() {
 }
 
 function goNext() {
+  if (unmetQuestions(current).length) { nudge(); return; }
   const numbers = screenNumbers();
   const index = numbers.indexOf(current);
   const target = index >= 0 && index < numbers.length - 1 ? numbers[index + 1] : resultStep;
@@ -382,13 +447,14 @@ function setAnswer(key, value) {
   syncVisibility();
 }
 
+clearableTiles(root);
 root.addEventListener('change', (event) => {
   const input = event.target.closest?.('input[data-q]');
   if (!input || input.hasAttribute('data-text')) return;
   const q = questionByKey(input.dataset.q);
   const picked = q.type === 'multi'
     ? [...root.querySelectorAll(`input[data-q="${q.key}"]:checked`)].map((i) => i.value)
-    : [input.value];
+    : (input.checked ? [input.value] : []);
   setAnswer(q.key, picked.length ? { options: picked, text: '', skipped: false } : { options: [], text: '', skipped: true });
 });
 
@@ -406,9 +472,13 @@ root.addEventListener('input', (event) => {
 root.addEventListener('click', async (event) => {
   const target = event.target.closest?.('button, a');
   if (!target) return;
-  if (target.hasAttribute('data-primary')) goNext();
+  if (target.hasAttribute('data-primary')) { if (target.getAttribute('aria-disabled') === 'true') nudge(); else goNext(); }
+  else if (target.hasAttribute('data-last-suggestion')) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button) return;
+    event.preventDefault();
+    go(resultStep);
+  }
   else if (target.hasAttribute('data-back')) goBack();
-  else if (target.hasAttribute('data-change-answers')) go(screenNumbers()[0] || 1);
   else if (target.dataset.skip) {
     const key = target.dataset.skip;
     root.querySelectorAll(`input[data-q="${key}"]`).forEach((i) => { i.checked = false; });
@@ -432,6 +502,7 @@ window.addEventListener('popstate', (event) => {
 
 function load(fresh, step) {
   state = fresh;
+  lastSuggestion = fresh.last_suggestion || null;
   answers = {};
   questions().forEach((q) => {
     if (q.answer) answers[q.key] = { options: q.answer.options || [], text: q.answer.text || '', skipped: Boolean(q.answer.skipped) };
@@ -456,6 +527,7 @@ async function boot() {
   questions().forEach((q) => {
     if (q.answer) answers[q.key] = { options: q.answer.options || [], text: q.answer.text || '', skipped: Boolean(q.answer.skipped) };
   });
+  lastSuggestion = state.last_suggestion || config.lastSuggestion || null;
   computeVisible();
   computeResultStep();
   const session = state.session;
@@ -463,7 +535,7 @@ async function boot() {
   let step = stepForSlug(slug);
   const reachable = (s) => s <= Math.max(session.furthest_step || 1, session.current_step || 1) || session.completed;
   if (!step || !reachable(step) || (step > resultStep) || (step !== resultStep && !screenNumbers().includes(step))) {
-    step = Math.min(session.current_step || 1, resultStep);
+    step = Math.min(session.resume_step || 1, resultStep);
     if (!screenNumbers().includes(step) && step !== resultStep) step = screenNumbers()[0] || 1;
   }
   history.replaceState({ journey: true, step, idx: history.state?.idx || 0 }, '', urlFor(step));

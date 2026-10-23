@@ -9,7 +9,7 @@
  *   tiles  S2b: intro, staggered tiles settle at their own depth (desktop only), captions lag
  *   steps  S3: the line draws through the three steps (scrubbed), numbers come up as it reaches them
  *   band   S4: heading, line, buttons, the tote mount settles, the swan pattern drifts
- * Hooks: data-door-window / data-door-media / data-door-target / data-door-pause, data-opener-line / data-opener-tick, data-band, data-rule, data-step, data-steps, data-walk (the future room walk).
+ * Hooks: data-door-window / data-door-media / data-door-target, data-opener-line / data-opener-tick, data-band, data-rule, data-step, data-steps, data-walk (the future room walk).
  */
 import { SCENES, cleanups, lineRise, fadeUp, settle, depth, drift, windowTo, pinnedScene } from './scenes.js';
 
@@ -42,7 +42,7 @@ if (gsap && ScrollTrigger) {
   /* ---------- S1 the opener ---------- */
   // Where the shrinking window centres the picture, per picture (x, y as a share of the screen): the robe sits right of centre, the door a little more; the old zoomed door keeps its ease-back.
   const OPENER_FOCUS = {
-    robe: { desktop: { x: 0.64, y: 0.47 }, phone: { x: 0.5, y: 0.32 } },
+    robe: { desktop: { x: 0.73, y: 0.47 }, phone: { x: 0.5, y: 0.32 } },   // 16:9 robe (2026-10-23): the robe sits at 58 to 87% across
     door: { desktop: { x: 0.62, y: 0.5 }, phone: { x: 0.58, y: 0.45 } },
     'door-gold': { desktop: { x: 0.53, y: 0.5 }, phone: { x: 0.51, y: 0.44 } },
   };
@@ -88,26 +88,20 @@ if (gsap && ScrollTrigger) {
     // the room chips arrive in the last fifth
     tl.fromTo(q('.door-chips'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.2 }, 0.8);
 
-    // the living still (one cycle per 48s), the optional door video, and the Pause control (the choice is remembered with Home's)
+    // the living still (one cycle per 48s), the optional door video
     const still = q('.door-still'), media = q('[data-door-media]'), video = q('.door-video');
     const loops = [gsap.to(still, { scale: 1.03, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' })];
-    const button = q('[data-door-pause]');
-    let userPaused = sessionStorage.getItem('spa99-hero-paused') === '1', inView = true, playing = false, shrunk = false;
+    let inView = true, playing = false, shrunk = false;
     const sync = () => {
-      // once Pause fades away (15% of the pin) nothing may keep moving: the loop and the video stop with it (WCAG 2.2.2)
-      const run = inView && !userPaused && !document.hidden && !shrunk;
+      // once the picture has shrunk (15% of the pin) nothing keeps moving: the loop and the video stop
+      const run = inView && !document.hidden && !shrunk;
       loops.forEach((t) => (run && !playing ? t.resume() : t.pause()));
       if (video && playing) (run ? video.play() : video.pause())?.catch?.(() => {});
     };
-    const label = () => { button.textContent = userPaused ? 'Play' : 'Pause'; button.setAttribute('aria-pressed', String(userPaused)); };
-    const toggle = () => { userPaused = !userPaused; sessionStorage.setItem('spa99-hero-paused', userPaused ? '1' : '0'); label(); sync(); };
-    button.addEventListener('click', toggle);
     document.addEventListener('visibilitychange', sync);
-    cleanups.push(() => { button.removeEventListener('click', toggle); document.removeEventListener('visibilitychange', sync); });
+    cleanups.push(() => document.removeEventListener('visibilitychange', sync));
     ScrollTrigger.create({ trigger: el, start: 'top bottom', end: 'bottom top', onToggle: (self) => { inView = self.isActive; sync(); } });
-    tl.to(button, { autoAlpha: 0, duration: 0.2 }, 0.15);
     tl.eventCallback('onUpdate', () => { const past = tl.time() >= 0.15; if (past !== shrunk) { shrunk = past; sync(); } });
-    label();
     sync();
 
     // the video (only when the page was built with one, which means the door is the opener): after the page, never on Save-Data, poster only otherwise

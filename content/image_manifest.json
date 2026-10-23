@@ -9,8 +9,8 @@
     ]
   },
   "relaxing-zone": {
-    "width": 3168,
-    "height": 1344,
+    "width": 4224,
+    "height": 1792,
     "widths": [
       480,
       800,
@@ -79,8 +79,8 @@
     ]
   },
   "lounge": {
-    "width": 2528,
-    "height": 1696,
+    "width": 5056,
+    "height": 3392,
     "widths": [
       480,
       800,
@@ -89,8 +89,8 @@
     ]
   },
   "relax-loungers": {
-    "width": 2730,
-    "height": 1536,
+    "width": 5504,
+    "height": 3072,
     "widths": [
       480,
       800,
@@ -184,13 +184,13 @@
     ]
   },
   "massage-room": {
-    "width": 1856,
-    "height": 2304,
+    "width": 3712,
+    "height": 4608,
     "widths": [
       480,
       800,
       1600,
-      1856
+      2400
     ]
   },
   "kitchenette": {
@@ -278,19 +278,23 @@
     ]
   },
   "robe": {
-    "width": 768,
-    "height": 1376,
+    "width": 5504,
+    "height": 3072,
     "widths": [
       480,
-      768
+      800,
+      1600,
+      2400
     ]
   },
   "robe-portrait": {
-    "width": 768,
-    "height": 1376,
+    "width": 3072,
+    "height": 5504,
     "widths": [
       480,
-      768
+      800,
+      1600,
+      2400
     ]
   }
 }

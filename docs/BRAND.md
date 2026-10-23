@@ -83,7 +83,7 @@ Shared everywhere:
 - **The swan draws itself** (stroke, then the gold fill) on the Gold Card, Book and the Home Gold scene. Nowhere else. On Home the draw is time-based on enter (2.4s), not scrubbed.
 - **Numbers count** only when they are small whole numbers that matter (visits a month, days ahead): 1.2s, once. Prices never animate.
 - **Pointer light**: a soft gold glow follows the pointer on dark scenes, desktop with a fine pointer only.
-- **Hero**: a looping muted video (6-10s, warm water, steam or light), or a living still (a 48s scale cycle and drifting steam) until the video exists. Always with a Pause control. Video loads after the page, never on Save-Data.
+- **Hero**: a looping muted video (6-10s, warm water, steam or light), or a living still (a 48s scale cycle and drifting steam) until the video exists. No Pause control (Moishe, 2026-10-23). Video loads after the page, never on Save-Data.
 - **Text on photographs and video** is allowed on marketing scenes, always on the solid part of the legibility veil (`--color-veil`). Text groups sit vertically centred and left aligned, not at the bottom of the screen (IMMERSIVE section 0).
 - **Header** overlays the first dark scene, turns solid after 64px, hides on scroll down and returns on scroll up.
 - **Page changes** cross-fade (View Transitions, opacity only, 240ms out, 480ms in); the header stays put.
@@ -209,7 +209,7 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --header-h: 4rem;
   --control-h: 3.25rem;                    /* 52px buttons and fields */
   --control-h-compact: 2.5rem;             /* 40px, Control only */
-  --tile-min-h: 4rem;
+  --tile-min-h: 4.5rem;
 
   /* Shape */
   --radius-sm: 6px;                        /* controls */
@@ -263,8 +263,20 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --color-pool: rgb(229 172 110 / 0.35);       /* proposed, round 3: warm light pool on the cream under the selected card */
   --color-room-veil: rgb(251 249 236 / 0.24);  /* proposed, round 3: cream veil over an unselected card's picture */
   --duration-ack: 240ms;                       /* proposed, round 3: the tag's acknowledgement fade */
+  /* Forms round 4 (docs/design/FORMS-ROUND4.md section 5). Proposed, round 4. */
+  --color-chosen-wash: var(--color-pattern);   /* proposed, round 4: alias, no new colour. Gold at 8% over a chosen tile; decoration only */
+  --tile-tall-h: 11rem;                        /* proposed, round 4: Company tiles from 64em */
+  --tile-compact-h: 3.5rem;                    /* derived, round 4: industry tiles (no sub line) */
+  --tile-large-h: 5.5rem;                      /* derived, round 4: Company tiles on a phone */
+  --tile-mark-room: 2rem;                      /* derived, round 4: room for the tile's mark at the right */
+  --glyph-col-w: 3rem;                         /* derived, round 4: the swan glyph column in a Company tile */
+  --measure-lead: 22rem;                       /* derived, round 4: the lead under a screen heading */
   --signin-w: 26rem;                           /* derived (round 3): the sign-in form column */
-  --tracking-engraved: 0.2em;                  /* derived (round 3): the engraved brand line on the Gold panel */
+  --control-h-label: 3.75rem;                  /* derived (round 4): a field with its label inside (60px) */
+  --color-field-well: var(--color-cream);      /* derived (round 4): alias, no new colour. The filled field on the raised cream panel */
+  --register-photo-h: clamp(10rem, 100svh - var(--header-h) - 28rem, 24rem); /* derived (round 4): the register stage picture, desktop */
+  --panel-overlap: var(--space-5);             /* derived (round 4): how far the cream panel rises over the espresso stage, below 64em */
+  --tracking-engraved: 0.2em;                  /* derived (round 3): the engraved brand line on the Gold panel; also the small caps "Launching" label (Home opening band, register caption), round 5 */
   --bar-h: 4.5rem;                             /* derived: Continue bar; 4rem from 64em */
   /* The Gold Card (docs/design/GOLD-CARD-3D.md 7.3). Derived, decoration only: the metal of one object. Brand gold is hue 31 degrees; nothing here goes brass (45+). */
   --color-gold-metal: #D9A46C;                 /* derived: card base metal (hue 31) */

@@ -51,9 +51,10 @@ class SpaRound3TemplateTests(TestCase):
     def test_moments_appear_in_their_places_and_only_with_a_picture(self):
         with built("towel-bench", "toiletries", "towel-rail", "slippers", "tote", "bottle-gym"):
             html = self.spa()
-        order = [m for m in re.findall(r'id="(dry-sauna|tiles-title|gym|relaxing-zone|how-title)"|sp-moment--(towel|shower|slippers)', html)]
+        order = [m for m in re.findall(r'id="(dry-sauna|tiles-title|gym|relaxing-zone|how-title)"|sp-moment--(shower|slippers)', html)]
         flat = [a or b for a, b in order]
-        self.assertEqual(flat[:3], ["towel", "dry-sauna", "tiles-title"])
+        self.assertEqual(flat[:2], ["dry-sauna", "tiles-title"])
+        self.assertNotIn("sp-moment--towel", html)  # the full-width towel band is gone (round 4)
         self.assertLess(flat.index("shower"), flat.index("relaxing-zone"))
         self.assertLess(flat.index("slippers"), flat.index("gym"))
         self.assertIn('class="scene sp-band sp-band--tote', html)
@@ -68,7 +69,6 @@ class SpaRound3TemplateTests(TestCase):
         with built("slippers", "towel-bench"):
             html = self.spa()
         self.assertNotIn("sp-moment--slippers", html)
-        self.assertIn("sp-moment--towel", html)
 
     def test_door_switch_plays_the_video_only_when_its_files_exist(self):
         Section.objects.filter(page__key="spa", key="opener_image").update(body="door-wide")
@@ -78,8 +78,12 @@ class SpaRound3TemplateTests(TestCase):
             with mock.patch.object(pages_media, "_exists", lambda p: "spa-door" in p):
                 self.assertIn("door-video", self.spa())
 
-    def test_home_gets_the_slippers_inset_only_when_the_picture_exists(self):
-        with built():
-            self.assertNotIn("home-slippers", self.client.get("/").content.decode())
+    def test_home_has_no_slippers_inset(self):
         with built("slippers"):
-            self.assertIn("home-slippers", self.client.get("/").content.decode())
+            self.assertNotIn("home-slippers", self.client.get("/").content.decode())
+
+    def test_slippers_moment_is_a_quiet_inset_not_a_band(self):
+        with built("slippers"):
+            html = self.spa()
+        self.assertIn("sp-moment--inset", html)
+        self.assertNotIn("sp-moment--over", html)

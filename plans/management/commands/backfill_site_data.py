@@ -33,15 +33,17 @@ from django.db import transaction
 
 from content import seed as content_seed
 from content.models import Page, Section
+from journey import seed as journey_seed
+from journey.models import Option, Question, SuggestionRule
 from plans import seed as plans_seed
 from plans.models import Facility, OpeningRule, Plan
 
 OLD_OPENING = "January 2027"
 # Seeded picture descriptions that no longer match the realistic photos (2026-10-23): replaced only while exactly this.
 OLD_FACILITY_ALTS = {
-    "cold-plunge": "Cold plunge pool set into a travertine floor",
-    "showers": "Rain showers behind walnut slatted screens",
-    "massage-room": "Massage room with a walnut table",
+    "cold-plunge": ("Cold plunge pool set into a travertine floor",),
+    "showers": ("Rain showers behind walnut slatted screens",),
+    "massage-room": ("Massage room with a walnut table", "Massage room with a made-up table and the swan on a timber slatted wall"),
 }
 
 
@@ -69,7 +71,7 @@ def backfill():
     for facility in Facility.objects.all():
         if facility.slug not in alts:
             continue
-        if facility.image_alt == "" or OLD_FACILITY_ALTS.get(facility.slug) == facility.image_alt:  # exact old wording only
+        if facility.image_alt == "" or facility.image_alt in OLD_FACILITY_ALTS.get(facility.slug, ()):  # exact old wording only
             facility.image_alt = alts[facility.slug]
             facility.save()
             changed["plans.Facility (picture description)"] += 1
@@ -120,19 +122,114 @@ def backfill():
         changed["content.Section (memberships: Not sure?)"] += 1
 
     changed.update(_spa_page())
+    changed.update(_home_opening_label())
     changed.update(_round_3())
+    changed.update(_journey_and_gold_2026_10_23())
+    return changed
+
+
+# (2026-10-23) exact old wording only; anything an admin has edited is left alone.
+OLD_JOURNEY_HELP = {"time": "Choose any that fit.", "facilities": "Choose as many as you like."}
+_KIT_TAIL = "\nSlippers | slippers | 62% 60%\nToiletries | toiletries | 50% 55%"
+OLD_KIT_BODIES = [  # every earlier seeded kit body (exact matches only)
+    "Towels | towel-bench | 45% 50%\nRobe | robe | 100% 38%" + _KIT_TAIL,
+    "Towels | towel-bench | 45% 50%\nRobe | robe | 66% 38%" + _KIT_TAIL,
+    "Towels | towel-bench-portrait | 50% 45%\nRobe | robe | 66% 38%" + _KIT_TAIL,
+]
+OLD_SECTION_TEXT = [  # page key, section key, field, old value, new value
+    ("journey", "change_answers", "cta_label", "Change my answers", "Start again"),
+    ("gold-apply", "screen_1", "heading", "Your property.", "About you."),
+    ("gold-apply", "screen_1", "body", "A few taps about your work in property.", "A few taps, so we know you."),
+    # Round 4 (2026-10-23): no promises of amenities, and the opening date reads "Launching ..."
+    ("home", "opening", "heading", "Launching {opening}.", "{opening}."),  # 2026-10-23 (later): "Launching" is a label row now
+    ("spa", "opener_4", "body", "Your robe and slippers are waiting.", "Take your time. Nothing here is rushed."),
+    ("spa", "moment_shower", "heading", "In every shower.", "Between rounds."),
+    ("spa", "moment_shower", "body", "Toiletries in the swan bottles. A fresh towel on the rail.",
+     "Warm water, cool stone and a moment to yourself."),
+    ("spa", "moment_slippers", "heading", "Soft underfoot.", "Unhurried."),
+    ("spa", "moment_slippers", "body", "Swan slippers, from the lockers to the loungers.",
+     "From the lockers to the loungers, at your own pace."),
+    ("spa", "moment_tote", "heading", "On the way out.", "Until next time."),
+    ("spa", "arrive_kit", "heading", "Every visit includes", "The details."),
+    *[("spa", "arrive_kit", "body", old, content_seed.KIT_BODY) for old in OLD_KIT_BODIES],
+    ("memberships", "every_visit", "body", "Every visit: {kit}, and every room.", "Every visit: every room, as long as you like."),
+    ("spa", "step_2", "body", "A towel, robe and slippers are waiting.", "Leave the day at the door."),
+]
+# Retired, never deleted: hidden from new journeys, old answers keep their label. (question, value, old label)
+OLD_RETIRED_OPTIONS = [("company", "often", "Often with someone (Most visits.)"), ("heard_via", "instagram", "Instagram"),
+                       ("heard_via", "walking_past", "Walking past")]
+OLD_SOMETIMES_POINTS = {"tier-2": 1, "tier-3": 1}
+
+
+def _journey_options_2026_10_23():
+    """Company has two answers, 'Sometimes' leans to Tier 3 (GST-01); 'How did you hear' loses two answers."""
+    changed = Counter()
+    for key, value, label in OLD_RETIRED_OPTIONS:
+        changed["journey.Option (retired)"] += Option.objects.filter(
+            question__key=key, value=value, label=label, active=True).update(active=False)
+    for option in Option.objects.filter(question__key="company", value="sometimes", plan_points=OLD_SOMETIMES_POINTS):
+        option.plan_points = {"tier-3": 3}
+        option.save()
+        changed["journey.Option (Sometimes leans to Tier 3)"] += 1
+    for option in Option.objects.filter(question__key="heard_via", value="bml", label="BML"):
+        option.label = "BML member"
+        option.save()
+        changed["journey.Option (BML member)"] += 1
+    social = Question.objects.filter(key="heard_via").first()
+    if social is not None and Option.objects.filter(question=social, value="bml", label="BML member").exists():
+        _, made = Option.objects.get_or_create(question=social, value="social_media", defaults={"label": "Social media", "order": 4})
+        changed["journey.Option (Social media)"] += made
+    for rule in SuggestionRule.objects.filter(name="Evenings with guests: towards Tier 3"):
+        olds = ([{"question": "company", "any_of": ["often"]}], [{"question": "company", "any_of": ["sometimes"]}])
+        if rule.conditions[1:] in olds:  # exact old conditions only
+            rule.conditions = rule.conditions[:1] + [{"question": "company", "any_of": journey_seed.GUEST_COMPANY}]
+            rule.save()
+            changed["journey.SuggestionRule (guests rule)"] += 1
+    for name, fields in journey_seed.GUEST_RULES.items():  # created when missing, never overwritten
+        _, made = SuggestionRule.objects.get_or_create(name=name, defaults=fields)
+        changed["journey.SuggestionRule (Sometimes: not Tier 1, ties to Tier 3)"] += made
+    return +changed  # drop zero counts
+
+
+def _journey_and_gold_2026_10_23():
+    """'Choose at least one.' on Your time / What draws you (and the rule behind it), Start again, Gold 'About you.'"""
+    changed = Counter()
+    for question in Question.objects.filter(key__in=OLD_JOURNEY_HELP):
+        if question.help_text == OLD_JOURNEY_HELP[question.key]:
+            question.help_text = "Choose at least one."
+            question.min_choices = max(question.min_choices, 1)
+            question.save()
+            changed["journey.Question (choose at least one)"] += 1
+    for page_key, key, field, old, new in OLD_SECTION_TEXT:
+        section = Section.objects.filter(page__key=page_key, key=key, **{field: old}).first()
+        if section is not None:
+            setattr(section, field, new)
+            section.save()
+            changed["content.Section (journey / Gold apply / spa / home wording)"] += 1
+    changed.update(_journey_options_2026_10_23())
     return changed
 
 
 OLD_STEP_2_PILLS = "Towel, robe and slippers\nYour own locker\nPhones stay in the locker"
 # page key -> the rows added in round 3 (None = every row of the page, creating the page too)
 ROUND_3_ROWS = {
-    "spa": ["opener_1", "opener_2", "opener_3", "opener_4", "opener_image", "moment_towel", "moment_shower",
+    "spa": ["opener_1", "opener_2", "opener_3", "opener_4", "opener_image", "moment_shower",
             "moment_slippers", "moment_tote", "arrive_kit"],
     "gold": ["holds_lead", "apply_note"],
     "memberships": ["every_visit"],
     "signin": None,
+    "journey": ["last_suggestion", "need_one"],  # 2026-10-23: the "See my last suggestion" link on reopening
 }
+
+
+def _home_opening_label():
+    """2026-10-23: the home `opening_label` row ("Launching"), created when missing; never overwritten."""
+    page = Page.objects.filter(key="home").first()
+    if page is None:
+        return {}
+    top = Section.objects.filter(page=page).order_by("-order").values_list("order", flat=True).first() or 0
+    _, made = Section.objects.get_or_create(page=page, key="opening_label", defaults={"body": "Launching", "order": top + 1})
+    return {"content.Section (home opening label)": 1} if made else {}
 
 
 def _round_3():
@@ -185,6 +282,13 @@ def _round_3():
 
 
 OLD_MASSAGE_LINE = "A quiet room for a massage, by appointment."
+OLD_SHOWERS_LINE = "Rain showers, good towels, everything you need."
+# 2026-10-23 (later): exact old fact lists only, slug -> (old, new)
+OLD_FACILITY_FACTS = {
+    "dry-sauna": (["80–90°C", "Dry heat", "10–15 minutes", "Sit on a towel"], ["80–90°C", "Dry heat", "10–15 minutes"]),
+    "cold-plunge": (["8–10°C", "1–3 minutes", "After the heat"], ["12°C", "1–3 minutes", "After the heat"]),
+    "showers": (["Rain showers", "Between rounds"], ["Rain showers", "Warm rain, cool stone"]),
+}
 OLD_SPA_INTRO = "Eight spaces, one quiet visit."
 # Stand-in images replaced by the realistic fal set (2026-10-22): swapped only while the old name is still set.
 OLD_FACILITY_IMAGES = {"cold-plunge": "cold-tub", "kitchenette": "lounge"}
@@ -231,8 +335,13 @@ def _spa_page():
                 facility.image_focus, touched = seed["image_focus"], True
             if untouched:  # empty facts can mean "show none" after an admin cleared them
                 facility.facts, touched = list(seed["facts"]), True
+        old_facts, new_facts = OLD_FACILITY_FACTS.get(facility.slug, (None, None))
+        if old_facts is not None and list(facility.facts or []) == old_facts:
+            facility.facts, touched = list(new_facts), True
         if facility.short_line == OLD_MASSAGE_LINE:
             facility.short_line, touched = "A quiet room for massage, part of your visit.", True
+        elif facility.slug == "showers" and facility.short_line == OLD_SHOWERS_LINE:
+            facility.short_line, touched = "Warm rain on cool stone, between rounds of heat.", True
         if touched:
             facility.save()
             changed["plans.Facility (the spa page fields)"] += 1

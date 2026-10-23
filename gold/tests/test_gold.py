@@ -20,7 +20,7 @@ User = get_user_model()
 def application_data(**over):
     data = {
         "first_name": "Dan", "last_name": "Cohen", "email": "dan@example.com", "mobile": "+447912345678",
-        "property_link": "owner_investor", "size_range": "50_199", "location": "north_london", "company": "Acme Estates",
+        "industry": "property", "property_link": "owner_investor", "size_range": "50_199", "location": "north_london", "company": "Acme Estates",
         "role": "Director", "bml_relationship": "yes", "referred_by": "Barry", "note": "", "marketing_opt_in": False,
     }
     data.update(over)
@@ -63,7 +63,7 @@ class SubmitTests(TestCase):
         journey.save_answer(session, "time", options=["evening", "late_night"])
         journey.save_answer(session, "frequency", options=["two_three"])
         journey.save_answer(session, "facilities", options=["gym", "cold_plunge"])
-        journey.save_answer(session, "company", options=["often"])
+        journey.save_answer(session, "company", options=["sometimes"])
         journey.save_answer(session, "heard_via", options=["bml"])
         engine.complete(session)
         return session
@@ -83,10 +83,10 @@ class SubmitTests(TestCase):
         self.assertEqual(barry.reply_to, ["hello@spa99.uk"])
         self.assertEqual(barry.subject, "Gold Card application: Dan Cohen (High potential)")
         body = barry.body
-        positions = [body.index(h) for h in ("1. PERSONAL DETAILS", "2. PROPERTY PROFILE", "3. WHAT THE SITE COLLECTED")]
+        positions = [body.index(h) for h in ("1. PERSONAL DETAILS", "2. ABOUT HIM", "3. WHAT THE SITE COLLECTED")]
         self.assertEqual(positions, sorted(positions))
-        for expected in ("dan@example.com", "Owner / investor", "Potential: High (12 points)", "Owner or investor (+5)",
-                         "Evening (6 to 10pm), Late night (10pm to 3am)", "Cold plunge, Gym", "Often with someone",
+        for expected in ("dan@example.com", "What he does: Property", "Owner / investor", "Potential: High (12 points)", "Owner or investor (+5)",
+                         "Evening (6 to 10pm), Late night (10pm to 3am)", "Cold plunge, Gym", "Sometimes with someone",
                          "Suggested membership: Tier 3", application.reference):
             self.assertIn(expected, body)
         html = barry.alternatives[0][0]
@@ -186,7 +186,7 @@ class EndpointTests(TestCase):
         journey.save_answer(session, "property_link", options=["developer"])
         journey.save_answer(session, "property_size", options=["200_plus"])
         data = client.get("/gold/options/").json()
-        self.assertEqual(data["prefill"], {"property_link": "developer", "size_range": "200_plus"})
+        self.assertEqual(data["prefill"], {"industry": "property", "property_link": "developer", "size_range": "200_plus"})
         self.assertIn({"value": "none", "label": "None of these"}, data["property_link"])
 
 
@@ -259,3 +259,64 @@ class RateLimitTests(TestCase):
             self.assertEqual(send(application_data(email=f"p{number}@example.com", privacy_accepted=True)).status_code, 201)
         self.assertEqual(send(application_data(email="p11@example.com", privacy_accepted=True)).status_code, 429)
         cache.clear()
+
+
+class IndustryTests(TestCase):
+    """2026-10-23: 'What do you do?' first; the property questions are for Property people only."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def form(self, **over):
+        data = {**application_data(), "privacy_accepted": True, **over}
+        form = GoldApplicationForm(data)
+        form.is_valid()
+        return form
+
+    def test_property_questions_are_asked_only_of_property_people(self):
+        self.assertIn("industry", self.form(industry="").errors)
+        self.assertIn("industry", self.form(industry="nonsense").errors)
+        self.assertIn("property_link", self.form(property_link="").errors)  # Property: the link is needed
+        finance = self.form(industry="finance", industry_other="ignored")  # the property answers are dropped
+        self.assertTrue(finance.is_valid(), finance.errors)
+        self.assertEqual((finance.cleaned_data["property_link"], finance.cleaned_data["size_range"]), ("", ""))
+        self.assertEqual(finance.cleaned_data["industry_other"], "")
+        no_link = self.form(industry="creative", property_link="")  # nobody is told "this isn't for me"
+        self.assertTrue(no_link.is_valid(), no_link.errors)
+        other = self.form(industry="other", industry_other="  Sculptor ")
+        self.assertEqual(other.cleaned_data["industry_other"], "Sculptor")
+
+    def test_a_non_property_applicant_gets_no_property_points_and_barry_sees_what_he_does(self):
+        data = self.form(industry="finance").cleaned_data
+        application, _ = services.submit_application(data)
+        # Only the non-property points count (North London 1, BML 3, referred 1): no property points.
+        self.assertEqual((application.industry, application.property_link, application.potential_score), ("finance", "", 5))
+        rows = dict(services.application_sections(application)[1]["rows"])
+        self.assertEqual(rows["What he does"], "Finance")
+        self.assertNotIn("Link to property", rows)
+        self.assertEqual(services.application_sections(application)[1]["title"], "About him")
+        mail.outbox.clear()
+        property_app, _ = services.submit_application(self.form(industry="property", email="p@example.com").cleaned_data)
+        self.assertEqual((property_app.potential_level, property_app.potential_score), ("high", 12))  # weights unchanged
+        self.assertIn("Link to property", dict(services.application_sections(property_app)[1]["rows"]))
+
+    def test_a_property_lawyer_from_the_journey_still_counts(self):
+        session = journey.create_session()
+        journey.save_answer(session, "industry", options=["law"])
+        journey.save_answer(session, "property_law", options=["yes"])
+        data = self.form(industry="law").cleaned_data
+        application, _ = services.submit_application(data, session=session)
+        self.assertEqual(application.property_link, "property_lawyer")
+
+    def test_options_returns_the_question_the_condition_and_the_prefill(self):
+        client = Client()
+        client.get("/journey/state/")
+        session = journey.session_from_cookies({"spa99_journey": client.cookies["spa99_journey"].value})
+        journey.save_answer(session, "industry", options=["finance"])
+        data = client.get("/gold/options/").json()
+        self.assertEqual(data["industry"]["question"], "What do you do?")
+        self.assertEqual([o["value"] for o in data["industry"]["options"]][:2], ["property", "finance"])
+        self.assertEqual(data["industry"]["other_value"], "other")
+        self.assertEqual(data["property_when"], {"question": "industry", "any_of": ["property"]})
+        self.assertEqual(data["prefill"], {"industry": "finance"})  # no property prefill for a non-property person

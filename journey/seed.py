@@ -26,8 +26,8 @@ FACILITIES = [
 ]
 COMPANY = [
     ("alone", "Alone (Time to myself.)", {T2: 1}, ""),
-    ("sometimes", "Sometimes with someone (A friend now and then.)", {T2: 1, T3: 1}, "Sometimes with a friend"),
-    ("often", "Often with someone (Most visits.)", {T3: 3}, "Often with someone"),
+    # Guest visits are Tier 3 and Gold only (GST-01), so "sometimes" leans to Tier 3. "Often" was retired (2026-10-23).
+    ("sometimes", "Sometimes with someone (A friend now and then.)", {T3: 3}, "Sometimes with a friend"),
 ]
 INDUSTRY = [
     ("property", "Property"), ("finance", "Finance"), ("business_owner", "Business owner"), ("law", "Law"),
@@ -40,14 +40,27 @@ PROPERTY_LINK = [
 PROPERTY_SIZE = [("1_9", "1 to 9"), ("10_49", "10 to 49"), ("50_199", "50 to 199"), ("200_plus", "200 or more")]
 YES_NO = [("yes", "Yes"), ("no", "No")]
 HEARD_VIA = [
-    ("instagram", "Instagram"), ("friend", "A friend"), ("bml", "BML"), ("walking_past", "Walking past"), ("other", "Other"),
+    ("friend", "A friend"), ("bml", "BML member"), ("social_media", "Social media"), ("other", "Other"),
 ]
+
+GUEST_COMPANY = ["sometimes", "often"]  # "often" was retired (2026-10-23); old sessions keep their points
+GUEST_RULES = {  # 2026-10-23: "Sometimes with someone" never yields Tier 1 and wins ties for Tier 3
+    "Sometimes with someone: not Tier 1": {
+        "kind": SuggestionRule.EXCLUDE, "order": 1, "plan_slugs": [T1],
+        "conditions": [{"question": "company", "any_of": GUEST_COMPANY}],
+    },
+    "Sometimes with someone: tie goes to Tier 3": {
+        "kind": SuggestionRule.TIE_BREAK, "order": 3, "plan_slugs": [T3, T2, T1],
+        "conditions": [{"question": "company", "any_of": GUEST_COMPANY}],
+    },
+}
+MIN_CHOICES = {"time": 1, "facilities": 1}  # 2026-10-23: "Choose at least one."
 
 # key, text, help, type, screen, order, condition, options
 QUESTIONS = [
-    ("time", "When would you come?", "Choose any that fit.", Question.MULTI, 1, 1, {}, TIME),
+    ("time", "When would you come?", "Choose at least one.", Question.MULTI, 1, 1, {}, TIME),
     ("frequency", "How often?", "", Question.SCALE, 1, 2, {}, FREQUENCY),
-    ("facilities", "What would you use?", "Choose as many as you like.", Question.MULTI, 2, 1, {}, FACILITIES),
+    ("facilities", "What would you use?", "Choose at least one.", Question.MULTI, 2, 1, {}, FACILITIES),
     ("company", "Do you usually come alone?", "", Question.SINGLE, 3, 1, {}, COMPANY),
     ("industry", "What do you do?", "", Question.SINGLE, 4, 1, {}, INDUSTRY),
     ("property_link", "Your link to property", "", Question.SINGLE, 4, 2,
@@ -81,6 +94,7 @@ def run(ensure):
     for key, text, help_text, kind, screen, order, condition, options in QUESTIONS:
         question, _ = ensure(Question, {"key": key}, {
             "text": text, "help_text": help_text, "type": kind, "screen": screen, "order": order, "condition": condition,
+            "min_choices": MIN_CHOICES.get(key, 0),
         })
         for position, option in enumerate(options, start=1):
             value, fields = _normalise(option)
@@ -95,10 +109,12 @@ def run(ensure):
         "kind": SuggestionRule.ADD_POINTS, "order": 2, "points": 3, "plan_slugs": [T3],
         "conditions": [
             {"question": "time", "any_of": ["evening", "late_night"]},
-            {"question": "company", "any_of": ["often"]},
+            {"question": "company", "any_of": GUEST_COMPANY},
         ],
         "reason": "Room to bring a guest",
     })
+    for name, fields in GUEST_RULES.items():  # guest visits are Tier 3 and Gold only (GST-01)
+        ensure(SuggestionRule, {"name": name}, fields)
     ensure(SuggestionRule, {"name": "Tie-break: prefer Tier 2"}, {
-        "kind": SuggestionRule.TIE_BREAK, "order": 3, "plan_slugs": [T2, T3, T1],
+        "kind": SuggestionRule.TIE_BREAK, "order": 4, "plan_slugs": [T2, T3, T1],
     })

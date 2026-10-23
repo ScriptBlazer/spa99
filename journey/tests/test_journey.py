@@ -46,8 +46,27 @@ class SuggestionTests(TestCase):
         self.assertEqual(self.slug(time=["daytime"], frequency="weekly"), "tier-1")
         self.assertEqual(self.slug(time=["evening"], frequency="two_three", company="alone"), "tier-2")
         self.assertEqual(self.slug(time=["evening"], frequency="most_days"), "tier-3")
-        # evenings, 2-3 times a week and often with a guest tips to Tier 3 (rule adds points)
-        self.assertEqual(self.slug(time=["evening"], frequency="two_three", company="often"), "tier-3")
+        # evenings, 2-3 times a week and sometimes with a guest tips to Tier 3 (rule adds points)
+        self.assertEqual(self.slug(time=["evening"], frequency="two_three", company="sometimes"), "tier-3")
+        # one guest visit a month is Tier 3 only (GST-01): "Sometimes" has points for it, "Often" is gone
+        self.assertEqual(Option.objects.get(question__key="company", value="sometimes").plan_points, {"tier-3": 3})
+
+    def test_sometimes_with_someone_is_never_tier_1_and_wins_ties_for_tier_3(self):
+        # daytime + now and then is Tier 1 on points alone; "sometimes" excludes it
+        self.assertEqual(self.slug(time=["daytime"], frequency="now_and_then"), "tier-1")
+        suggestion = engine.compute_suggestion(make_session(time=["daytime"], frequency="now_and_then", company="sometimes"))
+        self.assertNotEqual(suggestion.plan.slug, "tier-1")
+        self.assertIn("tier-1", suggestion.excluded)
+        # a tie goes to Tier 3 (it goes to Tier 2 without the answer)
+        tied = engine.compute_suggestion(make_session(company="sometimes"))
+        self.assertEqual(tied.plan.slug, "tier-3")
+
+    def test_company_and_heard_via_options_for_new_journeys(self):
+        state = services.build_state(make_session())
+        options = {q["key"]: [o["value"] for o in q["options"]] for s in state["screens"] for q in s["questions"]}
+        self.assertEqual(options["company"], ["alone", "sometimes"])
+        self.assertEqual(options["heard_via"], ["friend", "bml", "social_media", "other"])
+        self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML member")
 
     def test_three_reasons_from_answers_and_plan_facts(self):
         suggestion = engine.compute_suggestion(make_session(time=["evening"], frequency="two_three", company="alone"))
@@ -62,7 +81,7 @@ class SuggestionTests(TestCase):
         self.assertEqual(engine.compute_suggestion(session).plan.slug, "tier-1")  # next best by points
 
     def test_result_is_stored_and_marks_the_journey_complete(self):
-        session = make_session(time=["evening"], frequency="two_three")
+        session = make_session(time=["evening"], frequency="two_three", facilities=["gym"])
         result = engine.complete(session)
         session.refresh_from_db()
         self.assertTrue(session.completed)
@@ -136,7 +155,7 @@ class AnswerTests(TestCase):
         for key, options in bad:
             with self.assertRaises(services.AnswerError, msg=key):
                 services.save_answer(session, key, options=options)
-        answer, _ = services.save_answer(session, "time", skipped=True)  # always skippable
+        answer, _ = services.save_answer(session, "heard_via", skipped=True)  # optional questions can be skipped
         self.assertTrue(answer.skipped)
         self.assertEqual(answer.values(), [])
         self.assertEqual(Answer.objects.count(), 1)
@@ -157,6 +176,8 @@ class AnswerTests(TestCase):
         self.assertNotIn("property_link", visible())
         with self.assertRaises(services.AnswerError):  # cannot answer a question that is not shown
             services.save_answer(session, "property_link", options=["developer"])
+        services.save_answer(session, "time", options=["daytime"])
+        services.save_answer(session, "facilities", options=["gym"])
         services.save_answer(session, "industry", options=["property"])
         self.assertIn("property_link", visible())
         self.assertNotIn("property_size", visible())
@@ -197,6 +218,8 @@ class EndpointTests(TestCase):
 
         saved = self.post(client, "/journey/answer/", {"question": "frequency", "options": ["weekly"]}, token)
         self.assertEqual(saved.status_code, 200)
+        self.post(client, "/journey/answer/", {"question": "time", "options": ["daytime"]}, token)
+        self.post(client, "/journey/answer/", {"question": "facilities", "options": ["gym"]}, token)
         self.assertEqual(self.post(client, "/journey/answer/", {"question": "frequency", "options": ["bogus"]}, token).status_code, 400)
         self.post(client, "/journey/step/", {"step": 2}, token)
 
@@ -267,3 +290,70 @@ class SharedDeviceTests(TestCase):
         mine.refresh_from_db()
         self.assertEqual(mine.user_id, other.pk)
         self.assertEqual(client.post("/logout/").cookies["spa99_journey"]["max-age"], 0)
+
+
+class RequiredAndReopenTests(TestCase):
+    """2026-10-23: 'Choose at least one', reopening at screen 1 with the last suggestion kept, and Start again."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_time_and_facilities_need_a_choice_before_moving_on_or_finishing(self):
+        session = services.create_session()
+        question = next(q for q in services.visible_questions(session)[0] if q.key == "time")
+        self.assertEqual(question.min_choices, 1)
+        with self.assertRaises(services.AnswerError):
+            services.save_answer(session, "time", skipped=True)  # a required question cannot be skipped
+        with self.assertRaises(services.AnswerError) as caught:
+            services.set_step(session, direction="next")
+        self.assertEqual(caught.exception.missing, ["time"])
+        with self.assertRaises(services.AnswerError):
+            engine.complete(session)  # nothing is computed or stored
+        session.refresh_from_db()
+        self.assertEqual((session.completed, session.suggested_plan_id), (False, None))
+        services.save_answer(session, "time", options=["evening"])
+        self.assertEqual(services.set_step(session, direction="next"), 2)
+        with self.assertRaises(services.AnswerError) as caught:
+            services.set_step(session, direction="next")
+        self.assertEqual(caught.exception.missing, ["facilities"])
+        services.save_answer(session, "facilities", options=["gym"])
+        self.assertTrue(engine.complete(session)["suggested"])
+        data = {q["key"]: q for s in services.build_state(session)["screens"] for q in s["questions"]}
+        self.assertEqual((data["time"]["min_choices"], data["time"]["skippable"]), (1, False))
+        self.assertEqual((data["frequency"]["min_choices"], data["frequency"]["skippable"]), (0, True))
+
+    def test_reopening_resumes_at_screen_one_with_answers_and_the_last_suggestion(self):
+        client = Client()
+        client.get("/journey/state/")
+        session = services.session_from_cookies({"spa99_journey": client.cookies["spa99_journey"].value})
+        for key, value in (("time", ["evening"]), ("frequency", ["two_three"]), ("facilities", ["gym"])):
+            services.save_answer(session, key, options=value)
+        engine.complete(session)
+        state = client.get("/journey/state/").json()
+        self.assertEqual(state["session"]["resume_step"], 1)
+        suggestion = state["last_suggestion"]
+        self.assertEqual(suggestion["plan_slug"], "tier-2")
+        self.assertEqual((suggestion["plan_name"], suggestion["url"]), (session.suggested_plan.name, "/journey/your-membership/"))
+        time = next(q for s in state["screens"] for q in s["questions"] if q["key"] == "time")
+        self.assertEqual(time["answer"]["options"], ["evening"])  # ticked
+        config = client.get("/journey/").context["journey_config"]
+        self.assertEqual(config["lastSuggestion"], suggestion)
+        self.assertEqual(config["urls"]["restart"], "/journey/restart/")
+        self.assertEqual(Client().get("/journey/").context["journey_config"]["lastSuggestion"], None)
+
+    def test_start_again_gives_a_fresh_journey_and_keeps_the_old_one(self):
+        client = Client(enforce_csrf_checks=True)
+        token = client.get("/journey/state/").cookies["csrftoken"].value
+        old = services.session_from_cookies({"spa99_journey": client.cookies["spa99_journey"].value})
+        for key, value in (("time", ["evening"]), ("facilities", ["gym"])):
+            services.save_answer(old, key, options=value)
+        engine.complete(old)
+        self.assertEqual(client.post("/journey/restart/").status_code, 403)  # CSRF protected
+        state = client.post("/journey/restart/", headers={"X-CSRFToken": token}).json()
+        self.assertEqual((state["session"]["current_step"], state["last_suggestion"]), (1, None))
+        self.assertTrue(all(q["answer"] is None for s in state["screens"] for q in s["questions"]))
+        self.assertEqual(client.get("/journey/state/").json()["session"]["id"], state["session"]["id"])  # new cookie
+        old.refresh_from_db()
+        self.assertTrue(old.completed)  # statistics and Gold links on the old one stay
+        self.assertEqual(old.answers.count(), 2)

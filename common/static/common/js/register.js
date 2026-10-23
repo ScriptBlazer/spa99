@@ -1,26 +1,40 @@
-/* Register interest: plan picker and panel, date of birth in three fields, password checks. The shared validate.js
+/* Register interest: plan picker and membership card, date of birth in three fields, password checks. The shared validate.js
    does the live feedback (see form.spaValidation); this adds the parts only this form has. */
 import './forms.js';
 
 const form = document.getElementById('register-form');
 
-/* The plan panel follows the segmented picker. */
+/* The membership card follows the plan chips. The server renders the chosen plan, so the card is right before this runs. */
 const panel = document.querySelector('[data-plan-panel]');
-function showPlan() {
-  const chosen = document.querySelector('input[name="plan"]:checked');
-  if (!panel) return;
-  if (!chosen) {
-    panel.hidden = true;
-    return;
-  }
-  panel.hidden = false;
-  panel.querySelector('[data-plan-name]').textContent = chosen.dataset.name;
-  panel.querySelector('[data-plan-character]').textContent = chosen.dataset.character;
-  panel.querySelector('[data-plan-price]').textContent = `£${chosen.dataset.price} a month`;
-  panel.querySelector('[data-plan-vat]').textContent = `ex VAT (£${chosen.dataset.inc} inc VAT)`;
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+if (panel) {
+  const [body, ...spare] = panel.querySelectorAll('[data-plan-body]');
+  spare.forEach((extra) => extra.remove());
+  const empty = panel.querySelector('[data-plan-empty]');
+  const eyebrow = panel.querySelector('[data-plan-eyebrow]');
+  const text = panel.querySelector('[data-plan-text]');
+  const plainEyebrow = eyebrow.textContent.trim() === eyebrow.dataset.suggestedText ? 'Your membership' : eyebrow.textContent.trim();
+  const fill = (selector, value) => { body.querySelector(selector).textContent = value; };
+
+  const showPlan = (animate) => {
+    const chosen = document.querySelector('input[name="plan"]:checked');
+    body.hidden = !chosen;
+    empty.hidden = Boolean(chosen);
+    if (!chosen) { eyebrow.textContent = plainEyebrow; return; }
+    fill('[data-plan-name]', chosen.dataset.name);
+    fill('[data-plan-character]', chosen.dataset.character);
+    fill('[data-plan-price]', `£${chosen.dataset.price}`);
+    fill('[data-plan-vat]', `ex VAT (£${chosen.dataset.inc} inc VAT)`);
+    eyebrow.textContent = chosen.value === eyebrow.dataset.suggested ? eyebrow.dataset.suggestedText : plainEyebrow;
+    // One 240ms fade of the text block (opacity only). Reduced motion: none.
+    if (animate && !reduceMotion.matches && text.animate) {
+      const fade = getComputedStyle(document.documentElement).getPropertyValue('--duration-ack').trim();
+      [eyebrow, text].forEach((el) => el.animate({ opacity: [0, 1] }, { duration: parseFloat(fade) || 240, easing: 'ease-out' }));
+    }
+  };
+  document.querySelectorAll('input[name="plan"]').forEach((input) => input.addEventListener('change', () => showPlan(true)));
+  showPlan(false);
 }
-document.querySelectorAll('input[name="plan"]').forEach((input) => input.addEventListener('change', showPlan));
-showPlan();
 
 /* Date of birth: Day / Month / Year, auto-advance after 2 / 2 / 4 digits, one shared feedback line. The real field
    (type="date" without scripts) stays in the form and carries the composed value. */

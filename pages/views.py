@@ -4,13 +4,14 @@ from django.contrib.auth.decorators import login_not_required
 import re
 
 from django.http import Http404, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.templatetags.static import static
 from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET
 
 from content import services as content
+from journey import services as journey_services
 from journey.models import Option, Question
 from plans.models import SiteSettings
 
@@ -18,7 +19,7 @@ from . import services
 
 JOURNEY_SLUGS = {1: "your-time", 2: "what-draws-you", 3: "company", 4: "about-you"}
 JOURNEY_RESULT_SLUG = "your-membership"
-GOLD_SLUGS = {1: "property", 2: "visits", 3: "you"}
+GOLD_SLUGS = {1: "about-you", 2: "visits", 3: "you"}
 GOLD_SENT_SLUG = "sent"
 
 
@@ -129,12 +130,14 @@ def journey(request, slug=""):
     _check_slug(slug, {*JOURNEY_SLUGS.values(), JOURNEY_RESULT_SLUG})
     keys = ["screen_1", "screen_2", "screen_3", "screen_4", "result_label", "why", "result_cta", "change_answers",
             "gold_panel", "gold_line", "others", "continue", "skip", "last", "back", "prefer_not", "start_again",
-            "save_error", "result_loading", "result_error", "unavailable", "not_a_fit", "optional"]
+            "save_error", "result_loading", "result_error", "unavailable", "not_a_fit", "optional", "last_suggestion", "need_one"]
+    session = journey_services.session_from_cookies(request.COOKIES, request.user)
     config = {
         "slugs": JOURNEY_SLUGS, "resultSlug": JOURNEY_RESULT_SLUG, "base": reverse("journey"),
         "copy": _copy("journey", keys), "facilityImages": services.journey_facility_images(),
         "iconSprite": static("common/img/icons.svg"),
-        "urls": {"register": reverse("register"), "goldApply": reverse("gold_apply"), "home": reverse("home"),
+        "lastSuggestion": journey_services.last_suggestion(session) if session is not None else None,
+        "urls": {"restart": reverse("journey:restart"), "register": reverse("register"), "goldApply": reverse("gold_apply"), "home": reverse("home"),
                  "memberships": reverse("memberships")},
     }
     return _page(request, "pages/journey.html", "journey", journey_config=config)
@@ -144,6 +147,8 @@ def journey(request, slug=""):
 @ensure_csrf_cookie
 @require_GET
 def gold_apply(request, slug=""):
+    if slug == "property":  # step 1 was renamed to about-you (2026-10-23): keep old links working
+        return redirect("gold_apply_step", slug=GOLD_SLUGS[1])
     _check_slug(slug, {*GOLD_SLUGS.values(), GOLD_SENT_SLUG})
     keys = ["screen_1", "screen_2", "screen_3", "sent", "closed"]
     config = {

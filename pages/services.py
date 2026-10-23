@@ -482,7 +482,6 @@ def opener_picture(copy=None):
 
 # moment key -> its content row and the pictures it shows: (default name, focus, alt). A row's upload replaces the first picture.
 MOMENTS = {
-    "towel": ("moment_towel", [("towel-bench", "40% 55%", "A white towel with the gold swan, folded on the sauna bench")]),
     "shower": ("moment_shower", [("toiletries", "50% 55%", "Three frosted bottles with the gold swan in a stone niche"),
                                  ("towel-rail", "50% 50%", "A swan towel on a bronze rail by the shower")]),
     "slippers": ("moment_slippers", [("slippers", "62% 60%", "A pair of white swan slippers by a wooden lounger")]),
@@ -503,7 +502,7 @@ def _moment_pictures(row, pictures):
 
 
 def spa_moments(copy=None):
-    """Moments that can be shown: {key: {key, heading, body, pictures}} for towel, shower, slippers and tote.
+    """Moments that can be shown: {key: {key, heading, body, pictures}} for shower, slippers and tote.
     A moment is left out when its row has no heading (how Moishe turns one off) or none of its pictures exist
     (an upload, or a built render), so the page never shows an empty frame. Each picture has `has_image`."""
     copy = copy if copy is not None else content.page_content("spa")
@@ -518,7 +517,7 @@ def spa_moments(copy=None):
 
 def place_moments(sections, moments):
     """Insert moment items ({"kind": "moment", "moment": {...}}) into the room sections by rule, so hiding or moving
-    rooms never breaks the page: towel first; shower after the first tiles row (else after the first feature, else
+    rooms never breaks the page: shower after the first tiles row (else after the first feature, else
     last); slippers after the first feature that follows the shower (else last, before 'How a visit works')."""
     sections = list(sections)
 
@@ -537,8 +536,6 @@ def place_moments(sections, moments):
     if "slippers" in moments:
         anchor = first("feature", at)
         sections.insert(len(sections) if anchor is None else anchor + 1, item("slippers"))
-    if "towel" in moments:
-        sections.insert(0, item("towel"))
     return sections
 
 
@@ -554,7 +551,10 @@ def arrive_kit(copy=None):
         label, _, rest = (part.strip() for part in line.partition("|"))
         name, _, focus = (part.strip() for part in rest.partition("|"))
         if label:
-            items.append({"label": label, "name": name, "focus": focus or "50% 50%", "has_image": bool(name) and images.has_image(name)})
+            has = bool(name) and images.has_image(name)
+            info = images.manifest().get(name, {}) if has else {}
+            wide = bool(info.get("width") and info.get("height") and info["width"] / info["height"] >= 1.8)  # a wide picture gets a wide frame
+            items.append({"label": label, "name": name, "focus": focus or "50% 50%", "has_image": has, "wide": wide})
     return {"heading": row.heading, "items": items[:KIT_MAX]}
 
 

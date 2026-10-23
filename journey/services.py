@@ -17,7 +17,11 @@ UTM_FIELDS = ("utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_conte
 
 
 class AnswerError(ValueError):
-    """The answer cannot be saved. The message is safe to show."""
+    """The answer cannot be saved. The message is safe to show. `missing` lists question keys still to answer."""
+
+    def __init__(self, message, missing=None):
+        super().__init__(message)
+        self.missing = missing or []
 
 
 # ---------- sessions ----------
@@ -143,7 +147,9 @@ def _clean_values(question, options, active_values):
     if question.type in (Question.SINGLE, Question.SCALE) and len(values) != 1:
         raise AnswerError("Choose one option, or skip.")
     if question.type == Question.MULTI and not values:
-        raise AnswerError("Choose at least one option, or skip.")
+        raise AnswerError("Choose at least one option." if question.min_choices else "Choose at least one option, or skip.")
+    if len(values) < question.min_choices:
+        raise AnswerError(f"Choose at least {question.min_choices}.")
     if any(v not in active_values for v in values):
         raise AnswerError("That choice is not available.")
     return values
@@ -159,6 +165,8 @@ def save_answer(session, question_key, options=None, text="", skipped=False):
     active = {o.value: o for o in question.active_options}
 
     chosen, text = [], (text or "")
+    if skipped and question.min_choices:
+        raise AnswerError("Choose at least one option.")
     if skipped:
         text = ""
     elif question.type == Question.TEXT:
@@ -203,6 +211,30 @@ def _store(session, question, new_options, text, skipped):
     return answer, True
 
 
+# ---------- required questions ----------
+
+def missing_required(session, before_step=None):
+    """Keys of visible questions that need choices (min_choices) and do not have enough yet, on screens before
+    `before_step` (all screens when None). A skipped or unanswered question counts as missing."""
+    answers = answers_by_key(session)
+    visible, _ = visible_questions(session, answers)
+    missing = []
+    for question in visible:
+        if not question.min_choices or (before_step is not None and question.screen >= before_step):
+            continue
+        answer = answers.get(question.key)
+        chosen = 0 if answer is None or answer.skipped else len({o.value for o in answer.options.all() if o.active})
+        if chosen < question.min_choices:
+            missing.append(question.key)
+    return missing
+
+
+def require_answers(session, before_step=None):
+    missing = missing_required(session, before_step)
+    if missing:
+        raise AnswerError("Choose at least one option to continue.", missing)
+
+
 # ---------- steps ----------
 
 def next_screen(session, current=None):
@@ -236,6 +268,8 @@ def set_step(session, step=None, direction=None):
         target = min(target, last, next_screen(session, session.furthest_step))
     else:
         raise AnswerError("Choose a step.")
+    if target > session.current_step:  # moving forward: the screens he leaves must be complete
+        require_answers(session, before_step=target)
     session.current_step = target
     session.furthest_step = max(session.furthest_step, target)
     session.save(update_fields=["current_step", "furthest_step", "updated_at"])
@@ -254,7 +288,9 @@ def _question_data(question, visible_keys, answers):
         "screen": question.screen,
         "visible": question.key in visible_keys,
         "condition": question.condition,
-        "skippable": True,
+        "min_choices": question.min_choices,
+        "required": question.min_choices > 0,
+        "skippable": question.min_choices == 0,
         "options": [{"value": o.value, "label": o.label} for o in question.active_options],
         "answer": None if answer is None else {
             "options": [o.value for o in answer.options.all()],
@@ -262,6 +298,21 @@ def _question_data(question, visible_keys, answers):
             "skipped": answer.skipped,
         },
     }
+
+
+def last_suggestion(session):
+    """The stored suggestion of a finished journey, for the 'See my last suggestion' link. None when there is none.
+    `url` is the result page (a view of the stored answers; nothing is computed until he opens it)."""
+    plan = session.suggested_plan if session.suggested_plan_id else None
+    if plan is None:
+        return None
+    return {"plan_name": plan.name, "plan_slug": plan.slug, "url": result_url()}
+
+
+def result_url():
+    from django.urls import reverse  # local: pages.views holds the slug constants
+    from pages.views import JOURNEY_RESULT_SLUG
+    return reverse("journey_page", args=[JOURNEY_RESULT_SLUG])
 
 
 def build_state(session):
@@ -282,6 +333,8 @@ def build_state(session):
             "completed": session.completed,
             "result_step": result_step(session, visible),
             "total_screens": len(numbers),
+            "resume_step": numbers[0] if numbers else 1,  # reopening always starts at screen 1, answers ticked
         },
+        "last_suggestion": last_suggestion(session),
         "screens": [{"number": n, "questions": screens[n]} for n in sorted(screens)],
     }

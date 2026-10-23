@@ -4,32 +4,52 @@
 {% block main %}
 {% page_content "register" as r %}
 {% interest_cards as cards %}
+{% with chosen=form.plan.value|default:selected_plan %}
 <section class="section on-light register">
   <div class="container grid register-grid">
-    <aside class="register-aside">
-      <h1>{{ site_settings.wording }}</h1>
-      {% if cards %}
-      <div class="panel plan-panel" data-plan-panel aria-live="polite">
-        <p class="plan-panel-name lead"><strong data-plan-name></strong> <span class="muted" data-plan-character></span></p>
-        <p class="price price-sm num" data-plan-price></p>
-        <p class="small muted" data-plan-vat></p>
-      </div>
-      <fieldset class="plan-picker">
-        <legend class="sr-only">Membership you are interested in</legend>
-        <div class="segmented segmented--wrap" role="radiogroup">
-          {% for card in cards %}
-          <label class="seg"><input type="radio" name="plan" value="{{ card.slug }}" form="register-form"
-            data-name="{{ card.name }}" data-character="{{ card.character }}" data-price="{{ card.price_whole }}" data-inc="{{ card.price_inc }}"
-            {% if card.slug == form.plan.value|default:selected_plan %}checked{% endif %}><span>{{ card.name }}</span></label>
-          {% endfor %}
+    <aside class="register-stage on-dark">
+      {% include "users/_register_photo.html" %}
+      <div class="register-stage-copy" data-reveal="hero">
+        <h1>{{ site_settings.wording }}.</h1>
+        <p class="register-lead">{{ r.intro.body }}</p>
+        {% if cards %}
+        <div class="plan-card" data-plan-panel>
+          <p class="plan-eyebrow" data-plan-eyebrow data-suggested="{{ suggested_plan }}" data-suggested-text="Suggested by your answers">{% if chosen and chosen == suggested_plan %}Suggested by your answers{% else %}Your membership{% endif %}</p>
+          <div class="plan-text" data-plan-text aria-live="polite">
+            {% for card in cards %}{% if card.slug == chosen %}
+            <div data-plan-body>
+              <div class="plan-row">
+                <p class="plan-name" data-plan-name>{{ card.name }}</p>
+                <p class="plan-price num"><span data-plan-price>£{{ card.price_whole }}</span><small>a month</small></p>
+              </div>
+              <p class="plan-character" data-plan-character>{{ card.character }}</p>
+              <p class="plan-vat" data-plan-vat>ex VAT (£{{ card.price_inc }} inc VAT)</p>
+            </div>
+            {% endif %}{% endfor %}
+            <div data-plan-body hidden>{# filled by register.js when there was no server-side choice #}
+              <div class="plan-row"><p class="plan-name" data-plan-name></p><p class="plan-price num"><span data-plan-price></span><small>a month</small></p></div>
+              <p class="plan-character" data-plan-character></p>
+              <p class="plan-vat" data-plan-vat></p>
+            </div>
+            <p class="plan-empty" data-plan-empty{% if chosen %} hidden{% endif %}>Choose one. You can change it later.</p>
+          </div>
+          <fieldset class="plan-picker">
+            <legend class="sr-only">Membership you are interested in</legend>
+            <div class="plan-chips">
+              {% for card in cards %}
+              <label class="plan-chip"><input type="radio" name="plan" value="{{ card.slug }}" form="register-form"
+                data-name="{{ card.name }}" data-character="{{ card.character }}" data-price="{{ card.price_whole }}" data-inc="{{ card.price_inc }}"
+                {% if card.slug == chosen %}checked{% endif %}><span>{{ card.name }}</span></label>
+              {% endfor %}
+            </div>
+          </fieldset>
+          {% if from_journey %}<p class="plan-note"><span class="mark-glyph" aria-hidden="true"></span>{{ r.journey_note.body }}</p>{% endif %}
         </div>
-      </fieldset>
-      {% endif %}
-      <p class="muted">{{ r.intro.body }}</p>
-      {% if from_journey %}<p class="muted">{{ r.journey_note.body }}</p>{% endif %}
+        {% endif %}
+      </div>
     </aside>
 
-    <form class="register-form form-stack" method="post" id="register-form" data-live-validate novalidate
+    <form class="register-panel form-stack" data-reveal method="post" id="register-form" data-live-validate novalidate
           data-check-email-url="{% url 'check_email' %}" data-login-url="{% url 'login' %}">
       {% csrf_token %}
       <div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
@@ -63,7 +83,7 @@
             <div class="field"><label for="dob-year">Year</label><input id="dob-year" class="input" inputmode="numeric" autocomplete="bday-year" maxlength="4" placeholder="YYYY"></div>
           </div>
           <div data-dob-native>{{ form.date_of_birth }}</div>
-          <p class="feedback" data-error-for="date_of_birth" id="error-date_of_birth" aria-live="polite" data-hint="Spa 99 is for 18 and over." data-good="Looks right" data-state="{% if form.date_of_birth.errors %}error{% else %}hint{% endif %}">{% if form.date_of_birth.errors %}{{ form.date_of_birth.errors|join:" " }}{% else %}Spa 99 is for 18 and over.{% endif %}</p>
+          <p class="feedback" data-error-for="date_of_birth" id="{{ form.date_of_birth.auto_id }}_error" aria-live="polite" data-hint="Spa 99 is for 18 and over." data-good="Looks right" data-state="{% if form.date_of_birth.errors %}error{% else %}hint{% endif %}">{% if form.date_of_birth.errors %}{{ form.date_of_birth.errors|join:" " }}{% else %}Spa 99 is for 18 and over.{% endif %}</p>
         </div>
       </fieldset>
 
@@ -71,23 +91,24 @@
         <legend>Before you register</legend>
         <div class="field">
           <label class="check">{{ form.men_only_accepted }}<span>I understand Spa 99 is a men-only spa. <a href="{% url 'terms' %}">Our policy</a></span></label>
-          <p class="feedback" data-error-for="men_only_accepted" id="error-men_only_accepted" aria-live="polite" data-state="{% if form.men_only_accepted.errors %}error{% else %}hint{% endif %}">{{ form.men_only_accepted.errors|join:" " }}</p>
+          <p class="feedback" data-error-for="men_only_accepted" id="{{ form.men_only_accepted.auto_id }}_error" aria-live="polite" data-state="{% if form.men_only_accepted.errors %}error{% else %}hint{% endif %}">{{ form.men_only_accepted.errors|join:" " }}</p>
         </div>
         <div class="field">
           <label class="check">{{ form.marketing_opt_in }}<span>Send me occasional news from Spa 99.</span></label>
         </div>
         <div class="field">
           <label class="check">{{ form.privacy_accepted }}<span>Read how we use your details in our <a href="{% url 'privacy' %}">privacy notice</a>, and tick to accept it.</span></label>
-          <p class="feedback" data-error-for="privacy_accepted" id="error-privacy_accepted" aria-live="polite" data-state="{% if form.privacy_accepted.errors %}error{% else %}hint{% endif %}">{{ form.privacy_accepted.errors|join:" " }}</p>
+          <p class="feedback" data-error-for="privacy_accepted" id="{{ form.privacy_accepted.auto_id }}_error" aria-live="polite" data-state="{% if form.privacy_accepted.errors %}error{% else %}hint{% endif %}">{{ form.privacy_accepted.errors|join:" " }}</p>
         </div>
       </fieldset>
 
       <div class="register-submit">
         <button type="submit" class="btn btn-primary btn-block" data-working-text="One moment">{{ site_settings.wording }}</button>
-        <p class="muted">Already registered? <a href="{% url 'login' %}">Sign in</a></p>
+        <p class="register-foot small"><span class="muted">Already registered?</span> <a class="btn-quiet small" href="{% url 'login' %}">Sign in</a></p>
       </div>
     </form>
   </div>
 </section>
+{% endwith %}
 {% endblock %}
 {% block scripts %}{% validation_config %}<script type="module" src="{% static 'common/js/register.js' %}"></script>{% endblock %}

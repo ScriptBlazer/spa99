@@ -72,6 +72,10 @@ class Question(BaseModel):
     type = models.CharField(max_length=10, choices=TYPE_CHOICES, default=SINGLE)
     screen = models.PositiveSmallIntegerField(help_text="Screen number, from 1.")
     order = models.PositiveSmallIntegerField(default=0)
+    min_choices = models.PositiveSmallIntegerField(
+        default=0, help_text="At least this many choices are required (0 = optional, and it can be skipped). "
+                             "The journey cannot move on or finish until it is met.",
+    )
     active = models.BooleanField(default=True, help_text="Retire by unticking. Never delete: old answers stay readable.")
     condition = models.JSONField(
         default=dict, blank=True,

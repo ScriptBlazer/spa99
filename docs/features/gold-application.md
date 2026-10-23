@@ -21,7 +21,10 @@ Answers already given in the journey are reused, never asked twice.
 **Personal**
 - First and last name, email, mobile
 
-**Property profile**
+**About you** (screen 1, 2026-10-23: "About you." / "A few taps, so we know you.")
+- What do you do? Property · Finance · Business owner · Law · Medical · Tech · Creative · Other (the options are the journey's `industry` question; Other has an optional short text). Required, prefilled from the journey. Nobody should feel "this isn't for me": the next two questions appear only when he picks **Property**, and the server drops them for everyone else.
+
+**Property profile** (only if Property: link and size; the rest is for everyone)
 - Your link to property: Owner / investor · Developer · Manager · Work at a property or management firm · Agent / broker · Property lawyer · None of these
 - Size: number of units or properties (ranges: 1–9, 10–49, 50–199, 200+) or portfolio value range
 - Where: North London · Rest of London · Rest of UK · Abroad
@@ -61,7 +64,7 @@ To `barry@bmlgroup.co.uk`, cc `moishe.berkowitz@bmlgroup.co.uk` (recipients edit
 
 **1. Personal details:** name, email, mobile, date applied, application reference.
 
-**2. Property profile:** link to property, company and role, size, where, BML relationship, referred by, **Potential: High/Medium/Low** with the reasons.
+**2. About him:** what he does, then link to property (only if given), company and role, size, where, BML relationship, referred by, **Potential: High/Medium/Low** with the reasons.
 
 **3. What the site collected:** when he'd come, how often, facilities, company/guests, suggested tier, how he heard, journey timing (e.g. "completed in 3 min, visited twice before applying").
 
@@ -73,14 +76,15 @@ Clean, branded, readable on a phone. Applicant receives a short, calm acknowledg
 
 | Model | Holds |
 |---|---|
-| `GoldApplication` | UUID, `reference` (GC-XXXXXX), personal details, `property_link`, `size_range`, `location` (the "where"), company, role, `bml_relationship`, referred by, note, `spa_interest` (journey answers as readable text), linked journey session (and `user` if the same email registers), potential level + score + reasons, status (new / contacted / approved / declined, by hand in Control), internal notes, `email_sent_at` + `email_error`, `repeat_of`, marketing + privacy consent |
+| `GoldApplication` | UUID, `reference` (GC-XXXXXX), personal details, `industry` + `industry_other`, `property_link` and `size_range` (empty unless the industry is Property), `location` (the "where"), company, role, `bml_relationship`, referred by, note, `spa_interest` (journey answers as readable text), linked journey session (and `user` if the same email registers), potential level + score + reasons, status (new / contacted / approved / declined, by hand in Control), internal notes, `email_sent_at` + `email_error`, `repeat_of`, marketing + privacy consent |
 | `GoldChoice` | The answers offered on the form and in the journey: group (property_link, size, where, bml), stable value, label, order, active. Retire by unticking; old applications keep their value and label |
 | `GoldSignalSource` | Which journey question feeds which Gold signal: signal, journey question key, optional answer value, the value it gives (e.g. `property_law` = `yes` gives `property_lawyer`), order, active |
 | `GoldRule` | One row per weight: group (property_link, size, where, bml, referred, threshold), match value, points, `is_property`. Thresholds are rows with group `threshold` and value `high` / `medium` |
 
+- Industry rules: `industry` is required. When it is not Property, `property_link` and `size_range` are ignored (dropped), never required. When it is Property, `property_link` is required. A lawyer (`law`) whose journey said "is it property law: yes" is still stored as `property_lawyer`. The rating is unchanged: a non-property applicant just gets no property points.
 - Engine: `gold/rating.py` `rate_potential(signals)`, shared by the application and the journey result (the journey passes `property_link` and `size`).
 - Defaults (seeded, editable): owner/investor, developer, manager 5; works at a firm, agent, property lawyer 3; size 10-49 +1, 50-199 +2, 200+ +3; North London +1; works with BML +3; referred +1. High needs 6, Medium 3. So a bare owner is Medium and an owner with a portfolio of 10+ is High (matches journey.md "property link with scale").
-- Endpoints (public, CSRF + honeypot `website`; 10 *valid* applications per hour per IP (a form mistake does not use one up) plus a generous cap of 120 posts an hour of any kind): `GET /gold/options/` (choices, plus prefill from the journey cookie / signed-in user), `POST /gold/apply/` (JSON or form post; 201 `{"reference"}` or 400 `{"errors"}`).
+- Endpoints (public, CSRF + honeypot `website`; 10 *valid* applications per hour per IP (a form mistake does not use one up) plus a generous cap of 120 posts an hour of any kind): `GET /gold/options/` (choices, plus prefill from the journey cookie / signed-in user; `industry` `{question, options: [{value, label}], other_value, other_label}`; `property_when` `{question: "industry", any_of: ["property"]}` says when to show `property_link` and `size_range`; prefill has `industry`, `industry_other` and, only for Property, `property_link` / `size_range`), `POST /gold/apply/` (JSON or form post; 201 `{"reference"}` or 400 `{"errors"}`).
 - Emails are queued (django-q2) as `gold.tasks.send_gold_emails(application_id)`: Barry (to + cc from Site settings, subject `Gold Card application: Name (High potential)`, suffix ` - repeat application` for repeats), then the applicant's acknowledgement. The three sections come from `gold.services.application_sections()` so Control can show the same. The email has no "Open in Control" link until Control has a Gold page (see the TODO above). Resend (Barry only): `gold.services.resend_barry_email()`, also an action in the hidden admin.
 - A second submit within 2 minutes with the same email returns the first application and sends nothing new.
 - Stage switch `register_interest_open` also closes Gold applications.

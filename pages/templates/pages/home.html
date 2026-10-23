@@ -21,7 +21,7 @@
       <div class="hero-window" data-window>
         <div class="window-media" data-hero-media>
           {% if hv.poster %}<div class="hero-still-wrap"><picture><source media="(max-width: 47.99em)" srcset="{{ hv.poster_portrait }}" width="608" height="1080"><img class="photo hero-still" src="{{ hv.poster }}" width="1920" height="1080" alt="The reception: a wide reef fish tank set in travertine, with a long bench of sage cushions, a green wall and the Spa 99 swan" fetchpriority="high" decoding="async"></picture></div>{% endif %}
-          {% if hv %}<video class="hero-video" muted playsinline loop preload="none" aria-hidden="true" tabindex="-1" data-sources="{{ hv.sources }}"></video>{% endif %}
+          {% if hv %}<div class="hero-video-wrap" data-hero-drift><video class="hero-video" muted playsinline preload="none" aria-hidden="true" tabindex="-1" data-sources="{{ hv.sources }}"></video></div>{% endif %}
         </div>
         <div class="frame-tint" aria-hidden="true"></div>
         <div class="hero-veil" aria-hidden="true"></div>
@@ -37,7 +37,6 @@
           </div>
         </div>
       </div>
-      <button class="hero-pause btn-quiet" type="button" aria-pressed="false" data-hero-pause>Pause</button>
     </div>
     {# The round 2 layout: the words on the left, the frame on the right. With motion this is where the image lands; without it, it is simply the next block. #}
     <div class="hero-end">
@@ -85,15 +84,10 @@
         </div>
       </div>
       <div class="ritual-item ritual-rest">
-        {% has_photo "slippers" as has_slippers %}{% if has_slippers %}<div class="home-rest-pic">{% endif %}
         <figure class="frame frame--right" data-frame data-depth="5">
           <div class="frame-media">{% photo "relax-loungers" alt="Relaxing room with wooden loungers, travertine walls and round moss panels" sizes="(min-width: 64em) 34vw, 95vw" %}</div>
           <div class="frame-tint" aria-hidden="true"></div>
         </figure>
-        {% if has_slippers %}
-        {# One small mounted detail (docs/design/AMENITIES.md 5.1): slippers by the loungers. No words. #}
-        {% include "pages/_spa_mount.html" with name="slippers" alt="" sizes="(min-width: 64em) 12vw, 30vw" focus="62% 60%" depth="12" cls="home-slippers" %}
-        </div>{% endif %}
         <div class="frame-caption" data-caption data-drift="12">
           <h3>{{ home.scene_rest.body }}</h3>
           <p class="small">{{ lines.relaxing_zone }}</p>
@@ -228,7 +222,8 @@
   <div class="scene-stage">
     <div class="container grid opening-grid">
       <div class="opening-main">
-        <h2 id="opening-title" class="opening-date" data-rise>{{ home.opening.heading|default:site_settings.opening_label }}</h2>
+        {% if home.opening_label.body %}<p class="launch-label" data-fade>{{ home.opening_label.body }}</p>{% endif %}
+        <h2 id="opening-title" class="opening-date" data-rise>{{ home.opening.heading }}</h2>
         <p class="lead opening-address" data-fade>{{ site_settings.address_one_line }}</p>
         <p class="small opening-hours" data-fade>{% hours_summary %}, every day.{% if closure %} Closed for {{ closure }}.{% endif %}</p>
       </div>

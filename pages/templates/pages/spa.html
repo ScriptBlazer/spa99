@@ -47,7 +47,6 @@
       <div class="frame-tint" aria-hidden="true"></div>
     </figure>
   </div>
-  <button class="door-pause btn-quiet" type="button" aria-pressed="false" data-door-pause>Pause</button>
 </section>
 
 {# S2. The rooms, from the data: feature (with an optional companion) or a row of tiles. Sides alternate, the opening frame is on the right. #}
@@ -55,7 +54,7 @@
   {% if s.kind == "moment" %}
     {# the amenity moments, placed by the data (AMENITIES.md): a moment without a built picture never reaches here #}
     {% if s.moment.key == "shower" %}{% include "pages/_spa_moment_shower.html" with m=s.moment %}
-    {% elif s.moment.key == "slippers" %}{% include "pages/_spa_moment_band.html" with m=s.moment over=True %}
+    {% elif s.moment.key == "slippers" %}{% include "pages/_spa_moment_inset.html" with m=s.moment %}
     {% else %}{% include "pages/_spa_moment_band.html" with m=s.moment over=False %}{% endif %}
   {% elif s.kind == "feature" %}
     {% cycle "a" "b" "c" as ratio silent %}

@@ -14,7 +14,7 @@ class OptionInline(admin.TabularInline):
 
 @admin.register(Question)
 class QuestionAdmin(SimpleHistoryAdmin):
-    list_display = ("key", "text", "type", "screen", "order", "active")
+    list_display = ("key", "text", "type", "screen", "order", "min_choices", "active")
     list_filter = ("screen", "active", "type")
     inlines = [OptionInline]
 

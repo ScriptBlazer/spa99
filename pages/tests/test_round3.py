@@ -118,19 +118,19 @@ class MomentTests(TestCase):
         return [feature("dry"), {"kind": "tiles", "tiles": []}, feature("relax"), feature("gym")], moments(*keys)
 
     def test_placement_by_rule(self):
-        sections, found = self.sections("towel", "shower", "slippers")
+        sections, found = self.sections("shower", "slippers")
         self.assertEqual(order(pages.place_moments(sections, found)),
-                         ["towel", "dry", "tiles", "shower", "relax", "slippers", "gym"])
+                         ["dry", "tiles", "shower", "relax", "slippers", "gym"])
 
     def test_no_tiles_puts_the_shower_after_the_first_feature(self):
-        sections, found = self.sections("towel", "shower", "slippers")
+        sections, found = self.sections("shower", "slippers")
         sections = [s for s in sections if s["kind"] != "tiles"]
-        self.assertEqual(order(pages.place_moments(sections, found)), ["towel", "dry", "shower", "relax", "slippers", "gym"])
+        self.assertEqual(order(pages.place_moments(sections, found)), ["dry", "shower", "relax", "slippers", "gym"])
 
     def test_no_feature_after_the_shower_puts_slippers_last_and_no_rooms_still_works(self):
         sections, found = self.sections("shower", "slippers")
         self.assertEqual(order(pages.place_moments(sections[:2], found)), ["dry", "tiles", "shower", "slippers"])
-        self.assertEqual(order(pages.place_moments([], moments("towel", "shower", "slippers"))), ["towel", "shower", "slippers"])
+        self.assertEqual(order(pages.place_moments([], moments("shower", "slippers"))), ["shower", "slippers"])
 
     def test_slippers_without_shower_and_input_is_not_changed(self):
         sections, found = self.sections("slippers")
@@ -142,10 +142,8 @@ class MomentTests(TestCase):
         seed_all()
         with mock.patch("pages.services.images.has_image", side_effect=lambda n: n in ("towel-bench", "toiletries", "tote")):
             found = pages.spa_moments()
-            self.assertEqual(sorted(found), ["shower", "tote", "towel"])  # slippers: no picture
+            self.assertEqual(sorted(found), ["shower", "tote"])  # slippers: no picture
             self.assertEqual([p["has_image"] for p in found["shower"]["pictures"]], [True, False])  # towel-rail not built yet
-            Section.objects.filter(page__key="spa", key="moment_towel").update(heading="")
-            self.assertNotIn("towel", pages.spa_moments())
         with mock.patch("pages.services.images.has_image", return_value=False):
             self.assertEqual(pages.spa_moments(), {})
 
@@ -162,12 +160,10 @@ class KitAndSigninTests(TestCase):
         self.assertEqual([(i["label"], i["name"], i["focus"], i["has_image"]) for i in items],
                          [("Towels", "towel-bench", "45% 50%", True), ("Robe", "", "50% 50%", False), ("Tie", "nope", "50% 50%", False)])
 
-    def test_every_visit_sentence_comes_from_the_kit(self):
+    def test_every_visit_sentence_has_no_amenity_list(self):
         visit = pages.every_visit()
-        self.assertEqual(visit["text"], "Every visit: towels, robe, slippers and toiletries, and every room.")
+        self.assertEqual(visit["text"], "Every visit: every room, as long as you like.")
         self.assertEqual((visit["cta_label"], visit["cta_url"]), ("See the spa", "/the-spa/"))
-        Section.objects.filter(page__key="spa", key="arrive_kit").update(body="Robe | robe")
-        self.assertIn("Every visit: robe, and", pages.every_visit()["text"])
         Section.objects.filter(page__key="memberships", key="every_visit").update(visible=False)
         self.assertIsNone(pages.every_visit())
 

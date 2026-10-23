@@ -1,5 +1,7 @@
 # Spa 99: the robe, the towels and the rest (amenities, round 3)
 
+> **Round 4 (2026-10-23):** the towel band is removed, the slippers are now a quiet inset, and the wording makes no amenity promises. See the 2026-10-23 rows in `docs/PROJECT.md`; they win over this document where they differ.
+
 For the frontend and backend agents, and for whoever runs the fal jobs. Date 2026-10-23. Adds to `SPA-PAGE.md` (The spa page) and `SPA-OPENER.md`; small echoes on Home and Memberships. `docs/BRAND.md` wins on any conflict.
 
 Owner's words and decisions (PROJECT.md 2026-10-23, three rows):
@@ -109,7 +111,7 @@ Step 2 today: "Arrive." / "A towel, robe and slippers are waiting." / pills "Tow
 
 New: under the step line, before the pills, a row of **four small mounts** with a label under each:
 - Mount 1:1, 72 x 72 desktop, 64 x 64 phone (mount gap 6px). Label Figtree `--text-sm` cream, centred, margin-top `--space-2`. Gap between items `--space-4` desktop, `--space-3` phone. Phone: the four fit in one row (4 x 64 + 3 x 16 = 304 ≤ 335).
-- Items: Towels (`towel-bench`, focus `45% 50%`), Robe (`robe`, `66% 38%`), Slippers (`slippers`, `62% 60%`), Toiletries (`toiletries`, `50% 55%`). Each `alt=""` (the label says it).
+- Items: Towels (`towel-bench`, focus `45% 50%`), Robe (`robe`, `100% 38%`: the robe is 16:9 since 2026-10-23, at 58 to 87% across), Slippers (`slippers`, `62% 60%`), Toiletries (`toiletries`, `50% 55%`). Each `alt=""` (the label says it).
 - The first pill ("Towel, robe and slippers") goes (the row says it); "Your own locker" and "Phones stay in the locker" stay.
 - `<ul role="list" aria-label="Every visit includes">`.
 - Motion: the row Fades up as one group with the step (no stagger: it is a list). Reduced motion: visible.
@@ -117,7 +119,7 @@ New: under the step line, before the pills, a row of **four small mounts** with 
 **Content rows:** `arrive_kit`: heading "Every visit includes", body one item per line as `Label | image-name | focus`, seeded:
 ```
 Towels | towel-bench | 45% 50%
-Robe | robe | 66% 38%
+Robe | robe | 100% 38%
 Slippers | slippers | 62% 60%
 Toiletries | toiletries | 50% 55%
 ```

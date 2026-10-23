@@ -118,7 +118,9 @@ def preview(session):
 
 
 def complete(session):
-    """Work out and store the suggestion and Gold potential, mark the journey finished. Returns the result dict."""
+    """Work out and store the suggestion and Gold potential, mark the journey finished. Returns the result dict.
+    Raises AnswerError (with `missing`) while a required question has no choice: nothing is computed or stored."""
+    services.require_answers(session)
     suggestion = compute_suggestion(session)
     rating = compute_gold(session)
     detail = {

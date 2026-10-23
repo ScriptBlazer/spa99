@@ -34,11 +34,11 @@ class StatisticsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         seed_all()
-        # Visitor 1: evenings, 2-3 a week, often with a guest, property owner with a big portfolio. Suggested Tier 3.
+        # Visitor 1: evenings, 2-3 a week, sometimes with a guest, property owner with a big portfolio. Suggested Tier 3.
         cls.s1 = session_with({
-            "time": ["evening"], "frequency": ["two_three"], "facilities": ["gym", "wet_sauna"], "company": ["often"],
+            "time": ["evening"], "frequency": ["two_three"], "facilities": ["gym", "wet_sauna"], "company": ["sometimes"],
             "industry": ["property"], "property_link": ["owner_investor"], "property_size": ["50_199"],
-            "heard_via": ["instagram"],
+            "heard_via": ["social_media"],
         }, referrer="https://l.instagram.com/", utm={"utm_source": "instagram"})
         # Visitor 2: daytime, once a week, alone, finance. Suggested Tier 1.
         cls.s2 = session_with({
@@ -97,9 +97,9 @@ class StatisticsTests(TestCase):
         self.assertEqual((industries["answered"], industries["property_sessions"], industries["property_percent"]), (2, 1, 50.0))
         self.assertEqual(industries["gold_potential"], {"high": 1, "medium": 0, "low": 1})
         company = {o["value"]: o["count"] for o in services.company(qs)["options"]}
-        self.assertEqual((company["often"], company["alone"], company["sometimes"]), (1, 1, 0))
+        self.assertEqual((company["sometimes"], company["alone"]), (1, 1))
         sources = services.sources(qs)
-        self.assertEqual({o["value"]: o["count"] for o in sources["heard_via"]}["instagram"], 1)
+        self.assertEqual({o["value"]: o["count"] for o in sources["heard_via"]}["social_media"], 1)
         self.assertEqual(sources["referrers"], [{"host": "l.instagram.com", "count": 1}])
         self.assertEqual(sources["utm_sources"], [{"source": "instagram", "count": 1}])
 

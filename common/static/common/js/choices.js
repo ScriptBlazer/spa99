@@ -6,13 +6,26 @@ let counter = 0;
 const nextId = () => `c${(counter += 1)}`;
 const markSpan = () => el('span', { class: 'tile-mark', 'aria-hidden': 'true' });
 
+/** Swan glyphs for the Company answers, by option value: alone 1 gold; sometimes 1 gold + 1 line; often 2 gold. Any other value: none. */
+const COMPANY_GLYPHS = { alone: ['gold'], sometimes: ['gold', 'line'], often: ['gold', 'gold'] };
+export const companyGlyphs = (value) => COMPANY_GLYPHS[value] || [];
+
+/** Two frames after a screen is rendered, mark it settled so follow-ups rise in (and nothing animates on first paint). */
+export function settle(screen) {
+  const body = screen.querySelector('.screen-body');
+  if (!body) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => body.setAttribute('data-live', '')));
+}
+
+export const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 /** kind: '' | 'large' | 'small' | 'image'. image: { src, alt } (src '' shows the calm placeholder). */
-export function tileEl({ name, value, label, multi = false, kind = '', checked = false, image = null, dataset = {} }) {
+export function tileEl({ name, value, label, multi = false, kind = '', checked = false, image = null, glyphs = [], dataset = {} }) {
   const id = nextId();
   const { main, sub } = splitLabel(label);
   const input = el('input', { type: multi ? 'checkbox' : 'radio', name, value, id, dataset });
   if (checked) input.checked = true;
-  const classes = ['tile', multi ? 'tile-multi' : '', kind === 'large' ? 'tile-large' : '', kind === 'small' ? 'tile-small' : '', kind === 'image' ? 'tile-image' : ''].filter(Boolean).join(' ');
+  const classes = ['tile', multi ? 'tile-multi' : '', kind === 'large' ? 'tile-large tile-company' : '', kind === 'small' ? 'tile-small' : '', kind === 'image' ? 'tile-image' : ''].filter(Boolean).join(' ');
   const body = el('span', { class: 'tile-body' }, el('span', { class: 'tile-label', text: main }), sub ? el('span', { class: 'tile-sub', text: sub }) : null);
   if (kind === 'image') {
     const thumb = el('span', { class: 'tile-thumb' }, image?.src
@@ -20,7 +33,10 @@ export function tileEl({ name, value, label, multi = false, kind = '', checked =
       : el('span', { class: 'photo photo-placeholder', 'aria-hidden': 'true' }, el('span', { class: 'mark-glyph' })));
     return el('label', { class: classes, for: id }, input, thumb, body, markSpan());
   }
-  return el('label', { class: classes, for: id }, input, body, markSpan());
+  const cue = glyphs.length
+    ? el('span', { class: 'tile-glyphs', 'aria-hidden': 'true' }, glyphs.map((tone) => el('span', { class: `mark-glyph${tone === 'line' ? ' is-line' : ''}` })))
+    : null;
+  return el('label', { class: classes, for: id }, input, cue, body, markSpan());
 }
 
 export function tilesEl({ cls, options, ...rest }) {
@@ -48,4 +64,30 @@ export function arrowIcon(spriteUrl) {
   use.setAttribute('href', `${spriteUrl}#arrow-right`);
   svg.append(use);
   return svg;
+}
+
+/** Single-choice tiles can be tapped again to clear the answer (Space on the chosen one too). A radio cannot uncheck itself,
+   so remember whether it was chosen before the press, and if it was, uncheck it and fire the same `change` a checkbox would.
+   `scope` is the screen root; only tile radios are touched (segmented scales keep their normal behaviour). */
+const JOURNEY_ANSWER = '[data-q], [data-jq]'; // journey answers only; the Gold form's own fields (data-g) are not cleared this way
+export function clearableTiles(scope) {
+  let pressed = null;
+  const radioFor = (target) => {
+    const label = target.closest?.('label.tile');
+    const input = target.closest?.('input[type="radio"]') || label?.querySelector('input[type="radio"]');
+    return input && input.matches(JOURNEY_ANSWER) ? input : null;
+  };
+  const remember = (event) => { const input = radioFor(event.target); pressed = input ? { input, was: input.checked } : null; };
+  scope.addEventListener('pointerdown', remember, true);
+  scope.addEventListener('keydown', (event) => { if (event.key === ' ') remember(event); }, true);
+  scope.addEventListener('click', (event) => {
+    const input = event.target.closest?.('input[type="radio"]');
+    if (!input || !input.closest('.tile') || !input.matches(JOURNEY_ANSWER)) return;
+    const was = pressed && pressed.input === input ? pressed.was : false;
+    pressed = null;
+    if (was && input.checked) {
+      input.checked = false;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }, true);
 }

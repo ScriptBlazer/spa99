@@ -4,5 +4,5 @@
     {{ field }}
     <span>{% if label_html %}{{ label_html }}{% else %}{{ field.label }}{% endif %}</span>
   </label>
-  <p class="feedback" data-error-for="{{ field.html_name }}" id="error-{{ field.html_name }}" aria-live="polite" data-state="{% if field.errors %}error{% else %}hint{% endif %}">{% if field.errors %}{{ field.errors|join:" " }}{% endif %}</p>
+  <p class="feedback" data-error-for="{{ field.html_name }}" id="{{ field.auto_id }}_error" aria-live="polite" data-state="{% if field.errors %}error{% else %}hint{% endif %}">{% if field.errors %}{{ field.errors|join:" " }}{% endif %}</p>
 </div>

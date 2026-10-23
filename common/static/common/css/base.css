@@ -77,6 +77,10 @@ a:not([class]) { text-decoration: underline; text-decoration-thickness: 1px; tex
 }
 
 :focus-visible { outline: 2px solid var(--s-focus); outline-offset: 3px; }
+/* Elements focused by script (headings, sections) only to move the screen reader: never a visible ring.
+   Controls keep their :focus-visible ring. */
+[tabindex="-1"]:focus,
+[tabindex="-1"]:focus-visible { outline: none; }
 ::selection { background: var(--color-gold); color: var(--color-espresso); }
 
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

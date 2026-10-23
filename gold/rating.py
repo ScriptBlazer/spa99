@@ -63,6 +63,30 @@ def rate_potential(signals, extra_points=0):
     return Rating(level, score, reasons, is_property_link(signals.get(GoldRule.PROPERTY_LINK), rules))
 
 
+# ---------- what he does (the journey `industry` question is the one source of the options) ----------
+
+INDUSTRY_QUESTION = "industry"
+INDUSTRY_OTHER_QUESTION = "industry_other"  # the typed follow-up when Other is chosen
+PROPERTY_INDUSTRY = "property"  # property questions are only asked and accepted for this industry
+OTHER_INDUSTRY = "other"
+LAW_INDUSTRY = "law"
+PROPERTY_LAWYER = "property_lawyer"  # the property_link value a property lawyer gets
+
+
+def industry_choices():
+    """[(value, label)] of the active options of the journey's industry question, in order."""
+    from journey.models import Option
+    rows = Option.objects.filter(question__key=INDUSTRY_QUESTION, active=True).order_by("order", "value")
+    return [(row.value, row.label) for row in rows]
+
+
+def industry_label(value):
+    """Label for a stored industry value (retired options still resolve)."""
+    from journey.models import Option
+    row = Option.objects.filter(question__key=INDUSTRY_QUESTION, value=value).first()
+    return row.label if row else (value or "")
+
+
 # ---------- choices and journey signals (rows, edited in Control) ----------
 
 def choices(group, include_inactive=False):

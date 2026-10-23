@@ -121,7 +121,7 @@ def register(request):
         status = 400
     else:
         form, status = SignUpForm(initial={"plan": plan_slug}), 200
-    context = {"form": form, "plans": plans, "selected_plan": plan_slug, "from_journey": bool(session and session.completed)}
+    context = {"form": form, "plans": plans, "selected_plan": plan_slug, "suggested_plan": suggested, "from_journey": bool(session and session.completed)}
     return render(request, "users/register.html", context, status=status)
 
 

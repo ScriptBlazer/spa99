@@ -1,4 +1,4 @@
-/* The Gold Card application: property first, personal last. One screen at a time, one URL per screen.
+/* The Gold Card application: about you first, personal last. One screen at a time, one URL per screen.
  *
  *  - Choices come from /gold/options/ (with anything already known: the journey, or the signed-in person).
  *  - The visit answers are the journey's own questions: they are saved through the journey endpoints as they are tapped,
@@ -10,7 +10,7 @@ import { el, getJson, postJson, postWithRetry, splitLabel } from './api.js';
 import { observeReveals } from './reveal.js';
 import { attachValidation } from './validate.js';
 import { setWorking, clearWorking } from './buttons.js';
-import { arrowIcon as makeArrow, segmentedEl, tileEl } from './choices.js';
+import { arrowIcon as makeArrow, clearableTiles, companyGlyphs, reducedMotion, segmentedEl, settle, tileEl } from './choices.js';
 import { dismiss, showMessage } from './messages.js';
 
 const config = JSON.parse(document.getElementById('gold-config').textContent);
@@ -24,6 +24,7 @@ const STORE = 'spa99.gold.form';
 const SENT = 'spa99.gold.sent';
 const STEPS = [1, 2, 3];
 const SENT_STEP = 4;
+const PROPERTY_KEYS = ['property_link', 'size_range'];
 const VISIT_KEYS = ['time', 'frequency', 'facilities', 'company'];
 
 const c = (key) => copy[key] || { heading: '', body: '', cta: '' };
@@ -56,7 +57,7 @@ let chain = Promise.resolve();
 let errorMessage = null;
 function saveJourney(key) {
   const a = journeyAnswers[key];
-  const payload = a.skipped ? { question: key, skipped: true } : { question: key, options: a.options };
+  const payload = a.skipped ? { question: key, skipped: true } : a.text !== undefined ? { question: key, text: a.text } : { question: key, options: a.options };
   chain = chain.then(async () => {
     const result = await postWithRetry('/journey/answer/', payload);
     if (result.ok) { if (errorMessage) { dismiss(errorMessage); errorMessage = null; } }
@@ -82,23 +83,36 @@ function field(name, label, { optional = true, help = '', type = 'text', autocom
     el('p', { class: 'feedback', 'data-error-for': name, id: `error-${name}`, 'aria-live': 'polite', 'data-hint': help || hint, 'data-good': rules ? 'Looks right' : '', 'data-state': 'hint', text: help || hint }));
 }
 
-function choiceGroup(name, title, optionList, { kind = '', help = '', layout = 'tiles', cls = 'tiles tiles--stack' } = {}) {
+function choiceGroup(name, title, optionList, { kind = '', help = '', layout = 'tiles', cls = 'tiles tiles--stack', sub = false, hidden = false } = {}) {
   const labelId = `l-${name}`;
   const isChecked = (value) => form[name] === value;
   const controls = layout === 'segmented'
     ? segmentedEl({ name, options: optionList, labelledby: labelId, isChecked, dataset: { g: name } })
     : el('div', { class: cls }, optionList.map((o) => tileEl({ name, value: o.value, label: o.label, kind, checked: isChecked(o.value), dataset: { g: name } })));
-  return el('fieldset', { class: 'question', dataset: { group: name } },
+  return el('fieldset', { class: `question${sub ? ' sub-question' : ''}`, dataset: { group: name }, hidden },
     el('legend', {}, el('span', { id: labelId, text: title })),
     help ? el('span', { class: 'question-help', text: help }) : null,
     controls,
     el('p', { class: 'feedback flow-error', 'data-error-slot': name, 'aria-live': 'polite', 'data-state': 'hint' }));
 }
 
-function screenProperty() {
+const isProperty = () => (options.property_when?.any_of || ['property']).includes(form.industry);
+const isOther = () => form.industry === (options.industry.other_value || 'other');
+
+function screenAbout() {
+  const ind = options.industry;
+  const otherId = 'g-industry_other';
+  const otherInput = el('input', { id: otherId, name: 'industry_other', type: 'text', maxlength: '100', autocomplete: 'off', class: 'input' });
+  otherInput.value = form.industry_other || '';
+  otherInput.addEventListener('input', () => setField('industry_other', otherInput.value));
+  otherInput.addEventListener('change', () => saveIndustryOther());
+  const other = el('div', { class: 'question sub-question', dataset: { sub: 'industry_other' }, hidden: !isOther() },
+    el('div', { class: 'field' }, el('label', { for: otherId }, ind.other_label || 'Tell us more', el('span', { class: 'optional' }, ' (optional)')), otherInput));
   return [
-    choiceGroup('property_link', 'Your link to property', options.property_link, { cls: 'tiles tiles--stack' }),
-    choiceGroup('size_range', 'How large?', options.size_range, { layout: 'segmented', help: 'Units or properties' }),
+    choiceGroup('industry', ind.question, ind.options, { cls: 'tiles tiles--4' }),
+    other,
+    choiceGroup('property_link', 'Your link to property', options.property_link.filter((o) => o.value !== 'none'), { cls: 'tiles tiles--stack', sub: true, hidden: !isProperty() }),
+    choiceGroup('size_range', 'How large?', options.size_range, { layout: 'segmented', help: 'Units or properties', sub: true, hidden: !isProperty() }),
     choiceGroup('location', 'Where?', options.location, { cls: 'tiles tiles--2' }),
     choiceGroup('bml_relationship', 'Do you work with BML?', options.bml_relationship, { layout: 'segmented' }),
     el('div', { class: 'question' },
@@ -106,6 +120,27 @@ function screenProperty() {
       el('div', { class: 'field-pair fieldset-gap' }, field('company', 'Company'), field('role', 'Role'))),
     el('div', { class: 'question' }, field('referred_by', 'Referred by', { help: 'If someone suggested you apply.' })),
   ];
+}
+
+function saveIndustryOther() {
+  const text = (form.industry_other || '').trim().replace(/\s+/g, ' ');
+  journeyAnswers.industry_other = text ? { options: [], text, skipped: false } : { options: [], skipped: true };
+  saveJourney('industry_other');
+}
+
+/** Show or hide the follow-ups to match the industry. Values stay in the form, so they come back if he switches back. */
+function syncAbout() {
+  root.querySelectorAll('[data-group="property_link"], [data-group="size_range"]').forEach((block) => { block.hidden = !isProperty(); });
+  const other = root.querySelector('[data-sub="industry_other"]');
+  if (other) other.hidden = !isOther();
+}
+
+function revealFollowUp() {
+  if (!isProperty()) return;
+  const legend = root.querySelector('[data-group="property_link"] legend');
+  if (legend && legend.getBoundingClientRect().top > window.innerHeight * 0.75) {
+    legend.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  }
 }
 
 function visitControls() {
@@ -118,9 +153,9 @@ function visitControls() {
     if (q.type === 'scale') {
       controls = segmentedEl({ name: `j-${q.key}`, options: q.options, labelledby: labelId, isChecked, dataset });
     } else {
-      const kind = q.key === 'company' ? 'large' : q.key === 'facilities' ? '' : '';
+      const kind = q.key === 'company' ? 'large' : '';
       const cls = q.key === 'company' ? 'tiles tiles--1 tiles-company' : 'tiles tiles--2';
-      controls = el('div', { class: cls }, q.options.map((o) => tileEl({ name: `j-${q.key}`, value: o.value, label: o.label, multi, kind, checked: isChecked(o.value), dataset })));
+      controls = el('div', { class: cls }, q.options.map((o) => tileEl({ name: `j-${q.key}`, value: o.value, label: o.label, multi, kind, checked: isChecked(o.value), glyphs: q.key === 'company' ? companyGlyphs(o.value) : [], dataset })));
     }
     return el('fieldset', { class: 'question' }, el('legend', {}, el('span', { id: labelId, text: q.text })), q.help ? el('span', { class: 'question-help', text: q.help }) : null, controls);
   });
@@ -165,11 +200,11 @@ function screenYou() {
 
 function renderStep(step) {
   const head = c(`screen_${step}`);
-  const body = step === 1 ? screenProperty() : step === 2 ? screenVisits() : screenYou();
+  const body = step === 1 ? screenAbout() : step === 2 ? screenVisits() : screenYou();
   const last = step === 3;
   const primary = el('button', { type: last ? 'submit' : 'button', class: 'btn btn-primary', 'data-primary': '', 'data-working-text': 'Sending' }, last ? 'Send application' : jc('continue').cta, last ? null : ' ', last ? null : arrowIcon());
   const bar = el('div', { class: 'action-bar' }, step > 1 ? el('button', { type: 'button', class: 'btn-quiet', 'data-back': '', text: jc('back').cta }) : null, primary);
-  const section = el(last ? 'form' : 'section', { class: 'screen', 'data-reveal': '', novalidate: last ? '' : null, 'aria-label': head.heading },
+  const section = el(last ? 'form' : 'section', { class: 'screen', 'data-reveal': 'hero', novalidate: last ? '' : null, 'aria-label': head.heading },
     el('div', { class: 'screen-head' }, el('h1', { class: 'screen-title', tabindex: '-1', text: head.heading }), head.body ? el('p', { class: 'lead muted', text: head.body }) : null),
     el('div', { class: 'screen-body' }, body), bar);
   if (last) {
@@ -222,6 +257,7 @@ function show(step, reference = '') {
   window.scrollTo(0, 0);
   (node.querySelector('h1') || node).focus?.({ preventScroll: true });
   observeReveals(root);
+  settle(node);
 }
 
 function go(step, { replace = false, reference = '' } = {}) {
@@ -231,13 +267,17 @@ function go(step, { replace = false, reference = '' } = {}) {
   show(step, reference);
 }
 
+function fail(name, message, focusName = name) {
+  const slot = root.querySelector(`[data-error-slot="${name}"]`);
+  if (slot) { slot.dataset.state = 'error'; slot.textContent = message; }
+  const input = root.querySelector(`input[name="${focusName}"]`);
+  input?.focus();
+  input?.closest('fieldset')?.querySelector('legend')?.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
+}
 function next() {
-  if (current === 1 && !form.property_link) {
-    const slot = root.querySelector('[data-error-slot="property_link"]');
-    slot.dataset.state = 'error';
-    slot.textContent = 'Choose the one that fits, or "None of these".';
-    root.querySelector('input[name="property_link"]')?.focus();
-    return;
+  if (current === 1) {
+    if (!form.industry) { fail('industry', 'Choose the one closest to what you do.'); return; }
+    if (isProperty() && !form.property_link) { fail('property_link', 'Choose your link to property.'); return; }
   }
   go(current + 1);
 }
@@ -247,8 +287,8 @@ function back() {
 
 /* ---------- submit ---------- */
 
-const FIELDS = ['first_name', 'last_name', 'email', 'mobile', 'property_link', 'size_range', 'location', 'company', 'role', 'bml_relationship', 'referred_by', 'note', 'privacy_accepted', 'marketing_opt_in'];
-const STEP_OF = { property_link: 1, size_range: 1, location: 1, company: 1, role: 1, bml_relationship: 1, referred_by: 1 };
+const FIELDS = ['first_name', 'last_name', 'email', 'mobile', 'industry', 'industry_other', 'property_link', 'size_range', 'location', 'company', 'role', 'bml_relationship', 'referred_by', 'note', 'privacy_accepted', 'marketing_opt_in'];
+const STEP_OF = { industry: 1, industry_other: 1, property_link: 1, size_range: 1, location: 1, company: 1, role: 1, bml_relationship: 1, referred_by: 1 };
 
 async function onSubmit(event) {
   if (event.defaultPrevented) return; // the validation pass runs first and re-submits once everything is fine
@@ -258,6 +298,9 @@ async function onSubmit(event) {
   setWorking(button);
   const body = {};
   FIELDS.forEach((name) => { if (form[name] !== undefined && form[name] !== '') body[name] = form[name]; });
+  // Follow-ups belong to their industry only: anything else is not sent (the server drops it anyway).
+  if (!isProperty()) PROPERTY_KEYS.forEach((name) => delete body[name]);
+  if (!isOther()) delete body.industry_other;
   body.privacy_accepted = Boolean(form.privacy_accepted);
   body.marketing_opt_in = Boolean(form.marketing_opt_in);
   let result;
@@ -273,7 +316,12 @@ async function onSubmit(event) {
   if (result?.status === 400 && result.data?.errors) {
     const errors = result.data.errors;
     const early = Object.keys(errors).find((name) => STEP_OF[name]);
-    if (early && !errors.first_name && !errors.email) { go(STEP_OF[early]); return; }
+    if (early && !errors.first_name && !errors.email) {
+      go(STEP_OF[early]);
+      if (errors.industry) fail('industry', errors.industry.join(' '));
+      else if (errors.property_link) fail('property_link', errors.property_link.join(' '));
+      return;
+    }
     Object.entries(errors).forEach(([name, messages]) => {
       const slot = root.querySelector(`[data-error-for="${name}"]`);
       const input = root.querySelector(`[name="${name}"]`);
@@ -292,17 +340,25 @@ async function onSubmit(event) {
 
 /* ---------- events ---------- */
 
+clearableTiles(root);
+
 root.addEventListener('change', (event) => {
   const input = event.target;
   if (input.dataset?.g) {
     setField(input.dataset.g, input.value);
+    if (input.dataset.g === 'industry') {
+      journeyAnswers.industry = { options: [input.value], skipped: false };
+      saveJourney('industry');
+      syncAbout();
+      revealFollowUp();
+    }
     const slot = root.querySelector(`[data-error-slot="${input.dataset.g}"]`);
     if (slot) { slot.dataset.state = 'hint'; slot.textContent = ''; }
   } else if (input.dataset?.jq) {
     const q = journeyQuestions().find((item) => item.key === input.dataset.jq);
     const picked = q.type === 'multi'
       ? [...root.querySelectorAll(`input[data-jq="${q.key}"]:checked`)].map((i) => i.value)
-      : [input.value];
+      : (input.checked ? [input.value] : []);
     journeyAnswers[q.key] = { options: picked, skipped: picked.length === 0 };
     saveJourney(q.key);
   }
@@ -333,8 +389,11 @@ async function boot() {
   }
   Object.entries(options.prefill || {}).forEach(([name, value]) => { if (form[name] === undefined || form[name] === '') form[name] = value; });
   journey.screens.flatMap((s) => s.questions).forEach((q) => {
-    if (q.answer) journeyAnswers[q.key] = { options: q.answer.options || [], skipped: Boolean(q.answer.skipped) };
+    if (q.answer) journeyAnswers[q.key] = { options: q.answer.options || [], text: q.answer.text || undefined, skipped: Boolean(q.answer.skipped) };
   });
+  if (!form.industry && journeyAnswers.industry?.options?.length) form.industry = journeyAnswers.industry.options[0];
+  if (!form.industry && form.property_link && form.property_link !== 'none') form.industry = 'property';
+  if (form.industry && form.industry_other === undefined && journeyAnswers.industry_other?.text) form.industry_other = journeyAnswers.industry_other.text;
   const slug = location.pathname.split('/').filter(Boolean).pop();
   let step = stepForSlug(slug) || 1;
   if (step === SENT_STEP && !sessionStorage.getItem(SENT)) step = 1;

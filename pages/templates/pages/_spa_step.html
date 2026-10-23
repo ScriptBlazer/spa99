@@ -6,10 +6,10 @@
     <h3 class="vstep-word">{{ row.heading }}</h3>
     <p class="muted">{{ row.body }}</p>
     {% if kit.items %}
-    <ul class="kit" role="list" aria-label="{{ kit.heading|default:'Every visit includes' }}">
+    <ul class="kit" role="list" aria-label="{{ kit.heading|default:'The details' }}">
       {% for i in kit.items %}
-      <li class="kit-item">
-        {% if i.has_image %}{% include "pages/_spa_mount.html" with name=i.name alt="" sizes="72px" focus=i.focus cls="kit-mount" plain=True %}{% endif %}
+      <li class="kit-item{% if i.wide %} kit-item--wide{% endif %}">
+        {% if i.has_image %}{% include "pages/_spa_mount.html" with name=i.name alt="" sizes="(min-width: 48em) 136px, 112px" focus=i.focus cls="kit-mount" plain=True %}{% endif %}
         <span class="kit-label small">{{ i.label }}</span>
       </li>
       {% endfor %}

@@ -1,5 +1,7 @@
 # Spa 99: The spa opener (round 3)
 
+> **Update 2026-10-23 (Moishe):** the Pause control is removed from The spa opener (and Home). The living still keeps its tab-hidden, out-of-view and reduced-motion stops. Mentions of Pause below are superseded.
+
 For the frontend and backend agents. Date 2026-10-23. Replaces **SPA-PAGE.md section 4 S1** (picture, first-paint words, facts row and motion table). Everything else in SPA-PAGE.md stays. The moments woven through the rest of the page are in `docs/design/AMENITIES.md`; the later door video is in `docs/design/SPA-DOOR-VIDEO.md`. `docs/BRAND.md` wins on any conflict.
 
 Owner's words (PROJECT.md 2026-10-23): the full-screen gold swan door is too zoomed in; drop "Eight spaces, one quiet visit."; more text in the opening, and the text changes as you scroll, one line fading out as the next comes in. Then: "the robe gives it a crazy kind of vibe", try the robe hanging as the hero. The door video stays an option for later.
@@ -115,6 +117,8 @@ This is also exactly what screen readers get in every mode: all four `<li>` are 
 ---
 
 ## 4. The picture: `robe` (fal remake, required)
+
+**Status 2026-10-23: superseded by Moishe's own mock-up, widened.** No remake: his `robe` photo was outpainted to 16:9 with bria expand (the original pixels untouched) and upscaled 2x (SeedVR, 4896x2752), built to `robe-{480,800,1600,2400}`. `robe-portrait` is his portrait original (phone). The robe sits at 58 to 87% across, so the end frame focus is `78% 40%` (CSS) and the window focus x is 0.73 (JS), not 60% / 0.64. It keeps his salt lamp and massage beds on the left (his choice: "use my mock-ups as they are"). Old file: `.private/fal-renders/robe-old.png`.
 
 The owner's mock-up `docs/design/reference/amenities/robe.jpg` (768 x 1376) **cannot be cropped clean**: it has a salt lamp (a glowing lamp reads as a candle), rolled towels on a massage bed, is portrait only and too small for full screen. Remake with fal in the same look, two crops from one scene (generate both; do not crop the landscape for phone).
 

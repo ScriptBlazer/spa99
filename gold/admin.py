@@ -10,7 +10,7 @@ from .services import resend_barry_email
 @admin.register(GoldApplication)
 class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
     list_display = ("reference", "full_name", "email", "potential_level", "potential_score", "status", "email_sent_at", "created_at")
-    list_filter = ("status", "potential_level", "property_link")
+    list_filter = ("status", "potential_level", "industry", "property_link")
     search_fields = ("reference", "first_name", "last_name", "email", "company")
     readonly_fields = ("reference", "created_at", "updated_at", "email_sent_at", "email_error")
     actions = ["resend_email"]

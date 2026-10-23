@@ -75,7 +75,7 @@
   --header-h: 4rem;
   --control-h: 3.25rem;                    /* 52px buttons and fields */
   --control-h-compact: 2.5rem;             /* 40px, Control only */
-  --tile-min-h: 4rem;
+  --tile-min-h: 4.5rem;
 
   /* Shape */
   --radius-sm: 6px;                        /* controls */
@@ -133,6 +133,14 @@
   --color-pool: rgb(229 172 110 / 0.35);        /* proposed, round 3: warm light pool on the cream under the selected card */
   --color-room-veil: rgb(251 249 236 / 0.24);   /* proposed, round 3: cream veil over an unselected card's picture */
   --duration-ack: 240ms;                        /* proposed, round 3: the tag's acknowledgement fade */
+  /* Forms round 4 (docs/design/FORMS-ROUND4.md section 5). Proposed, round 4. */
+  --color-chosen-wash: var(--color-pattern);   /* proposed, round 4: alias, no new colour. Gold at 8% over a chosen tile; decoration only */
+  --tile-tall-h: 11rem;                        /* proposed, round 4: Company tiles from 64em */
+  --tile-compact-h: 3.5rem;                    /* derived, round 4: industry tiles (no sub line) */
+  --tile-large-h: 5.5rem;                      /* derived, round 4: Company tiles on a phone */
+  --tile-mark-room: 2rem;                      /* derived, round 4: room for the tile's mark at the right */
+  --glyph-col-w: 3rem;                         /* derived, round 4: the swan glyph column in a Company tile */
+  --measure-lead: 22rem;                       /* derived, round 4: the lead under a screen heading */
   --bar-h: 4.5rem;                             /* Continue bar; 4rem from 64em */
   /* The Gold Card (docs/design/GOLD-CARD-3D.md 7.3). Derived, decoration only: the metal of one object. Brand gold is hue 31 degrees; nothing here goes brass (45+). */
   --color-gold-metal: #D9A46C;                 /* derived: card base metal (hue 31) */
@@ -148,6 +156,10 @@
   --pill-h: 2rem;                              /* a static pill */
   --frame-h-feature: min(68svh, 34rem);        /* max height of a feature frame, desktop */
   --tile-w-phone: 72vw;                        /* a tile in the phone scroll row */
+  --control-h-label: 3.75rem;                   /* proposed, round 4: a field with its label inside (60px) */
+  --color-field-well: var(--color-cream);        /* proposed, round 4: alias, no new colour. The filled field on the raised cream panel (espresso text 10.95, muted label 5.32) */
+  --register-photo-h: clamp(10rem, 100svh - var(--header-h) - 34rem, 20rem); /* proposed, round 4: the register stage picture, desktop (280px at 800 tall) */
+  --panel-overlap: var(--space-5);               /* proposed, round 4: how far the cream panel rises over the espresso stage, below 64em */
   --signin-w: 26rem;                            /* derived (round 3): the sign-in form column */
   --ratio-tile: 3 / 4;
   --bleed: calc(var(--page-margin) + max(0px, (100vw - var(--container-max)) / 2));

@@ -108,3 +108,72 @@ class BackfillCommandTests(TestCase):
         self.assertTrue(Facility.objects.get(slug="gym").image_alt)
         self.assertTrue(OpeningRule.objects.get(key="shabbos-close").public_note)
         self.assertIn("Nothing to change", self.run_command())
+
+
+class JourneyAndGoldBackfillTests(TestCase):
+    """2026-10-23 wording: only the exact old values are replaced, edited ones are left alone."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def run_command(self):
+        call_command("backfill_site_data", stdout=StringIO())
+
+    def run_command_text(self):
+        out = StringIO()
+        call_command("backfill_site_data", stdout=out)
+        return out.getvalue()
+
+    def test_only_exact_old_values_change(self):
+        from journey.models import Question
+        Question.objects.filter(key="time").update(help_text="Choose any that fit.", min_choices=0)
+        Question.objects.filter(key="facilities").update(help_text="Pick a few.", min_choices=0)  # edited by hand
+        Section.objects.filter(page__key="journey", key="change_answers").update(cta_label="Change my answers")
+        Section.objects.filter(page__key="gold-apply", key="screen_1").update(
+            heading="Your property.", body="Our own words.")
+        Section.objects.filter(page__key="journey", key="last_suggestion").delete()
+        self.run_command()
+        time, facilities = Question.objects.get(key="time"), Question.objects.get(key="facilities")
+        self.assertEqual((time.help_text, time.min_choices), ("Choose at least one.", 1))
+        self.assertEqual((facilities.help_text, facilities.min_choices), ("Pick a few.", 0))
+        self.assertEqual(Section.objects.get(page__key="journey", key="change_answers").cta_label, "Start again")
+        screen = Section.objects.get(page__key="gold-apply", key="screen_1")
+        self.assertEqual((screen.heading, screen.body), ("About you.", "Our own words."))
+        self.assertEqual(Section.objects.get(page__key="journey", key="last_suggestion").cta_label, "See my last suggestion")
+        self.run_command()  # repeatable
+        self.assertEqual(Question.objects.get(key="facilities").help_text, "Pick a few.")
+
+    def test_round_4_wording_and_options_change_only_from_the_exact_old_values(self):
+        from journey.models import Option, Question, SuggestionRule
+        old = {("home", "opening", "heading"): "Launching {opening}.", ("spa", "opener_4", "body"): "Your robe and slippers are waiting.",
+               ("spa", "moment_shower", "heading"): "In every shower.", ("spa", "moment_tote", "heading"): "On the way out.",
+               ("spa", "arrive_kit", "heading"): "Every visit includes"}
+        for (page, key, field), value in old.items():
+            Section.objects.filter(page__key=page, key=key).update(**{field: value})
+        Section.objects.filter(page__key="spa", key="step_2").update(body="Our own words.")  # edited by hand
+        Option.objects.filter(question__key="company", value="sometimes").update(plan_points={"tier-2": 1, "tier-3": 1})
+        Option.objects.filter(question__key="heard_via", value="bml").update(label="BML")
+        Option.objects.filter(question__key="heard_via", value="social_media").delete()
+        for question, value, label in (("company", "often", "Often with someone (Most visits.)"), ("heard_via", "instagram", "Instagram")):
+            Option.objects.create(question=Question.objects.get(key=question), value=value, label=label, order=9)
+        SuggestionRule.objects.filter(name__startswith="Evenings with guests").update(conditions=[
+            {"question": "time", "any_of": ["evening", "late_night"]}, {"question": "company", "any_of": ["often"]}])
+        call_command("backfill_site_data", "--dry-run", stdout=StringIO())
+        self.assertEqual(Section.objects.get(page__key="home", key="opening").heading, "Launching {opening}.")  # dry run saves nothing
+        self.run_command()
+        self.assertEqual(Section.objects.get(page__key="home", key="opening").heading, "{opening}.")
+        self.assertEqual(Section.objects.get(page__key="spa", key="opener_4").body, "Take your time. Nothing here is rushed.")
+        self.assertEqual(Section.objects.get(page__key="spa", key="moment_shower").heading, "Between rounds.")
+        self.assertEqual(Section.objects.get(page__key="spa", key="moment_tote").heading, "Until next time.")
+        self.assertEqual(Section.objects.get(page__key="spa", key="arrive_kit").heading, "The details.")
+        self.assertEqual(Section.objects.get(page__key="spa", key="step_2").body, "Our own words.")
+        sometimes = Option.objects.get(question__key="company", value="sometimes")
+        self.assertEqual(sometimes.plan_points, {"tier-3": 3})
+        self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML member")
+        self.assertTrue(Option.objects.filter(question__key="heard_via", value="social_media", active=True).exists())
+        for value in ("often", "instagram"):  # retired, not deleted: old answers keep their label
+            self.assertFalse(Option.objects.get(value=value).active)
+        rule = SuggestionRule.objects.get(name__startswith="Evenings with guests")
+        self.assertEqual(rule.conditions[1], {"question": "company", "any_of": ["sometimes", "often"]})
+        self.assertIn("Nothing to change", self.run_command_text())

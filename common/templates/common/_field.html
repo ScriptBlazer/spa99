@@ -4,7 +4,7 @@ Optional aside (sign-in shell): aside_url, aside_text, aside_label put a quiet l
 <div class="field{% if aside_url %} field--aside{% endif %}">
   <label for="{{ field.id_for_label }}">{{ field.label }}{% if optional %} <span class="optional">(optional)</span>{% endif %}</label>
   {% if toggle %}<div class="field-row">{{ field }}<button type="button" class="field-toggle" data-password-toggle aria-controls="{{ field.id_for_label }}" aria-pressed="false">Show</button></div>{% else %}{{ field }}{% endif %}
-  <p class="feedback" data-error-for="{{ field.html_name }}" id="error-{{ field.html_name }}" aria-live="polite" data-hint="{{ hint }}" data-good="{{ good }}" data-state="{% if field.errors %}error{% else %}hint{% endif %}">{% if field.errors %}{{ field.errors|join:" " }}{% else %}{{ hint }}{% endif %}</p>
+  <p class="feedback" data-error-for="{{ field.html_name }}" id="{{ field.auto_id }}_error" aria-live="polite" data-hint="{{ hint }}" data-good="{{ good }}" data-state="{% if field.errors %}error{% else %}hint{% endif %}">{% if field.errors %}{{ field.errors|join:" " }}{% else %}{{ hint }}{% endif %}</p>
   {% if meter %}
   <ul class="checklist" data-password-checklist aria-label="Password checks">
     <li data-check="length">At least 10 characters</li>

@@ -1,10 +1,14 @@
 # Spa 99: hero video brief
 
+> **Update 2026-10-23 (Moishe, later):** the Pause/Play control is removed from Home. The video plays once and holds; the drift keeps its tab-hidden, out-of-view and reduced-motion stops.
+
 For whoever makes the Home hero loop (text-to-video, stock, or a shoot later). Used by scene H1 in `docs/design/IMMERSIVE.md`. Brand: `docs/BRAND.md`.
 
 > **Update 2026-10-22 (Moishe):** the reception feature is now a large fish tank, not a water wall. The lead concept becomes the fish tank (slow fish, light rays in the water, warm room around it); concept A below is retired.
 >
 > **Done 2026-10-22:** Moishe supplied the video himself (`Software Files/media/fish-tank-loop.mp4`, a 13s push-in on the fish tank). It loops with a 3s cross-fade (option B) and is encoded to the files in section 3. Details in `content/static/content/video/SOURCES.txt`. Portrait is 608x1080 (cropped from the 1076px source, not upscaled). No fal video needed.
+
+> **Update 2026-10-23 (Moishe):** the 10 s loop and the 3 s cross-fade are retired. The Home hero video (`fish-tank-loop-v2.mp4`, a 16 s slow push-in) plays **once**, then holds on its last frame. No restart, no poster swap, no fade back. After it ends, a very slow drift runs on the video wrapper (`.hero-video-wrap`: transform scale 1 to 1.03 over 40 s, sine ease-in-out, alternate, transform only). There is no Pause control (Moishe, 2026-10-23); the drift stops when the tab is hidden, out of view or under reduced motion; reduced motion shows the poster only (no video, no drift). A reload plays the push-in again from the first frame (the poster); a bfcache restore (back/forward) keeps the held last frame. The loop requirements in section 1 now apply only to a future looping clip; the Spa door video still loops.
 
 ## 1. What the loop must do
 

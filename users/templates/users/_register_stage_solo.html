@@ -1,0 +1,5 @@
+{% comment %}The espresso stage of "Check your email" and "Confirm your email": the photo and, when set, the opening line as a caption.{% endcomment %}
+<aside class="register-stage register-stage--solo on-dark">
+  {% include "users/_register_photo.html" %}
+  {% if site_settings.opening_label %}<p class="register-caption" data-reveal="hero"><span><span class="launch-label">Launching</span>{{ site_settings.opening_label }}</span></p>{% endif %}
+</aside>

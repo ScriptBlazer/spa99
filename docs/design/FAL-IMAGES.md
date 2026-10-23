@@ -115,6 +115,7 @@ Each prompt below goes **before** the house style block (section 3).
 - **Prompt:** "A travertine relaxation room in soft daytime light. Three wooden zero-gravity loungers with cream upholstered pads in a row, each with a folded caramel throw, small travertine side tables between them. Vein-cut travertine walls with vertical warm LED lines between the panels, two round panels of muted preserved moss on the end wall, a warm cove line around the ceiling. Calm and still. Camera at the foot of the room, slightly off-centre, looking along the loungers."
 
 ### 4. `lounge`: replace (fish tank)
+- **Status 2026-10-23: DONE, live.** Redone per Moishe as an edit of the old render with a very wide (about 3 m) reef tank flush in travertine and the long bench with sage pillows (refs: the hero poster frame and both tank refs). The "seen from the side" plan below is superseded. Home R4 focus 28% 55%. Old file: `.private/fal-renders/lounge-old.png`.
 - **Pages:** Home R4 "The lounge." (about 4:5, `frame--right`), Home preview for the kitchenette (3:2), interim kitchenette thumbnail and journey tile on The spa.
 - **Generate:** 3:2, min 2400x1600. The 4:5 crop at 55% 60% must hold the sofa, the window and the gold cove.
 - **Logo:** no. The Home hero right above already shows the tank with the backlit swan, so we do not show the swan twice in a row.
@@ -224,3 +225,7 @@ Each prompt below goes **before** the house style block (section 3).
 - **Second choice / A/B test:** FLUX.2 [pro] edit (up to 10 references, strong photorealism). Use it if the Nano results look too CGI.
 - Then a low-creativity upscaler (for example Clarity, creativity at or below 0.2) only where the output is below min px (`door-gold`, `door-white`).
 - Check the exact endpoint IDs in the fal catalogue before running. Make 2 to 4 variations per job and pick by hand.
+
+## Status 2026-10-23 (round 4)
+
+- `relaxing-zone`: redone (cushioned loungers with pillows, zoomed out by outpaint). `massage-room`: redone with luxury massage chairs (alt in `.private/fal-renders/massage-room-alt.png`). See PROJECT.md.

@@ -80,6 +80,7 @@ html.lenis, html.lenis body { height: auto; }
 .hero-window .frame-tint { display: none; }
 .hero-window .hero-still-wrap { inset: -9% 0 0 0; height: 109%; }                       /* phone: lifts the tank clear of the words under it */
 .hero-still { object-position: 40% 52%; }
+.hero-video-wrap { position: absolute; inset: 0; will-change: transform; } /* the end-of-video drift (scenes.js) moves this, never the video */
 .hero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1200ms var(--ease-soft); }
 .hero-video.is-playing { opacity: 1; }
 .window-media.has-video .hero-still-wrap { opacity: 0; transition: opacity 1200ms var(--ease-soft); }
@@ -88,7 +89,6 @@ html.lenis, html.lenis body { height: auto; }
   background: linear-gradient(to bottom, var(--color-veil) 0, var(--color-veil) var(--header-h), rgb(73 46 33 / 0) calc(var(--header-h) + 4rem)),
               linear-gradient(to top, var(--color-veil) 0, var(--color-veil) 54%, rgb(73 46 33 / 0) 80%); }
 .hero-first-inner { position: relative; z-index: 2; width: 100%; }
-.hero-pause { display: none; }
 .hero-copy .lead { max-width: 24rem; margin-top: var(--space-3); }
 .hero-copy .actions { margin-top: var(--space-4); }
 .hero-title { max-width: 7ch; }
@@ -342,8 +342,6 @@ html.motion .hero-window { animation: frame-in 1200ms var(--ease-soft) backwards
 html.motion .hero-still { animation: media-in 1600ms var(--ease-soft) backwards; }
 @keyframes frame-in { from { opacity: 0; } }
 @keyframes media-in { from { transform: scale(1.04); } }
-html.motion .hero-pause { display: inline-flex; position: absolute; z-index: 3; right: var(--page-margin); bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); min-width: 2.75rem; justify-content: center;
-  padding: 0 var(--space-2); background: var(--color-veil); border-radius: var(--radius-sm); font-size: var(--text-sm); }
 html.motion .hero-first .glow { z-index: 1; }
 html.motion .gold-scene .glow { z-index: 1; }
 @media (min-width: 64em) {
@@ -406,7 +404,7 @@ html.motion .frame-media, html.motion .window-media, html.motion .hero-window, h
 
 /* ---------- S1 the door: static layout = the end state, content height ---------- */
 .door-scene { position: relative; background: var(--color-bg-inverse); overflow-x: clip; min-height: 0; }
-.door-window, .door-pause { display: none; }
+.door-window { display: none; }
 .door-grid { position: relative; z-index: 1; padding-block: calc(var(--header-h) + var(--space-3)) var(--space-5); row-gap: var(--space-4); }
 .door-words, .door-target { grid-column: 1 / -1; }
 .door-target { grid-row: 1; order: -1; height: clamp(12.5rem, 38svh, 30rem); }
@@ -421,7 +419,7 @@ html.motion .frame-media, html.motion .window-media, html.motion .hero-window, h
 .opener-scene[data-opener="door-gold"] .door-still { inset: 0 -25%; }  /* the old zoomed door: wider than a phone screen, room to ease back without showing an edge */
 .opener-scene[data-opener="door-gold"] .door-still .photo { object-position: 55% 40%; }
 @media (max-width: 47.99em) { .opener-scene[data-opener="robe"][data-portrait] .door-still .photo { object-position: 50% 30%; } }   /* the portrait picture on a phone: the robe fills the top 60% */
-.door-target { --focus: 60% 42%; }                                              /* the frame crop: the hook, the collar and the swan on the chest */
+.door-target { --focus: 78% 40%; }                                              /* the frame crop: the robe (16:9 since 2026-10-23, robe at 58 to 87% across), hook to belt */
 .opener-scene[data-opener="door"] .door-target { --focus: 60% 45%; }
 .opener-scene[data-opener="door-gold"] .door-target { --focus: 50% 45%; }
 
@@ -582,11 +580,9 @@ html.motion .door-window { display: block; position: absolute; z-index: 0; top: 
 html.motion .door-window .frame-tint { opacity: 0; }                                   /* the lights come up as it lands (scenes) */
 html.motion .door-still { animation: media-in 1600ms var(--ease-soft) backwards; }
 html.motion .door-target .frame-media, html.motion .door-target .frame-tint { display: none; }   /* only a measuring box: the window is the picture */
-html.motion .door-pause { display: inline-flex; align-items: center; position: absolute; z-index: 3; right: var(--page-margin); top: calc(100svh - var(--space-3) - 2.75rem - env(safe-area-inset-bottom)); min-width: 2.75rem; min-height: 2.75rem; justify-content: center;
-  padding: 0 var(--space-2); background: var(--color-veil); border-radius: var(--radius-sm); font-size: var(--text-sm); }
 html.motion .frame-media, html.motion .window-media, html.motion .sp-detail, html.motion .sp-thumb { will-change: transform; }
 /* if the door scene fails: no full-screen picture, the frame shows its own picture */
-html.motion .door-scene.scene-failed .door-window, html.motion .door-scene.scene-failed .door-pause { display: none; }
+html.motion .door-scene.scene-failed .door-window { display: none; }
 html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .door-scene.scene-failed .door-target .frame-tint { display: block; }
 
 
@@ -628,7 +624,6 @@ html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .doo
 .sp-moment-title { font-size: var(--text-2xl); }
 .sp-moment-line { margin-top: var(--space-2); }
 /* band moments follow a picture, so they open without the room padding above */
-.sp-moment--towel, .sp-moment--slippers { padding-top: 0; }
 @media (min-width: 48em) {
   .sp-bandpic { aspect-ratio: auto; height: var(--band-h); }
 }
@@ -641,6 +636,15 @@ html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .doo
   .sp-moment-words--over { max-width: 22rem; pointer-events: auto; }
   .sp-bandveil { display: block; z-index: 1;
     background: linear-gradient(to right, var(--color-veil) 0, var(--color-veil) calc(var(--bleed) + 22rem), transparent calc(var(--bleed) + 34rem)); }
+}
+
+/* the slippers moment: a quiet line of words with one small mount beside it, no band */
+.sp-inset-grid { align-items: center; row-gap: var(--space-3); }
+.sp-inset-words { grid-column: 1 / -1; }
+.sp-inset-mount { grid-column: 1 / -1; width: min(60%, 14rem); aspect-ratio: 4 / 3; }
+@media (min-width: 64em) {
+  .sp-inset-words { grid-column: 2 / span 4; grid-row: 1; }
+  .sp-inset-mount { grid-column: 7 / span 3; grid-row: 1; width: 100%; max-width: 16rem; }
 }
 
 /* the shower pair: two mounts, the second in front and lower */
@@ -666,11 +670,13 @@ html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .doo
 .kit { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-3); }
 .kit-item { display: grid; justify-items: center; align-content: start; gap: var(--space-2); min-width: 4rem; }
 .kit-mount { width: 4rem; aspect-ratio: 1; --mount-gap: var(--mount-gap-sm); }
+.kit-item--wide .kit-mount { width: 7rem; aspect-ratio: 16 / 9; }
 .kit-label { color: var(--color-text-inverse); text-align: center; }
 @media (min-width: 48em) {
   .kit { gap: var(--space-4); }
   .kit-mount { width: 4.5rem; }
   .kit-item { min-width: 4.5rem; }
+  .kit-item--wide .kit-mount { width: 8.5rem; }
 }
 
 /* the tote on the way out */
@@ -682,13 +688,6 @@ html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .doo
   .sp-band--tote .sp-band-main { grid-column: 1 / span 8; grid-row: 1; align-self: end; }
   .sp-band--tote .sp-band-actions { grid-column: 1 / span 8; grid-row: 2; justify-self: start; align-self: start; }
   .sp-tote { grid-column: 10 / -1; grid-row: 1 / span 2; order: 0; width: 15rem; }
-}
-
-/* Home: the small slippers inset beside the rest frame (only when the picture exists) */
-.home-rest-pic { position: relative; }
-.home-slippers { position: absolute; z-index: 1; right: var(--space-3); bottom: calc(var(--space-3) * -1); width: 7.5rem; aspect-ratio: 4 / 5; }
-@media (min-width: 64em) {
-  .home-slippers { right: auto; left: calc(var(--gutter) * -1); width: 10rem; }
 }
 
 /* ---------- motion layout (html.motion) ---------- */
@@ -704,3 +703,6 @@ html.motion .sp-bandpic .frame-media { will-change: transform; }
 @media (min-width: 64em) {
   html.motion .opener-scene:not(.scene-failed) .opener-ticks { margin-top: var(--space-4); }
 }
+
+/* Home R4: the lounge photo has a wide tank on the left (2026-10-23); keep the whole tank in the frame. */
+.entry-visual .frame-media img { object-position: 28% 55%; }

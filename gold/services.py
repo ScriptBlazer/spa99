@@ -7,6 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from common.tasks import enqueue, erase_task_records
+from journey import engine as journey_engine
 from journey import services as journey_services
 from notifications.services import subject_for
 from plans.models import SiteSettings
@@ -89,10 +90,19 @@ def application_sections(application):
         ("Date applied", created),
         ("Reference", application.reference),
     ]
-    prop = [
-        ("Link to property", rating.label_for(PROPERTY_LINK, application.property_link)),
+    what = rating.industry_label(application.industry) or "Not given"
+    if application.industry_other:
+        what += f" ({application.industry_other})"
+    prop = [("What he does", what)]
+    if application.property_link:  # only people in Property are asked
+        prop.append(("Link to property", rating.label_for(PROPERTY_LINK, application.property_link)))
+    prop += [
         ("Company and role", " / ".join(p for p in (application.company, application.role) if p) or "Not given"),
-        ("Size", rating.label_for(SIZE, application.size_range) or "Not given"),
+    ]
+    # Size is only asked in Property (older applications have no industry: keep showing it for them).
+    if application.industry == rating.PROPERTY_INDUSTRY or (not application.industry and application.property_link):
+        prop.append(("Size", rating.label_for(SIZE, application.size_range) or "Not given"))
+    prop += [
         ("Where", rating.label_for(WHERE, application.location) or "Not given"),
         ("Works with BML", rating.label_for(BML, application.bml_relationship) or "Not given"),
         ("Referred by", application.referred_by or "Nobody named"),
@@ -114,7 +124,7 @@ def application_sections(application):
         collected = [("Journey", "He did not use the guided journey.")]
     return [
         {"title": "Personal details", "rows": personal},
-        {"title": "Property profile", "rows": prop},
+        {"title": "About him", "rows": prop},
         {"title": "What the site collected", "rows": collected},
     ]
 
@@ -137,12 +147,18 @@ def submit_application(data, session=None):
     if duplicate is not None:
         return duplicate, False
 
+    if data.get("industry") == rating.LAW_INDUSTRY and not data.get("property_link") and session is not None:
+        # A lawyer who told the journey it is property law still counts as a property lawyer (as the journey rates him).
+        if journey_engine.gold_signals(session)[0].get("property_link") == rating.PROPERTY_LAWYER:
+            data = {**data, "property_link": rating.PROPERTY_LAWYER}
+
     previous = GoldApplication.objects.filter(email__iexact=email).order_by("created_at").first()
     person = get_user_model().objects.filter(email__iexact=email).first()
     now = timezone.now()
     application = GoldApplication(
         first_name=data["first_name"], last_name=data["last_name"], email=email, mobile=data.get("mobile", ""),
-        property_link=data["property_link"], size_range=data.get("size_range", ""), location=data.get("location", ""),
+        industry=data.get("industry", ""), industry_other=data.get("industry_other", ""),
+        property_link=data.get("property_link", ""), size_range=data.get("size_range", ""), location=data.get("location", ""),
         company=data.get("company", ""), role=data.get("role", ""), bml_relationship=data.get("bml_relationship", ""),
         referred_by=data.get("referred_by", ""), note=data.get("note", ""),
         journey_session=session, user=person, repeat_of=previous,
@@ -201,7 +217,7 @@ def export_applications(email):
     return [
         {
             "reference": a.reference, "created_at": a.created_at.isoformat(), "name": a.full_name, "email": a.email,
-            "mobile": a.mobile, "property_link": a.property_link, "size_range": a.size_range, "where": a.location,
+            "mobile": a.mobile, "industry": a.industry, "industry_other": a.industry_other, "property_link": a.property_link, "size_range": a.size_range, "where": a.location,
             "company": a.company, "role": a.role, "bml_relationship": a.bml_relationship,
             "referred_by": a.referred_by, "note": a.note, "potential": a.potential_level, "status": a.status,
             "spa_interest": a.spa_interest,

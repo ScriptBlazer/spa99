@@ -30,7 +30,7 @@ def sign_up():
 def apply_for_gold():
     return gold_services.submit_application({
         "first_name": "Gus", "last_name": "Gold", "email": EMAIL, "mobile": "+447912345678",
-        "property_link": "owner_investor", "size_range": "10_49", "privacy_accepted": True,
+        "industry": "property", "property_link": "owner_investor", "size_range": "10_49", "privacy_accepted": True,
     })[0]
 
 

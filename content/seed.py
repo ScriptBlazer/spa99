@@ -8,6 +8,7 @@ Section keys use underscores so templates can reach them: {{ home.journey_entry.
 Multi-line text (steps, role lists) is one line per row in `body`."""
 from .models import Page, Section
 
+KIT_BODY = "Towels | towel-bench-portrait | 50% 45%\nRobe | robe | 100% 38%\nSlippers | slippers | 62% 60%\nToiletries | toiletries | 50% 55%"
 STEP_2_PILLS = "Your own locker\nPhones stay in the locker"  # the kit row (arrive_kit) now says towel, robe and slippers
 
 # page key: (title, meta description, [(section key, heading, body, cta label, cta url)])
@@ -30,6 +31,7 @@ PAGES = {
         ("journey_entry", "Which membership suits you?", "A few taps. Under two minutes.", "Tailor your membership", "/journey/"),
         ("memberships_teaser", "Three memberships. One single visit.", "", "Compare memberships", "/memberships/"),
         ("gold_teaser", "The Gold Card.", "For people in property. Free, by application.", "About the Gold Card", "/gold-card/"),
+        ("opening_label", "", "Launching", "", ""),
         ("opening", "{opening}.", "99 Vale Road, London N4.", "Register interest", "/register/"),
     ]),
     "spa": ("The spa", "Sauna, cold plunge, relaxing zone, gym and massage at 99 Vale Road.", [
@@ -37,23 +39,22 @@ PAGES = {
         ("opener_1", "Open {hours}.", "Every day. Closed for {closure}.", "", ""),
         ("opener_2", "For men only.", "18 and over.", "", ""),
         ("opener_3", "Heat, steam, cold and rest.", "{Rooms} rooms, all part of the same visit.", "", ""),
-        ("opener_4", "Stay as long as you like.", "Your robe and slippers are waiting.", "", ""),
+        ("opener_4", "Stay as long as you like.", "Take your time. Nothing here is rushed.", "", ""),
         ("opener_image", "", "robe", "", ""),  # name of the opener picture; "door-wide" switches to the door
         ("facts_rooms", "", "rooms, one visit", "", ""),
         ("facts_hours", "", "every day", "", ""),
         ("facts_men", "Men only", "18 and over", "", ""),
-        ("moment_towel", "Before the heat.", "A swan towel, folded on the bench.", "", ""),
         ("tiles_intro", "Steam, cold, water.", "Between rounds of heat.", "", ""),
-        ("moment_shower", "In every shower.", "Toiletries in the swan bottles. A fresh towel on the rail.", "", ""),
-        ("moment_slippers", "Soft underfoot.", "Swan slippers, from the lockers to the loungers.", "", ""),
-        ("moment_tote", "On the way out.", "", "", ""),
-        ("arrive_kit", "Every visit includes",
-         "Towels | towel-bench | 45% 50%\nRobe | robe | 66% 38%\nSlippers | slippers | 62% 60%\nToiletries | toiletries | 50% 55%", "", ""),
+        ("moment_shower", "Between rounds.", "Warm water, cool stone and a moment to yourself.", "", ""),
+        ("moment_slippers", "Unhurried.", "From the lockers to the loungers, at your own pace.", "", ""),
+        ("moment_tote", "Until next time.", "", "", ""),
+        ("arrive_kit", "The details.",
+         KIT_BODY, "", ""),
         ("how_it_works", "How a visit works", "", "", ""),
         ("step_1", "Book.", "Choose a time that suits you.", "", ""),
         ("step_1_pills", "", "", "", ""),
         ("booking_pending", "", "Booking opens with membership", "", ""),
-        ("step_2", "Arrive.", "A towel, robe and slippers are waiting.", "", ""),
+        ("step_2", "Arrive.", "Leave the day at the door.", "", ""),
         ("step_2_pills", "", STEP_2_PILLS, "", ""),
         ("step_3", "Stay.", "As long as you like, until closing.", "", ""),
         ("step_3_pills", "", "Every room is part of the visit", "", ""),
@@ -65,7 +66,7 @@ PAGES = {
         ("intro", "Memberships.", "Choose when you come and how often.", "", ""),
         ("not_sure", "Not sure?", "", "Tailor your membership", "/journey/"),
         ("compare", "Compare everything", "", "", ""),
-        ("every_visit", "", "Every visit: {kit}, and every room.", "See the spa", "/the-spa/"),
+        ("every_visit", "", "Every visit: every room, as long as you like.", "See the spa", "/the-spa/"),
         ("gold_line", "", "There is also the Gold Card, for people in property.", "About the Gold Card", "/gold-card/"),
         ("price_note", "", "Prices including VAT are shown under each price.", "", ""),
         ("register_label", "", "", "Register interest", "/register/"),
@@ -92,7 +93,7 @@ PAGES = {
         ("caption", "", "Your own locker, every visit.", "", ""),
     ]),
     "gold-apply": ("Apply for the Gold Card", "Apply for the Spa 99 Gold Card.", [
-        ("screen_1", "Your property.", "A few taps about your work in property.", "", ""),
+        ("screen_1", "About you.", "A few taps, so we know you.", "", ""),
         ("screen_2", "Your visits.", "What you would use, so we know you.", "", ""),
         ("screen_3", "You.", "So we can reply.", "", ""),
         ("sent", "Thank you.", "Your application is with us. We'll be in touch personally.", "Back to home", "/"),
@@ -106,7 +107,7 @@ PAGES = {
         ("result_label", "", "Your membership", "", ""),
         ("why", "Why it suits you", "", "", ""),
         ("result_cta", "", "", "Register interest in {plan}", "/register/"),
-        ("change_answers", "", "", "Change my answers", ""),
+        ("change_answers", "", "", "Start again", ""),  # same wording as start_again; the page reads start_again
         ("gold_panel", "The Gold Card.",
          "With your property background, you may be invited to hold the Gold Card. It's free, by application, and your answers come with you.",
          "Apply for the Gold Card", "/gold-card/apply/"),
@@ -118,6 +119,8 @@ PAGES = {
         ("back", "", "", "Back", ""),
         ("prefer_not", "", "", "Prefer not to say", ""),
         ("start_again", "", "", "Start again", ""),
+        ("last_suggestion", "", "", "See my last suggestion", ""),
+        ("need_one", "", "Choose at least one to continue.", "", ""),
         ("save_error", "", "We couldn't save that just now. Your answers are safe on this page.", "", ""),
         ("result_empty", "Thank you.", "Have a look at the memberships and choose the one that suits you.", "See memberships", "/memberships/"),
         ("result_loading", "", "One moment", "", ""),

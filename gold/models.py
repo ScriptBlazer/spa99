@@ -120,7 +120,9 @@ class GoldApplication(BaseModel):
     email = models.EmailField(db_index=True)
     mobile = models.CharField(max_length=16, blank=True, help_text="E.164")
 
-    property_link = models.CharField(max_length=20)
+    industry = models.CharField(max_length=20, blank=True, help_text="What he does: a journey `industry` option value.")
+    industry_other = models.CharField(max_length=100, blank=True, help_text="Typed when the industry is Other.")
+    property_link = models.CharField(max_length=20, blank=True, help_text="Only asked when the industry is Property.")
     size_range = models.CharField(max_length=10, blank=True)
     location = models.CharField("where", max_length=20, blank=True)
     company = models.CharField(max_length=150, blank=True)

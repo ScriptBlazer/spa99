@@ -46,8 +46,11 @@ def _body(request):
     return data if isinstance(data, dict) else None
 
 
-def _bad(message, status=400):
-    return JsonResponse({"error": message}, status=status)
+def _bad(message, status=400, missing=None):
+    body = {"error": message}
+    if missing:
+        body["missing"] = missing  # question keys that still need a choice
+    return JsonResponse(body, status=status)
 
 
 def _progress(session):
@@ -112,7 +115,7 @@ def step(request):
     try:
         services.set_step(session, step=data.get("step"), direction=data.get("direction"))
     except services.AnswerError as error:
-        return _bad(str(error))
+        return _bad(str(error), missing=error.missing)
     return _with_cookie(JsonResponse(_progress(session)), session)
 
 
@@ -129,14 +132,18 @@ def result(request):
             return _bad("No journey yet.", status=404)
         return JsonResponse(engine.preview(session))
     session, _ = _session_for(request)
-    return _with_cookie(JsonResponse(engine.complete(session)), session)
+    try:
+        return _with_cookie(JsonResponse(engine.complete(session)), session)
+    except services.AnswerError as error:
+        return _bad(str(error), missing=error.missing)
 
 
 @login_not_required  # PUBLIC: see state()
 @require_POST
 @rate_limited_json("journey-restart", 20, 60)
 def restart(request):
-    """'Start again': a new session on the same device. The old one stays for the statistics."""
+    """'Start again': a new empty session on the same device (new cookie), so the old answers, suggestion, statistics
+    and any Gold application linked to it stay intact. Returns the fresh state: screen 1, no answers, no last suggestion."""
     old, _ = _session_for(request)
     fresh = services.create_session(
         request.META.get("HTTP_USER_AGENT", ""), referrer=old.referrer,

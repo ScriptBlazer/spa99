@@ -10,7 +10,7 @@ from plans.management.commands.seed_phase1 import seed_all
 from plans.models import Facility, Plan
 
 PUBLIC_PAGES = [
-    "/", "/the-spa/", "/memberships/", "/gold-card/", "/gold-card/apply/", "/gold-card/apply/property/", "/book/", "/visit/",
+    "/", "/the-spa/", "/memberships/", "/gold-card/", "/gold-card/apply/", "/gold-card/apply/about-you/", "/book/", "/visit/",
     "/privacy/", "/terms/", "/journey/", "/journey/your-time/", "/journey/what-draws-you/", "/journey/company/",
     "/journey/about-you/", "/journey/your-membership/", "/register/", "/login/", "/forgot-password/", "/robots.txt", "/sitemap.xml",
 ]
@@ -107,7 +107,7 @@ class PageTests(TestCase):
     def test_memberships_round_3_details(self):
         html = self.client.get("/memberships/").content.decode()
         self.assertIn('<span class="cur">&pound;</span>299', html)  # the raised pound sign, still one price
-        self.assertIn("Every visit: towels, robe, slippers and toiletries, and every room.", html)
+        self.assertIn("Every visit: every room, as long as you like.", html)
         self.assertIn('href="/the-spa/">See the spa', html)
 
     def test_spa_page_lists_every_facility_with_a_finished_image_or_placeholder(self):
