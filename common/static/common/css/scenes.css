@@ -610,7 +610,13 @@ html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .doo
 @media (min-width: 64em) {
   .opener-scene .hero-veil {
     background: linear-gradient(to bottom, var(--color-header-solid) 0, var(--color-header-solid) var(--header-h), transparent calc(var(--header-h) + 4rem)),
-                linear-gradient(to right, var(--color-header-solid) 0, var(--color-header-solid) calc(var(--bleed) + 27rem), transparent calc(var(--bleed) + 38rem));
+                /* Moishe 2026-10-23: a long, eased fade (like Home), no visible edge; solid under the words up to bleed + 27rem */
+                linear-gradient(to right, var(--color-header-solid) 0, var(--color-header-solid) calc(var(--bleed) + 27rem),
+                  color-mix(in srgb, var(--color-header-solid) 82%, transparent) calc(var(--bleed) + 31rem),
+                  color-mix(in srgb, var(--color-header-solid) 58%, transparent) calc(var(--bleed) + 36rem),
+                  color-mix(in srgb, var(--color-header-solid) 34%, transparent) calc(var(--bleed) + 41rem),
+                  color-mix(in srgb, var(--color-header-solid) 14%, transparent) calc(var(--bleed) + 46rem),
+                  transparent calc(var(--bleed) + 51rem));
   }
 }
 .door-video { z-index: 0; }
