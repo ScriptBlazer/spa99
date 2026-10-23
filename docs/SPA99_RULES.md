@@ -20,7 +20,7 @@ Source: `Spa 99 - Rules and System Spec.pdf` v1.0, 16 Oct 2026 (255 rules, 53 sc
 
 | Rule | Override | Date |
 |---|---|---|
-| LC-26 | Phase 1: Gold application needs no account and has no approval flow on the site. Barry is emailed. | 2026-10-22 |
+| LC-26 | Phase 1: Gold application needs no account and has no approval flow on the site. Barry is emailed. Approval route decided 2026-10-23: Barry approves in the admin, the applicant gets an invite link to set up an account (see docs/PROJECT.md and docs/features/gold-application.md, "Approval and invite"). | 2026-10-22 |
 | ACC-07 | Phase 1: mobile collected but not SMS-verified. Email verification only. | 2026-10-22 |
 | MEM-02 | Gold targets property people. Everyone can apply; property people are nudged. | 2026-10-22 |
 

@@ -13,7 +13,7 @@ from notifications.services import subject_for
 from plans.models import SiteSettings
 
 from . import rating
-from .models import BML, PROPERTY_LINK, SIZE, WHERE, GoldApplication
+from .models import BML, PROPERTY_LINK, SIZE, WHERE, GoldApplication, GoldInvite
 
 logger = logging.getLogger("spa99.gold")
 
@@ -221,8 +221,15 @@ def export_applications(email):
             "company": a.company, "role": a.role, "bml_relationship": a.bml_relationship,
             "referred_by": a.referred_by, "note": a.note, "potential": a.potential_level, "status": a.status,
             "spa_interest": a.spa_interest,
+            "approved_at": a.approved_at.isoformat() if a.approved_at else None,
+            "invites": [
+                {"created_at": i.created_at.isoformat(), "sent_at": i.sent_at.isoformat() if i.sent_at else None,
+                 "expires_at": i.expires_at.isoformat(), "used_at": i.used_at.isoformat() if i.used_at else None,
+                 "replaced_at": i.revoked_at.isoformat() if i.revoked_at else None}
+                for i in a.invites.all().order_by("created_at")
+            ],
         }
-        for a in GoldApplication.objects.filter(email__iexact=email).order_by("created_at")
+        for a in GoldApplication.objects.filter(email__iexact=email).prefetch_related("invites").order_by("created_at")
     ]
 
 
@@ -232,7 +239,8 @@ def delete_applications(email):
     included, found by EmailLog.subject_email) and the queue records of their email tasks. Returns counts."""
     applications = GoldApplication.objects.filter(email__iexact=email)
     ids = list(applications.values_list("pk", flat=True))
+    invite_ids = list(GoldInvite.objects.filter(application_id__in=ids).values_list("pk", flat=True))  # invite emails are queued by invite id
     removed = applications.delete()[0]
     history = GoldApplication.history.model.objects.filter(id__in=ids).delete()[0]
-    queue = erase_task_records(ids, ["gold.tasks."])
+    queue = erase_task_records([*ids, *invite_ids], ["gold.tasks."])
     return {"gold_applications": removed, "gold_history_rows": history, "queue_records": queue}

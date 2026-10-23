@@ -49,7 +49,7 @@
       </div>
     </aside>
 
-    <form class="register-panel form-stack" data-reveal method="post" id="register-form" data-live-validate novalidate
+    <form class="form-panel register-panel form-stack" data-reveal method="post" id="register-form" data-live-validate novalidate
           data-check-email-url="{% url 'check_email' %}" data-login-url="{% url 'login' %}">
       {% csrf_token %}
       <div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
@@ -76,35 +76,20 @@
 
       <fieldset class="form-group">
         <legend>Date of birth</legend>
-        <div class="field" data-dob>
-          <div class="dob" data-dob-fields hidden role="group" aria-label="Date of birth">
-            <div class="field"><label for="dob-day">Day</label><input id="dob-day" class="input" inputmode="numeric" autocomplete="bday-day" maxlength="2" placeholder="DD"></div>
-            <div class="field"><label for="dob-month">Month</label><input id="dob-month" class="input" inputmode="numeric" autocomplete="bday-month" maxlength="2" placeholder="MM"></div>
-            <div class="field"><label for="dob-year">Year</label><input id="dob-year" class="input" inputmode="numeric" autocomplete="bday-year" maxlength="4" placeholder="YYYY"></div>
-          </div>
-          <div data-dob-native>{{ form.date_of_birth }}</div>
-          <p class="feedback" data-error-for="date_of_birth" id="{{ form.date_of_birth.auto_id }}_error" aria-live="polite" data-hint="Spa 99 is for 18 and over." data-good="Looks right" data-state="{% if form.date_of_birth.errors %}error{% else %}hint{% endif %}">{% if form.date_of_birth.errors %}{{ form.date_of_birth.errors|join:" " }}{% else %}Spa 99 is for 18 and over.{% endif %}</p>
-        </div>
+        {% include "common/_dob.html" %}
       </fieldset>
 
       <fieldset class="form-group">
         <legend>Before you register</legend>
-        <div class="field">
-          <label class="check">{{ form.men_only_accepted }}<span>I understand Spa 99 is a men-only spa. <a href="{% url 'terms' %}">Our policy</a></span></label>
-          <p class="feedback" data-error-for="men_only_accepted" id="{{ form.men_only_accepted.auto_id }}_error" aria-live="polite" data-state="{% if form.men_only_accepted.errors %}error{% else %}hint{% endif %}">{{ form.men_only_accepted.errors|join:" " }}</p>
-        </div>
-        <div class="field">
-          <label class="check">{{ form.marketing_opt_in }}<span>Send me occasional news from Spa 99.</span></label>
-        </div>
-        <div class="field">
-          <label class="check">{{ form.privacy_accepted }}<span>Read how we use your details in our <a href="{% url 'privacy' %}">privacy notice</a>, and tick to accept it.</span></label>
-          <p class="feedback" data-error-for="privacy_accepted" id="{{ form.privacy_accepted.auto_id }}_error" aria-live="polite" data-state="{% if form.privacy_accepted.errors %}error{% else %}hint{% endif %}">{{ form.privacy_accepted.errors|join:" " }}</p>
-        </div>
+        {% url 'terms' as terms_url %}{% url 'privacy' as privacy_url %}
+        {% include "common/_check.html" with field=form.men_only_accepted text="I understand Spa 99 is a men-only spa." link_url=terms_url link_text="Our policy" %}
+        {% include "common/_check.html" with field=form.marketing_opt_in text="Send me occasional news from Spa 99." no_feedback=True %}
+        {% include "common/_check.html" with field=form.privacy_accepted text="Read how we use your details in our" link_url=privacy_url link_text="privacy notice" text_after=", and tick to accept it." %}
       </fieldset>
 
-      <div class="register-submit">
+      <div class="form-submit">
         <button type="submit" class="btn btn-primary btn-block" data-working-text="One moment">{{ site_settings.wording }}</button>
-        <p class="register-foot small"><span class="muted">Already registered?</span> <a class="btn-quiet small" href="{% url 'login' %}">Sign in</a></p>
+        <p class="form-foot small"><span class="muted">Already registered?</span> <a class="btn-quiet small" href="{% url 'login' %}">Sign in</a></p>
       </div>
     </form>
   </div>

@@ -26,6 +26,10 @@ summary { cursor: pointer; }
   --s-hair: var(--color-hairline);
   --s-raised: var(--color-cream-raised);
   --s-field: var(--color-cream-raised);
+  --s-well: var(--color-field-well);
+  --s-well-line: var(--color-control-line);
+  --s-label: var(--color-text-muted);
+  --s-edge: var(--color-espresso);
   --s-focus: var(--color-focus);
   --s-danger: var(--color-danger);
   --s-accent: var(--color-text);
@@ -39,6 +43,10 @@ summary { cursor: pointer; }
   --s-hair: var(--color-hairline-inverse);
   --s-raised: var(--color-espresso-raised);
   --s-field: transparent;
+  --s-well: var(--color-espresso-raised);
+  --s-well-line: var(--color-text-muted-inverse);
+  --s-label: var(--color-text-muted-inverse);
+  --s-edge: var(--color-gold);
   --s-focus: var(--color-focus-inverse);
   --s-danger: var(--color-danger-inverse);
   --s-accent: var(--color-gold);

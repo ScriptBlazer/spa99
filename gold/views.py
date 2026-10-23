@@ -1,10 +1,14 @@
 """Gold JSON endpoints. Public on purpose: applying creates no account. CSRF protected, rate limited, honeypot."""
 import json
 
+from django.contrib import messages
+from django.contrib.auth import login
 from django.contrib.auth.decorators import login_not_required
 from django.http import JsonResponse
+from django.shortcuts import redirect, render
+from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from common.audit import client_ip
 from common.ratelimit import hit, rate_limited_json, too_many_response
@@ -13,7 +17,8 @@ from journey import services as journey_services
 from journey.models import Question
 
 from . import services
-from .forms import GoldApplicationForm
+from . import invites
+from .forms import GoldApplicationForm, GoldSetupForm
 from . import rating
 from .models import BML, PROPERTY_LINK, SIZE, WHERE
 
@@ -111,3 +116,36 @@ def apply(request):
     except services.ApplicationsClosed:
         return JsonResponse({"error": "Applications are not open yet."}, status=403)
     return JsonResponse({"reference": application.reference, "message": "Thank you. We'll be in touch."}, status=201)
+
+
+# ---------- account setup from the invite ----------
+
+SETUP_SCOPE, SETUP_LIMIT, SETUP_WINDOW = "gold-invite", 20, 3600
+
+
+def _invalid_link(request, status=410):
+    return render(request, "gold/invite_invalid.html", status=status)
+
+
+@login_not_required  # PUBLIC: the link in the approval email (signed, 14 days, single use, rate limited)
+@never_cache  # the link and the form hold a person's details: never stored by a browser or proxy
+@require_http_methods(["GET", "POST"])
+def invite_setup(request, token):
+    """GET shows the setup form (nothing is used up by opening it); POST creates the account and signs him in."""
+    if not hit(SETUP_SCOPE, client_ip(request) or "unknown", SETUP_LIMIT, SETUP_WINDOW):
+        return render(request, "gold/invite_invalid.html", {"throttled": True}, status=429)
+    status, invite = invites.read_invite(token)
+    if status != invites.OK:
+        return _invalid_link(request)
+    application = invite.application
+    form = GoldSetupForm(request.POST or None, application=application, mobile_editable=invites.mobile_needs_fixing(application), initial={"marketing_opt_in": application.marketing_consent})
+    if request.method == "POST" and form.is_valid():
+        try:
+            user = invites.accept_invite(token, form.cleaned_data)
+        except invites.InviteError as error:
+            return render(request, "gold/invite_invalid.html", {"text": error.text}, status=410)
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        messages.success(request, "Welcome to Spa 99. Your Gold Card is active.")
+        return redirect("account")
+    return render(request, "gold/invite_setup.html", {"form": form, "application": application},
+                  status=400 if request.method == "POST" else 200)

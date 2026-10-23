@@ -77,7 +77,7 @@ class Plan(BaseModel):
     @property
     def interest_allowed(self):
         """Can a person register interest in this plan? Visible monthly memberships only (not Gold, which is by
-        application, and not the single visit). Templates use this to hide the 'Register interest' action."""
+        application, and not the single visit). Templates use this to hide the 'Register' action."""
         return self.visible and self.kind == self.MONTHLY
 
     @property
@@ -97,7 +97,7 @@ class SiteSettings(BaseModel):
 
     INTEREST = "register_interest"
     JOIN = "join"
-    WORDING_CHOICES = [(INTEREST, "Register interest"), (JOIN, "Join")]
+    WORDING_CHOICES = [(INTEREST, "Register"), (JOIN, "Join")]
 
     singleton_key = models.CharField(max_length=10, default="site", unique=True, editable=False)
     vat_rate = models.DecimalField("VAT rate (%)", max_digits=5, decimal_places=2, default=Decimal("20.00"))
@@ -119,7 +119,7 @@ class SiteSettings(BaseModel):
     booking_open = models.BooleanField(default=False, help_text="Stage C: bookings (Phase 3).")
     join_wording = models.CharField(
         "wording", max_length=20, choices=WORDING_CHOICES, default=INTEREST,
-        help_text='"Register interest" now; "Join" when payments open.',
+        help_text='"Register" now; "Join" when payments open.',
     )
 
     contact_email = models.EmailField(default="hello@spa99.uk")

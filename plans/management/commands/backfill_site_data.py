@@ -25,6 +25,10 @@ written by hand:
   The last two run only on the first round 3 run (while the `signin` page does not exist), so clearing the gym's picture
   name or removing a note by hand stays cleared
 
+- (Gold approval, 2026-10-23) the `gold_invite` and `gold_active` email rows are created when missing
+
+- ("Register interest" becomes "Register", 2026-10-23) the button / heading / title rows, only while exactly the old wording
+
 - (virtual tour, 2026-10-23) the `tour` page and its rows, and the `spa` `tour_link` row, are created when missing
 
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
@@ -128,6 +132,21 @@ def backfill():
     changed.update(_round_3())
     changed.update(_journey_and_gold_2026_10_23())
     changed.update(_virtual_tour())
+    changed.update(_gold_invite_emails())
+    return changed
+
+
+def _gold_invite_emails():
+    """2026-10-23 (Gold approval): the two email rows are created when missing, never overwritten."""
+    from notifications.models import NotificationTemplate
+    from notifications.seed import DEFAULT_SUBJECTS
+
+    changed = Counter()
+    for key in ("gold_invite", "gold_active"):
+        subject, note = DEFAULT_SUBJECTS[key]
+        _, created = NotificationTemplate.objects.get_or_create(key=key, defaults={"subject": subject, "note": note})
+        if created:
+            changed["notifications.NotificationTemplate (Gold approval emails)"] += 1
     return changed
 
 
@@ -173,6 +192,18 @@ OLD_SECTION_TEXT = [  # page key, section key, field, old value, new value
     *[("spa", "arrive_kit", "body", old, content_seed.KIT_BODY) for old in OLD_KIT_BODIES],
     ("memberships", "every_visit", "body", "Every visit: {kit}, and every room.", "Every visit: every room, as long as you like."),
     ("spa", "step_2", "body", "A towel, robe and slippers are waiting.", "Leave the day at the door."),
+    # "Register interest" becomes "Register" everywhere (2026-10-23, owner decision)
+    ("home", "opening", "cta_label", "Register interest", "Register"),
+    ("memberships", "register_label", "cta_label", "Register interest", "Register"),
+    ("memberships", "continue", "body", "Register your interest. Nothing to pay now.", "Register. Nothing to pay now."),
+    ("journey", "result_cta", "cta_label", "Register interest in {plan}", "Register for {plan}"),
+    ("book", "placeholder", "cta_label", "Register interest", "Register"),
+    ("register", "intro", "heading", "Register interest", "Register"),
+]
+# (page key, field, old value, new value) for the Page row itself
+OLD_PAGE_TEXT = [
+    ("register", "title", "Register interest", "Register"),
+    ("register", "meta_description", "Register your interest in Spa 99.", "Register at Spa 99. Nothing to pay now."),
 ]
 # Retired, never deleted: hidden from new journeys, old answers keep their label. (question, value, old label)
 OLD_RETIRED_OPTIONS = [("company", "often", "Often with someone (Most visits.)"), ("heard_via", "instagram", "Instagram"),
@@ -225,6 +256,12 @@ def _journey_and_gold_2026_10_23():
             setattr(section, field, new)
             section.save()
             changed["content.Section (journey / Gold apply / spa / home wording)"] += 1
+    for page_key, field, old, new in OLD_PAGE_TEXT:
+        page = Page.objects.filter(key=page_key, **{field: old}).first()
+        if page is not None:
+            setattr(page, field, new)
+            page.save()
+            changed["content.Page (Register wording)"] += 1
     changed.update(_journey_options_2026_10_23())
     return changed
 

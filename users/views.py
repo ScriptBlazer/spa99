@@ -15,6 +15,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from common.audit import client_ip
 from common.ratelimit import hit, rate_limited_json
 from common.validators import normalise_email
+from gold import invites as gold_invites
 from journey import services as journey_services
 from plans.models import SiteSettings
 
@@ -219,8 +220,10 @@ def reset_password(request, uidb64, token):
 @require_http_methods(["GET"])
 def account(request):
     interest = getattr(request.user, "interest", None)
+    gold = interest is not None and interest.plan is not None and interest.plan.slug == "gold"
     return render(request, "users/account.html", {
         "interest": interest, "plans": services.interest_plans(), "verified": bool(request.user.email_verified_at),
+        "gold_since": gold_invites.gold_since(request.user) if gold else None, "is_gold": gold,
     })
 
 
@@ -245,7 +248,10 @@ class ChangePasswordView(auth_views.PasswordChangeView):
 @require_POST
 def account_interest(request):
     plan = services.interest_plans().filter(slug=request.POST.get("plan", "")).first()
-    if plan is None:
+    current = getattr(request.user, "interest", None)
+    if current is not None and current.plan is not None and current.plan.slug == "gold":
+        messages.info(request, "Your Gold Card is active. To change it, write to us.")  # Gold is never replaced by an interest choice
+    elif plan is None:
         messages.error(request, "Choose one of the memberships.")
     else:
         services.set_interest(request.user, plan)

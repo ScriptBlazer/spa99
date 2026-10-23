@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load pages_tags %}
+{% block head_title %}{% include "common/_head.html" with title="Link not available | Spa 99" %}{% endblock %}
+{% block main %}
+{% signin_shell as shell %}
+{% include "users/_shell_top.html" %}
+      {% if throttled %}
+      <h1>Please wait a moment.</h1>
+      <p class="signin-lead">Too many attempts. Please try again later.</p>
+      {% else %}
+      <h1>This link can't be used.</h1>
+      <p class="signin-lead">{% if text %}{{ text }}{% else %}It may have expired, or it may already have been used. Invite links work for 14 days.{% endif %}</p>
+      <p class="signin-lead">To get a new link, reply to your approval email or write to <a href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a>. If you already set up your account, you can sign in.</p>
+      {% endif %}
+      <div class="signin-actions"><a class="btn btn-primary btn-block" href="{% url 'login' %}">Sign in</a><a class="btn-quiet small" href="{% url 'home' %}">Back to home</a></div>
+{% include "users/_shell_bottom.html" %}
+{% endblock %}

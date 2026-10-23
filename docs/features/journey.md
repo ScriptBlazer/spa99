@@ -4,7 +4,7 @@ Phase 1. Apps: `journey`, `plans`, `insights`, `common`.
 
 ## What it is
 
-A short, comfortable series of screens that feels like choosing, not filling in a form. Not a chat. It learns when a visitor would come, what he'd use and what he does, then suggests the right membership and (for property people) nudges towards Gold. It ends in register interest.
+A short, comfortable series of screens that feels like choosing, not filling in a form. Not a chat. It learns when a visitor would come, what he'd use and what he does, then suggests the right membership and (for property people) nudges towards Gold. It ends in Register.
 
 Every answer is saved the moment it's given, from the first tap, even if the visitor never finishes. This feeds the statistics.
 
@@ -40,7 +40,7 @@ Every answer is saved the moment it's given, from the first tap, even if the vis
 - "Your membership: Tier 2" with three short reasons drawn from his answers (e.g. "Evenings suit you", "Two to three visits a week", "Book up to 3 days ahead").
 - Other tiers shown smaller, so he can choose differently.
 - Gold panel or line depending on potential (below).
-- Primary action: **Register interest** in the chosen tier (opens sign-up, answers carried over).
+- Primary action: **Register for** the chosen tier (button: "Register for Tier 2") (opens sign-up, answers carried over).
 
 ## Suggesting a tier (configurable, no hard-coded logic)
 

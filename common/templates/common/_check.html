@@ -1,8 +1,9 @@
-{# A checkbox row. Usage: {% include "common/_check.html" with field=form.men_only_accepted %} then pass `label_html` for custom text #}
+{% comment %}A consent row (72px, the whole row is the target). Usage: {% include "common/_check.html" with field=form.men_only_accepted %}
+Optional: text (replaces the field label), link_url + link_text (an underlined link after the text), text_after (plain text after the link), no_feedback=True (no error line, for optional boxes).{% endcomment %}
 <div class="field">
   <label class="check">
     {{ field }}
-    <span>{% if label_html %}{{ label_html }}{% else %}{{ field.label }}{% endif %}</span>
+    <span>{% if text %}{{ text }}{% else %}{{ field.label }}{% endif %}{% if link_url %} <a href="{{ link_url }}">{{ link_text }}</a>{{ text_after }}{% endif %}</span>
   </label>
-  <p class="feedback" data-error-for="{{ field.html_name }}" id="{{ field.auto_id }}_error" aria-live="polite" data-state="{% if field.errors %}error{% else %}hint{% endif %}">{% if field.errors %}{{ field.errors|join:" " }}{% endif %}</p>
+  {% if not no_feedback %}<p class="feedback" data-error-for="{{ field.html_name }}" id="{{ field.auto_id }}_error" aria-live="polite" data-state="{% if field.errors %}error{% else %}hint{% endif %}">{% if field.errors %}{{ field.errors|join:" " }}{% endif %}</p>{% endif %}
 </div>

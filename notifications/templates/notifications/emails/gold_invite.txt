@@ -1,0 +1,13 @@
+{% autoescape off %}Hello {{ first_name }},
+
+Good news: your Spa 99 Gold Card application has been approved.
+
+Set up your account here. Your details are already filled in, you only choose a password. The link works for {{ valid_days }} days and can be used once.
+
+{{ url }}
+
+If the link has expired, reply to this email and we will send a new one.
+
+{{ site_name }}, {{ address }}
+Questions? Reply to this email or write to {{ contact_email }}.
+{% endautoescape %}

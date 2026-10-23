@@ -153,22 +153,34 @@ body:has(dialog[open]) { overflow: hidden; }
 .seg:has(input:checked) { background: var(--s-accent); color: var(--s-on-accent); }
 .seg:has(input:focus-visible) { outline: 2px solid var(--s-focus); outline-offset: -4px; }
 
-/* ---------- fields with live feedback ---------- */
-.field { display: grid; gap: var(--space-2); }
-.field > label, .field-label { font-size: var(--text-sm); font-weight: 500; }
-.optional { color: var(--s-muted); font-weight: 400; }
-.field input::placeholder, .field textarea::placeholder, .input::placeholder { color: var(--s-muted); opacity: 1; }
-.field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .field select, .field textarea, .input {
-  width: 100%; min-height: var(--control-h); padding: 0 var(--space-3); background: var(--s-field); color: var(--s-text);
-  border: 1px solid var(--s-line); border-radius: var(--radius-sm); font-size: max(1rem, var(--text-base)); appearance: none; -webkit-appearance: none;
+/* ---------- forms: the one style (docs/design/REGISTER-ROUND4.md; PROJECT.md 2026-10-23) ----------
+   A field is a filled well with its label inside at the top. Consents are 72px choice rows. Groups have a caramel head with a short line.
+   Colours come from the surface names (--s-well, --s-well-line, --s-label, --s-edge in base.css), so the same classes work on cream and on espresso. */
+.field, [data-dob-native] { position: relative; display: grid; gap: var(--space-1); }
+.field > label:not(.check), .field-label, [data-dob-native] > label {
+  position: absolute; top: 0.5rem; left: var(--space-3); z-index: 1; max-width: calc(100% - var(--space-4)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--text-sm); font-weight: 500; line-height: 1.2; color: var(--s-label); pointer-events: none;
 }
-.field textarea { padding-block: var(--space-3); min-height: 7.5rem; resize: vertical; line-height: var(--leading-body); }
-.field input:focus, .field select:focus, .field textarea:focus, .input:focus { box-shadow: inset 0 0 0 1px var(--s-text); border-color: var(--s-text); }
-.field input[aria-invalid="true"], .field textarea[aria-invalid="true"], .input[aria-invalid="true"] { border-color: var(--s-danger); box-shadow: inset 0 0 0 1px var(--s-danger); outline: none; }
-.field input[aria-invalid="true"]:focus-visible { outline: 2px solid var(--s-focus); outline-offset: 3px; }
+.optional { color: inherit; font-weight: 400; }
+.field input::placeholder, .field textarea::placeholder { color: var(--s-label); opacity: 1; }
+.field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .field select, .field textarea {
+  width: 100%; min-height: var(--control-h-label); padding: 1.5rem var(--space-3) 0.375rem; background: var(--s-well); color: var(--s-text);
+  border: 0; border-bottom: 1px solid var(--s-well-line); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  font-size: max(1rem, var(--text-base)); appearance: none; -webkit-appearance: none;
+}
+.field textarea { min-height: 7.5rem; padding-top: 1.75rem; resize: vertical; line-height: var(--leading-body); }
+/* autofill keeps the well and the text colour; the label never moves, so nothing overlaps */
+.field input:-webkit-autofill { -webkit-text-fill-color: var(--s-text); caret-color: var(--s-text); transition: background-color 0s 600000s; }
+.field input:not([type="checkbox"]):focus-visible, .field select:focus-visible, .field textarea:focus-visible { outline: none; }
+.field input:not([type="checkbox"]):not([type="radio"]):focus, .field select:focus, .field textarea:focus { border-bottom-color: var(--s-edge); box-shadow: inset 0 -2px 0 var(--s-edge); }
+.field:has(input:not([type="checkbox"]):focus, textarea:focus, select:focus) > label:not(.check) { color: var(--s-text); }
+.field input[aria-invalid="true"]:not([type="checkbox"]), .field textarea[aria-invalid="true"], .field select[aria-invalid="true"] { border-bottom-color: var(--s-danger); box-shadow: inset 0 -2px 0 var(--s-danger); }
+.field:has(input[aria-invalid="true"]:not([type="checkbox"]), textarea[aria-invalid="true"], select[aria-invalid="true"]) > label:not(.check) { color: var(--s-danger); }
+@media (hover: hover) and (pointer: fine) { .field input:not([type="checkbox"]):not([type="radio"]):not([readonly]):hover, .field textarea:hover, .field select:hover { border-bottom-color: var(--s-text); } }
+.field input[readonly] { cursor: default; }
 .field-row { position: relative; }
-.field-toggle { position: absolute; right: 0; top: 0; bottom: 0; min-width: 3.5rem; padding: 0 var(--space-3); background: none; border: 0; font-size: var(--text-sm); font-weight: 500; text-decoration: underline; text-underline-offset: 0.25em; }
-.field-row input { padding-right: 4rem; }
+.field-row input:not([type="checkbox"]) { padding-right: 4.5rem; }
+.field-toggle { position: absolute; right: 0; top: 0.75rem; bottom: 0; min-width: 3.5rem; padding: 0 var(--space-3); background: none; border: 0; color: var(--s-text); font-size: var(--text-sm); font-weight: 500; text-decoration: underline; text-underline-offset: 0.25em; }
 
 .feedback, .field-error { min-height: 1.25rem; font-size: var(--text-sm); line-height: 1.4; color: var(--s-muted); display: flex; gap: var(--space-2); align-items: flex-start; max-width: none; }
 .feedback[data-state="good"]::before, .feedback[data-state="error"]::before {
@@ -187,23 +199,51 @@ body:has(dialog[open]) { overflow: hidden; }
 .checklist li::before { content: ""; flex: none; width: 0.875rem; height: 0.875rem; border: 1.5px solid var(--s-muted); border-radius: 50%; }
 .checklist li[data-ok="true"] { color: var(--s-text); }
 .checklist li[data-ok="true"]::before { border: 0; background: currentColor; -webkit-mask: url("../img/icon-check.svg") center / contain no-repeat; mask: url("../img/icon-check.svg") center / contain no-repeat; width: 0.875rem; height: 0.875rem; }
+@media (min-width: 48em) { .checklist { display: flex; flex-wrap: wrap; column-gap: var(--space-4); } }
 .strength { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-1); margin-top: var(--space-2); }
 .strength span { height: 2px; background: var(--s-hair); }
 .strength[data-level="1"] span:nth-child(-n+1), .strength[data-level="2"] span:nth-child(-n+2), .strength[data-level="3"] span:nth-child(-n+3), .strength[data-level="4"] span { background: var(--s-text); }
 .strength-word { font-size: var(--text-sm); color: var(--s-muted); min-height: 1.25rem; }
 
-.check { display: flex; gap: var(--space-3); align-items: flex-start; min-height: 2.75rem; padding-block: var(--space-2); cursor: pointer; }
-.check input { appearance: none; -webkit-appearance: none; position: relative; flex: none; width: 1.5rem; height: 1.5rem; margin: 0; background: var(--s-field); border: 1px solid var(--s-line); border-radius: calc(var(--radius-sm) - 2px); }
+/* consents: choosing, not ticking (a 72px row; the whole row is the target) */
+.check {
+  display: flex; gap: var(--space-3); align-items: center; min-height: var(--tile-min-h); padding: var(--space-3) var(--space-4); cursor: pointer;
+  background: var(--s-well); border: 1px solid var(--s-hair); border-radius: var(--radius-md);
+}
+.check input { appearance: none; -webkit-appearance: none; position: relative; flex: none; width: 1.5rem; height: 1.5rem; margin: 0; background: none; border: 1px solid var(--s-well-line); border-radius: calc(var(--radius-sm) - 2px); }
 .check input:checked { background: var(--s-accent); border-color: var(--s-accent); }
 .check input:checked::after { content: ""; position: absolute; inset: 3px; background: var(--s-on-accent); -webkit-mask: url("../img/icon-check.svg") center / contain no-repeat; mask: url("../img/icon-check.svg") center / contain no-repeat; }
-.check input[aria-invalid="true"] { border-color: var(--s-danger); box-shadow: inset 0 0 0 1px var(--s-danger); }
+.check input:focus-visible { outline: none; }
 .check span { padding-top: 0.0625rem; }
+.check span a { color: inherit; text-decoration: underline; text-underline-offset: 0.2em; }
+.check:has(input:checked) { border-color: var(--s-accent); box-shadow: inset 0 0 0 1px var(--s-accent); }
+.check:has(input[aria-invalid="true"]) { border-color: var(--s-danger); box-shadow: inset 0 0 0 1px var(--s-danger); }
+.check:has(input:focus-visible) { outline: 2px solid var(--s-focus); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .check:hover:not(:has(input:checked)):not(:has(input[aria-invalid="true"])) { border-color: var(--s-well-line); } }
 
 .dob { display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: var(--space-3); max-width: 22rem; }
+.field-pair { display: grid; gap: var(--space-4); }
+.field-pair .field { margin: 0; }
+@media (min-width: 48em) { .field-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-.form-group { display: grid; gap: var(--space-3); }
-.form-group > legend, legend.group-title { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); padding: 0; margin-bottom: var(--space-3); }
-.form-stack > * + * { margin-top: var(--space-6); }
+/* a group: caramel head with a short line, no boxes */
+.form-group { display: grid; gap: var(--space-4); }
+.form-group > legend, legend.group-title { display: flex; align-items: center; gap: var(--space-3); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 400; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); padding: 0; margin-bottom: var(--space-3); }
+.form-group > legend::before, legend.group-title::before { content: ""; flex: none; width: 1.5rem; height: 1px; background: var(--color-line); }
+.form-group:has(.check) { gap: var(--space-3); }
+.form-stack > * + * { margin-top: var(--space-5); }
+@media (min-width: 64em) { .form-stack > * + * { margin-top: var(--space-6); } }
+.form-submit { display: grid; margin-top: var(--space-6); }
+.form-foot { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--s-hair); max-width: none; }
+
+/* the raised cream panel every form on a light page sits in (register, change password, account) */
+.form-panel, .register-panel {
+  position: relative; padding: var(--space-4); background: var(--color-cream-raised); border: 1px solid var(--color-tier-edge); border-radius: var(--radius-md); box-shadow: var(--shadow-tier);
+}
+@media (min-width: 48em) { .form-panel, .register-panel { padding: var(--space-5); } }
+@media (min-width: 64em) { .form-panel, .register-panel { padding: var(--space-6); } }
+
+
 
 /* ---------- messages (one component for Django messages and scripts) ---------- */
 .messages { list-style: none; margin: 0; padding: 0; }

@@ -1,10 +1,10 @@
-# Feature: Register interest (accounts)
+# Feature: Register (accounts)
 
 Phase 1. Apps: `users`, `journey`, `notifications`, `common`.
 
 ## What it is
 
-A real account, created now, without payment (LC-09, ACC-03). Called "Register interest" in Phase 1. When payments open (Stripe, Phase 2), the same flow becomes "Join" by changing wording in Control and switching on the payment step. No rebuild.
+A real account, created now, without payment (LC-09, ACC-03). Called "Register" in Phase 1 (the button, heading and page title say "Register"; "Register for Tier 2" on a chosen plan). When payments open (Stripe, Phase 2), the same flow becomes "Join" by changing wording in Control and switching on the payment step. No rebuild.
 
 ## Flow
 
@@ -57,7 +57,7 @@ Shown right under the field, calm wording, no red shouting until he leaves the f
 - Later phases attach `Membership`, `PaymentMethod`, face identity and bookings to the same `User` without changing it.
 - Services (`users/services.py`): `register_interest`, `email_is_registered`, `verify_email`, `resend_verification`, `request_password_reset`, `reset_password`, `set_interest`, `export_user_data`, `delete_user_data`. The form is `users.forms.SignUpForm` (rules from `common/validators.py`; `data-validate="required name|email|mobile|password|dob"` switch on the JS mirror).
 - A second click within 2 minutes (same email and password, still unverified) returns the same account and sends nothing new.
-- Stage switch `register_interest_open` (Site settings) closes sign-up; the wording ("Register interest" / "Join") is `site_settings.wording`.
+- Stage switch `register_interest_open` (Site settings) closes sign-up; the wording ("Register" / "Join") is `site_settings.wording`.
 - Gold applications made earlier with the same email are linked to the new account.
 - GDPR delete removes the account, interest (and its history), Gold applications, the email-log rows for the address (those sent to the person and, through `EmailLog.subject_email`, those about them sent to someone else, such as Barry's Gold email), the django-q task records of their email jobs (done, failed and waiting; the email tasks return a plain status, never the log row) and login events. Journey sessions are kept for the statistics but anonymised (unlinked, cookie value replaced, referrer and typed text cleared, also in history).
 
@@ -99,4 +99,4 @@ From Spa 99, Reply-To `hello@spa99.uk`. Branded, plain and short. No email to Mo
 - Duplicate email is caught before submit.
 - Account created, linked to the journey session, verification email sent (mocked in tests).
 - Export gives all of a person's data (account, interest, journey answers). Delete removes or anonymises it.
-- Switching "Register interest" to "Join" is a setting/wording change in Control.
+- Switching "Register" to "Join" is a setting/wording change in Control.

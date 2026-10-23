@@ -31,3 +31,41 @@ def send_gold_emails(application_id, acknowledge=True):
             subject_email=application.email,
         )
     return log.status
+
+
+def send_gold_invite_email(invite_id):
+    """The 'set up your account' email. Takes only the invite id and builds the link now, so no token sits in the
+    queue. Returns a status string, never the EmailLog."""
+    from django.conf import settings
+
+    from .invites import INVITE_DAYS, make_token
+    from .models import GoldInvite
+
+    invite = GoldInvite.objects.select_related("application").filter(pk=invite_id).first()
+    if invite is None or not invite.is_usable:
+        return None
+    application = invite.application
+    url = f"{settings.SITE_URL}/gold/invite/{make_token(invite)}/"
+    log = send_templated(
+        "gold_invite", [application.email], subject_for("gold_invite"),
+        {"first_name": application.first_name, "url": url, "valid_days": INVITE_DAYS},
+        subject_email=application.email,
+    )
+    if log.status == log.SENT:
+        invite.sent_at = timezone.now()
+        invite.save(update_fields=["sent_at", "updated_at"])
+    return log.status
+
+
+def send_gold_active_email(application_id):
+    from django.conf import settings
+
+    application = GoldApplication.objects.filter(pk=application_id).first()
+    if application is None:
+        return None
+    log = send_templated(
+        "gold_active", [application.email], subject_for("gold_active"),
+        {"first_name": application.first_name, "url": f"{settings.SITE_URL}/account/"},
+        subject_email=application.email,
+    )
+    return log.status

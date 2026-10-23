@@ -2,7 +2,7 @@
 
 Status: brief, 2026-10-23. Owner: design. Feature: `docs/features/virtual-tour.md`. Decisions: PROJECT.md 2026-10-23 (own page `/tour/`, no fal, rooms built in three.js). Builds on `docs/design/IMMERSIVE.md` 12 and 14 (WebGL palette, loader pattern, kill switch) and `docs/design/GOLD-CARD-3D.md` (canvas maps from the page's own SVG paths, warm PMREM, dispose contract). `docs/BRAND.md` wins.
 
-Look reference per room: `.private/fal-renders/{lounge,dry-sauna,wet-sauna,relaxing-zone,gym}.png` (1400 px copies in `.private/shots/tour/ref-*.jpg`).
+Look reference per room: `.private/fal-renders/{lounge,dry-sauna,wet-sauna,relaxing-zone,gym,kitchenette,massage-room}.png` (1400 px copies in `.private/shots/tour/ref-*.jpg`).
 
 ## 0. In one screen
 
@@ -278,6 +278,17 @@ The relaxing zone and the gym have no ambient animation: render on demand only (
 
 ---
 
+
+### 2.7 Round 2 notes (2026-10-23, Moishe)
+
+**Doorway graph, round 2 (replaces the graph in 6.1 and the doorway tables above).** Chain: lounge, gym, kitchenette, massage room, then dry sauna (left) and wet sauna (right). Lounge to Gym (passage beside reception) and Relaxing zone (passage past the seating); Relaxing zone to Lounge; Gym to Lounge and Kitchenette; Kitchenette to Gym and Massage room; Massage room to Kitchenette, Dry sauna (left) and Wet sauna (right); Dry sauna to Massage room and Wet sauna; Wet sauna to Massage room and Dry sauna. The room list reaches any room.
+
+- **Lounge.** Reception is now a half-round counter (radius 1.0 to 1.6, centre on the west wall at z 0.4) growing out of the west wall, which is plain behind it (the three doorways are gone). Gold cove and lockup follow the desk. Gym passage: north wall, x -5.6, 1.0 x 2.2, marker (-5.6, 1.1, -2.95). Relaxing-zone passage: east wall, z 2.0, past the seating (flutes stop short of it), marker (3.55, 1.1, 2.0). No sauna markers. Tank, seating and look unchanged.
+- **Lounge correction (2026-10-23, Moishe; reference `docs/design/reference/tour/lounge-reception-corridor.jpg`; second pass the same day).** Supersedes the lounge bullet above for the desk and the gym passage. The desk keeps its curved end on the west wall (quarter ring, radius 1.0 to 1.6, centre (-7, 1.0)) and runs straight along the west wall to the south wall (x -6.0..-5.4, z 1.0..3.0): it sits in the south-west corner, the corner opposite the tank wall. The stacked gold Spa 99 lockup (dark iron inset, glow halo; no "BML SPA", no wall signage) is on the straight front, centred z 2.0. Gold cove centred (-5.0, 1.0). The way to the rooms is a long straight corridor in the SAME west wall as the desk, immediately to its right as you face it (north of it, between the desk and the tank-wall corner), opening at z -2.7..-1.1, 2.4 high, running 6 m west to x -13, parallel to the tank wall. It is not in the tank wall or the south wall (both plain). Corridor: travertine floor and walls, gold-leaf ceiling with warm LED cove lines both sides and LED lines at the floor, three gold fins at each jamb, a stone bench with cushion and a round plinth on the tank-side wall, two doors on that side and one opposite, a lit oak door at the far end, one warm point light (the lockup backlight light was dropped to stay inside the 4-light cap; the lockup is self-lit). Gym marker (-10, 1.1, -1.9), inside the corridor, 3 m in, with the lit end door behind it. First view: pos (2.9, 1.6, -0.8), yaw -97, pitch -5, arrive from (3.3, 1.6, -0.5): the corridor opening with the desk beside it, the tank wall running along the right; a short drag brings in the seating. Relaxing-zone passage, tank, seating and look unchanged. Not checked in a live browser (the sandbox could not serve or render WebGL); the module builds clean in a node smoke test.
+- **Relaxing zone.** TV on the west wall at z 1.7, 1.44 x 0.81, centre y 1.4, slim `--color-iron` frame, screen a dark canvas with a faint warm diagonal sheen and a small warm glow, no picture, no text. The west doorway to the gym is removed; the only marker is the lounge.
+- **Gym.** Shell is now 7.0 x 8.0 (z -5..3). East: night window and, facing it, 3 treadmills (z -3.7, -2.55, -1.4), 2 bikes, a rower. West: oak panels with the lockup, a rubber zone with a 12-dumbbell rack (heads instanced), a power rack with a loaded barbell, 2 adjustable benches (one inclined), 8 kettlebells and 9 plates (instanced), and a cable machine at the north wall. North: mirrors with a short passage in the middle; its back wall has one door with a marker to the kitchenette. Markers: lounge (south), kitchenette (north). About 30 draw calls.
+- **Kitchenette and massage room (added, 2026-10-23).** `TOUR_ROOMS` order is now lounge, gym, kitchenette, massage-room, dry-sauna, wet-sauna, relaxing-zone. Doorways: gym to kitchenette (south door, x -1.0) to massage room (east door, z -0.9); the massage room's south door goes back to the kitchenette, its west door (z -2.1, left) to the dry sauna and its east door (z -2.4, right) to the wet sauna. Kitchenette (4.4 x 5.0 x 2.7, look from `.private/fal-renders/kitchenette.png`): walnut counter with travertine top and splashback on the north wall, bronze built-in coffee machine and tap, one open oak shelf of 13 cream cups (instanced), the gold swan on the walnut panel above with an LED wash, cream fluted panelling low on the other walls, two low caramel boucle chairs round a round travertine table under a frosted pendant. Massage room (3.6 x 6.4 x 2.7, look from `massage-room.png`): oak slatted north wall with the gold swan, three cream-leather chairs with walnut sides along the east wall facing west with gaps (parts instanced), a stone chimney breast on the west wall with a flush linear fireplace (two additive flame layers scrolling slowly, a flickering floor glow and point light, 30 fps ambient) and a 75 inch dark TV above it, LED coves along both side walls. No fake facts: no amenity promises in the copy.
+
 ## 3. Motion
 
 ### 3.1 Tokens and curves
@@ -408,7 +419,7 @@ Same page, same layout, same text, same list. Only the stage changes.
 - `/tour/` is the Lounge (canonical). `/tour/lounge/` redirects 301 to `/tour/`.
 - `/tour/<slug>/` for `dry-sauna`, `wet-sauna`, `relaxing-zone`, `gym` (the `Facility` slugs). The room must be in the tour list and its `Facility` must be visible; anything else is a 404 (including real facilities not in the tour, such as `cold-plunge`).
 - Tour order and the list: `TOUR_ROOMS = ["lounge", "dry-sauna", "wet-sauna", "relaxing-zone", "gym"]` in code. Names come from `Facility.name`; the lounge is not a `Facility` today (see question 1), so its name comes from its content row.
-- Doorway graph (in code, with the room modules): Lounge to Dry sauna, Relaxing zone, Gym; Dry sauna to Wet sauna; Wet sauna to Relaxing zone; Relaxing zone to Lounge, Gym; Gym to Lounge, Relaxing zone. It follows the ritual (heat, steam, rest); the list reaches any room.
+- Doorway graph (superseded by 2.7, round 2): Lounge to Dry sauna, Relaxing zone, Gym; Dry sauna to Wet sauna; Wet sauna to Relaxing zone; Relaxing zone to Lounge, Gym; Gym to Lounge, Relaxing zone. It follows the ritual (heat, steam, rest); the list reaches any room.
 - The spa: each toured room gets a "Take the tour" link to `/tour/<slug>/`. Header and menu: "Virtual tour" after The spa, `aria-current` on all `/tour/` pages.
 
 ### 6.2 Content rows (page `tour`)
@@ -426,6 +437,8 @@ Page: key `tour`, title "Virtual tour", meta description "Look around the lounge
 | `room_wet_sauna` | | Warm stone under soft steam. | See it on The spa | |
 | `room_relaxing_zone` | | Lie back. Nothing here needs you. | See it on The spa | |
 | `room_gym` | | Free weights and machines, in low warm light. | See it on The spa | |
+| `room_kitchenette` | | A quiet corner for a warm drink and a low chair. | See it on The spa | |
+| `room_massage_room` | | Slatted oak, soft light and a fire to settle beside. | See it on The spa | |
 
 A blank room body falls back to `Facility.short_line`. A room section image overrides the fallback photo. Page `spa` gets `tour_link` with cta_label "Take the tour".
 

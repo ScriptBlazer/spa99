@@ -12,6 +12,8 @@ DEFAULT_SUBJECTS = {
         "Gold Card application: {name} ({potential} potential) - repeat application",
         "To Barry when the same person applies again.",
     ),
+    "gold_invite": ("Your Spa 99 Gold Card is approved", "To the applicant when Barry approves: the link to set up the account."),
+    "gold_active": ("Your Spa 99 Gold Card is active", "To an existing member when Barry approves their Gold application."),
     "gold_ack": ("Your Spa 99 Gold Card application", "To the applicant after they apply."),
 }
 

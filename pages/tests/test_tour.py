@@ -11,7 +11,7 @@ from pages import services
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import Facility
 
-ROOMS = ["lounge", "dry-sauna", "wet-sauna", "relaxing-zone", "gym"]
+ROOMS = ["lounge", "gym", "kitchenette", "massage-room", "dry-sauna", "wet-sauna", "relaxing-zone"]
 
 
 class TourTests(TestCase):
@@ -38,16 +38,16 @@ class TourTests(TestCase):
     def test_hidden_room_leaves_the_tour(self):
         Facility.objects.filter(slug="gym").update(visible=False)
         self.assertEqual(self.client.get("/tour/gym/").status_code, 404)
-        self.assertEqual([r["slug"] for r in services.tour_rooms()], ROOMS[:-1])
+        self.assertEqual([r["slug"] for r in services.tour_rooms()], [r for r in ROOMS if r != "gym"])
 
     def test_config_has_every_room_in_order(self):
         response = self.client.get("/tour/dry-sauna/")
         config = json.loads(response.content.decode().split('id="tour-config" type="application/json">')[1].split("</script>")[0])
         self.assertEqual(config["current"], "dry-sauna")
         self.assertEqual([r["slug"] for r in config["rooms"]], ROOMS)
-        dry = config["rooms"][1]
+        dry = config["rooms"][4]
         self.assertEqual((dry["name"], dry["order"], dry["tour_url"], dry["spa_url"]),
-                         ("Dry sauna", 2, "/tour/dry-sauna/", "/the-spa/#dry-sauna"))
+                         ("Dry sauna", 5, "/tour/dry-sauna/", "/the-spa/#dry-sauna"))
         self.assertEqual(dry["line"], "Pale wood, low light and a slow, dry heat.")
         self.assertTrue(dry["photo"].endswith(".jpg") or dry["photo"].endswith(".webp"))
         self.assertTrue(dry["alt"])
@@ -83,9 +83,9 @@ class TourBackfillTests(TestCase):
         self.assertIn("Would change", self.run_backfill("--dry-run"))
         self.assertFalse(Page.objects.filter(key="tour").exists())
         self.run_backfill()
-        self.assertEqual(Section.objects.filter(page__key="tour").count(), 9)
+        self.assertEqual(Section.objects.filter(page__key="tour").count(), 11)
         self.assertTrue(Section.objects.filter(page__key="spa", key="tour_link").exists())
         Section.objects.filter(page__key="tour", key="hint").update(body="Look around.")
         self.run_backfill()
         self.assertEqual(Section.objects.get(page__key="tour", key="hint").body, "Look around.")
-        self.assertEqual(Section.objects.filter(page__key="tour").count(), 9)
+        self.assertEqual(Section.objects.filter(page__key="tour").count(), 11)

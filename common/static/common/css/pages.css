@@ -168,12 +168,8 @@ html.motion .scene-failed .gstep-line { transform: none; }
 .signin-fields { display: grid; gap: var(--space-4); margin-top: var(--space-5); }
 .signin-fields .signin-alert { margin-top: 0; }
 .signin-fields .btn { margin-top: var(--space-3); }
-.signin-form .field-toggle { color: var(--color-text-inverse); }
-/* the "Forgotten?" link sits on the password label row; it follows the Show button in tab order (field--aside, components) */
-.field--aside { grid-template-columns: minmax(0, 1fr) auto; }
-.field--aside > label { grid-column: 1; grid-row: 1; }
-.field--aside > .field-aside { grid-column: 2; grid-row: 1; display: inline-flex; align-items: center; min-height: 2.75rem; margin-block: -0.75rem; font-size: var(--text-sm); }
-.field--aside > :not(label):not(.field-aside) { grid-column: 1 / -1; }
+/* the "Forgotten?" link sits under the password well, right aligned; it follows the Show button in tab order (field--aside) */
+.field--aside > .field-aside { justify-self: end; display: inline-flex; align-items: center; min-height: 2.75rem; margin-block: -0.5rem -0.75rem; font-size: var(--text-sm); }
 .signin-foot { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--color-hairline-inverse); }
 .signin-foot p { max-width: none; }
 .signin-actions { display: grid; gap: var(--space-3); justify-items: start; margin-top: var(--space-5); }
@@ -255,71 +251,24 @@ html:has(.register) { scroll-padding-top: calc(var(--header-h) + var(--space-4))
 .plan-note { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-hairline-inverse); font-size: var(--text-sm); color: var(--color-text-inverse); }
 .plan-note .mark-glyph { flex: none; width: 1rem; color: var(--color-gold); }
 
-/* the panel */
-.register-panel {
-  grid-column: 1 / -1; position: relative; z-index: 1; margin-top: calc(var(--panel-overlap) * -1); padding: var(--space-4);
-  background: var(--color-cream-raised); border: 1px solid var(--color-tier-edge); border-radius: var(--radius-md); box-shadow: var(--shadow-tier);
-}
-.register-panel--sm h1 { font-size: var(--text-2xl); line-height: var(--leading-tight); }
-.register-panel--sm .lead { margin-top: var(--space-3); }
+/* the panel: layout here, the raised look is .form-panel (components.css) */
+.register-panel { grid-column: 1 / -1; z-index: 1; margin-top: calc(var(--panel-overlap) * -1); }
+.register-panel h1, .register-panel--sm h1 { font-size: var(--text-2xl); line-height: var(--leading-tight); }
+.register-panel .lead { margin-top: var(--space-3); }
+.register-panel > .form-stack { margin-top: var(--space-5); }
 .register-panel--sm .actions { display: grid; justify-items: start; gap: var(--space-3); margin-top: var(--space-5); }
 .register-panel--sm .actions .btn-quiet { display: inline-flex; align-items: center; min-height: 2.75rem; }
 .register-panel--sm [data-resend-status] { margin-top: var(--space-3); }
 .register-panel--sm .form-stack-sm { margin-top: var(--space-5); }
-.register-panel.form-stack > * + * { margin-top: var(--space-5); }
-.register-panel .form-error { margin-bottom: var(--space-4); }
-.register-panel .form-group { gap: var(--space-4); }
-.register-panel .form-group > legend { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-lg); font-weight: 400; }
-.register-panel .form-group > legend::before { content: ""; flex: none; width: 1.5rem; height: 1px; background: var(--color-line); }
-.field-pair { display: grid; gap: var(--space-4); }
-.form-group .field-pair .field { margin: 0; }
-
-/* a field is a filled well with its label inside; the label never moves */
-.register-panel .field { position: relative; gap: var(--space-1); }
-.register-panel .field > label:not(.check) {
-  position: absolute; top: 0.5rem; left: var(--space-3); z-index: 1; font-size: var(--text-sm); font-weight: 500; line-height: 1.2; color: var(--color-text-muted); pointer-events: none;
-}
-.register-panel .field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
-  min-height: var(--control-h-label); padding: 1.5rem var(--space-3) 0.375rem; background: var(--color-field-well);
-  border: 0; border-bottom: 1px solid var(--color-control-line); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-}
-.register-panel .field-row input:not([type="checkbox"]) { padding-right: 4.5rem; }
-.register-panel .field input:not([type="checkbox"]):focus-visible { outline: none; }
-.register-panel .field input:not([type="checkbox"]):focus { border-bottom-color: var(--color-espresso); box-shadow: inset 0 -2px 0 var(--color-espresso); }
-.register-panel .field:has(input:not([type="checkbox"]):focus) > label:not(.check) { color: var(--color-espresso); }
-.register-panel .field input[aria-invalid="true"]:not([type="checkbox"]) { border-bottom-color: var(--color-danger); box-shadow: inset 0 -2px 0 var(--color-danger); }
-.register-panel .field:has(input[aria-invalid="true"]:not([type="checkbox"])) > label:not(.check) { color: var(--color-danger); }
-@media (hover: hover) and (pointer: fine) { .register-panel .field input:not([type="checkbox"]):hover { border-bottom-color: var(--color-espresso); } }
-.register-panel .field-toggle { top: 0.75rem; color: var(--color-espresso); }
-.register-panel .dob { max-width: 22rem; }
-.register-panel .checklist { margin-top: var(--space-2); }
-@media (min-width: 48em) { .register-panel .checklist { display: flex; flex-wrap: wrap; column-gap: var(--space-4); } }
-
-/* consents: choosing, not ticking */
-.register-panel .form-group:has(.check) { gap: var(--space-3); }
-.register-panel .check {
-  align-items: center; min-height: var(--tile-min-h); padding: var(--space-3) var(--space-4); background: var(--color-cream);
-  border: 1px solid var(--color-hairline); border-radius: var(--radius-md);
-}
-.register-panel .check span a { color: inherit; text-decoration: underline; text-underline-offset: 0.2em; }
-.register-panel .check:has(input:checked) { border-color: var(--color-espresso); box-shadow: inset 0 0 0 1px var(--color-espresso); }
-.register-panel .check:has(input[aria-invalid="true"]) { border-color: var(--color-danger); box-shadow: inset 0 0 0 1px var(--color-danger); }
-.register-panel .check:has(input:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: 3px; }
-.register-panel .check input:focus-visible { outline: none; }
-@media (hover: hover) and (pointer: fine) { .register-panel .check:hover:not(:has(input:checked)):not(:has(input[aria-invalid="true"])) { border-color: var(--color-control-line); } }
 
 .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
-.register-submit { display: grid; margin-top: var(--space-6); }
-.register-submit .btn { margin-top: 0; }
-.register-foot { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--color-hairline); max-width: none; }
 
 @media (min-width: 48em) {
   .register-photo { height: 14rem; }
   .register-stage { padding-top: var(--space-5); }
   .plan-card { max-width: 30rem; }
-  .register-panel { max-width: 40rem; padding: var(--space-5); }
+  .register-panel { max-width: 40rem; }
   .register-panel--sm { max-width: 32rem; }
-  .field-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (min-width: 64em) {
   .register { padding-block: 0 var(--space-7); }
@@ -333,7 +282,6 @@ html:has(.register) { scroll-padding-top: calc(var(--header-h) + var(--space-4))
   .register-stage h1 { margin-top: 0; }
   .plan-card { margin-top: var(--space-5); padding: var(--space-5); max-width: none; }
   .register-panel { grid-column: 7 / span 6; grid-row: 1; margin-block: var(--space-6); padding: var(--space-6); }
-  .register-panel.form-stack > * + * { margin-top: var(--space-6); }
   .register-panel--sm { align-self: center; }
   .register--solo { padding-bottom: 0; }
   .register--solo .register-grid { min-height: calc(100svh - var(--header-h)); }
@@ -356,7 +304,7 @@ html:has(.register) { scroll-padding-top: calc(var(--header-h) + var(--space-4))
 .detail-rows > div { display: flex; justify-content: space-between; gap: var(--space-4); padding-block: var(--space-3); border-top: 1px solid var(--s-hair); }
 .detail-rows { margin-block: var(--space-3); }
 .details > .small, .privacy-actions .actions { margin-top: var(--space-3); }
-.delete-form { margin-top: var(--space-4); padding: var(--space-4); border: 1px solid var(--s-hair); border-radius: var(--radius-md); }
+.delete-form { margin-top: var(--space-4); }
 .signout { padding-top: var(--space-4); }
 
 /* ---------- errors ---------- */

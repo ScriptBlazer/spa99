@@ -155,6 +155,11 @@ class GoldApplication(BaseModel):
     privacy_accepted_version = models.CharField(max_length=20, blank=True)
     privacy_accepted_at = models.DateTimeField(null=True, blank=True)
 
+    approved_at = models.DateTimeField(
+        null=True, blank=True, help_text="When Gold was approved. Gold's month starts here (LC-27). Set by 'Approve and invite'.")
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", editable=False)
+
     history = HistoricalRecords()
 
     class Meta:
@@ -170,3 +175,27 @@ class GoldApplication(BaseModel):
     @property
     def is_repeat(self):
         return self.repeat_of_id is not None
+
+
+class GoldInvite(BaseModel):
+    """One invite to set up an account after approval (docs/features/gold-application.md). The link carries a signed
+    copy of this row's id; the row decides whether it still works (not expired, not used, not replaced by a resend).
+    No history table: the row holds no personal data and is itself the record. Erased with the application."""
+
+    application = models.ForeignKey(GoldApplication, on_delete=models.CASCADE, related_name="invites")
+    expires_at = models.DateTimeField()
+    sent_at = models.DateTimeField(null=True, blank=True, help_text="Empty = the email has not gone out.")
+    used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True, help_text="Set when a newer invite replaces this one.")
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"invite for {self.application_id}"
+
+    @property
+    def is_usable(self):
+        from django.utils import timezone
+
+        return self.used_at is None and self.revoked_at is None and self.expires_at > timezone.now()

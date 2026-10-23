@@ -43,7 +43,7 @@ class SiteSettingsTests(TestCase):
         SiteSettings.objects.update(opening_date=date(2027, 3, 1))
         self.assertIn("Opening March 2027.", content.page_content("home")["hero"].body)
         self.assertIn("Opening March 2027.", content.page_meta("home")["meta_description"])
-        self.assertEqual(content.page_content("journey")["result_cta"].cta_label, "Register interest in {plan}")  # other braces untouched
+        self.assertEqual(content.page_content("journey")["result_cta"].cta_label, "Register for {plan}")  # other braces untouched
 
 
 class HoursAndLabelsTests(TestCase):
@@ -177,3 +177,19 @@ class JourneyAndGoldBackfillTests(TestCase):
         rule = SuggestionRule.objects.get(name__startswith="Evenings with guests")
         self.assertEqual(rule.conditions[1], {"question": "company", "any_of": ["sometimes", "often"]})
         self.assertIn("Nothing to change", self.run_command_text())
+
+
+class RegisterWordingBackfillTests(TestCase):
+    """'Register interest' becomes 'Register': only the exact old values change."""
+
+    def test_exact_old_wording_is_replaced_and_edits_are_left_alone(self):
+        seed_all()
+        Section.objects.filter(page__key="journey", key="result_cta").update(cta_label="Register interest in {plan}")
+        Section.objects.filter(page__key="home", key="opening").update(cta_label="Register interest")
+        Section.objects.filter(page__key="book", key="placeholder").update(cta_label="Join the list")  # edited by hand
+        call_command("backfill_site_data", "--dry-run", stdout=StringIO())
+        self.assertEqual(Section.objects.get(page__key="home", key="opening").cta_label, "Register interest")  # dry run saves nothing
+        call_command("backfill_site_data", stdout=StringIO())
+        self.assertEqual(Section.objects.get(page__key="journey", key="result_cta").cta_label, "Register for {plan}")
+        self.assertEqual(Section.objects.get(page__key="home", key="opening").cta_label, "Register")
+        self.assertEqual(Section.objects.get(page__key="book", key="placeholder").cta_label, "Join the list")

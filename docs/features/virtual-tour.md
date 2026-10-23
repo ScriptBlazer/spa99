@@ -43,7 +43,7 @@ More rooms only after these five feel good.
 
 ## Built: server side (2026-10-23)
 
-- Routes (`pages`): `/tour/` (lounge), `/tour/<slug>/` for `dry-sauna`, `wet-sauna`, `relaxing-zone`, `gym`; `/tour/lounge/` 301s to `/tour/`; anything else is a 404. The list and order live in `TOUR_ROOMS` in `pages/services.py` (slug, fallback name, photo alt, photo focus): adding a room is one line. A room whose Facility is hidden leaves the tour (404, dropped from the list); the lounge has no Facility so it is always in.
+- Routes (`pages`): `/tour/` (lounge), `/tour/<slug>/` for `gym`, `kitchenette`, `massage-room`, `dry-sauna`, `wet-sauna`, `relaxing-zone`; `/tour/lounge/` 301s to `/tour/`; anything else is a 404. The list and order live in `TOUR_ROOMS` in `pages/services.py` (slug, fallback name, photo alt, photo focus): adding a room is one line. A room whose Facility is hidden leaves the tour (404, dropped from the list); the lounge has no Facility so it is always in.
 - Template `pages/tour.html` is the full fallback (photo, h1, line, spa link, room list). Hooks for the 3D script: `#tour` (`data-room`), `#tour-stage`, `#tour-photo`, `#tour-caption`, `#tour-title`, `#tour-line`, `#tour-spa-link`, `#tour-rooms` (links carry `data-room-link`), `#tour-live`, hidden `#tour-logos` holding `#tour-mark`, `#tour-logo` and `#tour-logo-stacked` (inline gold stacked SVG, plus `data-src`), `{{ tour_config|json_script:"tour-config" }}`. The `{% block scripts %}` loads `tour/boot.js` (a module), which checks the gate and then loads three.js and the engine.
 - Config JSON: `{current, rooms: [{slug, name, line, photo, alt, focus, spa_url, spa_label, tour_url, order}], copy: {intro, hint, hint_tilt, tilt: {heading, body, cta_label}}}`.
 - Photo: the `room_<slug>` section image if set, else the manifest render named after the slug (1600 px WebP), else the brand placeholder.
@@ -66,3 +66,9 @@ Files: `common/static/common/js/tour/{boot,engine,kit,textures}.js`, `tour/rooms
 - Budget per room: 50 draw calls, 80k triangles, 4 point lights (3 mobile), 8 textures of your own (shared ones are free). `K.light(..., optional)` returns null on non-high tiers.
 - Do not write the two keywords that start a module statement, followed by a space, inside a comment: Django's static hashing matches them across lines (it broke `collectstatic` once).
 - Adding a room: drop `rooms/<slug>.js`; its slug must be in `TOUR_ROOMS`. Markers to it from other rooms then work with no engine change.
+
+## Round 2: kitchenette and massage room (2026-10-23)
+- `TOUR_ROOMS` order: lounge, gym, kitchenette, massage-room, dry-sauna, wet-sauna, relaxing-zone. Routes `/tour/kitchenette/` and `/tour/massage-room/` work like the others; The spa shows "Take the tour" for them from the Facility rows (kitchenette as a tile, massage room as the gym's companion, whose template now also shows the link).
+- Content rows `room_kitchenette` and `room_massage_room` are in the seed and created if missing by `backfill_site_data` (never overwritten). Photos: none yet (a `room_<slug>` section image, or a manifest render named `kitchenette` / `massage-room`, fills the no-WebGL fallback).
+- Modules: `rooms/kitchenette.js` (about 3 KB gzip) and `rooms/massage-room.js` (about 3.8 KB gzip, ambient fireplace). Doorway graph: gym to kitchenette to massage room, then dry sauna (left) and wet sauna (right); the lounge's relaxing zone is unchanged. Details in `docs/design/VIRTUAL-TOUR.md` 2.7.
+- Room sizes after round 2 (gzip -9, KB): lounge 6.3, dry sauna 5.2, gym 4.9, wet sauna 4.2, massage room 3.8, relaxing zone 3.2, kitchenette 3.0 (budget 6.5 per room, VIRTUAL-TOUR 4.2).

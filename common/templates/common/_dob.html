@@ -1,0 +1,11 @@
+{% comment %}Date of birth: three wells that common/static/common/js/register.js keeps in step with the real field (which is the no-JS fallback).
+Needs `form` with date_of_birth. One shared feedback line under the group.{% endcomment %}
+<div class="field" data-dob>
+  <div class="dob" data-dob-fields hidden role="group" aria-label="Date of birth">
+    <div class="field"><label for="dob-day">Day</label><input id="dob-day" inputmode="numeric" autocomplete="bday-day" maxlength="2" placeholder="DD"></div>
+    <div class="field"><label for="dob-month">Month</label><input id="dob-month" inputmode="numeric" autocomplete="bday-month" maxlength="2" placeholder="MM"></div>
+    <div class="field"><label for="dob-year">Year</label><input id="dob-year" inputmode="numeric" autocomplete="bday-year" maxlength="4" placeholder="YYYY"></div>
+  </div>
+  <div data-dob-native><label for="{{ form.date_of_birth.id_for_label }}">Date of birth</label>{{ form.date_of_birth }}</div>
+  <p class="feedback" data-error-for="date_of_birth" id="{{ form.date_of_birth.auto_id }}_error" aria-live="polite" data-hint="Spa 99 is for 18 and over." data-good="Looks right" data-state="{% if form.date_of_birth.errors %}error{% else %}hint{% endif %}">{% if form.date_of_birth.errors %}{{ form.date_of_birth.errors|join:" " }}{% else %}Spa 99 is for 18 and over.{% endif %}</p>
+</div>

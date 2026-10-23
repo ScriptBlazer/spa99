@@ -20,20 +20,22 @@
     <h1>{% account_greeting %}</h1>
 
     <div class="panel panel--line interest" data-interest>
-      {% if interest and interest.plan %}
+      {% if is_gold %}
+      <p class="lead">Your Gold Card is active{% if gold_since %} since {{ gold_since|date:"j F Y" }}{% endif %}.</p>
+      {% elif interest and interest.plan %}
       <p class="lead">You're registered for {{ interest.plan.name }}.</p>
       {% for card in cards %}{% if card.slug == interest.plan.slug %}<p class="muted num">&pound;{{ card.price_whole }} a month, ex VAT (&pound;{{ card.price_inc }} inc VAT)</p>{% endif %}{% endfor %}
       {% else %}
       <p class="lead">No membership chosen yet.</p>
       {% endif %}
-      <button type="button" class="btn-quiet" data-interest-change aria-expanded="false" aria-controls="interest-form">Change</button>
+      {% if not is_gold %}<button type="button" class="btn-quiet" data-interest-change aria-expanded="false" aria-controls="interest-form">Change</button>
       <form id="interest-form" method="post" action="{% url 'account_interest' %}" hidden class="interest-form">
         {% csrf_token %}
         <div class="segmented segmented--wrap" role="radiogroup" aria-label="Membership you are interested in">
           {% for card in cards %}<label class="seg"><input type="radio" name="plan" value="{{ card.slug }}"{% if interest.plan.slug == card.slug %} checked{% endif %}><span>{{ card.name }}</span></label>{% endfor %}
         </div>
         <div class="actions"><button type="submit" class="btn btn-primary" data-working-text="Saving">Save</button></div>
-      </form>
+      </form>{% endif %}
     </div>
 
     <div class="soon-cards">
@@ -66,12 +68,12 @@
         <a class="btn-quiet" href="{% url 'account_export' %}">Download my data</a>
         <button type="button" class="btn-quiet" data-delete-open aria-expanded="false" aria-controls="delete-form">Delete my account</button>
       </div>
-      <form id="delete-form" method="post" action="{% url 'account_delete' %}" hidden class="delete-form form-stack-sm">
+      <form id="delete-form" method="post" action="{% url 'account_delete' %}" hidden class="delete-form form-panel form-stack-sm">
         {% csrf_token %}
         <div class="field">
           <label for="delete-password">Your password</label>
-          <input id="delete-password" name="password" type="password" autocomplete="current-password" required>
-          <p class="feedback" data-hint-static>We ask for it to make sure this is you.</p>
+          <input id="delete-password" name="password" type="password" autocomplete="current-password" aria-describedby="delete-password_error" required>
+          <p class="feedback" id="delete-password_error" data-hint-static>We ask for it to make sure this is you.</p>
         </div>
         <button type="submit" class="btn btn-danger" data-confirm data-confirm-title="Delete your account?"
           data-confirm-message="This removes your details and your interest. It can't be undone."

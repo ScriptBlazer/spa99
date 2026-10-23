@@ -103,3 +103,21 @@ Clean, branded, readable on a phone. Applicant receives a short, calm acknowledg
 - Potential rating matches the weights; changing weights in Control changes new ratings.
 - Email to Barry (mocked in tests) has the three sections in order, with cc.
 - No account is created.
+
+## Approval and invite (decided 2026-10-23, built 2026-10-23, ADM-05)
+
+- Applying needs no account (Phase 1 override of LC-26 is kept).
+- When Barry approves an application, the applicant is emailed an invite: a one-time, signed link that expires after 14 days (resend from Control/admin).
+- The link opens account setup with name, email and mobile prefilled from the application; the applicant only sets a password (email counts as verified because the link went to it).
+- The new account is linked to the application, Gold is active at once, there is no payment step, and the Gold month starts on the approval date (LC-27).
+- Declined applicants get no account. A Gold applicant who already has an account just gets Gold added on approval (no invite needed).
+
+### Built (2026-10-23)
+
+- **Admin actions** on Gold applications (Django admin, staff with the Gold application change permission): "Approve and invite" and "Resend invite (the old link stops working)". Declined and already approved applications are skipped with a message. Approving sets `status = approved`, `approved_at` (the Gold month starts here, LC-27) and `approved_by`.
+- **Invite**: model `GoldInvite` (application, `expires_at` 14 days, `sent_at`, `used_at`, `revoked_at`). The link is `/gold/invite/<token>/`; the token is the signed invite id, and the row decides if it still works (expired, used or replaced by a resend all look the same: one friendly "This link can't be used" page, 410). The email task takes only the invite id and builds the link when sending, so no token is stored in the queue. Invite status (sent, expires, used) shows read-only under the application in the admin and in its own read-only list.
+- **Setup page**: name and email come from the application and are read-only. He sets a password, gives his date of birth (18+, the same field and validator as registration), and accepts the men-only policy and privacy notice (marketing optional). His mobile is shown read-only; if it is not a valid UK mobile or is already on another account, the field becomes editable with the usual message. Opening the link uses nothing up (the page is never cached). POST creates the user (email marked verified), links the application, the journey session and other applications with that email, activates Gold, signs him in and goes to the account page with a welcome message. Rate limited (20 a hour per IP), CSRF protected. Erasing a person also erases the invites and the queued invite emails; the export lists approval and invite dates.
+- **Gold on the account**: his `InterestRegistration.plan` becomes the `gold` plan (the only place a member's plan lives in Phase 1; memberships arrive in Phase 2). The account page says "Your Gold Card is active since <approval date>" and hides the interest picker, and the interest endpoint will not replace Gold.
+- **Existing account**: no invite; Gold is added, the application is linked, and the short "Your Gold Card is active" email is queued.
+- **Emails**: Notification rows `gold_invite` (button "Set up your account") and `gold_active`, subjects editable. Created by `seed_phase1` and `backfill_site_data` (create-if-missing).
+- Not built: a Control screen for approvals (admin only for now), declining from an action (set the status by hand), expiring Gold after a month (Phase 2 memberships).

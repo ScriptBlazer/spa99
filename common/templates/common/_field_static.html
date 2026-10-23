@@ -1,0 +1,3 @@
+{% comment %}A read-only value shown as a field well (the same look as _field.html), for details we already hold.
+Usage: {% include "common/_field_static.html" with id="setup-email" label="Email" value=application.email %}{% endcomment %}
+<div class="field"><label for="{{ id }}">{{ label }}</label><input id="{{ id }}" value="{{ value }}" readonly></div>
