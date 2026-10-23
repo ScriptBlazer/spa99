@@ -4,8 +4,8 @@
 {% block body_class %}page-tour{% endblock %}
 {% block head_extra %}
 <link rel="stylesheet" href="{% static 'common/css/tour.css' %}">
-{# Cheap half of the 3D gate, before first paint, so the photo is not shown for a frame first. boot.js does the WebGL2 probe and removes the class if it fails. #}
-<script>(function(d){if(d.dataset.webgl==="off"||matchMedia("(prefers-reduced-motion: reduce)").matches||matchMedia("(prefers-reduced-data: reduce)").matches||(navigator.connection&&navigator.connection.saveData))return;d.classList.add("tour-gl");setTimeout(function(){if(!document.body.classList.contains("tour-3d"))d.classList.remove("tour-gl")},6000)})(document.documentElement)</script>
+{# Cheap half of the 3D gate, before first paint, only for rooms that have a 3D view. While html.tour-gl is set the room photo is never shown (Moishe 2026-10-23: no photo flashing before the 3D); it comes back only if 3D fails (boot.js probe) or takes over 6 s. #}
+{% tour_modules as head_mods %}{% if room.slug in head_mods %}<script>(function(d){if(d.dataset.webgl==="off"||matchMedia("(prefers-reduced-motion: reduce)").matches||matchMedia("(prefers-reduced-data: reduce)").matches||(navigator.connection&&navigator.connection.saveData))return;d.classList.add("tour-gl");setTimeout(function(){if(!document.body.classList.contains("tour-3d"))d.classList.remove("tour-gl")},6000)})(document.documentElement)</script>{% endif %}
 {% endblock %}
 {% block header_mode %}overlay{% endblock %}
 {% block main %}
