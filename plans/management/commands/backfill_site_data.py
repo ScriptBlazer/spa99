@@ -21,7 +21,9 @@ written by hand:
 - (2026-10-23, round 3) missing rows for the opener lines, amenity moments and kit (`spa`), Gold page notes (`gold`), the
   Memberships "every visit" row and the whole `signin` page are created (never overwritten, never re-created for pages
   you did not ask about); step 2 pills lose "Towel, robe and slippers" only while exactly the old wording; Gold perks
-  without a `note` get the starting one; the gym gets its bottle picture name only while it has no small picture at all
+  without a `note` get the starting one; the gym gets its bottle picture name only while it has no small picture at all.
+  The last two run only on the first round 3 run (while the `signin` page does not exist), so clearing the gym's picture
+  name or removing a note by hand stays cleared
 
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 from collections import Counter
@@ -137,6 +139,9 @@ def _round_3():
     """Round 3 data (2026-10-23): fills missing rows only; the one wording change needs the exact old text."""
     changed = Counter()
     pages = list(content_seed.PAGES)
+    # The record that round 3 has run is the `signin` page (new in round 3). Perk notes and the gym picture name can be
+    # emptied by hand, and empty looks the same as "never set", so they are only set while that page does not exist yet.
+    first_run = not Page.objects.filter(key="signin").exists()
     for page_key, wanted in ROUND_3_ROWS.items():
         title, description, sections = content_seed.PAGES[page_key]
         page = Page.objects.filter(key=page_key).first()
@@ -159,7 +164,7 @@ def _round_3():
         changed["content.Section (spa step 2 pills)"] += 1
 
     gold = Plan.objects.filter(slug="gold").first()
-    if gold is not None:
+    if gold is not None and first_run:
         perks, touched = [dict(p) for p in gold.perks or []], False
         for perk in perks:
             note = plans_seed.GOLD_PERK_NOTES.get(perk.get("key"))
@@ -171,7 +176,7 @@ def _round_3():
             changed["plans.Plan (Gold perk notes)"] += 1
 
     gym = Facility.objects.filter(slug="gym").first()
-    if gym is not None and not gym.detail_image and not gym.detail_image_name:
+    if gym is not None and first_run and not gym.detail_image and not gym.detail_image_name:
         gym.detail_image_name = plans_seed.GYM_DETAIL["detail_image_name"]
         gym.detail_alt = gym.detail_alt or plans_seed.GYM_DETAIL["detail_alt"]
         gym.save()

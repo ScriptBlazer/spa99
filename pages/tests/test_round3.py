@@ -197,11 +197,25 @@ class BackfillRound3Tests(TestCase):
         self.assertTrue(Section.objects.filter(page__key="spa", key="opener_1").exists())
         self.assertEqual(Section.objects.get(page__key="spa", key="opener_2").heading, "Men only, hand edited.")
         self.assertEqual(Section.objects.get(page__key="spa", key="step_2_pills").body, "Your own locker\nPhones stay in the locker")
+        # first run of round 3 (no signin page yet): the gym name and the notes are set
         self.assertEqual(Facility.objects.get(slug="gym").detail_image_name, "bottle-gym")
         self.assertEqual(pages.gold_facts()["perks"][1]["note"], "The Thursday evening meal, included.")
         out = StringIO()
         call_command("backfill_site_data", stdout=out)
         self.assertNotIn("round 3", out.getvalue())
+
+    def test_hand_edits_to_gym_picture_and_perk_notes_survive(self):
+        seed_all()
+        gym = Facility.objects.get(slug="gym")
+        gym.detail_image_name = ""
+        gym.detail_alt = ""
+        gym.save()
+        gold = Plan.objects.get(slug="gold")
+        gold.perks = [{k: v for k, v in p.items() if k != "note"} for p in gold.perks]
+        gold.save()
+        call_command("backfill_site_data", stdout=StringIO())
+        self.assertEqual(Facility.objects.get(slug="gym").detail_image_name, "")
+        self.assertFalse(any("note" in p for p in Plan.objects.get(slug="gold").perks))
 
 
 class ViewContextTests(TestCase):
