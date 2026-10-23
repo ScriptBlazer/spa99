@@ -18,6 +18,11 @@ STORAGES = {
 Q_CLUSTER = {**Q_CLUSTER, "sync": True}  # noqa: F405
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.dummy.DummyCache"}}  # rate limits off unless a test turns them on
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+DEFAULT_FROM_EMAIL = "Spa 99 <from@example.test>"
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+CONTACT_EMAIL = "hello@example.test"
+GOLD_APPROVER_EMAILS = ["approver@example.test"]
+GOLD_APPROVER_CC = ["cc@example.test"]
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 STARTUP_REPORT = None  # keep test output quiet
 

@@ -138,3 +138,12 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
   .o-actions-rail { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .o-tablecard { transition: none; } }
+/* One-tap Gold approval (phone first): one calm card, one big button, quiet links underneath */
+.o-confirm { max-width: 32rem; margin-inline: auto; display: grid; gap: var(--space-3); }
+.o-confirm > * { margin: 0; }
+.o-confirm h1 { font-size: var(--text-xl); }
+.o-confirm-line { overflow-wrap: anywhere; }
+.o-confirm-form { display: grid; gap: var(--space-2); margin: var(--space-3) 0 0; }
+.o-confirm-go { min-height: 3.5rem; font-size: var(--text-lg); }
+.o-confirm-state { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-sunken); }
+.o-confirm-links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }

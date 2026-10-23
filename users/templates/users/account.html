@@ -41,7 +41,7 @@
     <div class="soon-cards">
       <div class="soon-card"><h2>Visits</h2><p>{{ a.opening_soon.heading }}</p></div>
       <div class="soon-card"><h2>Bookings</h2><p>{{ a.opening_soon.heading }}</p></div>
-      <div class="soon-card"><h2>Membership</h2><p>{{ a.opening_soon.heading }}</p></div>
+      <div class="soon-card"><h2>Membership</h2><p>{% if is_gold %}Gold member{% else %}{{ a.opening_soon.heading }}{% endif %}</p></div>{# Moishe 2026-10-23: Gold holders see "Gold member" here #}
     </div>
 
     <div class="account-id panel panel--line">

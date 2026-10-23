@@ -12,6 +12,9 @@ from common.permissions import staff_in_groups
 READERS = ("Owner", "Manager", "Viewer")
 WRITERS = ("Owner", "Manager")
 OWNERS = ("Owner",)
+APPROVER = "Approver"  # Gold only: may look at and decide Gold applications, sees nothing else (no People, export or delete)
+GOLD_READERS = READERS + (APPROVER,)
+GOLD_WRITERS = WRITERS + (APPROVER,)
 
 def _role(*groups):
     """View decorator: signed in, is_staff AND in one of the groups (superusers are staff too). A member account in a
@@ -29,11 +32,13 @@ def _role(*groups):
 reader = _role(*READERS)
 writer = _role(*WRITERS)
 owner = _role(*OWNERS)
+gold_reader = _role(*GOLD_READERS)
+gold_writer = _role(*GOLD_WRITERS)
 
 
 def role_names(user):
     """The Office roles this person holds, from one query."""
-    return set(user.groups.filter(name__in=READERS).values_list("name", flat=True))
+    return set(user.groups.filter(name__in=GOLD_READERS).values_list("name", flat=True))
 
 
 def abilities(user, roles=None):
@@ -41,7 +46,8 @@ def abilities(user, roles=None):
     roles = role_names(user) if roles is None else roles
     everything = user.is_authenticated and user.is_staff and user.is_superuser
     return {
-        "can_act": everything or user.is_staff and bool(roles & set(WRITERS)),
+        "can_act": everything or user.is_staff and bool(roles & set(GOLD_WRITERS)),
+        "can_see_all": everything or user.is_staff and bool(roles & set(READERS)),
         "can_export": everything or user.is_staff and bool(roles & set(WRITERS)),
         "can_delete": everything or user.is_staff and bool(roles & set(OWNERS)),
     }

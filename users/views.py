@@ -3,6 +3,7 @@ Logic is in services.py. The templates are bare placeholders for the frontend to
 names and form field names.
 """
 from django.contrib import messages
+from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_not_required
@@ -73,6 +74,8 @@ class LoginView(auth_views.LoginView):
         foreign = journey_services.cookie_belongs_to_someone_else(self.request.COOKIES, user)
         mine = None if foreign else journey_services.session_from_cookies(self.request.COOKIES, user)
         response = super().form_valid(form)
+        if getattr(self.request, "urlconf", "") == "config.urls_office":  # Office only: set on this session, not site-wide
+            self.request.session.set_expiry(settings.OFFICE_SESSION_AGE)
         journey_services.link_user(mine, user)
         return _forget_journey_cookie(response) if foreign else response
 

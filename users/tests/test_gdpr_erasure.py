@@ -49,7 +49,7 @@ class ErasureTests(TestCase):
     def test_delete_removes_emails_about_the_person_and_their_queue_records(self):
         user = sign_up()
         application = apply_for_gold()
-        barry_log = EmailLog.objects.get(template="gold_barry")
+        barry_log = EmailLog.objects.get(template="gold_approver")
         self.assertNotIn(EMAIL, barry_log.to)  # it went to Barry, so only the subject link can find it
         self.assertEqual(barry_log.subject_email, EMAIL)
         self.assertTrue(Task.objects.filter(func__startswith="gold.tasks.").exists())
@@ -58,7 +58,7 @@ class ErasureTests(TestCase):
         keep_task = Task.objects.create(id="keep", name="keep", func="users.tasks.send_welcome_email", args=(str(other.pk),), started="2026-10-22T10:00Z", stopped="2026-10-22T10:00Z", success=True)
 
         export = services.export_user_data(user)
-        self.assertIn("gold_barry", [e["template"] for e in export["emails"]])  # the export finds Barry's email too
+        self.assertIn("gold_approver", [e["template"] for e in export["emails"]])  # the export finds Barry's email too
 
         result = services.delete_user_data(user)
 

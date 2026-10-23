@@ -10,7 +10,7 @@ from django.utils import timezone
 from plans.models import SiteSettings
 
 from .models import EmailLog, NotificationTemplate
-from .seed import DEFAULT_SUBJECTS
+from .seed import DEFAULT_SUBJECTS, LEGACY_KEYS
 
 logger = logging.getLogger("spa99.email")
 
@@ -30,6 +30,8 @@ def subject_for(key, **values):
     """The subject line for an email: the NotificationTemplate row (edited in Control), or the built-in default.
     {placeholders} are replaced from `values`; unknown ones are left as typed."""
     row = NotificationTemplate.objects.filter(key=key).first()
+    if row is None and key in LEGACY_KEYS:  # an install not yet backfilled still has the old row name
+        row = NotificationTemplate.objects.filter(key=LEGACY_KEYS[key]).first()
     text = row.subject if row else DEFAULT_SUBJECTS[key][0]
     for name, value in values.items():
         text = text.replace("{" + name + "}", str(value))

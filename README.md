@@ -77,7 +77,9 @@ Private folder (default `/Users/moishe/Library/CloudStorage/OneDrive-Personal/BM
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Local dev keys, allowed into `dev/` only. Never on the server (it uses its instance role) |
 | `EMAIL_BACKEND` | Dev: console (default). Live: `notifications.backends.SesBackend` (SES via the server IAM role) or the default SMTP backend |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` | SMTP settings (only with the SMTP backend) |
-| `DEFAULT_FROM_EMAIL` | From address (default `Spa 99 <hello@spa99.uk>`); replies go to the contact email in Site settings |
+| `DEFAULT_FROM_EMAIL` | From address of every email. Required in prod (no default). DKIM is signed by the mail provider/DNS |
+| `SERVER_EMAIL`, `CONTACT_EMAIL` | Server error From (default: the From address); contact/Reply-To address (default: the From address) |
+| `GOLD_APPROVER_EMAILS`, `GOLD_APPROVER_CC` | Comma separated: who gets each Gold application email (empty = none sent), and who is copied |
 | `AWS_SES_REGION_NAME` | Region for `SesBackend` (default `eu-west-2`) |
 | `CLIENT_IP_HEADER` | Prod only. Header Caddy fills with the real visitor IP (default `X-Client-IP`; see below). Used for rate limits and the login log |
 | `SITE_WEBGL` | `false` switches the 3D Gold Card off for everyone (sets `data-webgl="off"` on `<html>`; the CSS card stays). Default `true` |

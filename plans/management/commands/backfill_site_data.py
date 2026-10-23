@@ -29,6 +29,8 @@ written by hand:
 
 - ("Register interest" becomes "Register", 2026-10-23) the button / heading / title rows, only while exactly the old wording
 
+- (2026-10-23) the `gold_barry` / `gold_barry_repeat` email rows are renamed `gold_approver` / `gold_approver_repeat`
+
 - (virtual tour, 2026-10-23) the `tour` page and its rows, and the `spa` `tour_link` row, are created when missing
 
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
@@ -133,6 +135,7 @@ def backfill():
     changed.update(_journey_and_gold_2026_10_23())
     changed.update(_virtual_tour())
     changed.update(_gold_invite_emails())
+    changed.update(_approver_email_rows())
     return changed
 
 
@@ -147,6 +150,29 @@ def _gold_invite_emails():
         _, created = NotificationTemplate.objects.get_or_create(key=key, defaults={"subject": subject, "note": note})
         if created:
             changed["notifications.NotificationTemplate (Gold approval emails)"] += 1
+    return changed
+
+
+def _approver_email_rows():
+    """2026-10-23: the `gold_barry` email rows are renamed `gold_approver` (keeping any subject edited in Control). If the
+    new row was already created from the seed and still has its starting subject, the old edited row replaces it."""
+    from notifications.models import NotificationTemplate
+    from notifications.seed import DEFAULT_SUBJECTS, LEGACY_KEYS
+
+    changed = Counter()
+    for new_key, old_key in LEGACY_KEYS.items():
+        old = NotificationTemplate.objects.filter(key=old_key).first()
+        if old is None:
+            continue
+        new = NotificationTemplate.objects.filter(key=new_key).first()
+        if new is not None:
+            if new.subject != DEFAULT_SUBJECTS[new_key][0]:
+                continue  # the new row was edited by hand: leave both, change nothing
+            new.delete()
+        old.key = new_key
+        old.note = DEFAULT_SUBJECTS[new_key][1]
+        old.save()
+        changed["notifications.NotificationTemplate (gold_barry renamed gold_approver)"] += 1
     return changed
 
 

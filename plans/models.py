@@ -122,13 +122,6 @@ class SiteSettings(BaseModel):
         help_text='"Register" now; "Join" when payments open.',
     )
 
-    contact_email = models.EmailField(default="hello@spa99.uk")
-    gold_alert_to = models.CharField(
-        max_length=300, default="barry@bmlgroup.co.uk", help_text="Comma separated addresses."
-    )
-    gold_alert_cc = models.CharField(
-        max_length=300, blank=True, default="moishe.berkowitz@bmlgroup.co.uk", help_text="Comma separated addresses."
-    )
     privacy_version = models.CharField(
         max_length=20, default="draft-1", help_text="Recorded on each person who accepts the privacy notice."
     )
@@ -147,17 +140,14 @@ class SiteSettings(BaseModel):
         obj, _ = cls.objects.get_or_create(singleton_key="site")
         return obj
 
-    @staticmethod
-    def _split(value):
-        return [part.strip() for part in (value or "").split(",") if part.strip()]
-
     @property
-    def gold_alert_to_list(self):
-        return self._split(self.gold_alert_to)
+    def contact_email(self):
+        """From the environment (CONTACT_EMAIL), else the address inside DEFAULT_FROM_EMAIL. Not stored."""
+        from email.utils import parseaddr
 
-    @property
-    def gold_alert_cc_list(self):
-        return self._split(self.gold_alert_cc)
+        from django.conf import settings
+
+        return settings.CONTACT_EMAIL or parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
 
     @property
     def wording(self):

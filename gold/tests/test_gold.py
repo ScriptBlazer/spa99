@@ -78,9 +78,9 @@ class SubmitTests(TestCase):
         self.assertEqual(session.gold_applications.count(), 1)
 
         barry, thanks = mail.outbox
-        self.assertEqual(barry.to, ["barry@bmlgroup.co.uk"])
-        self.assertEqual(barry.cc, ["moishe.berkowitz@bmlgroup.co.uk"])
-        self.assertEqual(barry.reply_to, ["hello@spa99.uk"])
+        self.assertEqual(barry.to, ["approver@example.test"])
+        self.assertEqual(barry.cc, ["cc@example.test"])
+        self.assertEqual(barry.reply_to, ["hello@example.test"])
         self.assertEqual(barry.subject, "Gold Card application: Dan Cohen (High potential)")
         body = barry.body
         positions = [body.index(h) for h in ("1. PERSONAL DETAILS", "2. ABOUT HIM", "3. WHAT THE SITE COLLECTED")]
@@ -90,9 +90,13 @@ class SubmitTests(TestCase):
                          "Suggested membership: Tier 3", application.reference):
             self.assertIn(expected, body)
         html = barry.alternatives[0][0]
-        for text in (body, html):  # Control has no Gold page yet: no dead link
+        approve, view = (f"http://office.localhost:8000/gold/{application.pk}/approve/confirm/", f"http://office.localhost:8000/gold/{application.pk}/")
+        for text in (body, html):  # both buttons point at the Office host and carry only the application id
             self.assertNotIn("Open in Control", text)
-            self.assertNotIn(f"/gold/{application.pk}/", text)
+            self.assertIn(approve, text)
+            self.assertIn(view, text)
+        self.assertIn("Approve", html)
+        self.assertIn("View application", html)
         self.assertEqual(thanks.to, ["dan@example.com"])
         self.assertIn("We have your Gold Card application", thanks.body)
 
@@ -101,13 +105,21 @@ class SubmitTests(TestCase):
         self.assertEqual(EmailLog.objects.filter(status="sent").count(), 2)
 
     def test_recipients_come_from_settings_and_a_double_click_sends_nothing_new(self):
-        SiteSettings.objects.update(gold_alert_to="a@bml.example, b@bml.example", gold_alert_cc="")
-        first, _ = services.submit_application(application_data())
-        again, created = services.submit_application(application_data())
+        with self.settings(GOLD_APPROVER_EMAILS=["a@bml.example", "b@bml.example"], GOLD_APPROVER_CC=[]):
+            first, _ = services.submit_application(application_data())
+            again, created = services.submit_application(application_data())
         self.assertEqual((again.pk, created), (first.pk, False))
         self.assertEqual(len(mail.outbox), 2)
         self.assertEqual(mail.outbox[0].to, ["a@bml.example", "b@bml.example"])
         self.assertEqual(mail.outbox[0].cc, [])
+
+    def test_no_approver_configured_sends_nothing_to_anyone_but_still_thanks_the_applicant(self):
+        with self.settings(GOLD_APPROVER_EMAILS=[]), self.assertLogs("spa99.email", "WARNING"):
+            application, _ = services.submit_application(application_data())
+        self.assertEqual([m.to for m in mail.outbox], [["dan@example.com"]])
+        application.refresh_from_db()
+        self.assertIsNone(application.email_sent_at)
+        self.assertIn("GOLD_APPROVER_EMAILS", application.email_error)
 
     def test_repeat_applications_are_linked_and_flagged(self):
         first, _ = services.submit_application(application_data())
@@ -127,7 +139,7 @@ class SubmitTests(TestCase):
         self.assertIsNone(application.email_sent_at)
         self.assertIn("mail server down", application.email_error)
         self.assertEqual(EmailLog.objects.filter(status="failed").count(), 2)  # Barry and the applicant
-        services.resend_barry_email(application)
+        services.resend_approver_email(application)
         application.refresh_from_db()
         self.assertIsNotNone(application.email_sent_at)
         self.assertEqual(application.email_error, "")
@@ -233,7 +245,7 @@ class EditableQuestionsTests(TestCase):
 
     def test_the_barry_email_is_linked_to_the_applicant(self):
         services.submit_application(application_data())
-        self.assertEqual(EmailLog.objects.get(template="gold_barry").subject_email, "dan@example.com")
+        self.assertEqual(EmailLog.objects.get(template="gold_approver").subject_email, "dan@example.com")
         self.assertEqual(EmailLog.objects.get(template="gold_ack").subject_email, "dan@example.com")
 
 

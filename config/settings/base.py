@@ -88,6 +88,7 @@ DATABASES = build_databases(ENV.get("DATABASE_URL"), BASE_DIR / ".private" / "db
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "users.User"
+OFFICE_SESSION_AGE = 30 * 24 * 60 * 60  # staff sign-ins on the Office host last 30 days (SESSION_COOKIE_AGE stays Django's default for the public site)
 LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/login/"
@@ -115,7 +116,13 @@ EMAIL_PORT = int(ENV.get("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = ENV.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = ENV.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = ENV.bool("EMAIL_USE_TLS", True)
-DEFAULT_FROM_EMAIL = ENV.get("DEFAULT_FROM_EMAIL", "Spa 99 <hello@spa99.uk>")
+# Every address comes from the environment, nothing is hard-coded. DEFAULT_FROM_EMAIL is required in prod (dev.py has a
+# dev-only default). DKIM is signed by the mail provider and DNS, not by Django.
+DEFAULT_FROM_EMAIL = ENV.get("DEFAULT_FROM_EMAIL", "")
+SERVER_EMAIL = ENV.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
+CONTACT_EMAIL = ENV.get("CONTACT_EMAIL", "")  # shown on the site and used as Reply-To; empty = the From address
+GOLD_APPROVER_EMAILS = ENV.list("GOLD_APPROVER_EMAILS", [])  # who gets each Gold application email (whoever is here acts as Barry)
+GOLD_APPROVER_CC = ENV.list("GOLD_APPROVER_CC", [])
 AWS_SES_REGION_NAME = ENV.get("AWS_SES_REGION_NAME", "eu-west-2")
 # Absolute links used in emails (no trailing slash).
 SITE_WEBGL = ENV.bool("SITE_WEBGL", True)  # false = the 3D Gold Card never loads (CSS card only); read by base.html as data-webgl

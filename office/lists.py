@@ -203,3 +203,13 @@ def gold_detail(application):
         "can_decline": application.status in WAITING,
         "can_resend": application.status == GoldApplication.APPROVED and state["state"] != "account_set_up" and not application.user_id,
     }
+
+
+def gold_confirm(application):
+    """What the one-tap approve page shows: who, potential, one property line and the applied date."""
+    sections = {t["title"]: dict(t["rows"]) for t in gold_services.application_sections(application)}
+    about = sections.get("About him", {})
+    line = [about.get("What he does", ""), about.get("Link to property", ""), about.get("Size", ""), about.get("Where", "")]
+    return {"id": str(application.pk), "name": application.full_name, "first_name": application.first_name, "status": application.status,
+            "potential": application.potential_level, "property_line": " · ".join(p for p in line if p and p != "Not given"),
+            "applied": application.created_at, "can_approve": application.status in WAITING}

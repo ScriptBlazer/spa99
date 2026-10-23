@@ -43,6 +43,7 @@ jobs:
           DJANGO_SETTINGS_MODULE: config.settings.prod
           SECRET_KEY: ci-only-Pq7Wm2Xz9Lk4Rt6Vb8Nc1Hd3Jf5Gs0Ya2Ue4Oi6Kp8Wq1Zx3Mv5Bn7Lc9Td
           ADMIN_PATH: ci-only-admin/
+          DEFAULT_FROM_EMAIL: "Spa 99 <ci@example.com>"
       - name: Tests
         run: python manage.py test
 

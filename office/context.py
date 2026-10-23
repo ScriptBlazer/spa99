@@ -5,11 +5,11 @@ from . import selectors
 
 def _person(user, roles):
     """The signed-in person for the header and the navigation: name, initials and role."""
-    from .permissions import READERS
+    from .permissions import GOLD_READERS
 
     name = user.get_full_name() or user.email
     letters = [part[0] for part in (user.first_name, user.last_name) if part] or [user.email[:1]]
-    role = next((r for r in READERS if r in roles), "Owner" if user.is_superuser else "Staff")
+    role = next((r for r in GOLD_READERS if r in roles), "Owner" if user.is_superuser else "Staff")
     return {"name": name, "first_name": user.first_name or name, "initials": "".join(letters[:2]).upper(), "role": role}
 
 
