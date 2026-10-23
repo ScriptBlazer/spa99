@@ -6,6 +6,7 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_not_required
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
@@ -127,6 +128,7 @@ def _invalid_link(request, status=410):
 
 
 @login_not_required  # PUBLIC: the link in the approval email (signed, 14 days, single use, rate limited)
+@never_cache  # the link and the form hold a person's details: never stored by a browser or proxy
 @require_http_methods(["GET", "POST"])
 def invite_setup(request, token):
     """GET shows the setup form (nothing is used up by opening it); POST creates the account and signs him in."""

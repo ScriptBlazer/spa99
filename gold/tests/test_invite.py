@@ -179,3 +179,54 @@ class SetupPageTests(TestCase):
         self.assertEqual(self.post(password="short").status_code, 400)
         self.assertEqual(self.post(privacy_accepted="").status_code, 400)
         self.assertFalse(User.objects.filter(email="dan@example.com").exists())
+
+
+class ReviewFixTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def setUp(self):
+        mail.outbox.clear()
+        self.barry = staff()
+
+    def test_missing_gold_plan_rolls_back_and_sends_nothing(self):
+        from plans.models import Plan
+
+        member = User.objects.create_user("dan@example.com", PASSWORD)
+        application = make_application()
+        mail.outbox.clear()
+        Plan.objects.filter(slug="gold").delete()
+        self.assertEqual(invites.approve_and_invite(application, self.barry), invites.SKIPPED)
+        application.refresh_from_db()
+        self.assertEqual((application.status, application.approved_at, application.user), ("new", None, member))  # linked at apply time, not by approval
+        self.assertFalse(InterestRegistration.objects.filter(user=member).exists())
+        self.assertEqual(mail.outbox, [])
+
+    def test_a_second_approval_of_the_same_application_is_skipped(self):
+        application = make_application()
+        stale = GoldApplication.objects.get(pk=application.pk)  # a second admin tab holding the old status
+        invites.approve_and_invite(application, self.barry)
+        self.assertEqual(invites.approve_and_invite(stale, self.barry), invites.SKIPPED)
+        self.assertEqual(GoldInvite.objects.count(), 1)
+
+    def test_erasing_a_person_removes_invite_queue_records_and_export_lists_the_dates(self):
+        from django_q.models import Task
+
+        application = make_application()
+        invites.approve_and_invite(application, self.barry)
+        invite = application.invites.get()
+        exported = services.export_applications("dan@example.com")[0]
+        self.assertIsNotNone(exported["approved_at"])
+        self.assertEqual(set(exported["invites"][0]), {"created_at", "sent_at", "expires_at", "used_at", "replaced_at"})
+        Task.objects.create(id="t1", name="x", func="gold.tasks.send_gold_invite_email", args=(str(invite.pk),), started=timezone.now(), stopped=timezone.now(), success=True)
+        result = services.delete_applications("dan@example.com")
+        self.assertGreaterEqual(result["queue_records"], 1)
+        self.assertFalse(Task.objects.filter(func="gold.tasks.send_gold_invite_email").exists())
+        self.assertFalse(GoldInvite.objects.exists())
+
+    def test_setup_page_is_not_cached(self):
+        application = make_application()
+        invites.approve_and_invite(application, self.barry)
+        link = "/" + link_in(invite_mail()).split("/", 3)[3]
+        self.assertIn("no-store", Client().get(link)["Cache-Control"])

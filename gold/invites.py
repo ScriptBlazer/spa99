@@ -111,21 +111,32 @@ def _new_invite(application):
     return invite
 
 
+class _Rollback(Exception):
+    pass
+
+
 def approve_and_invite(application, approved_by):
-    """Approve one application. Returns INVITED, ACTIVATED (existing account) or SKIPPED (declined / already approved)."""
-    if application.status in (GoldApplication.DECLINED, GoldApplication.APPROVED):
-        return SKIPPED
+    """Approve one application. Returns INVITED, ACTIVATED (existing account) or SKIPPED (declined, already approved,
+    or Gold could not be activated: nothing is changed or sent then). Safe against two people approving at once."""
     existing = get_user_model().objects.filter(email__iexact=application.email).first()
-    with transaction.atomic():
-        application.status = GoldApplication.APPROVED
-        application.approved_at = timezone.now()
-        application.approved_by = approved_by
-        if existing is not None:
-            application.user = existing
-            activate_gold(existing)
-        application.save()
-        if existing is None:
-            _new_invite(application)
+    try:
+        with transaction.atomic():
+            fresh = GoldApplication.objects.select_for_update().get(pk=application.pk)
+            if fresh.status in (GoldApplication.DECLINED, GoldApplication.APPROVED):
+                return SKIPPED
+            fresh.status = GoldApplication.APPROVED
+            fresh.approved_at = timezone.now()
+            fresh.approved_by = approved_by
+            if existing is not None:
+                if not activate_gold(existing):
+                    raise _Rollback
+                fresh.user = existing
+            fresh.save()
+            if existing is None:
+                _new_invite(fresh)
+    except _Rollback:
+        return SKIPPED
+    application.refresh_from_db()
     if existing is not None:
         _queue("gold.tasks.send_gold_active_email", str(application.pk))
         return ACTIVATED

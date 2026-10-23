@@ -47,6 +47,8 @@ class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
         done = {invites.INVITED: 0, invites.ACTIVATED: 0, invites.SKIPPED: 0}
         for application in queryset:
             done[invites.approve_and_invite(application, request.user)] += 1
+            if application.status not in (GoldApplication.DECLINED, GoldApplication.APPROVED):
+                self.message_user(request, f"{application.reference}: Gold could not be activated (is the Gold plan missing?). Nothing was changed or sent.", messages.ERROR)
         if done[invites.INVITED]:
             self.message_user(request, f"Approved and invited: {done[invites.INVITED]}.", messages.SUCCESS)
         if done[invites.ACTIVATED]:
