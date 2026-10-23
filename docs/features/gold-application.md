@@ -103,3 +103,11 @@ Clean, branded, readable on a phone. Applicant receives a short, calm acknowledg
 - Potential rating matches the weights; changing weights in Control changes new ratings.
 - Email to Barry (mocked in tests) has the three sections in order, with cc.
 - No account is created.
+
+## Approval and invite (decided 2026-10-23, to build with approvals, ADM-05)
+
+- Applying needs no account (Phase 1 override of LC-26 is kept).
+- When Barry approves an application, the applicant is emailed an invite: a one-time, signed link that expires after 14 days (resend from Control/admin).
+- The link opens account setup with name, email and mobile prefilled from the application; the applicant only sets a password (email counts as verified because the link went to it).
+- The new account is linked to the application, Gold is active at once, there is no payment step, and the Gold month starts on the approval date (LC-27).
+- Declined applicants get no account. A Gold applicant who already has an account just gets Gold added on approval (no invite needed).
