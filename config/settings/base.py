@@ -35,7 +35,7 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".localhost"] + ENV.list("ALLOWED_HOS
 CSRF_FAILURE_VIEW = "common.views.csrf_failure"
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    "common.admin_site.SpaAdminConfig",  # django.contrib.admin, superusers only
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -89,6 +89,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "plans.context_processors.site",
+                "users.context.member_area",
                 "office.context.office",
                 "system.context.system",
             ],

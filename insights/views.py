@@ -8,8 +8,6 @@ from office.permissions import reader
 
 from . import services
 
-READERS = ("Owner", "Manager", "Viewer")  # superusers always pass
-
 
 def _date(value):
     try:

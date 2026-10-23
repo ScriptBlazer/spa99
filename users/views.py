@@ -2,6 +2,8 @@
 Logic is in services.py. The templates are bare placeholders for the frontend to replace; keep the context
 names and form field names.
 """
+from functools import wraps
+
 from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
@@ -10,6 +12,7 @@ from django.contrib.auth.decorators import login_not_required
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect, render
+from django.utils.decorators import method_decorator
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
@@ -231,9 +234,21 @@ def reset_password(request, uidb64, token):
 
 # ---------- account (signed in; the default login lock applies) ----------
 
+def member_area(view):
+    """Only people with a membership (and superusers) open the member area; anyone else signed in gets a calm page that
+    says so, with a link back to the website (never a 404: they are signed in and did nothing wrong)."""
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        if not member.can_open(request.user):
+            return render(request, "users/no_membership.html", {"email": request.user.email})
+        return view(request, *args, **kwargs)
+    return wrapper
+
+
 def _screen(template, build):
     """A signed-in member screen: GET only, the login lock applies. `build(user)` returns the context."""
 
+    @member_area
     @require_GET
     def view(request):
         return render(request, template, build(request.user))
@@ -252,6 +267,7 @@ def password_change_old(request):
     return HttpResponseRedirect(reverse("password_change"), status=307)  # 307 keeps the method, so an old form post still lands
 
 
+@member_area
 @require_POST
 def account_emails(request):
     """Marketing emails on or off (UK GDPR consent, logged in the person's history). 20 a minute per person."""
@@ -277,6 +293,10 @@ class ChangePasswordView(auth_views.PasswordChangeView):
     form_class = ChangePasswordForm
     success_url = reverse_lazy("account_you")
 
+    @method_decorator(member_area)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
     def get_context_data(self, **kwargs):
         # the member shell (verify banner, greeting, email) needs the same base context as the other screens
         return {**member.base_context(self.request.user), **super().get_context_data(**kwargs)}
@@ -291,6 +311,7 @@ class ChangePasswordView(auth_views.PasswordChangeView):
         return super().form_valid(form)  # keeps this session signed in
 
 
+@member_area
 @require_POST
 def account_interest(request):
     plan = services.interest_plans().filter(slug=request.POST.get("plan", "")).first()
@@ -305,6 +326,7 @@ def account_interest(request):
     return redirect("account_membership")
 
 
+@member_area
 @require_GET
 def account_export(request):
     """Download everything we hold about the signed-in person (UK GDPR)."""
@@ -313,6 +335,7 @@ def account_export(request):
     return response
 
 
+@member_area
 @require_POST
 def account_delete(request):
     """Delete the signed-in person's data after they re-enter their password."""

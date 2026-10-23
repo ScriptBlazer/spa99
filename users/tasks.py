@@ -36,6 +36,23 @@ def send_password_reset_email(user_id):
     return log.status
 
 
+def send_team_invite_email(user_id):
+    """The 'you've been added to the team' email: the normal password reset link (one hour, single use)."""
+    from common import levels
+
+    user = User.objects.filter(pk=user_id, is_active=True).first()
+    if user is None:
+        return None
+    uid, token = tokens.make_reset_link_parts(user)
+    level = levels.LABELS[levels.held_level(user)]
+    log = send_templated(
+        "team_invite", [user.email], subject_for("team_invite"),
+        {"first_name": user.first_name, "url": f"{settings.SITE_URL}/reset/{uid}/{token}/", "level": level, "office_url": settings.OFFICE_URL},
+        subject_email=user.email,
+    )
+    return log.status
+
+
 def send_welcome_email(user_id):
     user = User.objects.select_related("interest__plan").filter(pk=user_id).first()
     if user is None:

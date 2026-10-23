@@ -1,0 +1,11 @@
+{% autoescape off %}Hello {{ first_name|default:"there" }},
+
+You've been added to the Spa 99 team ({{ level }}). Use the link below to choose your own password. It works for one hour and only once.
+
+{{ url }}
+
+Then sign in at {{ office_url }}. If the link has run out, ask the person who added you to send a new one.
+
+{{ site_name }}, {{ address }}
+Questions? Reply to this email or write to {{ contact_email }}.
+{% endautoescape %}

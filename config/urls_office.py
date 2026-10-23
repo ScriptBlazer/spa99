@@ -1,6 +1,6 @@
-"""Spa 99 Office (office.spa99.uk): the business back office for staff (Owner, Manager, Viewer).
+"""Spa 99 Office (office.spa99.uk): the business back office for staff (team levels Office, Admin, Developer and superuser).
 Chosen by common.middleware.HostRoutingMiddleware. Locked by default (LoginRequiredMiddleware); each office view
-then checks the role."""
+then checks the team level."""
 from django.contrib import admin
 from django.conf import settings
 from django.contrib.auth.decorators import login_not_required

@@ -1,0 +1,29 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Merge accounts" description="Two accounts for one person: the one you keep gets the membership, journey sessions and Gold applications of the other, which is then deleted." %}
+<section class="sys-panel" aria-label="Choose the accounts">
+  <form method="post" action="{% url 'system_team_merge' %}" class="sys-team-add">{% csrf_token %}
+    <label>Keep this account (email) <input type="email" name="keep" value="{{ keep }}" required autocomplete="off"></label>
+    <label>Merge this one into it (email) <input type="email" name="remove" value="{{ remove }}" required autocomplete="off"></label>
+    <button type="submit" class="sys-btn sm">Show what would move</button>
+  </form>
+</section>
+{% if preview %}
+<section class="sys-panel" aria-label="What moves" data-system-merge-preview>
+  <h2>Merge {{ remove_user.email }} into {{ keep_user.email }}?</h2>
+  <ul>
+    <li>Membership: {{ preview.membership }}</li>
+    <li>Journey sessions moved: {{ preview.sessions }}</li>
+    <li>Gold applications moved: {{ preview.gold }}</li>
+    <li>Sign-in records moved: {{ preview.sign_ins }}</li>
+    {% if preview.fill %}<li>Filled in from the other account: {{ preview.fill|join:", " }}</li>{% endif %}
+    {% if preview.drops_team_level %}<li>The other account has a team level. It goes with that account.</li>{% endif %}
+    <li>{{ remove_user.email }} is deleted. This cannot be undone. {{ keep_user.email }} keeps its own password and team level.</li>
+  </ul>
+  <form method="post" action="{% url 'system_team_merge' %}">{% csrf_token %}
+    <input type="hidden" name="keep" value="{{ keep_user.email }}"><input type="hidden" name="remove" value="{{ remove_user.email }}"><input type="hidden" name="confirm" value="1">
+    <button type="submit" class="sys-btn primary">Merge the accounts</button> <a class="sys-btn" href="{% url 'system_team' %}">Cancel</a>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

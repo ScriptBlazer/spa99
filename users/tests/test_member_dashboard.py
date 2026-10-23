@@ -50,7 +50,7 @@ class MemberScreenTests(TestCase):
         context = self.client.get("/account/membership/").context
         self.assertTrue(context["is_gold"])
         self.assertEqual(context["status"], "gold")
-        self.client.force_login(make_user("n@example.com", verified=False))
+        self.client.force_login(make_user("n@example.com", verified=False, is_superuser=True, is_staff=True))  # no membership: only a superuser sees the empty dashboard
         home = self.client.get("/account/")
         self.assertEqual(home.context["status"], "none")
         self.assertFalse(home.context["verified"])
@@ -95,10 +95,32 @@ class MemberScreenTests(TestCase):
         self.assertEqual(InterestRegistration.objects.get().plan.slug, "tier-3")
 
 
+class MemberAreaAccessTests(TestCase):
+    def setUp(self):
+        seed_all()
+
+    def test_no_membership_gets_a_calm_page_not_a_404_and_a_superuser_always_gets_in(self):
+        team = make_user("team@example.com", is_staff=True)
+        self.client.force_login(team)
+        for url in ("/account/", "/account/book/", "/account/membership/", "/account/you/", "/account/you/password/"):
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200, url)
+            self.assertContains(response, "No membership on this account")
+            self.assertContains(response, 'href="/"')
+        self.assertContains(self.client.post("/account/interest/", {"plan": "tier-1"}), "No membership on this account")
+        self.assertFalse(InterestRegistration.objects.filter(user=team).exists())  # being on the team never makes a membership
+        self.client.force_login(make_user("root@example.com", is_staff=True, is_superuser=True))
+        home = self.client.get("/account/")
+        self.assertEqual((home.status_code, home.context["status"]), (200, "none"))  # an empty membership
+        self.client.force_login(make_user("member@example.com", plan=plan("tier-2")))
+        self.assertEqual(self.client.get("/account/").context["status"], "registered")
+
+
 class ConsentTests(TestCase):
     def test_marketing_consent_on_off_is_logged_and_needs_login(self):
         self.assertEqual(self.client.post("/account/emails/", {"marketing": "1"}).status_code, 302)
         user = make_user()
+        InterestRegistration.objects.create(user=user)
         self.client.force_login(user)
         self.assertRedirects(self.client.post("/account/emails/", {"marketing": "1"}), "/account/you/", fetch_redirect_response=False)
         user.refresh_from_db()
@@ -122,11 +144,19 @@ class WebsiteMenuTests(TestCase):
         self.assertIn(">Sign in<", html)
         self.assertNotIn("My Spa 99</a>", html)
         self.assertNotIn('href="/book/"', html)
-        self.client.force_login(make_user())
+        member = make_user()
+        InterestRegistration.objects.create(user=member)
+        self.client.force_login(member)
         html = self.client.get("/").content.decode()
         self.assertIn('href="/account/">My Spa 99</a>', html)
         self.assertNotIn(">Sign in<", html)
         self.assertNotIn('href="/book/"', html)
+
+    def test_a_team_member_without_a_membership_gets_sign_in_not_my_spa_99(self):
+        self.client.force_login(make_user("team@example.com", is_staff=True))
+        html = self.client.get("/").content.decode()
+        self.assertIn(">Sign in<", html)
+        self.assertNotIn("My Spa 99</a>", html)
 
     def test_book_redirects_members_and_teases_visitors(self):
         teaser = self.client.get("/book/")

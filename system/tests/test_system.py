@@ -23,7 +23,7 @@ LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"
 def make_user(email="dev@example.com", system=True, staff=True, superuser=False):
     user = User.objects.create_user(email, PASSWORD, is_staff=staff, is_superuser=superuser)
     if system:
-        user.groups.add(Group.objects.get_or_create(name="System")[0])
+        user.groups.add(Group.objects.get_or_create(name="Developer")[0])
     return user
 
 
@@ -192,17 +192,17 @@ class ImportCommandTests(TestCase):
 
 
 class TeamAndDashboardTests(TestCase):
-    def test_team_roles_are_logged_and_you_cannot_lock_yourself_out(self):
-        for role in ("Owner", "Viewer", "System"):
+    def test_team_levels_are_logged_and_you_cannot_lock_yourself_out(self):
+        for role in ("Office", "Admin", "Developer"):
             Group.objects.get_or_create(name=role)
         me, other = make_user(), make_user("other@example.com", system=False)
         client = unlocked_client(me)
-        client.post(f"/team/{other.pk}/roles/", {"roles": ["Viewer"]})
-        self.assertEqual(list(other.groups.values_list("name", flat=True)), ["Viewer"])
-        entry = SystemChange.objects.get(section="team", field="roles")
-        self.assertEqual((entry.old_value, entry.new_value, entry.undoable), ([], ["Viewer"], False))
-        client.post(f"/team/{me.pk}/roles/", {"roles": ["Owner"]})  # would drop my own System role
-        self.assertTrue(me.groups.filter(name="System").exists())
+        client.post(f"/team/{other.pk}/access/", {"level": "office"})
+        self.assertEqual(list(other.groups.values_list("name", flat=True)), ["Office"])
+        entry = SystemChange.objects.get(section="team", field="level")
+        self.assertEqual((entry.old_value, entry.new_value, entry.undoable), ("No team access", "Office", False))
+        client.post(f"/team/{me.pk}/access/", {"level": "office"})  # would drop my own Developer level
+        self.assertTrue(me.groups.filter(name="Developer").exists())
         client.post(f"/team/{me.pk}/active/", {"active": "0"})
         me.refresh_from_db()
         self.assertTrue(me.is_active)

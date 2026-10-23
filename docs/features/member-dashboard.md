@@ -16,6 +16,8 @@ Branch `feature/member-dashboard`. Spec: `docs/design/MEMBER.md`. Decision: `PRO
 | POST `/account/interest/` | `account_interest` | Redirects to Membership |
 | `/account/export/`, POST `/account/delete/` | | Unchanged; a wrong delete password returns to You |
 
+**Who may open it** (rule book U1/U2): only a person holding a membership (an interest registration, which includes Gold) or a superuser (an empty membership is shown). Team members without a membership get a calm 200 page "No membership on this account" with a link to the website (not a 404); `users.views.member_area` guards every `/account/*` view, and the website menu shows "My Spa 99" only when `has_member_area` (context processor `users.context.member_area`), else "Sign in".
+
 Sign in lands on `/account/` (`LOGIN_REDIRECT_URL`); a safe `next` wins. Verify and register already redirect to `account`.
 
 ## Context (users/member.py; every screen also gets the base set)

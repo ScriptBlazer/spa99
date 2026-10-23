@@ -62,14 +62,18 @@ class ControlAccessTests(TestCase):
         self.assertRedirects(response, "/login/?next=/", fetch_redirect_response=False)
         self.assertEqual(self.client.get("/insights/").status_code, 404)  # public host has no control pages
 
-    def test_only_staff_reach_the_index(self):
+    def test_only_admin_level_and_up_reach_the_index_everyone_else_gets_404(self):
+        from django.contrib.auth.models import Group
+
         User = get_user_model()
         member = User.objects.create_user("member@example.com", "a-long-password-1")
-        staff = User.objects.create_user("staff@example.com", "a-long-password-1", is_staff=True)
-        self.client.force_login(member)
-        self.assertEqual(self.client.get("/", **self.host).status_code, 403)
-        self.client.force_login(staff)
-        self.assertEqual(self.client.get("/", **self.host).status_code, 200)
+        office = User.objects.create_user("office@example.com", "a-long-password-1", is_staff=True)
+        office.groups.add(Group.objects.create(name="Office"))
+        admin = User.objects.create_user("admin@example.com", "a-long-password-1", is_staff=True)
+        admin.groups.add(Group.objects.create(name="Admin"))
+        for user, expected in ((member, 404), (office, 404), (admin, 200)):
+            self.client.force_login(user)
+            self.assertEqual(self.client.get("/", **self.host).status_code, expected, user.email)
 
 
 class SpaDayTests(SimpleTestCase):

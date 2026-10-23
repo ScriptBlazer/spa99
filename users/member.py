@@ -6,8 +6,17 @@ from plans import services as plan_services
 from plans.models import SiteSettings
 
 from . import services
+from .models import InterestRegistration
 
 STATUS_GOLD, STATUS_REGISTERED, STATUS_NONE = "gold", "registered", "none"
+
+
+def can_open(user):
+    """May this person open the member area (/account/)? Only with a membership (interest and/or Gold); a superuser always
+    can (an empty membership is shown). Being on the team never gives member access (user rule book U1)."""
+    if not user.is_authenticated or not user.is_active:
+        return False
+    return user.is_superuser or InterestRegistration.objects.filter(user=user).exists()
 
 
 def _card(plan, vat, ranges):

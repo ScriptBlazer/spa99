@@ -142,7 +142,7 @@ class PermissionTests(TestCase):
         self.assertEqual(self.get(public_member).status_code, 403)
 
     def test_roles_can_read(self):
-        for role in ("Owner", "Manager", "Viewer"):
+        for role in ("Office", "Admin", "Developer"):
             response = self.get(self.staff(f"{role}@example.com", role))
             self.assertEqual(response.status_code, 200, role)
             self.assertIn("funnel", response.json())
@@ -150,19 +150,11 @@ class PermissionTests(TestCase):
         self.assertEqual(self.get(superuser).status_code, 200)
 
     def test_bad_dates_and_the_public_host_has_no_such_page(self):
-        viewer = self.staff("viewer2@example.com", "Viewer")
+        viewer = self.staff("viewer2@example.com", "Office")
         self.assertEqual(self.get(viewer, "/insights/summary/?from=yesterday").status_code, 400)
         self.assertEqual(self.get(viewer, host="localhost").status_code, 404)
 
-    def test_viewer_is_read_only_and_manager_cannot_manage_the_team(self):
-        viewer = Group.objects.get(name="Viewer").permissions.values_list("codename", flat=True)
-        self.assertTrue(all(code.startswith("view_") for code in viewer))
-        manager = set(Group.objects.get(name="Manager").permissions.values_list("codename", flat=True))
-        self.assertIn("change_plan", manager)
-        self.assertNotIn("change_goldapplication", manager)
-        self.assertNotIn("change_user", manager)
-        self.assertNotIn("add_group", manager)
-        owner = set(Group.objects.get(name="Owner").permissions.values_list("codename", flat=True))
-        self.assertTrue({"change_goldapplication", "change_user", "add_group"} <= owner)
-        call_command("setup_roles", stdout=StringIO())  # safe to run again
-        self.assertEqual(Group.objects.count(), 5)
+    def test_setup_roles_makes_the_four_team_groups_and_is_safe_to_run_again(self):
+        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {"Office", "Admin", "Developer", "Approver"})
+        call_command("setup_roles", stdout=StringIO())
+        self.assertEqual(Group.objects.count(), 4)
