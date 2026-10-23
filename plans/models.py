@@ -3,7 +3,7 @@ Nothing in this file is a rule: values come from rows (see docs/SPA99_RULES.md "
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from simple_history.models import HistoricalRecords
 
@@ -101,7 +101,9 @@ class SiteSettings(BaseModel):
     WORDING_CHOICES = [(INTEREST, "Register"), (JOIN, "Join")]
 
     singleton_key = models.CharField(max_length=10, default="site", unique=True, editable=False)
-    vat_rate = models.DecimalField("VAT rate (%)", max_digits=5, decimal_places=2, default=Decimal("20.00"))
+    vat_rate = models.DecimalField(
+        "VAT rate (%)", max_digits=5, decimal_places=2, default=Decimal("20.00"),
+        validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))])
     capacity = models.PositiveSmallIntegerField(default=25, help_text="Places in the spa at once (BK-03).")
     slot_length_minutes = models.PositiveSmallIntegerField(default=120)
     slot_step_minutes = models.PositiveSmallIntegerField(default=30)

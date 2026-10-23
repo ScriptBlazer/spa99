@@ -54,6 +54,7 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "common.middleware.HostRoutingMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "system.middleware.SystemGateMiddleware",  # System host: 404 for non-developers before CSRF can tell routes apart
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",

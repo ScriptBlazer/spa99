@@ -86,3 +86,11 @@ Each page lists rows as small forms (field prefix = the row id; `new...` prefixe
 - `SYSTEM_ENV_LABEL` (DEV/LIVE; dev default DEV, prod default LIVE, optional env var) reaches System templates as `system_env` through `system.context.system` (System host only).
 - The plan hide/show endpoint is removed: the row's Visible toggle saves through the normal row POST, which is logged and undoable.
 
+### Review fixes (2026-10-23)
+
+- The 12 hour limit is a hard cap: the System sign-in time is stored in the session and checked on every request (`services.sign_in_valid`); after 12 hours the person is signed out and sent to the sign-in, however active they were.
+- `SiteSettings.vat_rate` must be 0 to 100 (validator, `plans.0008`, schema only); VAT, opening date, stage switches and the recipients are passed as `risky_fields` so Settings and Emails confirm old to new.
+- `system.middleware.SystemGateMiddleware` (after sessions, before CSRF) answers the plain 404 to anyone who may not be on the System host, so real routes and unknown paths look the same. `/login/`, `/health/` and `/robots.txt` stay open.
+- Undo all runs in one transaction with a savepoint per entry: a refused entry (changed again, already undone) is skipped and reported while the others go through; any unexpected error rolls the whole batch back. Undo re-reads the entry with `select_for_update()` (no joins) and refuses when it was already undone.
+- A locked POST comes back after unlock to the Referer (same host only) or its section page, never to the POST-only URL.
+

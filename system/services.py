@@ -34,7 +34,16 @@ def may_use_system(user):
 
 
 UNLOCK_KEY = "system_unlocked_at"
-SIGNED_IN_KEY = "system_signed_in"  # set only by the System sign-in page: a session made on another host never counts
+SIGNED_IN_KEY = "system_signed_in"  # the time of the System sign-in (set only by the System sign-in page: a session made on another host never counts)
+
+
+def sign_in_valid(session, now=None):
+    """True while this System sign-in is younger than SYSTEM_SESSION_AGE (12 h), however active the person is."""
+    from django.conf import settings
+
+    stamp = session.get(SIGNED_IN_KEY)
+    now = time.time() if now is None else now
+    return bool(stamp) and now - stamp < settings.SYSTEM_SESSION_AGE
 
 
 def is_unlocked(session, now=None, idle_seconds=None):
@@ -94,6 +103,9 @@ def undo_change(change, user):
     if not changes.is_undoable_field(field):
         raise ChangeRefused("This entry cannot be undone.")
     with transaction.atomic():
+        change = SystemChange.objects.select_for_update().get(pk=change.pk)  # no select_related: Postgres cannot lock nullable joins
+        if change.undone_by.exists():
+            raise ChangeRefused("This change has already been undone.")
         obj = model.objects.filter(pk=change.object_pk).first()
         if obj is None:
             raise ChangeRefused("That row no longer exists.")
@@ -108,11 +120,15 @@ def undo_change(change, user):
     return obj
 
 
+@transaction.atomic
 def undo_batch(batch_id, user):
-    """Undo every undoable, not yet undone entry saved together. Returns (undone count, refused messages)."""
+    """Undo every undoable, not yet undone entry saved together. Returns (undone count, refused messages).
+    One transaction for the whole batch; each entry runs in its own savepoint (undo_change). A ChangeRefused rolls back
+    only that entry's savepoint and is reported (the others still go through); any other error escapes and rolls the
+    whole batch back."""
     entries = SystemChange.objects.filter(batch_id=batch_id, kind=SystemChange.UPDATED, undo_of__isnull=True, undone_by__isnull=True)
     done, refused = 0, []
-    for change in entries.order_by("-created_at"):
+    for change in list(entries.order_by("-created_at")):
         try:
             undo_change(change, user)
             done += 1

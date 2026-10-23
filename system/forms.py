@@ -23,6 +23,12 @@ class EmailsForm(forms.ModelForm):
 
 
 class SettingsForm(forms.ModelForm):
+    def clean_vat_rate(self):
+        rate = self.cleaned_data["vat_rate"]
+        if rate < 0 or rate > 100:
+            raise forms.ValidationError("Enter a rate between 0 and 100.")
+        return rate
+
     class Meta:
         model = SiteSettings
         fields = ["opening_date", "opening_text", "register_interest_open", "subscribe_open", "booking_open",

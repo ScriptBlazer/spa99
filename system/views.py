@@ -1,5 +1,7 @@
 """System pages: short views; logic in services.py. Templates are minimal with stable data-system-* hooks (the design
 brief is docs/design/SYSTEM.md). Every page except sign-in goes through `signed_in` or `unlocked` (404 for strangers)."""
+import time
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
@@ -18,6 +20,7 @@ from users.views import LoginView
 
 from . import changes, services
 from .forms import EmailsForm, SettingsForm
+from .forms_rules import RISKY
 from .models import SystemChange
 from .permissions import signed_in, unlocked
 
@@ -68,7 +71,7 @@ class SystemLoginView(LoginView):
     def form_valid(self, form):
         response = super().form_valid(form)
         self.request.session.set_expiry(settings.SYSTEM_SESSION_AGE)
-        self.request.session[services.SIGNED_IN_KEY] = True
+        self.request.session[services.SIGNED_IN_KEY] = time.time()  # the 12 hour limit counts from here
         services.lock(self.request.session)
         return response
 
@@ -166,7 +169,8 @@ def _edit_site(request, form_class, template, section):
         else:
             messages.info(request, "Nothing changed.")
         return redirect(request.path)
-    return page(request, template, section, {"form": form}, status=400 if request.method == "POST" else 200)
+    context = {"form": form, "risky_fields": RISKY.get(section, [])}
+    return page(request, template, section, context, status=400 if request.method == "POST" else 200)
 
 
 @unlocked
