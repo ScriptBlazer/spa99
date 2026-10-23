@@ -87,10 +87,12 @@ class SubmitTests(TestCase):
         self.assertEqual(positions, sorted(positions))
         for expected in ("dan@example.com", "Owner / investor", "Potential: High (12 points)", "Owner or investor (+5)",
                          "Evening (6 to 10pm), Late night (10pm to 3am)", "Cold plunge, Gym", "Often with someone",
-                         "Suggested membership: Tier 3", f"/gold/{application.pk}/", "Open in Control", application.reference):
+                         "Suggested membership: Tier 3", application.reference):
             self.assertIn(expected, body)
         html = barry.alternatives[0][0]
-        self.assertIn("Open in Control", html)
+        for text in (body, html):  # Control has no Gold page yet: no dead link
+            self.assertNotIn("Open in Control", text)
+            self.assertNotIn(f"/gold/{application.pk}/", text)
         self.assertEqual(thanks.to, ["dan@example.com"])
         self.assertIn("We have your Gold Card application", thanks.body)
 

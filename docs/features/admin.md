@@ -2,13 +2,28 @@
 
 Phase 1. Apps: `control`, `insights`, plus each app's `services.py`.
 
+## Status: what is built and what is not (2026-10-23)
+
+**Spa 99 Control is NOT built yet.** There is no `control` app and none of the sections below exist as screens.
+
+| Built | Not built |
+|---|---|
+| Control host routing (`CONTROL_DOMAIN` uses `config.urls_control`), login required, staff only | Every section in the table below (Dashboard, People, Gold, Journey, Plans, Hours, Content, Gold rules, Notifications, Settings, Team) |
+| `config.views.control_index`: a placeholder that returns the plain text "Spa 99 Control" | The Control screens in the brand look, CSV export buttons, GDPR export and delete buttons |
+| Roles `Owner`, `Manager`, `Viewer` (`setup_roles`) | Field-level permissions (Manager cannot change Team or Gold status) |
+| Statistics as JSON: `GET /insights/summary/` on the Control host (staff roles only) | Statistics charts and cards |
+| Change history on every model (`django-simple-history`) | History shown on each item |
+| The hidden Django admin (path from `ADMIN_PATH`, superusers): the ONLY place today to edit plans, hours, facilities, copy, Gold rules, notification templates and settings, and to see and export people and Gold applications | |
+
+Everything in the sections below is the plan, not the current state. Barry's Gold email has no "Open in Control" link for now. TODO: add it back when Control has `/gold/<id>/` (see `docs/features/gold-application.md`).
+
 ## What it is
 
 A custom back office in the Spa 99 look. Not the regular Django admin (that stays hidden as a superuser fallback). Everything that might change lives here, so rules and prices never need a developer.
 
 Mobile-usable, fast, calm. Same shared buttons, modal, messages and validation as the site (`common`).
 
-## Sections (Phase 1)
+## Sections (Phase 1, planned, not built)
 
 | Section | What you can do |
 |---|---|
@@ -26,7 +41,7 @@ Mobile-usable, fast, calm. Same shared buttons, modal, messages and validation a
 
 Every change is recorded (who, when, before and after) via `django-simple-history` and shown on the item (ADM-11).
 
-## Roles (Phase 1, to approve)
+## Roles (Phase 1, to approve; the groups exist, the Control checks do not)
 
 | Role | Can |
 |---|---|

@@ -6,5 +6,4 @@
 {{ forloop.counter }}. {{ section.title|upper }}
 {% for label, value in section.rows %}{{ label }}: {{ value }}
 {% endfor %}{% endfor %}
-Open in Control: {{ control_url }}
 {% endautoescape %}

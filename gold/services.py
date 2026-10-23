@@ -2,7 +2,6 @@
 import logging
 from datetime import timedelta
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
@@ -187,7 +186,6 @@ def barry_email_context(application):
         "sections": application_sections(application),
         "is_repeat": application.is_repeat,
         "repeat_reference": application.repeat_of.reference if application.repeat_of_id else "",
-        "control_url": f"{settings.CONTROL_URL}/gold/{application.pk}/",
         "recipients": site.gold_alert_to_list,
     }
 
