@@ -334,3 +334,7 @@ Frontend, before review; reviewer repeats 1, 3, 4, 7, 9 with screenshots at 375 
 10. **Clean revert.** Turning on reduced motion or resizing below 64em while on the page removes the canvas, `renderer.info.memory` geometries and textures read 0 after `dispose()`, and the static or CSS layout is correct. Never more than one WebGL context per page.
 11. **Budget.** `three.module.min.js` ≤ 155 KB gzip, `gold-card-3d.js` ≤ 9 KB, `scenes.js` ≤ 10 KB, Home motion JS on phones ≤ 75 KB, still 1280w ≤ 70 KB. Lighthouse mobile ≥ 90 unchanged; LCP on Home is still the hero image, on the Gold page the heading.
 12. **Accessibility.** The mount and everything in it are `aria-hidden`; axe shows no new issues; tab order skips the card.
+
+### 7.6 Retune by eye (2026-10-23, coordinator, real WebGL render)
+
+The flat look came from the bright strip sitting straight behind the camera, so the face mirrored it at every angle. The lights now stand off-axis (left high, right low, strip up-right), a broad soft `base` panel behind the viewer keeps the resting face warm gold, clearcoat is 0.4 and relief `bump` 2.0, so the swan stands out and the highlight sweeps as the card turns. Note for checks: the canvas fades in over `--duration-gl-in`; in a hidden/throttled browser the fade never finishes and screenshots show the CSS card underneath, so force `canvas { opacity: 1 }` to judge the 3D card.

@@ -19,8 +19,8 @@ const D2R = Math.PI / 180;
 //   rim: a hot strip behind (lights edges and the back). rough: multiplies the face roughness map (field 0.21, swan 0.1, text 0.3): lower = sharper mirror. coat: clearcoat. bump: swan and engraving relief.
 //   face/edge/back/light: reflection per surface and the key light. exposure. mood/period/peak: Home only, extra dim and brighten with the turn.
 const LOOK = {
-  hero: { wall: 0.07, floor: 0.05, fill: 0.2, boxL: 9, boxR: 8, strip: 11, stripW: 0.9, rim: 8, rough: 0.5, coat: 0.9, exposure: 1,    face: 1,    edge: 1,    back: 0.85, light: 0.3,  bump: 1.4, mood: 0,    period: 36, peak: 0 },
-  home: { wall: 0.05, floor: 0.04, fill: 0.15, boxL: 8, boxR: 7, strip: 10, stripW: 0.9, rim: 7, rough: 0.5, coat: 0.9, exposure: 0.95, face: 0.95, edge: 0.95, back: 0.8,  light: 0.25, bump: 1.4, mood: 0.35, period: 36, peak: 2 },
+  hero: { base: 2.2, wall: 0.16, floor: 0.09, fill: 0.4, boxL: 9, boxR: 8, strip: 11, stripW: 0.9, rim: 8, rough: 0.5, coat: 0.4, exposure: 1,    face: 1,    edge: 1,    back: 0.85, light: 0.3,  bump: 2.0, mood: 0,    period: 36, peak: 0 },
+  home: { base: 1.6, wall: 0.05, floor: 0.04, fill: 0.15, boxL: 8, boxR: 7, strip: 10, stripW: 0.9, rim: 7, rough: 0.5, coat: 0.9, exposure: 0.95, face: 0.95, edge: 0.95, back: 0.8,  light: 0.25, bump: 1.4, mood: 0.35, period: 36, peak: 2 },
 };
 const idle = (fn) => new Promise((resolve) => (window.requestIdleCallback ? requestIdleCallback(() => resolve(fn()), { timeout: 800 }) : setTimeout(() => resolve(fn()), 0)));
 
@@ -269,9 +269,12 @@ export function create(mount, { gsap, tokens, card }) {
       m.position.set(x, y, z); m.lookAt(0, 0, 0); studio.add(m);
     };
     studio.add(new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshBasicMaterial({ color: tok('--color-gold-studio').multiplyScalar(look.wall), side: THREE.BackSide })));   // warm walls: the face never meets black
-    part(3.2, 2.2, '--color-gold-studio', look.boxL, -3.2, 1.2, 3.6);   // softbox left, high
-    part(2.4, 3.2, '--color-gold-studio', look.boxR, 3.4, -0.2, 3.2);   // softbox right
-    part(look.stripW, 5.5, '--color-gold-studio', look.strip, 0.2, 0, 4.8);   // tall strip, centre
+    // Nothing bright sits straight behind the camera (the face would mirror it at every angle: that was the flat look).
+    // The lights stand off-axis, so the face mostly mirrors the dark room and each light sweeps across it as the card turns.
+    part(2, 1.4, '--color-gold-studio', look.boxL, -3.8, 2.2, 2.4);    // softbox left, high
+    part(1.6, 2.4, '--color-gold-studio', look.boxR, 3.9, -1.2, 2.2);  // softbox right, low
+    part(look.stripW, 5.5, '--color-gold-studio', look.strip, 2.6, 1.6, 3.2);   // tall strip, up and to the right
+    part(9, 6, '--color-gold-studio', look.base, 0, 0.4, 4.9);   // soft base panel behind the viewer: the resting face reads warm gold, the boxes give the peaks
     part(0.15, 4, '--color-led', look.rim, 4, 0.5, -1);         // rim strip
     part(1.6, 4, '--color-gold-studio', 1.4 * look.fill, -4.6, 0, 0.5); part(1.6, 4, '--color-gold-studio', 1.4 * look.fill, 4.6, 0, 1);   // side fills: a soft panel is always in reach at grazing angles
     part(5, 5, '--color-gold-studio', 1.1 * look.fill, 0, 2.9, 0.5);  // overhead fill
