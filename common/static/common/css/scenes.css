@@ -370,8 +370,6 @@ html.motion .gold-scene .glow { z-index: 1; }
 }
 
 /* H5 */
-html.motion .mark-draw .mark-fill { opacity: 0; }
-html.motion .mark-draw .mark-line { display: block; }
 
 /* will-change only where it moves, and only under motion */
 html.motion .frame-media, html.motion .window-media, html.motion .hero-window, html.motion [data-depth], html.motion [data-drift] { will-change: transform; }

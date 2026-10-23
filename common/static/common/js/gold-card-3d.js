@@ -19,7 +19,7 @@ const D2R = Math.PI / 180;
 //   rim: a hot strip behind (lights edges and the back). rough: multiplies the face roughness map (field 0.21, swan 0.1, text 0.3): lower = sharper mirror. coat: clearcoat. bump: swan and engraving relief.
 //   face/edge/back/light: reflection per surface and the key light. exposure. mood/period/peak: Home only, extra dim and brighten with the turn.
 const LOOK = {
-  hero: { base: 2.2, wall: 0.16, floor: 0.09, fill: 0.4, boxL: 9, boxR: 8, strip: 11, stripW: 0.9, rim: 8, rough: 0.5, coat: 0.4, exposure: 1,    face: 1,    edge: 1,    back: 0.85, light: 0.3,  bump: 2.0, mood: 0,    period: 36, peak: 0 },
+  hero: { base: 0.8, wall: 0.12, floor: 0.07, fill: 0.3, boxL: 11, boxR: 9, strip: 15, stripW: 0.9, rim: 8, rough: 0.5, coat: 0.4, exposure: 1,    face: 1,    edge: 1,    back: 0.85, light: 0.3,  bump: 1.8, mood: 0,    period: 36, peak: 0 },
   home: { base: 1.6, wall: 0.05, floor: 0.04, fill: 0.15, boxL: 8, boxR: 7, strip: 10, stripW: 0.9, rim: 7, rough: 0.5, coat: 0.9, exposure: 0.95, face: 0.95, edge: 0.95, back: 0.8,  light: 0.25, bump: 1.4, mood: 0.35, period: 36, peak: 2 },
 };
 const idle = (fn) => new Promise((resolve) => (window.requestIdleCallback ? requestIdleCallback(() => resolve(fn()), { timeout: 800 }) : setTimeout(() => resolve(fn()), 0)));
@@ -419,7 +419,9 @@ export function create(mount, { gsap, tokens, card }) {
     tick = loop; gsap.ticker.add(tick);
     running = true;
     // Hand-over: the canvas fades in over the CSS card (same proxy, same pose); the CSS card then rests under it.
-    gsap.to(canvas, { opacity: 1, duration: parseFloat(getComputedStyle(mount).getPropertyValue('--duration-gl-in')) || 1.2, ease: 'soft', onComplete: () => { shown = true; if (!dead) { card.gl = true; mount.classList.add('is-gl'); } } });
+    // tokens are in ms ("1200ms"); parseFloat alone read it as 1200 s (the 3D card took ~20 minutes to appear). Short on purpose: no flat card first.
+    const fadeMs = parseFloat(getComputedStyle(mount).getPropertyValue('--duration-gl-in')) || 400;
+    gsap.to(canvas, { opacity: 1, duration: Math.min(fadeMs / 1000, 0.4), ease: 'soft', onComplete: () => { shown = true; if (!dead) { card.gl = true; mount.classList.add('is-gl'); } } });
   })();
 
   function dispose() {

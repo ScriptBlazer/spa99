@@ -6,6 +6,32 @@ import { cleanups, lineRise, fadeUp, thread } from './scenes.js';
 const { gsap, ScrollTrigger } = window;
 const root = document.documentElement;
 
+/* TEMPORARY (2026-10-23): add ?glcheck to the URL to see whether the 3D card can run here, and if not, why. Remove once diagnosed. */
+if (new URLSearchParams(location.search).has('glcheck')) {
+  const why = [];
+  if (root.dataset.webgl === 'off') why.push('SITE_WEBGL is off');
+  if (!matchMedia('(min-width: 64em)').matches) why.push(`window too narrow (${innerWidth}px, needs 1024)`);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) why.push('Reduce motion is on');
+  if (navigator.connection?.saveData || matchMedia('(prefers-reduced-data: reduce)').matches) why.push('save data is on');
+  if ((navigator.deviceMemory ?? 8) < 4) why.push(`low memory reported (${navigator.deviceMemory} GB)`);
+  if ((navigator.hardwareConcurrency ?? 8) < 4) why.push(`few CPU cores reported (${navigator.hardwareConcurrency})`);
+  const strict = document.createElement('canvas').getContext('webgl2', { failIfMajorPerformanceCaveat: true });
+  const loose = document.createElement('canvas').getContext('webgl2');
+  if (!strict) why.push(loose ? 'WebGL2 only in slow software mode (graphics acceleration off?)' : 'no WebGL2');
+  const tag = document.createElement('div');
+  tag.textContent = why.length ? `3D card OFF: ${why.join('; ')}` : '3D card ON';
+  tag.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:9999;padding:10px 14px;background:#000;color:#fff;font:14px/1.4 sans-serif;border-radius:6px';
+  document.body.append(tag);
+  const errors = [];
+  addEventListener('error', (e) => errors.push(e.message || String(e.error)));
+  addEventListener('unhandledrejection', (e) => errors.push(String(e.reason?.message || e.reason)));
+  setTimeout(() => {
+    const canvas = document.querySelector('.gc-gl canvas');
+    const mount = document.querySelector('.gold-card');
+    tag.textContent += ` | after 8 s: canvas ${canvas ? `opacity ${(+getComputedStyle(canvas).opacity).toFixed(2)}` : 'missing'}, ${mount?.classList.contains('is-gl') ? '3D showing' : 'flat card showing'}${errors.length ? ` | errors: ${errors.join(' / ')}` : ''}`;
+  }, 8000);
+}
+
 /* ---------- the Gold Card (docs/design/GOLD-CARD-3D.md) ---------- */
 
 const ramp = (pts) => (t) => {                            // piecewise linear through [t, value] points
@@ -22,7 +48,7 @@ const HOME_SHEEN = ramp([[0, -1], [0.45, -1], [0.75, 1], [1, 1]]);
 export function goldCard(mount, scene, { desktop, fine, ctx }) {
   const q = (sel) => mount.querySelector(sel);
   const k = desktop ? 1 : 18 / 25;
-  const gc = { ry: -25 * k, rx: desktop ? 8 : 5, turn: 0, tiltX: 0, tiltY: 0, roll: 0, bob: 0, lift: 0, drop: 0, sheen: -1, draw: 0, line: 1, relief: 0, fade: 1, gl: false, k, p: 0 };
+  const gc = { ry: -25 * k, rx: desktop ? 8 : 5, turn: 0, tiltX: 0, tiltY: 0, roll: 0, bob: 0, lift: 0, drop: 0, sheen: -1, draw: 1, line: 0, relief: 1, fade: 1, gl: false, k, p: 0 };
   const el = { card: q('.gc-card'), float: q('.gc-float'), shade: q('.gc-shade'), sheen: q('.gc-sheen'), pool: q('.gc-pool') };
   gc.render = () => {
     mount.style.opacity = gc.fade;
@@ -38,16 +64,15 @@ export function goldCard(mount, scene, { desktop, fine, ctx }) {
   cleanups.push(() => { mount.style.opacity = ''; mount.style.transform = ''; ['card', 'float', 'shade', 'sheen', 'pool'].forEach((n) => el[n].removeAttribute('style')); });
 
   // Swan: the CSS card draws with DrawSVG, the canvas reads the same moments from the proxy. windows are [from, to] in timeline units.
-  gc.swan = (tl, { draw, relief, line }, ease) => {
-    const svg = q('.mark-draw'), W = draw[1] - draw[0];
-    const shadow = q('.gc-swan-shadow');
-    tl.fromTo(svg.querySelectorAll('.mark-line path'), { drawSVG: '0%' }, { drawSVG: '100%', duration: (W * 0.4) / 0.7, stagger: (W * 0.1) / 0.7, ease }, draw[0])
-      .fromTo(gc, { draw: 0 }, { draw: 1, duration: W, ease }, draw[0])
-      .fromTo(svg.querySelector('.mark-fill'), { opacity: 0 }, { opacity: 1, duration: relief[1] - relief[0], ease }, relief[0])
-      .fromTo(shadow, { opacity: 0 }, { opacity: 0.5, duration: relief[1] - relief[0], ease }, relief[0])
-      .fromTo(gc, { relief: 0 }, { relief: 1, duration: relief[1] - relief[0], ease }, relief[0])
-      .fromTo(svg.querySelector('.mark-line'), { opacity: 1 }, { opacity: 0, duration: line[1] - line[0], ease }, line[0])
-      .fromTo(gc, { line: 1 }, { line: 0, duration: line[1] - line[0], ease }, line[0]);
+  // Moishe 2026-10-23: the swan is there, complete and in full relief, from the first frame (no outline drawing in). Same signature, so callers stay.
+  gc.swan = (tl) => {
+    const svg = q('.mark-draw');
+    gsap.set(svg.querySelectorAll('.mark-line path'), { drawSVG: '100%' });
+    gsap.set(svg.querySelector('.mark-fill'), { opacity: 1 });
+    gsap.set(q('.gc-swan-shadow'), { opacity: 0.5 });
+    gsap.set(svg.querySelector('.mark-line'), { opacity: 0 });
+    Object.assign(gc, { draw: 1, relief: 1, line: 0 });
+    return tl;
   };
 
   // Idle float (18s bob, 23s roll), paused off screen and in a hidden tab (BRAND 7A loop rule).
