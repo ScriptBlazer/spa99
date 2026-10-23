@@ -171,6 +171,7 @@ html[data-page="marketing"] {
 /* Round 3, The spa (derived, 2026-10-23) */
 :root {
   --mount-gap: 0.375rem;                       /* derived: margin between the gold line of a mount and its photo (8px from 48em) */
+  --mount-gap-sm: 0.375rem;                    /* derived: the mount gap on small mounts (kit tiles), does not grow at 48em */
   --band-h: min(62svh, 36rem);                 /* derived: height of a full-bleed amenity band, desktop */
   --opener-measure: 26rem;                     /* derived: widest the opener words go, keeps them on the solid veil */
   --opener-pin: 0.6;                           /* derived: pin length of the opener in screens (0.8 from 64em), read by spa.js */

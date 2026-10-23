@@ -312,6 +312,7 @@ The designer refines these per task. Frontend uses only tokens, never raw values
 
 ### Round 3 layout tokens (The spa, 2026-10-23, derived)
 - `--mount-gap` 0.375rem (0.5rem from 48em): margin between a mount's gold line and its photo.
+- `--mount-gap-sm` 0.375rem: the same gap on small mounts (the kit tiles); does not grow at 48em.
 - `--band-h` min(62svh, 36rem): height of a full-bleed amenity band.
 - `--opener-measure` 26rem: widest the opener words go.
 - `--opener-pin` 0.6 (0.8 from 64em): opener pin length in screens.

@@ -663,9 +663,9 @@ html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .doo
 .sp-detail.frame--mount { box-shadow: none; }
 
 /* "Every visit includes": four small mounts with a label under each, in one row */
-.kit { display: flex; gap: var(--space-3); margin-top: var(--space-3); }
+.kit { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-3); }
 .kit-item { display: grid; justify-items: center; align-content: start; gap: var(--space-2); min-width: 4rem; }
-.kit-mount { width: 4rem; aspect-ratio: 1; --mount-gap: 0.375rem; }
+.kit-mount { width: 4rem; aspect-ratio: 1; --mount-gap: var(--mount-gap-sm); }
 .kit-label { color: var(--color-text-inverse); text-align: center; }
 @media (min-width: 48em) {
   .kit { gap: var(--space-4); }
