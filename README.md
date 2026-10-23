@@ -65,6 +65,7 @@ Private folder (default `/Users/moishe/Library/CloudStorage/OneDrive-Personal/BM
 | `SECRET_KEY` | Django secret. Prod refuses to start without a real one |
 | `DOMAIN` | Public domain, no `https://` (prod default `spa99.uk`) |
 | `CONTROL_DOMAIN` | Control domain (prod `control.spa99.uk`; local default `control.localhost`) |
+| `OFFICE_DOMAIN` | Office domain (prod `office.spa99.uk`; local default `office.localhost`) |
 | `DATABASE_URL` | Managed PostgreSQL on live (required in prod, `sslmode=require` added). Unset locally = SQLite |
 | `DEBUG` | Dev only. Prod forces it off |
 | `ALLOWED_HOSTS` | Optional extra hosts, comma separated (added to the defaults) |
@@ -80,7 +81,7 @@ Private folder (default `/Users/moishe/Library/CloudStorage/OneDrive-Personal/BM
 | `AWS_SES_REGION_NAME` | Region for `SesBackend` (default `eu-west-2`) |
 | `CLIENT_IP_HEADER` | Prod only. Header Caddy fills with the real visitor IP (default `X-Client-IP`; see below). Used for rate limits and the login log |
 | `SITE_WEBGL` | `false` switches the 3D Gold Card off for everyone (sets `data-webgl="off"` on `<html>`; the CSS card stays). Default `true` |
-| `SITE_URL`, `CONTROL_URL` | Absolute links in emails (defaults from `DOMAIN` / `CONTROL_DOMAIN`; dev `http://localhost:8000` and `http://control.localhost:8000`) |
+| `SITE_URL`, `CONTROL_URL`, `OFFICE_URL` | Absolute links in emails (defaults from `DOMAIN` / `CONTROL_DOMAIN`; dev `http://localhost:8000` and `http://control.localhost:8000`) |
 | `SENTRY_DSN` | Error reporting. Off when empty |
 | `IMAGE`, `APP_TAG` | Read by `docker-compose.yml`: image name and the git tag to run |
 | `GUNICORN_WORKERS` | Web workers in the container |

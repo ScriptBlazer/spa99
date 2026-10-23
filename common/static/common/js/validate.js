@@ -317,6 +317,9 @@ export function attachValidation(form, { remote: extraRemote = {} } = {}) {
     event.preventDefault();
     if (await validateAll()) {
       form.dataset.validated = 'true';
+      // Wait one task: a real click or Enter is still being dispatched here, and the browser silently ignores
+      // requestSubmit() while it fires that submit event (the "dead button" Moishe hit, 2026-10-23).
+      await new Promise((resolve) => setTimeout(resolve, 0));
       try { form.requestSubmit(event.submitter || undefined); } finally { delete form.dataset.validated; }
     }
   });

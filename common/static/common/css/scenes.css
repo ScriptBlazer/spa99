@@ -290,6 +290,11 @@ html.motion .gc-card, html.motion .gc-sheen { will-change: transform; }
 .gc-gl { aspect-ratio: 10 / 9; }   /* taller than the old 4:3 so the turn, tilt and float never reach the canvas edge; pointer-events none via .gold-card */
 .gc-gl canvas { display: block; width: 100%; height: 100%; opacity: 0; }
 .gold-card.is-gl .gc-stage { visibility: hidden; }
+/* Gold Card page hero on any screen: the flat card stays hidden until the 3D card has faded in, or until the gate says 3D can't run here
+   (.gl-off, set by gold-gl.js, gold-card.js or gold-hero.js's safety timer), so the flat card never flashes on refresh (Moishe 2026-10-23). */
+@media (prefers-reduced-motion: no-preference) {
+  html.motion:not([data-webgl="off"]) .gold-card--hero:not(.gl-off) .gc-stage { visibility: hidden; }
+}
 
 /* Gold Card page hero (G1): words left, the card right; phone: card on top */
 .gold-hero-grid > .gold-card { grid-column: 1 / -1; justify-self: center; order: -1; --gc-w: min(82vw, 24rem); }
@@ -370,8 +375,6 @@ html.motion .gold-scene .glow { z-index: 1; }
 }
 
 /* H5 */
-html.motion .mark-draw .mark-fill { opacity: 0; }
-html.motion .mark-draw .mark-line { display: block; }
 
 /* will-change only where it moves, and only under motion */
 html.motion .frame-media, html.motion .window-media, html.motion .hero-window, html.motion [data-depth], html.motion [data-drift] { will-change: transform; }
@@ -611,6 +614,9 @@ html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .doo
   }
 }
 .door-video { z-index: 0; }
+/* the robe's steam video (2026-10-23): framed exactly like its poster (the still under it), so the hand-over is invisible */
+.opener-scene[data-opener="robe"] .door-video { object-position: 64% 40%; }
+@media (max-width: 47.99em) { .opener-scene[data-opener="robe"][data-portrait] .door-video { object-position: 50% 30%; } }
 .window-media.has-video .door-zoom { opacity: 0; transition: opacity 1200ms var(--ease-soft); }
 
 /* ---------- the moments ---------- */

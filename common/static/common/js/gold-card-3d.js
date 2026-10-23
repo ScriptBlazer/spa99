@@ -1,4 +1,4 @@
-/* The Gold Card in three.js (docs/design/GOLD-CARD-3D.md). Loaded lazily by scenes.js, only on capable desktops, over the CSS card.
+/* The Gold Card in three.js (docs/design/GOLD-CARD-3D.md). Loaded lazily by scenes.js, on capable desktops, tablets and phones (gold-gl.js gate), over the CSS card.
  * Contract (IMMERSIVE 14.3): create(mount, { gsap, ScrollTrigger, tokens, card }) -> { ready, start, stop, dispose }.
  *  - `card` is the shared pose proxy that scenes.js tweens (ry, rx, turn, tiltX, tiltY, roll, bob, lift, drop, sheen, draw, line, relief, fade).
  *    This file only reads it, so the CSS card and the canvas are always in the same pose.
@@ -13,15 +13,15 @@ import * as THREE from '../vendor/three/three.module.min.js';
 const W = 85.6, H = 54, R = 3.18, BEV = 0.18, DEPTH = 0.44;       // millimetres: ISO ID-1
 const FW = 1024, FH = 646, BW = 1024, BH = 646;                    // face and back map sizes
 const D2R = Math.PI / 180;
-const WALL = 0.9;                                                // brightness of the studio walls (the floor of the card's light)
-// The look per page (2026-10-23, Moishe): on Home the card read as if a bright light was always on it. There the studio walls are darker,
-// the exposure a touch lower, and the reflections dim and brighten as the card turns (`mood`: how far they dim at the darkest angle, never
-// to black). The Gold Card page hero keeps the bright studio it had. `period` is the turn in degrees from one bright angle to the next.
+// THE LOOK (one block to tune; 2026-10-23, GOLD-CARD-3D.md 7.5): polished mirror-like gold in a dark studio. A mirror shows only what the studio holds, so:
+//   wall/floor/fill: the dark surroundings (multipliers of --color-gold-studio; fill = side, overhead and behind panels): the deep bronze. Never 0.
+//   boxL/boxR/strip: three defined bright softboxes in front of the card (strengths; stripW the tall strip's width). The face reflects them one after another as it turns. They are what you see as bright.
+//   rim: a hot strip behind (lights edges and the back). rough: multiplies the face roughness map (field 0.21, swan 0.1, text 0.3): lower = sharper mirror. coat: clearcoat. bump: swan and engraving relief.
+//   face/edge/back/light: reflection per surface and the key light. exposure. mood/period/peak: Home only, extra dim and brighten with the turn.
 const LOOK = {
-  home: { wall: 0.55, exposure: 0.9, mood: 0.45, period: 36, peak: 2 },
-  hero: { wall: WALL, exposure: 1, mood: 0, period: 36, peak: 0 },
+  hero: { base: 0.8, wall: 0.12, floor: 0.07, fill: 0.3, boxL: 11, boxR: 9, strip: 15, stripW: 0.9, rim: 8, rough: 0.5, coat: 0.4, exposure: 1,    face: 1,    edge: 1,    back: 0.85, light: 0.3,  bump: 1.8, mood: 0,    period: 36, peak: 0 },
+  home: { base: 1.6, wall: 0.05, floor: 0.04, fill: 0.15, boxL: 8, boxR: 7, strip: 10, stripW: 0.9, rim: 7, rough: 0.5, coat: 0.9, exposure: 0.95, face: 0.95, edge: 0.95, back: 0.8,  light: 0.25, bump: 1.4, mood: 0.35, period: 36, peak: 2 },
 };
-const BASE = { face: 0.5, edge: 0.6, back: 0.62, light: 0.6 };   // reflection and key light strengths at the brightest moment
 const idle = (fn) => new Promise((resolve) => (window.requestIdleCallback ? requestIdleCallback(() => resolve(fn()), { timeout: 800 }) : setTimeout(() => resolve(fn()), 0)));
 
 function roundedRect(w, h, r) {
@@ -269,13 +269,17 @@ export function create(mount, { gsap, tokens, card }) {
       m.position.set(x, y, z); m.lookAt(0, 0, 0); studio.add(m);
     };
     studio.add(new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), new THREE.MeshBasicMaterial({ color: tok('--color-gold-studio').multiplyScalar(look.wall), side: THREE.BackSide })));   // warm walls: the face never meets black
-    part(2.6, 0.9, '--color-led', 1.5, -2.5, 2.4, 3);        // key softbox
-    part(0.2, 5, '--color-gold-studio', 3.5, 0, 0, 4.5);         // the sheen strip
-    part(0.15, 4, '--color-led', 5, 4, 0.5, -1);         // rim strip
-    part(1.6, 4, '--color-gold-studio', 1.4, -4.6, 0, 0.5); part(1.6, 4, '--color-gold-studio', 1.4, 4.6, 0, 1);   // side fills: a soft panel is always in reach at grazing angles
-    part(5, 5, '--color-gold-studio', 1.1, 0, 2.9, 0.5);  // overhead fill
-    part(6, 3, '--color-gold-studio', 1.6, 0, 0, -4.6);   // behind: lights the back of the card
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ color: tok('--color-gold-studio').multiplyScalar(0.3) }));
+    // Nothing bright sits straight behind the camera (the face would mirror it at every angle: that was the flat look).
+    // The lights stand off-axis, so the face mostly mirrors the dark room and each light sweeps across it as the card turns.
+    part(2, 1.4, '--color-gold-studio', look.boxL, -3.8, 2.2, 2.4);    // softbox left, high
+    part(1.6, 2.4, '--color-gold-studio', look.boxR, 3.9, -1.2, 2.2);  // softbox right, low
+    part(look.stripW, 5.5, '--color-gold-studio', look.strip, 2.6, 1.6, 3.2);   // tall strip, up and to the right
+    part(9, 6, '--color-gold-studio', look.base, 0, 0.4, 4.9);   // soft base panel behind the viewer: the resting face reads warm gold, the boxes give the peaks
+    part(0.15, 4, '--color-led', look.rim, 4, 0.5, -1);         // rim strip
+    part(1.6, 4, '--color-gold-studio', 1.4 * look.fill, -4.6, 0, 0.5); part(1.6, 4, '--color-gold-studio', 1.4 * look.fill, 4.6, 0, 1);   // side fills: a soft panel is always in reach at grazing angles
+    part(5, 5, '--color-gold-studio', 1.1 * look.fill, 0, 2.9, 0.5);  // overhead fill
+    part(6, 3, '--color-gold-studio', 1.6 * look.fill, 0, 0, -4.6);   // behind: lights the back of the card
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ color: tok('--color-gold-studio').multiplyScalar(look.floor) }));
     floor.rotation.x = -Math.PI / 2; floor.position.y = -2.9; studio.add(floor);
     pmrem = new THREE.PMREMGenerator(renderer);
     const rt = pmrem.fromScene(studio, 0.02);
@@ -295,20 +299,20 @@ export function create(mount, { gsap, tokens, card }) {
     maps.draw = own(canvasTexture(drawCanvas, { color: true }));
     mats.edge = own(new THREE.MeshPhysicalMaterial({ color: rim, metalness: 1, roughness: 0.2 }));
     mats.face = own(new THREE.MeshPhysicalMaterial({
-      color: gold, metalness: 1, roughness: 1, anisotropy: 0.55, anisotropyRotation: Math.PI / 2, clearcoat: 0.35, clearcoatRoughness: 0.12,
+      color: gold, metalness: 1, roughness: look.rough, anisotropy: 0.3, anisotropyRotation: Math.PI / 2, clearcoat: look.coat, clearcoatRoughness: 0.05,
       normalMap: maps.faceNormal, roughnessMap: maps.faceRough, metalnessMap: maps.faceRough, emissive: tok('--color-gold-light'), emissiveMap: maps.draw, emissiveIntensity: 0,
     }));
     const bronze = tok('--color-gold-deep').lerp(tok('--color-gold-metal'), 0.22);
     bronze.g += 0.03; bronze.b += 0.075;                                              // NeutralToneMapping takes ~0.04 off the weakest channel: a dark metal would go orange without this
     mats.back = own(new THREE.MeshPhysicalMaterial({
-      color: bronze, metalness: 1, roughness: 1, envMapIntensity: BASE.back, clearcoat: 0.2, clearcoatRoughness: 0.3, normalMap: maps.backNormal, roughnessMap: maps.backRough, metalnessMap: maps.backRough,
+      color: bronze, metalness: 1, roughness: 1, envMapIntensity: look.back, clearcoat: 0.2, clearcoatRoughness: 0.3, normalMap: maps.backNormal, roughnessMap: maps.backRough, metalnessMap: maps.backRough,
     }));
     mats.face.onBeforeCompile = (shader) => {   // the fine detail is added on top of the relief map, whatever `relief` is
       shader.uniforms.fineMap = { value: maps.faceFine };
       shader.fragmentShader = shader.fragmentShader.replace('#include <common>', 'uniform sampler2D fineMap;\n#include <common>')
         .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n#ifdef USE_NORMALMAP_TANGENTSPACE\n\tvec3 fineN = texture2D( fineMap, vNormalMapUv ).xyz * 2.0 - 1.0;\n\tnormal = normalize( normal + tbn * vec3( fineN.xy / fineN.z, 0.0 ) );\n#endif');
     };
-    Object.assign(mats.face, { envMap: scene.environment, envMapIntensity: BASE.face }); mats.back.envMap = mats.edge.envMap = scene.environment; mats.edge.envMapIntensity = BASE.edge;   // per-material intensity needs the map set on the material (three r163+)
+    Object.assign(mats.face, { envMap: scene.environment, envMapIntensity: look.face }); mats.back.envMap = mats.edge.envMap = scene.environment; mats.edge.envMapIntensity = look.edge;   // per-material intensity needs the map set on the material (three r163+)
     const faceGeo = own(faceGeometry());
     const front = new THREE.Mesh(faceGeo, mats.face); front.position.z = zf;
     const back = new THREE.Mesh(faceGeo, mats.back); back.rotation.y = Math.PI; back.position.z = -zf;
@@ -316,7 +320,7 @@ export function create(mount, { gsap, tokens, card }) {
     group = new THREE.Group(); group.add(body, front, back);
     pivot = new THREE.Group(); pivot.add(group);
     scene.add(pivot);
-    light = new THREE.DirectionalLight(tok('--color-led'), BASE.light);
+    light = new THREE.DirectionalLight(tok('--color-led'), look.light);
     light.position.set(-30, 40, 120);
     scene.add(light);
   }
@@ -329,7 +333,7 @@ export function create(mount, { gsap, tokens, card }) {
     pivot.position.y = -(card.bob / 100) * H;                      // lift and drop move the whole mount in CSS (gc.render), so the canvas moves with the card
     mats.face.emissiveIntensity = card.line * card.draw > 0 ? card.line * 1.15 : 0;
     const k = card.relief;
-    mats.face.normalMap && mats.face.normalScale.set(k, k);
+    mats.face.normalMap && mats.face.normalScale.set(k * look.bump, k * look.bump);
     const sweep = card.sheen * 68 * D2R;
     scene.environmentRotation.y = sweep;
     light.position.set(-30 * Math.cos(sweep) + 120 * Math.sin(sweep), 40, 120 * Math.cos(sweep) + 30 * Math.sin(sweep));
@@ -337,8 +341,8 @@ export function create(mount, { gsap, tokens, card }) {
       // shadow and highlight: bright at `peak` degrees and every `period` after, darkest halfway between (Home: mid at rest, dark near -16 and 20, bright near 2)
       const glint = 0.5 + 0.5 * Math.cos(((turn - look.peak) * 2 * Math.PI) / look.period);
       const m = 1 - look.mood * (1 - glint);
-      mats.face.envMapIntensity = BASE.face * m; mats.edge.envMapIntensity = BASE.edge * m; mats.back.envMapIntensity = BASE.back * m;
-      light.intensity = BASE.light * m;
+      mats.face.envMapIntensity = look.face * m; mats.edge.envMapIntensity = look.edge * m; mats.back.envMapIntensity = look.back * m;
+      light.intensity = look.light * m;
     }
     drawLine();
   }
@@ -394,7 +398,7 @@ export function create(mount, { gsap, tokens, card }) {
     canvas = renderer.domElement;
     renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure; renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setClearColor(0x000000, 0);
-    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    dpr = Math.min(window.devicePixelRatio || 1, matchMedia('(min-width: 64em)').matches ? 1.5 : 2);   // the render size is the card box only; the loop drops to 1 if frames run slow
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(20, 4 / 3, 100, 600);
     camera.position.set(0, 0, camDistance());
@@ -415,7 +419,9 @@ export function create(mount, { gsap, tokens, card }) {
     tick = loop; gsap.ticker.add(tick);
     running = true;
     // Hand-over: the canvas fades in over the CSS card (same proxy, same pose); the CSS card then rests under it.
-    gsap.to(canvas, { opacity: 1, duration: parseFloat(getComputedStyle(mount).getPropertyValue('--duration-gl-in')) || 1.2, ease: 'soft', onComplete: () => { shown = true; if (!dead) { card.gl = true; mount.classList.add('is-gl'); } } });
+    // tokens are in ms ("1200ms"); parseFloat alone read it as 1200 s (the 3D card took ~20 minutes to appear). Short on purpose: no flat card first.
+    const fadeMs = parseFloat(getComputedStyle(mount).getPropertyValue('--duration-gl-in')) || 400;
+    gsap.to(canvas, { opacity: 1, duration: Math.min(fadeMs / 1000, 0.4), ease: 'soft', onComplete: () => { shown = true; if (!dead) { card.gl = true; mount.classList.add('is-gl'); } } });
   })();
 
   function dispose() {

@@ -1,0 +1,6 @@
+{% load office_tags %}{% comment %}One line for an invite: Sent 21 Oct, Expires in 3 days, Expired, Account set up. Blank when not approved.{% endcomment %}
+{% if invite.state == "account_set_up" %}Account set up
+{% elif invite.state == "expired" %}<span class="o-danger">{% include "office/_icon.html" with name="warning" %}Expired</span>
+{% elif invite.state == "sent" %}<span>Sent {{ invite.sent_at|dm }}</span><span class="o-sub">{{ invite.expires_at|expires_in }}</span>
+{% elif invite.state == "waiting_to_send" %}Waiting to send
+{% elif invite.state == "none" %}<span class="o-danger">{% include "office/_icon.html" with name="warning" %}No live invite</span>{% endif %}

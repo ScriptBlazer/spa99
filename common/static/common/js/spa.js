@@ -3,7 +3,8 @@
  * the matchMedia setup, the header and the shared patterns; this file adds the scenes of this page so Home's script stays as small as it was.
  * Same rules as scenes.js: transform and opacity only, scroll-driven tweens use ease "none", a scene that throws shows its static content.
  *   door   S1 the opener (docs/design/SPA-OPENER.md): the full-screen picture (the robe, or the door) shrinks onto .door-target inside a short pin
- *          (windowTo, Home's method), one line ("Open 5am to 3am.") sits still, the chips arrive at the end
+ *          (windowTo, Home's method), one line ("Open 5am to 3am.") sits still, the chips arrive at the end; the robe's steam video
+ *          (spa-hero-*, a self-looping file) plays in the same window and keeps playing in the shrunk frame
  *   moment AMENITIES.md M1 to M3: a full-bleed band (the picture travels a little and settles) or the overlapping pair of mounts; words rise or fade
  *   feature S2a/c/d: name rises, line and pills fade up, hairline draws (scrubbed), frame settles and drifts, inset and thumbnail travel more
  *   tiles  S2b: intro, staggered tiles settle at their own depth (desktop only), captions lag
@@ -71,15 +72,19 @@ if (gsap && ScrollTrigger) {
     // the room chips arrive in the last fifth
     tl.fromTo(q('.door-chips'), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.2 }, 0.8);
 
-    // the living still (one cycle per 48s), the optional door video
+    // the living still (one cycle per 48s) only without a video; the opener video (the robe's steam loop, 2026-10-23) loops by itself
     const still = q('.door-still'), media = q('[data-door-media]'), video = q('.door-video');
-    const loops = [gsap.to(still, { scale: 1.03, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' })];
+    const sources = video?.dataset.sources ? JSON.parse(video.dataset.sources) : [];
+    const willPlay = sources.length > 0 && !navigator.connection?.saveData;   // Save-Data: the poster only, held still
+    // with a video the poster holds still (it is the video's first frame, so the hand-over is invisible); without one, the still breathes
+    const loops = willPlay ? [] : [gsap.to(still, { scale: 1.03, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' })];
     let inView = true, playing = false, shrunk = false;
     const sync = () => {
-      // once the picture has shrunk (15% of the pin) nothing keeps moving: the loop and the video stop
-      const run = inView && !document.hidden && !shrunk;
-      loops.forEach((t) => (run && !playing ? t.resume() : t.pause()));
-      if (video && playing) (run ? video.play() : video.pause())?.catch?.(() => {});
+      // the breathing still stops once the picture has shrunk (15% of the pin); the video keeps playing in the shrunk frame,
+      // and pauses only off screen or with the tab hidden
+      const show = inView && !document.hidden;
+      loops.forEach((t) => (show && !shrunk ? t.resume() : t.pause()));
+      if (video && playing) (show ? video.play() : video.pause())?.catch?.(() => {});
     };
     document.addEventListener('visibilitychange', sync);
     cleanups.push(() => document.removeEventListener('visibilitychange', sync));
@@ -87,10 +92,10 @@ if (gsap && ScrollTrigger) {
     tl.eventCallback('onUpdate', () => { const past = tl.time() >= 0.15; if (past !== shrunk) { shrunk = past; sync(); } });
     sync();
 
-    // the video (only when the page was built with one, which means the door is the opener): after the page, never on Save-Data, poster only otherwise
+    // the video (only when the page was built with one): after the page, never on Save-Data (poster only), never with reduced motion (this scene does not run)
     const loadVideo = () => {
-      if (!video?.dataset.sources || navigator.connection?.saveData) return;
-      const pick = JSON.parse(video.dataset.sources).find((s) => matchMedia(s.media).matches && video.canPlayType(s.type));
+      if (!willPlay) return;
+      const pick = sources.find((s) => matchMedia(s.media).matches && video.canPlayType(s.type));
       if (!pick) return;
       video.addEventListener('playing', () => { playing = true; video.classList.add('is-playing'); media.classList.add('has-video'); sync(); }, { once: true });
       video.src = pick.src;

@@ -43,8 +43,9 @@ class SpaRound3TemplateTests(TestCase):
         self.assertNotIn("Eight spaces, one quiet visit", html)
 
     def test_robe_opener_with_a_phone_picture(self):
-        with built("robe", "robe-portrait"):
-            html = self.spa()
+        real = pages_media._exists
+        with built("robe", "robe-portrait"), mock.patch.object(pages_media, "_exists", lambda p: real(p) and "spa-hero" not in p):
+            html = self.spa()  # without the steam video files: the robe photo itself
         self.assertIn('data-opener="robe" data-portrait', html)
         self.assertIn("robe-portrait-480.webp", html)
         self.assertIn("A white robe with the gold swan hanging on a bronze hook", html)
@@ -79,6 +80,28 @@ class SpaRound3TemplateTests(TestCase):
             self.assertNotIn("door-video", self.spa())
             with mock.patch.object(pages_media, "_exists", lambda p: "spa-door" in p):
                 self.assertIn("door-video", self.spa())
+
+    def test_robe_opener_plays_the_steam_loop_with_its_poster_as_the_still(self):
+        real = pages_media._exists
+        with built("robe", "robe-portrait"):
+            with mock.patch.object(pages_media, "_exists", lambda p: real(p) and "spa-hero" not in p):
+                self.assertNotIn("door-video", self.spa())  # no files: the robe photo, no video
+            with mock.patch.object(pages_media, "_exists", lambda p: "spa-hero" in p):
+                html = self.spa()
+        self.assertIn('data-opener="robe"', html)
+        self.assertIn("door-video", html)
+        self.assertIn(" loop ", html)
+        self.assertIn("spa-hero-landscape.mp4", html)
+        self.assertEqual(html.count("spa-hero-poster-landscape.webp"), 3)  # preload, the full-screen still, the frame (reduced motion)
+        self.assertNotIn("spa-door", html)
+
+    def test_uploaded_opener_picture_has_no_video(self):
+        from pages import services
+        with mock.patch("pages.services.images.has_image", side_effect=lambda n: n == "robe"):
+            copy = services.content.page_content("spa")
+            self.assertEqual(services.opener_picture(copy)["video"], "spa-hero")
+            copy["intro"].image = "uploads/x.webp"  # Moishe's own upload replaces the robe, and its video with it
+            self.assertEqual(services.opener_picture(copy)["video"], "")
 
     def test_home_has_no_slippers_inset(self):
         with built("slippers"):

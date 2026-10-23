@@ -1,0 +1,18 @@
+{% load office_tags %}{% comment %}One tinted KPI tile on Analytics. Params: key (series key), label, hue (slate|sage|clay|ochre), anchor. Clicking scrolls to the matching chart.{% endcomment %}
+{% with s=data.series|getkey:key %}
+<a class="o-kpi o-kpi--{{ hue }}" href="#{{ anchor }}" data-kpi="{{ key }}" data-reveal>
+  <span class="o-kpi-label">{{ label }}</span>
+  <span class="o-kpi-body" data-region="kpi-{{ key }}" data-fade>
+    <span class="o-kpi-value">{{ s.total|compact }}</span>
+    {% change_ana s.total s.previous_total data.range as chg %}<span class="o-delta">{{ chg|default:"&nbsp;" }}</span>
+  </span>
+  {% sparkline s.values as spark %}
+  <span class="o-spark o-spark--kpi" aria-hidden="true">
+    <svg viewBox="0 0 100 40" preserveAspectRatio="none" focusable="false">
+      <defs><linearGradient id="kpi-{{ key }}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="o-spark-top"/><stop offset="1" class="o-spark-end"/></linearGradient></defs>
+      <path class="o-spark-area" data-morph="kpi-{{ key }}-area" d="{{ spark.area }}" fill="url(#kpi-{{ key }})"/>
+      <path class="o-spark-line" data-morph="kpi-{{ key }}-line" d="{{ spark.line }}" vector-effect="non-scaling-stroke"/>
+    </svg>
+  </span>
+</a>
+{% endwith %}

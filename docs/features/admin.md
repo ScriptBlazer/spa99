@@ -1,5 +1,8 @@
 # Feature: Spa 99 Control (custom admin) and statistics
 
+> **Superseded for the business half (2026-10-23).** The dashboard, statistics, people and Gold screens are now the Office: see `docs/features/office.md` (built, server side). Control is parked as the building control room placeholder at `control.spa99.uk`; `/insights/summary/` moved to the Office host. The sections below are the older plan and stay as reference for what the Office still has to take over (content, plans, hours, notifications, team).
+
+
 Phase 1. Apps: `control`, `insights`, plus each app's `services.py`.
 
 ## Status: what is built and what is not (2026-10-23)

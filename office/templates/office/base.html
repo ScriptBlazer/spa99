@@ -1,0 +1,67 @@
+{% load static office_tags %}<!doctype html>
+{% comment %}The Office shell (docs/design/OFFICE.md section 3, light): left navigation on desktop, bottom tabs on phone, header with title, range and person.
+Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main, head_extra, scripts. Set body_attrs="data-office-detail" on detail pages.{% endcomment %}
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#F4F2ED">
+<meta name="color-scheme" content="light">
+<script>var d=document.documentElement;d.classList.add("js");setTimeout(function(){if(!d.dataset.reveal)d.classList.add("no-reveal")},4000)</script>
+<title>{% block title %}Spa 99 Office{% endblock %}</title>
+<link rel="icon" href="{% static 'common/img/mark-gold.svg' %}" type="image/svg+xml">
+<link rel="preload" href="{% static 'common/fonts/signika-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{% static 'common/fonts/figtree-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{% static 'common/css/office.css' %}">
+<script type="module" src="{% static 'common/js/office.js' %}"></script>
+{% block head_extra %}{% endblock %}
+</head>
+<body class="office" data-office-section="{{ section }}" {% block body_attrs %}{% endblock %}>
+{% include "office/_icons.html" %}
+<a class="skip-link" href="#office-main">Skip to content</a>
+<span class="o-sentinel" data-office-sentinel aria-hidden="true"></span>
+
+<nav class="o-nav" data-office-nav aria-label="Office">
+  <a class="o-brand" href="{% url 'office_dashboard' %}" aria-label="Spa 99 Office, dashboard">
+    {% include "common/_mark.html" %}<span class="o-brand-name">Office</span>
+  </a>
+  <ul class="o-nav-list">
+    <li><a href="{% url 'office_dashboard' %}" data-office-nav-item="dashboard"{% if section == "dashboard" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="dashboard" %}<span>Dashboard</span></a></li>
+    <li><a href="{% url 'office_analytics' %}" data-office-nav-item="analytics"{% if section == "analytics" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="analytics" %}<span>Analytics</span></a></li>
+    <li><a href="{% url 'office_people' %}" data-office-nav-item="people"{% if section == "people" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="people" %}<span>People</span></a></li>
+    <li><a href="{% url 'office_gold' %}" data-office-nav-item="gold"{% if section == "gold" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="gold" %}<span>Gold</span><span class="o-badge-count" data-region="nav-badge" data-office-badge="gold">{% if office_waiting %}{{ office_waiting }}<span class="sr-only"> waiting</span>{% endif %}</span></a></li>
+  </ul>
+  <div class="o-nav-foot">
+    <div class="o-who"><span class="o-disc" aria-hidden="true">{{ office_person.initials }}</span><span class="o-who-text"><span class="o-who-name">{{ office_person.name }}</span><span class="o-who-role">{{ office_person.role }}</span></span></div>
+    <form method="post" action="{% url 'logout' %}" data-office-signout>{% csrf_token %}<button type="submit" class="o-quiet">Sign out</button></form>
+  </div>
+</nav>
+
+<div class="o-body">
+  <header class="o-header" data-office-header>
+    <div class="o-header-left">
+      {% block header_left %}{% include "common/_mark.html" %}<span class="o-title">{% if section == "dashboard" %}Dashboard{% elif section == "analytics" %}Analytics{% elif section == "people" %}People{% elif section == "gold" %}Gold{% endif %}</span>{% endblock %}
+    </div>
+    <div class="o-header-right">
+      {% block header_range %}{% endblock %}
+      <details class="o-person" data-person-menu>
+        <summary class="o-disc o-disc--btn" aria-label="Your account: {{ office_person.name }}"><span aria-hidden="true">{{ office_person.initials }}</span></summary>
+        <div class="o-menu">
+          <p class="o-menu-name">{{ office_person.name }}</p>
+          <p class="o-menu-role">{{ office_person.role }}</p>
+          <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit" class="o-menu-item">Sign out</button></form>
+        </div>
+      </details>
+    </div>
+  </header>
+  <main id="office-main" class="o-main" tabindex="-1">
+    {% block main %}{% endblock %}
+  </main>
+</div>
+
+<div class="o-toasts">{% include "common/_messages.html" %}</div>
+{% include "common/_modal.html" %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -19,6 +19,9 @@ class JourneySession(BaseModel):
 
     key = models.CharField(max_length=64, unique=True, default=new_session_key, editable=False,
                            help_text="Value of the first-party cookie. A secret: never shown in Control.")
+    person_key = models.CharField(max_length=64, blank=True, db_index=True, editable=False,
+                                  help_text="Who this is, anonymously: the first session's key, carried over when the browser restarts. "
+                                            "Office counting rules C1.")
     last_seen_at = models.DateTimeField(default=timezone.now)  # updated with queryset.update (no history row)
     visit_count = models.PositiveIntegerField(default=1, help_text="Returns after 30 minutes away count as a new visit.")
     device_type = models.CharField(max_length=10, blank=True)

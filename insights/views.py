@@ -4,7 +4,7 @@ from datetime import date
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
-from common.permissions import group_required
+from office.permissions import reader
 
 from . import services
 
@@ -19,7 +19,7 @@ def _date(value):
 
 
 @require_GET
-@group_required(*READERS)  # login enforced by LoginRequiredMiddleware; then role check
+@reader  # login enforced by LoginRequiredMiddleware; then role check
 def summary(request):
     """GET ?from=YYYY-MM-DD&to=YYYY-MM-DD&source=instagram&completed=yes|no  ->  all statistics cards as JSON."""
     date_from, date_to = _date(request.GET.get("from")), _date(request.GET.get("to"))

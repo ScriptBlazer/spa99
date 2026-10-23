@@ -21,7 +21,7 @@
       <div class="hero-window" data-window>
         <div class="window-media" data-hero-media>
           {% if hv.poster %}<div class="hero-still-wrap"><picture><source media="(max-width: 47.99em)" srcset="{{ hv.poster_portrait }}" width="608" height="1080"><img class="photo hero-still" src="{{ hv.poster }}" width="1920" height="1080" alt="The reception: a wide reef fish tank set in travertine, with a long bench of sage cushions, a green wall and the Spa 99 swan" fetchpriority="high" decoding="async"></picture></div>{% endif %}
-          {% if hv %}<div class="hero-video-wrap" data-hero-drift><video class="hero-video" muted playsinline preload="none" aria-hidden="true" tabindex="-1" data-sources="{{ hv.sources }}"></video></div>{% endif %}
+          {% if hv %}<div class="hero-video-wrap" data-hero-drift><video class="hero-video" muted playsinline loop preload="none" aria-hidden="true" tabindex="-1" data-sources="{{ hv.sources }}"></video></div>{% endif %}
         </div>
         <div class="frame-tint" aria-hidden="true"></div>
         <div class="hero-veil" aria-hidden="true"></div>

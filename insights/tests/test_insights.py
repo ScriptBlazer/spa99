@@ -121,7 +121,7 @@ class PermissionTests(TestCase):
         seed_all()
         call_command("setup_roles", stdout=StringIO())
 
-    def get(self, user=None, path="/insights/summary/", host="control.localhost"):
+    def get(self, user=None, path="/insights/summary/", host="office.localhost"):
         client = Client(HTTP_HOST=host)
         if user:
             client.force_login(user)

@@ -25,3 +25,7 @@
 {$CONTROL_DOMAIN} {
 	import app
 }
+
+{$OFFICE_DOMAIN} {
+	import app
+}

@@ -14,6 +14,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from common.tasks import enqueue
+from insights import metrics
 from common.validators import normalise_uk_mobile
 from plans.models import Plan, SiteSettings
 from users.models import InterestRegistration
@@ -78,10 +79,12 @@ def activate_gold(user):
     if plan is None:
         logger.error("Gold plan row is missing: cannot activate Gold")
         return False
-    interest, _ = InterestRegistration.objects.get_or_create(user=user, defaults={"plan": plan})
-    if interest.plan_id != plan.pk:
+    interest, created = InterestRegistration.objects.get_or_create(user=user, defaults={"plan": plan})
+    if created:
+        metrics.registered(plan.slug, interest.source, interest.created_at, marketing=user.marketing_consent)
+    elif interest.plan_id != plan.pk:
         interest.plan = plan
-        interest.save()
+        interest.save()  # the plan split follows this save (insights.signals)
     return True
 
 
@@ -143,6 +146,19 @@ def approve_and_invite(application, approved_by):
     return INVITED
 
 
+def decline_application(application):
+    """Decline a waiting application (new or contacted). Declined applicants never get an invite or an account.
+    Returns True if declined, False if it was not waiting (nothing changed). Safe against two people acting at once."""
+    with transaction.atomic():
+        fresh = GoldApplication.objects.select_for_update().get(pk=application.pk)
+        if fresh.status not in (GoldApplication.NEW, GoldApplication.CONTACTED):
+            return False
+        fresh.status = GoldApplication.DECLINED
+        fresh.save()
+    application.refresh_from_db()
+    return True
+
+
 def resend_invite(application):
     """A new link; the old one stops working. Only for approved applicants with no account yet. Returns INVITED or SKIPPED."""
     if application.status != GoldApplication.APPROVED or application.user_id is not None:
@@ -184,7 +200,8 @@ def accept_invite(token, cleaned):
                 marketing_consent_at=now if cleaned.get("marketing_opt_in") else None,
             )
             invite.used_at = now
-            invite.save(update_fields=["used_at", "updated_at"])
+            invite.save(update_fields=["used_at", "updated_at"])  # the Gold figures follow this save (insights.signals)
+            metrics.email_verified(now)
             application.user = user
             application.save(update_fields=["user", "updated_at"])
             GoldApplication.objects.filter(email__iexact=user.email, user__isnull=True).update(user=user)

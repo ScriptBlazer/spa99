@@ -9,6 +9,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from common.ratelimit import rate_limited_json
+from insights import visitors
 
 from . import engine, services
 
@@ -21,13 +22,16 @@ def _session_for(request):
     """The visitor's session from the cookie, or a fresh one. Returns (session, created)."""
     referrer = request.GET.get("ref") or request.META.get("HTTP_REFERER", "")
     utm = {name: request.GET.get(name, "") for name in services.UTM_FIELDS}
-    return services.get_or_create_session(
+    session, created = services.get_or_create_session(
         request.COOKIES.get(COOKIE_NAME),
         user_agent=request.META.get("HTTP_USER_AGENT", ""),
         referrer=referrer,
         utm=utm,
         user=request.user,
     )
+    if created:
+        visitors.record_journey_start(request)  # starting counts as a visitor that day
+    return session, created
 
 
 def _with_cookie(response, session):
@@ -133,7 +137,8 @@ def result(request):
         return JsonResponse(engine.preview(session))
     session, _ = _session_for(request)
     try:
-        return _with_cookie(JsonResponse(engine.complete(session)), session)
+        data = engine.complete(session)
+        return _with_cookie(JsonResponse(data), session)
     except services.AnswerError as error:
         return _bad(str(error), missing=error.missing)
 
@@ -147,6 +152,7 @@ def restart(request):
     old, _ = _session_for(request)
     fresh = services.create_session(
         request.META.get("HTTP_USER_AGENT", ""), referrer=old.referrer,
-        utm={name: getattr(old, name) for name in services.UTM_FIELDS}, user=request.user,
+        utm={name: getattr(old, name) for name in services.UTM_FIELDS}, user=request.user, previous=old,
     )
+    visitors.record_journey_start(request)
     return _with_cookie(JsonResponse(services.build_state(fresh)), fresh)

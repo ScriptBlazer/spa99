@@ -1,0 +1,278 @@
+{% extends "office/base.html" %}
+{% load static office_tags %}
+{% block title %}Analytics | Spa 99 Office{% endblock %}
+{% block head_extra %}<script defer src="{% static 'common/vendor/chartjs/4.6.1/chart.umd.min.js' %}"></script>{% endblock %}
+{% block header_range %}{% include "office/_range.html" with place="header" ranges=data.ranges current=data.range %}{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/office-charts.js' %}"></script>{% endblock %}
+{% block main %}
+<h1 class="sr-only">Analytics</h1>
+{% include "office/_range.html" with place="page" ranges=data.ranges current=data.range %}
+{% if data.updating %}<p class="o-sub" data-updating>Updating…</p>{% endif %}
+<div class="o-charts" data-office-charts>
+
+  {# 1 Visitors: the hero, a big number over a gradient area chart #}
+  <section class="o-card o-chartcard o-hero o-span-12" id="visitors" data-reveal data-chart-card="visitors" data-metric="visitors" aria-labelledby="h-visitors">
+    <h2 class="sr-only" id="h-visitors">Visitors</h2>
+    <div class="o-hero-head">
+      <div class="o-hero-figs" data-region="hero-figs" data-fade>
+        <div class="o-hero-fig" data-hero-fig="visitors">
+          <p class="o-hero-main"><span class="o-hero-num">{{ data.series.visitors.total|num }}</span><span class="o-hero-unit">visitors</span></p>
+          {% change_ana data.series.visitors.total data.series.visitors.previous_total data.range as c_visitors %}{% change_rate data.series.visitors.total data.series.visitors.previous_total as r_visitors %}
+          <p class="o-hero-change">{{ c_visitors }}{% if r_visitors %} <span class="o-hero-rate">{{ r_visitors }}</span>{% endif %}</p>
+        </div>
+        <div class="o-hero-fig" data-hero-fig="journeys_started" hidden>
+          <p class="o-hero-main"><span class="o-hero-num">{{ data.series.journeys_started.total|num }}</span><span class="o-hero-unit">started the journey</span></p>
+          {% change_ana data.series.journeys_started.total data.series.journeys_started.previous_total data.range as c_journeys_started %}{% change_rate data.series.journeys_started.total data.series.journeys_started.previous_total as r_journeys_started %}
+          <p class="o-hero-change">{{ c_journeys_started }}{% if r_journeys_started %} <span class="o-hero-rate">{{ r_journeys_started }}</span>{% endif %}</p>
+        </div>
+        <div class="o-hero-fig" data-hero-fig="people_registered" hidden>
+          <p class="o-hero-main"><span class="o-hero-num">{{ data.series.people_registered.total|num }}</span><span class="o-hero-unit">registered</span></p>
+          {% change_ana data.series.people_registered.total data.series.people_registered.previous_total data.range as c_people_registered %}{% change_rate data.series.people_registered.total data.series.people_registered.previous_total as r_people_registered %}
+          <p class="o-hero-change">{{ c_people_registered }}{% if r_people_registered %} <span class="o-hero-rate">{{ r_people_registered }}</span>{% endif %}</p>
+        </div>
+        <div class="o-hero-fig" data-hero-fig="page_views" hidden>
+          <p class="o-hero-main"><span class="o-hero-num">{{ data.series.page_views.total|num }}</span><span class="o-hero-unit">page views</span></p>
+          {% change_ana data.series.page_views.total data.series.page_views.previous_total data.range as c_page_views %}{% change_rate data.series.page_views.total data.series.page_views.previous_total as r_page_views %}
+          <p class="o-hero-change">{{ c_page_views }}{% if r_page_views %} <span class="o-hero-rate">{{ r_page_views }}</span>{% endif %}</p>
+        </div>
+      </div>
+    </div>
+    <div class="o-pills" data-series-pills hidden role="group" aria-label="Series shown">
+      <button type="button" class="o-pill" data-series="visitors" aria-pressed="true"><span class="o-swatch" aria-hidden="true"></span>Visitors</button>
+      <button type="button" class="o-pill" data-series="journeys_started" aria-pressed="true"><span class="o-swatch" aria-hidden="true"></span>Started the journey</button>
+      <button type="button" class="o-pill" data-series="people_registered" aria-pressed="true"><span class="o-swatch" aria-hidden="true"></span>Registered interest</button>
+      <button type="button" class="o-pill" data-series="page_views" aria-pressed="false"><span class="o-swatch" aria-hidden="true"></span>Page views</button>
+    </div>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <p class="o-summary" data-region="summary-visitors" data-fade>{{ data.summaries.visitors }}</p>
+    <div class="o-legend" data-legend="visitors"></div>
+    <div class="o-chartbox o-chartbox--hero" data-chart="visitors" data-empty-text="No visitors in this range yet."{% if not data.series.visitors.total and not data.series.page_views.total and not data.series.journeys_started.total and not data.series.people_registered.total %} data-empty{% endif %}>
+      <canvas id="chart-visitors" role="img" aria-label="{{ data.summaries.visitors }}" tabindex="-1"></canvas>
+      <p class="o-empty-chart">No visitors in this range yet.</p>
+    </div>
+    <details class="o-table" data-table="visitors"{% if not data.series.visitors.total and not data.series.page_views.total and not data.series.journeys_started.total and not data.series.people_registered.total %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="table-visitors" data-fade>
+        <table><caption class="sr-only">Visitors, page views, people started and registrations, {{ data.range|range_label }}</caption>
+          <thead><tr><th scope="col">{% if data.granularity == "week" %}Week{% else %}Date{% endif %}</th><th scope="col">Visitors</th><th scope="col">Page views</th><th scope="col">People started</th><th scope="col">Registered interest</th>{% if data.previous_labels %}<th scope="col">Previous visitors</th>{% endif %}</tr></thead>
+          <tbody>{% zip_lists data.labels data.series.visitors.values data.series.page_views.values data.series.visitors.previous data.series.journeys_started.values data.series.people_registered.values as vrows %}{% for r in vrows %}
+            <tr><th scope="row">{% if data.granularity == "week" %}{{ r.0|week_label }}{% else %}{{ r.0|day_label }}{% endif %}</th><td>{{ r.1|num }}</td><td>{{ r.2|num }}</td><td>{{ r.4|num }}</td><td>{{ r.5|num }}</td>{% if data.previous_labels %}<td>{{ r.3|num }}</td>{% endif %}</tr>{% endfor %}
+          </tbody></table>
+      </div>
+    </details>
+  </section>
+
+  {# 2 Four tinted KPI tiles #}
+  <div class="o-kpis o-span-12" data-office-kpis>
+    {% include "office/_kpi.html" with key="visitors" label="Visitors" hue="slate" anchor="visitors" %}
+    {% include "office/_kpi.html" with key="journeys_started" label="Started the journey" hue="sage" anchor="journeys" %}
+    {% include "office/_kpi.html" with key="people_registered" label="Registered interest" hue="clay" anchor="registrations" %}
+    {% include "office/_kpi.html" with key="gold_applications" label="Gold applications" hue="ochre" anchor="gold" %}
+  </div>
+
+  {# 3 Funnel #}
+  <section class="o-card o-chartcard o-span-12" id="journeys" data-reveal data-chart-card="funnel" aria-labelledby="h-funnel">
+    <header class="o-card-head"><h2 id="h-funnel">From visit to registration</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <p class="o-summary" data-region="summary-funnel" data-fade>{{ data.summaries.funnel }}</p>
+    <div class="o-chartbox o-chartbox--funnel" data-chart="funnel" data-empty-text="No journeys in this range yet."{% has_data data.funnel as f_any %}{% if not f_any %} data-empty{% endif %}>
+      <canvas id="chart-funnel" role="img" aria-label="{{ data.summaries.funnel }}" tabindex="-1"></canvas>
+      <p class="o-empty-chart">No journeys in this range yet.</p>
+    </div>
+    <p class="o-sub o-funnel-note" data-region="funnel-note" data-fade>{{ data.funnel_note }}</p>
+    <details class="o-table" data-table="funnel"{% if not f_any %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="table-funnel" data-fade>
+        <table><caption class="sr-only">The funnel, {{ data.range|range_label }}</caption>
+          <thead><tr><th scope="col">Step</th><th scope="col">People</th><th scope="col">Of visitors</th><th scope="col">Of the step before</th></tr></thead>
+          <tbody>{% for s in data.funnel %}<tr><th scope="row">{{ s|step_label }}</th><td>{{ s.value|num }}</td><td>{{ s.share_bp|bp_rate }}</td><td>{% if s.partial or s.step_rate_bp is None %}&mdash;{% else %}{{ s.step_rate_bp|bp_rate }}{% endif %}</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </details>
+  </section>
+
+  {# 4a Registrations by plan #}
+  <section class="o-card o-chartcard o-span-6" id="registrations" data-reveal data-chart-card="plan" aria-labelledby="h-plan">
+    <header class="o-card-head"><h2 id="h-plan">Registrations by plan</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <p class="o-summary" data-region="summary-plan" data-fade>{{ data.summaries.registrations_by_plan }}</p>
+    {% insight_of data.insights "tier_picked" as ins_tier_picked %}<p class="o-headline" data-region="head-tier-picked" data-fade>{% if ins_tier_picked %}<strong>{{ ins_tier_picked.top.label }}</strong> <span>{{ ins_tier_picked.top.value|num }} of {{ ins_tier_picked.top.of_total|num }}</span>{% endif %}</p>
+    {% has_data data.registrations_by_plan as p_any %}
+    <div class="o-donut">
+      <div class="o-chartbox o-chartbox--donut" data-chart="plan" data-empty-text="No registrations in this range yet."{% if not p_any %} data-empty{% endif %}>
+        <canvas id="chart-plan" role="img" aria-label="{{ data.summaries.registrations_by_plan }}" tabindex="-1"></canvas>
+        <p class="o-donut-centre" data-region="centre-plan" data-fade>{% sum_key data.registrations_by_plan as p_total %}<span class="o-donut-total">{{ p_total|num }}</span><span class="o-donut-word">registered</span></p>
+        <p class="o-empty-chart">No registrations in this range yet.</p>
+      </div>
+      <ul class="o-keylist" data-region="keylist-plan" data-fade>
+        {% if p_any %}{% ramp_rows data.registrations_by_plan "clay" "value" as plan_rows %}{% for r in plan_rows %}<li><span class="o-swatch" style="--sw: {{ r.swatch }}" aria-hidden="true"></span><span class="o-key-name">{{ r.label }}</span><span class="o-key-num">{{ r.value|num }}</span><span class="o-key-share">{{ r.share_bp|bp_rate }}</span></li>{% endfor %}{% endif %}
+      </ul>
+    </div>
+    <details class="o-table" data-table="plan"{% if not p_any %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="table-plan" data-fade>
+        <table><caption class="sr-only">Registrations by plan, {{ data.range|range_label }}</caption>
+          <thead><tr><th scope="col">Plan</th><th scope="col">Registrations</th><th scope="col">Share</th></tr></thead>
+          <tbody>{% for r in data.registrations_by_plan %}<tr><th scope="row">{{ r.label }}</th><td>{{ r.value|num }}</td><td>{{ r.share_bp|bp_rate }}</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </details>
+  </section>
+
+  {# 4b Suggested plan #}
+  <section class="o-card o-chartcard o-span-6" id="suggested" data-reveal data-chart-card="suggested" aria-labelledby="h-suggested">
+    <header class="o-card-head"><h2 id="h-suggested">Suggested plan</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <p class="o-summary" data-region="summary-suggested" data-fade>{{ data.summaries.suggested_plan }}</p>
+    {% insight_of data.insights "tier_suggested" as ins_tier_suggested %}<p class="o-headline" data-region="head-tier-suggested" data-fade>{% if ins_tier_suggested %}<strong>{{ ins_tier_suggested.top.label }}</strong> <span>{{ ins_tier_suggested.top.value|num }} of {{ ins_tier_suggested.top.of_total|num }}</span>{% endif %}</p>
+    {% has_data data.suggested_plan as s_any %}
+    <div class="o-donut">
+      <div class="o-chartbox o-chartbox--donut" data-chart="suggested" data-empty-text="No suggestions in this range yet."{% if not s_any %} data-empty{% endif %}>
+        <canvas id="chart-suggested" role="img" aria-label="{{ data.summaries.suggested_plan }}" tabindex="-1"></canvas>
+        <p class="o-donut-centre" data-region="centre-suggested" data-fade>{% sum_key data.suggested_plan as s_total %}<span class="o-donut-total">{{ s_total|num }}</span><span class="o-donut-word">suggested</span></p>
+        <p class="o-empty-chart">No suggestions in this range yet.</p>
+      </div>
+      <ul class="o-keylist" data-region="keylist-suggested" data-fade>
+        {% if s_any %}{% ramp_rows data.suggested_plan "clay" "value" as sug_rows %}{% for r in sug_rows %}<li><span class="o-swatch" style="--sw: {{ r.swatch }}" aria-hidden="true"></span><span class="o-key-name">{{ r.label }}</span><span class="o-key-num">{{ r.value|num }}</span><span class="o-key-share">{{ r.share_bp|bp_rate }}</span></li>{% endfor %}{% endif %}
+      </ul>
+    </div>
+    <details class="o-table" data-table="suggested"{% if not s_any %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="table-suggested" data-fade>
+        <table><caption class="sr-only">Suggested plan, {{ data.range|range_label }}</caption>
+          <thead><tr><th scope="col">Plan</th><th scope="col">Suggested</th><th scope="col">Share</th></tr></thead>
+          <tbody>{% for r in data.suggested_plan %}<tr><th scope="row">{{ r.label }}</th><td>{{ r.value|num }}</td><td>{{ r.share_bp|bp_rate }}</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </details>
+  </section>
+
+  {# 4c Picked vs suggested tier #}
+  <section class="o-card o-chartcard o-span-12" id="tiers" data-reveal data-chart-card="tiers" aria-labelledby="h-tiers">
+    <header class="o-card-head"><h2 id="h-tiers">Picked vs suggested tier</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    {% has_data data.tier_pair "picked" as t_picked %}{% has_data data.tier_pair "suggested" as t_sugg %}
+    <p class="o-summary">What people picked when they registered, next to the tier the journey suggested.</p>
+    <div class="o-legend" data-legend="tiers"></div>
+    <div class="o-chartbox" data-chart="tiers" data-empty-text="No picks or suggestions in this range yet."{% if not t_picked and not t_sugg %} data-empty{% endif %}>
+      <canvas id="chart-tiers" role="img" aria-label="Picked and suggested tier, side by side for each tier" tabindex="-1"></canvas>
+      <p class="o-empty-chart">No picks or suggestions in this range yet.</p>
+    </div>
+    <details class="o-table" data-table="tiers"{% if not t_picked and not t_sugg %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="table-tiers" data-fade>
+        <table><caption class="sr-only">Picked and suggested tier, {{ data.range|range_label }}</caption>
+          <thead><tr><th scope="col">Tier</th><th scope="col">Picked</th><th scope="col">Suggested</th></tr></thead>
+          <tbody>{% for r in data.tier_pair %}<tr><th scope="row">{{ r.label }}</th><td>{{ r.picked|num }}</td><td>{{ r.suggested|num }}</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </details>
+  </section>
+
+  {# 5 Journey answers: three donuts and one bar list (teal) #}
+  <section class="o-card o-chartcard o-span-12" id="answers" data-reveal data-chart-card="answers" aria-labelledby="h-answers">
+    <header class="o-card-head"><h2 id="h-answers">Journey answers</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <p class="o-summary" data-region="summary-answers" data-fade>{{ data.summaries.journey_answers }}</p>
+    <div class="o-multiples">
+      {% has_data data.journey_answers.time "count" as a1 %}
+      <div class="o-multiple"><h3>Time of day</h3>{% insight_of data.insights "time" as ins_ans_time %}<p class="o-headline" data-region="head-ans-time" data-fade>{% if ins_ans_time %}<strong>{{ ins_ans_time.top.label }}</strong> <span>{{ ins_ans_time.top.value|num }} of {{ ins_ans_time.top.of_total|num }}</span>{% endif %}</p>
+        <div class="o-chartbox o-chartbox--donut" data-chart="answers-time" data-empty-text="No answers in this range yet."{% if not a1 %} data-empty{% endif %}><canvas id="chart-answers-time" role="img" aria-label="{{ data.summaries.journey_answers }}" tabindex="-1"></canvas>
+          <p class="o-donut-centre" data-region="centre-answers-time" data-fade>{% sum_key data.journey_answers.time "count" as t1 %}<span class="o-donut-total">{{ t1|num }}</span><span class="o-donut-word">answers</span></p><p class="o-empty-chart">No answers in this range yet.</p></div>
+        <ul class="o-keylist" data-region="keylist-answers-time" data-fade>{% if a1 %}{% ramp_rows data.journey_answers.time "teal" "count" as r1 %}{% for r in r1 %}<li><span class="o-swatch" style="--sw: {{ r.swatch }}" aria-hidden="true"></span><span class="o-key-name">{{ r.label }}</span><span class="o-key-num">{{ r.value|num }}</span><span class="o-key-share">{{ r.share_bp|bp_rate }}</span></li>{% endfor %}{% endif %}</ul>
+      </div>
+      {% has_data data.journey_answers.frequency "count" as a2 %}
+      <div class="o-multiple"><h3>How often</h3>{% insight_of data.insights "frequency" as ins_ans_frequency %}<p class="o-headline" data-region="head-ans-frequency" data-fade>{% if ins_ans_frequency %}<strong>{{ ins_ans_frequency.top.label }}</strong> <span>{{ ins_ans_frequency.top.value|num }} of {{ ins_ans_frequency.top.of_total|num }}</span>{% endif %}</p>
+        <div class="o-chartbox o-chartbox--donut" data-chart="answers-frequency" data-empty-text="No answers in this range yet."{% if not a2 %} data-empty{% endif %}><canvas id="chart-answers-frequency" role="img" aria-label="{{ data.summaries.journey_answers }}" tabindex="-1"></canvas>
+          <p class="o-donut-centre" data-region="centre-answers-frequency" data-fade>{% sum_key data.journey_answers.frequency "count" as t2 %}<span class="o-donut-total">{{ t2|num }}</span><span class="o-donut-word">answers</span></p><p class="o-empty-chart">No answers in this range yet.</p></div>
+        <ul class="o-keylist" data-region="keylist-answers-frequency" data-fade>{% if a2 %}{% ramp_rows data.journey_answers.frequency "teal" "count" as r2 %}{% for r in r2 %}<li><span class="o-swatch" style="--sw: {{ r.swatch }}" aria-hidden="true"></span><span class="o-key-name">{{ r.label }}</span><span class="o-key-num">{{ r.value|num }}</span><span class="o-key-share">{{ r.share_bp|bp_rate }}</span></li>{% endfor %}{% endif %}</ul>
+      </div>
+      {% has_data data.journey_answers.company "count" as a4 %}
+      <div class="o-multiple"><h3>Company</h3>{% insight_of data.insights "company" as ins_ans_company %}<p class="o-headline" data-region="head-ans-company" data-fade>{% if ins_ans_company %}<strong>{{ ins_ans_company.top.label }}</strong> <span>{{ ins_ans_company.top.value|num }} of {{ ins_ans_company.top.of_total|num }}</span>{% endif %}</p>
+        <div class="o-chartbox o-chartbox--donut" data-chart="answers-company" data-empty-text="No answers in this range yet."{% if not a4 %} data-empty{% endif %}><canvas id="chart-answers-company" role="img" aria-label="{{ data.summaries.journey_answers }}" tabindex="-1"></canvas>
+          <p class="o-donut-centre" data-region="centre-answers-company" data-fade>{% sum_key data.journey_answers.company "count" as t4 %}<span class="o-donut-total">{{ t4|num }}</span><span class="o-donut-word">answers</span></p><p class="o-empty-chart">No answers in this range yet.</p></div>
+        <ul class="o-keylist" data-region="keylist-answers-company" data-fade>{% if a4 %}{% ramp_rows data.journey_answers.company "teal" "count" as r4 %}{% for r in r4 %}<li><span class="o-swatch" style="--sw: {{ r.swatch }}" aria-hidden="true"></span><span class="o-key-name">{{ r.label }}</span><span class="o-key-num">{{ r.value|num }}</span><span class="o-key-share">{{ r.share_bp|bp_rate }}</span></li>{% endfor %}{% endif %}</ul>
+      </div>
+      {% has_data data.journey_answers.facilities "count" as a3 %}
+      <div class="o-multiple"><h3>Facilities</h3>{% insight_of data.insights "facility" as ins_ans_facility %}<p class="o-headline" data-region="head-ans-facility" data-fade>{% if ins_ans_facility %}<strong>{{ ins_ans_facility.top.label }}</strong> <span>{{ ins_ans_facility.top.value|num }} of {{ ins_ans_facility.top.of_total|num }}</span>{% endif %}</p><p class="o-note">Members could choose more than one.</p>
+        {% top_of data.journey_answers.facilities "count" as f_top %}
+        <ul class="o-bars o-bars--teal" data-region="bars-facilities" data-fade data-facilities>
+          {% if a3 %}{% for a in data.journey_answers.facilities %}<li style="--share: {% ratio a.count f_top %}"><span class="o-bar-name">{{ a.label }}</span><span class="o-bar-num">{{ a.count|num }}</span></li>{% endfor %}
+          {% else %}<li class="o-empty-line">No answers in this range yet.</li>{% endif %}
+        </ul>
+      </div>
+    </div>
+    <details class="o-table" data-table="answers"{% if not a1 and not a2 and not a3 and not a4 %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="table-answers" data-fade>
+        {% include "office/_answers_tables.html" %}
+      </div>
+    </details>
+  </section>
+
+  {# 6 Where people stop #}
+  <section class="o-card o-chartcard o-span-8" id="dropoff" data-reveal data-chart-card="dropoff" aria-labelledby="h-dropoff">
+    <header class="o-card-head"><h2 id="h-dropoff">Where people stop</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <p class="o-summary" data-region="summary-dropoff" data-fade>{{ data.summaries.drop_off }}</p>
+    <div class="o-chartbox" data-chart="dropoff" data-empty-text="No journeys in this range yet."{% has_data data.drop_off "reached" as d_any %}{% if not d_any %} data-empty{% endif %}>
+      <canvas id="chart-dropoff" role="img" aria-label="{{ data.summaries.drop_off }}" tabindex="-1"></canvas>
+      <p class="o-empty-chart">No journeys in this range yet.</p>
+    </div>
+    <details class="o-table" data-table="dropoff"{% if not d_any %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="table-dropoff" data-fade>
+        <table><caption class="sr-only">Where people leave the journey, {{ data.range|range_label }}</caption>
+          <thead><tr><th scope="col">Screen</th><th scope="col">Question</th><th scope="col">Reached</th><th scope="col">Left here</th><th scope="col">Share who left</th></tr></thead>
+          <tbody>{% for s in data.drop_off %}<tr><th scope="row">{{ s.screen }}</th><td>{{ s.label }}</td><td>{{ s.reached|num }}</td><td>{{ s.left|num }}</td><td>{{ s.left_percent }}%</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </details>
+  </section>
+
+  {# 7 Gold applications: pill bars (ochre) #}
+  <section class="o-card o-chartcard o-span-4" id="gold" data-reveal data-chart-card="gold" aria-labelledby="h-gold">
+    <header class="o-card-head"><h2 id="h-gold">Gold applications</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <p class="o-summary" data-region="summary-gold" data-fade>{{ data.summaries.gold }}</p>
+    {% has_data data.gold.by_potential as g_any %}{% has_data data.gold.by_status_now as gs_any %}
+    <h3 class="o-subhead">By potential</h3>
+    {% top_of data.gold.by_potential "value" as g_top %}
+    <ul class="o-bars o-bars--ochre" data-region="bars-gold" data-fade data-gold-potential>
+      {% if g_any %}{% for r in data.gold.by_potential %}<li style="--share: {% ratio r.value g_top %}"><span class="o-bar-name">{{ r.label }}</span><span class="o-bar-num">{{ r.value|num }}</span></li>{% endfor %}
+      {% else %}<li class="o-empty-line">No applications in this range yet.</li>{% endif %}
+    </ul>
+    <h3 class="o-subhead">Where they stand now</h3>
+    <div data-region="gold-status" data-fade data-gold-status>
+      {% if gs_any %}
+      <div class="o-stack" role="img" aria-label="{% for r in data.gold.by_status_now %}{{ r.label }} {{ r.value|num }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+        {% for r in data.gold.by_status_now %}{% if r.value %}<span class="o-stack-seg o-stack-seg--{{ r.dimension }}" style="flex-grow: {{ r.value }}"></span>{% endif %}{% endfor %}
+      </div>
+      <ul class="o-legend o-legend--status">
+        {% for r in data.gold.by_status_now %}<li class="o-legend-item"><span class="o-swatch o-swatch--{{ r.dimension }}" aria-hidden="true"></span><span>{{ r.label }}</span><span class="o-legend-num">{{ r.value|num }}</span></li>{% endfor %}
+      </ul>
+      {% else %}<p class="o-empty-line">No applications yet.</p>{% endif %}
+    </div>
+    <details class="o-table" data-table="gold"{% if not g_any and not gs_any %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="table-gold" data-fade>
+        <table><caption class="sr-only">Gold applications by potential, {{ data.range|range_label }}</caption>
+          <thead><tr><th scope="col">Potential</th><th scope="col">Applications</th></tr></thead>
+          <tbody>{% for r in data.gold.by_potential %}<tr><th scope="row">{{ r.label }}</th><td>{{ r.value|num }}</td></tr>{% endfor %}</tbody></table>
+        <table><caption class="sr-only">Gold applications by status now</caption>
+          <thead><tr><th scope="col">Status now</th><th scope="col">Applications</th></tr></thead>
+          <tbody>{% for r in data.gold.by_status_now %}<tr><th scope="row">{{ r.label }}</th><td>{{ r.value|num }}</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </details>
+  </section>
+
+  {# 8 Top pages and referring sites: ranked lists, not charts #}
+  <section class="o-card o-ranked o-span-6" id="pages" data-reveal aria-labelledby="h-pages">
+    <header class="o-card-head"><h2 id="h-pages">Top pages</h2></header>
+    <p class="o-summary" data-region="summary-pages" data-fade>{{ pages.summaries.top_pages }}</p>
+    <ol class="o-rank" data-region="rank-pages" data-fade data-top-pages>
+      {% for p in pages.top_pages %}
+      <li style="--share: {% ratio p.views pages.top_pages.0.views %}"><span class="o-rank-name">{{ p.page|capfirst }}</span><span class="o-rank-num">{{ p.views|num }}</span></li>
+      {% empty %}<li class="o-empty-line">No page views in this range yet.</li>{% endfor %}
+    </ol>
+  </section>
+  <section class="o-card o-ranked o-span-6" id="referrers" data-reveal aria-labelledby="h-refs">
+    <header class="o-card-head"><h2 id="h-refs">Referring sites</h2></header>
+    <p class="o-summary" data-region="summary-refs" data-fade>{{ pages.summaries.referrers }}</p>
+    <ol class="o-rank" data-region="rank-refs" data-fade data-referrers>
+      {% for r in pages.referrers %}
+      <li style="--share: {% ratio r.visits pages.referrers.0.visits %}"><span class="o-rank-name">{% if r.site == "direct" %}Direct or unknown{% else %}{{ r.site }}{% endif %}</span><span class="o-rank-num">{{ r.visits|num }}</span></li>
+      {% empty %}<li class="o-empty-line">No visits in this range yet.</li>{% endfor %}
+    </ol>
+  </section>
+</div>
+{{ data|json_script:"office-series" }}
+{{ pages|json_script:"office-pages" }}
+{% endblock %}

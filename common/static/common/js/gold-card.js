@@ -22,7 +22,7 @@ const HOME_SHEEN = ramp([[0, -1], [0.45, -1], [0.75, 1], [1, 1]]);
 export function goldCard(mount, scene, { desktop, fine, ctx }) {
   const q = (sel) => mount.querySelector(sel);
   const k = desktop ? 1 : 18 / 25;
-  const gc = { ry: -25 * k, rx: desktop ? 8 : 5, turn: 0, tiltX: 0, tiltY: 0, roll: 0, bob: 0, lift: 0, drop: 0, sheen: -1, draw: 0, line: 1, relief: 0, fade: 1, gl: false, k, p: 0 };
+  const gc = { ry: -25 * k, rx: desktop ? 8 : 5, turn: 0, tiltX: 0, tiltY: 0, roll: 0, bob: 0, lift: 0, drop: 0, sheen: -1, draw: 1, line: 0, relief: 1, fade: 1, gl: false, k, p: 0 };
   const el = { card: q('.gc-card'), float: q('.gc-float'), shade: q('.gc-shade'), sheen: q('.gc-sheen'), pool: q('.gc-pool') };
   gc.render = () => {
     mount.style.opacity = gc.fade;
@@ -38,16 +38,15 @@ export function goldCard(mount, scene, { desktop, fine, ctx }) {
   cleanups.push(() => { mount.style.opacity = ''; mount.style.transform = ''; ['card', 'float', 'shade', 'sheen', 'pool'].forEach((n) => el[n].removeAttribute('style')); });
 
   // Swan: the CSS card draws with DrawSVG, the canvas reads the same moments from the proxy. windows are [from, to] in timeline units.
-  gc.swan = (tl, { draw, relief, line }, ease) => {
-    const svg = q('.mark-draw'), W = draw[1] - draw[0];
-    const shadow = q('.gc-swan-shadow');
-    tl.fromTo(svg.querySelectorAll('.mark-line path'), { drawSVG: '0%' }, { drawSVG: '100%', duration: (W * 0.4) / 0.7, stagger: (W * 0.1) / 0.7, ease }, draw[0])
-      .fromTo(gc, { draw: 0 }, { draw: 1, duration: W, ease }, draw[0])
-      .fromTo(svg.querySelector('.mark-fill'), { opacity: 0 }, { opacity: 1, duration: relief[1] - relief[0], ease }, relief[0])
-      .fromTo(shadow, { opacity: 0 }, { opacity: 0.5, duration: relief[1] - relief[0], ease }, relief[0])
-      .fromTo(gc, { relief: 0 }, { relief: 1, duration: relief[1] - relief[0], ease }, relief[0])
-      .fromTo(svg.querySelector('.mark-line'), { opacity: 1 }, { opacity: 0, duration: line[1] - line[0], ease }, line[0])
-      .fromTo(gc, { line: 1 }, { line: 0, duration: line[1] - line[0], ease }, line[0]);
+  // Moishe 2026-10-23: the swan is there, complete and in full relief, from the first frame (no outline drawing in). Same signature, so callers stay.
+  gc.swan = (tl) => {
+    const svg = q('.mark-draw');
+    gsap.set(svg.querySelectorAll('.mark-line path'), { drawSVG: '100%' });
+    gsap.set(svg.querySelector('.mark-fill'), { opacity: 1 });
+    gsap.set(q('.gc-swan-shadow'), { opacity: 0.5 });
+    gsap.set(svg.querySelector('.mark-line'), { opacity: 0 });
+    Object.assign(gc, { draw: 1, relief: 1, line: 0 });
+    return tl;
   };
 
   // Idle float (18s bob, 23s roll), paused off screen and in a hidden tab (BRAND 7A loop rule).
@@ -76,8 +75,8 @@ export function goldCard(mount, scene, { desktop, fine, ctx }) {
     cleanups.push(() => { scene.removeEventListener('pointermove', move); scene.removeEventListener('pointerleave', leave); gsap.ticker.remove(follow); });
   }
   gc.render();
-  // the three.js layer (capable desktops only): the gate and loader are in gold-gl.js, fetched only when this could pass
-  if (desktop && root.dataset.webgl !== 'off' && mount.dataset.webglGate) import(mount.dataset.webglGate).then((m) => m.loadCards(ctx, { mount, gc, gsap, ScrollTrigger, cleanups, root })).catch((e) => console.error('gold card 3d', e));
+  // the three.js layer (capable desktops, tablets and phones): the gate and loader are in gold-gl.js, fetched only when this could pass
+  if (root.dataset.webgl !== 'off' && mount.dataset.webglGate) import(mount.dataset.webglGate).then((m) => m.loadCards(ctx, { mount, gc, gsap, ScrollTrigger, cleanups, root })).catch((e) => { console.error('gold card 3d', e); mount.classList.add('gl-off'); });
   return gc;
 }
 

@@ -358,6 +358,9 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
 
 The designer refines these per task. Frontend uses only tokens, never raw values. Breakpoints are constants (CSS variables can't be used in media queries): `48em` (tablet) and `64em` (desktop).
 
+### Office tokens
+The Office (staff back office) is light and has its own `--office-*` tokens, defined in `common/static/common/css/office-tokens.css` under `.office`, never in `tokens.css`. Spec and values: `docs/design/OFFICE.md`.
+
 ### Round 3 layout tokens (The spa, 2026-10-23, derived)
 - `--mount-gap` 0.375rem (0.5rem from 48em): margin between a mount's gold line and its photo.
 - `--mount-gap-sm` 0.375rem: the same gap on small mounts (the kit tiles); does not grow at 48em.

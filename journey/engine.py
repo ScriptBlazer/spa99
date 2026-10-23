@@ -2,10 +2,12 @@
 All numbers come from data: Option.plan_points, SuggestionRule rows, GoldRule rows, Plan rows."""
 from dataclasses import dataclass, field
 
+from django.db import transaction
 from django.utils import timezone
 
 from content import services as content_services
 from gold import rating as gold_rating
+from insights import metrics
 from plans import services as plan_services
 
 from . import services
@@ -107,6 +109,12 @@ def gold_signals(session):
     return gold_rating.signals_from_answers(values), extra
 
 
+def counted_answers(session):
+    """["question:option", ...] for the answers that count: visible, answered (not skipped) option choices."""
+    answers = services.effective_answers(session)
+    return sorted(f"{key}:{value}" for key, answer in answers.items() for value in answer.values())
+
+
 def compute_gold(session):
     signals, extra = gold_signals(session)
     return gold_rating.rate_potential(signals, extra_points=extra)
@@ -123,11 +131,13 @@ def complete(session):
     services.require_answers(session)
     suggestion = compute_suggestion(session)
     rating = compute_gold(session)
+    counted = counted_answers(session)
     detail = {
         "scores": suggestion.scores if suggestion else {},
         "excluded": suggestion.excluded if suggestion else [],
         "reasons": suggestion.reasons if suggestion else [],
         "gold_reasons": rating.reasons,
+        "counted_answers": counted,  # what the stored figures counted for this journey (see insights.metrics)
     }
     plan = suggestion.plan if suggestion else None
     changed = (
@@ -138,14 +148,31 @@ def complete(session):
         or not session.completed
     )
     if changed:
-        last = services.result_step(session)
-        session.suggested_plan = plan
-        session.suggestion_detail = detail
-        session.gold_potential, session.gold_score = rating.level, rating.score
-        session.current_step = session.furthest_step = last
-        if not session.completed:
-            session.completed, session.completed_at = True, timezone.now()
-        session.save()
+        with transaction.atomic():
+            # Read the old state from the row under a lock: two tabs finishing at once must count the journey once
+            # (the second waits, then sees it completed and only adjusts what differs).
+            locked = type(session).objects.select_for_update(of=("self",)).select_related("suggested_plan").get(pk=session.pk)   # lock only this row: Postgres refuses FOR UPDATE on the nullable side of a join
+            first = not locked.completed
+            old_plan = locked.suggested_plan.slug if locked.suggested_plan_id else None
+            old_level = locked.gold_potential
+            old_counted = locked.suggestion_detail.get("counted_answers", [])
+            old_furthest = locked.furthest_step
+            if not first:
+                session.completed, session.completed_at = True, locked.completed_at
+            last = services.result_step(session)
+            session.suggested_plan = plan
+            session.suggestion_detail = detail
+            session.gold_potential, session.gold_score = rating.level, rating.score
+            session.current_step = session.furthest_step = last
+            if first:
+                session.completed, session.completed_at = True, timezone.now()
+            session.save()
+            if not session.is_bot:
+                metrics.journey_screens_reached(session.created_at, services.screens_between(old_furthest, last))
+                metrics.journey_completed(
+                    session.completed_at, plan.slug if plan else None, rating.level or None, counted, first=first,
+                    old_plan_slug=old_plan, old_gold_level=old_level or None, old_answers=old_counted,
+                )
     return build_result(session, suggestion, rating)
 
 

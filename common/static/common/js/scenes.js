@@ -260,16 +260,13 @@ SCENES.hero = (el, { desktop }) => {
   const still = q('.hero-still-wrap');
   const loops = [gsap.to(still, { scale: 1.03, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' })];
   const video = q('.hero-video');
-  let inView = true, playing = false, ended = false;
-  // The video plays once (16 s push-in), then holds on its last frame while a barely visible drift runs on its wrapper (transform only).
-  const drift = video ? gsap.to(q('[data-hero-drift]'), { scale: 1.03, duration: 40, yoyo: true, repeat: -1, ease: 'sine.inOut', paused: true }) : null;
+  let inView = true, playing = false;
+  // The video loops by itself (v3, 2026-10-23: a 14 s file whose last 2 s cross-fade into its start, so the native loop is invisible).
   const sync = () => {
     const run = inView && !document.hidden;
     loops.forEach((t) => (run && !playing ? t.resume() : t.pause()));
-    if (drift) (run && ended ? drift.resume() : drift.pause());
-    if (video && playing && !ended) (run ? video.play() : video.pause())?.catch?.(() => {});
+    if (video && playing) (run ? video.play() : video.pause())?.catch?.(() => {});
   };
-  const hold = () => { ended = true; sync(); };  // a reload replays the push-in; bfcache (back/forward) keeps the held last frame
   document.addEventListener('visibilitychange', sync);
   cleanups.push(() => document.removeEventListener('visibilitychange', sync));
   ScrollTrigger.create({ trigger: el, start: 'top bottom', end: 'bottom top', onToggle: (self) => { inView = self.isActive; sync(); } });
@@ -280,7 +277,6 @@ SCENES.hero = (el, { desktop }) => {
     const pick = JSON.parse(video.dataset.sources).find((s) => matchMedia(s.media).matches && video.canPlayType(s.type));
     if (!pick) return;
     const show = () => { playing = true; video.classList.add('is-playing'); media.classList.add('has-video'); sync(); };
-    video.addEventListener('ended', hold, { once: true });
     video.addEventListener('playing', show, { once: true });
     video.src = pick.src;
     video.play().catch(() => {});

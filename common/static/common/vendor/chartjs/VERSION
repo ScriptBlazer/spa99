@@ -1,0 +1,4 @@
+4.6.1
+File: chart.js@4.6.1 npm package, dist/chart.umd.min.js (MIT, see 4.6.1/LICENSE.md).
+Original sha256: 87364cc2b2a76a6684929e7d6b80b18a897794db38400caff1fcf1791c6925d2
+Only change: the trailing "//# sourceMappingURL=chart.umd.min.js.map" comment line is removed (the map is not shipped; ManifestStaticFilesStorage would fail on it).

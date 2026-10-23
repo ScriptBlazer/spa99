@@ -1,0 +1,52 @@
+{% extends "office/base.html" %}
+{% load office_tags %}
+{% block title %}People | Spa 99 Office{% endblock %}
+{% block main %}
+<h1 class="sr-only">People</h1>
+<form class="o-filters" method="get" action="{% url 'office_people' %}" data-filter-form data-list="people" role="search" aria-label="Find people">
+  <div class="o-filters-bar">
+    <div class="o-search">
+      <label for="f-q" class="sr-only">Search people</label>
+      {% include "office/_icon.html" with name="search" %}
+      <input id="f-q" type="search" name="q" value="{{ filters.q }}" placeholder="Search name, email or mobile" autocomplete="off" enterkeyhint="search" data-search>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm o-filters-open" data-filters-open hidden>{% include "office/_icon.html" with name="sliders" %}Filters</button>
+    <div class="o-filters-slot" data-filters-slot>
+      <div class="o-filters-body" data-filter-body>
+        <div class="o-filter-group"><label class="o-filter-label" for="f-plan">Plan</label>
+          <select id="f-plan" name="plan" class="o-select"><option value="">All plans</option>{% for p in plans %}<option value="{{ p.slug }}"{% if filters.plan == p.slug %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></div>
+        <div class="o-filter-group"><span class="o-filter-label" id="l-verified">Verified</span>
+          <fieldset class="o-seg" aria-labelledby="l-verified" style="--n: 3; --i: {% if filters.verified == 'yes' %}1{% elif filters.verified == 'no' %}2{% else %}0{% endif %}" data-default="">
+            <span class="o-seg-thumb" aria-hidden="true"></span>
+            <label class="o-seg-item"><input type="radio" name="verified" value=""{% if not filters.verified %} checked{% endif %}><span>All</span></label>
+            <label class="o-seg-item"><input type="radio" name="verified" value="yes"{% if filters.verified == "yes" %} checked{% endif %}><span>Verified</span></label>
+            <label class="o-seg-item"><input type="radio" name="verified" value="no"{% if filters.verified == "no" %} checked{% endif %}><span>Not yet</span></label>
+          </fieldset></div>
+        <div class="o-filter-group"><span class="o-filter-label" id="l-marketing">Marketing</span>
+          <fieldset class="o-seg" aria-labelledby="l-marketing" style="--n: 3; --i: {% if filters.marketing == 'yes' %}1{% elif filters.marketing == 'no' %}2{% else %}0{% endif %}" data-default="">
+            <span class="o-seg-thumb" aria-hidden="true"></span>
+            <label class="o-seg-item"><input type="radio" name="marketing" value=""{% if not filters.marketing %} checked{% endif %}><span>All</span></label>
+            <label class="o-seg-item"><input type="radio" name="marketing" value="yes"{% if filters.marketing == "yes" %} checked{% endif %}><span>Yes</span></label>
+            <label class="o-seg-item"><input type="radio" name="marketing" value="no"{% if filters.marketing == "no" %} checked{% endif %}><span>No</span></label>
+          </fieldset></div>
+      </div>
+    </div>
+    {% if office_can.can_export %}<a class="btn btn-secondary btn-sm o-export" href="{% url 'office_people_csv' %}?{{ request.GET.urlencode }}" data-export-csv data-export-base="{% url 'office_people_csv' %}">Export CSV</a>{% endif %}
+  </div>
+  <p class="o-totalline"><span data-total data-region="total">{{ total_registered|num }} people</span>
+    <a class="o-quiet" href="{% url 'office_people' %}" data-clear{% if not filters.q and not filters.plan and not filters.verified and not filters.marketing %} hidden{% endif %}>Clear</a>
+    <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button></p>
+  <dialog class="o-sheet" data-filter-sheet aria-labelledby="sheet-h">
+    <div class="o-sheet-head"><h2 id="sheet-h">Filters</h2></div>
+    <div data-sheet-slot></div>
+    <button type="button" class="btn btn-primary btn-block" data-sheet-close>Show results</button>
+  </dialog>
+</form>
+<div class="o-card o-tablecard" data-list-card>
+  <table class="o-list o-list--people">
+    <caption class="sr-only">People who have registered</caption>
+    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Plan interest</th><th scope="col">Verified</th><th scope="col">Marketing</th><th scope="col">Journey</th><th scope="col" class="num">Registered</th><th scope="col">Gold</th></tr></thead>
+    <tbody data-region="list" data-office-list="people">{% include "office/_people_rows.html" %}</tbody>
+  </table>
+</div>
+{% endblock %}

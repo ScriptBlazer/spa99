@@ -2,12 +2,15 @@
 <html lang="en-GB">
 <head>
 {% block head_title %}{% include "common/_head.html" with title=title|default:"Spa 99" %}{% endblock %}
+{% if office %}<link rel="stylesheet" href="{% static 'common/css/office-signin.css' %}">{% endif %}
 </head>
-<body class="on-dark">
+<body class="{% if office %}office office-signin{% else %}on-dark{% endif %}">
 <main id="main" class="bare" tabindex="-1">
   <div class="container">{% include "common/_messages.html" %}</div>
   {% block main %}{% endblock %}
+  {% if office %}<p class="office-foot">Spa 99 &middot; BML Group</p>{% endif %}
 </main>
 {% include "common/_modal.html" %}
+{% block scripts %}{% endblock %}
 </body>
 </html>
