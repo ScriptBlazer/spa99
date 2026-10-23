@@ -21,7 +21,7 @@
 .o-rings .o-h3 { margin-bottom: var(--space-4); }
 .o-ring-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4) var(--space-3); justify-items: center; }
 @media (min-width: 64em) { .o-ring-row { gap: var(--space-4); } }
-.o-ring-item { --c: var(--office-sage); --t: var(--office-sage-track); display: grid; justify-items: center; align-content: start; gap: var(--space-3); min-width: 0; color: inherit; text-decoration: none; text-align: center; }
+.o-ring-item { --c: var(--office-sage); --t: var(--office-sage-track); display: grid; justify-self: stretch; width: 100%; justify-items: center; align-content: start; gap: var(--space-3); min-width: 0; color: inherit; text-decoration: none; text-align: center; }
 .o-ring-item[data-ring="journeys_completed"] { --c: var(--office-teal); --t: var(--office-teal-track); }
 .o-ring-item[data-ring="registrations"] { --c: var(--office-clay); --t: var(--office-clay-track); }
 .o-ring-fig { position: relative; display: grid; place-items: center; width: min(var(--office-ring), 100%); aspect-ratio: 1; }   /* shrinks with its column so the three rings never touch */
