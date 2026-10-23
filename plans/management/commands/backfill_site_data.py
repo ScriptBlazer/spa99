@@ -16,7 +16,7 @@ written by hand:
 - (2026-10-23) facts are filled only on a never-touched row (cleared facts stay cleared); the three picture
   descriptions that no longer match the new photos (cold plunge, showers, massage room) are replaced only while they
   still have the exact old wording; the kitchenette goes from companion to tile only while it still has its seeded
-  image and facts
+  image and facts; the kitchenette moves after the showers only while all eight orders are still the old seeded ones
 
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 from collections import Counter
@@ -122,9 +122,29 @@ OLD_SPA_INTRO = "Eight spaces, one quiet visit."
 OLD_FACILITY_IMAGES = {"cold-plunge": "cold-tub", "kitchenette": "lounge"}
 
 
+# The seeded order before 2026-10-23 (kitchenette last). Reordered only while the rows still have exactly these.
+OLD_FACILITY_ORDER = {"dry-sauna": 1, "wet-sauna": 2, "cold-plunge": 3, "showers": 4, "relaxing-zone": 5,
+                      "massage-room": 6, "gym": 7, "kitchenette": 8}
+
+
+def _reorder_facilities():
+    """Kitchenette goes right after the showers so the four tiles share one row. Never touches a rearranged set."""
+    facilities = list(Facility.objects.all())
+    if {f.slug: f.order for f in facilities} != OLD_FACILITY_ORDER:
+        return 0
+    new = {row[0]: order for order, row in enumerate(plans_seed.FACILITIES, start=1)}
+    for facility in facilities:
+        if facility.order != new[facility.slug]:
+            facility.order = new[facility.slug]
+            facility.save()
+    return 1
+
+
 def _spa_page():
     """The spa page data: facility fields, missing copy rows and three exact-wording fixes. Fills empty only."""
     changed = Counter()
+    if _reorder_facilities():
+        changed["plans.Facility (order: kitchenette after showers)"] += 1
     for facility in Facility.objects.all():
         seed = plans_seed.FACILITY_SPA_PAGE.get(facility.slug)
         touched = False

@@ -9,6 +9,7 @@ from content import services as content
 from content.models import Section
 from pages import services as pages
 from plans.management.commands.seed_phase1 import seed_all
+from plans.management.commands.backfill_site_data import OLD_FACILITY_ORDER
 from plans.models import Facility, Plan, SiteSettings
 
 
@@ -27,22 +28,22 @@ class SpaSectionsTests(TestCase):
 
     def test_seed_gives_the_compositions_with_alternating_sides(self):
         self.assertEqual(layout(self.sections()), [
-            ("dry-sauna", None, "left"), ["wet-sauna", "cold-plunge", "showers"],
-            ("relaxing-zone", "massage-room", "right"), ("gym", None, "left"), ["kitchenette"]])
+            ("dry-sauna", None, "left"), ["wet-sauna", "cold-plunge", "showers", "kitchenette"],
+            ("relaxing-zone", "massage-room", "right"), ("gym", None, "left")])
 
     def test_hiding_rooms_never_breaks_the_layout(self):
         Facility.objects.filter(slug__in=["dry-sauna", "gym", "wet-sauna"]).update(visible=False)
         self.assertEqual(layout(self.sections()), [
-            ["cold-plunge", "showers"], ("relaxing-zone", "massage-room", "left"), ["kitchenette"]])
+            ["cold-plunge", "showers", "kitchenette"], ("relaxing-zone", "massage-room", "left")])
 
     def test_extra_and_lonely_companions_become_tiles_and_long_runs_split(self):
         Facility.objects.update(display="tile")
         Facility.objects.filter(slug="gym").update(display="feature")
         Facility.objects.filter(slug__in=["massage-room", "kitchenette", "cold-plunge"]).update(display="companion")
-        # order: dry-sauna wet-sauna cold-plunge showers relaxing-zone massage-room gym kitchenette
+        # order: dry-sauna wet-sauna cold-plunge showers kitchenette relaxing-zone massage-room gym
         self.assertEqual(layout(self.sections()), [
-            ["dry-sauna", "wet-sauna", "cold-plunge"], ["showers", "relaxing-zone", "massage-room"],
-            ("gym", "kitchenette", "left")])
+            ["dry-sauna", "wet-sauna", "cold-plunge", "showers"], ["kitchenette", "relaxing-zone", "massage-room"],
+            ("gym", None, "left")])
 
     def test_room_count_word_follows_visible_rooms(self):
         self.assertEqual(content.page_content("spa")["intro"].body, "Eight spaces, one quiet visit.")
@@ -149,3 +150,16 @@ class BackfillTests(TestCase):
         Facility.objects.filter(slug="kitchenette").update(display="companion", facts=["Mine"])
         call_command("backfill_site_data", stdout=StringIO())
         self.assertEqual(Facility.objects.get(slug="kitchenette").display, "companion")
+
+    def test_backfill_moves_the_kitchenette_only_in_an_untouched_order(self):
+        seed_all()
+        for slug, order in OLD_FACILITY_ORDER.items():
+            Facility.objects.filter(slug=slug).update(order=order)
+        call_command("backfill_site_data", stdout=StringIO())
+        self.assertEqual([f.slug for f in Facility.objects.all()][3:5], ["showers", "kitchenette"])
+        Facility.objects.filter(slug="gym").update(order=1)  # someone rearranged by hand
+        for slug, order in OLD_FACILITY_ORDER.items():
+            if slug != "gym":
+                Facility.objects.filter(slug=slug).update(order=order)
+        call_command("backfill_site_data", stdout=StringIO())
+        self.assertEqual(Facility.objects.get(slug="kitchenette").order, 8)

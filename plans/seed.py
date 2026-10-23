@@ -83,14 +83,14 @@ FACILITIES = [
      "A round oak cold plunge tub with steps, in a marble room"),
     ("showers", "Showers", "Rain showers, good towels, everything you need.", "Open rain showers.",
      "Rain showers behind black-framed frosted glass screens, with a marble column and a mosaic wall"),
+    ("kitchenette", "Kitchenette", "Tea, coffee and somewhere to sit after.", "A place to make a drink and stay a while.",
+     "Kitchenette and lounge corner"),
     ("relaxing-zone", "Relaxing zone", "Loungers, low light and nothing to do.", "Low light and comfortable seating.",
      "Relaxing zone with loungers, travertine and the swan on the wall"),
     ("massage-room", "Massage room", "A quiet room for massage, part of your visit.", "A private room for massage.",
      "Massage room with a made-up table and the swan on a timber slatted wall"),
     ("gym", "Gym", "Free weights and machines, never crowded.", "A calm, well equipped gym.",
      "Gym with free weights and a swan panel on the wall"),
-    ("kitchenette", "Kitchenette", "Tea, coffee and somewhere to sit after.", "A place to make a drink and stay a while.",
-     "Kitchenette and lounge corner"),
 ]
 
 # The spa page (docs/design/SPA-PAGE.md 3.2): slug -> display, image_name, image_focus, detail_image_name, facts.
