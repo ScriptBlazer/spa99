@@ -1,15 +1,30 @@
 {% extends "base_reduced.html" %}
-{% load static validation_tags %}
+{% load static content_tags pages_tags validation_tags %}
 {% block head_title %}{% include "common/_head.html" with title="Apply for the Gold Card | Spa 99" description=meta.meta_description %}{% endblock %}
 {% block head_extra %}<meta name="robots" content="noindex">{% endblock %}
 {% block messages %}{% endblock %}
 {% block main %}
-<div class="journey gold-flow on-dark" data-journey data-flow="gold">
-  <div class="progress" role="progressbar" aria-label="Your progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-progress><span class="progress-fill" data-progress-fill></span></div>
+{% page_content "gold" as g %}
+<div class="journey gold-flow gold-apply on-dark" data-journey data-flow="gold">
   <div class="container">{% include "common/_messages.html" %}</div>
-  <div class="container flow-container">
-    <div class="flow-col" data-flow-root>
-      <p class="muted flow-loading">One moment</p>
+  <div class="container grid gold-apply-grid">
+    <aside class="gold-apply-stage">
+      <div class="gold-apply-card" data-reveal="hero-image">{% photo "gold-card" alt="" sizes="(min-width: 64em) 30vw, 8rem" eager=True %}</div>
+      <div class="gold-apply-stage-copy" data-reveal="hero">
+        <p class="gold-apply-label">{{ g.apply.heading }}</p>
+        <ol class="gold-apply-ledger" aria-hidden="true">
+          <li class="gl-1"><span class="gl-ring"></span><span class="gl-name">{{ gold_config.copy.screen_1.heading|cut:"." }}</span></li>
+          <li class="gl-2"><span class="gl-ring"></span><span class="gl-name">{{ gold_config.copy.screen_2.heading|cut:"." }}</span></li>
+          <li class="gl-3"><span class="gl-ring"></span><span class="gl-name">{{ gold_config.copy.screen_3.heading|cut:"." }}</span></li>
+        </ol>
+        {% if g.apply_note.body %}<p class="gold-apply-note">{{ g.apply_note.body }}</p>{% endif %}
+      </div>
+    </aside>
+    <div class="gold-apply-panel">
+      <div class="progress" role="progressbar" aria-label="Your progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-progress><span class="progress-fill" data-progress-fill></span></div>
+      <div class="flow-col" data-flow-root>
+        <p class="muted flow-loading">One moment</p>
+      </div>
     </div>
   </div>
   <noscript><div class="container flow-container"><p class="lead">The application needs JavaScript. Please write to <a href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a>.</p></div></noscript>
