@@ -1,0 +1,9 @@
+{# One step of Gold's How it works. Needs n, row (copy row) and last (true for the third). #}
+<li class="gstep" data-gstep>
+  <span class="gstep-num num" aria-hidden="true">{{ n }}</span>
+  {% if not last %}<span class="gstep-line" aria-hidden="true"></span>{% endif %}
+  <div class="gstep-body">
+    <h3 class="gstep-word">{{ row.heading }}</h3>
+    <p class="muted">{{ row.body }}</p>
+  </div>
+</li>

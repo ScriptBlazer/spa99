@@ -114,9 +114,14 @@ class PageTests(TestCase):
 
     def test_gold_page_perks_come_from_the_gold_plan(self):
         html = self.client.get("/gold-card/").content.decode()
-        self.assertIn("Unlimited visits", html)
-        self.assertIn("Bring 2 guests a month", html)
-        self.assertIn("BML members&#x27; events", html)
+        for needle in ("Unlimited", "guests a month", "to book ahead", "3 bookings at a time", "BML members&#x27; events",
+                       "Each merch release", "Invitations through the year."):
+            self.assertIn(needle, html)
+        self.assertNotIn("Apply for the Gold Card</a>", html)  # one label per intent: the hero's "Apply"
+        Plan.objects.filter(slug="gold").update(visible=False)
+        html = self.client.get("/gold-card/").content.decode()
+        self.assertNotIn("What it holds.", html)  # G2 is left out when the Gold plan is hidden
+        self.assertIn("Who it is for.", html)
 
     def test_book_page_is_a_placeholder_without_fake_actions(self):
         html = self.client.get("/book/").content.decode()

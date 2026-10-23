@@ -39,6 +39,7 @@
   --font-body: "Figtree", system-ui, sans-serif;
   --tracking-display: -0.025em;
   --tracking-body: -0.01em;
+  --tracking-engraved: 0.2em;                   /* derived (round 3): the engraved brand line on the Gold panel, as on the card's back */
   --tracking-label: 0.08em;                /* derived: small uppercase labels only */
 
   --text-sm: 0.875rem;

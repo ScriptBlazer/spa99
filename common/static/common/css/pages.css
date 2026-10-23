@@ -20,18 +20,103 @@
 @media (min-width: 64em) {
   .gold-hero-text { grid-column: 1 / span 6; }
 }
-.gold-who { padding-top: 0; }
-.roles { margin-top: var(--space-5); }
-.roles li { font-family: var(--font-display); font-size: var(--text-xl); letter-spacing: var(--tracking-display); line-height: var(--leading-tight); margin-bottom: var(--space-4); break-inside: avoid; }
-@media (min-width: 48em) { .roles { columns: 2; column-gap: var(--gutter); } }
-.who-note { margin-top: var(--space-3); }
-.gold-holds { padding-top: 0; }
-.perk-groups { display: grid; gap: var(--space-6); }
-.perk-group { border-top: 1px solid var(--color-gold); padding-top: var(--space-4); }
-.perk-group ul { margin-top: var(--space-3); display: grid; gap: var(--space-2); }
-@media (min-width: 48em) { .perk-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--gutter); } }
-.gold-how { padding-top: 0; }
-.gold-apply { padding-bottom: var(--space-7); }
+/* ---------- Gold Card, below the card (docs/design/GOLD-PAGE-R3.md): G2 the back of the card, G3 who it is for, G4 how it works and apply ---------- */
+.gold-holds, .gold-who, .gold-how { position: relative; overflow-x: clip; padding-block: var(--space-5); }
+.gold-holds > .container, .gold-who > .container, .gold-how > .container { position: relative; z-index: 1; }
+.gold-holds .glow { z-index: 0; }
+.gold-how { padding-bottom: var(--space-7); }
+@media (min-width: 64em) { .gold-holds, .gold-who, .gold-how { padding-block: var(--space-6); } .gold-how { padding-bottom: var(--space-7); } }
+
+/* G2: an engraved panel in the colour of the card's back */
+.gold-back {
+  position: relative; isolation: isolate; overflow: hidden; padding: var(--space-4); border-radius: var(--radius-md);
+  background-color: var(--color-gold-deep);
+  background-image: radial-gradient(60% 80% at 15% 0%, var(--color-glow), transparent 70%), url("../img/swan-pattern.svg");
+  color: var(--color-text-inverse);
+}
+.gold-back::after { content: ""; position: absolute; inset: 8px; border: 1px solid var(--color-tier-edge-gold); border-radius: calc(var(--radius-md) - 6px); pointer-events: none; }
+.gold-back::before {   /* the one sheen: crosses once when half the panel is in view (gold-below.js adds .is-sheen) */
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; transform: translateX(-110%);
+  background: linear-gradient(105deg, transparent 35%, var(--color-sheen) 50%, transparent 65%);
+}
+@keyframes gb-sheen { to { transform: translateX(110%); } }
+@media (prefers-reduced-motion: no-preference) { html.motion .gold-back.is-sheen::before { animation: gb-sheen 1.8s var(--ease-soft) both; } }
+.gb-grid { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr); row-gap: var(--space-5); padding: var(--space-2); }
+.gb-lead { margin-top: var(--space-2); font-size: var(--text-lg); color: var(--color-text-muted-inverse); }
+.gb-title { font-family: var(--font-body); font-weight: 500; font-size: var(--text-sm); letter-spacing: var(--tracking-body); color: var(--color-text-muted-inverse); }
+.gb-figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5) var(--gutter); margin-top: var(--space-4); }
+.gb-fig::before, .gb-perk::before { content: ""; display: block; width: 1.5rem; height: 1px; margin-bottom: var(--space-2); background: var(--color-gold); }
+.gb-value { display: block; font-family: var(--font-display); font-weight: 500; font-size: var(--text-lg); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--color-text-inverse); }
+.gb-label { display: block; margin-top: var(--space-1); font-size: var(--text-sm); color: var(--color-text-muted-inverse); }
+.gb-pills { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+.gb-perks { display: grid; gap: var(--space-4); margin-top: var(--space-4); }
+.gb-perk-name { display: block; font-family: var(--font-display); font-weight: 500; font-size: var(--text-lg); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--color-text-inverse); }
+.gb-perk-note { display: block; margin-top: var(--space-1); font-size: var(--text-sm); color: var(--color-text-muted-inverse); }
+.gb-line { max-width: none; text-align: center; font-size: var(--text-sm); font-weight: 500; text-transform: uppercase; letter-spacing: var(--tracking-engraved); color: var(--color-gold-light); }
+@media (min-width: 48em) {
+  .gold-back { padding: var(--space-6); }
+  .gold-back::after { inset: 12px; }
+  .gb-grid { padding: 0; }
+  .gb-value { font-size: var(--text-xl); }
+}
+@media (min-width: 64em) {
+  .gb-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gutter); row-gap: var(--space-5); }
+  .gb-head { grid-column: 1 / span 6; grid-row: 1; }
+  .gb-visits { grid-column: 1 / span 6; grid-row: 2; }
+  .gb-beyond { grid-column: 8 / -1; grid-row: 2; }
+  .gb-line { grid-column: 1 / -1; grid-row: 3; margin-top: var(--space-4); }
+  .gb-figures:has(> li:nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* G3: a room, and the roles as pills */
+.gw-grid { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: var(--space-5); }
+.gw-roles { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+.gw-role { display: inline-flex; align-items: center; min-height: var(--chip-h); padding: 0 var(--space-3); border: 1px solid var(--color-gold); border-radius: var(--radius-md); font-size: var(--text-base); color: var(--color-text-inverse); }
+.gw-note { margin-top: var(--space-4); font-size: var(--text-sm); }
+.gw-pic { position: relative; }
+.gw-frame { aspect-ratio: 4 / 3; }
+.gw-inset { position: relative; width: 40%; margin: calc(var(--space-5) * -1) 0 0 auto; padding: var(--space-1); background: var(--color-espresso-raised); border: 1px solid var(--color-hairline-inverse); border-radius: var(--radius-sm); }
+.gw-inset-media { position: relative; aspect-ratio: 4 / 5; overflow: hidden; border-radius: calc(var(--radius-sm) - 2px); }
+.gw-inset-media picture, .gw-inset-media .photo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.gw-inset-media .photo { object-fit: cover; }
+.gw-caption { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted-inverse); }
+.gw-caption::before { content: ""; flex: none; width: 1.5rem; height: 1px; background: var(--color-gold); }
+@media (min-width: 64em) {
+  .gw-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gutter); align-items: center; }
+  .gw-text { grid-column: 1 / span 5; grid-row: 1; }
+  .gw-pic { grid-column: 7 / -1; grid-row: 1; padding-bottom: var(--space-6); }
+  .gw-frame { max-height: var(--frame-h-feature); }
+  .gw-inset { position: absolute; left: calc(var(--gutter) * -1); bottom: 0; width: 12rem; margin: 0; }
+  .gw-caption { position: absolute; left: calc(12rem + var(--space-3) - var(--gutter)); bottom: 0; margin-top: 0; }
+}
+
+/* G4: the steps, and the small card with the way in */
+.gh-grid { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: var(--space-6); }
+.gsteps { --gs-col: 2rem; display: grid; margin-top: var(--space-5); }
+.gstep { position: relative; display: grid; grid-template-columns: var(--gs-col) minmax(0, 1fr); column-gap: var(--space-3); align-items: baseline; padding-bottom: var(--space-5); }
+.gstep:last-child { padding-bottom: 0; }
+.gstep-num { font-family: var(--font-display); font-weight: 500; font-size: var(--text-lg); line-height: var(--leading-tight); color: var(--color-gold); }
+.gstep-line { position: absolute; left: calc(var(--gs-col) / 2 - 0.5px); top: 2.75rem; bottom: -0.375rem; width: 1px; background: var(--color-thread); transform-origin: 50% 0; }
+.gstep-word { font-size: var(--text-xl); line-height: var(--leading-tight); }
+.gstep-body p { margin-top: var(--space-1); }
+.gh-card { width: 70%; max-width: 20rem; }
+.gh-card .photo { display: block; width: 100%; height: auto; }
+.gh-apply-title { margin-top: var(--space-4); font-size: var(--text-xl); }
+.gh-apply-text p { margin-top: var(--space-2); }
+.gh-apply-text .btn { margin-top: var(--space-4); }
+.gh-apply-text .gh-note { margin-top: var(--space-3); }
+@media (min-width: 64em) {
+  .gsteps { --gs-col: 3rem; }
+  .gh-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gutter); align-items: center; }
+  .gh-steps { grid-column: 1 / span 6; }
+  .gh-apply { grid-column: 8 / -1; }
+  .gh-card { width: 20rem; }
+}
+/* motion hidden states (html.motion only; a scene that fails shows everything) */
+html.motion [data-gstep], html.motion [data-card] { opacity: 0; }
+html.motion .gstep-line { transform: scaleY(0); }
+html.motion .scene-failed [data-gstep], html.motion .scene-failed [data-card] { opacity: 1; }
+html.motion .scene-failed .gstep-line { transform: none; }
 
 /* ---------- book (placeholder) ---------- */
 .book-hero { min-height: calc(100svh - var(--header-h)); display: grid; place-items: center; padding-block: var(--space-7); background-image: url("../img/swan-pattern.svg"); }
