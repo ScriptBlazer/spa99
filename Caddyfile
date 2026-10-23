@@ -29,3 +29,7 @@
 {$OFFICE_DOMAIN} {
 	import app
 }
+
+{$SYSTEM_DOMAIN} {
+	import app
+}

@@ -20,7 +20,7 @@ def base_context():
     return {
         "site_name": "Spa 99",
         "tagline": "Beyond Luxury",
-        "contact_email": site.contact_email,
+        "contact_email": site.contact_address,
         "site_url": settings.SITE_URL,
         "address": site.address_one_line,
     }

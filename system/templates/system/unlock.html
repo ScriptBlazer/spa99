@@ -1,0 +1,14 @@
+{% extends "system/base_bare.html" %}
+{% block section %}unlock{% endblock %}
+{% block main %}
+<h1>Unlock System</h1>
+<p>Enter your password again. System locks after 15 minutes without activity.</p>
+{% if error %}<p data-system-error role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="{% url 'system_unlock' %}" data-system-unlock>
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <label>Password <input type="password" name="password" autocomplete="current-password" autofocus required></label>
+  <button type="submit">Unlock</button>
+</form>
+<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
+{% endblock %}

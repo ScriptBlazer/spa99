@@ -1,0 +1,10 @@
+{% extends "system/base.html" %}
+{% block title %}Emails | Spa 99 System{% endblock %}
+{% block main %}
+<h1>Emails</h1>
+<p>Recipients. Sender address and mail transport stay in the server settings.</p>
+<form method="post" data-system-form="emails">{% csrf_token %}
+  {% include "system/_fields.html" %}
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

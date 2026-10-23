@@ -9,6 +9,7 @@ services:
       DOMAIN: ${DOMAIN}
       CONTROL_DOMAIN: ${CONTROL_DOMAIN}
       OFFICE_DOMAIN: ${OFFICE_DOMAIN}
+      SYSTEM_DOMAIN: ${SYSTEM_DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

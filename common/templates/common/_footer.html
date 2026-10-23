@@ -15,7 +15,7 @@
     </nav>
     <address class="footer-contact">
       {{ site_settings.address_one_line|default:"99 Vale Road, London N4 1PR" }}<br>
-      <a href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a><br>
+      <a href="mailto:{{ site_settings.contact_address }}">{{ site_settings.contact_address }}</a><br>
       {% hours_summary as hours_line %}{% if hours_line %}<span class="muted">{{ hours_line }}</span>{% endif %}
     </address>
   </div>

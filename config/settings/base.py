@@ -20,9 +20,10 @@ DEBUG = False  # dev.py switches it on
 DOMAIN = ENV.get("DOMAIN", "spa99.uk")
 CONTROL_HOST = ENV.get("CONTROL_DOMAIN", "control.localhost")  # prod: control.spa99.uk (the building control room, parked)
 OFFICE_HOST = ENV.get("OFFICE_DOMAIN", "office.localhost")  # prod: office.spa99.uk (the business back office)
+SYSTEM_HOST = ENV.get("SYSTEM_DOMAIN", "system.localhost")  # prod: system.spa99.uk (developers only: the business rules)
 DEFAULT_ADMIN_PATH = "backstage-7d3f9a/"  # committed, so public: dev only. prod.py refuses it.
 ADMIN_PATH = ENV.get("ADMIN_PATH", DEFAULT_ADMIN_PATH).strip("/") + "/"  # hidden Django admin
-# ALLOWED_HOSTS in the environment ADDS to these defaults (prod.py adds DOMAIN, CONTROL_DOMAIN and OFFICE_DOMAIN too).
+# ALLOWED_HOSTS in the environment ADDS to these defaults (prod.py adds DOMAIN, CONTROL_DOMAIN, OFFICE_DOMAIN and SYSTEM_DOMAIN too).
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".localhost"] + ENV.list("ALLOWED_HOSTS", [])
 CSRF_FAILURE_VIEW = "common.views.csrf_failure"
 
@@ -44,6 +45,7 @@ INSTALLED_APPS = [
     "notifications",
     "insights",
     "office",
+    "system",
     "pages",
 ]
 
@@ -120,15 +122,16 @@ EMAIL_USE_TLS = ENV.bool("EMAIL_USE_TLS", True)
 # dev-only default). DKIM is signed by the mail provider and DNS, not by Django.
 DEFAULT_FROM_EMAIL = ENV.get("DEFAULT_FROM_EMAIL", "")
 SERVER_EMAIL = ENV.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
-CONTACT_EMAIL = ENV.get("CONTACT_EMAIL", "")  # shown on the site and used as Reply-To; empty = the From address
-GOLD_APPROVER_EMAILS = ENV.list("GOLD_APPROVER_EMAILS", [])  # who gets each Gold application email (whoever is here acts as Barry)
-GOLD_APPROVER_CC = ENV.list("GOLD_APPROVER_CC", [])
+# Recipients (Gold approver, CC, contact email) are not here: developers edit them in System (SiteSettings).
 AWS_SES_REGION_NAME = ENV.get("AWS_SES_REGION_NAME", "eu-west-2")
 # Absolute links used in emails (no trailing slash).
 SITE_WEBGL = ENV.bool("SITE_WEBGL", True)  # false = the 3D Gold Card never loads (CSS card only); read by base.html as data-webgl
 SITE_URL = ENV.get("SITE_URL", f"https://{DOMAIN}").rstrip("/")
 CONTROL_URL = ENV.get("CONTROL_URL", f"https://{CONTROL_HOST}").rstrip("/")
 OFFICE_URL = ENV.get("OFFICE_URL", f"https://{OFFICE_HOST}").rstrip("/")
+SYSTEM_URL = ENV.get("SYSTEM_URL", f"https://{SYSTEM_HOST}").rstrip("/")
+SYSTEM_UNLOCK_SECONDS = 15 * 60  # System asks for the password again after this much idle time
+SYSTEM_SESSION_AGE = 12 * 60 * 60  # a System sign-in lasts 12 hours at most
 
 
 LANGUAGE_CODE = "en-gb"
@@ -202,6 +205,7 @@ def build_startup_report(settings_module):
         "env_sources": ENV.used_sources(),
         "private_dir": "fallback .private/" if PRIVATE_DIR.using_fallback else "private folder",
         "database": describe_database(DATABASES),
+        "hosts": f"office={OFFICE_HOST} control={CONTROL_HOST} system={SYSTEM_HOST}",
         "media": MEDIA_DESCRIPTION,
         "media_is_local": MEDIA_IS_LOCAL,
         "missing_keys": ENV.missing_example_keys(),

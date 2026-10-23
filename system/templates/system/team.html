@@ -1,0 +1,28 @@
+{% extends "system/base.html" %}
+{% block title %}Team | Spa 99 System{% endblock %}
+{% block main %}
+<h1>Team</h1>
+<table data-system-team>
+  <thead><tr><th>Person</th><th>Active</th><th>Roles</th><th></th></tr></thead>
+  <tbody>
+  {% for row in staff %}
+    <tr data-system-person="{{ row.user.pk }}">
+      <td>{{ row.user.email }}{% if row.user.is_superuser %} (superuser){% endif %}</td>
+      <td>{{ row.user.is_active|yesno:"Yes,No" }}</td>
+      <td>
+        <form method="post" action="{% url 'system_team_roles' row.user.pk %}">{% csrf_token %}
+          {% for role in roles %}<label><input type="checkbox" name="roles" value="{{ role }}"{% if role in row.roles %} checked{% endif %}> {{ role }}</label> {% endfor %}
+          <button type="submit">Save roles</button>
+        </form>
+      </td>
+      <td>
+        <form method="post" action="{% url 'system_team_active' row.user.pk %}">{% csrf_token %}
+          <input type="hidden" name="active" value="{% if row.user.is_active %}0{% else %}1{% endif %}">
+          <button type="submit">{% if row.user.is_active %}Deactivate{% else %}Reactivate{% endif %}</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

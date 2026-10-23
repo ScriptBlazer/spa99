@@ -1,0 +1,29 @@
+{% comment %}The System shell. Minimal on purpose: stable data-system-* hooks for the designer (docs/design/SYSTEM.md); no CSS yet.
+Pages fill: title, main. Set `section` in the view.{% endcomment %}<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{% block title %}Spa 99 System{% endblock %}</title>
+{% block head_extra %}{% endblock %}
+</head>
+<body class="system" data-system-section="{{ section }}">
+<nav data-system-nav aria-label="System">
+  <ul>
+    {% for key, label, url_name in nav %}
+    <li>{% if url_name %}<a href="{% url url_name %}" data-system-nav-item="{{ key }}"{% if section == key %} aria-current="page"{% endif %}>{{ label }}</a>{% else %}<span data-system-nav-item="{{ key }}" data-system-soon aria-disabled="true">{{ label }} (next)</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  <div data-system-who>
+    <span data-system-user>{{ request.user.email }}</span>
+    <form method="post" action="{% url 'system_lock' %}" data-system-lock>{% csrf_token %}<button type="submit">Lock</button></form>
+    <form method="post" action="{% url 'logout' %}" data-system-signout>{% csrf_token %}<button type="submit">Sign out</button></form>
+  </div>
+</nav>
+<main id="system-main" data-system-main>
+  {% if messages %}<ul data-system-messages>{% for message in messages %}<li data-system-message="{{ message.level_tag }}">{{ message }}</li>{% endfor %}</ul>{% endif %}
+  {% block main %}{% endblock %}
+</main>
+</body>
+</html>

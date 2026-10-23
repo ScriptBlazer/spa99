@@ -8,6 +8,7 @@ from django.db import models
 from simple_history.models import HistoricalRecords
 
 from common.models import BaseModel
+from common.validators import split_emails, validate_email_list
 
 
 def plan_image_path(instance, filename):
@@ -122,6 +123,17 @@ class SiteSettings(BaseModel):
         help_text='"Register" now; "Join" when payments open.',
     )
 
+    # Recipients: edited by developers in System > Emails (never in env, never hard-coded). Blank = nothing is sent / the
+    # From address is used.
+    gold_approver_emails = models.CharField(
+        max_length=500, blank=True, validators=[validate_email_list],
+        help_text="Comma separated. Who gets each Gold application email (whoever is here acts as the approver). Empty = no email is sent.")
+    gold_approver_cc = models.CharField(
+        max_length=500, blank=True, validators=[validate_email_list], help_text="Comma separated. Copied on each Gold application email.")
+    contact_email = models.CharField(
+        max_length=254, blank=True, validators=[validate_email_list],
+        help_text="Shown on the site and used as Reply-To. Empty = the address inside DEFAULT_FROM_EMAIL.")
+
     privacy_version = models.CharField(
         max_length=20, default="draft-1", help_text="Recorded on each person who accepts the privacy notice."
     )
@@ -141,13 +153,21 @@ class SiteSettings(BaseModel):
         return obj
 
     @property
-    def contact_email(self):
-        """From the environment (CONTACT_EMAIL), else the address inside DEFAULT_FROM_EMAIL. Not stored."""
+    def contact_address(self):
+        """What the site shows and Reply-To uses: the stored contact email, else the address inside DEFAULT_FROM_EMAIL."""
         from email.utils import parseaddr
 
         from django.conf import settings
 
-        return settings.CONTACT_EMAIL or parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
+        return (split_emails(self.contact_email) or [parseaddr(settings.DEFAULT_FROM_EMAIL)[1]])[0]
+
+    @property
+    def approver_list(self):
+        return split_emails(self.gold_approver_emails)
+
+    @property
+    def approver_cc_list(self):
+        return split_emails(self.gold_approver_cc)
 
     @property
     def wording(self):

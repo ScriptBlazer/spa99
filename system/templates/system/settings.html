@@ -1,0 +1,9 @@
+{% extends "system/base.html" %}
+{% block title %}Settings | Spa 99 System{% endblock %}
+{% block main %}
+<h1>Settings</h1>
+<form method="post" data-system-form="settings">{% csrf_token %}
+  {% include "system/_fields.html" %}
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

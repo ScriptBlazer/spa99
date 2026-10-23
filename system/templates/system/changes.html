@@ -1,0 +1,18 @@
+{% extends "system/base.html" %}
+{% block title %}Change log | Spa 99 System{% endblock %}
+{% block main %}
+<h1>Change log</h1>
+<form method="get" data-system-filters>
+  <label>Section <select name="section"><option value="">All</option>{% for key, label in section_labels.items %}<option value="{{ key }}"{% if params.section == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>Who <input type="text" name="user" value="{{ params.user }}"></label>
+  <label>From <input type="date" name="date_from" value="{{ params.date_from }}"></label>
+  <label>To <input type="date" name="date_to" value="{{ params.date_to }}"></label>
+  <button type="submit">Filter</button>
+</form>
+{% include "system/_changes_table.html" %}
+<nav data-system-pages aria-label="Pages">
+  {% if entries.has_previous %}<a href="?page={{ entries.previous_page_number }}&section={{ params.section|urlencode }}&user={{ params.user|urlencode }}&date_from={{ params.date_from|urlencode }}&date_to={{ params.date_to|urlencode }}">Newer</a>{% endif %}
+  <span>Page {{ entries.number }} of {{ entries.paginator.num_pages }}</span>
+  {% if entries.has_next %}<a href="?page={{ entries.next_page_number }}&section={{ params.section|urlencode }}&user={{ params.user|urlencode }}&date_from={{ params.date_from|urlencode }}&date_to={{ params.date_to|urlencode }}">Older</a>{% endif %}
+</nav>
+{% endblock %}

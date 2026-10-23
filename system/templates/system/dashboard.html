@@ -1,0 +1,31 @@
+{% extends "system/base.html" %}
+{% block title %}Dashboard | Spa 99 System{% endblock %}
+{% block main %}
+<h1>Dashboard</h1>
+<section data-system-health aria-label="Health">
+  <h2>Health</h2>
+  <dl>
+    <dt>Database</dt><dd data-system-health-db="{{ health.database_ok|yesno:'ok,error' }}">{{ health.database_ok|yesno:"OK,Not answering" }}</dd>
+    <dt>Queue</dt><dd data-system-health-queue>{{ health.queue_size|default_if_none:"unknown" }}</dd>
+    <dt>Last roll-up</dt><dd data-system-health-rollup>{% if health.last_rollup %}{{ health.last_rollup|date:"j M Y H:i" }}{% else %}Not recorded{% endif %}</dd>
+    <dt>Snapshot age (seconds)</dt><dd data-system-health-snapshot>{{ health.snapshot_age_seconds|default_if_none:"none yet" }}</dd>
+  </dl>
+</section>
+<section data-system-counts aria-label="Key counts">
+  <h2>Key counts</h2>
+  <dl>
+    <dt>Registrations</dt><dd data-system-count="registrations">{{ health.counts.registrations|default:0 }}</dd>
+    <dt>Gold applications</dt><dd data-system-count="gold_applications">{{ health.counts.gold_applications|default:0 }}</dd>
+  </dl>
+</section>
+<section data-system-stages aria-label="Stage switches">
+  <h2>Stage switches</h2>
+  <ul>{% for label, on in stages %}<li data-system-stage="{{ label }}">{{ label }}: {{ on|yesno:"on,off" }}</li>{% endfor %}</ul>
+  <p><a href="{% url 'system_settings' %}">Change in Settings</a></p>
+</section>
+<section data-system-recent aria-label="Recent changes">
+  <h2>Recent changes</h2>
+  {% include "system/_changes_table.html" with entries=recent %}
+  <p><a href="{% url 'system_changes' %}">All changes</a></p>
+</section>
+{% endblock %}

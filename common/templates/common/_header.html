@@ -33,7 +33,7 @@
     <div class="menu-actions">
       {% if request.user.is_authenticated %}<a class="btn-quiet" href="{% url 'account' %}">Account</a>{% else %}<a class="btn-quiet" href="{% url 'login' %}">Sign in</a>{% endif %}
     </div>
-    <p class="menu-meta small muted">{{ site_settings.address_one_line|default:"99 Vale Road, London N4 1PR" }}<br>{{ site_settings.contact_email }}</p>
+    <p class="menu-meta small muted">{{ site_settings.address_one_line|default:"99 Vale Road, London N4 1PR" }}<br>{{ site_settings.contact_address }}</p>
   </div>
 </dialog>
 {% endwith %}

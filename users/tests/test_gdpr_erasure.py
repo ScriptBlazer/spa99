@@ -10,6 +10,7 @@ from gold import services as gold_services
 from gold.models import GoldApplication
 from notifications.models import EmailLog
 from plans.management.commands.seed_phase1 import seed_all
+from plans.tests.helpers import set_recipients
 from users import services
 from users.forms import SignUpForm
 from users.models import User
@@ -38,6 +39,7 @@ class ErasureTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         seed_all()
+        set_recipients()
 
     def test_email_tasks_return_a_status_not_the_email_log(self):
         sign_up()

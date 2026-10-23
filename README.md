@@ -66,6 +66,7 @@ Private folder (default `/Users/moishe/Library/CloudStorage/OneDrive-Personal/BM
 | `DOMAIN` | Public domain, no `https://` (prod default `spa99.uk`) |
 | `CONTROL_DOMAIN` | Control domain (prod `control.spa99.uk`; local default `control.localhost`) |
 | `OFFICE_DOMAIN` | Office domain (prod `office.spa99.uk`; local default `office.localhost`) |
+| `SYSTEM_DOMAIN` | System domain, developers only (prod `system.spa99.uk`; local default `system.localhost`) |
 | `DATABASE_URL` | Managed PostgreSQL on live (required in prod, `sslmode=require` added). Unset locally = SQLite |
 | `DEBUG` | Dev only. Prod forces it off |
 | `ALLOWED_HOSTS` | Optional extra hosts, comma separated (added to the defaults) |
@@ -78,12 +79,11 @@ Private folder (default `/Users/moishe/Library/CloudStorage/OneDrive-Personal/BM
 | `EMAIL_BACKEND` | Dev: console (default). Live: `notifications.backends.SesBackend` (SES via the server IAM role) or the default SMTP backend |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` | SMTP settings (only with the SMTP backend) |
 | `DEFAULT_FROM_EMAIL` | From address of every email. Required in prod (no default). DKIM is signed by the mail provider/DNS |
-| `SERVER_EMAIL`, `CONTACT_EMAIL` | Server error From (default: the From address); contact/Reply-To address (default: the From address) |
-| `GOLD_APPROVER_EMAILS`, `GOLD_APPROVER_CC` | Comma separated: who gets each Gold application email (empty = none sent), and who is copied |
+| `SERVER_EMAIL` | Server error From (default: the From address). The Gold approver list, CC and contact email are no longer env vars: developers set them in System > Emails (one-off copy: `manage.py import_email_settings_from_env --dry-run`) |
 | `AWS_SES_REGION_NAME` | Region for `SesBackend` (default `eu-west-2`) |
 | `CLIENT_IP_HEADER` | Prod only. Header Caddy fills with the real visitor IP (default `X-Client-IP`; see below). Used for rate limits and the login log |
 | `SITE_WEBGL` | `false` switches the 3D Gold Card off for everyone (sets `data-webgl="off"` on `<html>`; the CSS card stays). Default `true` |
-| `SITE_URL`, `CONTROL_URL`, `OFFICE_URL` | Absolute links in emails (defaults from `DOMAIN` / `CONTROL_DOMAIN`; dev `http://localhost:8000` and `http://control.localhost:8000`) |
+| `SITE_URL`, `CONTROL_URL`, `OFFICE_URL`, `SYSTEM_URL` | Absolute links in emails (defaults from `DOMAIN` / `CONTROL_DOMAIN` / `OFFICE_DOMAIN` / `SYSTEM_DOMAIN`; dev `http://localhost:8000`, `http://control.localhost:8000`, `http://office.localhost:8000`, `http://system.localhost:8000`) |
 | `SENTRY_DSN` | Error reporting. Off when empty |
 | `IMAGE`, `APP_TAG` | Read by `docker-compose.yml`: image name and the git tag to run |
 | `GUNICORN_WORKERS` | Web workers in the container |

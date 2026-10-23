@@ -13,7 +13,7 @@ class SendTemplatedTests(TestCase):
         log = send_templated("verify", ["a@example.com"], "Confirm", {"first_name": "Al & Co", "url": "http://x/y?a=1&b=2"})
         self.assertEqual(log.status, EmailLog.SENT)
         message = mail.outbox[0]
-        self.assertEqual(message.reply_to, ["hello@example.test"])
+        self.assertEqual(message.reply_to, ["from@example.test"])
         self.assertIn("http://x/y?a=1&b=2", message.body)  # the plain text version is not HTML-escaped
         self.assertIn("Al &amp; Co", message.alternatives[0][0])  # the HTML version is
         self.assertEqual(EmailLog.objects.get().subject, "Confirm")

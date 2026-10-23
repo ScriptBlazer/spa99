@@ -6,6 +6,7 @@ from django.core import mail
 from django.test import Client, TestCase, override_settings
 
 from gold import rating, services
+from gold import tasks as gold_tasks
 from gold.forms import GoldApplicationForm
 from gold.models import GoldApplication, GoldChoice, GoldRule, GoldSignalSource
 from journey import engine
@@ -13,6 +14,7 @@ from journey import services as journey
 from notifications.models import EmailLog
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import SiteSettings
+from plans.tests.helpers import set_recipients
 
 User = get_user_model()
 
@@ -57,6 +59,7 @@ class SubmitTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         seed_all()
+        set_recipients()
 
     def journey_session(self):
         session = journey.create_session()
@@ -105,21 +108,23 @@ class SubmitTests(TestCase):
         self.assertEqual(EmailLog.objects.filter(status="sent").count(), 2)
 
     def test_recipients_come_from_settings_and_a_double_click_sends_nothing_new(self):
-        with self.settings(GOLD_APPROVER_EMAILS=["a@bml.example", "b@bml.example"], GOLD_APPROVER_CC=[]):
-            first, _ = services.submit_application(application_data())
-            again, created = services.submit_application(application_data())
+        set_recipients("a@bml.example, b@bml.example", "")
+        first, _ = services.submit_application(application_data())
+        again, created = services.submit_application(application_data())
         self.assertEqual((again.pk, created), (first.pk, False))
         self.assertEqual(len(mail.outbox), 2)
         self.assertEqual(mail.outbox[0].to, ["a@bml.example", "b@bml.example"])
         self.assertEqual(mail.outbox[0].cc, [])
 
     def test_no_approver_configured_sends_nothing_to_anyone_but_still_thanks_the_applicant(self):
-        with self.settings(GOLD_APPROVER_EMAILS=[]), self.assertLogs("spa99.email", "WARNING"):
+        set_recipients("")
+        gold_tasks._warned.clear()  # the warning is logged once per process; other tests may have used it up
+        with self.assertLogs("spa99.email", "WARNING"):
             application, _ = services.submit_application(application_data())
         self.assertEqual([m.to for m in mail.outbox], [["dan@example.com"]])
         application.refresh_from_db()
         self.assertIsNone(application.email_sent_at)
-        self.assertIn("GOLD_APPROVER_EMAILS", application.email_error)
+        self.assertIn("System > Emails", application.email_error)
 
     def test_repeat_applications_are_linked_and_flagged(self):
         first, _ = services.submit_application(application_data())
@@ -211,6 +216,7 @@ class EditableQuestionsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         seed_all()
+        set_recipients()
 
     def test_choices_come_from_rows_and_retired_ones_are_refused_but_still_readable(self):
         GoldChoice.objects.filter(group="property_link", value="agent").update(active=False)

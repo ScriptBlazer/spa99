@@ -156,11 +156,18 @@ class ProdSettingsTests(SimpleTestCase):
         with self.assertRaises(ImproperlyConfigured):
             self.import_prod(environ)
 
-    def test_mail_settings_and_approvers_come_from_env(self):
-        settings = self.import_prod({**self.GOOD, "GOLD_APPROVER_EMAILS": "a@example.com, b@example.com", "GOLD_APPROVER_CC": "c@example.com",
-                                     "CONTACT_EMAIL": "hi@example.com"})
-        self.assertEqual((settings.GOLD_APPROVER_EMAILS, settings.GOLD_APPROVER_CC), (["a@example.com", "b@example.com"], ["c@example.com"]))
-        self.assertEqual((settings.CONTACT_EMAIL, settings.SERVER_EMAIL), ("hi@example.com", "Spa 99 <noreply@example.com>"))
+    def test_mail_transport_comes_from_env_but_recipients_are_not_settings_any_more(self):
+        settings = self.import_prod({**self.GOOD, "GOLD_APPROVER_EMAILS": "a@example.com", "CONTACT_EMAIL": "hi@example.com"})
+        self.assertEqual(settings.SERVER_EMAIL, "Spa 99 <noreply@example.com>")
+        for name in ("GOLD_APPROVER_EMAILS", "GOLD_APPROVER_CC", "CONTACT_EMAIL"):  # these live in System (SiteSettings) now
+            self.assertFalse(hasattr(settings, name))
+
+    def test_system_host_is_allowed_and_trusted_in_prod(self):
+        settings = self.import_prod({**self.GOOD, "SYSTEM_DOMAIN": "system.example.com"})
+        self.assertEqual(settings.SYSTEM_HOST, "system.example.com")
+        self.assertIn("system.example.com", settings.ALLOWED_HOSTS)
+        self.assertIn("https://system.example.com", settings.CSRF_TRUSTED_ORIGINS)
+        self.assertEqual(self.import_prod(self.GOOD).SYSTEM_URL, "https://system.spa99.uk")
 
     def test_refuses_missing_or_default_admin_path(self):
         for admin_path in (None, "backstage-7d3f9a/", "/backstage-7d3f9a"):

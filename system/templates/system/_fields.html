@@ -1,0 +1,9 @@
+{% if form.non_field_errors %}<p data-system-error role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+{% for field in form %}
+<div data-system-field="{{ field.name }}">
+  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+  {{ field }}
+  {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+  {% if field.errors %}<p data-system-error role="alert">{{ field.errors|join:" " }}</p>{% endif %}
+</div>
+{% endfor %}

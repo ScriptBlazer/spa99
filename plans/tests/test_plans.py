@@ -27,11 +27,13 @@ class PlanServiceTests(TestCase):
         SiteSettings.objects.update(vat_rate=Decimal("25.00"))
         self.assertEqual(services.price_inc_vat(Decimal("100.00")), Decimal("125.00"))
 
-    def test_site_settings_is_a_singleton_and_contact_email_comes_from_env(self):
+    def test_site_settings_is_a_singleton_and_contact_address_falls_back_to_the_from_address(self):
         first, second = SiteSettings.load(), SiteSettings.load()
         self.assertEqual(first.pk, second.pk)
         self.assertEqual(SiteSettings.objects.count(), 1)
-        self.assertEqual(first.contact_email, "hello@example.test")
+        self.assertEqual((first.contact_email, first.contact_address), ("", "from@example.test"))
+        first.contact_email = "hi@example.test"
+        self.assertEqual(first.contact_address, "hi@example.test")
         self.assertEqual((first.capacity, first.slot_length_minutes, first.slot_step_minutes, first.booking_notice_minutes), (25, 120, 30, 10))
 
     def test_plan_facts_follow_the_plan_row(self):

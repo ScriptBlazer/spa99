@@ -18,8 +18,8 @@ No visible pages. Everything later phases sit on.
 - Erasing a person deletes their history rows too (history holds personal data). This is the one exception to "history is never deleted".
 - Roles (Django Groups) are not created yet: the permission levels need approval first (RULES.md section 23).
 - Prod refuses to start without a real `SECRET_KEY` and `DATABASE_URL`. HSTS stays off until the site has run on HTTPS without problems.
-- Mail comes only from env: `DEFAULT_FROM_EMAIL` (required in prod), `SERVER_EMAIL`, `CONTACT_EMAIL`, `EMAIL_HOST/PORT/HOST_USER/HOST_PASSWORD/USE_TLS/BACKEND`, `GOLD_APPROVER_EMAILS`, `GOLD_APPROVER_CC`. Nothing is hard-coded; DKIM is signed by the mail provider/DNS. Dev has a dev-only From default and the console backend.
-- `ALLOWED_HOSTS` in the environment adds to the defaults (DOMAIN, CONTROL_DOMAIN, localhost, 127.0.0.1); it does not replace them.
+- Mail transport and the sender come only from env: `DEFAULT_FROM_EMAIL` (required in prod), `SERVER_EMAIL`, `EMAIL_HOST/PORT/HOST_USER/HOST_PASSWORD/USE_TLS/BACKEND`. Recipients (Gold approver, CC, contact email) are `SiteSettings` fields edited in System (2026-10-23; `CONTACT_EMAIL`, `GOLD_APPROVER_EMAILS`, `GOLD_APPROVER_CC` env vars are gone). Hosts: `DOMAIN`, `CONTROL_DOMAIN`, `OFFICE_DOMAIN`, `SYSTEM_DOMAIN` (+ `*_URL`); the startup log line lists them. Nothing is hard-coded; DKIM is signed by the mail provider/DNS. Dev has a dev-only From default and the console backend.
+- `ALLOWED_HOSTS` in the environment adds to the defaults (DOMAIN, CONTROL_DOMAIN, OFFICE_DOMAIN, SYSTEM_DOMAIN, localhost, 127.0.0.1); it does not replace them.
 - Prod also refuses to start if `ADMIN_PATH` is unset or still the committed default. Prod logs a loud warning if media is on local disk.
 - `DJANGO_SETTINGS_MODULE` is also read from the private / project `.env` (manage.py, wsgi, asgi). Tests use `config.settings.test`, which ignores `.env` files.
 - Static files use `common.storage.SpaStaticFilesStorage` so ES module imports get hashed names (cache busting).

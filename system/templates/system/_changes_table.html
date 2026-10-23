@@ -1,0 +1,19 @@
+<table data-system-changes>
+  <thead><tr><th>When</th><th>Who</th><th>Section</th><th>What</th><th>Field</th><th>Old</th><th>New</th><th></th></tr></thead>
+  <tbody>
+  {% for c in entries %}
+    <tr data-system-change="{{ c.pk }}">
+      <td>{{ c.created_at|date:"j M Y H:i" }}</td>
+      <td>{{ c.user_label|default:"a script" }}</td>
+      <td>{{ c.section }}</td>
+      <td>{{ c.model_label }}: {{ c.object_repr }}{% if c.kind == "created" %} (created){% elif c.kind == "deleted" %} (deleted){% endif %}</td>
+      <td>{{ c.field }}</td>
+      <td>{{ c.old_value|default_if_none:"" }}</td>
+      <td>{{ c.new_value|default_if_none:"" }}</td>
+      <td>{% if c.undoable %}<form method="post" action="{% url 'system_undo' c.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" data-system-undo>Undo</button></form>{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="8" data-system-empty>No changes yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

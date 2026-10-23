@@ -5,8 +5,8 @@ class HostRoutingMiddleware:
     """Serve each Spa 99 site on its own host.
 
     OFFICE_HOST uses config.urls_office (the business back office), CONTROL_HOST uses config.urls_control (the
-    building control room, parked); everything else uses config.urls. Sessions are per host, so a login on one host
-    never logs you into another. The two staff hosts are never indexed (X-Robots-Tag).
+    building control room, parked), SYSTEM_HOST uses config.urls_system (developers only); everything else uses config.urls. Sessions are per host, so a login on one host
+    never logs you into another. The three staff hosts are never indexed (X-Robots-Tag).
     """
 
     def __init__(self, get_response):
@@ -17,6 +17,8 @@ class HostRoutingMiddleware:
         staff_host = True
         if host == settings.OFFICE_HOST.lower():
             request.urlconf = "config.urls_office"
+        elif host == settings.SYSTEM_HOST.lower():
+            request.urlconf = "config.urls_system"
         elif host == settings.CONTROL_HOST.lower():
             request.urlconf = "config.urls_control"
         else:
