@@ -55,6 +55,10 @@ class InitTests(SentryTestCase):
         self.assertEqual(observability.init_sentry(env_with(), "dev"), "off")
         self.assertIsNone(sentry_sdk.get_client().dsn)
 
+    def test_release_is_empty_not_git_when_unset(self):
+        self.start()
+        self.assertEqual(sentry_sdk.get_client().options["release"], "")  # "" stops the SDK running git
+
     def test_on_uses_environment_and_release_from_env(self):
         self.assertEqual(self.start(), "on(dev)")
         self.assertEqual(self.start(SENTRY_ENVIRONMENT="live", APP_VERSION="1.2.3"), "on(live)")
@@ -62,7 +66,7 @@ class InitTests(SentryTestCase):
         self.assertEqual((options["release"], options["send_default_pii"], options["traces_sample_rate"]), ("1.2.3", False, 0.0))
 
 
-class ScrubTests(SimpleTestCase):
+class ScrubTests(SentryTestCase):
     def test_request_is_scrubbed(self):
         event = {
             "request": {
@@ -79,6 +83,24 @@ class ScrubTests(SimpleTestCase):
         self.assertNotIn("query_string", request)  # /journey/ query strings are dropped
         self.assertEqual(request["headers"], {"Accept": "text/html"})
 
+    def test_header_allowlist_drops_ip_and_referer(self):
+        headers = {"X-Client-IP": "1.2.3.4", "CF-Connecting-IP": "1.2.3.4", "True-Client-IP": "1.2.3.4",
+                   "Referer": "https://spa99.uk/x?email=a", "User-Agent": "UA", "Accept-Language": "en"}
+        out = observability.before_send({"request": {"url": "https://spa99.uk/", "headers": headers}}, {})
+        self.assertEqual(out["request"]["headers"], {"User-Agent": "UA", "Accept-Language": "en"})
+
+    def test_staff_host_query_dropped_and_q_sensitive_on_public(self):
+        office = {"request": {"url": "https://office.localhost/people/?q=Jo", "query_string": "q=Jo&page=2"}}
+        self.assertNotIn("query_string", observability.before_send(office, {})["request"])
+        public = {"request": {"url": "https://spa99.uk/faq/?q=Jo", "query_string": "q=Jo&page=2"}}
+        self.assertEqual(observability.before_send(public, {})["request"]["query_string"], "q=[Filtered]&page=2")
+
+    def test_transactions_are_scrubbed_too(self):
+        self.start(SENTRY_TRACES_SAMPLE_RATE="1")
+        self.assertIs(sentry_sdk.get_client().options["before_send_transaction"], observability.before_send)
+        event = {"type": "transaction", "request": {"url": "https://office.localhost/?q=Jo", "query_string": "q=Jo", "cookies": {"a": "b"}}}
+        self.assertEqual(observability.before_send(event, {})["request"], {"url": "https://office.localhost/"})
+
     def test_other_query_strings_hide_sensitive_keys(self):
         event = {"request": {"url": "https://spa99.uk/faq/?page=2&mobile=0777", "query_string": "page=2&mobile=0777"}}
         self.assertEqual(observability.before_send(event, {})["request"]["query_string"], "page=2&mobile=[Filtered]")
@@ -94,7 +116,10 @@ class ScrubTests(SimpleTestCase):
         self.assertEqual(out["user"], {"id": "7"})
         self.assertNotIn("jo@example.com", str(out))
         self.assertEqual(out["extra"], {"first_name": "[Filtered]", "count": 3, "nested": {"api_token": "[Filtered]"}})
-        self.assertEqual(out["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"], {"phone": "[Filtered]", "n": 2})
+        self.assertNotIn("vars", out["exception"]["values"][0]["stacktrace"]["frames"][0])
+
+    def test_rate_limit_drop_only_for_own_429_responses(self):
+        self.assertIsNotNone(observability.before_send({"message": "Stripe said Too Many Requests"}, {}))
 
     def test_rate_limited_and_disallowed_host_events_are_dropped(self):
         self.assertIsNone(observability.before_send({"contexts": {"response": {"status_code": 429}}}, {}))
@@ -104,12 +129,28 @@ class ScrubTests(SimpleTestCase):
 class CaptureTests(SentryTestCase):
     def test_ignored_exceptions_are_dropped_and_others_sent(self):
         self.start()
-        for error in (Http404(), PermissionDenied(), DisallowedHost(), BrokenPipeError()):
+        for error in (Http404(), PermissionDenied(), DisallowedHost()):
             sentry_sdk.capture_exception(error)
         self.assertEqual(self.events, [])
-        sentry_sdk.capture_exception(ValueError("real bug"))
+        sentry_sdk.capture_exception(ConnectionResetError("job socket"))  # no request: a real problem, kept
         self.assertEqual(len(self.events), 1)
-        self.assertEqual(self.events[0]["tags"]["host"], "worker")
+        sentry_sdk.capture_exception(ValueError("real bug"))
+        self.assertEqual(len(self.events), 2)
+        self.assertEqual(self.events[1]["tags"]["host"], "worker")
+
+    def test_local_variables_are_never_sent(self):
+        self.start()
+
+        def handler():
+            first, contact = "Jo", "0770" + "0900123"  # noqa: F841
+            raise ValueError("boom")
+
+        try:
+            handler()
+        except ValueError:
+            sentry_sdk.capture_exception()
+        self.assertEqual(len(self.events), 1)
+        self.assertFalse(any("vars" in f for e in self.events[0]["exception"]["values"] for f in e["stacktrace"]["frames"]))
 
     def test_error_logs_become_events_and_info_does_not(self):
         self.start()

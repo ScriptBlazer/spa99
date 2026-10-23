@@ -18,17 +18,19 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
 FILTERED = "[Filtered]"
-DROPPED_HEADERS = {"cookie", "authorization", "x-csrftoken"}
+ALLOWED_HEADERS = {"accept", "accept-language", "user-agent", "host", "content-type", "content-length"}  # allowlist: no IP, Referer, cookies
 SENSITIVE_PATHS = ("/journey/", "/register/", "/gold-card/apply/", "/login/", "/unlock/")
 SENSITIVE_WORDS = ("password", "token", "secret", "key", "email", "phone", "mobile", "name", "address")
-IGNORED_ERRORS = [Http404, PermissionDenied, DisallowedHost, RequestAborted, ConnectionResetError, BrokenPipeError]
+IGNORED_ERRORS = [Http404, PermissionDenied, DisallowedHost, RequestAborted]
+DISCONNECT_ERRORS = (ConnectionResetError, BrokenPipeError)  # ignored only when the event has a request (a client left)
+SENSITIVE_KEYS = {"q", "search"}  # too short to match as words
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 HOST_BY_URLCONF = {"config.urls_office": "office", "config.urls_control": "control", "config.urls_system": "system"}
 
 
 def is_sensitive_key(key):
     key = str(key).lower()
-    return any(word in key for word in SENSITIVE_WORDS)
+    return key in SENSITIVE_KEYS or any(word in key for word in SENSITIVE_WORDS)
 
 
 def _scrub_text(value):
@@ -49,12 +51,16 @@ def _scrub_request(request):
     request.pop("data", None)
     headers = request.get("headers")
     if isinstance(headers, dict):
-        request["headers"] = {k: v for k, v in headers.items() if k.lower() not in DROPPED_HEADERS and not is_sensitive_key(k)}
-    path = request.get("url", "").split("://", 1)[-1]
-    path = "/" + path.split("/", 1)[1] if "/" in path else "/"
+        request["headers"] = {k: v for k, v in headers.items() if k.lower() in ALLOWED_HEADERS}
+    host_and_path = request.get("url", "").split("://", 1)[-1]
+    host = host_and_path.split("/", 1)[0].split(":")[0].lower()
+    path = "/" + host_and_path.split("/", 1)[1] if "/" in host_and_path else "/"
+    path = path.split("?", 1)[0]
+    request["url"] = request.get("url", "").split("?", 1)[0]
+    staff_hosts = {settings.OFFICE_HOST.lower(), settings.CONTROL_HOST.lower(), settings.SYSTEM_HOST.lower()}
     query = request.get("query_string")
     if query:
-        if path.startswith(SENSITIVE_PATHS):
+        if host in staff_hosts or path.startswith(SENSITIVE_PATHS):
             request.pop("query_string")
         elif isinstance(query, str):
             pairs = parse_qsl(query, keep_blank_values=True)
@@ -65,14 +71,16 @@ def _scrub_request(request):
 
 
 def _is_rate_limited(event):
-    request_status = (event.get("contexts", {}).get("response") or {}).get("status_code")
-    text = " ".join(str(event.get(k, "")) for k in ("message", "logentry"))
-    return request_status == 429 or "Too Many Requests" in text
+    """Only our own 429 responses (the rate limiter), never an outside service's 429 in a message."""
+    return (event.get("contexts", {}).get("response") or {}).get("status_code") == 429
 
 
 def before_send(event, hint):
     """Drop noise, then remove personal data from whatever is left. Returns None to drop the event."""
     if event.get("logger") == "django.security.DisallowedHost" or _is_rate_limited(event):
+        return None
+    exc_info = (hint or {}).get("exc_info")
+    if exc_info and issubclass(exc_info[0], DISCONNECT_ERRORS) and (event.get("request") or {}).get("url"):
         return None
     if isinstance(event.get("request"), dict):
         _scrub_request(event["request"])
@@ -86,8 +94,10 @@ def before_send(event, hint):
     for exc in (event.get("exception") or {}).get("values", []):
         exc["value"] = _scrub_text(exc.get("value"))
         for frame in (exc.get("stacktrace") or {}).get("frames", []):
-            if "vars" in frame:
-                frame["vars"] = _scrub(frame["vars"])
+            frame.pop("vars", None)  # backstop: include_local_variables is also off
+    for span in event.get("spans") or []:
+        if "data" in span:
+            span["data"] = _scrub(span["data"])
     if "extra" in event:
         event["extra"] = _scrub(event["extra"])
     for crumb in (event.get("breadcrumbs") or {}).get("values", []):
@@ -116,13 +126,15 @@ def init_sentry(env, default_environment, transport=None):
     sentry_sdk.init(
         dsn=dsn,
         environment=environment,
-        release=env.get("APP_VERSION") or None,  # set at build/deploy; no git calls at runtime
+        release=env.get("APP_VERSION") or env.get("SENTRY_RELEASE") or "",  # "" (not None) stops the SDK running git; set at build/deploy
         send_default_pii=False,
         traces_sample_rate=_rate(env, "SENTRY_TRACES_SAMPLE_RATE"),
         profiles_sample_rate=_rate(env, "SENTRY_PROFILES_SAMPLE_RATE"),
         integrations=[DjangoIntegration(), LoggingIntegration(level=20, event_level=40)],  # INFO breadcrumbs, ERROR+ events
         ignore_errors=IGNORED_ERRORS,
         before_send=before_send,
+        before_send_transaction=before_send,
+        include_local_variables=False,
         transport=transport,
     )
     return f"on({environment})"
