@@ -23,21 +23,26 @@ def asset_url(path):
 
 @register.simple_tag
 def hero_video():
-    """{% hero_video as hv %}: {'sources': json, 'poster': url} when hero video files exist, else None.
-    Files (docs/design/HERO-VIDEO.md): hero-landscape.webm/.mp4, hero-portrait.webm/.mp4, hero-poster-landscape.webp."""
+    """{% hero_video as hv %}: {'sources': json, 'poster': url, 'poster_portrait': url} for the Home hero.
+    The posters are the hero's only still (never another photo); 'sources' is '[]' when no video files exist.
+    None only when there is neither a video nor a poster.
+    Files (docs/design/HERO-VIDEO.md): hero-landscape.webm/.mp4, hero-portrait.webm/.mp4, hero-poster-landscape.webp, hero-poster-portrait.webp."""
     wide, tall = "(min-width: 48em)", "(max-width: 47.99em)"
     candidates = [
-        ("hero-landscape.webm", 'video/webm; codecs="av01.0.05M.08"', wide),
+        ("hero-landscape.webm", 'video/webm; codecs="av01.0.08M.08"', wide),
         ("hero-landscape.mp4", "video/mp4", wide),
-        ("hero-portrait.webm", 'video/webm; codecs="av01.0.05M.08"', tall),
+        ("hero-portrait.webm", 'video/webm; codecs="av01.0.04M.08"', tall),
         ("hero-portrait.mp4", "video/mp4", tall),
     ]
     sources = [{"src": static(VIDEO_DIR + name), "type": kind, "media": media}
                for name, kind, media in candidates if _exists(VIDEO_DIR + name)]
-    if not sources:
+    landscape = VIDEO_DIR + "hero-poster-landscape.webp"
+    portrait = VIDEO_DIR + "hero-poster-portrait.webp"
+    poster = static(landscape) if _exists(landscape) else ""
+    poster_portrait = static(portrait) if _exists(portrait) else poster
+    if not sources and not poster:
         return None
-    poster = VIDEO_DIR + "hero-poster-landscape.webp"
-    return {"sources": json.dumps(sources), "poster": static(poster) if _exists(poster) else ""}
+    return {"sources": json.dumps(sources), "poster": poster, "poster_portrait": poster_portrait}
 
 
 @register.simple_tag

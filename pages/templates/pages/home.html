@@ -5,7 +5,8 @@
 {% block header_mode %}overlay{% endblock %}
 {% block head_title %}{% include "common/_head.html" with title="Spa 99 | Beyond Luxury" description=meta.meta_description %}{% endblock %}
 {% block head_extra %}
-<link rel="preload" as="image" type="image/webp" fetchpriority="high" imagesrcset="{% photo_srcset "fish-tank" %}" imagesizes="(min-width: 48em) 100vw, 300vw">
+{% hero_video as hv_head %}{% if hv_head.poster %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="{{ hv_head.poster }}" media="(min-width: 48em)">
+<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="{{ hv_head.poster_portrait }}" media="(max-width: 47.99em)">{% endif %}
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"DaySpa","name":"Spa 99","description":"A private spa for men in North London.","url":"{{ request.scheme }}://{{ request.get_host }}/","email":"{{ site_settings.contact_email }}","address":{"@type":"PostalAddress","streetAddress":"{{ site_settings.address_street|default:"99 Vale Road"|escapejs }}","addressLocality":"{{ site_settings.address_town|default:"London"|escapejs }}","postalCode":"{{ site_settings.address_postcode|default:"N4 1PR"|escapejs }}","addressCountry":"GB"}}</script>
 {% endblock %}
 {% block main %}
@@ -19,8 +20,8 @@
     <div class="hero-first" data-glow>
       <div class="hero-window" data-window>
         <div class="window-media" data-hero-media>
-          {% if hv %}<video class="hero-video" muted playsinline loop preload="none" aria-hidden="true" tabindex="-1"{% if hv.poster %} poster="{{ hv.poster }}"{% endif %} data-sources="{{ hv.sources }}"></video>{% endif %}
-          <div class="hero-still-wrap">{% photo "fish-tank" alt="The reception: three men in robes on a stone bench in front of a large fish tank, beside a green wall and the Spa 99 swan, under a gold-leaf cove" sizes="(min-width: 48em) 100vw, 300vw" eager=True override=home.hero.image css_class="hero-still" %}</div>
+          {% if hv.poster %}<div class="hero-still-wrap"><picture><source media="(max-width: 47.99em)" srcset="{{ hv.poster_portrait }}" width="608" height="1080"><img class="photo hero-still" src="{{ hv.poster }}" width="1920" height="1080" alt="The reception: a wide reef fish tank set in travertine, with a long bench of sage cushions, a green wall and the Spa 99 swan" fetchpriority="high" decoding="async"></picture></div>{% endif %}
+          {% if hv %}<video class="hero-video" muted playsinline loop preload="none" aria-hidden="true" tabindex="-1" data-sources="{{ hv.sources }}"></video>{% endif %}
         </div>
         <div class="frame-tint" aria-hidden="true"></div>
         <div class="hero-veil" aria-hidden="true"></div>
@@ -49,7 +50,7 @@
           </div>
         </div>
         <figure class="frame frame--right hero-target" data-hero-target>
-          <div class="frame-media">{% photo "fish-tank" alt="" sizes="(min-width: 64em) 65vw, 100vw" css_class="hero-still-end" %}</div>
+          <div class="frame-media">{% if hv.poster %}<picture><source media="(max-width: 47.99em)" srcset="{{ hv.poster_portrait }}"><img class="photo hero-still-end" src="{{ hv.poster }}" alt="" loading="lazy" decoding="async"></picture>{% endif %}</div>
           <div class="frame-tint" aria-hidden="true"></div>
         </figure>
       </div>
@@ -163,7 +164,7 @@
       </div>
       <div class="entry-visual">
         <figure class="frame frame--right" data-frame data-depth="6">
-          <div class="frame-media">{% photo "lounge" alt="The lounge: a curved sofa by a window, under a gold-leaf ceiling cove" sizes="(min-width: 64em) 40vw, 100vw" %}</div>
+          <div class="frame-media">{% photo "lounge" alt="The lounge: a wide reef fish tank set in travertine, with a curved sofa" sizes="(min-width: 64em) 40vw, 100vw" %}</div>
           <div class="frame-tint" aria-hidden="true"></div>
         </figure>
         <div class="frame-caption" data-caption data-drift="12">
