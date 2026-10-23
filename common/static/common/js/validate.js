@@ -15,6 +15,7 @@
  * has lost focus (or on submit). A remote check may return a string (an error) or { state: 'info', text, link: { href, label } }.
  * The form's API is kept on form.spaValidation. A field may name another element to focus via data-focus-target.
  */
+import { csrfToken } from './api.js';
 
 const config = (() => {
   try { return JSON.parse(document.getElementById('validation-config')?.textContent || '{}'); } catch { return {}; }
@@ -221,8 +222,9 @@ const REMOTE_DELAY_MS = 450;
 /** Live checks are POSTs (never GET) so an email or mobile number does not end up in a URL or an access log. The CSRF
  *  token is the one already on the page's forms. Returns the parsed JSON, or null if the check could not be made. */
 async function postCheck(url, field, value) {
-  const token = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
-  if (!token) return null; // no token on the page: the server checks again on submit
+  // the token on the page's forms, else the csrftoken cookie (the Gold application form is built in JS and has no hidden input)
+  const token = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || csrfToken();
+  if (!token) return null; // no token at all: the server checks again on submit
   const response = await fetch(url, {
     method: 'POST', credentials: 'same-origin',
     headers: { Accept: 'application/json', 'X-CSRFToken': token, 'Content-Type': 'application/x-www-form-urlencoded' },
