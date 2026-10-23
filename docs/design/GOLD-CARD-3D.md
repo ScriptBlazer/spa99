@@ -309,6 +309,12 @@ Reused: `--color-led` (key and rim light), `--color-cream` (sheen strip), `--col
 
 ---
 
+### 7.5 Contrast pass (2026-10-23, Moishe: "the card has become much more flat")
+
+**Finding.** No regression from the three.js rebuild: three is 0.186.1 before and after (0c6377e, f779f88 only added exports to `tools/three/entry.js`; PMREM, NeutralToneMapping, environment rotation and per-material `envMapIntensity` are the same code). The Gold Card page parameters were also unchanged since the approved commit 22df2e8; Home (020ccb4) only got its own darker `LOOK`. The flatness is in the approved design itself: since fb580c7 the studio was built to be "never black" (walls 0.9, big side, overhead and behind fills, strip only 3.5, face `envMapIntensity` 0.5, key light 0.6), so every angle met a mid-bright panel and the highlight had little to stand out from.
+**Change.** All studio values are one `LOOK` block at the top of `gold-card-3d.js`, per page. Dark parts: walls 0.2 (Home 0.12), floor 0.12, side, overhead and behind fills x0.55 (Home x0.4): deep bronze, not black. Highlights: key softbox 5, sheen strip 14, rim 12 (were 1.5, 3.5, 5). Reflection strength face and edge 0.95, back 0.85; key light 0.4. Home is still darker and moodier (and keeps the turn dimming, now 35%) but with the same strong peaks. The CSS card tier and the still are unchanged. three.js is not downgraded or changed.
+**Tune** (in `LOOK`): `wall`, `floor`, `fill` for the darkness of the shadows; `strip`, `key`, `rim` for how bright and crisp the highlights are; `face` for overall reflection strength; `exposure`; Home `mood`. If the face goes black at some angle raise `wall` to 0.3; if the highlight clips to white lower `strip` to 9.
+
 ## 8. Acceptance checks
 
 Frontend, before review; reviewer repeats 1, 3, 4, 7, 9 with screenshots at 375 and 1440.
