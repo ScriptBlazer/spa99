@@ -187,3 +187,17 @@ class FreshnessTests(OfficeTestCase):
         data = selectors.build_analytics("7d", metrics.day(), figures)
         self.assertEqual(data["series"]["journeys_started"]["previous_total"], 0)
         self.assertIsNone(selectors.build_analytics("all", metrics.day(), figures)["series"]["journeys_started"]["previous_total"])
+
+
+class CountedAnswersBackfillTests(TestCase):
+    def test_backfill_fills_old_finished_journeys_and_they_then_vote(self):
+        seed_all()
+        session = finished_journey(time="evening")
+        JourneySession.objects.filter(pk=session.pk).update(suggestion_detail={})  # finished before answers were recorded
+        self.assertEqual(people.load().vote_counts(None, today())[1], {})
+        out = StringIO()
+        call_command("backfill_counted_answers", "--dry-run", stdout=out)
+        self.assertIn("1 completed journey", out.getvalue())
+        self.assertNotIn("counted_answers", JourneySession.objects.get().suggestion_detail)
+        call_command("backfill_counted_answers", stdout=StringIO())
+        self.assertEqual(people.load().vote_counts(None, today())[1].get("time:evening"), 1)
