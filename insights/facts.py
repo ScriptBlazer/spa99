@@ -6,8 +6,9 @@ import logging
 import re
 
 from django.db import transaction
+from django.utils import timezone
 
-from . import metrics, reader
+from . import metrics, people, reader
 from .metrics import K
 from .models import Insight
 
@@ -22,7 +23,7 @@ INSIGHTS = (
     ("frequency", "How often they would come", ("answer", "frequency"), "people"),
     ("company", "Who they come with", ("answer", "company"), "people"),
     ("tier_picked", "Most picked tier", ("plan", K.REGISTRATIONS_BY_PLAN), "registrations"),
-    ("tier_suggested", "Most suggested tier", ("plan", K.SUGGESTED_PLAN), "journeys"),
+    ("tier_suggested", "Most suggested tier", ("plan", K.SUGGESTED_PLAN), "people"),
     ("source", "Where people come from", ("referrer",), "visits"),
 )
 TITLES = {key: title for key, title, _, _ in INSIGHTS}
@@ -64,21 +65,28 @@ def _sentence(title, items, total, noun):
     return (text + f" Next is {rest[0][0]} with {rest[0][1]:,}.") if rest else text
 
 
-def wanted(today=None):
-    """{(range, key, rank): fields} the stored daily rows imply. Insights with no data are left out."""
+def wanted(today=None, figures=None):
+    """{(range, key, rank): fields} per the counting rules (office-counting-rules.md): answers and the suggested tier are one
+    vote per person (latest finished journey in the range), the picked tier is registrations in the range. Insights with no
+    data are left out."""
     today = today or metrics.day()
-    plans, options, multi = _lookups()
+    figures = figures or people.load()
+    plans, options, _ = _lookups()
     out = {}
     for name in RANGES:
         start, end = reader.range_dates(name, today)
-        sums = reader.totals(start, end, (K.JOURNEY_ANSWER, K.REGISTRATIONS_BY_PLAN, K.SUGGESTED_PLAN, K.REFERRERS, K.JOURNEYS_COMPLETED))
-        finished = sums.get((K.JOURNEYS_COMPLETED, ""), 0)
+        sums = figures.overlay(reader.totals(start, end, (K.REFERRERS,)), start, end)
+        voters = sums[(people.VOTERS, "")]
         for key, title, source, noun in INSIGHTS:
             items = _items(source, sums, plans, options)
             if not items:
                 continue
-            # a multiple-choice question is shared out as people (journeys finished), not as answers
-            total = max(finished, items[0][1]) if source[0] == "answer" and source[1] in multi else sum(v for _, v in items)
+            if source[0] == "answer":
+                total = max(voters, items[0][1])  # of the people who finished a journey in the range
+            elif key == "tier_picked":  # of all registrations in the range, including the few without a tier
+                total = max(sums[(K.REGISTRATIONS, "")], sum(v for _, v in items))
+            else:
+                total = sum(v for _, v in items)
             for rank, (label, value) in enumerate(items[:MAX_RANK], start=1):
                 out[(name, key, rank)] = {
                     "title": title, "label": label[:120], "value": value, "of_total": total,
@@ -87,21 +95,24 @@ def wanted(today=None):
     return out
 
 
-def write_all(today=None):
-    """Make the table equal to `wanted` (idempotent: a second run changes nothing). Returns the number of rows."""
-    want = wanted(today)
+def write_all(today=None, figures=None):
+    """Make the table equal to `wanted` (idempotent: a second run changes nothing, and only changed rows are written).
+    Overlapping runs are safe on SQLite and Postgres: rows are upserted on the unique key, never delete-then-insert.
+    Returns the number of rows."""
+    want = wanted(today, figures)
+    now = timezone.now()
     with transaction.atomic():
         existing = {(r.range, r.key, r.rank): r for r in Insight.objects.all()}
-        for ident in set(existing) - set(want):
-            existing[ident].delete()
-        fresh = []
+        stale = [existing[i].pk for i in set(existing) - set(want)]
+        if stale:
+            Insight.objects.filter(pk__in=stale).delete()
+        changed = []
         for (name, key, rank), fields in want.items():
             row = existing.get((name, key, rank))
-            if row is None:
-                fresh.append(Insight(range=name, key=key, rank=rank, **fields))
-            elif any(getattr(row, f) != v for f, v in fields.items()):
-                for f, v in fields.items():
-                    setattr(row, f, v)
-                row.save()
-        Insight.objects.bulk_create(fresh)
+            if row is None or any(getattr(row, f) != v for f, v in fields.items()):
+                changed.append(Insight(range=name, key=key, rank=rank, updated_at=now, **fields))
+        Insight.objects.bulk_create(
+            changed, update_conflicts=True, unique_fields=["range", "key", "rank"],
+            update_fields=["title", "label", "value", "of_total", "sentence", "updated_at"],
+        )
     return len(want)

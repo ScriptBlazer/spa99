@@ -157,8 +157,6 @@ class StoredFigureTests(OfficeTestCase):
         finished_journey()
         services.register_interest(cleaned())
         gold_services.submit_application(application_data())
-        for key in (K.PEOPLE_STARTED, K.PEOPLE_FINISHED, K.PEOPLE_REGISTERED):  # counted per request by visitors.record_step
-            metrics.count(key, "", 1, metrics.day(), counter=False)
         OfficeGoal.objects.create(key="registrations", range="7d", target=4)
         rollup.run()
         owner = staff("Owner")
@@ -171,7 +169,7 @@ class StoredFigureTests(OfficeTestCase):
         self.assertIsNone(rings["journeys_completed"]["goal"])  # no goal row: "No goal set"
         self.assertIsNone(rings["journeys_completed"]["percent"])
         self.assertEqual(data["gold_waiting"], 1)
-        self.assertEqual([s["key"] for s in data["stats"]], ["registrations", "journeys_completed", "visitors", "page_views"])
+        self.assertEqual([s["key"] for s in data["stats"]], ["registrations", "visitors", "page_views"])
         self.assertIn("change", data["stats"][0])
         self.assertEqual([f["previous_value"] for f in data["funnel"]], [None, 0, 1, 1])
         self.assertEqual(len(data["stats"][0]["series"]), 7)
@@ -238,12 +236,17 @@ class FreshSentenceTests(OfficeTestCase):
         from insights.models import MetricText
         from office import selectors
 
-        summaries.write_all()
+        from office import snapshots
+
+        snapshots.build_everything()
         self.assertIn("No visitors", MetricText.objects.get(key="chart_visitors", scope="30d").text)
         client = Client(HTTP_HOST="localhost", HTTP_USER_AGENT="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1")
-        client.get("/")
+        with self.captureOnCommitCallbacks(execute=True):  # the debounced refresh job runs after the first visitor
+            client.get("/")
         self.assertNotIn("No visitors", MetricText.objects.get(key="chart_visitors", scope="30d").text)
-        metrics.count(K.PEOPLE_STARTED, "", 7, metrics.day())
+        for _ in range(3):  # registered without ever being a visitor: the funnel must not show more than 100%
+            services.register_interest(cleaned(email=f"v{_}@example.com", mobile=f"0791234567{_}"))
+        snapshots.build_everything()
         funnel = selectors.dashboard("7d")["funnel"]
         self.assertTrue(all((s["step_rate_bp"] or 0) <= 10000 for s in funnel))
-        self.assertTrue(funnel[1]["partial"] and funnel[1]["step_rate_bp"] is None)
+        self.assertTrue(funnel[3]["partial"] and funnel[3]["step_rate_bp"] is None)

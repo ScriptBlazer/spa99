@@ -84,14 +84,14 @@ def should_count(request, response):
 
 
 def _refresh_sentences(today):
-    """Keep the stored visitor sentences close behind the figures: for each of the day's first visitors, then every 25th."""
-    from common.tasks import enqueue
+    """Keep the stored snapshots close behind the figures: for each of the day's first visitors, then every 25th."""
+    from office import snapshots
 
     from .models import DailyMetric
 
     count = DailyMetric.objects.filter(date=today, key=K.VISITORS, dimension="").values_list("value", flat=True).first() or 0
     if count <= 5 or count % 25 == 0:
-        enqueue("insights.summaries.write_visitor_sentences")  # a background job: never in the page request
+        snapshots.request_refresh()  # a debounced background job: never in the page request
 
 
 def record_page_view(request):
@@ -116,9 +116,6 @@ def record_page_view(request):
         metrics.count(K.REFERRERS, source, 1, today, counter=False)
 
 
-STEPS = (("started", K.PEOPLE_STARTED), ("finished", K.PEOPLE_FINISHED), ("registered", K.PEOPLE_REGISTERED))
-
-
 def counts_here(request):
     """The step counters follow the visitor counter's rules: counter on, public host, not a bot, not a prefetch."""
     from django.conf import settings
@@ -132,35 +129,21 @@ def counts_here(request):
     return device_type(request.META.get("HTTP_USER_AGENT", "")) not in ("bot", "unknown")
 
 
-def record_step(request, step):
-    """Count this person once today at `step` ("started", "finished" or "registered") through the same anonymous daily
-    hash as the visitor counter (no IP or user agent stored). A later step also counts the earlier ones, and a person
-    not yet counted as a visitor today is counted as one, so visitors >= started >= finished >= registered always
-    holds. Never raises: counting must not break the journey or a registration."""
+def record_journey_start(request):
+    """A journey start also counts as a visitor that day (the same anonymous daily hash, nothing else stored), so the
+    funnel's first step is never below its second. The people figures themselves come from the journey tables in the
+    background job. Never raises: counting must not break the journey."""
     try:
         if not counts_here(request):
             return
         today = metrics.day()
         digest = visitor_hash(todays_salt(today), client_ip(request) or "", request.META.get("HTTP_USER_AGENT", ""))
-        new_visitor = False
-        with transaction.atomic():
-            row = VisitorHash.objects.filter(date=today, hash=digest).first()
-            if row is None:
-                try:
-                    with transaction.atomic():
-                        row = VisitorHash.objects.create(date=today, hash=digest)
-                    new_visitor = True
-                except IntegrityError:
-                    row = VisitorHash.objects.get(date=today, hash=digest)
-            if new_visitor:
-                metrics.count(K.VISITORS, "", 1, today, counter=False)
-            for flag, key in STEPS:
-                # the conditional update lets two parallel requests flip the flag (and count) only once
-                if VisitorHash.objects.filter(pk=row.pk, **{flag: False}).update(**{flag: True}):
-                    metrics.count(key, "", 1, today, counter=False)
-                if flag == step:
-                    break
-        if new_visitor:
-            _refresh_sentences(today)
+        try:
+            with transaction.atomic():
+                VisitorHash.objects.create(date=today, hash=digest)
+        except IntegrityError:
+            return  # already counted today
+        metrics.count(K.VISITORS, "", 1, today, counter=False)
+        _refresh_sentences(today)
     except Exception:  # noqa: BLE001
-        logger.warning("Visitor counter skipped a funnel step", exc_info=True)
+        logger.warning("Visitor counter skipped a journey start", exc_info=True)

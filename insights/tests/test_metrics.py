@@ -15,8 +15,9 @@ from gold.tests.test_gold import application_data
 from gold import services as gold_services
 from insights import metrics, rebuild, rollup, visitors
 from insights.metrics import K
-from insights.models import DailyMetric, Insight, MetricCounter, MetricText, PeriodMetric, VisitorHash, VisitorSalt
+from insights.models import DailyMetric, Insight, OfficeSnapshot, MetricCounter, MetricText, PeriodMetric, VisitorHash, VisitorSalt
 from journey import engine
+from journey.models import JourneySession
 from journey import services as journey
 from plans.management.commands.seed_phase1 import seed_all
 from users import services
@@ -143,8 +144,8 @@ class RollupAndRebuildTests(TestCase):
     def test_rollup_is_idempotent_writes_rates_weeks_months_and_sentences(self):
         today = metrics.day()
         DailyMetric.objects.bulk_create([
-            DailyMetric(date=today, key=K.VISITORS, value=200), DailyMetric(date=today, key=K.PEOPLE_STARTED, value=50),
-            DailyMetric(date=today, key=K.PEOPLE_FINISHED, value=25), DailyMetric(date=today, key=K.PEOPLE_REGISTERED, value=10), DailyMetric(date=today, key=K.REGISTRATIONS, value=10),
+            DailyMetric(date=today, key=K.VISITORS, value=200), DailyMetric(date=today, key=K.JOURNEYS_STARTED, value=50),
+            DailyMetric(date=today, key=K.JOURNEYS_COMPLETED, value=25), DailyMetric(date=today, key=K.REGISTRATIONS, value=10),
             DailyMetric(date=today - timedelta(days=1), key=K.VISITORS, value=100),
         ])
         rollup.run()
@@ -164,7 +165,7 @@ class RollupAndRebuildTests(TestCase):
         self.assertGreaterEqual(month.value, 200)
         self.assertTrue(PeriodMetric.objects.filter(period="week", key=K.REGISTRATIONS).exists())
         self.assertEqual(MetricCounter.objects.get(key=K.VISITORS).value, 300)
-        self.assertIn("10 registrations", MetricText.objects.get(key="dashboard_changed", scope="today").text)
+        self.assertTrue(OfficeSnapshot.objects.filter(page="dashboard", range="all").exists())  # the job wrote the snapshots
 
     def test_rebuild_matches_live_figures_and_repairs_a_wrong_one(self):
         finished_journey()
@@ -219,11 +220,10 @@ class InsightTests(TestCase):
         self.assertEqual((top.label, top.value, top.of_total), (label("evening"), 2, 3))
         self.assertEqual((second.label, second.value), (label("daytime"), 1))
         self.assertIn("2 of 3", top.sentence)
-        self.assertEqual(top.value, DailyMetric.objects.get(key=K.JOURNEY_ANSWER, dimension="time:evening").value)
         picked = Insight.objects.get(range="all", key="tier_picked", rank=1)
         self.assertEqual((picked.value, picked.of_total), (1, 1))
         self.assertFalse(Insight.objects.filter(key="source").exists())  # no referrer data: skipped
-        DailyMetric.objects.filter(key=K.JOURNEY_ANSWER).delete()  # data gone: the rows go too
+        JourneySession.objects.all().delete()  # data gone: the rows go too
         rollup.run()
         self.assertFalse(Insight.objects.filter(key="time").exists())
 
@@ -276,38 +276,35 @@ class VisitorCounterTests(TestCase):
             self.assertNotIn(secret, everything)
         self.assertEqual(VisitorHash.objects.count(), 2)
 
-    def test_people_steps_count_once_a_day_nest_and_store_no_ip(self):
+    def test_a_journey_start_counts_a_visitor_once_a_day_and_stores_no_ip(self):
         request = self.view()
         request.urlconf = "config.urls"
-        visitors.record_step(request, "started")
-        visitors.record_step(request, "started")  # a second window, same person: still one
-        self.assertEqual((today_row(K.VISITORS), today_row(K.PEOPLE_STARTED), today_row(K.PEOPLE_FINISHED)), (1, 1, 0))  # never seen as a page view: still a visitor
-        visitors.record_step(request, "registered")  # skipping a step still counts the earlier ones
-        visitors.record_step(request, "finished")
-        self.assertEqual([today_row(k) for k in (K.VISITORS, K.PEOPLE_STARTED, K.PEOPLE_FINISHED, K.PEOPLE_REGISTERED)], [1, 1, 1, 1])
+        visitors.record_journey_start(request)
+        visitors.record_journey_start(request)  # a second window, same person: still one visitor
+        self.assertEqual(today_row(K.VISITORS), 1)
         self.count(request)  # the page view of the same person adds no second visitor
         self.assertEqual(today_row(K.VISITORS), 1)
         other = self.view(addr="198.51.100.9")
         other.urlconf = "config.urls"
-        visitors.record_step(other, "started")
-        self.assertEqual([today_row(K.VISITORS), today_row(K.PEOPLE_STARTED), today_row(K.PEOPLE_REGISTERED)], [2, 2, 1])
+        visitors.record_journey_start(other)
+        self.assertEqual(today_row(K.VISITORS), 2)
         everything = " ".join(str(v) for model in (VisitorHash, VisitorSalt, DailyMetric) for v in model.objects.values_list())
         for secret in ("203.0.113.7", "198.51.100.9", "Safari", "Macintosh"):
             self.assertNotIn(secret, everything)
 
-    def test_people_steps_skip_bots_staff_hosts_and_never_raise(self):
+    def test_journey_start_skips_bots_and_staff_hosts_and_never_raises(self):
         bot = self.view(agent="Googlebot/2.1")
         bot.urlconf = "config.urls"
         staff = self.view(host="office.localhost")
         staff.urlconf = "config.urls_office"
         for request in (bot, staff):
-            visitors.record_step(request, "started")
-        self.assertEqual((VisitorHash.objects.count(), today_row(K.PEOPLE_STARTED)), (0, 0))
+            visitors.record_journey_start(request)
+        self.assertEqual((VisitorHash.objects.count(), today_row(K.VISITORS)), (0, 0))
         request = self.view()
         request.urlconf = "config.urls"
         with mock.patch("insights.visitors.todays_salt", side_effect=RuntimeError("boom")):
-            visitors.record_step(request, "started")  # logged and swallowed
-        self.assertEqual(today_row(K.PEOPLE_STARTED), 0)
+            visitors.record_journey_start(request)  # logged and swallowed
+        self.assertEqual(today_row(K.VISITORS), 0)
 
     def test_bots_staff_hosts_static_and_non_pages_are_not_counted(self):
         self.count(self.view(agent="Googlebot/2.1"))
@@ -323,9 +320,10 @@ class VisitorCounterTests(TestCase):
         self.assertFalse(DailyMetric.objects.filter(key=K.PAGE_VIEWS).exists())
 
     def test_sentence_refresh_is_queued_not_run_in_the_request(self):
-        with mock.patch("common.tasks.enqueue") as queued, mock.patch("insights.summaries.write_visitor_sentences") as direct:
-            self.count(self.view())
-        queued.assert_called_once_with("insights.summaries.write_visitor_sentences")
+        with mock.patch("common.tasks.enqueue") as queued, mock.patch("office.snapshots.build_everything") as direct:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.count(self.view())
+        queued.assert_called_once_with("office.snapshots.refresh")  # queued after the request's work, never run in it
         direct.assert_not_called()
 
     def test_a_failure_never_breaks_the_page(self):

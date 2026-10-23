@@ -30,7 +30,7 @@ def _session_for(request):
         user=request.user,
     )
     if created:
-        visitors.record_step(request, "started")  # one person once a day, however many sessions they open
+        visitors.record_journey_start(request)  # starting counts as a visitor that day
     return session, created
 
 
@@ -138,7 +138,6 @@ def result(request):
     session, _ = _session_for(request)
     try:
         data = engine.complete(session)
-        visitors.record_step(request, "finished")
         return _with_cookie(JsonResponse(data), session)
     except services.AnswerError as error:
         return _bad(str(error), missing=error.missing)
@@ -153,7 +152,7 @@ def restart(request):
     old, _ = _session_for(request)
     fresh = services.create_session(
         request.META.get("HTTP_USER_AGENT", ""), referrer=old.referrer,
-        utm={name: getattr(old, name) for name in services.UTM_FIELDS}, user=request.user,
+        utm={name: getattr(old, name) for name in services.UTM_FIELDS}, user=request.user, previous=old,
     )
-    visitors.record_step(request, "started")
+    visitors.record_journey_start(request)
     return _with_cookie(JsonResponse(services.build_state(fresh)), fresh)

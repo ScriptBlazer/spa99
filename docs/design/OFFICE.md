@@ -141,17 +141,17 @@ Three single rings in a row (Apple Fitness summary style), not concentric. Each 
 
 | Ring | Colour | Number in the middle | Line under the ring | Goal line | Change line |
 |---|---|---|---|---|---|
-| Started | `--office-sage` | `42` | "people started" | "Goal 60" | "+12 on last week" |
-| Finished | `--office-teal` | `31` | "finished it" | "Goal 40" | "+4 on last week" |
-| Registered | `--office-clay` | `18` | "registered" | "Goal 25" | "Same as last week" |
+| Started | `--office-sage` | `42` | "started the journey" | "Goal 60" | "+12 on last week" |
+| Finished | `--office-teal` | `31` | "finished the journey" | "Goal 40" | "+4 on last week" |
+| Registered | `--office-clay` | `18` | "registered interest" | "Goal 25" | "Same as last week" |
 
 - Number: Signika 500, `--text-xl` phone (inside a 96px ring) / `--office-stat` desktop (inside 152px), espresso, tabular, centred. Under-ring line Figtree 500 `--text-sm` espresso; goal and change lines `--text-sm` muted, one each. The change line is a **count**: "+12 on last week", "6 fewer than last week", "Same as last week", "New this week" when last period was 0. For Today: "on yesterday". Minus is written as "fewer".
-- "Started" is `journeys_started` (one per browser, as stored). "Finished" is `journeys_completed`. Labels say people, never "journeys completed" or a rate.
+- "Started" is `people_started` (one person once a day, by the anonymous daily hash). "Finished" is `people_finished`. Labels are the three phrases above, never "journeys completed" or a rate.
 - **With a goal:** track in the metric `-track`; arc in the full colour from 12 o'clock clockwise, round caps, length = count / goal. Over 100% the arc continues into a second lap (cap 200%); the cap end gets a 3px `--office-surface` halo (`stroke` underlay) so the overlap reads. The big number stays the count; the goal is only the small "Goal 60" line.
 - **No goal set:** no track and no arc; the full ring is drawn in the metric at 48% (`color-mix(in oklab, var(--office-sage) 48%, var(--office-surface))`), a calm closed circle, the count in the middle, and no goal line (no "No goal set" text on the Dashboard; the Django admin is where goals are set).
 - Geometry: `--office-ring` 96px / 152px, stroke 10px / 14px, `pathLength="100"`. Rings are 24px apart on phone, spread evenly on desktop.
 - Draw-in: arc `stroke-dashoffset` 100 to target, 1400ms, left to right 120ms apart, on first view. Range switch: transitions from the old value (600ms). Reduced motion: final.
-- The row is one `role="img"` with `aria-label`: "42 people started the journey, goal 60. 31 finished it, goal 40. 18 registered, goal 25." (goal parts omitted when unset). Each ring links to its Analytics chart.
+- The row is one `role="img"` with `aria-label`: "42 started the journey, goal 60. 31 finished the journey, goal 40. 18 registered interest, goal 25." (goal parts omitted when unset). Each ring links to its Analytics chart.
 
 ### 4.4 Gold waiting tile
 
@@ -165,7 +165,7 @@ Three single rings in a row (Apple Fitness summary style), not concentric. Each 
 
 Four steps, plain counts, no percent on the Dashboard.
 
-- Desktop: four columns in one card. Each: label Figtree 500 `--text-sm` muted ("Visitors", "Started the journey", "Finished it", "Registered"); number Signika 500 `--text-xl` espresso; a 10px pill bar in the step's colour (slate, sage, teal, clay) on its `-track`, length = share of visitors (`scaleX`, origin left, min 6px so a small step still shows). Under the bar, muted `--text-sm`: "31 of 42 who started" (count of the previous step, never a rate).
+- Desktop: four columns in one card. Each: label Figtree 500 `--text-sm` muted ("Visitors", "Started the journey", "Finished the journey", "Registered interest"); number Signika 500 `--text-xl` espresso; a 10px pill bar in the step's colour (slate, sage, teal, clay) on its `-track`, length = share of visitors (`scaleX`, origin left, min 6px so a small step still shows). Under the bar, muted `--text-sm`: "31 of 42 who started" (count of the previous step, never a rate).
 - Phone: four rows, label left, number right, bar full width under, the "of" line under the bar.
 
 ### 4.6 Site visitors and Page views tiles
@@ -321,7 +321,7 @@ Formats unchanged (en-GB, Europe/London): 1,204 · 12.4k from 10,000 on tiles ·
 Copy: short, calm, British, no exclamation marks.
 - Dashboard change lines are counts: "+12 on last week", "6 fewer than last week", "Same as last week", "New this week". Today: "on yesterday".
 - What-changed line (stored by the roll-up) uses counts: "18 people registered this week, 4 more than last week. Two Gold applications are waiting." / "A quiet day so far."
-- Ring labels exactly: "people started", "finished it", "registered", "Goal 60".
+- Ring labels exactly: "started the journey", "finished the journey", "registered interest", "Goal 60".
 - Never "journeys completed", "completion rate" or "% of goal" on the Dashboard.
 
 ---

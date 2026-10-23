@@ -12,7 +12,7 @@ import { clearWorking } from './buttons.js';
 const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const BUSY_AFTER_MS = 300;
 const COPY = ['style', 'd', 'aria-label'];
-const LABELS = { today: 'Today', '7d': '7 days', '30d': '30 days', '90d': '90 days', all: 'All' };
+const LABELS = { today: 'Today', '7d': '7 days', '30d': '30 days', '90d': '90 days', all: 'All time' };
 let seq = 0;
 let shown = null; // the range currently on screen
 let failedUrl = '';

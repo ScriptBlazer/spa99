@@ -1,5 +1,5 @@
 """Recompute the event figures from the source tables (the repair tool behind `rebuild_metrics`, also the one-off
-backfill). Never run from a migration. Visitor, page-view and people_* figures have no source table (anonymous hashes are wiped daily), so they are left alone."""
+backfill). Never run from a migration. Visitor and page-view figures have no source table (anonymous hashes are wiped daily), so they are left alone. The people figures, answers, insights and snapshots are rewritten from the journey and registration tables by the roll-up that runs at the end."""
 from collections import defaultdict
 
 from django.db import transaction
@@ -92,6 +92,9 @@ def apply():
     Returns (number of differences fixed, roll-up summary)."""
     with transaction.atomic():
         want_counters, want_daily = expected()
+        OBSOLETE = ("people_started", "people_finished", "people_registered")  # the old per-day hash flags (counting rules C3)
+        DailyMetric.objects.filter(key__in=OBSOLETE).delete()
+        MetricCounter.objects.filter(key__in=OBSOLETE).delete()
         MetricCounter.objects.filter(key__in=EVENT_KEYS).delete()
         DailyMetric.objects.filter(key__in=EVENT_KEYS).delete()
         MetricCounter.objects.bulk_create([MetricCounter(key=k, dimension=d, value=v) for (k, d), v in want_counters.items()])

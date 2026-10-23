@@ -79,3 +79,12 @@ def interest_post_save(sender, instance, created, **kwargs):
 
     slugs = dict(Plan.objects.filter(pk__in=[p for p in (old["plan_id"], instance.plan_id) if p]).values_list("pk", "slug"))
     metrics.interest_plan_changed(slugs.get(old["plan_id"]), slugs.get(instance.plan_id), instance.created_at)
+
+
+@receiver(post_save, sender="insights.OfficeGoal", dispatch_uid="insights_goal_saved")
+@receiver(post_delete, sender="insights.OfficeGoal", dispatch_uid="insights_goal_deleted")
+def goal_changed(sender, **kwargs):
+    """A goal edited in the admin moves the rings' percentages: refresh the stored snapshots."""
+    from office import snapshots
+
+    snapshots.request_refresh()

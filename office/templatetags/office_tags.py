@@ -199,6 +199,8 @@ ANALYTICS_PERIODS = {"7d": "the previous 7 days", "30d": "the previous 30 days",
 @register.simple_tag
 def change_line(value, previous, range_name):
     """A change as a count, in words (OFFICE section 10): +12 on last week · 6 fewer than last week · Same as last week · New this week."""
+    if range_name == "all" or previous is None:
+        return ""  # All time has no period before it
     value, previous = _int(value), _int(previous)
     ref, fresh = PERIODS.get(range_name, PERIODS["7d"])
     diff = value - previous
@@ -240,13 +242,13 @@ def sum_of(values):
     return sum(_int(v) for v in (values or []))
 
 
-GOAL_WORDS = {"journeys_started": ("people started the journey", "people started"), "journeys_completed": ("finished it", "finished it"),
-              "registrations": ("registered", "registered")}
+GOAL_WORDS = {"journeys_started": ("started the journey", "started the journey"), "journeys_completed": ("finished the journey", "finished the journey"),
+              "registrations": ("registered interest", "registered interest")}
 
 
 @register.simple_tag
 def ring_sentence(rings):
-    """One sentence for the three rings: '42 people started the journey, goal 60. 31 finished it, goal 40. 18 registered, goal 25.'"""
+    """One sentence for the three rings: '42 started the journey, goal 60. 31 finished the journey, goal 40. 18 registered interest, goal 25.'"""
     parts = []
     for ring in rings or []:
         words = GOAL_WORDS.get(ring.get("key"), (ring.get("label", ""), ring.get("label", "")))[0]
@@ -325,7 +327,7 @@ def index_of(items, value):
 
 @register.filter
 def range_label(value):
-    return {"today": "Today", "7d": "7 days", "30d": "30 days", "90d": "90 days", "all": "All"}.get(value, value)
+    return {"today": "Today", "7d": "7 days", "30d": "30 days", "90d": "90 days", "all": "All time"}.get(value, value)
 
 
 @register.simple_tag

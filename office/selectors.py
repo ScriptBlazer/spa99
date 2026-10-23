@@ -1,17 +1,19 @@
-"""What the Office pages show, built only from stored rows (MetricCounter, DailyMetric, PeriodMetric, MetricText,
-OfficeGoal). Fixed number of queries whatever the data: no counting over source tables. The two short source lists
-on the dashboard (waiting applications, latest registrations) are plain `LIMIT 5` reads, not counts."""
+"""What the Office pages show. The `build_*` functions add up the stored rows (DailyMetric, PeriodMetric, ...) into the
+finished payload of a page and range; only `office.snapshots` calls them (the hourly roll-up and the debounced refresh
+after events). The public `dashboard`, `analytics` and `pages` just read the one stored OfficeSnapshot row (nothing is
+summed on page load; a missing row gives an empty state, never an inline computation). The two short source lists on the
+dashboard (waiting applications, latest registrations) are plain `LIMIT 5` reads."""
 from datetime import timedelta
 
 from insights import metrics, reader
 from insights.metrics import K
 from insights import facts
-from insights.models import DailyMetric, Insight, MetricCounter, MetricText, OfficeGoal, PeriodMetric
+from insights.models import DailyMetric, Insight, MetricCounter, MetricText, OfficeGoal, OfficeSnapshot, PeriodMetric
 from insights.rollup import basis_points
 from journey.models import Option, Question
 from plans.models import Plan
 
-DASHBOARD_RANGES = ("today", "7d", "30d")
+DASHBOARD_RANGES = ("today", "7d", "30d", "all")
 ANALYTICS_RANGES = ("7d", "30d", "90d", "all")
 WEEKLY_AFTER_DAYS = 120  # 'all' sends weekly points once history is longer than this
 JOURNEY_QUESTIONS = ("time", "frequency", "facilities", "company")
@@ -43,7 +45,7 @@ def _direction(now, before):
     return {"percent": abs(pct), "direction": "flat" if pct == 0 else ("up" if pct > 0 else "down")}
 
 
-FUNNEL_NOTE = "Some earlier figures are lower than later steps because people counting started recently."
+FUNNEL_NOTE = "A later step can be higher than an earlier one: some people register without the journey, or visited before visitors were counted."
 
 
 def _share(value, whole):
@@ -89,46 +91,70 @@ def tier_pair(insights):
 
 # ---------- dashboard ----------
 
-def dashboard(range_name="7d", today=None):
-    """Everything the Dashboard needs, for range today / 7d / 30d. JSON friendly."""
+def _spark_buckets(range_name, today):
+    """The sparkline points as (first day, last day): the last 7 or 30 days, or for All the whole history, daily until it
+    passes WEEKLY_AFTER_DAYS and then weekly (like Analytics)."""
+    if range_name != "all":
+        return [(d, d) for d in _days(today, 30 if range_name == "30d" else 7)]
+    first = DailyMetric.objects.order_by("date").values_list("date", flat=True).first() or today
+    if (today - first).days <= WEEKLY_AFTER_DAYS:
+        return [(d, d) for d in _days(today, max((today - first).days + 1, 7))]
+    from insights.rollup import week_start
+    out, cursor = [], week_start(first)
+    while cursor <= today:
+        out.append((cursor, min(cursor + timedelta(days=6), today)))
+        cursor += timedelta(days=7)
+    return out
+
+
+def _bucket_sums(by_day, buckets):
+    return [sum(v for d, v in by_day.items() if a <= d <= b) for a, b in buckets]
+
+
+def build_dashboard(range_name="7d", today=None, figures=None):
+    """The stored Dashboard payload for range today / 7d / 30d / all (without the two live LIMIT-5 lists). JSON friendly.
+    People and registrations come from `figures` (counting rules C1 to C3); visitors and page views from the daily rows."""
+    from insights import people
+
     range_name = range_name if range_name in DASHBOARD_RANGES else "7d"
     today = today or metrics.day()
-    size = reader.RANGE_DAYS[range_name]
-    spark_days = _days(today, 30 if range_name == "30d" else 7)
-    first = today - timedelta(days=2 * size - 1)  # this window and the one before it
-    first = min(first, spark_days[0])
-    rows = list(DailyMetric.objects.filter(date__gte=first, date__lte=today).values_list("date", "key", "dimension", "value"))
-    stored = counters(K.REGISTRATIONS, K.GOLD_APPLICATIONS, K.GOLD_BY_STATUS, K.JOURNEYS_STARTED, K.JOURNEYS_COMPLETED)
+    figures = figures or people.load()
+    size = reader.RANGE_DAYS[range_name]  # None for all: no previous period
+    now = (None, today) if size is None else (today - timedelta(days=size - 1), today)
+    before = None if size is None else (today - timedelta(days=2 * size - 1), today - timedelta(days=size))
+    spark = _spark_buckets(range_name, today)
+    daily = {}
+    for d, key, v in DailyMetric.objects.filter(key__in=(K.VISITORS, K.PAGE_VIEWS), dimension="").values_list("date", "key", "value"):
+        daily.setdefault(key, {})[d] = v
+    stored = counters(K.REGISTRATIONS, K.GOLD_APPLICATIONS, K.GOLD_BY_STATUS)
     goals = {(g.key, g.range): g.target for g in OfficeGoal.objects.all()}
 
-    now_days, before_days = _days(today, size), _days(today - timedelta(days=size), size)
+    def over(by_day, window):
+        return None if window is None else sum(v for d, v in by_day.items() if (window[0] is None or window[0] <= d) and d <= window[1])
 
-    def total(key, days):
-        return sum(_series(rows, key, days))
+    def stat(key, label, link, value, previous, series):
+        extra = {"percent": None, "direction": "none"} if previous is None else _direction(value, previous)
+        return {"key": key, "label": label, "value": value, "previous": previous,
+                "change": None if previous is None else value - previous, **extra, "series": series, "link": link}
 
-    def stat(key, label, link):
-        value, previous = total(key, now_days), total(key, before_days)
-        return {"key": key, "label": label, "value": value, "previous": previous, "change": value - previous,
-                **_direction(value, previous), "series": _series(rows, key, spark_days), "link": link}
-
-    # People (one per anonymous daily hash), so every step nests: visitors >= started >= finished >= registered.
-    started, done = total(K.PEOPLE_STARTED, now_days), total(K.PEOPLE_FINISHED, now_days)
-    visitors, registered = total(K.VISITORS, now_days), total(K.PEOPLE_REGISTERED, now_days)
-    stats = [stat(K.REGISTRATIONS, "Registrations", "registrations"), stat(K.JOURNEYS_COMPLETED, "Journeys completed", "journeys"),
-             stat(K.VISITORS, "Site visitors", "visitors"), stat(K.PAGE_VIEWS, "Page views", "pages")]
-
-    received = stored.get((K.GOLD_APPLICATIONS, ""), 0)
+    started, done = figures.started(*now), figures.finished(*now)
+    registered, visitors = figures.registered(*now), over(daily.get(K.VISITORS, {}), now)
+    stats = [stat(K.REGISTRATIONS, "Registrations", "registrations", registered, None if before is None else figures.registered(*before),
+                  figures.registered_series(spark)),
+             stat(K.VISITORS, "Site visitors", "visitors", visitors, over(daily.get(K.VISITORS, {}), before), _bucket_sums(daily.get(K.VISITORS, {}), spark)),
+             stat(K.PAGE_VIEWS, "Page views", "pages", over(daily.get(K.PAGE_VIEWS, {}), now), over(daily.get(K.PAGE_VIEWS, {}), before),
+                  _bucket_sums(daily.get(K.PAGE_VIEWS, {}), spark))]
 
     def ring(key, label, goal_key, value, previous):
         goal = _goal(goals, goal_key, range_name)
         return {"key": key, "label": label, "value": value, "goal": goal,
                 "percent": min(200, round(value * 100 / goal)) if goal else None,
-                "previous": previous, "change": value - previous}
+                "previous": previous, "change": None if previous is None else value - previous}
 
     rings = [
-        ring("journeys_started", "Started the journey", OfficeGoal.JOURNEYS_STARTED, started, total(K.PEOPLE_STARTED, before_days)),
-        ring("journeys_completed", "Finished the journey", OfficeGoal.JOURNEYS_FINISHED, done, total(K.PEOPLE_FINISHED, before_days)),
-        ring("registrations", "Registered interest", OfficeGoal.REGISTRATIONS, registered, total(K.PEOPLE_REGISTERED, before_days)),
+        ring("journeys_started", "Started the journey", OfficeGoal.JOURNEYS_STARTED, started, None if before is None else figures.started(*before)),
+        ring("journeys_completed", "Finished the journey", OfficeGoal.JOURNEYS_FINISHED, done, None if before is None else figures.finished(*before)),
+        ring("registrations", "Registered interest", OfficeGoal.REGISTRATIONS, registered, None if before is None else figures.registered(*before)),
     ]
     funnel_values = [("visitors", "Visitors", visitors), ("started", "Started the journey", started),
                      ("completed", "Finished the journey", done), ("registered", "Registered interest", registered)]
@@ -139,23 +165,12 @@ def dashboard(range_name="7d", today=None):
                        "share_bp": min(basis_points(value, visitors) or 0, 10000),
                        "step_rate_bp": _share(value, funnel_values[i - 1][2]) if i else None,
                        "partial": bool(i and value > funnel_values[i - 1][2])})
-    from gold.models import GoldApplication
-    from users.models import InterestRegistration
-
-    waiting_rows = GoldApplication.objects.filter(status__in=[GoldApplication.NEW, GoldApplication.CONTACTED]).order_by("-created_at")[:5]
-    latest = InterestRegistration.objects.select_related("user", "plan").order_by("-created_at")[:5]
     return {
         "range": range_name, "ranges": list(DASHBOARD_RANGES), "today": today.isoformat(),
         "what_changed": _text("dashboard_changed", range_name),
         "gold_waiting": waiting_count(stored), "rings": rings, "stats": stats, "funnel": funnel, "funnel_note": FUNNEL_NOTE if any(f["partial"] for f in funnel) else "",
         "insights": insights_for(range_name, 2),
-        "waiting": {
-            "count": waiting_count(stored),
-            "items": [{"id": str(a.pk), "name": a.full_name, "potential": a.potential_level, "applied": a.created_at.isoformat()} for a in waiting_rows],
-        },
-        "latest": [{"id": str(i.user_id), "name": i.user.get_full_name() or i.user.email, "plan": i.plan.name if i.plan_id else "",
-                    "registered": i.created_at.isoformat()} for i in latest],
-        "totals": {"registrations": stored.get((K.REGISTRATIONS, ""), 0), "gold_applications": received},
+        "totals": {"registrations": stored.get((K.REGISTRATIONS, ""), 0), "gold_applications": stored.get((K.GOLD_APPLICATIONS, ""), 0)},
     }
 
 
@@ -189,9 +204,9 @@ def _fetch(range_name, granularity, labels, key_list):
     return list(rows.values_list("date", "key", "dimension", "value"))
 
 
-SERIES_KEYS = (K.VISITORS, K.PEOPLE_STARTED, K.JOURNEYS_COMPLETED, K.REGISTRATIONS, K.PEOPLE_FINISHED, K.PEOPLE_REGISTERED, K.EMAIL_VERIFIED, K.GOLD_APPLICATIONS, K.GOLD_APPROVED)
-BREAKDOWN_KEYS = (K.REGISTRATIONS_BY_PLAN, K.REGISTRATIONS_BY_SOURCE, K.SUGGESTED_PLAN, K.JOURNEY_GOLD_POTENTIAL,
-                  K.GOLD_BY_POTENTIAL, K.JOURNEY_ANSWER, K.JOURNEY_SCREEN)
+SERIES_KEYS = (K.VISITORS, K.EMAIL_VERIFIED, K.GOLD_APPLICATIONS, K.GOLD_APPROVED)  # stored daily rows
+PEOPLE_SERIES = ("journeys_started", "journeys_completed", "registrations", "people_registered")  # from the source tables (job only)
+BREAKDOWN_KEYS = (K.JOURNEY_GOLD_POTENTIAL, K.GOLD_BY_POTENTIAL, K.JOURNEY_SCREEN)
 PAGE_KEYS = (K.PAGE_VIEWS, K.VISITORS, K.REFERRERS)
 
 
@@ -207,11 +222,14 @@ def _plan_order():
     return list(Plan.objects.order_by("order").values_list("slug", "name"))
 
 
-def analytics(range_name="30d", today=None):
-    """JSON for the Analytics charts: series per key with the previous period, funnel, breakdowns, journey answers,
+def build_analytics(range_name="30d", today=None, figures=None):
+    """The stored JSON for the Analytics charts: series per key with the previous period, funnel, breakdowns, journey answers,
     drop-off per screen, Gold, and the stored sentence for each chart."""
+    from insights import people as source
+
     range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
     today = today or metrics.day()
+    figures = figures or source.load()
     granularity, labels = _points(range_name, today)
     rows = _fetch(range_name, granularity, labels, SERIES_KEYS + BREAKDOWN_KEYS + (K.PAGE_VIEWS,))
     size = len(labels)
@@ -222,11 +240,21 @@ def analytics(range_name="30d", today=None):
     for key in SERIES_KEYS + (K.PAGE_VIEWS,):
         values = _series(rows, key, labels)
         series[key] = {"total": sum(values), "values": values, "previous": _series(rows, key, previous) if previous else []}
-    series[K.JOURNEYS_STARTED] = series[K.PEOPLE_STARTED]  # the hero/KPI read the key "journeys_started": it is people now
+    # People and registrations per the counting rules: the total is distinct people (or registrations) in the whole range,
+    # the points are per day (per week for a long All).
+    def buckets(days):
+        return [(d, d) for d in days] if granularity == "day" else [(d, min(d + timedelta(days=6), today)) for d in days]
+
+    start, end = labels[0], today
+    here, before = buckets(labels), buckets(previous)
+    for key, count, values in (("journeys_started", figures.started, figures.started_series), ("journeys_completed", figures.finished, figures.finished_series),
+                               ("registrations", figures.registered, figures.registered_series)):
+        series[key] = {"total": count(start, end), "values": values(here), "previous": values(before) if before else []}
+    series["people_registered"] = series["registrations"]  # the hero reads this key
     total = lambda key: series[key]["total"]  # noqa: E731
 
-    funnel_def = [("visitors", "Visitors", total(K.VISITORS)), ("started", "Started the journey", total(K.PEOPLE_STARTED)),
-                  ("completed", "Finished the journey", total(K.PEOPLE_FINISHED)), ("registered", "Registered interest", total(K.PEOPLE_REGISTERED))]
+    funnel_def = [("visitors", "Visitors", total(K.VISITORS)), ("started", "Started the journey", total("journeys_started")),
+                  ("completed", "Finished the journey", total("journeys_completed")), ("registered", "Registered interest", total("registrations"))]
     funnel = [{"key": k, "label": label, "value": v, "share_bp": min(basis_points(v, funnel_def[0][2]) or 0, 10000),
                "step_rate_bp": _share(v, funnel_def[i - 1][2]) if i else None,
                "partial": bool(i and v > funnel_def[i - 1][2])}
@@ -235,8 +263,7 @@ def analytics(range_name="30d", today=None):
     plans = _plan_order()
     people = insights_for(range_name, facts.MAX_RANK)
 
-    def by_plan(key):
-        found = _by_dimension(rows, key, labels)
+    def by_plan(found):
         out = [{"dimension": slug, "label": name, "value": found.get(slug, 0)} for slug, name in plans]
         if found.get("none"):
             out.append({"dimension": "none", "label": "No plan chosen", "value": found["none"]})
@@ -245,7 +272,7 @@ def analytics(range_name="30d", today=None):
 
     option_labels = {(q, v): (facts.clean_label(label), order) for q, v, label, order in Option.objects.filter(question__key__in=JOURNEY_QUESTIONS, active=True)
                      .order_by("order").values_list("question__key", "value", "label", "order")}
-    answers_found = _by_dimension(rows, K.JOURNEY_ANSWER, labels)
+    voters, answers_found, suggested_found = figures.vote_counts(start, end)  # one vote per person
     answers = {}
     for q in JOURNEY_QUESTIONS:
         items = [{"value": v, "label": label, "count": answers_found.get(f"{q}:{v}", 0)}
@@ -279,8 +306,8 @@ def analytics(range_name="30d", today=None):
         "range": range_name, "ranges": list(ANALYTICS_RANGES), "granularity": granularity,
         "labels": [d.isoformat() for d in labels], "previous_labels": [d.isoformat() for d in previous],
         "series": series, "funnel": funnel, "funnel_note": FUNNEL_NOTE if any(f["partial"] for f in funnel) else "",
-        "registrations_by_plan": by_plan(K.REGISTRATIONS_BY_PLAN), "suggested_plan": by_plan(K.SUGGESTED_PLAN),
-        "registrations_by_source": [{"dimension": d, "value": v} for d, v in sorted(_by_dimension(rows, K.REGISTRATIONS_BY_SOURCE, labels).items())],
+        "registrations_by_plan": by_plan(figures.registered_by(start, end, 1)), "suggested_plan": by_plan(suggested_found),
+        "registrations_by_source": [{"dimension": d, "value": v} for d, v in sorted(figures.registered_by(start, end, 2).items())],
         "journey_answers": answers, "drop_off": screens, "gold": gold,
         "insights": people, "tier_pair": tier_pair(people),
         "summaries": {chart: texts.get(f"chart_{chart}", "") for chart in
@@ -288,8 +315,8 @@ def analytics(range_name="30d", today=None):
     }
 
 
-def pages(range_name="30d", today=None, limit=10):
-    """JSON for page views: series, top pages by path group and referring sites (site names only; 'direct' = no referrer)."""
+def build_pages(range_name="30d", today=None, limit=10):
+    """The stored JSON for page views: series, top pages by path group and referring sites (site names only; 'direct' = no referrer)."""
     range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
     today = today or metrics.day()
     granularity, labels = _points(range_name, today)
@@ -303,3 +330,71 @@ def pages(range_name="30d", today=None, limit=10):
         "top_pages": [{"page": p, "views": v} for p, v in top], "referrers": [{"site": s, "visits": v} for s, v in refs],
         "summaries": {"top_pages": texts.get("chart_top_pages", ""), "referrers": texts.get("chart_referrers", "")},
     }
+
+
+# ---------- reading the stored snapshots ----------
+
+def _snapshot(page, range_name):
+    return OfficeSnapshot.objects.filter(page=page, range=range_name).values_list("payload", flat=True).first()
+
+
+def _empty_funnel():
+    steps = (("visitors", "Visitors"), ("started", "Started the journey"), ("completed", "Finished the journey"), ("registered", "Registered interest"))
+    return [{"key": k, "label": label, "value": 0, "previous_value": None if i == 0 else 0, "share_bp": 0, "step_rate_bp": None, "partial": False}
+            for i, (k, label) in enumerate(steps)]
+
+
+def empty_dashboard(range_name):
+    """What the Dashboard shows before its first snapshot exists (a fresh database): zeros, no text. Never computed from data."""
+    today = metrics.day()
+    zeros = [0] * (30 if range_name == "30d" else 7)
+    stat = lambda key, label, link: {"key": key, "label": label, "value": 0, "previous": 0, "change": 0, "percent": None,  # noqa: E731
+                                     "direction": "none", "series": zeros, "link": link}
+    ring = lambda key, label: {"key": key, "label": label, "value": 0, "goal": None, "percent": None, "previous": 0, "change": 0}  # noqa: E731
+    return {"range": range_name, "ranges": list(DASHBOARD_RANGES), "today": today.isoformat(), "what_changed": "", "gold_waiting": 0,
+            "rings": [ring("journeys_started", "Started the journey"), ring("journeys_completed", "Finished the journey"),
+                      ring("registrations", "Registered interest")],
+            "stats": [stat(K.REGISTRATIONS, "Registrations", "registrations"), stat(K.VISITORS, "Site visitors", "visitors"),
+                      stat(K.PAGE_VIEWS, "Page views", "pages")],
+            "funnel": _empty_funnel(), "funnel_note": "", "insights": [], "totals": {"registrations": 0, "gold_applications": 0}}
+
+
+def empty_analytics(range_name):
+    series = {key: {"total": 0, "values": [], "previous": []} for key in SERIES_KEYS + PEOPLE_SERIES + (K.PAGE_VIEWS,)}
+    return {"range": range_name, "ranges": list(ANALYTICS_RANGES), "granularity": "day", "labels": [], "previous_labels": [],
+            "series": series, "funnel": _empty_funnel(), "funnel_note": "", "registrations_by_plan": [], "suggested_plan": [],
+            "registrations_by_source": [], "journey_answers": {q: [] for q in JOURNEY_QUESTIONS}, "drop_off": [],
+            "gold": {"by_potential": [], "by_status_now": []}, "insights": [], "tier_pair": [],
+            "summaries": {chart: "" for chart in ("visitors", "funnel", "registrations_by_plan", "suggested_plan", "journey_answers",
+                                                  "drop_off", "gold", "top_pages", "referrers")}}
+
+
+def empty_pages(range_name):
+    return {"range": range_name, "granularity": "day", "labels": [], "page_views": [], "visitors": [], "top_pages": [], "referrers": [],
+            "summaries": {"top_pages": "", "referrers": ""}}
+
+
+def dashboard(range_name="7d"):
+    """The Dashboard payload: one stored snapshot row, plus the two short live lists (LIMIT 5 reads, not counts)."""
+    from gold.models import GoldApplication
+    from users.models import InterestRegistration
+
+    range_name = range_name if range_name in DASHBOARD_RANGES else "7d"
+    data = _snapshot(OfficeSnapshot.DASHBOARD, range_name) or empty_dashboard(range_name)
+    waiting_rows = GoldApplication.objects.filter(status__in=[GoldApplication.NEW, GoldApplication.CONTACTED]).order_by("-created_at")[:5]
+    latest = InterestRegistration.objects.select_related("user", "plan").order_by("-created_at")[:5]
+    return {**data,
+            "waiting": {"count": data["gold_waiting"],
+                        "items": [{"id": str(a.pk), "name": a.full_name, "potential": a.potential_level, "applied": a.created_at.isoformat()} for a in waiting_rows]},
+            "latest": [{"id": str(i.user_id), "name": i.user.get_full_name() or i.user.email, "plan": i.plan.name if i.plan_id else "",
+                        "registered": i.created_at.isoformat()} for i in latest]}
+
+
+def analytics(range_name="30d"):
+    range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
+    return _snapshot(OfficeSnapshot.ANALYTICS, range_name) or empty_analytics(range_name)
+
+
+def pages(range_name="30d"):
+    range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
+    return _snapshot(OfficeSnapshot.PAGES, range_name) or empty_pages(range_name)

@@ -363,6 +363,7 @@ class PeopleCountTests(TestCase):
     """2026-10-23: several journey windows from one browser count as one person started that day."""
 
     def test_restarting_counts_one_person_not_one_per_session(self):
+        from insights import metrics, people
         from insights.metrics import K
         from insights.models import DailyMetric
 
@@ -372,4 +373,6 @@ class PeopleCountTests(TestCase):
         client.post("/journey/restart/")
         client.post("/journey/restart/")
         value = lambda key: DailyMetric.objects.filter(key=key).values_list("value", flat=True).first() or 0  # noqa: E731
-        self.assertEqual((value(K.JOURNEYS_STARTED), value(K.PEOPLE_STARTED), value(K.VISITORS)), (3, 1, 1))
+        self.assertEqual((value(K.JOURNEYS_STARTED), value(K.VISITORS)), (3, 1))  # three sessions, one visitor
+        self.assertEqual(len({s.person_key for s in JourneySession.objects.all()}), 1)  # one person
+        self.assertEqual(people.load().started(None, metrics.day()), 1)

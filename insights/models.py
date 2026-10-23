@@ -71,10 +71,6 @@ class VisitorHash(models.Model):
 
     date = models.DateField()
     hash = models.CharField(max_length=64)
-    # Funnel steps this anonymous person reached today (each counted once a day; a later step implies the earlier ones).
-    started = models.BooleanField(default=False)
-    finished = models.BooleanField(default=False)
-    registered = models.BooleanField(default=False)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["date", "hash"], name="visitor_hash_unique")]
@@ -100,6 +96,33 @@ class Insight(models.Model):
 
     def __str__(self):
         return f"{self.key}[{self.range}] #{self.rank} {self.label}"
+
+
+class OfficeSnapshot(models.Model):
+    """The finished payload of one Office data view (page: dashboard, analytics or pages) for one range, written by the
+    roll-up and by the debounced refresh after each event. Views read this one row; nothing is summed on page load."""
+
+    DASHBOARD, ANALYTICS, PAGES = "dashboard", "analytics", "pages"
+
+    page = models.CharField(max_length=12)
+    range = models.CharField(max_length=5)
+    payload = models.JSONField(default=dict)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["page", "range"], name="office_snapshot_unique")]
+
+    def __str__(self):
+        return f"{self.page}[{self.range}]"
+
+
+class SnapshotRefresh(models.Model):
+    """One row that debounces the background refresh: queued_at is set when a refresh job is queued and cleared when the
+    job starts, so a burst of events queues one job. A stale value (the queue is off) expires and the hourly roll-up
+    covers the gap."""
+
+    key = models.CharField(max_length=20, unique=True, default="snapshots")
+    queued_at = models.DateTimeField(null=True, blank=True)
 
 
 class OfficeGoal(models.Model):

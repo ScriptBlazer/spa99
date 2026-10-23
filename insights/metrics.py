@@ -40,13 +40,10 @@ class K:
     VISITORS = "visitors"                                    # daily unique visitors (one per anonymous hash per day)
     PAGE_VIEWS = "page_views"                                # dimension "" = all pages, else path group
     REFERRERS = "referrers"                                  # dimension: referring site host
-    PEOPLE_STARTED = "people_started"                        # daily people (anonymous hash) who started the journey; nests inside visitors
-    PEOPLE_FINISHED = "people_finished"                      # ... who finished it; nests inside people_started
-    PEOPLE_REGISTERED = "people_registered"                  # ... who registered; nests inside people_finished
 
-    RATE_JOURNEY_START = "rate_journey_start"                # people started / visitors, basis points
-    RATE_JOURNEY_FINISH = "rate_journey_finish"              # people finished / people started
-    RATE_REGISTER = "rate_register"                          # people registered / visitors
+    RATE_JOURNEY_START = "rate_journey_start"                # journeys started / visitors, basis points
+    RATE_JOURNEY_FINISH = "rate_journey_finish"              # journeys completed / started
+    RATE_REGISTER = "rate_register"                          # registrations / visitors
 
 
 # Rebuilt from the source tables by `rebuild_metrics`.
@@ -75,6 +72,13 @@ def _bump(model, lookup, amount):
         model.objects.filter(**lookup).update(value=F("value") + amount)
 
 
+def _refresh_after_commit():
+    """Queue one debounced snapshot refresh once the surrounding transaction commits (a rolled-back event queues nothing)."""
+    from office import snapshots
+
+    snapshots.request_refresh()
+
+
 def count(key, dimension="", amount=1, on=None, counter=True, daily=True):
     """Add `amount` (negative to take back) to the all-time counter and to the day's row (`on` = the day, default today)."""
     if not amount:
@@ -82,6 +86,7 @@ def count(key, dimension="", amount=1, on=None, counter=True, daily=True):
     dimension = (dimension or "")[:100]
     if counter:
         _bump(MetricCounter, {"key": key, "dimension": dimension}, amount)
+        _refresh_after_commit()  # a counted event: the stored snapshots are refreshed in the background
     if daily and key not in NO_DAILY:
         _bump(DailyMetric, {"date": on or day(), "key": key, "dimension": dimension}, amount)
 

@@ -9,7 +9,7 @@ from common.useragent import device_type
 from insights import metrics
 
 from .conditions import matches
-from .models import Answer, JourneySession, Option, Question
+from .models import Answer, JourneySession, Option, Question, new_session_key
 
 COOKIE_NAME = "spa99_journey"
 NEW_VISIT_AFTER = timedelta(minutes=30)
@@ -27,11 +27,16 @@ class AnswerError(ValueError):
 
 # ---------- sessions ----------
 
-def create_session(user_agent="", referrer="", utm=None, user=None):
+def create_session(user_agent="", referrer="", utm=None, user=None, previous=None):
+    """A new journey session. `previous` (a restart in the same browser) hands over its person_key, so the person stays one
+    person; otherwise the session's own key becomes its person_key."""
     utm = utm or {}
     kind = device_type(user_agent)
+    key = new_session_key()
     with transaction.atomic():
         session = JourneySession.objects.create(
+            key=key,
+            person_key=(previous.person_key or previous.key) if previous is not None else key,
             device_type=kind,
             is_bot=kind == "bot",
             referrer=(referrer or "")[:500],

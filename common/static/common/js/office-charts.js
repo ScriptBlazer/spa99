@@ -254,8 +254,8 @@ function start() {
         let drop = -1; let low = Infinity;   // the largest drop is the step that carried on the smallest share
         steps.forEach((s, i) => { if (i && !s.partial && s.step_rate_bp !== null && s.step_rate_bp < low) { low = s.step_rate_bp; drop = i - 1; } });
         const ink = [T.surface, T.iron, T.surface, T.surface];   // AA on each bar: cream on slate, teal and clay; iron on the lighter sage
-        const text = steps.map((s, i) => (i && !s.partial && s.step_rate_bp !== null ? `${nf.format(s.value)} · ${rate(s.step_rate_bp)} carried on` : nf.format(s.value)));
-        const short = steps.map((s, i) => (i && !s.partial && s.step_rate_bp !== null ? `${nf.format(s.value)} · ${rate(s.step_rate_bp)}` : nf.format(s.value)));
+        const text = steps.map((s, i) => (!s.value ? 'None yet' : i && !s.partial && s.step_rate_bp !== null ? `${nf.format(s.value)} · ${rate(s.step_rate_bp)} carried on` : nf.format(s.value)));
+        const short = steps.map((s, i) => (!s.value ? 'None yet' : i && !s.partial && s.step_rate_bp !== null ? `${nf.format(s.value)} · ${rate(s.step_rate_bp)}` : nf.format(s.value)));
         const names = steps.map((s) => s.label);
         const top = Math.max(...steps.map((s) => s.value), 1);
         const narrow = (charts.get('funnel')?.box || root.querySelector('[data-chart="funnel"]')).clientWidth < 520;

@@ -2,11 +2,11 @@
 the roll-up into MetricText from the stored daily rows and counters; pages only read them (up to an hour old)."""
 from django.db import transaction
 
-from . import metrics, reader
+from . import metrics, people, reader
 from .metrics import K
 from .models import MetricCounter, MetricText
 
-DASHBOARD_RANGES = ("today", "7d", "30d")
+DASHBOARD_RANGES = ("today", "7d", "30d", "all")
 CHART_RANGES = ("7d", "30d", "90d", "all")
 CHARTS = ("visitors", "funnel", "registrations_by_plan", "suggested_plan", "journey_answers", "drop_off", "gold", "top_pages", "referrers")
 THAN = {"today": "yesterday", "7d": "last week", "30d": "the previous 30 days", "90d": "the previous 90 days"}
@@ -47,18 +47,18 @@ def _top(sums, key, labels):
     return (labels.get(items[0][0], items[0][0]), items[0][1], sum(v for _, v in items)) if items else None
 
 
-def chart_sentences(name, today, plans, options, waiting):
+def chart_sentences(name, today, plans, options, waiting, figures):
     start, end = reader.range_dates(name, today)
-    sums = reader.totals(start, end)
+    sums = figures.overlay(reader.totals(start, end), start, end)  # people and answers per the counting rules, not per session
     prev = reader.previous_dates(name, today)
     before = reader.totals(*prev) if prev else {}
     total = lambda k, s=sums: s.get((k, ""), 0)  # noqa: E731
-    visitors, started, done, registered = total(K.VISITORS), total(K.PEOPLE_STARTED), total(K.PEOPLE_FINISHED), total(K.PEOPLE_REGISTERED)
+    visitors, started, done, registered = total(K.VISITORS), total(people.STARTED), total(people.FINISHED), total(people.REGISTERED)
     out = {}
     if visitors:
         trend = change(visitors, total(K.VISITORS, before))
         out["visitors"] = f"{plural(visitors, 'visitor')} {PERIOD[name]}" + (f", {trend} {THAN[name]}." if trend else ".")
-        out["funnel"] = (f"Of {visitors:,} visitors, {started:,} started the journey, {done:,} completed it and {registered:,} registered.")
+        out["funnel"] = (f"Of {visitors:,} visitors, {started:,} started the journey, {done:,} finished the journey and {registered:,} registered interest.")
     top = _top(sums, K.REGISTRATIONS_BY_PLAN, plans)
     if top:
         out["registrations_by_plan"] = f"{top[0]} leads with {top[1]:,} of {plural(top[2], 'registration')}."
@@ -89,17 +89,17 @@ def chart_sentences(name, today, plans, options, waiting):
     return {chart: out.get(chart, NOTHING[chart]) for chart in CHARTS}
 
 
-WORDS = ((K.REGISTRATIONS, "registration", "registrations"), (K.PEOPLE_STARTED, "person started", "people started"),
-         (K.PEOPLE_FINISHED, "person finished", "people finished"))
+WORDS = ((people.REGISTERED, "person registered interest", "people registered interest"),
+         (people.STARTED, "person started the journey", "people started the journey"),
+         (people.FINISHED, "person finished the journey", "people finished the journey"))
 
 
-def dashboard_sentence(name, today, waiting):
-    """Plain counts only: '5 registrations in the last 7 days, 2 more than last week. 9 people started, 3 fewer than last week.'"""
-    keys = [k for k, _, _ in WORDS]
+def dashboard_sentence(name, today, waiting, figures):
+    """Plain counts only: '5 people registered interest in the last 7 days, 2 more than last week. 9 people started the journey, ...'"""
     start, end = reader.range_dates(name, today)
-    now = reader.totals(start, end, keys)
+    now = figures.overlay({}, start, end)
     prev = reader.previous_dates(name, today)
-    before = reader.totals(*prev, keys) if prev else {}
+    before = figures.overlay({}, *prev) if prev else {}
     sentences = []
     for key, one, many in WORDS:
         value, was = now.get((key, ""), 0), before.get((key, ""), 0)
@@ -130,30 +130,15 @@ def _waiting():
     return counters.get((K.GOLD_BY_STATUS, "new"), 0) + counters.get((K.GOLD_BY_STATUS, "contacted"), 0)
 
 
-def write_all(today=None):
-    """Rewrite every sentence (idempotent: same stored rows, same text). Returns the number of rows written."""
+def write_all(today=None, figures=None):
+    """Rewrite every sentence (idempotent: same stored rows, same text). Job only. Returns the number of rows written."""
     today = today or metrics.day()
+    figures = figures or people.load()
     waiting = _waiting()
     plans, options = _names()
-    wanted = {("dashboard_changed", name): dashboard_sentence(name, today, waiting) for name in DASHBOARD_RANGES}
+    wanted = {("dashboard_changed", name): dashboard_sentence(name, today, waiting, figures) for name in DASHBOARD_RANGES}
     for name in CHART_RANGES:
-        for chart, text in chart_sentences(name, today, plans, options, waiting).items():
+        for chart, text in chart_sentences(name, today, plans, options, waiting, figures).items():
             wanted[(f"chart_{chart}", name)] = text
     _store(wanted)
     return len(wanted)
-
-
-VISITOR_CHARTS = ("visitors", "funnel", "top_pages", "referrers")
-
-
-def write_visitor_sentences(today=None):
-    """Only the sentences that depend on visitor figures. Called when visitors arrive (throttled there), so the Analytics
-    summaries do not wait for the hourly roll-up; same stored rows in, same text out."""
-    today = today or metrics.day()
-    plans, options = _names()
-    wanted = {}
-    for name in CHART_RANGES:
-        texts = chart_sentences(name, today, plans, options, _waiting())
-        for chart in VISITOR_CHARTS:
-            wanted[(f"chart_{chart}", name)] = texts[chart]
-    _store(wanted)

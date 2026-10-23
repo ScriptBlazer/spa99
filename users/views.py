@@ -16,7 +16,6 @@ from common.audit import client_ip
 from common.ratelimit import hit, rate_limited_json
 from common.validators import normalise_email
 from gold import invites as gold_invites
-from insights import visitors
 from journey import services as journey_services
 from plans.models import SiteSettings
 
@@ -121,7 +120,6 @@ def register(request):
                 return _message(request, "Not open yet", "Registration is not open yet.", status=403)
             else:
                 request.session[PENDING_EMAIL_KEY] = result.user.email
-                visitors.record_step(request, "registered")
                 return redirect("register_sent")
         status = 400
     else:
