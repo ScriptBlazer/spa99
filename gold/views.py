@@ -136,7 +136,7 @@ def invite_setup(request, token):
     if status != invites.OK:
         return _invalid_link(request)
     application = invite.application
-    form = GoldSetupForm(request.POST or None, application=application, mobile_editable=invites.mobile_in_use(application), initial={"marketing_opt_in": application.marketing_consent})
+    form = GoldSetupForm(request.POST or None, application=application, mobile_editable=invites.mobile_needs_fixing(application), initial={"marketing_opt_in": application.marketing_consent})
     if request.method == "POST" and form.is_valid():
         try:
             user = invites.accept_invite(token, form.cleaned_data)

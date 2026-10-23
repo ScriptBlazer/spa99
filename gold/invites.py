@@ -9,10 +9,12 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.core import signing
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from common.tasks import enqueue
+from common.validators import normalise_uk_mobile
 from plans.models import Plan, SiteSettings
 from users.models import InterestRegistration
 
@@ -56,9 +58,16 @@ def read_invite(token):
     return (OK, invite) if invite is not None and invite.is_usable else (INVALID, None)
 
 
-def mobile_in_use(application):
-    """True when the application's mobile is already on an account (the setup form then lets him change it)."""
-    return bool(application.mobile) and get_user_model().objects.filter(mobile=application.mobile).exists()
+def mobile_needs_fixing(application):
+    """True when the application's mobile cannot go on the account as it is: not a valid UK mobile (same validator as
+    registration) or already on another account. The setup form then lets him enter it."""
+    if not application.mobile:
+        return False
+    try:
+        mobile = normalise_uk_mobile(application.mobile)
+    except ValidationError:
+        return True
+    return get_user_model().objects.filter(mobile=mobile).exists()
 
 
 # ---------- gold on the account ----------
@@ -145,7 +154,10 @@ def accept_invite(token, cleaned):
     application = invite.application
     User = get_user_model()
     now = timezone.now()
-    mobile = cleaned.get("mobile") or application.mobile or None
+    try:
+        mobile = normalise_uk_mobile(cleaned.get("mobile") or application.mobile) if (cleaned.get("mobile") or application.mobile) else None
+    except ValidationError:
+        raise InviteError("That mobile number could not be used. Please try again.") from None
     try:
         with transaction.atomic():
             invite = GoldInvite.objects.select_for_update().get(pk=invite.pk)
@@ -170,6 +182,6 @@ def accept_invite(token, cleaned):
                 session.user = user
                 session.save(update_fields=["user", "updated_at"])
             activate_gold(user)
-    except IntegrityError:
+    except (IntegrityError, ValidationError):
         raise InviteError("That could not be saved. Please try again.") from None
     return user

@@ -116,6 +116,7 @@ class GoldSetupForm(forms.Form):
         if mobile_editable:
             self.fields["mobile"].required = True
             self.initial.setdefault("mobile", application.mobile)
+            self.fields["mobile"].widget.attrs.setdefault("data-validate", "required mobile")
         else:
             del self.fields["mobile"]
 

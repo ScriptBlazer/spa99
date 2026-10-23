@@ -13,7 +13,7 @@
           <div class="field"><label for="setup-last">Last name</label><input id="setup-last" class="input" value="{{ application.last_name }}" readonly></div>
         </div>
         <div class="field"><label for="setup-email">Email</label><input id="setup-email" class="input" value="{{ application.email }}" readonly></div>
-        {% if form.mobile %}{% include "common/_field.html" with field=form.mobile hint="Another account uses the mobile we have. Enter yours." good="Looks right" %}
+        {% if form.mobile %}{% include "common/_field.html" with field=form.mobile hint="We could not use the mobile we have. Enter yours." good="Looks right" %}
         {% elif application.mobile %}<div class="field"><label for="setup-mobile">Mobile</label><input id="setup-mobile" class="input" value="{{ application.mobile }}" readonly></div>{% endif %}
         <div class="field" data-dob>
           <p class="label">Date of birth</p>

@@ -167,6 +167,14 @@ class SetupPageTests(TestCase):
         self.assertEqual(self.post(mobile="07911 111222").status_code, 302)
         self.assertEqual(User.objects.get(email="dan@example.com").mobile, "+447911111222")
 
+    def test_an_invalid_mobile_on_the_application_asks_again_instead_of_crashing(self):
+        GoldApplication.objects.update(mobile="+447700900123")  # not a valid UK mobile
+        self.assertContains(self.client.get(self.url), 'name="mobile"')
+        self.assertContains(self.post(), "mobile", status_code=400)  # required again, no 500
+        self.assertFalse(User.objects.filter(email="dan@example.com").exists())
+        self.assertEqual(self.post(mobile="07123 456789").status_code, 302)
+        self.assertEqual(User.objects.get(email="dan@example.com").mobile, "+447123456789")
+
     def test_weak_password_and_missing_acceptance_are_refused(self):
         self.assertEqual(self.post(password="short").status_code, 400)
         self.assertEqual(self.post(privacy_accepted="").status_code, 400)
