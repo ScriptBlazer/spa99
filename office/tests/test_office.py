@@ -61,6 +61,19 @@ class RoutingAndRoleTests(OfficeTestCase):
         self.assertContains(login, "Spa 99 Office")
         self.assertEqual(login["X-Robots-Tag"], "noindex, nofollow")
         self.assertNotContains(login, "/register/")
+        self.assertContains(login, "common/js/forms.js")  # the password toggle and live validation scripts are on the page
+        self.assertContains(login, 'id="validation-config"')
+
+    def test_office_sign_in_posts_and_shows_errors(self):
+        user = staff("Owner", "signin@example.com")
+        user.set_password("a-long-test-password-1")
+        user.save()
+        client = Client(HTTP_HOST=OFFICE)
+        bad = client.post("/login/", {"username": "signin@example.com", "password": "wrong"})
+        self.assertEqual(bad.status_code, 200)
+        self.assertContains(bad, "form-error")
+        good = client.post("/login/", {"username": "signin@example.com", "password": "a-long-test-password-1"})
+        self.assertEqual(good.status_code, 302)
 
     def test_members_and_staff_without_a_role_are_refused_and_roles_can_read(self):
         member = User.objects.create_user("member@example.com", "x")
