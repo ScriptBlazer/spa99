@@ -67,3 +67,5 @@ details.sys-panel[open] > summary.sys-add, details[open] > summary.sys-add { bor
 .system .sys-pp input[type=number], .sys-table td .sys-pp input[type=number] { width: 48px; padding: 0 var(--sys-1); text-align: center; -moz-appearance: textfield; appearance: textfield; }
 .sys-pp input::-webkit-inner-spin-button, .sys-pp input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .sys-row .sys-points { flex-wrap: wrap; }
+/* money and other decimal cells: room for 9,999.99 plus the stepper (Moishe 2026-10-23: prices were cut off) */
+.sys-table td input[type=number][step="0.01"], .sys-table td input[type=number][step="any"] { width: 108px; }
