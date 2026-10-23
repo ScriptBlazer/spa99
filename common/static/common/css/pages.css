@@ -136,11 +136,70 @@ html.motion .scene-failed .gstep-line { transform: none; }
 .visit-getting p { margin-top: var(--space-2); }
 .visit-men { margin-top: var(--space-5); }
 
-/* ---------- legal ---------- */
-.legal-inner { max-width: calc(var(--measure) + 2 * var(--page-margin)); margin-inline: 0; }
-.legal-note { margin-top: var(--space-4); padding: var(--space-3) var(--space-4); }
-.legal-body h2 { margin-top: var(--space-6); }
-.legal-body p { margin-top: var(--space-3); }
+/* ---------- legal (Privacy notice, Terms of use; 2026-10-23) ----------
+   One reading column at --measure. Phone: title, an open Contents list, then the parts. Desktop (64em): the article
+   column sits in the middle, the Contents list is a sticky rail on the left. Restrained: only the title group reveals;
+   the long text never animates (BRAND 7B). Print: the text only. */
+.legal { padding-block: var(--space-6) var(--section-y); }
+.legal-grid { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: var(--space-5); }
+.legal-lead { margin-top: var(--space-4); }
+.legal-lead p { font-size: var(--text-lg); line-height: var(--leading-snug); }
+.legal-lead p + p { margin-top: var(--space-2); }
+.legal-meta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-top: var(--space-4); color: var(--s-muted); }
+
+.legal-toc details { border-block: 1px solid var(--s-hair); }
+.legal-toc summary { display: flex; align-items: center; justify-content: space-between; min-height: 2.75rem; cursor: pointer; list-style: none; color: var(--s-muted); }
+.legal-toc summary::-webkit-details-marker { display: none; }
+.legal-toc summary::after { content: "+"; font-family: var(--font-body); font-size: var(--text-lg); font-weight: 400; letter-spacing: 0; line-height: 1; }
+.legal-toc details[open] summary::after { content: "\2212"; }
+.legal-toc ol { list-style: none; margin: 0; padding: 0 0 var(--space-3); counter-reset: legal-toc; }
+.legal-toc li { counter-increment: legal-toc; }
+.legal-toc a { display: grid; grid-template-columns: 2.5ch minmax(0, 1fr); gap: var(--space-2); padding-block: var(--space-2); text-decoration: none; line-height: var(--leading-snug); }
+.legal-toc a::before { content: counter(legal-toc); color: var(--s-muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; line-height: inherit; padding-top: 0.1em; }
+.legal-toc a[aria-current] { font-weight: 600; }
+.legal-toc a[aria-current]::before { color: var(--s-text); }
+@media (hover: hover) and (pointer: fine) {
+  .legal-toc a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.25em; }
+}
+
+.legal-part { padding-top: var(--space-5); scroll-margin-top: calc(var(--header-h) + var(--space-4)); }
+.legal-part + .legal-part { margin-top: var(--space-6); border-top: 1px solid var(--s-hair); }
+.legal-part h2 { font-size: var(--text-xl); }
+.legal-part h3 { margin-top: var(--space-5); font-family: var(--font-body); font-size: var(--text-base); font-weight: 600; letter-spacing: var(--tracking-body); line-height: var(--leading-snug); }
+.legal-part h2 + p, .legal-part h2 + ul { margin-top: var(--space-4); }
+.legal-part h3 + p, .legal-part h3 + ul { margin-top: var(--space-2); }
+.legal-part p + p, .legal-part ul + p, .legal-part p + ul { margin-top: var(--space-3); }
+.legal-part ul { list-style: none; margin: 0; padding: 0; max-width: var(--measure); }
+.legal-part li { position: relative; padding-left: var(--space-4); }
+.legal-part li + li { margin-top: var(--space-2); }
+.legal-part li::before { content: ""; position: absolute; left: 0; top: 0.8em; width: 0.625rem; height: 1px; background: var(--color-line); } /* decoration */
+.legal-part a { overflow-wrap: anywhere; }
+/* Dev only: a fill-later value (ICO number, hosting provider). Live never shows it (content/legal_render.py). */
+.legal-todo { padding: 0 0.25em; background: var(--color-cream-raised); color: var(--color-danger); font-weight: 600; outline: 1px dashed var(--color-danger); outline-offset: 1px; }
+
+@media (min-width: 64em) {
+  .legal { padding-top: var(--space-7); }
+  .legal-grid { grid-template-columns: minmax(12rem, 1fr) minmax(0, var(--measure)) minmax(0, 1fr); column-gap: var(--space-6); row-gap: var(--space-6); }
+  .legal-head, .legal-body { grid-column: 2; }
+  .legal-toc { grid-column: 1; grid-row: 2; align-self: start; position: sticky; top: calc(var(--header-h) + var(--space-5)); max-width: 16rem; }
+  .legal-toc details { border-bottom: 0; }
+  .legal-toc summary { pointer-events: none; cursor: default; }
+  .legal-toc summary::after { content: none; }
+  .legal-toc a { font-size: var(--text-sm); padding-block: var(--space-1); }
+  .legal-part:first-child { padding-top: 0; }
+}
+
+@media print {
+  .site-header, .site-footer, .skip-link, .legal-toc, .messages { display: none !important; }
+  body, .legal { background: none; color: var(--color-espresso); }
+  .legal { padding: 0; }
+  .legal-grid { display: block; }
+  [data-reveal] { opacity: 1 !important; transform: none !important; }
+  .legal-part { padding-top: var(--space-3); margin-top: var(--space-4) !important; }
+  .legal-part h2, .legal-part h3 { break-after: avoid; }
+  .legal-part li, .legal-part p { break-inside: avoid; }
+  .legal-part a[href^="http"]::after, .legal-part a[href^="/"]::after { content: " (" attr(href) ")"; font-size: var(--text-sm); }
+}
 
 /* ---------- sign in, check your email, messages ---------- */
 .auth { padding-block: var(--space-7) var(--section-y); }

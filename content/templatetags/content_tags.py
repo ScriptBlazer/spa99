@@ -33,3 +33,21 @@ def photo_srcset(name):
 def parts(sections, prefix="part_"):
     """The sections of a page whose key starts with `prefix`, in order (the numbered parts of a legal page)."""
     return [section for key, section in sections.items() if key.startswith(prefix)]
+
+
+@register.simple_tag(takes_context=True)
+def legal_text(context, text, doc=None):
+    """{% legal_text part.body doc %}: a legal body as safe HTML (format in content/legal.py). The contact email and the
+    privacy version come from Site settings; {ico} / {hosting} from the privacy page rows, marked on dev while empty."""
+    from django.conf import settings
+
+    from content import legal_render
+    from plans.models import SiteSettings
+
+    site = context.get("site_settings") or SiteSettings.load()
+    values = {}
+    if any("{" + key + "}" in (text or "") for key in legal_render.PLACEHOLDERS):
+        rows = doc if doc is not None and context.get("page_key") == "privacy" else services.page_content("privacy")
+        values = {key: rows[key].body for key in legal_render.PLACEHOLDERS}
+    return legal_render.render(text, contact=site.contact_address, version=site.privacy_version, values=values,
+                               show_placeholders=settings.DEBUG)

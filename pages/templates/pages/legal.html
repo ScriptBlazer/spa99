@@ -1,21 +1,48 @@
 {% extends "base.html" %}
-{% load content_tags %}
+{% load content_tags static %}
+{% comment %}Privacy notice and Terms of use. Text is content rows (content/legal.py writes the first version; edited in Control).
+The format of each body is in content/legal.py; content/legal_render.py turns it into HTML.{% endcomment %}
 {% block main %}
 {% page_content page_key as doc %}
-<section class="section on-light legal">
-  <div class="container legal-inner">
-    <h1>{{ doc.body.heading|default:meta.title }}</h1>
-    {% if doc.draft_note %}<p class="legal-note panel panel--line"><strong>{{ doc.draft_note.heading }}</strong> {{ doc.draft_note.body }}</p>{% endif %}
+{% with parts=doc|parts %}
+<article class="section on-light legal" data-legal>
+  <div class="container legal-grid">
+    <header class="legal-head" data-reveal="hero">
+      <h1>{{ doc.body.heading|default:meta.title }}</h1>
+      {% if doc.body.body %}<div class="legal-lead">{% legal_text doc.body.body doc %}</div>{% endif %}
+      {% if doc.updated.body %}
+      <p class="legal-meta small"><span>{{ doc.updated.heading|default:"Last updated" }} {{ doc.updated.body }}</span>{% if page_key == "privacy" %}<span>Version {{ site_settings.privacy_version }}</span>{% endif %}</p>
+      {% endif %}
+    </header>
+
+    {% if parts %}
+    <nav class="legal-toc" aria-label="On this page">
+      <details open data-legal-toc>
+        <summary class="label">Contents</summary>
+        <ol>
+          {% for part in parts %}<li><a href="#{{ part.heading|slugify }}">{{ part.heading }}</a></li>{% endfor %}
+          {% if doc.contact %}<li><a href="#contact">{{ doc.contact.heading|default:"Contact" }}</a></li>{% endif %}
+        </ol>
+      </details>
+    </nav>
+    {% endif %}
+
     <div class="legal-body">
-      {% for line in doc.body.body|lines %}<p>{{ line }}</p>{% endfor %}
-      {% for part in doc|parts %}
-      <h2>{{ part.heading }}</h2>
-      {% for line in part.body|lines %}<p>{{ line }}</p>{% endfor %}
+      {% for part in parts %}
+      <section class="legal-part" id="{{ part.heading|slugify }}" aria-labelledby="{{ part.heading|slugify }}-h">
+        <h2 id="{{ part.heading|slugify }}-h">{{ part.heading }}</h2>
+        {% legal_text part.body doc %}
+      </section>
       {% endfor %}
       {% if doc.contact %}
-      <h2>{{ doc.contact.heading }}</h2><p>{{ doc.contact.body }} <a href="mailto:{{ site_settings.contact_address }}">{{ site_settings.contact_address }}</a>.</p>
+      <section class="legal-part" id="contact" aria-labelledby="contact-h">
+        <h2 id="contact-h">{{ doc.contact.heading|default:"Contact" }}</h2>
+        {% legal_text doc.contact.body doc %}
+      </section>
       {% endif %}
     </div>
   </div>
-</section>
+</article>
+{% endwith %}
 {% endblock %}
+{% block scripts %}{{ block.super }}<script type="module" src="{% static 'common/js/legal.js' %}"></script>{% endblock %}
