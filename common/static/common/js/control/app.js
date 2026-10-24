@@ -102,8 +102,11 @@ async function navigate(href, { push = true } = {}) {
       setCurrent(doc);
       if (push) {
         // the entry we leave keeps its page only (an open room or screen is not part of "where I was")
-        if (location.search && currentPath !== "/music/") history.replaceState(null, "", location.pathname);
-        history.pushState(null, "", url);
+        // (if Back was pressed meanwhile the address already is where Back landed: no push, the queued sync follows)
+        if (!pendingPop) {
+          if (location.search && currentPath !== "/music/") history.replaceState(null, "", location.pathname);
+          history.pushState(null, "", url);
+        }
       }
       currentPath = new URL(res.url).pathname;
       window.scrollTo(0, 0);
@@ -197,6 +200,7 @@ export function boot() {
   document.addEventListener("click", onLinkClick);
   document.addEventListener("keydown", onKeydown);
   window.addEventListener("popstate", () => {
+    if (navigating) { pendingPop = true; return; }  // a page is loading: sync to this address when it finishes
     if (location.pathname !== currentPath) navigate(location.href, { push: false });
     else syncFromUrl();
   });

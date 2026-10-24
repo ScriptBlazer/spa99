@@ -1,8 +1,8 @@
 /* The Overview as a simple 3D model of the real ground floor (docs/design/CONTROL.md section 4.1).
-   Clean massing: a light slab, light floors and thin low walls drawn from the plan outlines (control/plan.py model()), no textures.
+   Clean massing: a light slab, light floors and thin walls drawn from the plan outlines (control/plan.py model()), no textures.
    A room's light shows only as a soft warm tint on its floor (strength = brightness, colour = the warmth scale). Rooms with no
    controls (plant, WCs, stairs, lift, electrical) are slightly darker and have no label or click.
-   Camera: starts straight above, fitted to the building. Drag to tilt (top view to 55 degrees) and turn, wheel or pinch to zoom,
+   Camera: starts tilted 22 degrees, fitted to the building. Drag to tilt (top view to 55 degrees) and turn, wheel or pinch to zoom,
    shift-drag or two fingers to move. Tap or click a room (a drag is not a tap) to open its panel.
    Renders only when something changes. No WebGL, or reduced motion: this module does nothing and the 2D plan stays. */
 import * as THREE from "../../vendor/three/three.module.min.js";
@@ -230,11 +230,16 @@ class Model {
     this.drag = null;
     this.pinch = null;
     this.tmp = new THREE.Vector3();
-    this.buildLabels();
-    this.resize();
-    this.view.az = this.homeAz();
-    this.bind();
-    this.paint(true);
+    try {
+      this.buildLabels();
+      this.resize();
+      this.view.az = this.homeAz();
+      this.bind();
+      this.paint(true);
+    } catch (e) {
+      this.dispose();  // a half-built model must not leak its context, listeners or observer
+      throw e;
+    }
     this.requestRender();
   }
 
@@ -254,7 +259,6 @@ class Model {
       host.append(a);
       return { el: a, room: r };
     });
-    this.notes = [];  // no loose captions: everything drawn belongs to the model
   }
 
   /* ----- state: the room lights and the selected room ----- */
@@ -516,6 +520,8 @@ class Model {
     cv.addEventListener("pointercancel", onUp, { signal });
     cv.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse" && !this.pts.size) this.setHover(null); }, { signal });
     cv.addEventListener("wheel", onWheel, { passive: false, signal });
+    // touch-action is pan-y: a vertical swipe scrolls the page. Two fingers, or a drag that is already turning the model, must not.
+    cv.addEventListener("touchmove", (e) => { if (e.cancelable && (e.touches.length > 1 || (this.drag && this.drag.moved > TAP_PX))) e.preventDefault(); }, { passive: false, signal });
     cv.addEventListener("webglcontextlost", (e) => { e.preventDefault(); disposeOverview(); }, { signal });
     $("[data-model-reset]", this.root).addEventListener("click", () => this.resetView(), { signal });
     this.ro = new ResizeObserver(() => this.resize());

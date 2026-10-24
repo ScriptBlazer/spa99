@@ -183,5 +183,4 @@ def model():
         x1, y1, x2, y2 = room["box"]
         points = room.get("poly") or [(x1 + INSET, y1 + INSET), (x2 - INSET, y1 + INSET), (x2 - INSET, y2 - INSET), (x1 + INSET, y2 - INSET)]
         rooms.append({"id": room["id"], "slug": room["slug"], "name": room["name"], "points": [list(point) for point in points]})
-    door = next(r["door"] for r in GEOMETRY if r.get("door"))
-    return {"rooms": rooms, "notes": [{"text": "Entrance, Vale Road", "x": (door[0] + door[1]) / 2, "y": 408}]}
+    return {"rooms": rooms}

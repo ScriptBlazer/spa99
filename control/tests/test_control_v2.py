@@ -45,7 +45,6 @@ class Model3dTests(SimpleTestCase):
         dry = by_slug["dry-sauna"]["points"]
         self.assertEqual(dry, [[12 + plan.INSET, 14 + plan.INSET], [142 - plan.INSET, 14 + plan.INSET], [142 - plan.INSET, 192 - plan.INSET], [12 + plan.INSET, 192 - plan.INSET]])
         self.assertGreater(len(by_slug["reception-lounge"]["points"]), 4)  # the L shaped entrance keeps its outline
-        self.assertEqual(data["notes"][0]["text"], "Entrance, Vale Road")
 
 
 class SceneAndOverviewPageTests(ControlTestCase):
