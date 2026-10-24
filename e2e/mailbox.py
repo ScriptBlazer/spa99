@@ -64,3 +64,22 @@ def link(message, contains):
 
 def count_to(to):
     return sum(1 for message in messages() if to.lower() in recipients(message))
+
+
+def html_body(message):
+    part = message.get_body(preferencelist=("html",))
+    return part.get_content() if part is not None else ""
+
+
+def text_body(message):
+    part = message.get_body(preferencelist=("plain",))
+    return part.get_content() if part is not None else ""
+
+
+def subjects_to(to):
+    """The subjects of every email sent to (or cc'd to) `to`, oldest first."""
+    return [str(m["Subject"]) for m in messages() if to.lower() in recipients(m)]
+
+
+def count_subject(to, subject_has):
+    return sum(1 for m in messages() if to.lower() in recipients(m) and subject_has.lower() in str(m["Subject"]).lower())

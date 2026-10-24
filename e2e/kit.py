@@ -16,6 +16,11 @@ SITE = f"http://localhost:{PORT}"
 OFFICE = f"http://office.localhost:{PORT}"
 CONTROL = f"http://control.localhost:{PORT}"
 SYSTEM = f"http://system.localhost:{PORT}"
+# The second ("strict") server: same database and mail folder, but real rate limits and tiny upload limits (e2e/settings_strict.py).
+# 0 = scripts/e2e.sh did not start one; the walk-throughs that need it say so and skip.
+STRICT_PORT = int(os.environ.get("E2E_STRICT_PORT", "0") or 0)
+STRICT_SITE = f"http://localhost:{STRICT_PORT}"
+STRICT_CONTROL = f"http://control.localhost:{STRICT_PORT}"
 WORKSPACE_DIR = Path(os.environ.get("E2E_WORKSPACE", ROOT / ".private" / "e2e"))
 REPORT_DIR = Path(os.environ.get("E2E_REPORT_DIR", ROOT / ".private" / "e2e-report"))
 UNLOCK_CODE = os.environ.get("SYSTEM_UNLOCK_CODE", "482916")
@@ -41,6 +46,19 @@ IGNORED_CONSOLE = [r"GPU stall", r"GL Driver", r"WebGL", r"swiftshader", r"Group
 
 class StepFailed(Exception):
     pass
+
+
+def strict_server_up():
+    """True when the strict server (rate limits on, tiny upload limits) is answering."""
+    if not STRICT_PORT:
+        return False
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{STRICT_PORT}/health/", timeout=5) as response:
+            return response.status == 200
+    except OSError:
+        return False
 
 
 # ---------- the throwaway database and manage.py ----------
@@ -78,16 +96,19 @@ class Walk:
         self.allow_console = [re.compile(p) for p in (*IGNORED_CONSOLE, *allow_console)]
         self.steps = []
         self.console_errors, self.server_errors = [], []
+        self.dialogs = []             # alert / confirm / prompt boxes the pages tried to open (always dismissed)
+        self.watch_dialogs = False    # a walk-through that sets this gets a last check: no dialog opened
         self.contexts, self.last_page = [], None
         self.started = time.time()
         self.shots = REPORT_DIR / "shots"
         self.shots.mkdir(parents=True, exist_ok=True)
 
     # --- browser contexts: one per person / host (cookies are per host anyway) ---
-    def page(self, width=1280, height=800, mobile=False):
+    def page(self, width=1280, height=800, mobile=False, user_agent=None):
+        options = {"user_agent": user_agent} if user_agent else {}
         context = self.browser.new_context(
             viewport={"width": width, "height": height}, locale="en-GB", timezone_id="Europe/London", accept_downloads=True,
-            is_mobile=mobile, has_touch=mobile, device_scale_factor=2 if mobile else 1)
+            is_mobile=mobile, has_touch=mobile, device_scale_factor=2 if mobile else 1, **options)
         context.set_default_timeout(TIMEOUT)
         context.on("page", self._hook)
         page = context.new_page()
@@ -98,7 +119,16 @@ class Walk:
     def _hook(self, page):
         page.on("console", lambda message: self._console(message))
         page.on("pageerror", lambda error: self._script_error(f"Script error: {error} ({page.url})"))
+        page.on("dialog", lambda dialog: self._dialog(dialog, page))
         page.on("response", lambda response: self.server_errors.append(f"{response.status} {response.request.method} {response.url}") if response.status >= 500 else None)
+
+    def _dialog(self, dialog, page):
+        if dialog.type != "beforeunload":  # the browser's own "leave this page?" box is not the site opening a message
+            self.dialogs.append(f"{dialog.type} box: '{dialog.message[:80]}' on {page.url}")
+        try:
+            dialog.dismiss()
+        except Exception:  # noqa: BLE001 - already closed
+            pass
 
     def _script_error(self, text):
         if not any(pattern.search(text) for pattern in self.allow_console):
@@ -134,9 +164,16 @@ class Walk:
             raise StepFailed(name) from error
         record["shot"] = self._shoot(page, name) if page else ""
 
+    def info(self, text):
+        """A passing line in the report that records a fact (used for open questions: what the app did, not a verdict)."""
+        self.steps.append({"name": text, "status": "pass", "error": "", "shot": ""})
+
     def check_errors(self):
-        """The last two checks of every walk-through: no server errors, no console errors."""
-        for label, found in (("No server errors (HTTP 5xx)", self.server_errors), ("No console errors", self.console_errors)):
+        """The last checks of every walk-through: no server errors, no console errors (and, if asked, no dialog boxes)."""
+        checks = [("No server errors (HTTP 5xx)", self.server_errors), ("No console errors", self.console_errors)]
+        if self.watch_dialogs:
+            checks.append(("No JavaScript dialog (alert, confirm, prompt) opened", self.dialogs))
+        for label, found in checks:
             unique = list(dict.fromkeys(found))
             self.steps.append({"name": label, "status": "fail" if unique else "pass", "error": "\n".join(unique[:8]), "shot": ""})
 
@@ -256,8 +293,8 @@ def answer_journey(page, stop_before_result=False):
     return page.locator("[data-flow-root] .result-tier").inner_text()
 
 
-def apply_gold(page, first, last, email, mobile):
-    """Fill in the Gold Card application (about you, your visits, you) and send it. Returns the reference (GC-XXXXXX)."""
+def gold_to_last_screen(page):
+    """Open the Gold application, choose Finance, pass 'your visits', and wait on the last screen ('you')."""
     page.goto(f"{SITE}/gold-card/apply/")
     page.wait_for_selector("[data-flow-root] .screen")
     page.locator("label.tile:has(input[name=industry][value=finance])").click()
@@ -265,11 +302,24 @@ def apply_gold(page, first, last, email, mobile):
     page.wait_for_selector("[data-flow-root] .screen-title")
     page.locator("[data-primary]").click()           # screen 3: you
     page.locator("#g-first_name").wait_for()
+
+
+def gold_fill_you(page, first, last, email, mobile, note="", privacy=True):
+    """Fill the last Gold screen. Values go in exactly as given (no trimming), so bad input can be tried."""
     page.locator("#g-first_name").fill(first)
     page.locator("#g-last_name").fill(last)
     page.locator("#g-email").fill(email)
     page.locator("#g-mobile").fill(mobile)
-    tick(page, "privacy_accepted")
+    if note:
+        page.locator("#g-note").fill(note)
+    if privacy:
+        tick(page, "privacy_accepted")
+
+
+def apply_gold(page, first, last, email, mobile, note=""):
+    """Fill in the Gold Card application (about you, your visits, you) and send it. Returns the reference (GC-XXXXXX)."""
+    gold_to_last_screen(page)
+    gold_fill_you(page, first, last, email, mobile, note)
     page.locator("[data-primary]").click()
     page.wait_for_selector(".gold-sent")
     return page.locator(".gold-sent .reference").inner_text()

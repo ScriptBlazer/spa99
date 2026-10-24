@@ -187,7 +187,7 @@ def upload(request):
         with transaction.atomic():
             LibraryLock.lock()  # one upload at a time past the size check (held while the file is stored)
             if summary()["used_bytes"] + info["size"] > media_rules.library_max_bytes():
-                return _upload_failed(request, "The Library is full. Delete something to make room.", 507)
+                return _upload_failed(request, "The Library is full. Delete something to make room.", 413)
             asset.file.save(file.name, file, save=False)  # the name is replaced by the uuid path (asset_path)
             _save_history(asset, request.user)
     except Exception:
@@ -268,7 +268,7 @@ def asset_duration(request, pk):
             with transaction.atomic():
                 LibraryLock.lock()
                 if summary()["used_bytes"] - asset.poster_bytes + poster.size > media_rules.library_max_bytes():
-                    return _fail("The Library is full. Delete something to make room.", 507)
+                    return _fail("The Library is full. Delete something to make room.", 413)
                 if asset.poster:
                     asset.poster.delete(save=False)
                 asset.poster.save("poster.jpg", poster, save=False)

@@ -291,9 +291,13 @@ function back() {
 const FIELDS = ['first_name', 'last_name', 'email', 'mobile', 'industry', 'industry_other', 'property_link', 'size_range', 'location', 'company', 'role', 'bml_relationship', 'referred_by', 'note', 'privacy_accepted', 'marketing_opt_in'];
 const STEP_OF = { industry: 1, industry_other: 1, property_link: 1, size_range: 1, location: 1, company: 1, role: 1, bml_relationship: 1, referred_by: 1 };
 
+let sending = false; // one application in flight at a time: a second click or Enter while it is sent does nothing
+
 async function onSubmit(event) {
   if (event.defaultPrevented) return; // the validation pass runs first and re-submits once everything is fine
   event.preventDefault();
+  if (sending) return;
+  sending = true;
   const formEl = event.currentTarget;
   const button = formEl.querySelector('[data-primary]');
   setWorking(button);
@@ -306,6 +310,7 @@ async function onSubmit(event) {
   body.marketing_opt_in = Boolean(form.marketing_opt_in);
   let result;
   try { result = await postJson('/gold/apply/', body); } catch { result = null; }
+  sending = false;
   if (result?.ok) {
     sessionStorage.removeItem(STORE);
     const reference = result.data?.reference || '';

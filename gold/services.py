@@ -137,6 +137,12 @@ def _recent_duplicate(email):
     return GoldApplication.objects.filter(email__iexact=email, created_at__gte=cutoff).first()
 
 
+def _serialise_submissions(site):
+    """Take the write lock first (a row lock on Postgres, the database write lock on SQLite) so the duplicate check below
+    and the insert cannot interleave with another submission. Same code on both."""
+    SiteSettings.objects.filter(pk=site.pk).update(updated_at=timezone.now())
+
+
 def submit_application(data, session=None):
     """Save an application from validated form data. Creates no account. Returns (application, created).
     A second identical submit within two minutes (double click) returns the first one and sends nothing new."""
@@ -144,31 +150,32 @@ def submit_application(data, session=None):
     if not site.register_interest_open:
         raise ApplicationsClosed
     email = data["email"].strip().lower()
-    duplicate = _recent_duplicate(email)
-    if duplicate is not None:
-        return duplicate, False
-
-    if data.get("industry") == rating.LAW_INDUSTRY and not data.get("property_link") and session is not None:
-        # A lawyer who told the journey it is property law still counts as a property lawyer (as the journey rates him).
-        if journey_engine.gold_signals(session)[0].get("property_link") == rating.PROPERTY_LAWYER:
-            data = {**data, "property_link": rating.PROPERTY_LAWYER}
-
-    previous = GoldApplication.objects.filter(email__iexact=email).order_by("created_at").first()
-    person = get_user_model().objects.filter(email__iexact=email).first()
-    now = timezone.now()
-    application = GoldApplication(
-        first_name=data["first_name"], last_name=data["last_name"], email=email, mobile=data.get("mobile", ""),
-        industry=data.get("industry", ""), industry_other=data.get("industry_other", ""),
-        property_link=data.get("property_link", ""), size_range=data.get("size_range", ""), location=data.get("location", ""),
-        company=data.get("company", ""), role=data.get("role", ""), bml_relationship=data.get("bml_relationship", ""),
-        referred_by=data.get("referred_by", ""), note=data.get("note", ""),
-        journey_session=session, user=person, repeat_of=previous,
-        spa_interest=interest_snapshot(session),
-        marketing_consent=bool(data.get("marketing_opt_in")),
-        privacy_accepted_version=site.privacy_version, privacy_accepted_at=now,
-    )
-    rate_application(application)
     with transaction.atomic():
+        _serialise_submissions(site)  # two clicks at the same instant are handled one after the other
+        duplicate = _recent_duplicate(email)
+        if duplicate is not None:
+            return duplicate, False
+
+        if data.get("industry") == rating.LAW_INDUSTRY and not data.get("property_link") and session is not None:
+            # A lawyer who told the journey it is property law still counts as a property lawyer (as the journey rates him).
+            if journey_engine.gold_signals(session)[0].get("property_link") == rating.PROPERTY_LAWYER:
+                data = {**data, "property_link": rating.PROPERTY_LAWYER}
+
+        previous = GoldApplication.objects.filter(email__iexact=email).order_by("created_at").first()
+        person = get_user_model().objects.filter(email__iexact=email).first()
+        now = timezone.now()
+        application = GoldApplication(
+            first_name=data["first_name"], last_name=data["last_name"], email=email, mobile=data.get("mobile", ""),
+            industry=data.get("industry", ""), industry_other=data.get("industry_other", ""),
+            property_link=data.get("property_link", ""), size_range=data.get("size_range", ""), location=data.get("location", ""),
+            company=data.get("company", ""), role=data.get("role", ""), bml_relationship=data.get("bml_relationship", ""),
+            referred_by=data.get("referred_by", ""), note=data.get("note", ""),
+            journey_session=session, user=person, repeat_of=previous,
+            spa_interest=interest_snapshot(session),
+            marketing_consent=bool(data.get("marketing_opt_in")),
+            privacy_accepted_version=site.privacy_version, privacy_accepted_at=now,
+        )
+        rate_application(application)
         application.save()
     queue_emails(application)
     return application, True

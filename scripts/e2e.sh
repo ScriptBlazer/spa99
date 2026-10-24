@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One command, whole site: a real browser (Playwright) walks the nine user journeys against a THROWAWAY copy of the site.
+# One command, whole site: a real browser (Playwright) walks every user journey and the beta-tester scenarios against a THROWAWAY copy of the site.
 #
 #   scripts/e2e.sh                     run everything, write the report, delete the workspace
 #   scripts/e2e.sh --keep              keep the workspace (.private/e2e: database, emails, media, server log) to look around
@@ -40,13 +40,17 @@ fi
 WS="$ROOT/.private/e2e"                  # throwaway workspace (git-ignored)
 REPORT="$ROOT/.private/e2e-report"       # the report is kept (git-ignored)
 SERVER_PID=""
+STRICT_PID=""
 
 cleanup() {
-  if [ -n "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
-    kill "$SERVER_PID" 2>/dev/null
-    wait "$SERVER_PID" 2>/dev/null
-  fi
+  for pid in "$SERVER_PID" "$STRICT_PID"; do
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      kill "$pid" 2>/dev/null
+      wait "$pid" 2>/dev/null
+    fi
+  done
   if [ -f "$WS/server.log" ]; then cp "$WS/server.log" "$REPORT/server.log" 2>/dev/null; fi
+  if [ -f "$WS/server-strict.log" ]; then cp "$WS/server-strict.log" "$REPORT/server-strict.log" 2>/dev/null; fi
   if [ "$KEEP" = "1" ]; then
     echo "Workspace kept: $WS"
   else
@@ -70,10 +74,22 @@ for port in range(8765, 8800):
 PYEOF
 )"
 [ -n "$PORT" ] || { echo "No free port between 8765 and 8799."; exit 2; }
+# A second free port for the strict server (real rate limits, tiny Library limits: e2e/settings_strict.py).
+STRICT_PORT="$("$PY" - "$PORT" <<'PYEOF'
+import socket, sys
+for port in range(int(sys.argv[1]) + 1, 8830):
+    with socket.socket() as s:
+        if s.connect_ex(("127.0.0.1", port)) != 0:
+            print(port)
+            break
+PYEOF
+)"
+[ -n "$STRICT_PORT" ] || { echo "No free port for the strict server."; exit 2; }
 
 # ---- isolation: everything the site reads comes from here, never from your real .env or database ----
 export E2E_WORKSPACE="$WS"
 export E2E_PORT="$PORT"
+export E2E_STRICT_PORT="$STRICT_PORT"
 export E2E_REPORT_DIR="$REPORT"
 export DJANGO_SETTINGS_MODULE="e2e.settings"          # refuses to start unless the database is inside $WS
 export SPA99_SKIP_ENV_FILES=1                         # environment variables only (no OneDrive .env, no project .env)
@@ -108,6 +124,17 @@ for _ in $(seq 1 60); do
   sleep 0.5
 done
 curl -fsS "http://127.0.0.1:$PORT/health/" >/dev/null 2>&1 || { echo "The server never answered /health/."; tail -n 25 "$WS/server.log"; exit 2; }
+
+# The strict server: same database, mail and media, but real rate limits and tiny Library limits. Only the walk-throughs that
+# prove limits use it. If it does not start, those walk-throughs say so and skip; everything else still runs.
+echo "Starting the strict server on 127.0.0.1:$STRICT_PORT (rate limits on, tiny Library limits) ..."
+DJANGO_SETTINGS_MODULE="e2e.settings_strict" "$PY" manage.py runserver "127.0.0.1:$STRICT_PORT" --noreload > "$WS/server-strict.log" 2>&1 &
+STRICT_PID=$!
+for _ in $(seq 1 60); do
+  if curl -fsS "http://127.0.0.1:$STRICT_PORT/health/" >/dev/null 2>&1; then break; fi
+  if ! kill -0 "$STRICT_PID" 2>/dev/null; then echo "The strict server stopped (limit walk-throughs will be skipped). Log:"; tail -n 10 "$WS/server-strict.log"; export E2E_STRICT_PORT=0; break; fi
+  sleep 0.5
+done
 
 "$PY" -m e2e.run "${RUN_ARGS[@]+"${RUN_ARGS[@]}"}"
 STATUS=$?

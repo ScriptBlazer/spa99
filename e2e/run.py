@@ -7,7 +7,10 @@ import urllib.request
 
 from . import report
 from .kit import PORT, REPORT_DIR, Walk, run_walk, setup_staff
-from .walks import WALKS
+from .walks import WALKS as CORE_WALKS
+from .walks_beta import BETA_WALKS
+
+WALKS = CORE_WALKS + BETA_WALKS
 
 
 def server_is_up():
@@ -27,7 +30,7 @@ def main(argv=None):
 
     if args.list:
         for number, (key, title, _, _) in enumerate(WALKS, start=1):
-            print(f"{number}  {key:14} {title}")
+            print(f"{number:>2}  {key:22} {title}")
         return 0
     wanted = [item.strip() for item in args.only.split(",") if item.strip()]
     chosen = [(n, w) for n, w in enumerate(WALKS, start=1) if not wanted or w[0] in wanted or str(n) in wanted]

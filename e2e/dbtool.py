@@ -6,8 +6,11 @@ an event loop, where Django refuses database calls, so the run calls this in a c
   create-staff EMAIL PASSWORD LEVEL [--approver] [--first NAME] [--last NAME]   Office, Admin or Developer team account
   set-approver EMAIL        who receives Gold applications (the same field as System > Emails)
   registrations             number of registered-interest rows
-  user EMAIL                {"exists", "plan"}
-  gold EMAIL                {"status", "has_user", "count"}
+  user EMAIL                {"exists", "count", "plan", "verified", "active"}
+  gold EMAIL                {"status" (newest), "statuses", "waiting", "has_user", "count", "invites", "invites_used"}
+  gold-total                number of Gold applications of any email
+  age-gold EMAIL            make this email's applications a day old (so a re-apply is not inside the two-minute double-click window)
+  events KIND               System audit events of one kind (for example unlock_failed)
   waiting                   Gold applications waiting for a decision
   price SLUG                plan price ex VAT
   assets                    Control Library files
@@ -37,8 +40,9 @@ def main(argv):
     from django.contrib.auth import get_user_model
 
     from control.models import MediaAsset
-    from gold.models import GoldApplication
+    from gold.models import GoldApplication, GoldInvite
     from plans.models import Plan, SiteSettings
+    from system.models import SystemEvent
     from users.models import InterestRegistration
 
     User = get_user_model()
@@ -58,13 +62,30 @@ def main(argv):
     if cmd == "registrations":
         return {"count": InterestRegistration.objects.count()}
     if cmd == "user":
-        user = User.objects.filter(email__iexact=args[0]).first()
+        matches = User.objects.filter(email__iexact=args[0])
+        user = matches.first()
         interest = getattr(user, "interest", None) if user else None
-        return {"exists": user is not None, "plan": interest.plan.slug if interest and interest.plan_id else None}
+        return {"exists": user is not None, "count": matches.count(), "plan": interest.plan.slug if interest and interest.plan_id else None,
+                "verified": bool(user and user.email_verified_at), "active": bool(user and user.is_active)}
     if cmd == "gold":
         rows = GoldApplication.objects.filter(email__iexact=args[0]).order_by("-created_at")
         first = rows.first()
-        return {"status": first.status if first else None, "has_user": User.objects.filter(email__iexact=args[0]).exists(), "count": rows.count()}
+        invites = GoldInvite.objects.filter(application__email__iexact=args[0])
+        return {"status": first.status if first else None, "statuses": [r.status for r in rows],
+                "waiting": rows.filter(status__in=[GoldApplication.NEW, GoldApplication.CONTACTED]).count(),
+                "has_user": User.objects.filter(email__iexact=args[0]).exists(), "count": rows.count(),
+                "invites": invites.count(), "invites_used": invites.filter(used_at__isnull=False).count()}
+    if cmd == "gold-total":
+        return {"count": GoldApplication.objects.count()}
+    if cmd == "age-gold":
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        n = GoldApplication.objects.filter(email__iexact=args[0]).update(created_at=timezone.now() - timedelta(days=1))
+        return {"aged": n}
+    if cmd == "events":
+        return {"count": SystemEvent.objects.filter(kind=args[0]).count()}
     if cmd == "waiting":
         return {"count": GoldApplication.objects.filter(status__in=[GoldApplication.NEW, GoldApplication.CONTACTED]).count()}
     if cmd == "price":

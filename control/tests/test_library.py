@@ -149,7 +149,7 @@ class LibraryV2Tests(ControlTestCase):
         self.assertEqual(upload(self.client, MP3).status_code, 201)
         with override_settings(CONTROL_LIBRARY_MAX_GB=0.0000001):
             r = upload(self.client, MP3, name="b.mp3")
-        self.assertEqual(r.status_code, 507)
+        self.assertEqual(r.status_code, 413)
         self.assertEqual(r.json()["error"], "The Library is full. Delete something to make room.")
         listing = self.client.get("/library/assets/").json()
         self.assertEqual(listing["library"]["used_bytes"], len(MP3))
@@ -301,7 +301,7 @@ class HardeningTests(ControlTestCase):
         with override_settings(CONTROL_LIBRARY_MAX_GB=(len(MP4) + 1500) / 1024 ** 3):
             self.assertEqual(upload(self.client, MP3, name="b.mp3").status_code, 201)  # 1500 left, mp3 is ~214 bytes
             r = self.client.post(f"/library/assets/{asset.id}/duration/", {"duration_seconds": 5, "poster": SimpleUploadedFile("p.jpg", jpeg + b"\x00" * 2000)})
-            self.assertEqual(r.status_code, 507)
+            self.assertEqual(r.status_code, 413)
 
     def test_media_links_get_the_long_expiry(self):
         from unittest import mock
