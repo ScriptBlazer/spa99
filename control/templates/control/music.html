@@ -1,0 +1,17 @@
+{% extends "control/base.html" %}
+{% block main %}
+<h1 class="ctl-title">Music</h1>
+<p class="ctl-lead">Pick what plays in each zone. The speakers are pretend; the files are real.</p>
+<div class="ctl-music" data-music>
+  <section class="ctl-zones" aria-labelledby="zones-h">
+    <header class="ctl-zones-head"><h2 id="zones-h">Zones</h2><button type="button" class="ctl-btn" data-music-act="group" hidden>Group all</button></header>
+    <ul class="ctl-zonelist" data-zone-list>
+      {% for z in zone_rows %}<li><a class="ctl-zone" href="?zone={{ z.id }}" data-zone="{{ z.id }}"><span class="ctl-art-sm">{% if z.playing %}<span class="ctl-cover f{{ z.field }}"><span>{{ z.source }}</span></span>{% else %}<span class="ctl-cover is-empty"></span>{% endif %}</span><span class="ctl-zone-name">{{ z.name }}</span><span class="ctl-zone-state">{{ z.state }}</span></a></li>{% endfor %}
+    </ul>
+    <button type="button" class="ctl-btn ctl-mute-all" data-music-act="mute-all" hidden>{% include "common/_icon.html" with name="speaker-x" %}Mute all</button>
+  </section>
+  <section class="ctl-player" data-player aria-label="Player">
+    <noscript><p class="ctl-soft">The players need JavaScript. Turn it on to choose music for each zone.</p></noscript>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,5 @@
+<div class="ctl-scenes" role="group" aria-label="Scenes">
+  <span class="ctl-scenes-label">Scene {% include "control/_chip.html" %}</span>
+  <div class="ctl-scenes-row">{% for s in scenes %}<button type="button" class="ctl-scene" data-scene="{{ s.key }}" aria-pressed="{% if s.key == active.key %}true{% else %}false{% endif %}">{{ s.label }}</button>{% endfor %}</div>
+  <p class="ctl-scenes-now" data-f="scene_now">Now: {{ active.label }} &middot; since {{ active.time }}</p>
+</div>

@@ -1,0 +1,10 @@
+{% comment %}
+The photo light preview (brief section 5): the real room photo with stacked layers whose opacity is set by --o-night, --o-lamps,
+--o-pool, --o-warm and --o-cool (lights.js sets them live; present.py sets them for the first paint). Only opacity changes.
+The "lamps" layer is a stand-in for a lamps map: soft warm spots, see present.LAMPS.
+{% endcomment %}{% with v=room.v %}<div class="ctl-photo{% if big %} is-big{% endif %}" style="{{ v.photo_style }}" data-photo>
+  {% if v.photo_urls %}<picture><source media="(max-width: 47.99em)" srcset="{{ v.photo_urls.small }}"><img src="{{ v.photo_urls.large }}" alt="" width="800" height="533" loading="{% if big %}eager{% else %}lazy{% endif %}" decoding="async" draggable="false"></picture>{% else %}<span class="ctl-swan" aria-hidden="true"></span>{% endif %}
+  <span class="l l-night" aria-hidden="true"></span><span class="l l-lamps" aria-hidden="true" style="--lamps:{{ v.lamps }}"></span><span class="l l-pool" aria-hidden="true"></span><span class="l l-warm" aria-hidden="true"></span><span class="l l-cool" aria-hidden="true"></span>
+  <button type="button" class="ctl-offchip" data-act="light-on" aria-label="Lights are off in {{ room.name }}. Turn them on"{% if not v.off %} hidden{% endif %}>Off</button>
+  {% if close %}<a class="ctl-close" href="{{ close }}" data-close aria-label="Close">{% include "common/_icon.html" with name="x-r" %}</a>{% endif %}
+</div>{% endwith %}

@@ -189,6 +189,7 @@ MEDIA_DESCRIPTION, MEDIA_IS_LOCAL = finish_media_description(MEDIA_STORAGE, MEDI
 CONTROL_MAX_AUDIO_MB = int(ENV.get("CONTROL_MAX_AUDIO_MB", 50))
 CONTROL_MAX_VIDEO_MB = int(ENV.get("CONTROL_MAX_VIDEO_MB", 500))
 CONTROL_MAX_IMAGE_MB = int(ENV.get("CONTROL_MAX_IMAGE_MB", 20))
+CONTROL_LIBRARY_MAX_GB = float(ENV.get("CONTROL_LIBRARY_MAX_GB", 10))  # total size of everything in the Library (demo value)
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440  # 2.5 MB: anything bigger goes to a temp file on disk
 
 STORAGES = {

@@ -1,6 +1,7 @@
 {% load static %}{% comment %}
-The Control shell (docs/design/CONTROL.md section 3 to 5). DEMO banner, top bar, live strip, bottom tabs on a phone.
-Pages fill `main`. Everything the page needs is printed once in #ctl-demo; control.js owns it after that.
+The Control shell (docs/design/CONTROL.md v2, section 3). DEMO banner, top bar with six tabs, bell, mini player, bottom tabs on a
+phone, one side panel / sheet, toasts. Pages fill `main`. Everything the page needs is printed once in #ctl-demo; the modules in
+common/js/control/ own it after that and swap `main` when you change tab (so the music keeps playing).
 {% endcomment %}<!doctype html>
 <html lang="en-GB">
 <head>
@@ -17,16 +18,17 @@ Pages fill `main`. Everything the page needs is printed once in #ctl-demo; contr
 <script>document.documentElement.classList.add('js')</script>
 <script type="module" src="{% static 'common/js/control.js' %}"></script>
 </head>
-<body class="control" data-page="{{ section }}">
+<body class="control" data-page="{{ section }}" data-swan="{% static 'common/img/mark-gold.svg' %}" data-icons="{% static 'common/img/icons.svg' %}">
 {% include "control/_demo_banner.html" %}
 <a class="ctl-skip" href="#ctl-main">Skip to content</a>
 <header class="ctl-top">
-  <a class="ctl-brand" href="{% url 'control_rooms' %}"><img src="{% static 'common/img/mark-gold.svg' %}" alt="" width="14" height="20"><span>Control</span></a>
+  <a class="ctl-brand" href="{% url 'control_overview' %}"><img src="{% static 'common/img/mark-gold.svg' %}" alt="" width="14" height="20"><span class="ctl-brand-name">Control</span><span class="ctl-brand-page" data-pagetitle aria-hidden="true">{{ page_title }}</span></a>
   <nav class="ctl-nav" aria-label="Control">
-    <ul>{% for key, label, url_name, icon in nav %}<li><a href="{% url url_name %}"{% if section == key %} aria-current="page"{% endif %}>{{ label }}</a></li>{% endfor %}</ul>
+    <ul>{% for key, label, url_name, icon in nav %}<li><a href="{% url url_name %}" data-nav="{{ key }}"{% if section == key %} aria-current="page"{% endif %}>{{ label }}</a></li>{% endfor %}</ul>
   </nav>
   <span class="ctl-grow"></span>
   <p class="ctl-clock"><span class="ctl-date" data-f="date">{{ state.now.date }}</span> <span data-f="clock">{{ state.now.clock }}</span></p>
+  <button type="button" class="ctl-bell" data-alerts-open aria-haspopup="dialog" aria-expanded="false" aria-controls="ctl-alerts" aria-label="Alerts{% if alert_count %}, {{ alert_count }} open{% endif %}">{% include "common/_icon.html" with name="bell" %}<span class="ctl-badge" data-f="alert-count"{% if not alert_count %} hidden{% endif %}>{{ alert_count }}</span></button>
   <details class="ctl-who" data-who>
     <summary aria-label="Account menu, {{ person.name }}"><span class="ctl-disc" aria-hidden="true">{{ person.initials }}</span></summary>
     <div class="ctl-menu">
@@ -38,36 +40,38 @@ Pages fill `main`. Everything the page needs is printed once in #ctl-demo; contr
     </div>
   </details>
 </header>
-<section class="ctl-strip" aria-label="The building now">
-  <div class="ctl-cell">
-    <p class="ctl-num"><span data-f="in">{{ strip.people }}</span> <span class="ctl-of">of <span data-f="cap">{{ state.capacity }}</span></span></p>
-    <p class="ctl-lbl" data-f="in-label"{% if strip.closed %} data-tone="muted"{% elif strip.nearly_full %} data-tone="warn"{% endif %}>{% if strip.closed %}Closed{% elif strip.nearly_full %}Nearly full{% else %}In the building{% endif %}</p>
-  </div>
-  <div class="ctl-cell">
-    <p class="ctl-num" data-f="bands">{{ strip.bands }}</p>
-    <p class="ctl-lbl">Wristbands active</p>
-  </div>
-  <div class="ctl-cell">
-    <p class="ctl-num"><span data-f="lockers">{{ strip.lockers }}</span> <span class="ctl-of">of {{ state.lockers_total }}</span></p>
-    <p class="ctl-lbl">Lockers in use</p>
-  </div>
-  <div class="ctl-cell ctl-cell-alerts" data-alerts-cell data-count="{{ alert_count }}">
-    {% if alert_count %}<button type="button" class="ctl-alert-btn" data-alerts-open aria-haspopup="dialog" aria-expanded="false" aria-controls="ctl-alerts">
-      <span class="ctl-num" data-f="alert-count">{{ alert_count }}</span><span class="ctl-lbl"><span data-f="alert-label">{% if alert_count == 1 %}Alert{% else %}Alerts{% endif %}</span></span></button>
-    {% else %}<p class="ctl-num" data-f="alert-count">0</p><p class="ctl-lbl" data-f="alert-label" data-tone="ok">No alerts</p>{% endif %}
-  </div>
-</section>
 <div class="ctl-alerts" id="ctl-alerts" role="dialog" aria-label="Open alerts" hidden></div>
 <main class="ctl-main" id="ctl-main" tabindex="-1">
 {% if messages %}<ul class="ctl-messages">{% for message in messages %}<li role="status">{{ message }}</li>{% endfor %}</ul>{% endif %}
 {% block main %}{% endblock %}
 </main>
-<nav class="ctl-tabs" aria-label="Control">
-  {% for key, label, url_name, icon in nav %}<a href="{% url url_name %}"{% if section == key %} aria-current="page"{% endif %}>{% include "common/_icon.html" with name=icon %}<span>{{ label }}</span></a>{% endfor %}
+<aside class="ctl-mini" data-mini aria-label="Now playing" hidden></aside>
+<nav class="ctl-tabs" aria-label="Control tabs">
+  {% for key, label, url_name, icon in nav_phone %}<a href="{% url url_name %}" data-nav="{{ key }}"{% if section == key %} aria-current="page"{% endif %}>{% include "common/_icon.html" with name=icon %}<span>{{ label }}</span></a>{% endfor %}
+  <button type="button" data-more-open aria-haspopup="dialog">{% include "common/_icon.html" with name="dots-three" %}<span>More</span></button>
 </nav>
+<div class="ctl-backdrop" data-backdrop hidden></div>
+<aside class="ctl-panel" data-panel role="dialog" aria-modal="true" aria-labelledby="ctl-panel-title" hidden>
+  <div class="ctl-grip" data-grip aria-hidden="true"><span></span></div>
+  <div class="ctl-panel-body" data-panel-body></div>
+</aside>
+<aside class="ctl-tray" data-tray aria-label="Uploads" hidden></aside>
 <div class="ctl-toasts" data-toasts></div>
 <p class="ctl-sr" role="status" aria-live="polite" data-live></p>
 {% include "control/_reset_dialog.html" %}
+<dialog class="ctl-dialog" data-dialog aria-labelledby="ctl-dialog-h"><form method="dialog" data-dialog-form></form></dialog>
+<template id="ctl-more-tpl">
+  <div class="ctl-pn-body">
+    <h2 class="ctl-pn-title" id="ctl-panel-title" tabindex="-1">More</h2>
+    <ul class="ctl-more-list">
+      {% for key, label, url_name, icon in nav_more %}<li><a href="{% url url_name %}" data-nav="{{ key }}">{% include "common/_icon.html" with name=icon %}<span>{{ label }}</span></a></li>{% endfor %}
+      <li><button type="button" data-reset>{% include "common/_icon.html" with name="power" %}<span>Reset demo</span></button></li>
+      {% if office_url %}<li><a href="{{ office_url }}" data-no-pjax>{% include "common/_icon.html" with name="arrow-right" %}<span>Open Office</span></a></li>{% endif %}
+      <li><a href="{% url 'control_password' %}" data-no-pjax>{% include "common/_icon.html" with name="lock-simple" %}<span>Change password</span></a></li>
+      <li><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">{% include "common/_icon.html" with name="arrow-left" %}<span>Sign out</span></button></form></li>
+    </ul>
+  </div>
+</template>
 {{ json_state|json_script:"ctl-demo" }}
 </body>
 </html>

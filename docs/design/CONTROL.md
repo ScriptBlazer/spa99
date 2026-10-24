@@ -102,48 +102,46 @@ All motion uses `--ease-soft`, except progress bars (linear, constant motion).
 
 ### 4.1 The plan drawing
 
-One inline SVG, `viewBox="0 0 1200 720"`, built from a room geometry list in the template (so new rooms are a data change). Stylised, believable, not architectural: rooms are rounded rectangles (radius 8) separated by 8px gaps of `--ctl-bg` (the gaps are the walls; no stroked outlines). Plan sits on `--ctl-bg`, max height 600px, centred in its column.
+**The plan follows Moishe's real drawing**, not the first sketch of this brief: Panorama Interior, "99 Vale Road - Shvitz, Proposed ground floor lighting", Rev 04, 1:80 (OneDrive, BML / Spa 99 / Plans). One long rectangle, drawn stylised: the right rooms in the right places at roughly the right proportions, no architecture. The geometry lives in `control/plan.py` (one list, so a new room is a data change).
+
+One inline SVG per size, `viewBox="0 0 1200 440"` on desktop. Rooms are rounded rectangles (radius 8) separated by 8-unit gaps of `--ctl-bg` (the gaps are the walls; no stroked outlines). Left to right:
 
 ```
-y  40 +----------+---------+------------------+-----------+-----------+
-      |  Gym     | Massage | Relaxing zone    | Dry sauna | Wet sauna |
-      |          | room    |  (loungers)      |  (benches)| (benches) |
-  260 +----------+         |                  +-----------+-----------+
-      | Changing |         |                  |   Cold plunge (pool)  |
-      | (unlit)  |         |                  |                       |
-  360 |          +---------+------------------+--glass----------------+
-      |          |   Corridor  ------------------->  | Wet area         |
-  440 +----------+-----------------+----------+------+----------------+
-      |Reception |  Lounge         |Kitchen-  |  Showers               |
-      | desk     | [fish tank wall]|ette      |  (o o o o)             |
-      |          |  (sofa curve)   |          |                        |
-  680 +--[door]--+-----------------+----------+------------------------+
-       Entrance, Vale Road
-x     40        280               620        800                    1160
+     x 12        142             307      467            757  837   955          1190
+y 14  +-----------+---------------+--------+--------------+----+-----+-----------+
+      | Dry sauna | Showers       | WCs    | Stairs and   | WC | Plant| Not        |
+      | (heater)  | (4 heads)     |        | lift         |    | room | surveyed   |
+ 192  +-----------+ Cold plunge   +--------+              +----+-----+ - - - - - -+
+      | Wet sauna | (pool,benches)| Chang- +--------------+                       |
+      | (benches) +---------------+ ing    | Plant|Riser  | ENTRANCE (lounge and  |
+ 247  |           | Relaxing zone +--------+------+-------+ reception, sofas,     |
+      |           | (six loungers)| Hallway   (links all)  | curved feature wall,  |
+ 305  |           |               +-----------+---------+--+ fish tank) +----------+
+      |           |               |Kitchenette| Massage | Gym |          |Electrical|
+ 390  +-----------+---------------+-----------+---------+-----+----------+----------+
 ```
 
-Coordinates (x1, y1, x2, y2), each inset 4px to make the 8px gaps:
-
-| Room | Box | Hints (1 to 3 shapes, `--ctl-wall`, decoration) |
+| Room (plan id) | State room (slug) | Controls |
 |---|---|---|
-| Gym | 40, 40, 280, 260 | two short bars (racks) |
-| Changing (not controllable, no light, label `--ctl-text-3`) | 40, 260, 280, 440 | locker row as a dashed line |
-| Reception | 40, 440, 280, 680 | desk: a 90×16 rounded rect; entrance gap in the bottom wall at x 120 to 200 with "Entrance" 12px below the plan |
-| Lounge | 280, 440, 620, 680 | **fish tank** along the west wall (the wall shared with Reception): rect 14 wide, 180 tall, `--ctl-tank` at 0.45, label "Fish tank" 11px; a sofa as a curved path |
-| Kitchenette | 620, 440, 800, 680 | counter as an L line |
-| Corridor | 280, 360, 1160, 440 | a dotted line along its length; a thin glass line at x 800 labelled "Wet area" |
-| Massage room | 280, 40, 480, 360 | table: a 40×100 rounded rect |
-| Relaxing zone | 480, 40, 800, 360 | four lounger shapes (rounded rects 22×60) |
-| Dry sauna | 800, 40, 980, 220 | two bench lines |
-| Wet sauna | 980, 40, 1160, 220 | two bench lines |
-| Cold plunge | 800, 220, 1160, 360 | pool: rounded rect inset 28, stroke `--ctl-wall` |
-| Showers | 800, 440, 1160, 680 | four shower heads as 8px circles |
+| Dry sauna GF07 | `dry-sauna` | lights, climate |
+| Wet sauna GF06 | `wet-sauna` | lights, climate |
+| Showers, Cold plunge (both GF08, drawn as two rooms) | `showers`, `cold-plunge` | lights, music, climate on the plunge |
+| Relaxing zone GF05 | `relaxing-zone` | lights, music, screen |
+| Changing room GF09 | `changing-room` | lights, music |
+| Hallway GF11 (replaces the "Corridor" of the first sketch) | `hallway` | lights, music, screen |
+| Kitchenette GF04 | `kitchenette` | lights, music, screen |
+| Massage room GF03 | `massage-room` | lights, music |
+| Gym GF02 | `gym` | lights, music, screen |
+| Entrance GF01 = lounge and reception (one space) | `reception-lounge` | lights, music, screen, tank water |
+| WCs, Stairs and lift, Plant rooms, Dry riser, Electrical | none | drawn unlit, not links, label in `--ctl-text-3` |
+
+Hints (`--ctl-wall`, decoration): sauna benches and the dry sauna heater, shower heads, the cold plunge pool and benches, six loungers, locker row, the stair and lift, a round table in the kitchenette, the massage table, gym equipment, and in the Entrance the **curved feature wall**, the **fish tank** along it (`--ctl-tank` at 0.45 alpha, labelled "Fish tank"), sofas and armchairs. The Entrance doors are a gold dash on the bottom wall with "Entrance, Vale Road" below, and the planters of the pavement are a row of faint rounded rectangles under the plan. The unsurveyed corner is a dashed outline.
 
 **Lighting a room:** each room has three stacked shapes. (1) base fill `--ctl-surface`; (2) a light shape filled with a radial gradient (centre 40% from top-left, warmth colour from the warmth scale at 0.9 alpha at the centre to 0 at the edge) whose **opacity = 0.12 + brightness × 0.55** when on, 0 when off; (3) the label. Lights off: base only, label `--ctl-text-3`, line "Off". On: label `--ctl-text` (Signika 500 16px; 13px for rooms under 200 wide), value line 12px `--ctl-text-2` "60%  2700K" (saunas and plunge add the temperature: "86°C"). People count, when above 0, sits top-right in 12px `--ctl-text-2` ("3"), with the full phrase in the accessible name. Light opacity changes ease over `--ctl-glide` for scenes and presets, instantly while dragging.
 
 **Interaction:** each controllable room is an SVG `<a href="?room=slug">` with `aria-label` "Dry sauna. Lights 60 percent, 2700 kelvin. 86 degrees. 3 people." Hover (fine pointer): base fill to `--ctl-raised`, 160ms. Focus: 2px gold outline drawn as an inset rect. Selected: the same gold outline, persistent. Alert in a room: a 2px `--ctl-danger` inset outline plus the word "Alert" in the value line.
 
-**Phone plan:** the same geometry transposed (x and y swapped, `viewBox="0 0 720 1200"`), labels kept upright, so the plan fills the width (about 343px wide, 570px tall) and every room is at least 56px on its short side. Under the plan, the four building numbers in a 2 by 2 block, then Playing rows. Tapping a room opens the room sheet at peek height (`--ctl-sheet-peek`), so the top of the plan stays visible above it and visibly re-lights.
+**Phone plan:** the same geometry transposed (x and y swapped, `viewBox="0 0 470 1200"`), labels kept upright, so the plan fills the width (about 343px wide, 876px tall) and every controllable room is at least 56px on its short side (the Hallway band is stretched by 30 units to get there; a test checks it). Under the plan, the four building numbers in a 2 by 2 block, then Playing rows. Tapping a room opens the room sheet at peek height (`--ctl-sheet-peek`), so the top of the plan stays visible above it and visibly re-lights.
 
 ## 5. The photo light preview (replaces the glow)
 
@@ -159,7 +157,7 @@ The room photo itself is re-lit. Only opacity changes (BRAND 7: never animate fi
 
 `d` (darkness) = `0.88 × (1 − b/100)^1.2` while on. **Off:** night 0.94, lamps 0, warm and cool 0; the room becomes a faint silhouette with the word "Off" on a `--ctl-chip-bg` chip, bottom-left. 3000K is "as photographed" (the renders are warm already), so the default looks exactly like the site.
 
-**Lamps maps** are made once, offline, by a small management command (Pillow, already a dependency): keep pixels above the 88th luminance percentile, feather 6px, everything else black; save `<name>-lamps-800.webp` and `-480.webp` beside the photo in `content/static/content/img/`. Commit the files. Photos used: reception, lounge, corridor, dry-sauna, wet-sauna, cold-plunge, showers, relaxing-zone, massage-room, gym, kitchenette. A room without a photo gets the swan pattern on espresso and the same night layer.
+**Lamps maps** would be made once, offline, by a small management command (Pillow; not installed here, see below): keep pixels above the 88th luminance percentile, feather 6px, everything else black; save `<name>-lamps-800.webp` and `-480.webp` beside the photo in `content/static/content/img/`. Photos used: lounge (for Reception and lounge), corridor (for the Hallway), lockers (for the Changing room), dry-sauna, wet-sauna, cold-plunge, showers, relaxing-zone, massage-room, gym, kitchenette. **Built with CSS spots instead of lamps maps:** Pillow is not installed in this project, so each room has two or three soft warm radial gradients (`present.LAMPS`, blended with `screen`) standing in for the lamps map; same layer, same opacity rule. A lamps map made from the photo can replace them later without changing the page. A room without a photo gets the swan pattern on espresso and the same night layer.
 
 Motion: while a slider is dragged, layers follow instantly (`transition: none`). Scenes and presets: `transition: opacity var(--ctl-glide) var(--ease-soft)`, rooms 60ms apart in order. Reduced motion: always instant.
 
@@ -169,7 +167,7 @@ Title "Rooms", line "Light and temperature in every room." Scene bar under it.
 
 ### 6.1 Room card
 
-Grid `repeat(auto-fill, minmax(320px, 1fr))`, 24px gap: 3 across at 1440 (content 1360), 1 column on phone. Order as v1 (Reception and lounge first), plus Corridor after Lounge.
+Grid `repeat(auto-fill, minmax(320px, 1fr))`, 24px gap: 3 across at 1440 (content 1360), 1 column on phone. Order: Reception and lounge, Hallway, Changing room, then the Office's rooms as v1.
 
 ```
 +------------------------------------------+
@@ -214,8 +212,8 @@ Default zones (DEMO values, editable):
 
 | Zone | Rooms |
 |---|---|
-| Lounge | Reception, Lounge, Kitchenette, Corridor |
-| Wet area | Cold plunge, Showers (no speakers in the saunas) |
+| Lounge | Reception and lounge, Kitchenette, Hallway |
+| Wet area | Cold plunge, Showers, Changing room (no speakers in the saunas) |
 | Relaxing zone | Relaxing zone |
 | Massage room | Massage room |
 | Gym | Gym |
@@ -268,7 +266,7 @@ Desktop: side panel; phone: full sheet. Segmented at the top: **Library** | **Sp
 
 Title "Screens", line "What each screen shows, and when."
 
-Screens (DEMO values): Reception, Lounge, Corridor, Gym, Relaxing zone, Kitchenette.
+Screens (DEMO values): Reception, Lounge, Hallway, Gym, Relaxing zone, Kitchenette.
 
 ### 8.1 Screen grid
 
@@ -441,8 +439,8 @@ Never: looping decoration (no equaliser bars, no pulsing dots), bounce, blur, an
 
 1. Six tabs on desktop (Overview, Rooms, Music, Screens, Schedule, Library), five on phone with More; each control has one home, other places link to it.
 2. DEMO banner with the new text on every page; Reset demo resets pretend state and leaves Library files and playlists untouched; DEMO chips on each simulated group, none in the Library.
-3. Overview floor plan matches section 4.1 (rooms, fish tank on the Lounge wall next to Reception, corridor to the wet area, entrance); each room lit by brightness and warmth; tapping a room opens its panel beside the plan (desktop) or a peek sheet (phone) and the plan re-lights live.
-4. Phone plan is the transposed version, every room at least 56px on its short side.
+3. Overview floor plan matches section 4.1 (the real ground floor lighting plan: saunas, shower and cold plunge, relaxing zone, changing room, hallway, kitchenette, massage, gym, the Entrance with its curved wall and fish tank); each room lit by brightness and warmth; tapping a room opens its panel beside the plan (desktop) or a peek sheet (phone) and the plan re-lights live.
+4. Phone plan is the transposed version, every controllable room at least 56px on its short side.
 5. Room cards use the real photo; moving Light or Warmth visibly re-lights it (night, lamps, pool, warm, cool layers), Off shows a silhouette and "Off"; only opacity changes; lamps maps exist for every room photo.
 6. Scenes glide the photos and the plan room by room over about 2s; Undo works; reduced motion is instant.
 7. Room panel: photo, light, climate, music trim and link, screen thumbnail and link; no source or content choosers inside it.

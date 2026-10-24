@@ -1,0 +1,35 @@
+{% extends "control/base.html" %}
+{% block main %}
+<h1 class="ctl-title is-sentence" data-f="sentence">{{ sentence }}</h1>
+{% include "control/_scenebar.html" %}
+{% if open_room %}<section class="ctl-nojs-panel" aria-label="{{ open_room.name }}">{% url 'control_overview' as back %}{% include "control/_room_panel.html" with room=open_room back_url=back %}</section>{% endif %}
+<div class="ctl-ov" data-overview>
+  <section class="ctl-plan-wrap" data-plan>
+    <h2 class="ctl-sr" id="ctl-plan-h">Floor plan. Each room is a link; the Rooms tab lists them all.</h2>
+    {% include "control/_plan.html" with drawing=plan.desktop kind="desktop" %}
+    {% include "control/_plan.html" with drawing=plan.phone kind="phone" %}
+  </section>
+  <aside class="ctl-rail" data-rail aria-label="The building now">
+    <div class="ctl-rail-main" data-rail-main>
+      <section class="ctl-nums">
+        <div class="ctl-cell"><p class="ctl-num"><span data-f="in">{{ strip.people }}</span> <span class="ctl-of">of <span data-f="cap">{{ state.capacity }}</span></span></p>
+          <p class="ctl-lbl" data-f="in-label"{% if strip.closed %} data-tone="muted"{% elif strip.nearly_full %} data-tone="warn"{% endif %}>{% if strip.closed %}Closed{% elif strip.nearly_full %}Nearly full{% else %}In the building{% endif %}</p></div>
+        <div class="ctl-cell"><p class="ctl-num"><span data-f="lockers">{{ strip.lockers }}</span> <span class="ctl-of">of {{ state.lockers_total }}</span></p><p class="ctl-lbl">Lockers in use</p></div>
+        <div class="ctl-cell"><p class="ctl-num" data-f="bands">{{ strip.bands }}</p><p class="ctl-lbl">Wristbands active</p></div>
+        <div class="ctl-cell"><p class="ctl-num" data-f="alerts-n">{{ alert_count }}</p><p class="ctl-lbl" data-f="alerts-label"{% if not alert_count %} data-tone="ok"{% endif %}>{% if alert_count == 1 %}Alert{% elif alert_count %}Alerts{% else %}No alerts{% endif %}</p></div>
+      </section>
+      <section class="ctl-rail-sec" aria-labelledby="ov-playing">
+        <h2 id="ov-playing">Playing {% include "control/_chip.html" %}</h2>
+        <ul class="ctl-playing" data-playing>{% for z in zone_rows %}<li><a class="ctl-prow" href="{% url 'control_music' %}?zone={{ z.id }}" data-zone-row="{{ z.id }}"><span class="ctl-prow-zone">{{ z.name }}</span><span class="ctl-prow-track">{% if z.playing %}{{ z.title }}{% else %}<span class="ctl-soft">Off</span>{% endif %}</span></a></li>{% endfor %}</ul>
+      </section>
+      <section class="ctl-rail-sec" aria-labelledby="ov-screens">
+        <h2 id="ov-screens">Screens {% include "control/_chip.html" %}</h2>
+        <ul class="ctl-thumbs" data-thumbs>{% for screen in state.screens %}<li><a href="{% url 'control_screens' %}?screen={{ screen.id }}" aria-label="{{ screen.name }}: {{ screen.label }}" data-thumb="{{ screen.id }}">{% include "control/_slide_tile.html" %}</a></li>{% endfor %}</ul>
+      </section>
+    </div>
+    <div class="ctl-rail-panel" data-rail-panel hidden></div>
+  </aside>
+</div>
+<template id="ctl-room-tpl">{% include "control/_room_panel.html" with generic=True %}</template>
+<template id="ctl-tile-tpl">{% include "control/_slide_tile.html" with screen=blank_screen %}</template>
+{% endblock %}

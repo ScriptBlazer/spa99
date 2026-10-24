@@ -1,0 +1,8 @@
+{% load static %}{# 16:9 miniature of a built-in slide, real HTML scaled with container units. Every slide is present; CSS shows data-content. #}
+<div class="ctl-tile" data-tile="{{ screen.id }}" data-content="{{ screen.effective }}" aria-hidden="true">
+  <div class="ctl-slide ctl-slide-welcome"><img src="{% static 'common/img/mark-gold.svg' %}" alt=""><p class="ctl-s-title">Welcome to Spa 99</p><p class="ctl-s-sub">Beyond Luxury</p></div>
+  <div class="ctl-slide ctl-slide-hours"><p class="ctl-s-kicker">Today</p><p class="ctl-s-title">{{ state.hours_line }}</p><p class="ctl-s-sub">{{ state.hours_detail|join:" · " }}</p></div>
+  <div class="ctl-slide ctl-slide-menu"><p class="ctl-s-kicker">Kitchenette</p><ul>{% for item in state.menu %}<li>{{ item }}</li>{% endfor %}</ul></div>
+  <div class="ctl-slide ctl-slide-notices"><p class="ctl-s-kicker">Notice</p><p class="ctl-s-title" data-notice="{{ screen.id }}">{{ screen.notice }}</p></div>
+  <div class="ctl-slide ctl-slide-off"><p>Off</p></div>
+</div>

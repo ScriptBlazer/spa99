@@ -17,3 +17,12 @@ def frac(value, bounds):
 def pos_style(item):
     """Inline left/width for a band on a lane."""
     return f"left:{item['pct']}%;width:{item['wpct']}%"
+
+
+@register.filter
+def meter(used, maximum):
+    """How full the Library is, 0 to 1 (the meter bar is a scaleX of this)."""
+    try:
+        return round(min(1, max(0, float(used) / float(maximum))), 4)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return 0

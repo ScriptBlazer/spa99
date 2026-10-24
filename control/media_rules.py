@@ -7,10 +7,19 @@ from django.conf import settings
 from .models import MediaAsset
 
 HEAD = 4096
+# One list, shown in the Library and enforced here (docs/design/CONTROL.md 10.3). Browsers play these everywhere.
+ALLOWED_EXT = {"mp3", "m4a", "wav", "mp4", "webm", "jpg", "png", "webp"}
+KIND_WORD = {"audio": "Music", "video": "Videos", "image": "Pictures"}
+TYPES_TEXT = "Music: MP3, M4A or WAV. Video: MP4 (H.264) or WebM. Pictures: JPG, PNG or WebP."
+HEIC_BRANDS = (b"heic", b"heix", b"hevc", b"hevx", b"heim", b"heis", b"mif1", b"msf1", b"avif")
 
 
 class Rejected(Exception):
-    """Carries a message that is safe to show the uploader."""
+    """Carries a message that is safe to show the uploader, and the HTTP status to answer with."""
+
+    def __init__(self, message, status=400):
+        super().__init__(message)
+        self.status = status
 
 
 def sniff(head):
@@ -33,10 +42,20 @@ def sniff(head):
         return MediaAsset.VIDEO, "webm", "video/webm"
     if head[4:8] == b"ftyp":
         brand = head[8:12]
+        if brand in HEIC_BRANDS:
+            return MediaAsset.IMAGE, "heic", "image/heic"
         if brand in (b"M4A ", b"M4B ", b"M4P "):
             return MediaAsset.AUDIO, "m4a", "audio/mp4"
         return MediaAsset.VIDEO, "mp4", "video/mp4"
     return None
+
+
+def library_max_bytes():
+    return int(settings.CONTROL_LIBRARY_MAX_GB * 1024 ** 3)
+
+
+def is_jpeg(head):
+    return head[:3] == b"\xff\xd8\xff"
 
 
 def limit_bytes(kind):
@@ -78,13 +97,17 @@ def inspect(upload):
     upload.seek(0)
     found = sniff(head)
     if not found:
-        raise Rejected("That file type is not allowed. Use mp3, aac, m4a, wav or ogg audio, mp4 (h264) or webm video, or jpg, png or webp images.")
+        raise Rejected("This type can't be used. For music use MP3, M4A or WAV.", 415)
     kind, ext, mime = found
+    if ext == "heic":
+        raise Rejected("HEIC pictures can't be shown on screens. Save it as JPG and try again.", 415)
+    if ext not in ALLOWED_EXT:
+        raise Rejected("This type can't be used. For music use MP3, M4A or WAV.", 415)
     if ext == "mp4" and _not_h264(head):
-        raise Rejected("That video is not h264. Re-export it as mp4 (h264) or webm.")
+        raise Rejected("That video is not H.264. Re-export it as MP4 (H.264) or WebM.", 415)
     if upload.size == 0:
-        raise Rejected("That file is empty.")
+        raise Rejected("That file is empty.", 400)
     if upload.size > limit_bytes(kind):
-        raise Rejected(f"That {kind} file is too big. The limit for {kind} is {limit_bytes(kind) // (1024 * 1024)} MB.")
+        raise Rejected(f"This file is {round(upload.size / (1024 * 1024))} MB. {KIND_WORD[kind]} can be up to {limit_bytes(kind) // (1024 * 1024)} MB.", 413)
     width, height = image_size(head, ext) if kind == "image" else (None, None)
     return {"kind": kind, "ext": ext, "mime": mime, "size": upload.size, "width": width, "height": height}

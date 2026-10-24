@@ -15,7 +15,7 @@ from plans.models import Facility, SiteSettings
 
 User = get_user_model()
 HOST = "control.localhost"
-PATHS = ("/", "/schedule/", "/screens/", "/password/", "/?room=dry-sauna")
+PATHS = ("/", "/rooms/", "/music/", "/screens/", "/schedule/", "/library/", "/password/", "/?room=dry-sauna", "/rooms/?room=gym")
 
 
 def person(group=None, **extra):
@@ -60,7 +60,8 @@ class AccessTests(ControlTestCase):
             for path in PATHS:
                 response = get(user, path)
                 self.assertEqual(response.status_code, 200, f"{user.email} {path}")
-                self.assertContains(response, "Pretend building. Nothing here controls real hardware.")
+                self.assertContains(response, "Rooms, music and screens are pretend. The Library is real.")
+                self.assertContains(response, "Pretend building. Library is real.")
                 self.assertContains(response, "<title>DEMO ")
 
     def test_the_control_pages_are_not_on_the_other_hosts(self):
@@ -76,10 +77,11 @@ class StateTests(ControlTestCase):
     def test_rooms_are_the_visible_facilities_in_order_with_reception_first(self):
         Facility.objects.filter(slug="gym").update(visible=False)
         names = [r["name"] for r in demo.demo_state()["rooms"]]
-        expected = ["Reception and lounge"] + [f.name for f in Facility.objects.filter(visible=True).order_by("order", "name")]
+        expected = ["Reception and lounge", "Hallway", "Changing room"] + [f.name for f in Facility.objects.filter(visible=True).order_by("order", "name")]
         self.assertEqual(names, expected)
         self.assertNotIn("Gym", names)
-        self.assertEqual(names[1], "Dry sauna")
+        self.assertEqual(names[:3], ["Reception and lounge", "Hallway", "Changing room"])
+        self.assertEqual(names[3], "Dry sauna")
 
     def test_a_new_room_gets_lights_and_music_only(self):
         Facility.objects.create(name="Quiet room", slug="quiet-room", order=99)
@@ -128,7 +130,7 @@ class StateTests(ControlTestCase):
 
     def test_the_page_works_as_a_snapshot_without_scripts(self):
         response = get(person("Admin", is_staff=True), "/")
-        for text in ("Dry sauna", "Cold plunge", "Wristbands active", "Lockers in use", "Scene"):
+        for text in ("Dry sauna", "Cold plunge", "Wristbands active", "Lockers in use", "Scene", "Floor plan"):
             self.assertContains(response, text)
         self.assertContains(get(person("Admin", is_staff=True), "/?room=dry-sauna"), 'data-room="dry-sauna"')
 
@@ -136,27 +138,35 @@ class StateTests(ControlTestCase):
 class NothingIsSavedTests(ControlTestCase):
     def test_pages_have_no_forms_that_post_except_sign_out_and_password(self):
         admin = person("Admin", is_staff=True)
-        for path in ("/", "/schedule/", "/screens/"):
+        for path in ("/", "/rooms/", "/music/", "/screens/", "/schedule/"):
             html = get(admin, path).content.decode()
             actions = re.findall(r"<form[^>]*method=\"post\"[^>]*>", html)
-            self.assertEqual(len(actions), 1, path)
-            self.assertIn("/logout/", actions[0])
+            self.assertTrue(actions, path)
+            for action in actions:
+                self.assertIn("/logout/", action)
             self.assertNotIn("hx-post", html)
             self.assertNotIn("hx-put", html)
 
-    def test_the_script_never_talks_to_the_server(self):
+    def test_only_the_library_modules_talk_to_the_server(self):
         from pathlib import Path
 
-        source = (Path(__file__).resolve().parents[2] / "common/static/common/js/control.js").read_text()
-        for word in ("fetch(", "XMLHttpRequest", "sendBeacon", "WebSocket", "EventSource"):
-            self.assertNotIn(word, source)
+        folder = Path(__file__).resolve().parents[2] / "common/static/common/js/control"
+        talkers = {"libdata.js", "upload.js"}  # the Library: real files and playlists (fetch and XHR)
+        for path in sorted(folder.glob("*.js")):
+            source = path.read_text()
+            if path.name in talkers:
+                continue
+            for word in ("fetch(", "XMLHttpRequest", "sendBeacon", "WebSocket", "EventSource"):
+                if path.name == "app.js" and word == "fetch(":
+                    continue  # app.js fetches the next page's HTML (GET) when you change tab
+                self.assertNotIn(word, source, f"{path.name} uses {word}")
 
     def test_posting_to_the_pages_is_refused_and_changes_nothing(self):
         admin = person("Admin", is_staff=True)
         client = Client(HTTP_HOST=HOST)
         client.force_login(admin)
         before = (Facility.objects.count(), SiteSettings.load().capacity)
-        for path in ("/", "/schedule/", "/screens/"):
+        for path in ("/", "/rooms/", "/music/", "/schedule/", "/screens/"):
             self.assertEqual(client.post(path, {"capacity": 1, "name": "x"}).status_code, 405, path)
         self.assertEqual((Facility.objects.count(), SiteSettings.load().capacity), before)
 

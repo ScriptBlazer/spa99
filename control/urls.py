@@ -3,7 +3,9 @@ from django.urls import path
 from . import views, views_library as lib
 
 urlpatterns = [
-    path("", views.rooms, name="control_rooms"),
+    path("", views.overview, name="control_overview"),
+    path("rooms/", views.rooms, name="control_rooms"),
+    path("music/", views.music, name="control_music"),
     path("schedule/", views.schedule, name="control_schedule"),
     path("screens/", views.screens, name="control_screens"),
     path("library/", lib.library, name="control_library"),
@@ -18,6 +20,7 @@ urlpatterns = [
     path("library/playlists/<uuid:pk>/delete/", lib.playlist_delete, name="control_playlist_delete"),
     path("library/playlists/<uuid:pk>/items/add/", lib.item_add, name="control_item_add"),
     path("library/playlists/<uuid:pk>/items/remove/", lib.item_remove, name="control_item_remove"),
+    path("library/playlists/<uuid:pk>/items/seconds/", lib.item_seconds, name="control_item_seconds"),
     path("library/playlists/<uuid:pk>/items/reorder/", lib.item_reorder, name="control_item_reorder"),
     path("password/", views.ControlPasswordView.as_view(), name="control_password"),
 ]

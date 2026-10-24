@@ -12,6 +12,10 @@ def asset_path(instance, filename):
     return f"control/media/{instance.pk}.{instance.ext}"
 
 
+def poster_path(instance, filename):
+    return f"control/media/{instance.pk}-poster.jpg"
+
+
 class MediaAsset(models.Model):
     AUDIO, VIDEO, IMAGE = "audio", "video", "image"
     KINDS = [(AUDIO, "Audio"), (VIDEO, "Video"), (IMAGE, "Image")]
@@ -27,10 +31,13 @@ class MediaAsset(models.Model):
     width = models.PositiveIntegerField(null=True, blank=True)
     height = models.PositiveIntegerField(null=True, blank=True)
     tags = models.JSONField(default=list, blank=True, help_text="A short list of lowercase words, e.g. music, screens.")
+    artist = models.CharField(max_length=120, blank=True, help_text="Audio only, optional.")
+    peaks = models.JSONField(null=True, blank=True, help_text="Audio: about 200 waveform heights from 0 to 1, made by the browser.")
+    poster = models.FileField(upload_to=poster_path, max_length=200, blank=True, help_text="Video: a still frame (jpg) made by the browser.")
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
 
-    history = HistoricalRecords()
+    history = HistoricalRecords(excluded_fields=["peaks"])
 
     class Meta:
         ordering = ["-created_at"]
@@ -60,6 +67,7 @@ class PlaylistItem(models.Model):
     playlist = models.ForeignKey(Playlist, on_delete=models.CASCADE, related_name="items")
     asset = models.ForeignKey(MediaAsset, on_delete=models.CASCADE, related_name="playlist_items")
     position = models.PositiveIntegerField()
+    seconds = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Pictures in a screens playlist: seconds on screen (4 to 60). Empty means 8.")
 
     class Meta:
         ordering = ["position"]

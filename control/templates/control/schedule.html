@@ -2,7 +2,7 @@
 {% load control_ui %}
 {% block main %}
 <h1 class="ctl-title">Schedule</h1>
-<p class="ctl-lead">Automatic changes through the day. Opening hours come from the Office and are read only here.</p>
+<p class="ctl-lead">Automatic changes through the day. Opening hours come from the Office and are read only here. {% include "control/_chip.html" %}</p>
 <p class="ctl-lock">{% include "common/_icon.html" with name="lock-simple" %}From opening hours in the Office</p>
 
 <div class="ctl-axis" aria-hidden="true">{% for tick in state.axis %}<span style="left:{{ tick.pct }}%">{{ tick.label }}</span>{% endfor %}</div>
@@ -18,6 +18,7 @@
       {% if day.today %}<span class="ctl-now" data-nowline style="left:{{ state.now_pct }}%"><span class="ctl-now-tag" data-f="clock">{{ state.now.clock }}</span></span>{% endif %}
     </div>
   </div>
+  {% if day.today %}<div class="ctl-slane" data-slane aria-label="Screens"><span class="ctl-slane-label">Screens</span><div class="ctl-slane-track" data-slane-track></div></div>{% endif %}
   {% if day.notes or day.skipped %}<ul class="ctl-notes">{% for n in day.notes %}<li>{{ n }}</li>{% endfor %}{% if day.skipped %}<li>Skipped, closed: {{ day.skipped }}.</li>{% endif %}</ul>{% endif %}
   <ol class="ctl-daylist">
     {% for item in day.list %}{% if item.type == "event" %}<li><button type="button" data-ev="{{ item.key }}" data-day="{{ day.index }}" aria-haspopup="dialog"{% if item.skipped %} class="is-skipped"{% endif %}><span class="ctl-time">{{ item.time }}</span> {{ item.name }}{% if item.skipped %} <span class="ctl-soft">Skipped, closed</span>{% endif %}</button></li>

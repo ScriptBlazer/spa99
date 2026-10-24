@@ -1,0 +1,20 @@
+{# One drawing of the floor plan (desktop or phone). Rooms are links; light shape opacity and colour are set live. #}
+<svg class="ctl-plan ctl-plan-{{ kind }}" viewBox="{{ drawing.viewbox }}" role="group" aria-labelledby="ctl-plan-h" focusable="false"{% if kind == "phone" %} aria-hidden="true"{% endif %}>
+  <defs>{% for room in state.rooms %}<radialGradient id="lg-{{ kind }}-{{ room.slug }}" cx="0.4" cy="0.4" r="0.75" data-lg="{{ room.slug }}" style="--lc:var(--ctl-warm-{{ room.v.glow_k }})"><stop offset="0" style="stop-color:var(--lc)" stop-opacity="0.9"/><stop offset="1" style="stop-color:var(--lc)" stop-opacity="0"/></radialGradient>{% endfor %}</defs>
+  {% for p in drawing.planters %}<rect class="pr-planter" x="{{ p.x }}" y="{{ p.y }}" width="{{ p.w }}" height="{{ p.h }}" rx="3"/>{% endfor %}
+  {% for s in drawing.shapes %}{% if s.room %}<a class="pr{% if s.small %} is-small{% endif %}{% if s.slim %} is-slim{% endif %}" href="?room={{ s.slug }}" data-open-room="{{ s.slug }}" data-plan-room="{{ s.slug }}" data-tone="{{ s.room.v.tone }}" aria-label="{{ s.aria }}"{% if kind == "phone" %} tabindex="-1"{% endif %}>
+    {% if s.poly %}<path class="pr-base" d="{{ s.poly }}"/><path class="pr-light" d="{{ s.poly }}" fill="url(#lg-{{ kind }}-{{ s.slug }})" style="opacity:{{ s.room.v.plan_opacity }}"/>{% else %}<rect class="pr-base" x="{{ s.x }}" y="{{ s.y }}" width="{{ s.w }}" height="{{ s.h }}" rx="8"/><rect class="pr-light" x="{{ s.x }}" y="{{ s.y }}" width="{{ s.w }}" height="{{ s.h }}" rx="8" fill="url(#lg-{{ kind }}-{{ s.slug }})" style="opacity:{{ s.room.v.plan_opacity }}"/>{% endif %}
+    {{ s.hints }}
+    {% if s.poly %}<path class="pr-ring" d="{{ s.poly }}"/>{% else %}<rect class="pr-ring" x="{{ s.x }}" y="{{ s.y }}" width="{{ s.w }}" height="{{ s.h }}" rx="8"/>{% endif %}
+    <text class="pr-name" x="{{ s.name_x }}" y="{{ s.name_y }}" text-anchor="{{ s.anchor }}">{% if s.lines %}{% for word in s.lines %}<tspan x="{{ s.name_x }}" dy="{% if forloop.first %}0{% else %}1.05em{% endif %}">{{ word }}</tspan>{% endfor %}{% else %}{{ s.name }}{% endif %}</text>
+    <text class="pr-val" data-pv="1" x="{{ s.val_x }}" y="{{ s.val_y }}" text-anchor="{{ s.anchor }}">{{ s.room.v.plan_line }}</text>
+    {% if s.room.caps.climate %}<text class="pr-val" data-pv="2" x="{{ s.val_x }}" y="{{ s.val2_y }}" text-anchor="{{ s.anchor }}">{{ s.room.v.plan_line2 }}</text>{% endif %}
+    <text class="pr-count" data-pc x="{{ s.count_x }}" y="{{ s.count_y }}" text-anchor="end">{% if s.room.people %}{{ s.room.people }}{% endif %}</text>
+  </a>{% else %}<g class="pr is-static{% if s.ghost %} is-ghost{% endif %}">
+    <rect class="pr-base" x="{{ s.x }}" y="{{ s.y }}" width="{{ s.w }}" height="{{ s.h }}" rx="8"/>
+    {{ s.hints }}
+    <text class="pr-name" x="{{ s.name_x }}" y="{{ s.name_y }}" text-anchor="{{ s.anchor }}">{% if s.lines %}{% for word in s.lines %}<tspan x="{{ s.name_x }}" dy="{% if forloop.first %}0{% else %}1.05em{% endif %}">{{ word }}</tspan>{% endfor %}{% else %}{{ s.name }}{% endif %}</text>
+  </g>{% endif %}
+  {% if s.door %}<line class="pr-door" x1="{{ s.door.x1 }}" y1="{{ s.door.y1 }}" x2="{{ s.door.x2 }}" y2="{{ s.door.y2 }}"/><text class="pr-note pr-entrance" x="{{ s.entrance.x }}" y="{{ s.entrance.y }}" text-anchor="{{ s.entrance.anchor }}">Entrance, Vale Road</text>{% endif %}
+  {% endfor %}
+</svg>

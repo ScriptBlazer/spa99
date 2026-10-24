@@ -77,7 +77,7 @@ class LibraryTests(ControlTestCase):
         asset = MediaAsset.objects.get()
         path = asset.file.name
         r = post_json(self.client, f"/library/assets/{asset.id}/update/", {"title": "Calm", "tags": ["Spa", "spa", "x"]})
-        self.assertEqual((r.json()["title"], r.json()["tags"]), ("Calm", ["spa", "x"]))
+        self.assertEqual((r.json()["title"], r.json()["tags"]), ("Calm", ["music", "spa", "x"]))  # audio always carries "music"
         self.assertEqual(post_json(self.client, f"/library/assets/{asset.id}/duration/", {"duration_seconds": 185.4}).json()["duration_seconds"], 185.4)
         self.assertEqual(post_json(self.client, f"/library/assets/{asset.id}/duration/", {"duration_seconds": "nope"}).status_code, 400)
         self.assertEqual(self.client.get(f"/library/assets/{asset.id}/delete/").status_code, 405)
@@ -112,3 +112,128 @@ class LibraryTests(ControlTestCase):
         self.assertEqual(post_json(self.client, f"/library/playlists/{screens['id']}/items/add/", {"asset_id": str(assets[0].id)}).status_code, 400)
         self.client.post(f"{base}/delete/")
         self.assertEqual((Playlist.objects.count(), PlaylistItem.objects.count(), MediaAsset.objects.count()), (1, 0, 3))
+
+
+WAV = b"RIFF\x24\x00\x00\x00WAVEfmt " + b"\x00" * 40
+AAC = b"\xff\xf1\x50\x80" + b"\x00" * 100
+OGG = b"OggS" + b"\x00" * 100
+HEIC = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic" + b"\x00" * 100
+M4A = b"\x00\x00\x00\x18ftypM4A \x00\x00\x00\x00M4A mp42" + b"\x00" * 100
+JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 200
+
+
+class LibraryV2Tests(ControlTestCase):
+    """The v2 Library UI needs: one list of types, brief messages, total size, peaks and posters, artist, timings, used in."""
+
+    def setUp(self):
+        self.admin = person("Admin", is_staff=True)
+        self.client = client_for(self.admin)
+
+    def test_types_are_the_brief_list_and_messages_match(self):
+        for content, name in ((AAC, "a.aac"), (OGG, "a.ogg")):
+            r = upload(self.client, content, name=name)
+            self.assertEqual(r.status_code, 415, name)
+            self.assertEqual(r.json()["error"], "This type can't be used. For music use MP3, M4A or WAV.")
+        r = upload(self.client, HEIC, name="photo.jpg")
+        self.assertEqual(r.status_code, 415)
+        self.assertIn("HEIC pictures can't be shown on screens", r.json()["error"])
+        for content, name in ((WAV, "a.wav"), (M4A, "a.m4a"), (MP3, "a.mp3")):
+            self.assertEqual(upload(self.client, content, name=name).status_code, 201, name)
+        with override_settings(CONTROL_MAX_VIDEO_MB=1):
+            big = MP4 + b"\x00" * 1_048_576
+            r = upload(self.client, big, name="v.mp4")
+            self.assertEqual(r.status_code, 413)
+            self.assertEqual(r.json()["error"], "This file is 1 MB. Videos can be up to 1 MB.")
+
+    def test_library_total_size_is_enforced(self):
+        self.assertEqual(upload(self.client, MP3).status_code, 201)
+        with override_settings(CONTROL_LIBRARY_MAX_GB=0.0000001):
+            r = upload(self.client, MP3, name="b.mp3")
+        self.assertEqual(r.status_code, 507)
+        self.assertEqual(r.json()["error"], "The Library is full. Delete something to make room.")
+        listing = self.client.get("/library/assets/").json()
+        self.assertEqual(listing["library"]["used_bytes"], len(MP3))
+        self.assertGreater(listing["library"]["max_bytes"], 1_000_000_000)
+
+    def test_default_tags_by_kind_and_the_tag_rules(self):
+        upload(self.client, MP3)
+        upload(self.client, PNG, name="p.png")
+        audio, image = MediaAsset.objects.get(kind="audio"), MediaAsset.objects.get(kind="image")
+        self.assertEqual((audio.tags, image.tags), (["music"], ["screens"]))
+        r = post_json(self.client, f"/library/assets/{image.id}/update/", {"tags": ["music", "lounge"]})
+        self.assertEqual(r.json()["tags"], ["screens", "lounge"])  # pictures are never music
+        r = post_json(self.client, f"/library/assets/{audio.id}/update/", {"tags": []})
+        self.assertEqual(r.json()["tags"], ["music"])
+
+    def test_artist_is_for_music_only(self):
+        upload(self.client, MP3)
+        upload(self.client, PNG, name="p.png")
+        audio, image = MediaAsset.objects.get(kind="audio"), MediaAsset.objects.get(kind="image")
+        self.assertEqual(post_json(self.client, f"/library/assets/{audio.id}/update/", {"artist": "Night Shift Quartet"}).json()["artist"], "Night Shift Quartet")
+        self.assertEqual(post_json(self.client, f"/library/assets/{image.id}/update/", {"artist": "x"}).status_code, 400)
+
+    def test_browser_measurements_peaks_and_poster(self):
+        upload(self.client, MP3)
+        upload(self.client, MP4, name="v.mp4")
+        audio, video = MediaAsset.objects.get(kind="audio"), MediaAsset.objects.get(kind="video")
+        peaks = [round(i / 20, 2) for i in range(20)]
+        r = self.client.post(f"/library/assets/{audio.id}/duration/", {"duration_seconds": "200.5", "peaks": json.dumps(peaks)})
+        self.assertEqual(r.json()["peaks"], peaks)
+        self.assertEqual(self.client.post(f"/library/assets/{audio.id}/duration/", {"duration_seconds": "1", "peaks": "[1,2]"}).json()["peaks"], peaks)  # too short: ignored
+        poster = SimpleUploadedFile("p.jpg", JPEG)
+        r = self.client.post(f"/library/assets/{video.id}/duration/", {"duration_seconds": "30", "width": "1920", "height": "1080", "poster": poster})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.json()["poster_url"])
+        video.refresh_from_db()
+        self.assertEqual((video.width, video.height), (1920, 1080))
+        path = video.poster.name
+        self.assertTrue(default_storage.exists(path))
+        bad = self.client.post(f"/library/assets/{video.id}/duration/", {"duration_seconds": "30", "poster": SimpleUploadedFile("p.jpg", b"not a jpeg")})
+        self.assertEqual(bad.status_code, 400)
+        self.client.post(f"/library/assets/{video.id}/delete/")
+        self.assertFalse(default_storage.exists(path))
+
+    def test_picture_timing_in_a_screens_playlist(self):
+        upload(self.client, PNG, name="p.png")
+        upload(self.client, MP4, name="v.mp4")
+        image, video = MediaAsset.objects.get(kind="image"), MediaAsset.objects.get(kind="video")
+        playlist = post_json(self.client, "/library/playlists/create/", {"name": "Lounge reel", "kind": "screens"}).json()
+        base = f"/library/playlists/{playlist['id']}"
+        post_json(self.client, f"{base}/items/add/", {"asset_id": str(image.id)})
+        added = post_json(self.client, f"{base}/items/add/", {"asset_id": str(video.id)}).json()
+        image_item, video_item = added["items"][0]["id"], added["items"][1]["id"]
+        self.assertIsNone(added["items"][0]["seconds"])
+        r = post_json(self.client, f"{base}/items/seconds/", {"item_id": image_item, "seconds": 12})
+        self.assertEqual(r.json()["items"][0]["seconds"], 12)
+        for body in ({"item_id": image_item, "seconds": 3}, {"item_id": image_item, "seconds": 61}, {"item_id": image_item, "seconds": "x"}, {"item_id": video_item, "seconds": 8}):
+            self.assertEqual(post_json(self.client, f"{base}/items/seconds/", body).status_code, 400, body)
+
+    def test_used_in_lists_playlists(self):
+        upload(self.client, MP3)
+        audio = MediaAsset.objects.get()
+        playlist = post_json(self.client, "/library/playlists/create/", {"name": "Evening", "kind": "music"}).json()
+        post_json(self.client, f"/library/playlists/{playlist['id']}/items/add/", {"asset_id": str(audio.id)})
+        found = self.client.get("/library/assets/").json()["assets"][0]
+        self.assertEqual(found["playlists"], [{"id": playlist["id"], "name": "Evening", "kind": "music"}])
+        self.assertEqual(found["uploaded_by"], self.admin.email)
+
+    def test_plain_form_post_works_without_javascript(self):
+        r = self.client.post("/library/assets/upload/", {"file": SimpleUploadedFile("song.mp3", MP3), "next": "page"})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r["Location"], "/library/")
+        self.assertEqual(MediaAsset.objects.get().title, "song")
+        page = self.client.get("/library/")
+        self.assertContains(page, "song")
+        self.assertContains(page, "added to the Library")
+        bad = self.client.post("/library/assets/upload/", {"file": SimpleUploadedFile("x.exe", b"MZ\x00\x00"), "next": "page"}, follow=True)
+        self.assertContains(bad, "This type can&#x27;t be used")
+
+    def test_library_page_has_no_demo_chip_and_says_it_is_real(self):
+        page = self.client.get("/library/")
+        self.assertContains(page, "Files here are stored for real.")
+        self.assertNotContains(page, "ctl-chip-demo")
+        html = page.content.decode()
+        self.assertIn(".m4a", html)
+        for gone in (".ogg", ".aac", ".heic"):
+            self.assertNotIn(f'"{gone}', html)
+            self.assertNotIn(f",{gone}", html)

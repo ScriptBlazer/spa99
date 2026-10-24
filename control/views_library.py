@@ -5,17 +5,18 @@ import json
 import logging
 import re
 
+from django.contrib import messages
 from django.db import IntegrityError, transaction
-from django.db.models import Max, Q
+from django.db.models import Max, Sum
 from django.http import Http404, JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
 from common.ratelimit import rate_limited_json
 
 from . import media_rules
 from .models import MediaAsset, Playlist, PlaylistItem
-from .views import _context, admin_only
+from .views import _context, _json_state, admin_only
 
 logger = logging.getLogger("spa99.control")
 TAG_RE = re.compile(r"[^a-z0-9 \-]")
@@ -49,23 +50,51 @@ def _tags(value):
     return clean[:8]
 
 
-def asset_json(asset):
-    return {"id": str(asset.id), "title": asset.title, "kind": asset.kind, "mime": asset.mime, "size_bytes": asset.size_bytes,
-            "duration_seconds": asset.duration_seconds, "width": asset.width, "height": asset.height, "tags": asset.tags,
-            "url": asset.file.url, "created_at": asset.created_at.isoformat()}
+def _kind_tags(kind, tags):
+    """Music belongs to audio only; screens media (video, pictures) always carries "screens"; audio always carries "music"."""
+    if kind == MediaAsset.AUDIO:
+        return ["music"] + [t for t in tags if t != "music"]
+    return ["screens"] + [t for t in tags if t not in ("music", "screens")]
+
+
+def asset_json(asset, playlists=None):
+    """`playlists` = the playlists using this file (id, name, kind); the browser adds the screens and zones it knows about."""
+    return {"id": str(asset.id), "title": asset.title, "artist": asset.artist, "kind": asset.kind, "mime": asset.mime,
+            "size_bytes": asset.size_bytes, "duration_seconds": asset.duration_seconds, "width": asset.width, "height": asset.height,
+            "tags": asset.tags, "peaks": asset.peaks, "url": asset.file.url, "poster_url": asset.poster.url if asset.poster else None,
+            "uploaded_by": (asset.uploaded_by.get_full_name() or asset.uploaded_by.email) if asset.uploaded_by_id else "",
+            "created_at": asset.created_at.isoformat(), "playlists": playlists or []}
 
 
 def playlist_json(playlist):
-    items = playlist.items.select_related("asset")
+    items = playlist.items.select_related("asset", "asset__uploaded_by")
     return {"id": str(playlist.id), "name": playlist.name, "kind": playlist.kind,
-            "items": [{"id": item.id, "position": item.position, "asset": asset_json(item.asset)} for item in items]}
+            "items": [{"id": item.id, "position": item.position, "seconds": item.seconds, "asset": asset_json(item.asset)} for item in items]}
+
+
+def summary():
+    """Library size against the total limit (the meter on the page)."""
+    used = MediaAsset.objects.aggregate(total=Sum("size_bytes"))["total"] or 0
+    return {"used_bytes": used, "max_bytes": media_rules.library_max_bytes()}
+
+
+def _used_in(rows):
+    """{asset id: [playlist, ...]} for these assets, in one query."""
+    found = {}
+    for item in PlaylistItem.objects.filter(asset__in=rows).select_related("playlist"):
+        entry = {"id": str(item.playlist_id), "name": item.playlist.name, "kind": item.playlist.kind}
+        if entry not in found.setdefault(str(item.asset_id), []):
+            found[str(item.asset_id)].append(entry)
+    return found
 
 
 def _remove_file(asset):
-    try:
-        asset.file.delete(save=False)
-    except Exception:  # a missing or unreachable file must not block removing the row
-        logger.exception("Could not delete media file for asset %s", asset.pk)
+    for field in (asset.file, asset.poster):
+        try:
+            if field:
+                field.delete(save=False)
+        except Exception:  # a missing or unreachable file must not block removing the row
+            logger.exception("Could not delete media file for asset %s", asset.pk)
 
 
 def _save_history(asset, user):
@@ -78,8 +107,15 @@ def _save_history(asset, user):
 @admin_only
 @require_GET
 def library(request):
-    return render(request, "control/library.html", {**_context(request, "library"), "kinds": MediaAsset.KINDS,
-                                                    "limits": {k: media_rules.limit_bytes(k) for k in ("audio", "video", "image")}})
+    """The page. The files are listed here too, so it reads without JavaScript; library.js takes over when it runs."""
+    found = list(MediaAsset.objects.all()[:200])
+    limits = {k: media_rules.limit_bytes(k) for k in ("audio", "video", "image")}
+    context = _context(request, "library")
+    context["json_state"] = _json_state(context)
+    return render(request, "control/library.html", {
+        **context, "assets": found, "summary": summary(), "limits": limits,
+        "limit_mb": {k: v // (1024 * 1024) for k, v in limits.items()}, "types_text": media_rules.TYPES_TEXT,
+        "accept": ",".join(f".{e}" for e in sorted(media_rules.ALLOWED_EXT)) + ",.jpeg"})
 
 
 @admin_only
@@ -90,11 +126,20 @@ def assets(request):
         found = found.filter(kind=request.GET["kind"])
     if request.GET.get("q"):
         found = found.filter(title__icontains=request.GET["q"][:100])
-    rows = list(found[:500])
+    rows = list(found.select_related("uploaded_by")[:500])
     tag = TAG_RE.sub("", request.GET.get("tag", "").lower()).strip()
     if tag:  # JSON contains is not portable between SQLite and Postgres, so tags are filtered here (library is small)
         rows = [a for a in rows if tag in a.tags]
-    return JsonResponse({"assets": [asset_json(a) for a in rows]})
+    used = _used_in(rows)
+    return JsonResponse({"assets": [asset_json(a, used.get(str(a.id))) for a in rows], "library": summary()})
+
+
+def _upload_failed(request, message, status):
+    """JSON for the page script; a plain form post (no JavaScript) goes back to the page with the message."""
+    if request.POST.get("next") == "page":
+        messages.error(request, message)
+        return redirect("control_library")
+    return _fail(message, status)
 
 
 @admin_only
@@ -103,21 +148,27 @@ def assets(request):
 def upload(request):
     file = request.FILES.get("file")
     if not file:
-        return _fail("Choose a file to upload.")
+        return _upload_failed(request, "Choose a file to upload.", 400)
     try:
         info = media_rules.inspect(file)
     except media_rules.Rejected as error:
-        return _fail(str(error), 415 if "not allowed" in str(error) or "not h264" in str(error) else 413 if "too big" in str(error) else 400)
+        return _upload_failed(request, str(error), error.status)
+    if summary()["used_bytes"] + info["size"] > media_rules.library_max_bytes():
+        return _upload_failed(request, "The Library is full. Delete something to make room.", 507)
     title = (request.POST.get("title") or re.sub(r"\.[A-Za-z0-9]{1,5}$", "", file.name or "")).strip()[:120] or "Untitled"
     asset = MediaAsset(title=title, kind=info["kind"], ext=info["ext"], mime=info["mime"], size_bytes=info["size"],
-                       width=info["width"], height=info["height"], tags=_tags(request.POST.get("tags", "")), uploaded_by=request.user)
+                       width=info["width"], height=info["height"], uploaded_by=request.user,
+                       tags=_kind_tags(info["kind"], _tags(request.POST.get("tags", ""))))
     asset.file.save(file.name, file, save=False)  # the name is replaced by the uuid path (asset_path)
     try:
         _save_history(asset, request.user)
     except Exception:
         _remove_file(asset)
         raise
-    return JsonResponse(asset_json(asset), status=201)
+    if request.POST.get("next") == "page":
+        messages.success(request, f"{asset.title} added to the Library.")
+        return redirect("control_library")
+    return JsonResponse({**asset_json(asset), "library": summary()}, status=201)
 
 
 @admin_only
@@ -130,16 +181,37 @@ def asset_update(request, pk):
         if not title:
             return _fail("Give it a name.")
         asset.title = title
+    if "artist" in data:
+        if asset.kind != MediaAsset.AUDIO:
+            return _fail("Only music files have an artist.")
+        asset.artist = str(data["artist"]).strip()[:120]
     if "tags" in data:
-        asset.tags = _tags(data["tags"])
+        asset.tags = _kind_tags(asset.kind, _tags(data["tags"]))
     _save_history(asset, request.user)
-    return JsonResponse(asset_json(asset))
+    return JsonResponse(asset_json(asset, _used_in([asset]).get(str(asset.id))))
+
+
+def _peaks(value):
+    """About 200 numbers from 0 to 1 (JSON text from a form, or a list). Anything else is ignored."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return None
+    if not isinstance(value, list) or not 8 <= len(value) <= 400:
+        return None
+    try:
+        numbers = [round(min(1.0, max(0.0, float(v))), 3) for v in value]
+    except (TypeError, ValueError):
+        return None
+    return numbers
 
 
 @admin_only
 @require_POST
 def asset_duration(request, pk):
-    """The browser reports length (and video size) after it has loaded the file."""
+    """The browser reports what it saw after the upload: length, video size, audio waveform peaks, a video poster frame.
+    JSON, or a form with an optional `poster` file (jpg, up to 1 MB)."""
     asset = get_object_or_404(MediaAsset, pk=pk)
     data = _data(request)
     try:
@@ -149,6 +221,7 @@ def asset_duration(request, pk):
     if not 0 < seconds < 24 * 3600 or asset.kind == MediaAsset.IMAGE:
         return _fail("That duration is not valid for this file.")
     asset.duration_seconds = round(seconds, 2)
+    fields = ["duration_seconds"]
     if asset.kind == MediaAsset.VIDEO:
         for field in ("width", "height"):
             try:
@@ -157,8 +230,24 @@ def asset_duration(request, pk):
                 continue
             if 0 < value < 20000:
                 setattr(asset, field, value)
-    asset.save(update_fields=["duration_seconds", "width", "height"])
-    return JsonResponse(asset_json(asset))
+                fields.append(field)
+        poster = request.FILES.get("poster")
+        if poster:
+            head = poster.read(16)
+            poster.seek(0)
+            if not media_rules.is_jpeg(head) or poster.size > 1_048_576:
+                return _fail("The poster must be a jpg under 1 MB.")
+            if asset.poster:
+                asset.poster.delete(save=False)
+            asset.poster.save("poster.jpg", poster, save=False)
+            fields.append("poster")
+    if asset.kind == MediaAsset.AUDIO and data.get("peaks") is not None:
+        peaks = _peaks(data.get("peaks"))
+        if peaks:
+            asset.peaks = peaks
+            fields.append("peaks")
+    asset.save(update_fields=fields)
+    return JsonResponse(asset_json(asset, _used_in([asset]).get(str(asset.id))))
 
 
 @admin_only
@@ -168,13 +257,14 @@ def asset_delete(request, pk):
     asset._history_user = request.user
     asset_id = str(asset.pk)
     with transaction.atomic():
-        file = asset.file
+        files = [f for f in (asset.file, asset.poster) if f]
         asset.delete()
-    try:
-        file.delete(save=False)
-    except Exception:
-        logger.exception("Could not delete media file for asset %s", asset_id)
-    return JsonResponse({"deleted": asset_id})
+    for file in files:
+        try:
+            file.delete(save=False)
+        except Exception:
+            logger.exception("Could not delete media file for asset %s", asset_id)
+    return JsonResponse({"deleted": asset_id, "library": summary()})
 
 
 # ---------- playlists ----------
@@ -263,6 +353,28 @@ def item_remove(request, pk):
             return _fail("That item is not in this playlist.", 404)
         item.delete()
         _renumber(playlist, playlist.items.all())
+    return JsonResponse(playlist_json(playlist))
+
+
+@admin_only
+@require_POST
+def item_seconds(request, pk):
+    """How long a picture stays on screen in a screens playlist: 4 to 60 seconds (videos play their own length)."""
+    playlist = _playlist(pk)
+    data = _data(request)
+    item = playlist.items.select_related("asset").filter(pk=data.get("item_id") or 0).first() if str(data.get("item_id", "")).isdigit() else None
+    if not item:
+        return _fail("That item is not in this playlist.", 404)
+    if item.asset.kind != MediaAsset.IMAGE:
+        return _fail("Only pictures have a time on screen. Videos play their full length.")
+    try:
+        seconds = int(data.get("seconds"))
+    except (TypeError, ValueError):
+        return _fail("Send seconds as a number from 4 to 60.")
+    if not 4 <= seconds <= 60:
+        return _fail("Pictures can stay on screen for 4 to 60 seconds.")
+    item.seconds = seconds
+    item.save(update_fields=["seconds"])
     return JsonResponse(playlist_json(playlist))
 
 
