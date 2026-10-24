@@ -22,12 +22,36 @@ class Rejected(Exception):
         self.status = status
 
 
-def sniff(head):
-    """-> (kind, ext, mime) from the first bytes, or None."""
-    if head[:3] == b"ID3" or (len(head) > 1 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0):
-        if head[:3] != b"ID3" and head[1] & 0x06 == 0:  # layer bits 00 = AAC in ADTS
+MP4_BRANDS = (b"isom", b"mp41", b"mp42", b"avc1", b"M4V ", b"dash")  # no "qt  " (QuickTime) and no 3GP
+
+
+def _mp3_frame(four):
+    """A real MPEG audio frame header: sync, a known version and layer, a usable bitrate and sample rate."""
+    return (len(four) == 4 and four[0] == 0xFF and four[1] & 0xE0 == 0xE0 and (four[1] >> 3) & 3 != 1
+            and (four[1] >> 1) & 3 != 0 and four[2] >> 4 != 15 and (four[2] >> 2) & 3 != 3)
+
+
+def _id3_frame_offset(head):
+    """Where the audio starts after an ID3v2 tag (size is 4 syncsafe bytes; a footer adds 10)."""
+    if len(head) < 10 or any(b & 0x80 for b in head[6:10]):
+        return None
+    size = (head[6] << 21) | (head[7] << 14) | (head[8] << 7) | head[9]
+    return 10 + size + (10 if head[5] & 0x10 else 0)
+
+
+def sniff(head, read_at=None):
+    """-> (kind, ext, mime) from the first bytes, or None. `read_at(offset, n)` reads further into the file (needed to look
+    past a big ID3 tag); without it only `head` is used."""
+    if head[:3] == b"ID3":
+        offset = _id3_frame_offset(head)
+        if offset is None:
+            return None
+        four = head[offset:offset + 4] if offset + 4 <= len(head) else (read_at(offset, 4) if read_at else b"")
+        return (MediaAsset.AUDIO, "mp3", "audio/mpeg") if _mp3_frame(four) else None
+    if len(head) > 1 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0:
+        if head[1] & 0x06 == 0:  # layer bits 00 = AAC in ADTS (not an allowed type, named so the message is right)
             return MediaAsset.AUDIO, "aac", "audio/aac"
-        return MediaAsset.AUDIO, "mp3", "audio/mpeg"
+        return (MediaAsset.AUDIO, "mp3", "audio/mpeg") if _mp3_frame(head[:4]) else None
     if head[:4] == b"OggS":
         return MediaAsset.AUDIO, "ogg", "audio/ogg"
     if head[:4] == b"RIFF" and head[8:12] == b"WAVE":
@@ -39,14 +63,16 @@ def sniff(head):
     if head[:8] == b"\x89PNG\r\n\x1a\n":
         return MediaAsset.IMAGE, "png", "image/png"
     if head[:4] == b"\x1a\x45\xdf\xa3":
-        return MediaAsset.VIDEO, "webm", "video/webm"
+        # EBML header: the DocType element (0x4282, length 4) must say "webm" (Matroska "mkv" is refused)
+        return (MediaAsset.VIDEO, "webm", "video/webm") if b"\x42\x82\x84webm" in head[:80] else None
     if head[4:8] == b"ftyp":
         brand = head[8:12]
         if brand in HEIC_BRANDS:
             return MediaAsset.IMAGE, "heic", "image/heic"
         if brand in (b"M4A ", b"M4B ", b"M4P "):
             return MediaAsset.AUDIO, "m4a", "audio/mp4"
-        return MediaAsset.VIDEO, "mp4", "video/mp4"
+        if brand in MP4_BRANDS:
+            return MediaAsset.VIDEO, "mp4", "video/mp4"
     return None
 
 
@@ -95,7 +121,13 @@ def inspect(upload):
     """Checks an UploadedFile. Returns dict(kind, ext, mime, size, width, height) or raises Rejected."""
     head = upload.read(HEAD)
     upload.seek(0)
-    found = sniff(head)
+    def read_at(offset, n):
+        upload.seek(offset)
+        data = upload.read(n)
+        upload.seek(0)
+        return data
+
+    found = sniff(head, read_at)
     if not found:
         raise Rejected("This type can't be used. For music use MP3, M4A or WAV.", 415)
     kind, ext, mime = found

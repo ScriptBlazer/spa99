@@ -4,7 +4,11 @@ common.middleware.HostRoutingMiddleware. Admin level and up; everyone else gets 
 from django.contrib import admin
 from django.core.files.storage import default_storage
 from django.conf import settings
+from django.http import Http404
 from django.urls import include, path, re_path
+
+from common import levels
+from common.permissions import level_required
 from django.views.static import serve
 
 from common.views import health
@@ -17,6 +21,13 @@ urlpatterns = [
     path(settings.ADMIN_PATH, admin.site.urls),
 ]
 
-# Local development only: serve the Library files from the local media folder (live uses signed S3 URLs).
+# Local development only: serve the Library files (control/media/ only) from the local media folder to Admin level and up
+# (live uses signed S3 URLs).
+def _dev_media(request, path):
+    if not path.startswith("control/media/"):
+        raise Http404
+    return serve(request, path, document_root=default_storage.location)
+
+
 if settings.DEBUG and hasattr(default_storage, "location") and not getattr(default_storage, "bucket_name", None):
-    urlpatterns += [re_path(r"^media/(?P<path>.*)$", serve, {"document_root": default_storage.location})]
+    urlpatterns += [re_path(r"^media/(?P<path>.*)$", level_required(levels.ADMIN, deny=Http404)(_dev_media))]

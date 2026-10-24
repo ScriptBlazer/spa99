@@ -27,6 +27,7 @@ class MediaAsset(models.Model):
     ext = models.CharField(max_length=5, help_text="From the sniffed type, never from the uploaded name.")
     mime = models.CharField(max_length=60)
     size_bytes = models.PositiveBigIntegerField()
+    poster_bytes = models.PositiveIntegerField(default=0, help_text="Size of the poster still, counted in the Library total.")
     duration_seconds = models.FloatField(null=True, blank=True, help_text="Reported by the browser after upload.")
     width = models.PositiveIntegerField(null=True, blank=True)
     height = models.PositiveIntegerField(null=True, blank=True)
@@ -72,3 +73,13 @@ class PlaylistItem(models.Model):
     class Meta:
         ordering = ["position"]
         constraints = [models.UniqueConstraint(fields=["playlist", "position"], name="control_item_position_unique")]
+
+
+class LibraryLock(models.Model):
+    """One row (pk 1) locked while the Library total is checked and a file is added, so two uploads cannot both pass the
+    size check. select_for_update is a no-op on SQLite (one writer at a time anyway) and a real row lock on Postgres."""
+
+    @classmethod
+    def lock(cls):
+        cls.objects.get_or_create(pk=1)
+        return cls.objects.select_for_update().get(pk=1)

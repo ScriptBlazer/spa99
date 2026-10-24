@@ -4,7 +4,9 @@ default storage and handed out as storage URLs (signed on live)."""
 import json
 import logging
 import re
+import uuid
 
+from django.conf import settings
 from django.contrib import messages
 from django.db import IntegrityError, transaction
 from django.db.models import Max, Sum
@@ -15,12 +17,25 @@ from django.views.decorators.http import require_GET, require_POST
 from common.ratelimit import rate_limited_json
 
 from . import media_rules
-from .models import MediaAsset, Playlist, PlaylistItem
+from .models import LibraryLock, MediaAsset, Playlist, PlaylistItem
 from .views import _context, _json_state, admin_only
 
 logger = logging.getLogger("spa99.control")
 TAG_RE = re.compile(r"[^a-z0-9 \-]")
 KINDS_FOR = {Playlist.MUSIC: {MediaAsset.AUDIO}, Playlist.SCREENS: {MediaAsset.VIDEO, MediaAsset.IMAGE}}
+
+
+def _uuid(value):
+    try:
+        return uuid.UUID(str(value))
+    except ValueError:
+        return None
+
+
+def _int_id(value):
+    """A row number from the request, or 0 (nothing) when it is not a plain number that fits."""
+    text = str(value if value is not None else "")
+    return int(text) if text.isdigit() and len(text) <= 9 else 0
 
 
 def _fail(message, status=400):
@@ -57,11 +72,21 @@ def _kind_tags(kind, tags):
     return ["screens"] + [t for t in tags if t not in ("music", "screens")]
 
 
+def media_url(fieldfile):
+    """A link to a Library file. On S3 the signed link lasts CONTROL_MEDIA_URL_HOURS (default 12) so Screens and Music can
+    run all day; locally it is the plain media URL."""
+    if not fieldfile:
+        return None
+    if getattr(fieldfile.storage, "bucket_name", None):
+        return fieldfile.storage.url(fieldfile.name, expire=settings.CONTROL_MEDIA_URL_HOURS * 3600)
+    return fieldfile.url
+
+
 def asset_json(asset, playlists=None):
     """`playlists` = the playlists using this file (id, name, kind); the browser adds the screens and zones it knows about."""
     return {"id": str(asset.id), "title": asset.title, "artist": asset.artist, "kind": asset.kind, "mime": asset.mime,
             "size_bytes": asset.size_bytes, "duration_seconds": asset.duration_seconds, "width": asset.width, "height": asset.height,
-            "tags": asset.tags, "peaks": asset.peaks, "url": asset.file.url, "poster_url": asset.poster.url if asset.poster else None,
+            "tags": asset.tags, "peaks": asset.peaks, "url": media_url(asset.file), "poster_url": media_url(asset.poster),
             "uploaded_by": (asset.uploaded_by.get_full_name() or asset.uploaded_by.email) if asset.uploaded_by_id else "",
             "created_at": asset.created_at.isoformat(), "playlists": playlists or []}
 
@@ -74,8 +99,9 @@ def playlist_json(playlist):
 
 def summary():
     """Library size against the total limit (the meter on the page)."""
-    used = MediaAsset.objects.aggregate(total=Sum("size_bytes"))["total"] or 0
-    return {"used_bytes": used, "max_bytes": media_rules.library_max_bytes()}
+    totals = MediaAsset.objects.aggregate(files=Sum("size_bytes"), posters=Sum("poster_bytes"))
+    used = (totals["files"] or 0) + (totals["posters"] or 0)
+    return {"used_bytes": used, "max_bytes": media_rules.library_max_bytes(), "url_ttl_seconds": settings.CONTROL_MEDIA_URL_HOURS * 3600}
 
 
 def _used_in(rows):
@@ -153,15 +179,17 @@ def upload(request):
         info = media_rules.inspect(file)
     except media_rules.Rejected as error:
         return _upload_failed(request, str(error), error.status)
-    if summary()["used_bytes"] + info["size"] > media_rules.library_max_bytes():
-        return _upload_failed(request, "The Library is full. Delete something to make room.", 507)
     title = (request.POST.get("title") or re.sub(r"\.[A-Za-z0-9]{1,5}$", "", file.name or "")).strip()[:120] or "Untitled"
     asset = MediaAsset(title=title, kind=info["kind"], ext=info["ext"], mime=info["mime"], size_bytes=info["size"],
                        width=info["width"], height=info["height"], uploaded_by=request.user,
                        tags=_kind_tags(info["kind"], _tags(request.POST.get("tags", ""))))
-    asset.file.save(file.name, file, save=False)  # the name is replaced by the uuid path (asset_path)
     try:
-        _save_history(asset, request.user)
+        with transaction.atomic():
+            LibraryLock.lock()  # one upload at a time past the size check (held while the file is stored)
+            if summary()["used_bytes"] + info["size"] > media_rules.library_max_bytes():
+                return _upload_failed(request, "The Library is full. Delete something to make room.", 507)
+            asset.file.save(file.name, file, save=False)  # the name is replaced by the uuid path (asset_path)
+            _save_history(asset, request.user)
     except Exception:
         _remove_file(asset)
         raise
@@ -237,10 +265,17 @@ def asset_duration(request, pk):
             poster.seek(0)
             if not media_rules.is_jpeg(head) or poster.size > 1_048_576:
                 return _fail("The poster must be a jpg under 1 MB.")
-            if asset.poster:
-                asset.poster.delete(save=False)
-            asset.poster.save("poster.jpg", poster, save=False)
-            fields.append("poster")
+            with transaction.atomic():
+                LibraryLock.lock()
+                if summary()["used_bytes"] - asset.poster_bytes + poster.size > media_rules.library_max_bytes():
+                    return _fail("The Library is full. Delete something to make room.", 507)
+                if asset.poster:
+                    asset.poster.delete(save=False)
+                asset.poster.save("poster.jpg", poster, save=False)
+                asset.poster_bytes = poster.size
+                fields += ["poster", "poster_bytes"]
+                asset.save(update_fields=fields)
+            return JsonResponse(asset_json(asset, _used_in([asset]).get(str(asset.id))))
     if asset.kind == MediaAsset.AUDIO and data.get("peaks") is not None:
         peaks = _peaks(data.get("peaks"))
         if peaks:
@@ -329,7 +364,7 @@ def item_add(request, pk):
     try:
         with transaction.atomic():
             playlist = Playlist.objects.select_for_update().get(pk=pk)
-            asset = MediaAsset.objects.filter(pk=data.get("asset_id")).first()
+            asset = MediaAsset.objects.filter(pk=_uuid(data.get("asset_id"))).first() if _uuid(data.get("asset_id")) else None
             if not asset:
                 return _fail("That file is not in the Library.", 404)
             if asset.kind not in KINDS_FOR[playlist.kind]:
@@ -348,7 +383,7 @@ def item_add(request, pk):
 def item_remove(request, pk):
     playlist = _playlist(pk)
     with transaction.atomic():
-        item = playlist.items.filter(pk=_data(request).get("item_id") or 0).first() if str(_data(request).get("item_id", "")).isdigit() else None
+        item = playlist.items.filter(pk=_int_id(_data(request).get("item_id"))).first()
         if not item:
             return _fail("That item is not in this playlist.", 404)
         item.delete()
@@ -362,7 +397,7 @@ def item_seconds(request, pk):
     """How long a picture stays on screen in a screens playlist: 4 to 60 seconds (videos play their own length)."""
     playlist = _playlist(pk)
     data = _data(request)
-    item = playlist.items.select_related("asset").filter(pk=data.get("item_id") or 0).first() if str(data.get("item_id", "")).isdigit() else None
+    item = playlist.items.select_related("asset").filter(pk=_int_id(data.get("item_id"))).first()
     if not item:
         return _fail("That item is not in this playlist.", 404)
     if item.asset.kind != MediaAsset.IMAGE:

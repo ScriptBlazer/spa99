@@ -9,7 +9,7 @@ from django.test import Client, override_settings
 from control.models import MediaAsset, Playlist, PlaylistItem
 from control.tests.test_control import HOST, ControlTestCase, person
 
-MP3 = b"ID3\x03\x00\x00\x00\x00\x00\x00" + b"\x00" * 200
+MP3 = b"ID3\x03\x00\x00\x00\x00\x00\x00" + b"\xff\xfb\x90\x00" + b"\x00" * 200  # ID3 header (size 0), then a real frame header
 PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + (640).to_bytes(4, "big") + (480).to_bytes(4, "big") + b"\x08\x06\x00\x00\x00" + b"\x00" * 50
 MP4 = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" + b"avc1" + b"\x00" * 100
 HEVC = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" + b"hvc1" + b"\x00" * 100
@@ -237,3 +237,109 @@ class LibraryV2Tests(ControlTestCase):
         for gone in (".ogg", ".aac", ".heic"):
             self.assertNotIn(f'"{gone}', html)
             self.assertNotIn(f",{gone}", html)
+
+
+class HardeningTests(ControlTestCase):
+    def setUp(self):
+        self.admin = person("Admin", is_staff=True)
+        self.client = client_for(self.admin)
+
+    def test_bad_ids_are_404_or_400_never_500(self):
+        upload(self.client, MP3)
+        playlist = post_json(self.client, "/library/playlists/create/", {"name": "P", "kind": "music"}).json()
+        base = f"/library/playlists/{playlist['id']}/items"
+        for bad in ("not-a-uuid", "", None, 12345, "x" * 500):
+            r = post_json(self.client, f"{base}/add/", {"asset_id": bad})
+            self.assertEqual(r.status_code, 404, bad)
+            self.assertEqual(r.json()["error"], "That file is not in the Library.")
+        for name in ("remove", "seconds"):
+            for bad in ("9" * 40, "-1", "abc", None):
+                self.assertEqual(post_json(self.client, f"{base}/{name}/", {"item_id": bad, "seconds": 5}).status_code, 404, (name, bad))
+        self.assertEqual(post_json(self.client, f"{base}/reorder/", {"item_ids": ["9" * 40]}).status_code, 400)
+
+    def test_dev_media_is_admin_only_and_limited_to_library_files(self):
+        import importlib
+
+        import config.urls_control as urls
+
+        with override_settings(DEBUG=True):
+            from django.core.files.storage import FileSystemStorage
+            import tempfile
+            from unittest import mock
+
+            with tempfile.TemporaryDirectory() as root:
+                (__import__("pathlib").Path(root) / "control" / "media").mkdir(parents=True)
+                (__import__("pathlib").Path(root) / "control" / "media" / "a.mp3").write_bytes(MP3)
+                (__import__("pathlib").Path(root) / "secret.txt").write_text("private")
+                with mock.patch("django.core.files.storage.default_storage._wrapped", FileSystemStorage(location=root), create=True):
+                    importlib.reload(urls)
+                    view = urls.urlpatterns[-1].callback
+                    from django.test import RequestFactory
+
+                    def call(user, path):
+                        request = RequestFactory().get("/media/" + path)
+                        request.user = user
+                        try:
+                            return view(request, path).status_code
+                        except Exception as error:
+                            return getattr(error, "status_code", type(error).__name__)
+
+                    self.assertEqual(call(self.admin, "control/media/a.mp3"), 200)
+                    self.assertEqual(call(self.admin, "secret.txt"), "Http404")
+                    self.assertEqual(call(person("Office", is_staff=True), "control/media/a.mp3"), "Http404")
+        importlib.reload(urls)
+
+    def test_quota_counts_posters_and_is_checked_under_the_lock(self):
+        upload(self.client, MP4, name="v.mp4")
+        asset = MediaAsset.objects.get()
+        jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 996
+        r = self.client.post(f"/library/assets/{asset.id}/duration/", {"duration_seconds": 5, "poster": SimpleUploadedFile("p.jpg", jpeg)})
+        self.assertEqual(r.status_code, 200, r.content)
+        asset.refresh_from_db()
+        self.assertEqual(asset.poster_bytes, 1000)
+        self.assertEqual(self.client.get("/library/assets/").json()["library"]["used_bytes"], len(MP4) + 1000)
+        with override_settings(CONTROL_LIBRARY_MAX_GB=(len(MP4) + 1500) / 1024 ** 3):
+            self.assertEqual(upload(self.client, MP3, name="b.mp3").status_code, 201)  # 1500 left, mp3 is ~214 bytes
+            r = self.client.post(f"/library/assets/{asset.id}/duration/", {"duration_seconds": 5, "poster": SimpleUploadedFile("p.jpg", jpeg + b"\x00" * 2000)})
+            self.assertEqual(r.status_code, 507)
+
+    def test_media_links_get_the_long_expiry(self):
+        from unittest import mock
+
+        from control.views_library import media_url
+
+        upload(self.client, MP3)
+        asset = MediaAsset.objects.get()
+        storage = mock.Mock(bucket_name="b")
+        storage.url.return_value = "https://signed"
+        field = mock.Mock(storage=storage, name="n")
+        field.name = "control/media/x.mp3"
+        with override_settings(CONTROL_MEDIA_URL_HOURS=12):
+            self.assertEqual(media_url(field), "https://signed")
+        storage.url.assert_called_once_with("control/media/x.mp3", expire=12 * 3600)
+        self.assertEqual(self.client.get("/library/assets/").json()["library"]["url_ttl_seconds"], 12 * 3600)
+
+    def test_sniff_is_strict(self):
+        from control.media_rules import sniff
+
+        ebml = b"\x1a\x45\xdf\xa3\x9f\x42\x86\x81\x01\x42\x82\x84"
+        self.assertEqual(sniff(ebml + b"webm" + b"\x00" * 20)[1], "webm")
+        self.assertIsNone(sniff(ebml + b"\x00\x00\x00\x00" + b"matroska"))  # an mkv is not a webm
+        self.assertIsNone(sniff(b"ID3\x03\x00\x00\x00\x00\x00\x00" + b"<html>garbage"))  # ID3 then no audio frame
+        self.assertIsNone(sniff(b"ID3\x03\x00\x00\x00\x00\x00\x00" + b"\xff\xe1\x90\x00"))  # reserved version bits
+        self.assertIsNone(sniff(b"ID3\x03\x00\x00\x00\x00\x00\x00" + b"\xff\xfb\xf0\x00"))  # bitrate 1111
+        self.assertEqual(sniff(MP3)[1], "mp3")
+        self.assertEqual(sniff(b"\xff\xfb\x90\x00")[1], "mp3")  # a bare frame with no tag
+        self.assertIsNone(sniff(b"\xff\xfb\xfc\x00"))  # sample rate bits 11
+        for brand in (b"qt  ", b"3gp5", b"XXXX"):
+            self.assertIsNone(sniff(b"\x00\x00\x00\x18ftyp" + brand + b"\x00" * 20), brand)
+        for brand in (b"isom", b"mp41", b"mp42", b"avc1", b"M4V ", b"dash"):
+            self.assertEqual(sniff(b"\x00\x00\x00\x18ftyp" + brand + b"\x00" * 20)[1], "mp4", brand)
+
+    def test_id3_tag_larger_than_the_header_read_is_followed(self):
+        tag = 6000  # syncsafe size bytes for 6000 = 0,0,0x2e,0x70
+        size = bytes([0, 0, (tag >> 7) & 0x7F, tag & 0x7F])
+        data = b"ID3\x03\x00\x00" + size + b"\x00" * tag + b"\xff\xfb\x90\x00" + b"\x00" * 100
+        self.assertEqual(upload(self.client, data).status_code, 201)
+        bad = b"ID3\x03\x00\x00" + size + b"\x00" * tag + b"<html>" + b"\x00" * 100
+        self.assertEqual(upload(self.client, bad).status_code, 415)

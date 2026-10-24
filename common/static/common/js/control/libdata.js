@@ -2,7 +2,7 @@
    Everything else reads the cache kept here. Writes are POSTs with the CSRF token. Pretend state never goes through here. */
 import { bus } from "./core.js";
 
-export const L = { assets: [], playlists: [], loaded: false, loading: null, loadedAt: 0, summary: { used_bytes: 0, max_bytes: 0 }, error: "" };
+export const L = { assets: [], playlists: [], loaded: false, loading: null, loadedAt: 0, summary: { used_bytes: 0, max_bytes: 0, url_ttl_seconds: 3600 }, error: "" };
 const URLS = { assets: "/library/assets/", playlists: "/library/playlists/" };
 
 export function csrfToken() {
@@ -36,7 +36,7 @@ export async function postForm(url, form) {
 
 export function loadLibrary(force = false) {
   if (L.loading) return L.loading;
-  const fresh = L.loaded && Date.now() - L.loadedAt < 45 * 60 * 1000;  // signed links last an hour on live
+  const fresh = L.loaded && Date.now() - L.loadedAt < L.summary.url_ttl_seconds * 750;  // refresh at 75% of the signed link life (server says how long; 12 h on live)
   if (fresh && !force) return Promise.resolve(L);
   L.loading = Promise.all([getJSON(URLS.assets), getJSON(URLS.playlists)]).then(([a, p]) => {
     L.assets = a.assets;
@@ -50,6 +50,9 @@ export function loadLibrary(force = false) {
   }).catch((error) => { L.error = error.message; return L; }).finally(() => { L.loading = null; });
   return L.loading;
 }
+
+// A long-running Screens or Music page re-fetches the list (and so the fresh signed links) before the old ones expire.
+setInterval(() => { if (L.loaded) loadLibrary(); }, 10 * 60 * 1000);
 
 export const asset = (id) => L.assets.find((a) => a.id === id) || null;
 export const playlist = (id) => L.playlists.find((p) => p.id === id) || null;
