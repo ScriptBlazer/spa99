@@ -317,8 +317,9 @@ class Model {
     const t = Math.tan((FOV * Math.PI) / 360);
     const aspect = this.size.w / Math.max(1, this.size.h);
     const c = Math.abs(Math.cos(az)); const s = Math.abs(Math.sin(az));
-    const halfW = (c * this.half.x + s * this.half.z) * 1.04;
-    const halfH = (s * this.half.x + c * this.half.z) * 1.04;
+    const pad = 1.06 + 0.55 * Math.sin(pol);  // tilting brings the near edge closer, so leave room for it
+    const halfW = (c * this.half.x + s * this.half.z) * pad;
+    const halfH = (s * this.half.x + c * this.half.z) * pad;
     const dist = Math.max(halfH / t, halfW / (t * aspect)) / zoom;
     this.dist = dist;
     const target = this.tmp.copy(this.centre).add(pan);

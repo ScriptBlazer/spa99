@@ -408,7 +408,7 @@ a.pr[data-tone="danger"] .pr-ring { stroke: var(--ctl-danger); opacity: 1; }
 .ctl-m-canvas.is-hover { cursor: pointer; }
 .ctl-m-canvas.is-drag { cursor: grabbing; }
 .ctl-m-labels { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.ctl-m-label { position: absolute; left: 0; top: 0; width: max-content; padding: 2px 8px; border-radius: 10px; background: var(--color-cream-raised); color: var(--color-espresso); font: 600 12px/1.2 var(--ctl-font); letter-spacing: var(--tracking-body); text-align: center; will-change: transform; transition: opacity var(--ctl-quick); }
+body.control .ctl-m-label { position: absolute; left: 0; top: 0; width: max-content; padding: 2px 8px; border-radius: 10px; background: var(--color-cream-raised); color: var(--ctl-bg); font: 600 12px/1.2 var(--ctl-font); letter-spacing: var(--tracking-body); text-align: center; will-change: transform; transition: opacity var(--ctl-quick); }
 .ctl-m-label.is-hidden { opacity: 0; }
 .ctl-m-label.is-hidden:focus-visible { opacity: 1; }
 .ctl-m-label.is-hover, .ctl-m-label.is-selected { font-weight: 700; box-shadow: 0 0 0 2px var(--ctl-accent); }
