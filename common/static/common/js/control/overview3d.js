@@ -13,7 +13,8 @@ import { panelKey } from "./panel.js";
 const FOV = 26;  // degrees: a long lens so the plan stays true to shape
 const MAX_POLAR = (55 * Math.PI) / 180;
 const ZOOM = [0.85, 3];
-const WALL_H = 22;  // plan units (the building is 1200 long): low, so you see in
+const WALL_H = 90;  // plan units (about 43 per metre, so roughly 2.1 m): tall enough to read as rooms when tilted
+const START_POLAR = (22 * Math.PI) / 180;  // the first view is already a little tilted, so it reads as 3D
 const WALL_HALF = 4;  // each room's own half of the shared wall (plan.py INSET)
 const SLAB = 6;
 const PAD = 10;
@@ -136,14 +137,15 @@ function build(root, data) {
     dim: new THREE.MeshStandardMaterial({ color: dimColour, roughness: 1, metalness: 0 }),
     wall: new THREE.MeshStandardMaterial({ color: wallColour, roughness: 1, metalness: 0 }),
     ring: new THREE.MeshBasicMaterial({ color: gold }),
+    shade: new THREE.MeshBasicMaterial({ color: new THREE.Color(0, 0, 0), transparent: true, opacity: 0.07, depthWrite: false }),  // a soft darker edge where the floor meets the walls
   };
   const mask = glowTexture();
   const disposables = [mask, ...Object.values(mats), renderer];
 
   // soft ambient (sky and ground) plus one directional light
-  const ambient = new THREE.HemisphereLight(new THREE.Color(1, 1, 1), dimColour.clone().multiplyScalar(0.8), 2.2);
-  const sun = new THREE.DirectionalLight(new THREE.Color(1, 1, 1), 0.9);
-  sun.position.set(-600, 1000, 500);
+  const ambient = new THREE.HemisphereLight(new THREE.Color(1, 1, 1), wallColour.clone().multiplyScalar(0.72), 2.3);
+  const sun = new THREE.DirectionalLight(new THREE.Color(1, 1, 1), 1.0);
+  sun.position.set(-700, 900, 600);
   scene.add(ambient, sun);
 
   const all = data.rooms.flatMap((r) => r.points);
@@ -171,6 +173,12 @@ function build(root, data) {
     const floorGeo = flat(shapeOf(room.points), 0.3);
     scene.add(new THREE.Mesh(floorGeo, live ? mats.floor : mats.dim));
     disposables.push(floorGeo);
+
+    const shadeShape = shapeOf(room.points);
+    shadeShape.holes.push(pathOf(offsetPoly(room.points, -14)));
+    const shadeGeo = flat(shadeShape, 0.45);
+    scene.add(new THREE.Mesh(shadeGeo, mats.shade));
+    disposables.push(shadeGeo);
 
     const wallShape = shapeOf(outer);
     wallShape.holes.push(pathOf(room.points));
@@ -212,7 +220,7 @@ class Model {
     this.abort = new AbortController();
     Object.assign(this, build(root, data));
     this.live = this.rooms.filter((r) => r.slug);
-    this.view = { az: 0, pol: 0, zoom: 1, pan: new THREE.Vector3() };
+    this.view = { az: 0, pol: START_POLAR, zoom: 1, pan: new THREE.Vector3() };
     this.touched = false;
     this.size = { w: 0, h: 0 };
     this.raf = 0;
@@ -246,14 +254,7 @@ class Model {
       host.append(a);
       return { el: a, room: r };
     });
-    this.notes = (this.data.notes || []).map((n) => {
-      const s = document.createElement("span");
-      s.className = "ctl-m-note";
-      s.textContent = n.text;
-      s.setAttribute("aria-hidden", "true");
-      host.append(s);
-      return { el: s, x: n.x, z: n.y };
-    });
+    this.notes = [];  // no loose captions: everything drawn belongs to the model
   }
 
   /* ----- state: the room lights and the selected room ----- */
@@ -275,7 +276,7 @@ class Model {
       if (on) {
         const [R, G, B] = warmRgb(r.lights.warmth);
         item.glowMat.color.setRGB(R / 255, G / 255, B / 255, THREE.SRGBColorSpace);
-        item.glowMat.opacity = 0.12 + 0.43 * (r.lights.bright / 100);
+        item.glowMat.opacity = 0.1 + 0.3 * (r.lights.bright / 100);
       }
       item.selected = sel;
       item.tone = tone;
@@ -385,14 +386,20 @@ class Model {
     const scale = h / 2 / (this.dist * Math.tan((FOV * Math.PI) / 360));
     const c = Math.abs(Math.cos(this.view.az)); const s = Math.abs(Math.sin(this.view.az));
     const v = new THREE.Vector3();
-    for (const l of this.labels) {
+    const list = this.labels.map((l) => {
       v.set(l.room.centre[0], 1, l.room.centre[1]).project(this.camera);
-      l.el.style.transform = `translate(${((v.x * 0.5 + 0.5) * w).toFixed(1)}px, ${((-v.y * 0.5 + 0.5) * h).toFixed(1)}px) translate(-50%, -50%)`;
-      l.el.style.maxWidth = `${Math.max(40, (c * l.room.w + s * l.room.h) * scale - 2).toFixed(0)}px`;
-    }
-    for (const n of this.notes) {
-      v.set(n.x, 0, n.z).project(this.camera);
-      n.el.style.transform = `translate(${((v.x * 0.5 + 0.5) * w).toFixed(1)}px, ${((-v.y * 0.5 + 0.5) * h).toFixed(1)}px) translate(-50%, -50%)`;
+      const x = (v.x * 0.5 + 0.5) * w; const y = (-v.y * 0.5 + 0.5) * h;
+      l.el.style.maxWidth = `${Math.max(56, (c * l.room.w + s * l.room.h) * scale).toFixed(0)}px`;
+      return { l, x, y, rank: (l.room.selected ? 1e9 : 0) + (this.hover === l.room.slug ? 1e9 : 0) + l.room.w * l.room.h };
+    });
+    for (const it of list) { it.bw = it.l.el.offsetWidth; it.bh = it.l.el.offsetHeight; }
+    const placed = [];
+    for (const it of list.sort((a, b) => b.rank - a.rank)) {
+      const box = [it.x - it.bw / 2 - 2, it.y - it.bh / 2 - 2, it.x + it.bw / 2 + 2, it.y + it.bh / 2 + 2];
+      const clash = placed.some((p) => box[0] < p[2] && p[0] < box[2] && box[1] < p[3] && p[1] < box[3]);
+      it.l.el.classList.toggle("is-hidden", clash);  // never two labels on top of each other: the smaller room waits until there is space
+      if (!clash) placed.push(box);
+      it.l.el.style.transform = `translate(${it.x.toFixed(1)}px, ${it.y.toFixed(1)}px) translate(-50%, -50%)`;
     }
   }
 
