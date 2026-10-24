@@ -1,0 +1,19 @@
+{% extends "control/base.html" %}
+{% block main %}
+<h1 class="ctl-sr">Rooms</h1>
+<div class="ctl-scenes" role="group" aria-label="Scenes">
+  <span class="ctl-scenes-label">Scene</span>
+  <div class="ctl-scenes-row">{% for s in scenes %}<button type="button" class="ctl-scene" data-scene="{{ s.key }}" aria-pressed="{% if s.key == active.key %}true{% else %}false{% endif %}">{{ s.label }}</button>{% endfor %}</div>
+  <p class="ctl-scenes-now" data-f="scene_now">Now: {{ active.label }} &middot; since {{ active.time }}</p>
+</div>
+<ul class="ctl-grid">
+  {% for room in state.rooms %}<li>{% include "control/_card.html" %}</li>{% endfor %}
+</ul>
+
+<div class="ctl-backdrop" data-backdrop{% if not open_room %} hidden{% endif %}><a href="{% url 'control_rooms' %}" data-close tabindex="-1" aria-label="Close room"></a></div>
+<aside class="ctl-drawer" id="ctl-drawer" role="dialog" aria-modal="true" aria-labelledby="ctl-drawer-title" data-drawer{% if not open_room %} hidden{% endif %}>
+  {% if open_room %}{% include "control/_drawer_body.html" with room=open_room %}{% endif %}
+</aside>
+<template id="ctl-drawer-tpl">{% include "control/_drawer_body.html" with generic=True %}</template>
+<template id="ctl-tile-tpl">{% include "control/_tile.html" with screen=blank_screen %}</template>
+{% endblock %}

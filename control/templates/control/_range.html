@@ -1,0 +1,2 @@
+{% load control_ui %}{# Slider. f = field name, label = accessible name, vt = aria-valuetext. Fill is drawn from --v (a scaleX). #}
+<span class="ctl-range{% if compact %} is-compact{% endif %}{% if warm %} is-warm{% endif %}" style="--v:{% if generic %}0{% else %}{{ value|frac:bounds }}{% endif %}"><input type="range" data-f="{{ f }}" min="{{ min }}" max="{{ max }}" step="{{ step|default:1 }}"{% if not generic %} value="{{ value }}" aria-valuetext="{{ vt }}"{% endif %} aria-label="{{ label }}"></span>

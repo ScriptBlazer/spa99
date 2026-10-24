@@ -1,0 +1,8 @@
+{# 16:9 miniature of what a screen shows, in the brand. Real HTML scaled with container units; every variant is present and CSS shows the current one (data-content), so a change cross-fades. #}
+{% load static %}<div class="ctl-tile" data-tile="{{ screen.id }}" data-content="{{ screen.effective }}" aria-hidden="true">
+  <div class="ctl-screen ctl-screen-welcome"><img src="{% static 'common/img/mark-gold.svg' %}" alt=""><p class="ctl-s-title">Welcome to Spa 99</p><p class="ctl-s-sub">Beyond Luxury</p></div>
+  <div class="ctl-screen ctl-screen-hours"><p class="ctl-s-kicker">Today</p><p class="ctl-s-title">{{ state.hours_line }}</p><p class="ctl-s-sub">{{ state.hours_detail|join:" · " }}</p></div>
+  <div class="ctl-screen ctl-screen-menu"><p class="ctl-s-kicker">Kitchenette</p><ul>{% for item in state.menu %}<li>{{ item }}</li>{% endfor %}</ul></div>
+  <div class="ctl-screen ctl-screen-notices"><p class="ctl-s-kicker">Notice</p><p class="ctl-s-title" data-notice="{{ screen.id }}">{{ screen.notice }}</p></div>
+  <div class="ctl-screen ctl-screen-off"><p>Off</p></div>
+</div>

@@ -1,0 +1,17 @@
+{% extends "control/base.html" %}
+{% block main %}
+<h1 class="ctl-title">Screens</h1>
+<p class="ctl-lead">What each screen in the building is showing.</p>
+<ul class="ctl-screens">
+  {% for screen in state.screens %}<li>
+  <article class="ctl-screen-card" data-screen="{{ screen.id }}">
+    {% include "control/_tile.html" %}
+    <h2>{{ screen.name }}</h2>
+    <p class="ctl-soft">{{ screen.room_name }}</p>
+    <p class="ctl-sr" data-f="summary">{{ screen.name }} screen shows {{ screen.label }}.</p>
+    <div class="ctl-seg ctl-seg-wide" role="radiogroup" aria-label="{{ screen.name }} shows">{% for o in options %}<label><input type="radio" name="content-{{ screen.id }}" data-f="content" value="{{ o.key }}"{% if screen.effective == o.key %} checked{% endif %}><span>{{ o.label }}</span></label>{% endfor %}</div>
+    <div class="ctl-line"><span class="ctl-label">Power</span>{% include "control/_toggle.html" with f="power" checked=screen.power label=screen.name|add:" power" %}</div>
+    <p class="ctl-field ctl-notice-field"><label for="notice-{{ screen.id }}">Notice text</label><input id="notice-{{ screen.id }}" type="text" maxlength="80" data-f="notice" value="{{ screen.notice }}" autocomplete="off"></p>
+  </article></li>{% endfor %}
+</ul>
+{% endblock %}

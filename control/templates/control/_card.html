@@ -1,0 +1,17 @@
+{% load control_ui %}{% with v=room.v caps=room.caps %}
+<article class="ctl-card" data-room="{{ room.slug }}" data-tone="{{ v.tone }}" style="--glow-c:var(--ctl-warm-{{ v.glow_k }});--glow-a:{{ v.glow_a }}">
+  <span class="ctl-glow" aria-hidden="true"></span>
+  <header class="ctl-card-head">
+    <h2><a class="ctl-card-open" href="?room={{ room.slug }}" data-open-room="{{ room.slug }}">{{ room.name }}</a></h2>
+    <span class="ctl-pill" data-f="badge" data-tone="{{ v.tone }}">{{ v.badge }}</span>
+  </header>
+  {% if caps.climate %}<p class="ctl-climate"><span class="ctl-big" data-f="cur_text">{{ v.cur_text }}</span><span class="ctl-target">target <span data-f="target_text">{{ v.target_text }}</span></span></p>
+  {% if v.hum_text %}<p class="ctl-sub" data-f="hum_text">{{ v.hum_text }}</p>{% endif %}
+  {% elif caps.tank %}<p class="ctl-sub">Fish tank water <span data-f="tank_text">{{ v.tank_text }}</span></p>{% endif %}
+  <dl class="ctl-rows">
+    <div class="ctl-row"><dt>Lights</dt><dd>{% include "control/_range.html" with f="bright" min=0 max=100 bounds="0,100" value=room.lights.bright vt=v.bright_vt label="Brightness, "|add:room.name compact=True %}<span class="ctl-val" data-f="bright_text">{{ v.bright_text }}</span><span class="ctl-soft" data-f="warmth_text">{{ v.warmth_text }}</span></dd></div>
+    {% if caps.music %}<div class="ctl-row"><dt>Music</dt><dd><span class="ctl-music" data-f="music_text">{{ v.music_text }}</span>{% include "control/_range.html" with f="vol" min=0 max=100 bounds="0,100" value=room.music.vol vt=v.vol_vt label="Volume, "|add:room.name compact=True %}<span class="ctl-val" data-f="vol_text">{{ room.music.vol }}</span></dd></div>{% endif %}
+    {% if v.screen %}<div class="ctl-row"><dt>Screen</dt><dd data-f="screen_text">{{ v.screen_text }}</dd></div>{% endif %}
+  </dl>
+  <p class="ctl-people" data-f="people_text">{{ v.people_text }}</p>
+</article>{% endwith %}

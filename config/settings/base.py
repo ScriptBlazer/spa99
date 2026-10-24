@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "insights",
     "office",
     "system",
+    "control",
     "pages",
 ]
 

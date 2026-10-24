@@ -1,0 +1,36 @@
+{% extends "control/base.html" %}
+{% load control_ui %}
+{% block main %}
+<h1 class="ctl-title">Schedule</h1>
+<p class="ctl-lead">Automatic changes through the day. Opening hours come from the Office and are read only here.</p>
+<p class="ctl-lock">{% include "common/_icon.html" with name="lock-simple" %}From opening hours in the Office</p>
+
+<div class="ctl-axis" aria-hidden="true">{% for tick in state.axis %}<span style="left:{{ tick.pct }}%">{{ tick.label }}</span>{% endfor %}</div>
+{% for day in state.week %}
+<section class="ctl-day{% if day.today %} is-today{% endif %}" aria-labelledby="day-{{ day.index }}">
+  <h2 class="ctl-day-h" id="day-{{ day.index }}">{{ day.label }} <span class="ctl-soft">{{ day.short }}</span></h2>
+  <div class="ctl-lane-wrap" style="--rows:{{ day.rows }}">
+    {% for e in day.events %}<span class="ctl-mark{% if e.skipped %} is-skipped{% endif %}" style="left:{{ e.pct }}%;--r:{{ e.row }}" aria-hidden="true"></span>
+    <button type="button" class="ctl-ev{% if e.end %} is-end{% endif %}{% if e.skipped %} is-skipped{% endif %}" style="--at:{{ e.pct }}%;--r:{{ e.row }}" data-ev="{{ e.key }}" data-day="{{ day.index }}" aria-haspopup="dialog" aria-expanded="false">{{ e.name }}<span class="ctl-sr">, {{ e.time }}{% if e.skipped %}. Skipped, closed{% endif %}</span></button>{% endfor %}
+    <div class="ctl-lane" title="From opening hours in the Office">
+      {% for b in day.bands %}<span class="ctl-band" style="{{ b|pos_style }}"><span>{{ b.label }}</span></span>{% endfor %}
+      {% for c in day.closed %}<span class="ctl-closed" style="{{ c|pos_style }}"><span>{{ c.label }}</span></span>{% endfor %}
+      {% if day.today %}<span class="ctl-now" data-nowline style="left:{{ state.now_pct }}%"><span class="ctl-now-tag" data-f="clock">{{ state.now.clock }}</span></span>{% endif %}
+    </div>
+  </div>
+  {% if day.notes or day.skipped %}<ul class="ctl-notes">{% for n in day.notes %}<li>{{ n }}</li>{% endfor %}{% if day.skipped %}<li>Skipped, closed: {{ day.skipped }}.</li>{% endif %}</ul>{% endif %}
+  <ol class="ctl-daylist">
+    {% for item in day.list %}{% if item.type == "event" %}<li><button type="button" data-ev="{{ item.key }}" data-day="{{ day.index }}" aria-haspopup="dialog"{% if item.skipped %} class="is-skipped"{% endif %}><span class="ctl-time">{{ item.time }}</span> {{ item.name }}{% if item.skipped %} <span class="ctl-soft">Skipped, closed</span>{% endif %}</button></li>
+    {% else %}<li class="ctl-daylist-closed"><span>{{ item.text }}{% if item.kind == "shabbos" %}, example times{% endif %}</span></li>{% endif %}{% endfor %}
+  </ol>
+</section>
+{% endfor %}
+
+<div class="ctl-pop" data-pop role="dialog" aria-labelledby="ctl-pop-title" hidden>
+  <h3 id="ctl-pop-title" data-pop-title tabindex="-1"></h3>
+  <p class="ctl-soft" data-pop-time></p>
+  <p data-pop-text></p>
+  <div class="ctl-line"><span class="ctl-label">Runs</span>{% include "control/_toggle.html" with f="runs" checked=True label="Runs" %}</div>
+  <div class="ctl-pop-actions"><button type="button" class="ctl-btn" data-pop-close>Close</button><button type="button" class="ctl-btn ctl-btn-primary" data-pop-run>Run now</button></div>
+</div>
+{% endblock %}
