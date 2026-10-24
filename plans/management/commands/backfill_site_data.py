@@ -33,6 +33,13 @@ written by hand:
 
 - (virtual tour, 2026-10-23) the `tour` page and its rows, and the `spa` `tour_link` row, are created when missing
 
+- (legal pages, 2026-10-23) the Privacy notice and Terms of use get their full text (content/legal.py): missing rows are
+  created, the "To be supplied." placeholder rows, the empty title row and the "Write to us at" contact row are replaced
+  only while they still have exactly that wording, the "Draft." note is hidden while unchanged, and the privacy version
+  in Site settings goes from "draft-1" to the dated version (people who accepted "draft-1" keep that record)
+  (review round, same day) privacy parts still exactly as first written get the corrected text (Sentry wording, change
+  history, Gold consents, optional details, tour storage, team sign-ins)
+
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 from collections import Counter
 
@@ -138,6 +145,62 @@ def backfill():
     changed.update(_approver_email_rows())
     changed.update(_gold_bml_no_off())
     changed.update(_industry_gold_points())
+    changed.update(_legal_pages())
+    return changed
+
+
+def _legal_pages():
+    """2026-10-23: the real Privacy notice and Terms of use. Never overwrites a row edited in Control."""
+    from content import legal
+    from plans.models import SiteSettings
+
+    changed = Counter()
+    pages = list(content_seed.PAGES)
+    for page_key in ("privacy", "terms"):
+        title, description, sections = content_seed.PAGES[page_key]
+        page, made = Page.objects.get_or_create(key=page_key, defaults={
+            "title": title, "meta_description": description, "order": pages.index(page_key) + 1})
+        if made:
+            changed["content.Page (legal pages)"] += 1
+        touched = False
+        for field, (old, new) in legal.OLD_PAGE_TEXT.get(page_key, {}).items():
+            if getattr(page, field) == old:
+                setattr(page, field, new)
+                touched = True
+        if touched:
+            page.save()
+            changed["content.Page (legal title and description)"] += 1
+        for order, (key, heading, body, cta_label, cta_url) in enumerate(sections, start=1):
+            section = Section.objects.filter(page=page, key=key).first()
+            if section is None:
+                Section.objects.create(page=page, key=key, heading=heading, body=body, cta_label=cta_label,
+                                       cta_url=cta_url, order=order)
+                changed["content.Section (legal rows created)"] += 1
+                continue
+            placeholder = (section.body == legal.OLD_PLACEHOLDER_BODY
+                           or (key == "contact" and section.body == legal.OLD_CONTACT_BODY)
+                           or (key == "body" and section.body == "" and section.heading == legal.OLD_BODY_HEADINGS[page_key]))
+            if placeholder:
+                section.heading, section.body, section.order = heading, body, order
+                section.save()
+                changed["content.Section (legal placeholder text replaced)"] += 1
+        if page_key == "privacy":  # review round (2026-10-23): rows still exactly the first text get the corrected text
+            bodies = {key: body for key, _, body, _, _ in sections}
+            for key, old_body in legal.ROUND_1_PRIVACY_BODIES.items():
+                for section in Section.objects.filter(page=page, key=key, body=old_body):
+                    section.body = bodies[key]
+                    section.save()
+                    changed["content.Section (privacy notice review corrections)"] += 1
+        for note in Section.objects.filter(page=page, key="draft_note", body=legal.OLD_DRAFT_NOTE, visible=True):
+            note.visible = False
+            note.save()
+            changed["content.Section (legal draft note hidden)"] += 1
+
+    site = SiteSettings.load()
+    if site.privacy_version == "draft-1":
+        site.privacy_version = legal.PRIVACY_VERSION
+        site.save()
+        changed["plans.SiteSettings (privacy version)"] += 1
     return changed
 
 

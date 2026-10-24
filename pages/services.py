@@ -15,7 +15,8 @@ from plans.models import Facility, OpeningRule, Plan, SiteSettings
 # Home "What's inside" preview: the photo shown for a room (IMMERSIVE-R2 section 3, R3). Rooms not listed keep the current picture.
 # No photo here may appear elsewhere on Home: dry-sauna (Heat, slowly), cold-plunge, relax-loungers (the ritual) and lounge
 # (the journey entry) are already used above, so those rooms are not listed.
-HOME_PREVIEW_IMAGES = {"wet-sauna": "wet-sauna", "showers": "showers", "massage-room": "massage-room", "gym": "gym", "kitchenette": "kitchenette"}
+# Home-specific preview crops; any room not listed uses its own Facility.image_name.
+HOME_PREVIEW_IMAGES = {"cold-plunge": "cold-tub", "wet-sauna": "wet-sauna", "showers": "showers", "massage-room": "massage-room", "gym": "gym", "kitchenette": "kitchenette"}
 
 
 def split_label(label):
@@ -388,11 +389,20 @@ def next_from_line(copy=None):
     return copy["next_from"].body.replace("{price}", f"£{cheapest['price_whole']}").replace("{price_inc}", f"£{cheapest['price_inc']}")
 
 
+def _home_preview(facility):
+    """The hover picture on Home: a Home-specific crop when there is one, else the room's own image (Facility.image_name),
+    so every visible room has a preview (Moishe 2026-10-23: dry sauna, cold plunge and relaxing zone had none)."""
+    for name in (HOME_PREVIEW_IMAGES.get(facility.slug, ""), facility.image_name or ""):
+        if name and images.has_image(name):
+            return name
+    return ""
+
+
 def room_index():
     """All visible rooms for Home: name, one line, anchor slug, and the render to preview (an uploaded image wins)."""
     return [
         {"slug": f.slug, "name": f.name, "line": f.short_line, "image": f.image if f.image else None,
-         "preview": HOME_PREVIEW_IMAGES.get(f.slug, "") if images.has_image(HOME_PREVIEW_IMAGES.get(f.slug, "")) else ""}
+         "preview": _home_preview(f)}
         for f in plan_services.visible_facilities()
     ]
 

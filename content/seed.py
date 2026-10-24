@@ -6,6 +6,7 @@ so the date lives in one place.
 
 Section keys use underscores so templates can reach them: {{ home.journey_entry.heading }}.
 Multi-line text (steps, role lists) is one line per row in `body`."""
+from . import legal
 from .models import Page, Section
 
 KIT_BODY = "Towels | towel-bench-portrait | 50% 45%\nRobe | robe | 100% 38%\nSlippers | slippers | 62% 60%\nToiletries | toiletries | 50% 55%"
@@ -163,21 +164,8 @@ PAGES = {
         ("men_only", "", "Men only. 18 and over.", "", ""),
         ("getting_here", "", "", "", ""),
     ]),
-    "privacy": ("Privacy notice", "How Spa 99 uses your information.", [
-        ("body", "Privacy notice.", "", "", ""),
-        ("draft_note", "Draft.", "The full text is to be supplied before launch.", "", ""),
-        ("part_1", "What we collect", "To be supplied.", "", ""),
-        ("part_2", "How we use it", "To be supplied.", "", ""),
-        ("part_3", "Your rights", "To be supplied.", "", ""),
-        ("contact", "Contact", "Write to us at", "", ""),
-    ]),
-    "terms": ("Terms", "Spa 99 terms.", [
-        ("body", "Terms.", "", "", ""),
-        ("draft_note", "Draft.", "The full text is to be supplied before launch.", "", ""),
-        ("part_1", "Membership", "To be supplied.", "", ""),
-        ("part_2", "Using the spa", "To be supplied.", "", ""),
-        ("contact", "Contact", "Write to us at", "", ""),
-    ]),
+    "privacy": legal.PRIVACY,  # full text and its sources: content/legal.py, docs/features/legal.md (2026-10-23)
+    "terms": legal.TERMS,
 }
 
 

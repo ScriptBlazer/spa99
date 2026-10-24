@@ -222,6 +222,10 @@ def export_applications(email):
             "mobile": a.mobile, "industry": a.industry, "industry_other": a.industry_other, "property_link": a.property_link, "size_range": a.size_range, "where": a.location,
             "company": a.company, "role": a.role, "bml_relationship": a.bml_relationship,
             "referred_by": a.referred_by, "note": a.note, "potential": a.potential_level, "status": a.status,
+            "potential_score": a.potential_score, "potential_reasons": a.potential_reasons,
+            "marketing_consent": a.marketing_consent, "privacy_accepted_version": a.privacy_accepted_version,
+            "privacy_accepted_at": a.privacy_accepted_at.isoformat() if a.privacy_accepted_at else None,
+            **({"internal_notes": a.internal_notes} if a.internal_notes else {}),
             "spa_interest": a.spa_interest,
             "approved_at": a.approved_at.isoformat() if a.approved_at else None,
             "invites": [
