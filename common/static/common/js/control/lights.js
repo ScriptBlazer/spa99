@@ -14,7 +14,7 @@ let frame = 0;
 
 const st = () => S.st;
 export const roomOf = (slug) => st().rooms.find((r) => r.slug === slug);
-const sceneOf = (key) => st().scenes.find((s) => s.key === key);
+export const sceneOf = (key) => st().scenes.find((s) => s.key === key);
 export const screenOf = (id) => st().screens.find((s) => s.id === id);
 
 /* ---------- derived values ---------- */
@@ -88,7 +88,8 @@ function roomFields(r) {
 /* ---------- warm colour for the plan ---------- */
 
 let warmStops = null;
-function warmColour(kelvin) {
+/** The brand warm-light colour for a colour temperature, as [r, g, b] (0 to 255), blended between the token stops. */
+export function warmRgb(kelvin) {
   if (!warmStops) {
     const style = getComputedStyle(document.body);
     warmStops = st().warm_stops.map((k) => {
@@ -103,11 +104,12 @@ function warmColour(kelvin) {
     const b = warmStops[i];
     if (k <= b.k) {
       const t = (k - a.k) / (b.k - a.k);
-      return `rgb(${a.rgb.map((v, j) => Math.round(v + (b.rgb[j] - v) * t)).join(" ")})`;
+      return a.rgb.map((v, j) => Math.round(v + (b.rgb[j] - v) * t));
     }
   }
-  return "";
+  return [255, 255, 255];
 }
+const warmColour = (kelvin) => `rgb(${warmRgb(kelvin).join(" ")})`;
 
 /* ---------- painting ---------- */
 
@@ -148,7 +150,7 @@ function paintPhoto(scope, r) {
 
 function paintPlan(r, f) {
   const [word, tone] = status(r);
-  const opacity = r.lights.on ? 0.12 + (r.lights.bright / 100) * 0.55 : 0;
+  const opacity = r.lights.on ? 0.06 + (r.lights.bright / 100) * 0.22 : 0;  // calm: a soft tint, never a strong fill
   const colour = warmColour(r.lights.warmth);
   const line1 = tone === "danger" ? "Alert" : r.lights.on ? `${r.lights.bright}%  ${r.lights.warmth}K` : "Off";
   const line2 = r.caps.climate && r.heater ? f.cur_text : "";
@@ -201,7 +203,13 @@ export function renderLights() {
   if (label) { if (!open) label.dataset.tone = "muted"; else if (nearly) label.dataset.tone = "warn"; else delete label.dataset.tone; }
   const al = $('[data-f="alerts-label"]');
   if (al) { if (n === 0) al.dataset.tone = "ok"; else delete al.dataset.tone; }
-  for (const b of $$("[data-scene]")) b.setAttribute("aria-pressed", String(b.dataset.scene === s.scene.key && !sc.hidden));
+  const live = !glides.length;
+  for (const b of $$("[data-scene]")) {
+    const here = b.dataset.scene === s.scene.key && !sc.hidden && live && sceneMatches(sc);
+    b.dataset.active = String(here);
+    const tag = $(".ctl-scene-tag", b);
+    if (tag) tag.hidden = !here;
+  }
   for (const scope of $$("[data-room]")) {
     const r = roomOf(scope.dataset.room);
     if (!r) continue;
@@ -211,6 +219,7 @@ export function renderLights() {
     paintPhoto(scope, r);
   }
   for (const r of s.rooms) paintPlan(r, roomFields(r));
+  bus.emit("lights-rendered");
   renderBell();
   if (view.alertsOpen) {
     const sig = s.alerts.map((a) => a.id).join();
@@ -282,11 +291,40 @@ function lightOn(r) {
 
 /* ---------- scenes: values glide, room by room ---------- */
 
+/** What a scene sets in one room: the saved edit (Scene editor), else the scene's own values. null = the scene leaves the light alone. */
+export function sceneRoom(sc, r) {
+  if (!r.caps.lights) return null;
+  const edit = st().sceneEdits && st().sceneEdits[sc.key];
+  const mine = edit && edit.rooms && edit.rooms[r.slug];
+  if (mine) return { bright: mine.bright, warmth: mine.warmth };
+  if (sc.lights === null || sc.lights === undefined) return null;
+  return { bright: (sc.exceptions && sc.exceptions[r.slug]) ?? sc.lights, warmth: sc.warmth };
+}
+
+/** What a scene does to one music zone: "keep", "off", "sp:<playlist id>" (demo Spotify) or "lib:<playlist id>" (Library). */
+export function sceneZone(sc, zoneId) {
+  const edit = st().sceneEdits && st().sceneEdits[sc.key];
+  const mine = edit && edit.zones && edit.zones[zoneId];
+  if (mine) return mine;
+  return sc.music && sc.music.on === false ? "off" : "keep";
+}
+
+/** True when every room's light is exactly what the scene sets (so the scene is "Active"). */
+export function sceneMatches(sc) {
+  let any = false;
+  for (const r of st().rooms) {
+    const v = sceneRoom(sc, r);
+    if (!v) continue;
+    any = true;
+    if (r.lights.bright !== v.bright || r.lights.warmth !== v.warmth || r.lights.on !== v.bright > 0) return false;
+  }
+  return any;
+}
+
 function targetFor(r, sc) {
   const out = {};
-  if (sc.lights !== null && sc.lights !== undefined && r.caps.lights) {
-    out.lights = { on: true, bright: (sc.exceptions && sc.exceptions[r.slug]) ?? sc.lights, warmth: sc.warmth };
-  }
+  const v = sceneRoom(sc, r);
+  if (v) out.lights = { on: v.bright > 0, bright: v.bright, warmth: v.warmth };
   if (sc.heaters && r.caps.climate) out.heater = sc.heaters === "on" || Boolean(sc.chiller_stays && r.caps.climate.kind === "water");
   return out;
 }
@@ -314,7 +352,11 @@ export function applyScene(key) {
     if (content) screens[s.id] = { content, notice: sc.notice && content === "notices" ? sc.notice : undefined };
   }
   glide(items, screens);
-  if (sc.music && S.sceneMusic) S.sceneMusic(sc.music);
+  if (sc.music && S.sceneMusic) {
+    const choices = {};
+    for (const z of st().music.zones) choices[z.id] = sceneZone(sc, z.id);
+    S.sceneMusic(sc.music, choices);
+  }
   toast(`${sc.label} applied to ${plural(touched, "room")}.`, () => undo(before));
   announce(`${sc.label} scene applied.`);
 }
@@ -424,23 +466,25 @@ export function openRoom(slug, { push = true } = {}) {
   const music = S.roomMusic ? S.roomMusic(r) : { zone: "" };
   if (!r.caps.music || !music.zone) $$('[data-cap="music"]', node).forEach((x) => x.remove());
   else { const a = $('[data-f="music_open"]', node); if (a) a.href = `/music/?zone=${music.zone}`; }
+  let preview = null;
   if (r.caps.screen) {
     const a = $('[data-f="screen_open"]', node);
     if (a) a.href = `/screens/?screen=${r.caps.screen}`;
     const slot = $("[data-tile-slot]", node);
-    const tile = $("#ctl-tile-tpl") && $("#ctl-tile-tpl").content.firstElementChild.cloneNode(true);
-    if (slot && tile) {
-      tile.dataset.tile = r.caps.screen;
-      const note = $("[data-notice]", tile);
-      if (note) note.dataset.notice = r.caps.screen;
-      slot.replaceWith(tile);
-      if (S.mountPreview) S.mountPreview(tile.parentElement, screenOf(r.caps.screen), { replace: tile });
+    const screen = screenOf(r.caps.screen);
+    if (slot && screen && S.mountPreview) {
+      // the preview fills whatever it is mounted on, so it gets a box of its own (never the whole section or panel)
+      preview = document.createElement("div");
+      preview.className = "ctl-prev";
+      preview.dataset.prev = screen.id;
+      slot.replaceWith(preview);
+      S.mountPreview(preview, screen);
     }
   } else {
     $$('[data-cap="screen"]', node).forEach((x) => x.remove());
   }
   fillPhoto(node, r);
-  openPanel({ key: `room:${slug}`, node, rail: true, size: "peek", onClose: () => { if (location.search) history.replaceState(null, "", location.pathname); S.render(); } });
+  openPanel({ key: `room:${slug}`, node, rail: true, size: "peek", onClose: (quiet) => { if (preview && preview._preview) preview._preview.destroy(); if (!quiet && location.search) history.replaceState(null, "", location.pathname); S.render(); } });
   if (push) history.replaceState(null, "", `${location.pathname}?room=${slug}`);
   S.render();
 }
@@ -690,8 +734,6 @@ export function initLights() {
   document.addEventListener("click", (event) => {
     const t = event.target instanceof Element ? event.target : null;
     if (!t) return;
-    const scene = t.closest("[data-scene]");
-    if (scene) { applyScene(scene.dataset.scene); return; }
     const act = t.closest("[data-act]");
     if (act && act.closest("[data-room]")) {
       const r = roomOf(act.closest("[data-room]").dataset.room);

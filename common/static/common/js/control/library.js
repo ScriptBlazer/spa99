@@ -217,7 +217,7 @@ function rebuildShell() {
 }
 
 function go(search, replace = false) {
-  history[replace ? "replaceState" : "pushState"](null, "", `${location.pathname}${search}`);
+  history.replaceState(null, "", `${location.pathname}${search}`);  // a view inside the Library never adds a history entry (only a tab change does)
   syncLibraryUrl();
 }
 
@@ -430,7 +430,7 @@ function openItem(id, push = true) {
     const n = event.target;
     if (n instanceof HTMLInputElement && n.matches("[data-item-scrub]")) { n.dataset.drag = "0"; if (playing === id) audioEl().currentTime = Number(n.value); }
   });
-  openPanel({ key: `item:${id}`, node, size: "full", onClose: () => { stopPreview(); const q = params(); q.delete("item"); const s = q.toString(); history.replaceState(null, "", `${location.pathname}${s ? `?${s}` : ""}`); } });
+  openPanel({ key: `item:${id}`, node, size: "full", onClose: (quiet) => { stopPreview(); if (quiet) return; const q = params(); q.delete("item"); const s = q.toString(); history.replaceState(null, "", `${location.pathname}${s ? `?${s}` : ""}`); } });
   if (push) { const q = params(); q.set("item", id); history.replaceState(null, "", `${location.pathname}?${q}`); }
 }
 

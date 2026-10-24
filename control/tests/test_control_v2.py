@@ -36,6 +36,34 @@ class PlanTests(SimpleTestCase):
                 self.assertFalse(ax1 < bx2 and bx1 < ax2 and ay1 < by2 and by1 < ay2, f"{a} overlaps {b}")
 
 
+class Model3dTests(SimpleTestCase):
+    def test_the_3d_outlines_cover_every_room_and_walls_between_rooms_are_the_gaps(self):
+        data = plan.model()
+        by_slug = {r["slug"]: r for r in data["rooms"] if r["slug"]}
+        self.assertEqual(set(by_slug), {"dry-sauna", "wet-sauna", "showers", "cold-plunge", "relaxing-zone", "changing-room", "hallway", "kitchenette", "massage-room", "gym", "reception-lounge"})
+        self.assertNotIn("survey", {r["id"] for r in data["rooms"]})  # the not-surveyed ghost is not drawn
+        dry = by_slug["dry-sauna"]["points"]
+        self.assertEqual(dry, [[12 + plan.INSET, 14 + plan.INSET], [142 - plan.INSET, 14 + plan.INSET], [142 - plan.INSET, 192 - plan.INSET], [12 + plan.INSET, 192 - plan.INSET]])
+        self.assertGreater(len(by_slug["reception-lounge"]["points"]), 4)  # the L shaped entrance keeps its outline
+        self.assertEqual(data["notes"][0]["text"], "Entrance, Vale Road")
+
+
+class SceneAndOverviewPageTests(ControlTestCase):
+    def test_overview_ships_the_3d_model_data_and_its_2d_fallback(self):
+        html = get(person("Admin", is_staff=True), "/").content.decode()
+        self.assertIn('data-model-canvas', html)
+        self.assertIn('id="ctl-plan3d"', html)
+        self.assertEqual(html.count('class="ctl-plan ctl-plan-'), 2)
+
+    def test_scene_chips_open_the_editor_and_are_labelled_scenes(self):
+        for path in ("/", "/rooms/"):
+            html = get(person("Admin", is_staff=True), path).content.decode()
+            self.assertIn(">Scenes ", html)
+            self.assertEqual(len(re.findall(r'<button type="button" class="ctl-scene" data-scene="', html)), 5)
+            self.assertEqual(html.count('data-active="true"'), 1)  # the scene for the time of day shows Active
+            self.assertNotIn("aria-pressed", re.search(r'<div class="ctl-scenes".*?</div>', html, re.S).group(0))
+
+
 class StateV2Tests(ControlTestCase):
     def test_hallway_and_changing_room_are_there_and_corridor_is_gone(self):
         state = demo.demo_state()

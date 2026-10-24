@@ -73,18 +73,39 @@ S.roomMusic = (room) => {
   return { zone: z.id, text: `${z.name}, ${cur && lead.src ? lead.src.name || cur.title : "off"}` };
 };
 
-S.captureMusic = () => ({ zones: M().zones.map((z) => ({ id: z.id, vol: z.vol, playing: z.playing, muted: z.muted })) });
+S.captureMusic = () => ({ zones: M().zones.map((z) => ({ id: z.id, vol: z.vol, playing: z.playing, muted: z.muted, pos: z.pos, i: z.i, queue: structuredClone(z.queue), orig: [...(z.orig || [])], src: z.src ? { ...z.src } : null })) });
 S.restoreMusic = (before) => {
-  for (const b of before.zones) { const z = zoneById(b.id); if (z) { z.vol = b.vol; z.playing = b.playing; z.muted = b.muted; } }
-  touchAll();
-};
-S.sceneMusic = (music) => {
-  for (const z of M().zones) {
-    if (music.on === false) z.playing = false;
-    else if (music.vol !== undefined) z.vol = music.vol;
+  for (const b of before.zones) {
+    const z = zoneById(b.id);
+    if (!z) continue;
+    Object.assign(z, { vol: b.vol, playing: b.playing, muted: b.muted, pos: b.pos, i: b.i, queue: structuredClone(b.queue), orig: [...b.orig], src: b.src ? { ...b.src } : null });
   }
   touchAll();
+  syncAudio();
 };
+/** A scene's music. `choices` maps a zone id to "keep", "off", "sp:<id>" (demo Spotify playlist) or "lib:<id>" (Library playlist). */
+S.sceneMusic = (music, choices = {}) => {
+  for (const z of M().zones) {
+    const choice = choices[z.id] || (music.on === false ? "off" : "keep");
+    if (choice === "off") { z.playing = false; continue; }
+    if (music.vol !== undefined) z.vol = music.vol;
+    if (choice.startsWith("sp:")) {
+      const pl = spotPl(choice.slice(3));
+      if (pl) { Q.playNow(z, spotTracks(pl), 0); z.src = { kind: "spotify", label: `Spotify, ${pl.name}`, name: pl.name, plId: pl.id }; }
+    } else if (choice.startsWith("lib:")) {
+      const pl = L.playlists.find((p) => p.id === choice.slice(4));
+      if (pl && pl.items.length) { Q.playNow(z, listTracks(pl), 0); z.src = { kind: "library", label: `Library, ${pl.name}`, name: pl.name }; }
+    }
+  }
+  touchAll();
+  syncAudio();
+};
+
+/** The playlists a scene can start in a zone (demo Spotify samples and the real Library music playlists), for the scene editor. */
+export function scenePlaylists() {
+  return [...S.st.spotify.map((p) => ({ value: `sp:${p.id}`, label: `Spotify, ${p.name}` })),
+    ...musicLists().filter((p) => p.items.length).map((p) => ({ value: `lib:${p.id}`, label: `Library, ${p.name}` }))];
+}
 
 function touchAll() { syncGroup(); save(); S.render(); }
 

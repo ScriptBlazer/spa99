@@ -7,12 +7,27 @@ import { initScreens, renderScreens, renderSchedLane, runScreens, haltScreens, p
 import { initMusic, renderMusic, runMusic, mountMusic, zoneById } from "./music.js";
 import { initLibrary, mountLibrary, unmountLibrary, syncLibraryUrl, renderMeter } from "./library.js";
 import { initUpload, renderTray } from "./upload.js";
+import { initScenes } from "./scenes.js";
 import { loadLibrary, L } from "./libdata.js";
 import { openPanel, closePanel, closePanelQuietly, panelKey, trapTab, initSheet } from "./panel.js";
 
 const ROUTES = ["/", "/rooms/", "/music/", "/screens/", "/schedule/", "/library/"];
 let currentPath = location.pathname;
 let navigating = false;
+let pendingPop = false;  // Back or Forward pressed while a page was still loading: handled when it finishes
+let overviewMod = null;  // the 3D model (loads three.js, only on the Overview)
+
+/** History rules: only a real tab change pushes ONE entry. Opening or closing a panel, picking a zone, a Library view, all
+    replace the current entry, so Back always means "the previous tab" and can never loop. */
+
+/** The Overview shows the 3D model (the 2D plan stays as the fallback). Other tabs release it. */
+function syncOverview() {
+  if (document.body.dataset.page !== "overview") { if (overviewMod) overviewMod.disposeOverview(); return; }
+  import("./overview3d.js").then((mod) => {
+    overviewMod = mod;
+    if (document.body.dataset.page === "overview") mod.mountOverview();
+  }).catch(() => { /* three.js did not load: the 2D plan is already showing */ });
+}
 
 function renderAll() {
   renderLights();
@@ -50,6 +65,7 @@ function mount() {
   if (page === "library") mountLibrary(); else unmountLibrary();
   if (page === "music") mountMusic();
   S.render();
+  syncOverview();
   if (page !== "library") syncFromUrl();
   if (usesLibrary() || page === "screens" || page === "music") loadLibrary().then(() => S.render());
   renderTray(true);
@@ -68,7 +84,7 @@ function setCurrent(doc) {
 }
 
 async function navigate(href, { push = true } = {}) {
-  if (navigating) return;
+  if (navigating) { if (!push) pendingPop = true; return; }
   navigating = true;
   const url = new URL(href, location.href);
   try {
@@ -80,10 +96,15 @@ async function navigate(href, { push = true } = {}) {
     if (!main || !doc.body.classList.contains("control")) { location.assign(url); return; }
     const apply = () => {
       closePanelQuietly();
+      if (overviewMod) overviewMod.disposeOverview();
       const here = $("#ctl-main");
       here.innerHTML = main.innerHTML;
       setCurrent(doc);
-      if (push) history.pushState(null, "", url);
+      if (push) {
+        // the entry we leave keeps its page only (an open room or screen is not part of "where I was")
+        if (location.search && currentPath !== "/music/") history.replaceState(null, "", location.pathname);
+        history.pushState(null, "", url);
+      }
       currentPath = new URL(res.url).pathname;
       window.scrollTo(0, 0);
       mount();
@@ -95,6 +116,11 @@ async function navigate(href, { push = true } = {}) {
     location.assign(url);
   } finally {
     navigating = false;
+    if (pendingPop) {
+      pendingPop = false;
+      if (location.pathname !== currentPath) navigate(location.href, { push: false });
+      else syncFromUrl();
+    }
   }
 }
 
@@ -107,7 +133,7 @@ function onLinkClick(event) {
   event.preventDefault();
   if (url.pathname === currentPath) {
     if (url.search === location.search) return;
-    history.pushState(null, "", url);
+    history.replaceState(null, "", url);  // same tab: a panel or a selection, not a new page
     syncFromUrl();
     return;
   }
@@ -161,6 +187,7 @@ export function boot() {
   S.save = save;
   S.render = renderAll;
   initLights();
+  initScenes();
   initScreens();
   initMusic();
   initUpload();

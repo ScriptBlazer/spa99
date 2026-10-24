@@ -114,7 +114,7 @@ def _open_room(context, request):
 def overview(request):
     context = _context(request, "overview")
     context["json_state"] = _json_state(context)
-    return render(request, "control/overview.html", {**context, "plan": _plan(context["state"]), "open_room": _open_room(context, request)})
+    return render(request, "control/overview.html", {**context, "plan": _plan(context["state"]), "model3d": plan.model(), "open_room": _open_room(context, request)})
 
 
 @admin_only

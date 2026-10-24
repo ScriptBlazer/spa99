@@ -455,7 +455,7 @@ export function openScreen(id, { push = true } = {}) {
       if (row && /^\d\d:\d\d$/.test(n.value)) { row.t = n.value; sortRows(s); renderSched(node, s); changed(); }
     }
   });
-  openPanel({ key: `screen:${id}`, node, size: "full", onClose: () => { if (location.search) history.replaceState(null, "", location.pathname); } });
+  openPanel({ key: `screen:${id}`, node, size: "full", onClose: (quiet) => { if (!quiet && location.search) history.replaceState(null, "", location.pathname); } });
   mountPreview(host, s, { priority: 10 });
   if (push) history.replaceState(null, "", `${location.pathname}?screen=${id}`);
   const unsub = bus.on("library", () => { if (panelKey() === `screen:${id}`) { renderChooser(node, s); renderSched(node, s); } else unsub(); });

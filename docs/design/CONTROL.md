@@ -82,7 +82,7 @@ All motion uses `--ease-soft`, except progress bars (linear, constant motion).
 ```
 +-----------------------------------------------------------------------------------------+
 | Open until 03:00. 17 guests in.                                     (Signika 32, 1 line)|
-| Scene  [Opening] [Daytime] [Evening*] [Closing] [Cleaning]     Now: Evening, since 18:00 |
+| Scenes  [Opening] [Daytime] [Evening Active] [Closing] [Cleaning]   Now: Evening, since 18:00 |
 +----------------------------------------------------------------+------------------------+
 |                                                                | The building now       |
 |                    FLOOR PLAN (SVG)                            | 17 of 25 in   21 lockers|
@@ -96,11 +96,23 @@ All motion uses `--ease-soft`, except progress bars (linear, constant motion).
 +----------------------------------------------------------------+------------------------+
 ```
 - Status sentence from real hours and the sim: "Open until 03:00. 17 guests in." / "Closed. Opens at 05:00." / "Nearly full. 23 guests in." (warn word, never colour alone).
-- Scene bar as v1 (section 8 of v1, kept: five buttons, `aria-pressed`, glide room by room, Undo toast). It lives on Overview and Rooms only.
+- **Scenes bar (v2.1, replaces v1's apply-on-press):** labelled "Scenes" (with the DEMO chip and "Tap one to see and change what it sets"), five chips: Opening, Daytime, Evening, Closing, Cleaning. **A chip never applies anything: it opens the scene editor** (see 4.2). The chip whose scene is the current one AND whose values every room's light matches shows a small gold "Active" mark (and a 2px gold underline); change a room by hand and the mark goes. "Now: Evening, since 18:00" stays on the right. Lives on Overview and Rooms only.
 - **Right column** (`--ctl-rail-w`): the four building numbers (32px values, 12px labels, 2 by 2), Playing (one 52px row per music zone: zone, title, play/pause; row opens Music), Screens (six 16:9 thumbnails 48px wide; opens Screens).
-- **Tap a room on the plan:** the right column becomes that room's panel (section 6.2, same content as on Rooms), with a back arrow "The building". The plan stays visible and re-lights live as sliders move: this is the moment that sells the demo. Esc or back returns the column. URL `?room=slug`.
+- **Tap a room on the plan (or the 3D model):** the right column becomes that room's panel (section 6.2, same content as on Rooms), with a back arrow "The building". The plan stays visible and re-lights live as sliders move: this is the moment that sells the demo. Esc or back returns the column. URL `?room=slug`.
 
-### 4.1 The plan drawing
+### 4.0 The 3D model (v2.1, replaces the coloured plan as the main Overview picture)
+
+Moishe on v2: the coloured plan was too hard and worse than v1. The Overview now shows a **simple 3D model** of the same real plan (`control/plan.py` `model()` gives the outlines; the browser extrudes them with the vendored three.js, `js/control/overview3d.js`, loaded only on the Overview).
+
+- **Look:** clean architectural massing, no textures. A low slab, light warm-white floors and thin low walls (22 units high on a 1200 long building, so you see in), one soft hemisphere (sky and ground) light plus one directional light. No shadows or AO (kept out so nothing can look noisy). Tokens (control.css first block): `--ctl-m-floor`, `--ctl-m-wall`, `--ctl-m-dim`, `--ctl-m-slab`; gold is `--ctl-accent`. The background is the Control shell (`--ctl-surface`).
+- **Colour is calm.** No fill per room. A room's light shows only as a soft warm tint on its floor: radial, stronger in the middle, **opacity 0.12 + 0.43 x brightness** at the centre (about a third of that at the edge), colour from the warmth scale (`--ctl-warm-*`). Off rooms are plain. Spaces with no controls (plant rooms, WCs, stairs and lift, dry riser, electrical) have a slightly darker floor, no label and cannot be clicked. The "not surveyed" ghost is not drawn.
+- **Labels:** small HTML labels (Figtree 12px, 13px from 48em, espresso with a cream halo, 700 when hovered or selected) placed from the 3D position of each controllable room's centre; they are real `<a href="?room=slug" data-open-room>` links (keyboard works, `aria-label` has the lights and any alert), `pointer-events: none` so the canvas gets the touches. A room with an alert gets a small dark-red dot. Labels wrap inside the room's on-screen width. A quiet note "Entrance, Vale Road" sits under the entrance edge.
+- **Camera:** perspective, 26 degree lens, starts **straight above** and fitted to the building (it re-fits as you turn and zoom). On a narrow canvas (aspect under 0.95, so phones in portrait) it starts turned 90 degrees so the long side runs down the screen. **Drag** (mouse or one finger) tilts from top view to **55 degrees** and turns; **wheel or pinch** zooms (0.85x to 3x); shift-drag or two fingers move the view (only when zoomed in); **Top view** button (top right) eases back (420ms). The page never scrolls while a finger is on the model (`touch-action: none`).
+- **Hover and select:** hovering a room (or focusing its label) outlines it in gold (a thin ring on the floor edge plus its own half of the walls); the room whose panel is open keeps the gold outline. **Tap or click (not a drag: under 6px and 700ms) opens that room's Rooms panel** exactly as in 4.2; a tap on a space with no controls does nothing.
+- **Performance and cleanup:** renders only on interaction, a state change (light, selection, alert) or the 420ms reset tween; `devicePixelRatio` capped at 2; the model is disposed (geometry, materials, texture, renderer, context, listeners) when you leave the tab and rebuilt on return.
+- **Fallback:** no WebGL (or the model fails to build), or `prefers-reduced-motion: reduce`: the model is not shown and the **2D plan (4.1) stays**, with calmer colours too (light tint opacity 0.06 + 0.22 x brightness, gradient centre 0.7 alpha). Without JavaScript the 2D plan is the page.
+
+### 4.1 The plan drawing (2D, the fallback)
 
 **The plan follows Moishe's real drawing**, not the first sketch of this brief: Panorama Interior, "99 Vale Road - Shvitz, Proposed ground floor lighting", Rev 04, 1:80 (OneDrive, BML / Spa 99 / Plans). One long rectangle, drawn stylised: the right rooms in the right places at roughly the right proportions, no architecture. The geometry lives in `control/plan.py` (one list, so a new room is a data change).
 
@@ -137,11 +149,26 @@ y 14  +-----------+---------------+--------+--------------+----+-----+----------
 
 Hints (`--ctl-wall`, decoration): sauna benches and the dry sauna heater, shower heads, the cold plunge pool and benches, six loungers, locker row, the stair and lift, a round table in the kitchenette, the massage table, gym equipment, and in the Entrance the **curved feature wall**, the **fish tank** along it (`--ctl-tank` at 0.45 alpha, labelled "Fish tank"), sofas and armchairs. The Entrance doors are a gold dash on the bottom wall with "Entrance, Vale Road" below, and the planters of the pavement are a row of faint rounded rectangles under the plan. The unsurveyed corner is a dashed outline.
 
-**Lighting a room:** each room has three stacked shapes. (1) base fill `--ctl-surface`; (2) a light shape filled with a radial gradient (centre 40% from top-left, warmth colour from the warmth scale at 0.9 alpha at the centre to 0 at the edge) whose **opacity = 0.12 + brightness × 0.55** when on, 0 when off; (3) the label. Lights off: base only, label `--ctl-text-3`, line "Off". On: label `--ctl-text` (Signika 500 16px; 13px for rooms under 200 wide), value line 12px `--ctl-text-2` "60%  2700K" (saunas and plunge add the temperature: "86°C"). People count, when above 0, sits top-right in 12px `--ctl-text-2` ("3"), with the full phrase in the accessible name. Light opacity changes ease over `--ctl-glide` for scenes and presets, instantly while dragging.
+**Lighting a room:** each room has three stacked shapes. (1) base fill `--ctl-surface`; (2) a light shape filled with a radial gradient (centre 40% from top-left, warmth colour from the warmth scale at 0.7 alpha at the centre to 0 at the edge) whose **opacity = 0.06 + brightness × 0.22** when on (v2.1: calmer, was 0.12 + 0.55), 0 when off; (3) the label. Lights off: base only, label `--ctl-text-3`, line "Off". On: label `--ctl-text` (Signika 500 16px; 13px for rooms under 200 wide), value line 12px `--ctl-text-2` "60%  2700K" (saunas and plunge add the temperature: "86°C"). People count, when above 0, sits top-right in 12px `--ctl-text-2` ("3"), with the full phrase in the accessible name. Light opacity changes ease over `--ctl-glide` for scenes and presets, instantly while dragging.
 
 **Interaction:** each controllable room is an SVG `<a href="?room=slug">` with `aria-label` "Dry sauna. Lights 60 percent, 2700 kelvin. 86 degrees. 3 people." Hover (fine pointer): base fill to `--ctl-raised`, 160ms. Focus: 2px gold outline drawn as an inset rect. Selected: the same gold outline, persistent. Alert in a room: a 2px `--ctl-danger` inset outline plus the word "Alert" in the value line.
 
-**Phone plan:** the same geometry transposed (x and y swapped, `viewBox="0 0 470 1200"`), labels kept upright, so the plan fills the width (about 343px wide, 876px tall) and every controllable room is at least 56px on its short side (the Hallway band is stretched by 30 units to get there; a test checks it). Under the plan, the four building numbers in a 2 by 2 block, then Playing rows. Tapping a room opens the room sheet at peek height (`--ctl-sheet-peek`), so the top of the plan stays visible above it and visibly re-lights.
+**Phone plan:** the same geometry transposed (x and y swapped, `viewBox="0 0 470 1200"`), labels kept upright, so the plan fills the width (about 343px wide, 876px tall) and every controllable room is at least 56px on its short side (the Hallway band is stretched by 30 units to get there; a test checks it). Under the plan, the four building numbers in a 2 by 2 block, then Playing rows. Tapping a room opens the room sheet at peek height (`--ctl-sheet-peek`), so the top of the plan stays visible above it and visibly re-lights. (With the 3D model on, the phone shows the model full width instead, turned 90 degrees; the transposed 2D plan is the fallback.)
+
+### 4.2 Opening a room from the Overview, and the history rules (v2.1)
+
+- **Every controllable room in `plan.py` opens the same Rooms panel** (light and warmth, climate where it has it, small read-only Music and Screen lines with "Open in Music" and "Open in Screens"). Tapping a room never switches tab. Rooms with a screen or a music zone (Relaxing zone, Entrance, Hallway, Gym, Kitchenette) used to show "Off" or "Welcome to Spa 99" full panel: the screen preview was mounted on the whole Screen section, and its absolutely positioned stage covered the panel. It is now mounted on its own 16:9 box.
+- **History:** only a real tab change pushes one entry (and the entry you leave is cleaned to its bare path, except Music which keeps `?zone=`). Opening or closing a panel (room, screen, Library item, scene), picking a zone and moving between Library views all use `replaceState`. A panel that closes because the tab changed or another panel replaced it never touches the address. Back goes to the previous tab once, Forward likewise; Back or Forward pressed while a page is loading is queued and handled when it finishes.
+
+### 4.3 Scene editor (v2.1)
+
+Tapping a scene chip opens a panel (a full-height side panel on desktop, a full sheet on a phone) titled with the scene name, a DEMO chip and the scene's one-line description. **Nothing is applied by opening it.**
+
+- **Rooms:** one block per room with its name, a **Light** slider (0 to 100, 0 reads "Off") and a **Warmth** slider (2200 to 4000 K), prefilled with the scene's current values (its own defaults, e.g. Daytime 80% at 3000 K with the Relaxing zone at 40%, or the values saved earlier).
+- **Music:** one row per zone with a select: "Leave the music as it is", "Music off", the six demo Spotify playlists and the Library music playlists (loaded a moment later without losing a choice already made). A saved choice whose playlist was deleted reads "Playlist no longer available" and is skipped on apply.
+- **Buttons:** **Save scene** (primary; enabled only when something changed) stores the scene in the demo state (`localStorage` key `spa99.control.demo.v2`, field `sceneEdits`; nothing goes to the server) and toasts "Daytime saved."; **Apply now** (separate, secondary; enabled only when nothing is unsaved) applies the saved scene to the rooms and zones with the usual glide, the toast "Daytime applied to 11 rooms." and Undo (Undo also restores each zone's queue); **Back to the original** (link, only when an edit exists) removes the saved edit. A note says "You have changes that are not saved. Save the scene, then apply it." while dirty and "Saved in this browser only." otherwise. On a phone the sheet closes after Apply so the change is seen.
+- The Schedule still refers to scenes by name; when a scheduled scene runs it uses the saved values. Reset demo clears saved scenes with the rest of the browser state.
+- Hidden scene "Saunas heat" has no chip and no editor.
 
 ## 5. The photo light preview (replaces the glow)
 
@@ -417,7 +444,7 @@ Never: looping decoration (no equaliser bars, no pulsing dots), bounce, blur, an
 ## 13. Phone (375)
 
 - Banner (short text), top bar, content, mini player (when playing), bottom tabs (5) with safe area.
-- Overview: transposed plan full width, then numbers and Playing. Room sheet at peek.
+- Overview: the 3D model full width (turned 90 degrees, one finger tilts and turns, two zoom), or the transposed plan as the fallback, then numbers and Playing. Room sheet at peek.
 - Rooms: one column cards (photo 3:2 full width).
 - Music: zone list first as a horizontal row of zone chips (artwork 32 + name) above the player; player stacks: artwork `min(72vw, 280px)` centred, title, artist, scrub, transport, volume, Listen here, Change music; queue below. Source picker is a full sheet.
 - Screens: one column; panel is a full sheet.
@@ -439,10 +466,10 @@ Never: looping decoration (no equaliser bars, no pulsing dots), bounce, blur, an
 
 1. Six tabs on desktop (Overview, Rooms, Music, Screens, Schedule, Library), five on phone with More; each control has one home, other places link to it.
 2. DEMO banner with the new text on every page; Reset demo resets pretend state and leaves Library files and playlists untouched; DEMO chips on each simulated group, none in the Library.
-3. Overview floor plan matches section 4.1 (the real ground floor lighting plan: saunas, shower and cold plunge, relaxing zone, changing room, hallway, kitchenette, massage, gym, the Entrance with its curved wall and fish tank); each room lit by brightness and warmth; tapping a room opens its panel beside the plan (desktop) or a peek sheet (phone) and the plan re-lights live.
+3. Overview is the 3D model of section 4.0 (top view start, drag to tilt and turn, zoom, Top view button, calm floor tints, gold hover outline, labels, tap opens the panel) with the 2D floor plan of section 4.1 as the fallback (the real ground floor lighting plan: saunas, shower and cold plunge, relaxing zone, changing room, hallway, kitchenette, massage, gym, the Entrance with its curved wall and fish tank); each room lit by brightness and warmth; tapping a room opens its panel beside the plan (desktop) or a peek sheet (phone) and the plan re-lights live.
 4. Phone plan is the transposed version, every controllable room at least 56px on its short side.
 5. Room cards use the real photo; moving Light or Warmth visibly re-lights it (night, lamps, pool, warm, cool layers), Off shows a silhouette and "Off"; only opacity changes; lamps maps exist for every room photo.
-6. Scenes glide the photos and the plan room by room over about 2s; Undo works; reduced motion is instant.
+6. Scene chips open the scene editor (4.3); Save scene and Apply now are separate; Apply glides the photos and the plan room by room over about 2s; Undo works; reduced motion is instant. Tapping any room anywhere on the Overview opens its Rooms panel; Back goes to the previous tab once and never loops (4.2).
 7. Room panel: photo, light, climate, music trim and link, screen thumbnail and link; no source or content choosers inside it.
 8. Music: five zones, edit rooms, Group all / Ungroup, Mute all with Undo; player with artwork, title, artist, source, scrub, shuffle, repeat (three states), previous, play/pause, next, volume, queue with drag and keyboard reorder.
 9. Library source plays real uploaded tracks and playlists; Listen here plays the real file in this browser; without it, position and track changes follow real durations silently.

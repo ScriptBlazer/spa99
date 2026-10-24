@@ -170,3 +170,18 @@ def planters(phone):
         (ax, ay), (bx, by) = _pt(x, 402, phone), _pt(x + 70, 410, phone)
         out.append({"x": _fix(min(ax, bx)), "y": _fix(min(ay, by)), "w": _fix(abs(bx - ax)), "h": _fix(abs(by - ay))})
     return out
+
+
+def model():
+    """The same plan as outlines for the 3D Overview, in plan units (y down). Each room is already inset by INSET, so the gaps
+    between rooms are the walls; the script grows each outline by half a gap to draw its own half of every shared wall.
+    `slug` None = a space with no controls (drawn darker, no label). The "not surveyed" ghost is not drawn."""
+    rooms = []
+    for room in GEOMETRY:
+        if room.get("ghost"):
+            continue
+        x1, y1, x2, y2 = room["box"]
+        points = room.get("poly") or [(x1 + INSET, y1 + INSET), (x2 - INSET, y1 + INSET), (x2 - INSET, y2 - INSET), (x1 + INSET, y2 - INSET)]
+        rooms.append({"id": room["id"], "slug": room["slug"], "name": room["name"], "points": [list(point) for point in points]})
+    door = next(r["door"] for r in GEOMETRY if r.get("door"))
+    return {"rooms": rooms, "notes": [{"text": "Entrance, Vale Road", "x": (door[0] + door[1]) / 2, "y": 408}]}

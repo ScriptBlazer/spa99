@@ -73,12 +73,35 @@ export function normalizeZones(s) {
   }
 }
 
+/** Saved scene edits, kept only for scenes and rooms that still exist, with numbers in range. */
+function cleanEdits(raw, s) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const sc of s.scenes) {
+    const mine = raw[sc.key];
+    if (!mine || typeof mine !== "object") continue;
+    const rooms = {};
+    for (const r of s.rooms) {
+      const v = mine.rooms && mine.rooms[r.slug];
+      if (v && Number.isFinite(v.bright) && Number.isFinite(v.warmth)) rooms[r.slug] = { bright: clamp(Math.round(v.bright), 0, 100), warmth: clamp(Math.round(v.warmth / 100) * 100, 2200, 4000) };
+    }
+    const zones = {};
+    for (const z of s.zones) {
+      const v = mine.zones && mine.zones[z.id];
+      if (typeof v === "string" && (v === "keep" || v === "off" || /^(sp|lib):[\w-]+$/.test(v))) zones[z.id] = v;
+    }
+    out[sc.key] = { rooms, zones };
+  }
+  return out;
+}
+
 export function restore(base) {
   OLD_KEYS.forEach((k) => localStorage.removeItem(k));
   const s = structuredClone(base);
   const t = londonNow();
   s.scene = { key: s.active_scene, changed: false, since: s.scenes.find((x) => x.key === s.active_scene).time };
   s.runs = {};
+  s.sceneEdits = {};  // what the scene editor saved: { sceneKey: { rooms: { slug: { bright, warmth } }, zones: { zoneId: choice } } }
   s.staff = 0;
   s.nextPeople = 0;
   s.nextAlert = 0;
@@ -103,6 +126,7 @@ export function restore(base) {
   }
   if (saved.scene && s.scenes.some((x) => x.key === saved.scene.key)) s.scene = saved.scene;
   s.runs = saved.runs || {};
+  s.sceneEdits = cleanEdits(saved.sceneEdits, s);
   s.staff = saved.staff || 0;
   if (Array.isArray(saved.alerts)) s.alerts = saved.alerts.filter((a) => s.rooms.some((r) => r.slug === a.room));
   if (saved.music && Array.isArray(saved.music.zones)) {
@@ -139,7 +163,7 @@ export function writeNow() {
   for (const s of st.screens) ss[s.id] = { show: s.show, power: s.power, loop: s.loop, playing: s.playing, notice: s.notice, sched: s.sched };
   const zones = st.music.zones.map(({ id, rooms, vol, muted, shuffle, repeat, playing, pos, queue, i, orig, src }) => ({ id, rooms, vol, muted, shuffle, repeat, playing, pos, queue, i, orig, src }));
   try {
-    localStorage.setItem(KEY, JSON.stringify({ v: st.v, t: Date.now(), rooms: rs, screens: ss, scene: st.scene, runs: st.runs, staff: st.staff, alerts: st.alerts,
+    localStorage.setItem(KEY, JSON.stringify({ v: st.v, t: Date.now(), rooms: rs, screens: ss, scene: st.scene, runs: st.runs, sceneEdits: st.sceneEdits, staff: st.staff, alerts: st.alerts,
       music: { zones, group: st.music.group, sel: st.music.sel, last: st.music.last, spotify: st.music.spotify } }));
   } catch (e) { /* storage full or blocked: the demo still works for this visit */ }
 }

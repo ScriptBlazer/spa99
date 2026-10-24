@@ -16,7 +16,7 @@ export const panelNode = () => (cur ? cur.node : null);
 export function openPanel({ key, node, size = "peek", rail = false, onClose = null }) {
   const same = cur && cur.key === key;
   const wasOpen = Boolean(cur);
-  if (cur && !same) closeNow(false);
+  if (cur && !same) closeNow(false);  // switching panels: the old one closes quietly (it must not touch the address)
   const lastFocus = cur ? cur.lastFocus : document.activeElement;
   const useRail = rail && XWIDE.matches && railHost();
   cur = { key, rail: Boolean(useRail), onClose, lastFocus, node };
@@ -64,7 +64,7 @@ function closeNow(restore) {
     backdrop().hidden = true;
     document.body.classList.remove("has-panel");
   }
-  if (onClose) onClose();
+  if (onClose) onClose(!restore);  // true = closed quietly (a tab change or another panel opening): leave the address alone
   if (restore && lastFocus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
 }
 

@@ -53,8 +53,8 @@ def layer_style(lights):
 
 
 def light_opacity(lights):
-    """The plan light shape: 0.12 + brightness x 0.55 when on, else 0."""
-    return round(0.12 + lights["bright"] / 100 * 0.55, 3) if lights["on"] else 0
+    """The plan light shape, a soft tint and never a strong fill: 0.06 + brightness x 0.22 when on, else 0."""
+    return round(0.06 + lights["bright"] / 100 * 0.22, 3) if lights["on"] else 0
 
 
 def temp_text(value, decimals, unit="°C"):

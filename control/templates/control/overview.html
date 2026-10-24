@@ -6,6 +6,12 @@
 <div class="ctl-ov" data-overview>
   <section class="ctl-plan-wrap" data-plan>
     <h2 class="ctl-sr" id="ctl-plan-h">Floor plan. Each room is a link; the Rooms tab lists them all.</h2>
+    <div class="ctl-m" data-model hidden>
+      <canvas class="ctl-m-canvas" data-model-canvas aria-hidden="true"></canvas>
+      <div class="ctl-m-labels" data-model-labels></div>
+      <button type="button" class="ctl-btn ctl-m-reset" data-model-reset>Top view</button>
+      <p class="ctl-m-hint" aria-hidden="true">Drag to tilt and turn. Pinch or scroll to zoom. Tap a room to open it.</p>
+    </div>
     {% include "control/_plan.html" with drawing=plan.desktop kind="desktop" %}
     {% include "control/_plan.html" with drawing=plan.phone kind="phone" %}
   </section>
@@ -32,4 +38,5 @@
 </div>
 <template id="ctl-room-tpl">{% include "control/_room_panel.html" with generic=True %}</template>
 <template id="ctl-tile-tpl">{% include "control/_slide_tile.html" with screen=blank_screen %}</template>
+{{ model3d|json_script:"ctl-plan3d" }}
 {% endblock %}
