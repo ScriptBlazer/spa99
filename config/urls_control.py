@@ -2,8 +2,10 @@
 values, nothing reaches hardware. The business back office is the Office (config.urls_office). Chosen by
 common.middleware.HostRoutingMiddleware. Admin level and up; everyone else gets a plain 404."""
 from django.contrib import admin
+from django.core.files.storage import default_storage
 from django.conf import settings
-from django.urls import include, path
+from django.urls import include, path, re_path
+from django.views.static import serve
 
 from common.views import health
 
@@ -14,3 +16,7 @@ urlpatterns = [
     # Hidden Django admin: superuser fallback only. Path is set by ADMIN_PATH.
     path(settings.ADMIN_PATH, admin.site.urls),
 ]
+
+# Local development only: serve the Library files from the local media folder (live uses signed S3 URLs).
+if settings.DEBUG and hasattr(default_storage, "location") and not getattr(default_storage, "bucket_name", None):
+    urlpatterns += [re_path(r"^media/(?P<path>.*)$", serve, {"document_root": default_storage.location})]

@@ -13,8 +13,9 @@ from users import views as user_views
 from . import demo, present
 
 NAV = [("rooms", "Rooms", "control_rooms", "squares-four"), ("schedule", "Schedule", "control_schedule", "calendar-blank"),
-       ("screens", "Screens", "control_screens", "monitor")]
-TITLES = {"rooms": "Rooms", "schedule": "Schedule", "screens": "Screens", "password": "Change password"}
+       ("screens", "Screens", "control_screens", "monitor"),
+       ("library", "Library", "control_library", "speaker-high")]
+TITLES = {"rooms": "Rooms", "schedule": "Schedule", "screens": "Screens", "library": "Library", "password": "Change password"}
 admin_only = level_required(levels.ADMIN, deny=Http404)  # a plain 404 for anyone else (sign-in is enforced before this)
 
 

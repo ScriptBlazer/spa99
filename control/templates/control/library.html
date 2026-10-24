@@ -1,0 +1,13 @@
+{% extends "control/base.html" %}
+{% block main %}
+<h1 class="ctl-title">Library</h1>
+<p class="ctl-lead">Music, videos and pictures for the building. Playback into rooms is simulated for now; uploads are real.</p>
+<section data-library data-api-assets="{% url 'control_assets' %}" data-api-upload="{% url 'control_asset_upload' %}" data-api-playlists="{% url 'control_playlists' %}" data-api-playlist-create="{% url 'control_playlist_create' %}" data-limit-audio="{{ limits.audio }}" data-limit-video="{{ limits.video }}" data-limit-image="{{ limits.image }}">
+  <form data-upload-form enctype="multipart/form-data" method="post" action="{% url 'control_asset_upload' %}">{% csrf_token %}
+    <input type="file" name="file" data-upload-input accept=".mp3,.aac,.m4a,.wav,.ogg,.mp4,.webm,.jpg,.jpeg,.png,.webp">
+    <button type="submit">Upload</button>
+  </form>
+  <ul data-asset-list></ul>
+  <div data-playlist-list></div>
+</section>
+{% endblock %}
