@@ -113,7 +113,11 @@ async function navigate(href, { push = true } = {}) {
       mount();
       here.focus({ preventScroll: true });
     };
-    if (document.startViewTransition && !MOTION.matches) await document.startViewTransition(apply).updateCallbackDone;
+    if (document.startViewTransition && !MOTION.matches) {
+      const vt = document.startViewTransition(apply);
+      vt.ready.catch(() => {}); vt.finished.catch(() => {});  // a skipped fade is fine; never an uncaught error
+      await vt.updateCallbackDone;
+    }
     else apply();
   } catch (e) {
     location.assign(url);
