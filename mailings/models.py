@@ -18,8 +18,8 @@ INVITE_DAYS = 30
 class Mailing(BaseModel):
     NEWS, SERVICE = "news", "service"
     KIND_CHOICES = [(NEWS, "News (marketing: only people who opted in, with unsubscribe)"), (SERVICE, "Service message (no unsubscribe, says why they get it)")]
-    DRAFT, SCHEDULED, SENDING, SENT, CANCELLED, FAILED = "draft", "scheduled", "sending", "sent", "cancelled", "failed"
-    STATUS_CHOICES = [(DRAFT, "Draft"), (SCHEDULED, "Scheduled"), (SENDING, "Sending"), (SENT, "Sent"), (CANCELLED, "Cancelled"), (FAILED, "Failed")]
+    DRAFT, SCHEDULED, SENDING, PAUSED, SENT, CANCELLED, FAILED = "draft", "scheduled", "sending", "paused", "sent", "cancelled", "failed"
+    STATUS_CHOICES = [(DRAFT, "Draft"), (SCHEDULED, "Scheduled"), (SENDING, "Sending"), (PAUSED, "Paused"), (SENT, "Sent"), (CANCELLED, "Cancelled"), (FAILED, "Failed")]
     EDITABLE = (DRAFT,)
 
     name = models.CharField(max_length=120, help_text="Only shown in System.")
@@ -70,6 +70,8 @@ class MailingRecipient(BaseModel):
     reason = models.CharField(max_length=200, blank=True, help_text="Why it was skipped or failed.")
     sent_at = models.DateTimeField(null=True, blank=True)
     message_id = models.CharField(max_length=100, blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0, help_text="Sends that SES throttled; after 5 the row fails.")
+    retry_at = models.DateTimeField(null=True, blank=True, help_text="A throttled send waits until then (backoff).")
 
     class Meta:
         ordering = ["email"]
@@ -106,6 +108,8 @@ class Invite(BaseModel):
     registered_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     expires_at = models.DateTimeField(help_text="The personal link stops working then (30 days after it was created).")
     message_id = models.CharField(max_length=100, blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    retry_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
 
     class Meta:
@@ -136,6 +140,17 @@ class EmailOptOut(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.email
+
+
+class UnsubscribeKey(BaseModel):
+    """The opaque reference in an unsubscribe link: one random key per address, so no address appears in a URL. No expiry (an old
+    email must still be able to stop the mail). Erased with the person's data; the opt-out itself is EmailOptOut or the consent flag."""
+
+    email = models.EmailField(unique=True, help_text="Lower case.")
+    token = models.CharField(max_length=40, unique=True, default=new_token, editable=False)
 
     def __str__(self):
         return self.email

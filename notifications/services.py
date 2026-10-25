@@ -77,6 +77,8 @@ def preview_email(key, subject, body, extra=None):
 
 def fill_subject(text, values):
     for name, value in values.items():
+        if name == "first_name" and not str(value).strip():
+            value = "there"  # the same fallback as the body
         text = text.replace("{" + name + "}", str(value))
     return text
 

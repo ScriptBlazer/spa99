@@ -162,24 +162,29 @@ def batch_summary(batch_id):
 
 # ---------- the personal link ----------
 
-def open_invite(token):
-    """Mark the invite opened (first time only; never downgrades a registered one). Returns the Invite when the link is good
-    (it exists and has not expired), else None. A link that does not exist and one that expired look the same to the caller."""
+def good_invite(token):
+    """The Invite when the link is good (it exists, was sent and has not expired), else None. Marks nothing: a link scanner opening
+    the link must not count as opened. A link that does not exist and one that expired look the same to the caller."""
     invite = Invite.objects.filter(token=token or "").first()
-    if invite is None or invite.expired or invite.status in (Invite.SKIPPED, Invite.FAILED, Invite.QUEUED):
+    if invite is None or invite.expired or invite.status in (Invite.SKIPPED, Invite.FAILED, Invite.QUEUED, Invite.SENDING):
         return None
-    if invite.status == Invite.SENT:
-        Invite.objects.filter(pk=invite.pk, status=Invite.SENT).update(status=Invite.OPENED, opened_at=timezone.now(), updated_at=timezone.now())
-        invite.refresh_from_db()
     return invite
 
 
+def mark_opened(invite):
+    """First time only; never downgrades a registered one."""
+    if invite.status == Invite.SENT:
+        Invite.objects.filter(pk=invite.pk, status=Invite.SENT).update(status=Invite.OPENED, opened_at=timezone.now(), updated_at=timezone.now())
+
+
 def prefill(token):
-    """The register form's starting values for a session's invite token: {first_name, last_name, email} (empty when it is not good).
-    Only a convenience: the person still confirms everything, and the address is verified by the confirm link as always."""
-    invite = open_invite(token) if token else None
+    """Called when the Register page renders with the invite in the session: marks the invite opened (a person really got here) and
+    returns the form's starting values {first_name, last_name, email} (empty when it is not good). Only a convenience: the person
+    confirms everything, and the address is verified by the confirm link as always."""
+    invite = good_invite(token) if token else None
     if invite is None:
         return {}
+    mark_opened(invite)
     first, _, last = invite.name.partition(" ")
     return {"first_name": first.strip(), "last_name": last.strip(), "email": invite.email}
 

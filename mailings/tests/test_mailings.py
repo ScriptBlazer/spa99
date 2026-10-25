@@ -223,7 +223,10 @@ class UnsubscribeTests(TestCase):
 
     def test_confirm_page_changes_nothing_and_post_turns_news_off_once(self):
         user = person("u@example.com", consent=True)
-        url = f"/unsubscribe/{tokens.make_unsubscribe_token('u@example.com')}/"
+        token = tokens.make_unsubscribe_token("u@example.com")
+        self.assertNotIn("example", token)  # opaque: no address in the link
+        self.assertEqual(token, tokens.make_unsubscribe_token("U@example.com"))  # one key per address
+        url = f"/unsubscribe/{token}/"
         client = Client()
         self.assertContains(client.get(url), "data-unsubscribe-confirm")
         user.refresh_from_db()
@@ -328,8 +331,10 @@ class InviteFlowTests(TestCase):
         response = client.get(f"/invite/{invite.token}/")
         self.assertRedirects(response, "/register/", fetch_redirect_response=False)
         invite.refresh_from_db()
-        self.assertEqual((invite.status, invite.opened_at is not None), (Invite.OPENED, True))
+        self.assertEqual(invite.status, Invite.SENT)  # a link scanner following the redirect does not count as opened
         page = client.get("/register/")
+        invite.refresh_from_db()
+        self.assertEqual((invite.status, invite.opened_at is not None), (Invite.OPENED, True))  # the Register page really rendered
         self.assertContains(page, 'value="Al"')
         self.assertContains(page, 'value="al@example.com"')
         user = user_services.register_interest({
@@ -337,7 +342,8 @@ class InviteFlowTests(TestCase):
             "date_of_birth": datetime.date(1990, 1, 1), "plan": "tier-2"}).user
         invite.refresh_from_db()
         self.assertEqual((invite.status, invite.registered_user, invite.registered_at is not None), (Invite.REGISTERED, user, True))
-        client.get(f"/invite/{invite.token}/")  # opening again never downgrades it
+        client.get(f"/invite/{invite.token}/")
+        client.get("/register/")  # opening again never downgrades it
         invite.refresh_from_db()
         self.assertEqual(invite.status, Invite.REGISTERED)
 
@@ -348,6 +354,7 @@ class InviteFlowTests(TestCase):
         Invite.objects.filter(pk=invite.pk).update(expires_at=timezone.now() - datetime.timedelta(minutes=1))
         client = Client()
         client.get(f"/invite/{invite.token}/")
+        client.get("/register/")
         invite.refresh_from_db()
         self.assertEqual(invite.status, Invite.SENT)  # expired: not marked, no prefill
         self.assertNotContains(client.get("/register/"), 'value="al@example.com"')
@@ -364,3 +371,97 @@ class InviteFlowTests(TestCase):
         self.assertEqual(len(user_services.export_user_data(user)["group_emails"]), 1)
         user_services.delete_user_data(user)
         self.assertFalse(MailingRecipient.objects.exists() or Invite.objects.exists())
+
+
+SES_BACKEND = "notifications.backends.SesBackend"
+LOCK_CACHE = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "mail-lock"}}
+
+
+class ResilienceTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+        cls.users = [person(f"r{i}@example.com", consent=True) for i in range(2)]
+        cls.admin = User.objects.create_user("dev@example.com", "a-long-test-password-1")
+
+    def started(self):
+        with mock.patch("mailings.sending.enqueue"):
+            return sending.start(mailing(kind=Mailing.SERVICE), self.admin)
+
+    def test_a_slice_pauses_when_ses_stops_allowing_and_resume_needs_the_gate(self):
+        m = self.started()
+        refusing = sending.ses.SendingRefused("Amazon SES is still in sandbox")
+        with mock.patch("mailings.sending.ses.require_sending_allowed", side_effect=refusing):
+            self.assertEqual(sending.run_mailing(m.pk), "paused")
+            m.refresh_from_db()
+            self.assertEqual((m.status, "sandbox" in m.error), (Mailing.PAUSED, True))
+            with self.assertRaises(sending.MailingError):
+                sending.resume(m)
+            with self.assertRaises(sending.MailingError):
+                sending.start_invites_resume("00000000-0000-0000-0000-000000000000")
+            self.assertEqual(sending.run_invites("00000000-0000-0000-0000-000000000000"), "paused")
+        self.assertEqual(len(mail.outbox), 0)
+        sending.resume(m)  # allowed again (dev): back to sending and finishes
+        m.refresh_from_db()
+        self.assertEqual((m.status, len(mail.outbox)), (Mailing.SENT, 2))
+
+    def test_a_paused_mailing_can_be_cancelled(self):
+        m = self.started()
+        Mailing.objects.filter(pk=m.pk).update(status=Mailing.PAUSED)
+        self.assertEqual(sending.cancel(m, self.admin).status, Mailing.CANCELLED)
+
+    def test_ses_throttling_requeues_with_backoff_then_sends(self):
+        m = self.started()
+        real = sending.send_templated
+        calls = []
+
+        def flaky(*args, **kwargs):
+            calls.append(args[1])
+            if len(calls) == 1:
+                from notifications.models import EmailLog
+                return EmailLog(status=EmailLog.FAILED, error="ClientError: An error occurred (Throttling) when calling SendEmail")
+            return real(*args, **kwargs)
+
+        sleeps = []
+
+        def sleeper(seconds):  # time "passes": the backoff is over
+            sleeps.append(seconds)
+            MailingRecipient.objects.update(retry_at=None)
+
+        with mock.patch.object(sending, "send_templated", flaky), mock.patch.object(sending, "_sleep", sleeper), \
+                mock.patch("mailings.sending.enqueue"):
+            sending.run_mailing(m.pk)
+        row = MailingRecipient.objects.get(mailing=m, email="r0@example.com")
+        self.assertEqual((row.status, row.attempts), ("sent", 1))  # waited for its backoff, then went
+        self.assertTrue(sleeps)  # eased off after the throttle
+        self.assertEqual(MailingRecipient.objects.filter(mailing=m, status="failed").count(), 0)
+        # after five throttles the row fails instead of looping for ever
+        row = MailingRecipient.objects.create(mailing=m, email="x@example.com", attempts=sending.MAX_ATTEMPTS - 1)
+        self.assertFalse(sending._back_off(MailingRecipient, row.pk, row.attempts))
+
+    @override_settings(CACHES=LOCK_CACHE)
+    def test_only_one_worker_runs_a_mailing_at_a_time(self):
+        cache.clear()
+        m = self.started()
+        self.assertTrue(sending._acquire(f"mailing:{m.pk}"))  # another worker holds it
+        self.assertEqual(sending.run_mailing(m.pk), "busy")
+        self.assertEqual(len(mail.outbox), 0)
+        sending._release(f"mailing:{m.pk}")
+        with mock.patch("mailings.sending.enqueue"):
+            sending.run_mailing(m.pk)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertTrue(sending._acquire(f"mailing:{m.pk}"))  # the finished slice released it
+        cache.clear()
+
+    def test_erasing_a_gold_applicant_removes_their_group_rows_and_invites(self):
+        from gold import services as gold_services
+
+        app = application("nobody@example.com", consent=True)
+        m = mailing(kind=Mailing.SERVICE, group="applicants", params={"status": "new"})
+        with mock.patch("mailings.sending.enqueue"):
+            sending.start(m, self.admin)
+        Invite.objects.create(name="N", email="nobody@example.com", batch_id="00000000-0000-0000-0000-000000000003")
+        tokens.make_unsubscribe_token("nobody@example.com")
+        gold_services.delete_applications("nobody@example.com")
+        from mailings.models import UnsubscribeKey
+        self.assertFalse(MailingRecipient.objects.filter(email="nobody@example.com").exists() or Invite.objects.exists() or UnsubscribeKey.objects.filter(email="nobody@example.com").exists())

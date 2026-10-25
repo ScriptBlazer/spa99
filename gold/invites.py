@@ -203,6 +203,9 @@ def accept_invite(token, cleaned):
                 marketing_consent=bool(cleaned.get("marketing_opt_in")),
                 marketing_consent_at=now if cleaned.get("marketing_opt_in") else None,
             )
+            from users.services import _after_registration
+
+            _after_registration(user, bool(cleaned.get("marketing_opt_in")))  # invites for this address become registered
             invite.used_at = now
             invite.save(update_fields=["used_at", "updated_at"])  # the Gold figures follow this save (insights.signals)
             metrics.email_verified(now)

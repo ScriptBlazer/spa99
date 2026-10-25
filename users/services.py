@@ -345,7 +345,9 @@ def delete_user_data(user):
     anonymised = _anonymise_sessions(user)
     removed_logins = _login_events(user).delete()[0]
     removed_emails = _email_logs(email).delete()[0]
-    removed_emails += _mailing_rows(user).delete()[0] + _invites(email).delete()[0]  # group sends and invites hold the address too
+    from mailings.erasure import erase_address
+
+    removed_emails += erase_address(email, user)  # group sends, invites and the unsubscribe key hold the address too
     gold = gold_services.delete_applications(email)
     queue = erase_task_records([pk], ["users.tasks."])
     interest = InterestRegistration.objects.filter(user=user).select_related("plan").first()

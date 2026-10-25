@@ -9,7 +9,7 @@
       <form method="post" action="{% url 'system_mailing_delete' mailing.pk %}">{% csrf_token %}<button type="submit" class="sys-btn" data-confirm data-confirm-danger data-confirm-title="Delete this draft?" data-confirm-body="The draft is removed. This cannot be undone." data-confirm-label="Delete draft">Delete draft</button></form>
     {% elif mailing.status == "scheduled" %}
       <form method="post" action="{% url 'system_mailing_cancel' mailing.pk %}">{% csrf_token %}<button type="submit" class="sys-btn" data-confirm data-confirm-title="Cancel this send?" data-confirm-body="It will not go out at the scheduled time. Nobody gets it." data-confirm-label="Cancel send" data-confirm-cancel="Keep it">Cancel schedule</button></form>
-    {% elif mailing.status == "sending" %}
+    {% elif mailing.status == "sending" or mailing.status == "paused" %}
       <form method="post" action="{% url 'system_mailing_cancel' mailing.pk %}" data-se-stop>{% csrf_token %}<button type="submit" class="sys-btn" data-confirm data-confirm-danger data-confirm-title="Stop sending?" data-confirm-body="{{ progress.queued|add:progress.sending|floatformat:'0g' }} people will not get it." data-confirm-label="Stop sending" data-confirm-cancel="Keep sending">Stop sending</button></form>
     {% endif %}
   </div>
@@ -34,6 +34,9 @@
       </div>
       <p class="sr" role="status" aria-live="polite" data-se-announce></p>
     </section>
+  {% elif mailing.status == "paused" %}
+    <p class="sys-note error" data-se-state role="alert">Paused at {{ progress.sent|add:progress.bounced|add:progress.skipped|add:progress.failed|floatformat:"0g" }} of {{ progress.total|floatformat:"0g" }}{% if mailing.error %}: {{ mailing.error }}{% endif %} Nobody gets it twice.</p>
+    <form method="post" action="{% url 'system_mailing_resume' mailing.pk %}" class="se-resume" data-se-resume>{% csrf_token %}<button type="submit" class="sys-btn sm">Carry on sending</button><span class="sys-muted">Sending can carry on once Amazon allows it again.</span></form>
   {% elif mailing.status == "sent" %}
     <p class="sys-note success" data-se-state>Sent to {{ progress.sent|add:progress.bounced|floatformat:"0g" }} on {{ mailing.finished_at|date:"j M" }} at {{ mailing.finished_at|date:"H:i" }}.{% if progress.skipped %} {{ progress.skipped|floatformat:"0g" }} skipped (suppressed or no longer eligible).{% endif %}{% if progress.failed %} {{ progress.failed|floatformat:"0g" }} could not be sent.{% endif %}
       {% if progress.bounced %} <a href="{% url 'system_suppressions' %}">Bounces so far: {{ progress.bounced }}</a>{% endif %}</p>

@@ -1,24 +1,28 @@
-"""Unsubscribe links: a signed token holding the address, no login, no expiry (an old email must still be able to stop the
-mail). The token proves only 'this link was made by us for this address'; the only thing it can do is switch that
-address's marketing off."""
+"""Unsubscribe links: an opaque random key per address (UnsubscribeKey), no login, no expiry (an old email must still be able to
+stop the mail), and no address in the URL. The key can only switch that address's marketing off."""
 from django.conf import settings
-from django.core import signing
+from django.db import IntegrityError, transaction
 from django.urls import reverse
 
-SALT = "spa99.mailings.unsubscribe"
+from .models import UnsubscribeKey
 
 
 def make_unsubscribe_token(email):
-    return signing.dumps({"e": (email or "").strip().lower()}, salt=SALT)
+    email = (email or "").strip().lower()
+    row = UnsubscribeKey.objects.filter(email=email).first()
+    if row is None:
+        try:
+            with transaction.atomic():
+                row = UnsubscribeKey.objects.create(email=email)
+        except IntegrityError:  # two sends at once
+            row = UnsubscribeKey.objects.get(email=email)
+    return row.token
 
 
 def read_unsubscribe_token(token):
-    """The address in a valid token, else None."""
-    try:
-        email = signing.loads(token, salt=SALT).get("e", "")
-    except signing.BadSignature:
-        return None
-    return email or None
+    """The address behind a key, else None."""
+    row = UnsubscribeKey.objects.filter(token=token or "").first()
+    return row.email if row else None
 
 
 def unsubscribe_url(email):

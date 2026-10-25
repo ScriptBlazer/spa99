@@ -37,14 +37,14 @@ def unsubscribe(request, token):
     return render(request, "mailings/unsubscribe.html", {"done": False, "email": _mask(email), "token": token})
 
 
-@login_not_required  # PUBLIC: the personal link in an invite. Marks it opened and sends the person to Register.
+@login_not_required  # PUBLIC: the personal link in an invite. Sends the person to Register (opened is marked when Register renders).
 @require_GET
 def invite_link(request, token):
-    """The session remembers the invite so Register can pre-fill name and email. A link that is unknown, expired or not sent yet
+    """The session remembers the invite so Register can pre-fill name and email (and mark it opened when it renders). A link that is unknown, expired or not sent yet
     looks the same as a good one: the person lands on Register."""
     if not hit("invite-link", client_ip(request) or "unknown", 60, 60):
         return _message(request, "Please wait", "Too many attempts. Please try again in a minute.", status=429)
-    invite = invites.open_invite(token)
+    invite = invites.good_invite(token)
     if invite is not None:
         request.session[invites.SESSION_KEY] = invite.token
     return redirect("register")

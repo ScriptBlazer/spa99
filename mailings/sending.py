@@ -13,8 +13,9 @@ import uuid
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from common.tasks import enqueue
@@ -32,6 +33,10 @@ SLICE_SECONDS = 60  # one task works this long, then queues the next (django-q k
 STALE_SECONDS = 300  # a row 'sending' for longer than this belongs to a worker that died
 MIN_SCHEDULE_SECONDS = 60
 _sleep = time.sleep  # tests replace this
+LOCK_SECONDS = SLICE_SECONDS + 60
+MAX_ATTEMPTS = 5  # a throttled send is tried this often (30 s, 60 s, 120 s ... apart) before it fails
+TRANSIENT = ("Throttling", "MaxSendingRateExceeded", "TooManyRequests", "ServiceUnavailable", "InternalFailure", "InternalServerError",
+             "RequestTimeout", "ConnectTimeout", "ReadTimeout", "EndpointConnectionError")
 NEWS_NOTICE = "You are receiving this because you opted in to news from Spa 99."
 INVITE_NOTICE = "You are receiving this because Spa 99 invited you to register."
 
@@ -82,6 +87,56 @@ def _who(user):
 
 def _reason_word(log):
     return (log.error or "failed").split(":")[0][:200]
+
+
+def _acquire(name):
+    """One active worker per mailing or batch (so two cannot double the rate). Shared through the cache (the database cache in
+    production); a worker that dies frees it after LOCK_SECONDS. If the cache is unreachable the worker goes ahead."""
+    try:
+        return cache.add(f"mailings:lock:{name}", 1, LOCK_SECONDS)
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _release(name):
+    try:
+        cache.delete(f"mailings:lock:{name}")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _transient(log):
+    """SES asked us to slow down, or a passing server or network problem: try again later instead of failing."""
+    return any(word in (log.error or "") for word in TRANSIENT)
+
+
+def _ready(qs):
+    now = timezone.now()
+    return qs.filter(Q(retry_at__isnull=True) | Q(retry_at__lte=now))
+
+
+def _wait_for_retry(qs, deadline):
+    """No row is ready but some wait for their backoff: sleep until the first is due (within this slice). False when nothing waits or
+    the slice has no time left."""
+    first = qs.exclude(retry_at__isnull=True).order_by("retry_at").values_list("retry_at", flat=True).first()
+    if first is None:
+        return False
+    seconds = (first - timezone.now()).total_seconds()
+    if seconds > deadline - time.monotonic():
+        return False
+    _sleep(max(seconds, 0) + 0.01)
+    return True
+
+
+def _back_off(model, pk, attempts):
+    """Put a throttled row back in the queue. True when it will be retried, False when it has used its attempts."""
+    attempts += 1
+    if attempts >= MAX_ATTEMPTS:
+        return False
+    delay = 30 * 2 ** (attempts - 1)
+    model.objects.filter(pk=pk).update(status="queued", attempts=attempts, retry_at=timezone.now() + timedelta(seconds=delay),
+                                       reason="Waiting: Amazon SES asked us to slow down", updated_at=timezone.now())
+    return True
 
 
 def subject_line(subject, first_name):
@@ -195,8 +250,8 @@ def cancel(mailing, user=None, request=None):
     """Stop a scheduled or sending mailing: queued people are skipped, those already sent stay sent."""
     with transaction.atomic():
         row = Mailing.objects.select_for_update().get(pk=mailing.pk)
-        if row.status not in (Mailing.SCHEDULED, Mailing.SENDING):
-            raise MailingError("Only a scheduled or sending mailing can be cancelled.")
+        if row.status not in (Mailing.SCHEDULED, Mailing.SENDING, Mailing.PAUSED):
+            raise MailingError("Only a scheduled, sending or paused mailing can be cancelled.")
         was = row.status
         row.status, row.finished_at = Mailing.CANCELLED, timezone.now()
         row.save(update_fields=["status", "finished_at", "updated_at"])
@@ -211,9 +266,14 @@ def cancel(mailing, user=None, request=None):
 
 
 def resume(mailing):
-    """Queue the worker again for a sending mailing (safe: it never sends twice). For a stuck or restarted worker."""
-    if mailing.status != Mailing.SENDING:
-        raise MailingError("Only a mailing that is sending can be resumed.")
+    """Queue the worker again for a sending or paused mailing (safe: it never sends twice). Needs SES to allow sending."""
+    if mailing.status not in (Mailing.SENDING, Mailing.PAUSED):
+        raise MailingError("Only a mailing that is sending or paused can be resumed.")
+    try:
+        ses.require_sending_allowed()
+    except ses.SendingRefused as error:
+        raise MailingError(str(error)) from None
+    Mailing.objects.filter(pk=mailing.pk, status=Mailing.PAUSED).update(status=Mailing.SENDING, error="", updated_at=timezone.now())
     enqueue("mailings.tasks.send_mailing", str(mailing.pk))
 
 
@@ -239,8 +299,14 @@ def progress(mailing):
 
 # ---------- mailings: the background work ----------
 
+def _pause(mailing, reason):
+    Mailing.objects.filter(pk=mailing.pk, status=Mailing.SENDING).update(status=Mailing.PAUSED, error=reason[:300], updated_at=timezone.now())
+    logger.warning("Mailing %s paused: %s", mailing.pk, reason)
+
+
 def run_mailing(mailing_id, budget=SLICE_SECONDS):
-    """One slice of work. Returns a plain status string (never personal data: django-q keeps task results)."""
+    """One slice of work. Returns a plain status string (never personal data: django-q keeps task results). One worker at a time per
+    mailing; SES must still allow sending at the start of every slice, else the mailing is paused with the reason."""
     mailing = Mailing.objects.filter(pk=mailing_id).first()
     if mailing is None:
         return "missing"
@@ -250,23 +316,17 @@ def run_mailing(mailing_id, budget=SLICE_SECONDS):
     if errors or mailing.group not in segments.GROUPS:
         Mailing.objects.filter(pk=mailing.pk, status=Mailing.SENDING).update(status=Mailing.FAILED, finished_at=timezone.now(), error="The text or the group is no longer valid.")
         return "failed"
-    _fail_stale(mailing)
-    group = segments.GROUPS[mailing.group]
-    deadline, pacer = time.monotonic() + budget, Pacer(rate_per_second())
-    while time.monotonic() < deadline:
-        batch = list(mailing.recipients.filter(status=MailingRecipient.QUEUED).order_by("email")[:50])
-        if not batch:
-            break
-        for recipient in batch:
-            if not Mailing.objects.filter(pk=mailing.pk, status=Mailing.SENDING).exists():  # cancelled meanwhile
-                break
-            if time.monotonic() >= deadline:
-                break
-            pacer.wait()
-            _send_one(mailing, group, recipient)
-        else:
-            continue
-        break
+    try:
+        ses.require_sending_allowed()
+    except ses.SendingRefused as error:
+        _pause(mailing, str(error))
+        return "paused"
+    if not _acquire(f"mailing:{mailing.pk}"):
+        return "busy"  # another worker is on it
+    try:
+        _slice(mailing, budget)
+    finally:
+        _release(f"mailing:{mailing.pk}")
     counts = refresh_counts(mailing)
     mailing.refresh_from_db()
     if mailing.status != Mailing.SENDING:
@@ -274,9 +334,28 @@ def run_mailing(mailing_id, budget=SLICE_SECONDS):
     if counts.get("queued", 0):
         enqueue("mailings.tasks.send_mailing", str(mailing.pk))
         return "sending"
-    if counts.get("sending", 0):  # another worker is mid-send; it finishes the mailing
+    if counts.get("sending", 0):  # a send is in flight (or died: it is marked failed after a few minutes)
         return "sending"
     return _finish(mailing, counts)
+
+
+def _slice(mailing, budget):
+    _fail_stale(mailing)
+    group = segments.GROUPS[mailing.group]
+    queued = mailing.recipients.filter(status=MailingRecipient.QUEUED)
+    deadline, pacer = time.monotonic() + budget, Pacer(rate_per_second())
+    while time.monotonic() < deadline:
+        batch = list(_ready(queued).order_by("email")[:50])
+        if not batch:
+            if _wait_for_retry(queued, deadline):
+                continue
+            return
+        for recipient in batch:
+            if time.monotonic() >= deadline or not Mailing.objects.filter(pk=mailing.pk, status=Mailing.SENDING).exists():  # time up, or cancelled
+                return
+            pacer.wait()
+            if _send_one(mailing, group, recipient) == "throttled":
+                _sleep(1)  # SES said slow down: ease off for everyone, not just this row
 
 
 def _fail_stale(mailing):
@@ -328,6 +407,8 @@ def _send_one(mailing, group, recipient):
         _mark(recipient, MailingRecipient.SENT, "", sent_at=log.sent_at, message_id=log.message_id)
     elif log.status == EmailLog.SUPPRESSED:
         _mark(recipient, MailingRecipient.SKIPPED, "On the suppression list (bounce or complaint)")
+    elif _transient(log) and _back_off(MailingRecipient, recipient.pk, recipient.attempts):
+        return "throttled"
     else:
         _mark(recipient, MailingRecipient.FAILED, _reason_word(log))
 
@@ -379,33 +460,53 @@ def start_invites(batch_id, user=None, request=None):
 
 
 def start_invites_resume(batch_id):
-    """Queue the invite worker again for a batch with invites still waiting (it never sends one twice)."""
+    """Queue the invite worker again for a batch with invites still waiting (it never sends one twice). Needs SES to allow sending."""
+    try:
+        ses.require_sending_allowed()
+    except ses.SendingRefused as error:
+        raise MailingError(str(error)) from None
     if not Invite.objects.filter(batch_id=batch_id, status=Invite.QUEUED).exists():
         raise MailingError("No invites are waiting in this batch.")
     enqueue("mailings.tasks.send_invites", str(batch_id))
 
 
 def run_invites(batch_id, budget=SLICE_SECONDS):
-    """One slice of invite sending, the same claim-then-send rules as run_mailing. Returns a plain status string."""
+    """One slice of invite sending, the same rules as run_mailing (gate checked first: invites stay queued and the slice stops when SES
+    refuses; one worker per batch). Returns a plain status string."""
     try:
         batch_id = uuid.UUID(str(batch_id))
     except ValueError:
         return "missing"
-    deadline, pacer = time.monotonic() + budget, Pacer(rate_per_second())
-    Invite.objects.filter(batch_id=batch_id, status=Invite.SENDING, updated_at__lt=timezone.now() - timedelta(seconds=STALE_SECONDS)).update(
-        status=Invite.FAILED, reason="Interrupted; not retried so nobody gets it twice", updated_at=timezone.now())
-    while time.monotonic() < deadline:
-        batch = list(Invite.objects.filter(batch_id=batch_id, status=Invite.QUEUED).order_by("email")[:50])
-        if not batch:
-            break
-        for invite in batch:
-            if time.monotonic() >= deadline:
+    try:
+        ses.require_sending_allowed()
+    except ses.SendingRefused as error:
+        logger.warning("Invites %s paused: %s", batch_id, error)
+        return "paused"
+    if not _acquire(f"invites:{batch_id}"):
+        return "busy"
+    try:
+        Invite.objects.filter(batch_id=batch_id, status=Invite.SENDING, updated_at__lt=timezone.now() - timedelta(seconds=STALE_SECONDS)).update(
+            status=Invite.FAILED, reason="Interrupted; not retried so nobody gets it twice", updated_at=timezone.now())
+        queued = Invite.objects.filter(batch_id=batch_id, status=Invite.QUEUED)
+        deadline, pacer = time.monotonic() + budget, Pacer(rate_per_second())
+        while time.monotonic() < deadline:
+            batch = list(_ready(queued).order_by("email")[:50])
+            if not batch:
+                if _wait_for_retry(queued, deadline):
+                    continue
                 break
-            pacer.wait()
-            _send_invite(invite)
-        else:
-            continue
-        break
+            stop = False
+            for invite in batch:
+                if time.monotonic() >= deadline:
+                    stop = True
+                    break
+                pacer.wait()
+                if _send_invite(invite) == "throttled":
+                    _sleep(1)
+            if stop:
+                break
+    finally:
+        _release(f"invites:{batch_id}")
     if Invite.objects.filter(batch_id=batch_id, status=Invite.QUEUED).exists():
         enqueue("mailings.tasks.send_invites", str(batch_id))
         return "sending"
@@ -438,6 +539,8 @@ def _send_invite(invite):
         _invite_mark(invite, Invite.SENT, "", sent_at=log.sent_at, message_id=log.message_id)
     elif log.status == EmailLog.SUPPRESSED:
         _invite_mark(invite, Invite.SKIPPED, "On the suppression list (bounce or complaint)")
+    elif _transient(log) and _back_off(Invite, invite.pk, invite.attempts):
+        return "throttled"
     else:
         _invite_mark(invite, Invite.FAILED, _reason_word(log))
 
