@@ -6,6 +6,6 @@
 {% include "users/_shell_top.html" %}
       <h1>{{ title }}</h1>
       <p class="signin-lead">{{ text }}</p>
-      <div class="signin-actions"><a class="btn btn-primary btn-block" href="{% url 'login' %}">Sign in</a><a class="btn-quiet small" href="{% url 'home' %}">Back to home</a></div>
+      <div class="signin-actions">{% if user.is_authenticated %}<a class="btn btn-primary btn-block" href="{% url 'account' %}">Back to My Spa 99</a>{% else %}<a class="btn btn-primary btn-block" href="{% url 'login' %}">Sign in</a>{% endif %}<a class="btn-quiet small" href="{% url 'home' %}">Back to home</a></div>
 {% include "users/_shell_bottom.html" %}
 {% endblock %}

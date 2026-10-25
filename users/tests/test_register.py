@@ -335,3 +335,10 @@ class AccountTests(TestCase):
         self.assertTrue(User.objects.get(pk=user.pk).check_password("a-new-long-password-9"))
         self.assertEqual(self.client.get("/account/").status_code, 200)  # still signed in
         self.assertContains(self.client.get("/account/you/"), "Change password")
+
+
+class SignUpNeedsATierTests(TestCase):
+    def test_form_refuses_a_sign_up_without_a_tier(self):
+        form = SignUpForm(signup_data(plan=""))
+        self.assertFalse(form.is_valid())
+        self.assertEqual(form.errors["plan"], ["Choose a membership to continue."])

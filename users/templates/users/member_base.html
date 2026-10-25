@@ -11,6 +11,7 @@
     <a class="m-rail-brand" href="{% url 'account' %}" aria-label="My Spa 99, home"><img src="{% static 'common/img/logo-stacked-gold.svg' %}" alt="" width="72" height="72"></a>
     {% include "users/_member_nav.html" with kind="rail" %}
     <a class="m-rail-back" href="{% url 'home' %}" data-member-website>{% include "common/_icon.html" with name="arrow-right" %}<span>Back to the website</span></a>
+    <form class="m-rail-signout" method="post" action="{% url 'logout' %}" data-member-signout>{% csrf_token %}<button type="submit">Sign out</button></form>
   </aside>
   <div class="m-topbar on-dark" data-member-topbar>
     {% if request.resolver_match.url_name == 'password_change' %}<a class="m-topbar-back" href="{% url 'account_you' %}">{% include "common/_icon.html" with name="arrow-right" %}<span>You</span></a>

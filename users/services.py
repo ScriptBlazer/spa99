@@ -327,3 +327,18 @@ def delete_user_data(user):
         "queue_records": gold["queue_records"] + queue,
     }
 
+
+
+def choose_tier(user, slug):
+    """A signed-in person picks a tier, whichever page they picked it on. Returns (outcome, plan): "saved", "same",
+    "gold" (a Gold member is never switched to a tier this way) or "invalid" (not a plan anyone can register interest in)."""
+    current = InterestRegistration.objects.filter(user=user).select_related("plan").first()
+    if current is not None and current.plan is not None and current.plan.slug == "gold":
+        return "gold", current.plan
+    plan = interest_plans().filter(slug=slug or "").first()
+    if plan is None:
+        return "invalid", None
+    if current is not None and current.plan_id == plan.pk:
+        return "same", plan
+    set_interest(user, plan)
+    return "saved", plan

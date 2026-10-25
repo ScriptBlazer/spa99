@@ -32,8 +32,16 @@ if (panel) {
       [eyebrow, text].forEach((el) => el.animate({ opacity: [0, 1] }, { duration: parseFloat(fade) || 240, easing: 'ease-out' }));
     }
   };
-  document.querySelectorAll('input[name="plan"]').forEach((input) => input.addEventListener('change', () => showPlan(true)));
+  const planError = document.querySelector('[data-plan-error]');
+  document.querySelectorAll('input[name="plan"]').forEach((input) => input.addEventListener('change', () => { if (planError) planError.hidden = true; showPlan(true); }));
   showPlan(false);
+  // A tier is required: stop the submit and say so next to the chips (the server checks too).
+  form?.addEventListener('submit', (e) => {
+    if (document.querySelector('input[name="plan"]:checked') || !planError) return;
+    e.preventDefault();
+    planError.hidden = false;
+    planError.scrollIntoView({ block: 'center' });
+  }, true);
 }
 
 /* Date of birth: Day / Month / Year, auto-advance after 2 / 2 / 4 digits, one shared feedback line. The real field

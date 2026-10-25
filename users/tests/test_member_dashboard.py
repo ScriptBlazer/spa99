@@ -89,9 +89,9 @@ class MemberScreenTests(TestCase):
     def test_old_password_address_redirects(self):
         self.assertRedirects(self.client.get("/account/password/"), "/account/you/password/", status_code=307, fetch_redirect_response=False)
 
-    def test_interest_change_returns_to_membership(self):
+    def test_interest_change_returns_to_the_dashboard(self):
         self.client.force_login(make_user(plan=plan("tier-1")))
-        self.assertRedirects(self.client.post("/account/interest/", {"plan": "tier-3"}), "/account/membership/", fetch_redirect_response=False)
+        self.assertRedirects(self.client.post("/account/interest/", {"plan": "tier-3"}), "/account/", fetch_redirect_response=False)
         self.assertEqual(InterestRegistration.objects.get().plan.slug, "tier-3")
 
 
@@ -195,3 +195,61 @@ class StaffHostLoginRedirectTests(TestCase):
             response = self.client.post("/login/", {"username": user.email, "password": "Correct-horse-9"}, HTTP_HOST=host)
             self.assertEqual(response.status_code, 302, host)
             self.assertNotIn("/account/", response["Location"], host)
+
+
+class ChooseTierTests(TestCase):
+    def setUp(self):
+        seed_all()
+
+    def test_every_entry_path_saves_the_tier_and_lands_on_the_dashboard(self):
+        user = make_user()
+        InterestRegistration.objects.create(user=user, plan=None)  # signed up before a tier was required
+        self.client.force_login(user)
+        paths = [("get", "/register/?plan=tier-1", "tier-1"),  # compare page, journey result, memberships page, Gold page links
+                 ("post", "/account/interest/", "tier-2")]  # the member area's own tier cards
+        for method, url, slug in paths:
+            response = self.client.get(url) if method == "get" else self.client.post(url, {"plan": slug})
+            self.assertRedirects(response, "/account/", fetch_redirect_response=False)
+            self.assertEqual(InterestRegistration.objects.get(user=user).plan.slug, slug)
+        page = self.client.get("/account/")
+        self.assertContains(page, "Tier 2 interest")
+        self.assertContains(page, "Saved. You&#x27;re interested in Tier 2.")
+
+    def test_gold_member_cannot_switch(self):
+        user = make_user(plan=plan("gold"))
+        self.client.force_login(user)
+        self.client.get("/register/?plan=tier-1")
+        self.client.post("/account/interest/", {"plan": "tier-1"})
+        self.assertEqual(InterestRegistration.objects.get(user=user).plan.slug, "gold")
+
+    def test_no_redirect_loop_for_a_member_with_no_tier(self):
+        user = make_user()
+        InterestRegistration.objects.create(user=user, plan=None)
+        self.client.force_login(user)
+        for url in ("/account/", "/account/membership/", "/account/book/", "/account/you/"):
+            self.assertEqual(self.client.get(url).status_code, 200, url)
+        self.assertContains(self.client.get("/account/"), "No membership chosen yet")
+        self.assertContains(self.client.get("/account/membership/"), "Choose your membership")
+
+    def test_signed_out_choice_goes_to_register_with_the_plan(self):
+        response = self.client.get("/register/?plan=tier-3")
+        self.assertEqual(response.context["selected_plan"], "tier-3")
+
+
+class SignOutTests(TestCase):
+    def setUp(self):
+        seed_all()
+
+    def test_logout_is_post_only_and_lands_on_home_with_a_message(self):
+        self.client.force_login(make_user(plan=plan("tier-1")))
+        self.assertEqual(self.client.get("/logout/").status_code, 405)
+        self.assertIn("_auth_user_id", self.client.session)
+        response = self.client.post("/logout/")
+        self.assertRedirects(response, "/", fetch_redirect_response=False)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertContains(self.client.get("/"), "You&#x27;re signed out.")
+
+    def test_header_and_member_area_offer_sign_out(self):
+        self.client.force_login(make_user(plan=plan("tier-1")))
+        self.assertContains(self.client.get("/"), 'action="/logout/"')
+        self.assertContains(self.client.get("/account/"), "data-member-signout")

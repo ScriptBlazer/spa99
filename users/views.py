@@ -101,8 +101,17 @@ class LoginView(auth_views.LoginView):
 class LogoutView(auth_views.LogoutView):
     """Sign out (POST only). The journey cookie goes too, so the next person on this device starts a new journey."""
 
+    def get_success_url(self):
+        """Visitors on the public site land on the home page; the staff hosts keep LOGOUT_REDIRECT_URL (their sign-in)."""
+        if getattr(self.request, "urlconf", "") in STAFF_URLCONFS:
+            return super().get_success_url()
+        return reverse("home")
+
     def post(self, request, *args, **kwargs):
-        return _forget_journey_cookie(super().post(request, *args, **kwargs))
+        response = super().post(request, *args, **kwargs)
+        if getattr(request, "urlconf", "") not in STAFF_URLCONFS:
+            messages.success(request, "You're signed out.")  # added after the session was cleared, so it shows on the next page
+        return _forget_journey_cookie(response)
 
 
 # ---------- register interest ----------
@@ -110,7 +119,9 @@ class LogoutView(auth_views.LogoutView):
 @login_not_required  # PUBLIC: anyone can register interest
 @require_http_methods(["GET", "POST"])
 def register(request):
-    if request.user.is_authenticated:
+    if request.user.is_authenticated:  # every "choose this tier" link ends here (compare page, journey result, Gold page): save it
+        if request.GET.get("plan"):
+            _tier_message(request, *services.choose_tier(request.user, request.GET["plan"]))
         return redirect("account")
     if not SiteSettings.load().register_interest_open:
         return _message(request, "Not open yet", "Registration is not open yet.", status=403)
@@ -323,19 +334,23 @@ class TeamPasswordView(_PasswordChange):
     success_url = "/password/"
 
 
+def _tier_message(request, outcome, plan):
+    if outcome == "gold":
+        messages.info(request, "Your Gold Card is active. To change it, write to us.")  # Gold is never replaced by an interest choice
+    elif outcome == "invalid":
+        messages.error(request, "Choose one of the memberships.")
+    elif outcome == "same":
+        messages.info(request, f"{plan.name} is already your choice.")
+    else:
+        messages.success(request, f"Saved. You're interested in {plan.name}.")
+    return outcome
+
+
 @member_area
 @require_POST
 def account_interest(request):
-    plan = services.interest_plans().filter(slug=request.POST.get("plan", "")).first()
-    current = getattr(request.user, "interest", None)
-    if current is not None and current.plan is not None and current.plan.slug == "gold":
-        messages.info(request, "Your Gold Card is active. To change it, write to us.")  # Gold is never replaced by an interest choice
-    elif plan is None:
-        messages.error(request, "Choose one of the memberships.")
-    else:
-        services.set_interest(request.user, plan)
-        messages.success(request, "Your interest is updated.")
-    return redirect("account_membership")
+    outcome = _tier_message(request, *services.choose_tier(request.user, request.POST.get("plan", "")))
+    return redirect("account_membership" if outcome == "invalid" else "account")
 
 
 @member_area

@@ -36,7 +36,7 @@ def sign_out_member(page):
     page.goto(f"{SITE}/account/you/")
     with page.expect_navigation():
         page.locator("form.m-signout button").click()
-    page.wait_for_url(re.compile(r"/login/"))
+    page.wait_for_url(f"{SITE}/")  # signing out lands on the home page
 
 
 def submit_login_form(page, email, password):

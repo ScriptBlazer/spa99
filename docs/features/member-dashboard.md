@@ -13,7 +13,8 @@ Branch `feature/member-dashboard`. Spec: `docs/design/MEMBER.md`. Decision: `PRO
 | `/account/you/password/` | `password_change` | Change password (GET and POST); success goes to You |
 | `/account/password/` | `password_change_old` | Old address, kept: 307 to the new one |
 | `POST /account/emails/` | `account_emails` | Marketing consent: `marketing=1` on, anything else off. 20 a minute per person. Saves only on change, stamps `marketing_consent_at`, and the User history logs it. `Accept: application/json` gets `{"saved", "marketing"}`; otherwise a "Saved." message and a redirect to You |
-| POST `/account/interest/` | `account_interest` | Redirects to Membership |
+| POST `/account/interest/` | `account_interest` | Saves the tier (`services.choose_tier`), message, redirects to Home (an invalid choice returns to Membership) |
+| POST `/logout/` | `logout` | Sign out (GET is 405). Public site lands on Home with "You're signed out."; the staff hosts keep their own sign-in page |
 | `/account/export/`, POST `/account/delete/` | | Unchanged; a wrong delete password returns to You |
 
 **Who may open it** (rule book U1/U2): only a person holding a membership (an interest registration, which includes Gold) or a superuser (an empty membership is shown). Team members without a membership get a calm 200 page "No membership on this account" with a link to the website (not a 404); `users.views.member_area` guards every `/account/*` view, and the website menu shows "My Spa 99" only when `has_member_area` (context processor `users.context.member_area`), else "Sign in".
@@ -41,3 +42,9 @@ Book is gone from the header (desktop and menu) and footer. Signed in shows "My 
 ## Tests
 
 `users/tests/test_member_dashboard.py` (screens, context, flag, login redirect, consent, menu, `/book/`, sitemap). Existing tests for the old single account page and password URL were moved to the new routes.
+
+## Choosing a tier and signing out (2026-10-25)
+
+- Every "choose this tier" link (compare/memberships page Continue, journey result, Gold page) goes to `/register/?plan=slug`. Signed out: the sign-up form with that plan picked. Signed in: `register` saves it with `services.choose_tier(user, slug)` (outcomes saved / same / gold / invalid), shows a short message and redirects to `/account/`. Before, it redirected to the dashboard and dropped the plan (the loop). Gold members are never switched. State change on a GET link is a deliberate shortcut so every existing link works.
+- Sign-up now requires a tier (form field `plan` required, "Choose a membership to continue.", also checked in `register.js`). Accounts made earlier without a tier still see "No membership chosen yet" and can choose.
+- Sign out: POST form in the desktop rail ("Sign out", `data-member-signout`), at the end of You (phone and desktop), and in the public header and menu whenever someone is signed in (next to "My Spa 99" for members). The "no membership" page links to the memberships and has Sign out.
