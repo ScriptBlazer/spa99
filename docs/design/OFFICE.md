@@ -364,3 +364,13 @@ Copy: short, calm, British, no exclamation marks.
 13. Contrast spot checks with a tool: muted on sunken 5.38 or more, espresso on every tint 10 or more, focus ring visible on every control.
 14. Viewer sees no action buttons; Owner and Manager approve via list (desktop), rail, phone bar and email page, each through a confirmation.
 15. Lighthouse Dashboard 375, mid phone: LCP 2.5s or less, CLS 0.
+
+---
+
+## Final approval statuses (2026-10-25)
+
+- **Awaiting final approval**: outlined pill (surface fill, 1px gold-text ring, gold-text 5.77:1). **Sent back**: caramel-tint pill with espresso text (10.25:1), shown beside "Waiting" in list rows. No side stripes.
+- **Panels** (`.o-callout`): "Awaiting final approval" (sunken tint) and "Sent back for review" (caramel tint) in the decision card: who, when, the final approver's note on a surface inset. The "No final approver" note is a calm caramel-tint notice on the Gold list (approvers only) and in the decision card.
+- **Final approvers** get "Confirm approval" and "Send back for review". Send back opens the shared centred modal with an optional note (counter, max `note_max`), then posts; without JS the rail shows a plain note box. Phone decision bar: Send back (left), Confirm approval (right).
+- **Filter**: the segmented control keeps its four items; a small "Awaiting final (N)" chip (a radio in the same `status` group) sits beside the totals line, shown while N > 0 or selected. Selected, the segmented thumb hides.
+- **One-tap page** (`gold_final.html`) matches the approve page: name, potential and status pills, property line, who approved, Confirm approval, then a note box and Send back for review.

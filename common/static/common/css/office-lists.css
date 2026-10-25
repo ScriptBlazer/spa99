@@ -147,3 +147,30 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 .o-confirm-go { min-height: 3.5rem; font-size: var(--text-lg); }
 .o-confirm-state { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-sunken); }
 .o-confirm-links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
+
+/* ---------- final approval (2026-10-25): two statuses, calm panels, one filter chip. Tint and full hairlines only, never a side stripe. ---------- */
+.o-badge--s-awaiting_final { background: var(--office-surface); color: var(--office-gold-text); box-shadow: inset 0 0 0 1px var(--office-gold-text); }   /* 5.77 on the card */
+.o-badge--s-sent-back { background: var(--office-caramel-tint); color: var(--office-text); }                                                              /* 10.25 */
+.o-list .c-status .o-badge + .o-badge { margin-left: var(--space-1); }
+.o-callout { display: grid; gap: var(--space-1); max-width: none; margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--office-radius); background: var(--office-sunken); color: var(--office-text); font-size: var(--text-sm); line-height: var(--leading-snug); }
+.o-callout > * { margin: 0; max-width: none; }
+.o-callout--back, .o-callout--calm, .o-state--warn { background: var(--office-caramel-tint); }
+.o-state--warn { padding: var(--space-3) var(--space-4); border-radius: var(--office-radius); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-snug); color: var(--office-text); }
+.o-callout--calm { margin-bottom: var(--space-4); }
+.o-callout-title { font-weight: 600; }
+.o-callout .o-sub { color: var(--office-muted); }   /* 5.44 on the caramel tint */
+.o-callout-note { margin-top: var(--space-1); padding: var(--space-2) var(--space-3); border-radius: var(--office-radius); background: var(--office-surface); font-size: var(--text-base); overflow-wrap: anywhere; }
+.o-note-field { display: grid; gap: var(--space-1); }
+.js .o-note-field { display: none; }
+.o-note-field textarea, .o-confirm-form textarea { box-sizing: border-box; width: 100%; min-height: 6rem; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-control-line); border-radius: var(--office-radius); background: var(--office-surface); color: var(--office-text); font: inherit; resize: vertical; }
+.o-note-field textarea:focus-visible, .o-confirm-form textarea:focus-visible { outline: 2px solid var(--office-text); outline-offset: 2px; box-shadow: none; }
+.o-act--send-back { display: grid; gap: var(--space-2); }
+@media (max-width: 63.99em) { .o-bar .o-act--send-back { flex: 1; order: -1; } }
+.o-totalline { flex-wrap: wrap; }
+.o-chip { position: relative; display: inline-flex; align-items: center; min-height: 2rem; padding: 0 var(--space-3); border-radius: var(--office-pill); background: var(--office-surface); box-shadow: inset 0 0 0 1px var(--color-control-line); color: var(--office-text); font-size: var(--text-sm); font-weight: 600; white-space: nowrap; cursor: pointer; transition: background-color var(--office-dur-swap) var(--ease-soft), color var(--office-dur-swap) var(--ease-soft); }
+.o-chip input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.o-chip:has(input:checked) { background: var(--office-text); color: var(--color-cream); box-shadow: none; }
+.o-chip:has(input:focus-visible) { outline: 2px solid var(--office-text); outline-offset: 2px; }
+@media (pointer: coarse) { .o-chip { min-height: 2.75rem; } }
+.o-seg:not(:has(input:checked)) .o-seg-thumb { opacity: 0; }
+.o-badge { gap: 0.25em; }

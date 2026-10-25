@@ -232,4 +232,5 @@ def gold_confirm(application):
     return {"id": str(application.pk), "name": application.full_name, "first_name": application.first_name, "status": application.status,
             "potential": application.potential_level, "property_line": " · ".join(p for p in line if p and p != "Not given"),
             "applied": application.created_at, "can_approve": application.status in WAITING,
-            "awaiting_final": application.status == GoldApplication.AWAITING_FINAL, "sent_back": application.sent_back_at is not None}
+            "awaiting_final": application.status == GoldApplication.AWAITING_FINAL, "sent_back": application.sent_back_at is not None,
+            "final_requested_by": _name(application.final_requested_by), "final_requested_at": application.final_requested_at.isoformat() if application.final_requested_at else ""}

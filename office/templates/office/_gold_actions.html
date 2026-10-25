@@ -18,9 +18,11 @@
           data-confirm-title="Confirm approval for {{ a.name }}?" data-confirm-body="The potential is Low. He gets an invite to set up his account, or Gold is added to his existing account."
           data-confirm-label="Confirm approval" data-confirm-cancel="Not now">Confirm approval</button></form>
 <form method="post" action="{% url 'office_gold_final_send_back' a.id %}" data-office-action data-final-send-back class="o-act o-act--send-back">{% csrf_token %}
-  <label class="o-sub" for="note-{% if bar %}bar{% else %}rail{% endif %}">Note for the approvers (optional)</label>
-  <textarea id="note-{% if bar %}bar{% else %}rail{% endif %}" name="note" rows="2" maxlength="{{ a.note_max }}"></textarea>
-  <button type="submit" class="btn btn-secondary{% if not bar %} btn-block{% endif %}" data-working-text="Sending back" data-confirm
-          data-confirm-title="Send {{ a.name }} back?" data-confirm-body="Every approver is emailed to ask if they are sure. The applicant is told nothing."
-          data-confirm-label="Send back" data-confirm-cancel="Cancel">Send back</button></form>
+  {% if not bar %}<div class="o-note-field" data-note-field>
+    <label class="o-sub" for="note-rail">Note for the approvers (optional)</label>
+    <textarea id="note-rail" name="note" rows="2" maxlength="{{ a.note_max }}"></textarea>
+  </div>{% endif %}
+  <button type="submit" class="btn btn-secondary{% if not bar %} btn-block{% endif %}" data-working-text="Sending back" data-send-back
+          data-note-max="{{ a.note_max }}" data-note-title="Send {{ a.name }} back for review?" data-note-body="Every approver is emailed to ask if they are sure. The applicant is told nothing."
+          data-note-label="Note for the approvers (optional)" data-note-confirm="Send back" data-note-cancel="Cancel">{% if bar %}Send back<span class="sr-only"> for review</span>{% else %}Send back for review{% endif %}</button></form>
 {% endif %}

@@ -3,6 +3,7 @@
    Toasts and the confirm modal are the shared ones (feedback.js, docs/design/FEEDBACK.md). */
 import { toast, confirmModal, initFeedback } from './feedback.js';
 import { initFormProblems, collectProblems, showProblems } from './form-problems.js';
+import { initApproval } from './system-combobox.js';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -197,6 +198,9 @@ function specFor(form) {
   if (form.matches('[data-system-undo-form][data-system-risky]')) {
     const d = form.dataset;
     return { title: `Undo ${d.noun} change on ${ENV}?`, rows: [{ label: d.what, old: d.old, now: d.new }], line: d.line, action: `Undo 1 ${d.noun}` };
+  }
+  if (form.matches('[data-approval-remove]')) { // Approval: "Remove X as approver?" with the consequence, no diff
+    return { title: form.dataset.confirmTitle, rows: [], line: form.dataset.confirmBody, action: 'Remove', danger: true };
   }
   if (form.matches('[data-system-confirm]')) {
     const d = form.dataset;
@@ -574,4 +578,4 @@ function initExpand() {
   $$('[data-system-expand][aria-expanded=true]').forEach((b) => { b.textContent = 'Less'; });
 }
 
-initForms(); initExpand(); initSubmit(); initTimer(); initKeys(); initAudit(); initMenu(); refreshBar();
+initForms(); initApproval(); initExpand(); initSubmit(); initTimer(); initKeys(); initAudit(); initMenu(); refreshBar();

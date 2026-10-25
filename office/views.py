@@ -146,7 +146,8 @@ def gold(request):
     stored = selectors.counters(K.GOLD_APPLICATIONS, K.GOLD_BY_STATUS)
     context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "section": "gold",
                "final_approver_missing": not approval.final_approver_exists(),
-               "total_applications": stored.get((K.GOLD_APPLICATIONS, ""), 0), "waiting": selectors.waiting_count(stored)}
+               "total_applications": stored.get((K.GOLD_APPLICATIONS, ""), 0), "waiting": selectors.waiting_count(stored),
+               "awaiting_final_count": stored.get((K.GOLD_BY_STATUS, "awaiting_final"), 0)}
     return _varied(render(request, _fragment(request, "office/gold.html", "office/_gold_rows.html"), context))
 
 

@@ -1,25 +1,23 @@
-<div class="sys-scroll"><table class="sys-table" data-system-approval-list="{{ role }}">
-  <thead><tr><th scope="col">Person</th><th scope="col">Level</th><th scope="col">Emails go to</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
-  <tbody>
+{# The chosen people for one role. Context: people, role. Delivery form: account email ticked = emails go to the account; unticked shows an address box. #}
+<ul class="sys-people" data-system-approval-list="{{ role }}">
   {% for p in people %}
-    <tr data-system-person="{{ p.id }}">
-      <td>{{ p.name }} <span class="mono">{{ p.email }}</span>{% if not p.active %} <span class="sys-badge">Inactive</span>{% endif %}</td>
-      <td>{{ p.level_label }}</td>
-      <td>
-        {% if p.can_change %}
-        <form method="post" action="{% url 'system_approval_delivery' p.id %}" data-problems data-system-delivery-form>{% csrf_token %}
-          <label class="sys-toggle"><input type="checkbox" name="use_account_email" value="1"{% if p.use_account_email %} checked{% endif %}> <span>Send to their account email</span></label>
-          <input type="email" name="other_email" value="{{ p.other_email }}" placeholder="Other address" aria-label="Other email for {{ p.email }}"{% if p.use_account_email %} data-hidden{% endif %}>
-          <button type="submit" class="sys-btn sm">Save</button>
-        </form>
-        {% else %}{{ p.address }}{% endif %}
-      </td>
-      <td>{% if p.can_change %}
-        <form method="post" action="{% if role == 'final' %}{% url 'system_approval_final_remove' p.id %}{% else %}{% url 'system_approval_approvers_remove' p.id %}{% endif %}" data-system-form="approval-remove" data-system-confirm="{% if role == 'final' %}final approver{% else %}approver{% endif %}" data-system-confirm-label="Remove" data-system-confirm-what="{{ p.email }}" data-noun="approver" data-plural="approvers" data-line="They stop getting these emails and can no longer act on them." style="display:inline">{% csrf_token %}
-          <button type="submit" class="sys-btn sm">Remove</button>
-        </form>{% endif %}</td>
-    </tr>
-  {% empty %}<tr><td class="sys-empty" colspan="4">Nobody yet.</td></tr>
+  <li class="sys-person" data-system-person="{{ p.id }}">
+    <div class="sys-person-id"><span class="sys-person-name">{{ p.name }}</span>{% if p.name != p.email %} <span class="mono sys-person-email">{{ p.email }}</span>{% endif %}{% if not p.active %} <span class="sys-badge">Inactive</span>{% endif %}</div>
+    <span class="sys-badge sys-level">{{ p.level_label }}</span>
+    <div class="sys-person-mail">
+      {% if p.can_change %}
+      <form method="post" action="{% url 'system_approval_delivery' p.id %}" class="sys-deliver"{% if p.use_account_email %} data-account{% endif %} data-problems data-system-delivery-form>{% csrf_token %}
+        <label class="sys-toggle"><input type="checkbox" name="use_account_email" value="1"{% if p.use_account_email %} checked{% endif %}> <span>Send to their account email</span></label>
+        <input type="email" name="other_email" value="{{ p.other_email }}" placeholder="name@example.com" autocomplete="off" aria-label="Other email address for {{ p.name }}">
+        <button type="submit" class="sys-btn sm" data-delivery-save>Save</button>
+      </form>
+      {% else %}<span class="sys-muted">Emails go to <span class="mono">{{ p.address }}</span></span>{% endif %}
+    </div>
+    <div class="sys-person-act">{% if p.can_change %}
+      <form method="post" action="{% if role == 'final' %}{% url 'system_approval_final_remove' p.id %}{% else %}{% url 'system_approval_approvers_remove' p.id %}{% endif %}" data-approval-remove data-confirm-title="Remove {{ p.name }} as {% if role == 'final' %}final approver{% else %}approver{% endif %}?" data-confirm-body="{% if role == 'final' %}They stop getting final approval emails and can no longer confirm or send back.{% else %}They stop getting approval emails and can no longer approve, decline or resend.{% endif %}">{% csrf_token %}
+        <button type="submit" class="sys-btn sm">Remove<span class="sr"> {{ p.name }}</span></button>
+      </form>{% endif %}</div>
+  </li>
+  {% empty %}<li class="sys-empty sys-people-empty">Nobody yet.</li>
   {% endfor %}
-  </tbody>
-</table></div>
+</ul>

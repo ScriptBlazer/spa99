@@ -1,7 +1,7 @@
 {% extends "office/base.html" %}
 {% load office_tags %}
 {% block title %}{{ application.name }} | Spa 99 Office{% endblock %}
-{% block body_attrs %}data-office-detail{% if office_can.can_act or office_can.can_final %} data-has-bar{% endif %}{% endblock %}
+{% block body_attrs %}data-office-detail{% if office_can.can_act or office_can.can_final and application.can_final %} data-has-bar{% endif %}{% endblock %}
 {% block header_left %}<a class="o-back" href="{% url 'office_gold' %}">{% include "office/_icon.html" with name="chevron-left" %}<span>Gold</span></a>{% endblock %}
 {% block main %}
 {% with a=application %}
@@ -27,11 +27,16 @@
       {% elif a.status == "declined" %}
         <p class="o-state">Declined {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>
       {% elif a.awaiting_final %}
-        <p class="o-state" data-awaiting-final>Awaiting final approval{% if a.final_requested_by %}. Approved by {{ a.final_requested_by|first_word }} {{ a.final_requested_at|dm }}, but the potential is Low.{% endif %}</p>
+        <div class="o-callout" data-awaiting-final>
+          <p class="o-callout-title">Awaiting final approval</p>
+          <p class="o-sub">{% if a.final_requested_by %}Approved by {{ a.final_requested_by|first_word }}{% if a.final_requested_at %} on {{ a.final_requested_at|dm }}{% endif %}, but the potential is Low. {% endif %}{% if office_can.can_final %}Confirm it, or send it back for the approvers to look again.{% else %}A final approver confirms it or sends it back. The applicant has been told nothing.{% endif %}</p>
+        </div>
       {% endif %}
-      {% if a.sent_back %}<div class="o-note" data-sent-back>
-        <p class="o-state">Sent back {{ a.sent_back.at|dm }}{% if a.sent_back.by %} by {{ a.sent_back.by|first_word }}{% endif %}</p>
-        {% if a.sent_back.note %}<p class="o-sub" data-sent-back-note>{{ a.sent_back.note|linebreaksbr }}</p>{% endif %}
+      {% if a.sent_back %}<div class="o-callout o-callout--back" data-sent-back>
+        <p class="o-callout-title">Sent back for review</p>
+        <p class="o-sub">{% if a.sent_back.by %}{{ a.sent_back.by|first_word }}, {% endif %}{{ a.sent_back.at|dm }}. Low potential, are you sure?</p>
+        {% if a.sent_back.note %}<p class="o-callout-note" data-sent-back-note>{{ a.sent_back.note|linebreaksbr }}</p>{% endif %}
+        {% if a.status == "new" or a.status == "contacted" %}<p class="o-sub">The next approval goes straight through.</p>{% endif %}
       </div>{% endif %}
       {% if final_approver_missing and a.potential == "low" and a.can_approve and office_can.can_act %}<p class="o-state o-state--warn" data-final-approver-missing>No final approver is set, so a Low potential approval goes through at once. Set one in System, Approval.</p>{% endif %}
       <div class="o-actions-rail">{% include "office/_gold_actions.html" %}</div>
@@ -42,10 +47,11 @@
     </section>
   </aside>
 </div>
-{% if office_can.can_act or office_can.can_final %}
+{% if office_can.can_act or office_can.can_final and a.can_final %}
 <div class="o-bar" data-region="decision-bar" data-office-bar>
   {% if a.status == "approved" %}<p class="o-state">Approved {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>
-  {% elif a.status == "declined" %}<p class="o-state">Declined {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>{% endif %}
+  {% elif a.status == "declined" %}<p class="o-state">Declined {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>
+  {% elif a.awaiting_final and not office_can.can_final %}<p class="o-state">Awaiting final approval</p>{% endif %}
   <div class="o-bar-actions">{% include "office/_gold_actions.html" with bar=True %}</div>
 </div>
 {% endif %}
