@@ -1,0 +1,5 @@
+<div class="ctl-scenes" role="group" aria-labelledby="ctl-scenes-h">
+  <span class="ctl-scenes-label" id="ctl-scenes-h">Scenes {% include "control/_chip.html" %}<span class="ctl-scenes-hint">Tap one to see and change what it sets</span></span>
+  <div class="ctl-scenes-row">{% for s in scenes %}<button type="button" class="ctl-scene" data-scene="{{ s.key }}" data-active="{% if s.key == active.key %}true{% else %}false{% endif %}" aria-haspopup="dialog" title="Edit the {{ s.label }} scene"><span>{{ s.label }}</span><span class="ctl-scene-tag"{% if s.key != active.key %} hidden{% endif %}>Active</span></button>{% endfor %}</div>
+  <p class="ctl-scenes-now" data-f="scene_now">Now: {{ active.label }} &middot; since {{ active.time }}</p>
+</div>

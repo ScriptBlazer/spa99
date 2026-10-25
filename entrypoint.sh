@@ -10,6 +10,7 @@ case "$1" in
       --bind 0.0.0.0:8000 \
       --workers "${GUNICORN_WORKERS:-3}" \
       --worker-tmp-dir /dev/shm \
+      --timeout "${GUNICORN_TIMEOUT:-300}" \
       --access-logfile - \
       --error-logfile -
     ;;

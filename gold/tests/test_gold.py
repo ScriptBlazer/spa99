@@ -116,6 +116,19 @@ class SubmitTests(TestCase):
         self.assertEqual(mail.outbox[0].to, ["a@bml.example", "b@bml.example"])
         self.assertEqual(mail.outbox[0].cc, [])
 
+    def test_a_double_click_is_taken_one_after_the_other_and_makes_one_application(self):
+        """The two requests of a double click must queue on the write lock; the second then sees the first as a duplicate."""
+        order = []
+        real_lock, real_check = services._serialise_submissions, services._recent_duplicate
+        with mock.patch.object(services, "_serialise_submissions", lambda site: (order.append("lock"), real_lock(site))), \
+                mock.patch.object(services, "_recent_duplicate", lambda email: (order.append("check"), real_check(email))[1]):
+            first, created_first = services.submit_application(application_data())
+            again, created_again = services.submit_application(application_data(email=" DAN@example.com "))
+        self.assertEqual(order, ["lock", "check", "lock", "check"])  # the lock is always taken before the duplicate check
+        self.assertEqual((created_first, created_again, again.pk), (True, False, first.pk))
+        self.assertEqual(GoldApplication.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 2)  # one email to the approver, one thank-you
+
     def test_no_approver_configured_sends_nothing_to_anyone_but_still_thanks_the_applicant(self):
         set_recipients("")
         gold_tasks._warned.clear()  # the warning is logged once per process; other tests may have used it up

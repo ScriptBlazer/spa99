@@ -1,0 +1,6 @@
+{% comment %}The photo frame inside the generic panel template: the script fills in the picture for the room it opens.{% endcomment %}
+<div class="ctl-photo is-big" data-photo>
+  <span class="l l-night" aria-hidden="true"></span><span class="l l-lamps" aria-hidden="true"></span><span class="l l-pool" aria-hidden="true"></span><span class="l l-warm" aria-hidden="true"></span><span class="l l-cool" aria-hidden="true"></span>
+  <button type="button" class="ctl-offchip" data-act="light-on" hidden>Off</button>
+  <button type="button" class="ctl-close" data-close aria-label="Close">{% include "common/_icon.html" with name="x-r" %}</button>
+</div>

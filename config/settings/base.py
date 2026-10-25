@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "insights",
     "office",
     "system",
+    "control",
     "pages",
 ]
 
@@ -183,6 +184,15 @@ def finish_media_description(storage, description):
 
 
 MEDIA_DESCRIPTION, MEDIA_IS_LOCAL = finish_media_description(MEDIA_STORAGE, MEDIA_DESCRIPTION)
+# Control Library upload limits (MB per kind). Files stream to temp files above FILE_UPLOAD_MAX_MEMORY_SIZE (never held in memory);
+# DATA_UPLOAD_MAX_MEMORY_SIZE only counts non-file fields, so it is not raised.
+CONTROL_MAX_AUDIO_MB = int(ENV.get("CONTROL_MAX_AUDIO_MB", 50))
+CONTROL_MAX_VIDEO_MB = int(ENV.get("CONTROL_MAX_VIDEO_MB", 500))
+CONTROL_MAX_IMAGE_MB = int(ENV.get("CONTROL_MAX_IMAGE_MB", 20))
+CONTROL_LIBRARY_MAX_GB = float(ENV.get("CONTROL_LIBRARY_MAX_GB", 10))  # total size of everything in the Library (demo value)
+CONTROL_MEDIA_URL_HOURS = int(ENV.get("CONTROL_MEDIA_URL_HOURS", 12))  # how long signed links to Library files last (live)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440  # 2.5 MB: anything bigger goes to a temp file on disk
+
 STORAGES = {
     "default": MEDIA_STORAGE,
     "staticfiles": {"BACKEND": "common.storage.SpaStaticFilesStorage"},

@@ -1,18 +1,18 @@
 # Feature: Spa 99 Control (custom admin) and statistics
 
-> **Superseded for the business half (2026-10-23).** The dashboard, statistics, people and Gold screens are now the Office: see `docs/features/office.md` (built, server side). Control is parked as the building control room placeholder at `control.spa99.uk`; `/insights/summary/` moved to the Office host. The sections below are the older plan and stay as reference for what the Office still has to take over (content, plans, hours, notifications, team).
+> **Superseded for the business half (2026-10-23).** The dashboard, statistics, people and Gold screens are now the Office: see `docs/features/office.md` (built, server side). Control is the building control room at `control.spa99.uk`, built as a non-functional DEMO (2026-10-24, `docs/features/control.md`); `/insights/summary/` moved to the Office host. The sections below are the older plan and stay as reference for what the Office still has to take over (content, plans, hours, notifications, team).
 
 
 Phase 1. Apps: `control`, `insights`, plus each app's `services.py`.
 
-## Status: what is built and what is not (2026-10-23)
+## Status: what is built and what is not (2026-10-24)
 
-**Spa 99 Control is NOT built yet.** There is no `control` app and none of the sections below exist as screens.
+**Control is a DEMO (2026-10-24).** The `control` app (Rooms, Schedule, Screens, change password) shows pretend values for the building and sends nothing to hardware or the server: see `docs/features/control.md`. None of the business sections below exist as Control screens (they are the Office and System).
 
 | Built | Not built |
 |---|---|
 | Control host routing (`CONTROL_DOMAIN` uses `config.urls_control`), login required, staff only | Every section in the table below (Dashboard, People, Gold, Journey, Plans, Hours, Content, Gold rules, Notifications, Settings, Team) |
-| `config.views.control_index`: a placeholder that returns the plain text "Spa 99 Control" | The Control screens in the brand look, CSV export buttons, GDPR export and delete buttons |
+| The Control DEMO: Rooms with scenes, room drawer, Schedule, Screens, DEMO banner, Admin level and up (plain 404 for everyone else); real hardware control waits for the `venue` app | The Control screens in the brand look, CSV export buttons, GDPR export and delete buttons |
 | Roles `Owner`, `Manager`, `Viewer` (`setup_roles`) | Field-level permissions (Manager cannot change Team or Gold status) |
 | Statistics as JSON: `GET /insights/summary/` on the Control host (staff roles only) | Statistics charts and cards |
 | Change history on every model (`django-simple-history`) | History shown on each item |

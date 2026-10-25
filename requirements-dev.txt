@@ -1,2 +1,4 @@
 -r requirements.txt
 coverage==7.16.2
+# End-to-end run only (scripts/e2e.sh, docs/features/e2e.md). Then once: .venv/bin/python -m playwright install chromium
+playwright==1.64.1

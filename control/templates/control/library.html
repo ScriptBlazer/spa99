@@ -1,0 +1,29 @@
+{% extends "control/base.html" %}
+{% load control_ui %}
+{% block main %}
+<header class="ctl-lib-head">
+  <div>
+    <h1 class="ctl-title">Library</h1>
+    <p class="ctl-lock">{% include "common/_icon.html" with name="lock-simple" %}Files here are stored for real.</p>
+  </div>
+  <div class="ctl-lib-tools">
+    <p class="ctl-meter" data-meter data-used="{{ summary.used_bytes }}" data-max="{{ summary.max_bytes }}"><span class="ctl-meter-text" data-meter-text>{{ summary.used_bytes|filesizeformat }} of {{ summary.max_bytes|filesizeformat }}</span><span class="ctl-meter-bar" aria-hidden="true"><span style="transform:scaleX({{ summary.used_bytes|meter:summary.max_bytes }})"></span></span></p>
+    <button type="button" class="ctl-btn ctl-btn-primary" data-lib-upload hidden>{% include "common/_icon.html" with name="upload-simple" %}<span>Upload</span></button>
+  </div>
+</header>
+<section class="ctl-library" data-library
+  data-api-assets="{% url 'control_assets' %}" data-api-upload="{% url 'control_asset_upload' %}" data-api-playlists="{% url 'control_playlists' %}"
+  data-api-playlist-create="{% url 'control_playlist_create' %}" data-accept="{{ accept }}"
+  data-limit-audio="{{ limit_mb.audio }}" data-limit-video="{{ limit_mb.video }}" data-limit-image="{{ limit_mb.image }}">
+  <form class="ctl-upload-form" method="post" enctype="multipart/form-data" action="{% url 'control_asset_upload' %}">{% csrf_token %}
+    <input type="hidden" name="next" value="page">
+    <p class="ctl-field"><label for="ctl-file">Add a file</label><input id="ctl-file" type="file" name="file" accept="{{ accept }}"></p>
+    <p class="ctl-soft">{{ types_text }} Up to {{ limit_mb.audio }} MB, {{ limit_mb.video }} MB and {{ limit_mb.image }} MB.</p>
+    <button type="submit" class="ctl-btn ctl-btn-primary">Upload</button>
+  </form>
+  <div data-lib-ui></div>
+  <ul class="ctl-lib-static">{% for a in assets %}<li><span>{{ a.title }}</span> <span class="ctl-soft">{{ a.get_kind_display }}, {{ a.size_bytes|filesizeformat }}</span></li>{% empty %}<li class="ctl-soft">Nothing here yet.</li>{% endfor %}</ul>
+  <input type="file" multiple hidden data-lib-input accept="{{ accept }}">
+</section>
+<div class="ctl-drop" data-drop hidden><div class="ctl-drop-card"><p class="ctl-drop-title">Drop to add to the Library</p><p class="ctl-soft">{{ types_text }}</p></div></div>
+{% endblock %}

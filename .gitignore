@@ -31,3 +31,7 @@ tmp*/
 
 # Agent worktrees
 .claude/worktrees/
+
+# End-to-end run (scripts/e2e.sh): throwaway workspace and the kept report
+.private/e2e/
+.private/e2e-report/

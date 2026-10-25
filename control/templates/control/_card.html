@@ -1,0 +1,15 @@
+{% load control_ui %}{% with v=room.v caps=room.caps %}
+<article class="ctl-rcard" data-room="{{ room.slug }}" data-tone="{{ v.tone }}">
+  {% include "control/_photo.html" %}
+  <div class="ctl-rcard-body">
+    <header class="ctl-rcard-head">
+      <h2><a class="ctl-rcard-open" href="?room={{ room.slug }}" data-open-room="{{ room.slug }}">{{ room.name }}</a></h2>
+      <span class="ctl-pill" data-f="badge" data-tone="{{ v.tone }}">{{ v.badge }}</span>
+    </header>
+    {% if caps.climate %}<p class="ctl-climate"><span class="ctl-big" data-f="cur_text">{{ v.cur_text }}</span><span class="ctl-target">target <span data-f="target_text">{{ v.target_text }}</span></span><span class="ctl-people" data-f="people_text">{{ v.people_text }}</span></p>
+    {% else %}<p class="ctl-climate"><span class="ctl-sub">{% if caps.tank %}Fish tank water <span data-f="tank_text">{{ v.tank_text }}</span>{% else %}&nbsp;{% endif %}</span><span class="ctl-people" data-f="people_text">{{ v.people_text }}</span></p>{% endif %}
+    <div class="ctl-row"><span class="ctl-label">Light</span>{% include "control/_range.html" with f="bright" min=0 max=100 bounds="0,100" value=room.lights.bright vt=v.bright_vt label="Light, "|add:room.name compact=True %}<span class="ctl-val" data-f="bright_text">{{ v.bright_text }}</span></div>
+    <div class="ctl-row"><span class="ctl-label">Warmth</span>{% include "control/_range.html" with f="warmth" min=2200 max=4000 step=100 bounds="2200,4000" value=room.lights.warmth vt=v.warmth_vt label="Warmth, "|add:room.name compact=True warm=True %}<span class="ctl-val" data-f="warmth_text">{{ v.warmth_text }}</span></div>
+    <p class="ctl-links">{% if caps.music and v.zone_id %}<a href="{% url 'control_music' %}?zone={{ v.zone_id }}" data-f="music_link"><span class="ctl-soft">Music:</span> <span data-f="music_text">{{ v.music_text }}</span></a>{% else %}<span><span class="ctl-soft">Music:</span> none</span>{% endif %}{% if v.screen %}<a href="{% url 'control_screens' %}?screen={{ v.screen.id }}"><span class="ctl-soft">Screen:</span> <span data-f="screen_text">{{ v.screen_text }}</span></a>{% else %}<span><span class="ctl-soft">Screen:</span> none</span>{% endif %}</p>
+  </div>
+</article>{% endwith %}

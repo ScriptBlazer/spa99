@@ -3,8 +3,10 @@
 <head>
 {% block head_title %}{% include "common/_head.html" with title=title|default:"Spa 99" %}{% endblock %}
 {% if office %}<link rel="stylesheet" href="{% static 'common/css/office-signin.css' %}">{% endif %}
+{% if control %}<link rel="stylesheet" href="{% static 'common/css/control.css' %}">{% endif %}
 </head>
 <body class="{% if office %}office office-signin{% else %}on-dark{% endif %}">
+{% if control %}{% include "control/_demo_banner.html" with hide_reset=True %}{% endif %}
 <main id="main" class="bare" tabindex="-1">
   <div class="container">{% include "common/_messages.html" %}</div>
   {% block main %}{% endblock %}

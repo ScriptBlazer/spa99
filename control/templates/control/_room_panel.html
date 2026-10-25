@@ -1,0 +1,46 @@
+{% load control_ui %}{% comment %}
+The room panel. Used for the room named in ?room= (so it reads without JavaScript) and once, generic, inside
+<template id="ctl-room-tpl"> that the script copies and fills (it removes the parts a room does not have). Lights and climate
+live here; music and screens only show their state and link to their own tab.
+{% endcomment %}{% with v=room.v caps=room.caps %}
+<div class="ctl-pn" data-room="{% if not generic %}{{ room.slug }}{% endif %}" data-tone="{{ v.tone }}">
+  {% if generic %}{% include "control/_photo_generic.html" %}{% else %}{% include "control/_photo.html" with big=True close=back_url %}{% endif %}
+  <div class="ctl-pn-body">
+    <header class="ctl-pn-head">
+      <h2 class="ctl-pn-title" id="ctl-panel-title" tabindex="-1" data-f="name">{{ room.name }}</h2>
+      <p class="ctl-pn-meta"><span class="ctl-pill" data-f="badge" data-tone="{{ v.tone }}">{{ v.badge }}</span> <span data-f="people_text">{{ v.people_text }}</span></p>
+    </header>
+
+    <section class="ctl-group" aria-labelledby="g-light">
+      <h3 id="g-light">Light {% include "control/_chip.html" %}</h3>
+      <div class="ctl-seg" role="radiogroup" aria-label="Preset">{% for p in state.presets %}<label><input type="radio" name="preset" data-f="preset" value="{{ p.key }}"{% if not generic and v.preset == p.key %} checked{% endif %}><span>{{ p.label }}</span></label>{% endfor %}</div>
+      <div class="ctl-line ctl-line-slider"><span class="ctl-label">Light</span>{% include "control/_range.html" with f="bright" min=0 max=100 bounds="0,100" value=room.lights.bright vt=v.bright_vt label="Light" %}<span class="ctl-val" data-f="bright_text">{{ v.bright_text }}</span></div>
+      <div class="ctl-line ctl-line-slider"><span class="ctl-label">Warmth</span>{% include "control/_range.html" with f="warmth" min=2200 max=4000 step=100 bounds="2200,4000" value=room.lights.warmth vt=v.warmth_vt label="Warmth" warm=True %}<span class="ctl-val" data-f="warmth_text">{{ v.warmth_text }}</span></div>
+    </section>
+
+    {% if generic or caps.climate %}<section class="ctl-group" data-cap="climate" aria-labelledby="g-climate">
+      <h3 id="g-climate">Climate {% include "control/_chip.html" %}</h3>
+      <p class="ctl-hero"><span data-f="cur_text">{{ v.cur_text }}</span></p>
+      <div class="ctl-line"><span class="ctl-label">Target</span>
+        <span class="ctl-stepper"><button type="button" data-act="target" data-delta="-1" aria-label="Lower target">&minus;</button><span class="ctl-step-val" data-f="target_text">{{ v.target_text }}</span><button type="button" data-act="target" data-delta="1" aria-label="Raise target">+</button></span></div>
+      {% if generic or v.hum_text %}<div class="ctl-line" data-cap="humidity"><span class="ctl-label">Humidity <span class="ctl-soft" data-f="hum_text">{{ v.hum_text }}</span></span>
+        <span class="ctl-stepper"><button type="button" data-act="hum" data-delta="-5" aria-label="Lower humidity target">&minus;</button><span class="ctl-step-val" data-f="hum_target_text">{{ v.hum_target_text }}</span><button type="button" data-act="hum" data-delta="5" aria-label="Raise humidity target">+</button></span></div>{% endif %}
+      <div class="ctl-line"><span class="ctl-label" data-f="heater_label">{% if caps.climate.heater %}{{ caps.climate.heater }}{% else %}Heating{% endif %}</span>
+        {% include "control/_toggle.html" with f="heater" checked=room.heater label="Heating" %}</div>
+    </section>{% endif %}
+
+    {% if generic or caps.music %}<section class="ctl-group" data-cap="music" aria-labelledby="g-music">
+      <h3 id="g-music">Music</h3>
+      <p class="ctl-pn-row"><span data-f="music_text">{{ v.music_text }}</span><a class="ctl-link" data-f="music_open" href="{% if generic %}#{% else %}{% url 'control_music' %}?zone={{ v.zone_id }}{% endif %}">Open in Music</a></p>
+      <div class="ctl-line ctl-line-slider"><span class="ctl-label">In this room</span>{% include "control/_range.html" with f="trim" min=0 max=100 bounds="0,100" value=room.music.trim vt="100 percent" label="Music volume in this room" %}<span class="ctl-val" data-f="trim_text">{{ room.music.trim }}</span></div>
+    </section>{% endif %}
+
+    {% if generic or v.screen %}<section class="ctl-group" data-cap="screen" aria-labelledby="g-screen">
+      <h3 id="g-screen">Screen</h3>
+      {% if generic %}<div data-tile-slot></div>{% else %}{% include "control/_slide_tile.html" with screen=v.screen %}{% endif %}
+      <p class="ctl-pn-row"><span data-f="screen_text">{{ v.screen_text }}</span><a class="ctl-link" data-f="screen_open" href="{% if generic %}#{% else %}{% url 'control_screens' %}?screen={{ v.screen.id }}{% endif %}">Open in Screens</a></p>
+    </section>{% endif %}
+
+    <p class="ctl-note">Saved in this browser only.</p>
+  </div>
+</div>{% endwith %}

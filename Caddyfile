@@ -23,6 +23,10 @@
 }
 
 {$CONTROL_DOMAIN} {
+	# Control Library uploads: video may be up to 500 MB (CONTROL_MAX_VIDEO_MB), so the body limit sits above that.
+	request_body {
+		max_size 600MB
+	}
 	import app
 }
 

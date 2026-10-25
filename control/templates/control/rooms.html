@@ -1,0 +1,12 @@
+{% extends "control/base.html" %}
+{% block main %}
+<h1 class="ctl-title">Rooms</h1>
+<p class="ctl-lead">Light and temperature in every room.</p>
+{% include "control/_scenebar.html" %}
+{% if open_room %}<section class="ctl-nojs-panel" aria-label="{{ open_room.name }}">{% url 'control_rooms' as back %}{% include "control/_room_panel.html" with room=open_room back_url=back %}</section>{% endif %}
+<ul class="ctl-rgrid">
+  {% for room in state.rooms %}<li>{% include "control/_card.html" %}</li>{% endfor %}
+</ul>
+<template id="ctl-room-tpl">{% include "control/_room_panel.html" with generic=True %}</template>
+<template id="ctl-tile-tpl">{% include "control/_slide_tile.html" with screen=blank_screen %}</template>
+{% endblock %}

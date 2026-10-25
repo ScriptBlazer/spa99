@@ -1,0 +1,2 @@
+{# Toggle: a real checkbox drawn as a track and knob, with the state in words beside it. #}
+<label class="ctl-toggle"><input type="checkbox" role="switch" data-f="{{ f }}"{% if checked %} checked{% endif %} aria-label="{{ label }}"><span class="ctl-toggle-track" aria-hidden="true"></span><span class="ctl-toggle-word" data-f="{{ f }}_word">{% if checked %}On{% else %}Off{% endif %}</span></label>

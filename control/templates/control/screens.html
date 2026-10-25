@@ -1,0 +1,17 @@
+{% extends "control/base.html" %}
+{% block main %}
+<h1 class="ctl-title">Screens</h1>
+<p class="ctl-lead">What each screen shows, and when. {% include "control/_chip.html" %}</p>
+<ul class="ctl-sgrid" data-screens>
+  {% for screen in state.screens %}<li>
+  <article class="ctl-scard" data-screen="{{ screen.id }}">
+    <a class="ctl-scard-open" href="?screen={{ screen.id }}" data-open-screen="{{ screen.id }}" aria-label="{{ screen.name }}, {{ screen.label }}. Open"></a>
+    <div class="ctl-prev" data-prev="{{ screen.id }}">{% include "control/_slide_tile.html" %}</div>
+    <div class="ctl-scard-body">
+      <div><h2>{{ screen.name }}</h2><p class="ctl-soft" data-f="summary">{{ screen.label }}</p><p class="ctl-state" data-f="state_word">{% if screen.power %}Playing{% else %}Off{% endif %}</p></div>
+      <button type="button" class="ctl-iconbtn ctl-sbtn" data-act="screen-play" aria-label="Pause {{ screen.name }}" hidden>{% include "common/_icon.html" with name="pause" %}</button>
+    </div>
+  </article></li>{% endfor %}
+</ul>
+<template id="ctl-tile-tpl">{% include "control/_slide_tile.html" with screen=blank_screen %}</template>
+{% endblock %}
