@@ -1,7 +1,7 @@
 /* My Spa 99: the small behaviours. Everything works without this file; it only removes steps.
    - the tab bar hides while a field has focus (never floats over the keyboard)
    - toasts leave after 4 seconds
-   - choosing a membership tile marks it at once and offers "Keep ..."
+   - choosing a membership tile marks it at once and offers "Switch to ..." (or "Choose ..." with no tier yet)
    - the marketing switch saves as it is flipped */
 import { csrfToken } from './api.js';
 import { dismiss, showMessage } from './messages.js';
@@ -37,7 +37,8 @@ function initInterest() {
     const changed = !!chosen && chosen.value !== form.dataset.current;
     if (changed) {
       form.dataset.changed = 'true';
-      button.textContent = `Keep ${chosen.closest('[data-plan-name]').dataset.planName}`;
+      const name = chosen.closest('[data-plan-name]').dataset.planName;
+      button.textContent = form.dataset.current ? `Switch to ${name}` : `Choose ${name}`;
     } else {
       delete form.dataset.changed;
     }

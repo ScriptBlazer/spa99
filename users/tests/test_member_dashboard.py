@@ -150,14 +150,16 @@ class WebsiteMenuTests(TestCase):
         html = self.client.get("/").content.decode()
         self.assertIn('href="/account/">My Spa 99</a>', html)
         self.assertNotIn(">Sign in<", html)
+        self.assertNotIn(">Sign out<", html)
         self.assertNotIn('href="/book/"', html)
 
-    def test_a_team_member_without_a_membership_gets_sign_out_not_my_spa_99(self):
+    def test_signed_in_website_shows_my_spa_99_only(self):
+        """Moishe: the website shows Sign in, or My Spa 99 once signed in; signing out happens inside My Spa 99."""
         self.client.force_login(make_user("team@example.com", is_staff=True))
         html = self.client.get("/").content.decode()
-        self.assertIn(">Sign out<", html)
-        self.assertNotIn(">Sign in<", html)  # header, menu and footer: never "Sign in" while signed in
-        self.assertNotIn("My Spa 99</a>", html)
+        self.assertIn('href="/account/">My Spa 99</a>', html)
+        self.assertNotIn(">Sign in<", html)
+        self.assertNotIn(">Sign out<", html)
 
     def test_book_redirects_members_and_teases_visitors(self):
         teaser = self.client.get("/book/")
@@ -254,9 +256,9 @@ class SignOutTests(TestCase):
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertContains(self.client.get("/"), "You&#x27;re signed out.")
 
-    def test_header_and_member_area_offer_sign_out(self):
+    def test_sign_out_lives_in_my_spa_99_not_on_the_website(self):
         self.client.force_login(make_user(plan=plan("tier-1")))
-        self.assertContains(self.client.get("/"), 'action="/logout/"')
+        self.assertNotContains(self.client.get("/"), 'action="/logout/"')
         self.assertContains(self.client.get("/account/"), "data-member-signout")
 
 
