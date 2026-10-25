@@ -125,15 +125,18 @@ function init(button) {
 
   /* ----- the panel ----- */
 
-  // The viewer's own choice (localStorage) wins; else the System > Settings default. Storage may be blocked: every touch is guarded.
+  // The viewer's own choice (localStorage) wins until the System > Settings default changes: the choice is stored with the
+  // default it was made under ("light|dark"), so a new default in Settings applies again. Storage may be blocked: every touch is guarded.
   const THEME_KEY = 'spa99.system.codeTheme';
+  const fallback = () => (button.dataset.themeDefault === 'light' ? 'light' : 'dark');
   const theme = () => {
     let saved = null;
     try { saved = localStorage.getItem(THEME_KEY); } catch { /* blocked */ }
-    if (saved === 'dark' || saved === 'light') return saved;
-    return button.dataset.themeDefault === 'light' ? 'light' : 'dark';
+    const [value, madeUnder] = (saved || '').split('|');
+    if ((value === 'dark' || value === 'light') && madeUnder === fallback()) return value;
+    return fallback();
   };
-  const storeTheme = (value) => { try { localStorage.setItem(THEME_KEY, value); } catch { /* blocked: the choice lasts until reload */ } };
+  const storeTheme = (value) => { try { localStorage.setItem(THEME_KEY, `${value}|${fallback()}`); } catch { /* blocked: the choice lasts until reload */ } };
 
   function buildPanel() {
     const panel = el('section', 'sys-panel sc-panel');
