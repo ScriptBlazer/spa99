@@ -76,3 +76,6 @@ Errors: 400 `{ok: false, message, errors: [{line, col, message}]}` (syntax, not 
 **Audit feed.** Event groups carry `icon: "code"` and `changed_fields`; the drawer (`feed.entry_detail`) adds `diff_lines` (same row shape as the preview), `diff_truncated`, `changed_fields`.
 
 **Limits.** 128 KB text; nesting 12 levels; 20 errors returned; literals only (text, whole and decimal numbers, True, False, None, lists, dicts, tuples, a minus sign); duplicate keys refused. Rows are validated against the database as it is now, one row at a time, so a cross-row rule that is only true after two rows change together (Gold High and Medium thresholds moved in one edit) can be refused; change them in two steps.
+
+**Theme (2026-10-25).** The code panel is dark by default (code-editor palette, panel only). A sun/moon toggle in the panel's top bar, left of Copy and Edit, switches it; the viewer's choice is kept in `localStorage` (`spa99.system.codeTheme`, every access guarded) and wins. The default is `SiteSettings.code_theme_default` (dark or light, migration `plans.0014`), edited in System > Settings > Developer ("Code view theme"), logged and undoable like any setting, and so also a key in `SETTINGS`. The page passes it as `data-theme-default` on the toggle.
+

@@ -135,3 +135,8 @@ Only three new values (`--sc-line`, `--sc-sel`, `--sc-kw`); the rest alias exist
 2. Page header identical to today when closed; the toggle is the only addition.
 3. Editor text and highlight never drift after typing, Tab, paste, or scrolling 200+ lines; phone input 16px.
 4. No one-sided borders anywhere: error lines, diff rows, the stale strip and the current line are tints only.
+
+## 12. Dark theme (added 2026-10-25, owner request)
+
+The code panel defaults to a real code-editor dark theme (near-black blue-grey, classic syntax hues); only the panel (toolbar, editor, review, diff, status strip) is dark, the rest of System stays light. A 24px icon toggle (moon when dark, sun when light; `aria-label="Dark theme"`, `aria-pressed`) sits in the toolbar immediately left of Copy and Edit. Order: the viewer's saved choice (`localStorage`, try/catch everywhere), else Settings "Code view theme". Values and contrast: `docs/BRAND.md` (Dark code theme); implemented as local token overrides in `system-code.css` so light stays exactly as in sections 3 to 10. Dark comments are italic; the primary button inverts (light on dark).
+

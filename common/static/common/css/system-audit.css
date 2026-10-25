@@ -153,3 +153,14 @@ html:not(.js) .au-dates { display: flex; } html:not(.js) .au-custom-btn { displa
 }
 
 .au-check { display: inline-block; margin: 0 0 0 var(--sys-2); }
+
+/* code_edit: the code as typed, as tinted rows (add / remove), hunk headers muted */
+.au-code { max-height: 320px; overflow: auto; border-radius: var(--sys-radius); background: var(--sys-surface); box-shadow: inset 0 0 0 1px var(--sys-line); font: 400 var(--sys-fs-sm)/20px var(--sys-mono); white-space: pre; tab-size: 4; }
+.au-code:focus-visible { outline: 2px solid var(--sys-accent); outline-offset: 2px; }
+.au-cin { width: max-content; min-width: 100%; }
+.au-cr { display: grid; grid-template-columns: 36px 16px 1fr; min-height: 20px; }
+.au-cr .n { text-align: right; padding-right: 6px; color: var(--sys-text-3); user-select: none; } .au-cr .g { text-align: center; user-select: none; } .au-cr .t { padding-right: var(--sys-3); }
+.au-cr[data-type="add"] { background: var(--sys-ok-bg); } .au-cr[data-type="add"] .g { color: var(--sys-add); font-weight: 600; }
+.au-cr[data-type="del"] { background: var(--sys-danger-bg); } .au-cr[data-type="del"] .g { color: var(--sys-del); font-weight: 600; }
+.au-cr[data-type="hunk"] { background: var(--sys-bg); color: var(--sys-text-3); } .au-cr[data-type="hunk"] .t { grid-column: 1 / -1; padding-left: var(--sys-2); }
+.au-trunc { margin-top: var(--sys-1); }

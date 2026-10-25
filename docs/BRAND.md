@@ -372,6 +372,11 @@ The designer refines these per task. Frontend uses only tokens, never raw values
 ### Office tokens
 The Office (staff back office) is light and has its own `--office-*` tokens, defined in `common/static/common/css/office-tokens.css` under `.office`, never in `tokens.css`. Spec and values: `docs/design/OFFICE.md`. `--office-toast-edge: rgb(73 46 33 / 0.08)` (approved 2026-10-25, FEEDBACK): the 1px edge of an Office toast, decoration only.
 
+### System code view tokens (2026-10-25, derived)
+In `system.css` under `body.system` (System only, never in `tokens.css`). Spec: `docs/design/SYSTEM-CODE-VIEW.md` section 10. Three new values, marked **derived (System code view)**: `--sc-line: #F7F6F3` (current-line tint), `--sc-sel: rgb(73 46 33 / .10)` (espresso selection tint), `--sc-kw: #8A2F6B` (plum for `True`, `False`, `None`, 7.78:1 on white). The rest alias existing `--sys-*` values (`--sc-gutter`, `--sc-ln`, `--sc-err`, `--sc-name`, `--sc-key`, `--sc-str`, `--sc-num`, `--sc-com`, `--sc-punc`, `--sc-ro`), plus `--sc-fs` / `--sc-lh` (13px / 20px, 16px / 24px below 48em).
+
+**Dark code theme** (System code view, 2026-10-25, **derived (System code view)**; the code panel only, the rest of System stays light; defined in `system-code.css` under `.sc-panel[data-theme="dark"]`, default from Settings, the viewer's toggle wins): editor `#0D1117`; gutter, toolbar, status `#161B22`; hairline `#30363D`; text `#E6EDF3`, `#AEB7C2`, `#9AA4B0`; current line `#161D29`; selection `rgb(56 139 253 / .20)`; error tint `#3A1519` with squiggle `#FF7B72`; diff add `#12261E` / sign `#7EE787`, delete `#3A1519` / sign `#FFA198`; keys `#9CDCFE`, strings `#E3A27C`, numbers `#B5CEA8`, `True`/`False`/`None` `#D69AD2`, comments `#A3B1A3` (italic), punctuation `#B4BDC8`, read only `#9AA4B0`; badges warn `#E3B341` on `#3B2F0E`, info `#79C0FF` on `#12253F`; primary button `#0D1117` on `#E6EDF3`, danger white on `#CF222E`. Every text pair is 5.0:1 or more on the editor, current line, selection over current line, error and diff tints.
+
 ### Round 3 layout tokens (The spa, 2026-10-23, derived)
 - `--mount-gap` 0.375rem (0.5rem from 48em): margin between a mount's gold line and its photo.
 - `--mount-gap-sm` 0.375rem: the same gap on small mounts (the kit tiles); does not grow at 48em.

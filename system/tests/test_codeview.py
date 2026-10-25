@@ -357,3 +357,27 @@ class AccessTests(CodeTestCase):
         self.assertEqual((response.status_code, response["Retry-After"]), (429, "60"))
         self.assertEqual(self.post("plans", "preview", "{", version).status_code, 400)
         self.assertEqual(self.client.post("/code/plans/preview/", "not json", content_type="application/json").status_code, 400)
+
+
+class FrontendShellTests(CodeTestCase):
+    def test_toggle_and_code_assets_only_on_rule_pages(self):
+        for key in SECTIONS:
+            html = self.client.get(f"/{key}/").content.decode()
+            self.assertIn(f'data-system-code="/code/{key}/"', html)
+            self.assertIn('aria-label="Rules as code"', html)
+            self.assertIn("system-code", html)
+        for path in ("/team/", "/changes/", "/"):
+            html = self.client.get(path).content.decode()
+            self.assertNotIn("data-system-code", html)
+            self.assertNotIn("system-code", html)
+
+    def test_theme_default_comes_from_settings_and_is_in_the_settings_code(self):
+        from plans.models import SiteSettings
+
+        html = self.client.get("/plans/").content.decode()
+        self.assertIn('data-theme-default="dark"', html)
+        row = SiteSettings.load()
+        row.code_theme_default = "light"
+        row.save()
+        self.assertIn('data-theme-default="light"', self.client.get("/plans/").content.decode())
+        self.assertIn('"code_theme_default": "light"', self.client.get("/code/settings/").json()["code"])

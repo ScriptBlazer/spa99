@@ -152,6 +152,10 @@ class SiteSettings(BaseModel):
         "Longest sign-in (hours)", default=12, validators=[MinValueValidator(1), MaxValueValidator(72)],
         help_text="A System sign-in ends after this many hours, however active the person is (1 to 72).")
 
+    code_theme_default = models.CharField(
+        "Code view theme", max_length=5, choices=[("dark", "Dark"), ("light", "Light")], default="dark",
+        help_text="The look of the System code view for people who have not picked their own (the toggle in the code view remembers their choice).")
+
     discount_contact_url = models.URLField(
         "Discount contact link (WhatsApp)", max_length=300, blank=True, validators=[URLValidator(schemes=["https"])],
         help_text="Barry's personal WhatsApp link (https only), shown as 'Looking for a better rate?' on the sign-up and "

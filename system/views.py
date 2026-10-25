@@ -44,6 +44,7 @@ def page(request, template, section, context=None, status=200):
     context = {"section": section, "nav": NAV, "section_labels": changes.SECTION_LABELS, **(context or {})}
     if codeview.section(section) is not None:  # the rule pages get the code view's address (the page header shows the </> icon)
         context.setdefault("code_url", reverse("system_code", args=[section]))
+        context.setdefault("code_theme_default", SiteSettings.load().code_theme_default)
     return render(request, template, context, status=status)
 
 
