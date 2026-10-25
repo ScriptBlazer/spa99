@@ -31,10 +31,14 @@ class SesBackend(BaseEmailBackend):
             if not recipients:
                 continue
             try:
-                self.client.send_email(
+                response = self.client.send_email(
                     Destination={"ToAddresses": recipients},
                     Content={"Raw": {"Data": message.message().as_bytes()}},
                 )
+                try:  # lets send_templated keep the id on the EmailLog (a mock client returns something else: ignored)
+                    message.ses_message_id = str(response["MessageId"])
+                except (TypeError, KeyError, IndexError, AttributeError):
+                    pass
                 sent += 1
             except Exception as error:  # the message can repeat the address, so only the type is logged
                 logger.error("SES send failed (%s)", type(error).__name__)

@@ -1,0 +1,4 @@
+{# The SES production gate. Context: ses {mode, allowed, message, max_24h, sent_24h, max_rate}. #}
+<p class="sys-note{% if not ses.allowed %} error{% endif %}" data-system-ses="{{ ses.mode }}" data-allowed="{{ ses.allowed|yesno:'1,0' }}">
+  {% if ses.mode == "production" %}Amazon SES: production access. Group sends and invites are on.{% elif ses.mode == "dev" %}Development: emails are printed or kept in memory, not sent. Group sends and invites are on.{% else %}{{ ses.message }}{% endif %}
+</p>

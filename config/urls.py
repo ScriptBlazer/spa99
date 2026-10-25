@@ -10,6 +10,7 @@ urlpatterns = [
     path("ses/notifications/", ses_notifications, name="ses_notifications"),  # public: Amazon SNS, signature checked
     path("journey/", include("journey.urls")),
     path("gold/", include("gold.urls")),
+    path("", include("mailings.urls")),  # public: unsubscribe and personal invite links
     path("", include("users.urls")),  # login, logout
     path("", include("users.urls_public")),  # register interest, verify, reset, account
     path("", include("pages.urls")),  # the website pages, the journey and Gold application screens

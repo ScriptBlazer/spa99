@@ -1,0 +1,13 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Import a list" description="One person a line: name and email, separated by a comma or semicolon. A header row is fine. Up to 2000 rows or 1 MB." %}
+{% include "system/_emails_tabs.html" with tab="invites" %}
+{% include "system/_ses_state.html" %}
+<form method="post" action="{% url 'system_invites_review' %}" enctype="multipart/form-data" data-system-invites-import>{% csrf_token %}
+  <section class="sys-panel"><div class="sys-group">
+    <label for="invites-text">Paste the list</label><textarea id="invites-text" name="text" rows="10" data-invites-text></textarea>
+    <label for="invites-file">Or upload a CSV file</label><input id="invites-file" type="file" name="file" accept=".csv,.txt,text/csv,text/plain">
+  </div></section>
+  <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Check the list</button></div>
+</form>
+{% endblock %}

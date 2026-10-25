@@ -43,7 +43,7 @@ def show(field, value):
     """One stored JSON value as short readable text. `field` is the model field (or None for a name only)."""
     name = getattr(field, "name", field or "") or ""
     if value is None or value == "":
-        return "empty"
+        return "the default wording" if name == "body" else "empty"
     if isinstance(value, bool):
         return ("on" if value else "off") if name.endswith("_open") or name in ("is_active", "active", "visible") else ("yes" if value else "no")
     if hasattr(field, "flatchoices") and field.flatchoices:

@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "journey",
     "gold",
     "notifications",
+    "mailings",
     "insights",
     "office",
     "system",
@@ -144,6 +145,9 @@ SERVER_EMAIL = ENV.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 AWS_SES_REGION_NAME = ENV.get("AWS_SES_REGION_NAME", "eu-west-2")
 # SES bounce/complaint feedback arrives from this one SNS topic at POST /ses/notifications/. Empty = that endpoint is off (404).
 SES_SNS_TOPIC_ARN = (ENV.get("SES_SNS_TOPIC_ARN", "") or "").strip()
+# Group sends and invites go out at most this many a second (and never above what SES reports for the account). Not an env var:
+# change it here if SES raises the account's rate. No pacing when the queue runs inline (development).
+MAILING_RATE_PER_SECOND = 10
 # Absolute links used in emails (no trailing slash).
 SITE_WEBGL = ENV.bool("SITE_WEBGL", True)  # false = the 3D Gold Card never loads (CSS card only); read by base.html as data-webgl
 SITE_URL = ENV.get("SITE_URL", f"https://{DOMAIN}").rstrip("/")

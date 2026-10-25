@@ -1,0 +1,15 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Send to a group" description="Write a message, pick a group, see the count, send now or schedule." %}
+{% include "system/_emails_tabs.html" with tab="mailings" %}
+{% include "system/_ses_state.html" %}
+<p><a class="sys-btn primary" href="{% url 'system_mailing_new' %}" data-system-new-mailing>New mailing</a></p>
+<section class="sys-panel"><div class="sys-scroll"><table class="sys-table" data-system-mailings>
+  <thead><tr><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Status</th><th scope="col">People</th><th scope="col">Sent</th><th scope="col">When</th></tr></thead>
+  <tbody>{% for m in mailings %}
+    <tr data-system-mailing="{{ m.pk }}"><td><a href="{% url 'system_mailing' m.pk %}">{{ m.name }}</a></td><td>{{ m.get_kind_display }}</td><td>{{ m.get_status_display }}</td><td>{{ m.total_count }}</td><td>{{ m.sent_count }}</td>
+      <td>{% if m.scheduled_at and m.status == "scheduled" %}{{ m.scheduled_at|date:"j M Y H:i" }}{% else %}{{ m.started_at|default:m.created_at|date:"j M Y H:i" }}{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="sys-muted">No mailings yet.</td></tr>{% endfor %}</tbody>
+</table></div></section>
+{% if mailings.has_other_pages %}<p>{% if mailings.has_previous %}<a href="?page={{ mailings.previous_page_number }}">Newer</a>{% endif %} {% if mailings.has_next %}<a href="?page={{ mailings.next_page_number }}">Older</a>{% endif %}</p>{% endif %}
+{% endblock %}

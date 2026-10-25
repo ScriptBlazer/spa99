@@ -1,9 +1,0 @@
-{% autoescape off %}Hello {{ first_name }},
-
-Thank you. We have your Gold Card application and we will be in touch.
-
-Your reference is {{ reference }}.
-
-{{ site_name }}, {{ address }}
-Questions? Reply to this email or write to {{ contact_email }}.
-{% endautoescape %}

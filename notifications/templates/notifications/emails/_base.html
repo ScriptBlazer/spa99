@@ -18,6 +18,7 @@
       <tr><td style="padding:16px 24px;font-size:13px;color:#492E21;">
         {{ site_name }}, {{ address }}.<br>
         Questions? Reply to this email or write to <a href="mailto:{{ contact_email }}" style="color:#492E21;">{{ contact_email }}</a>.
+        {% block footer_extra %}{% endblock %}
       </td></tr>
     </table>
   </td></tr>

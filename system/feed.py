@@ -230,7 +230,8 @@ EVENT_ICONS = {
     SystemEvent.SIGN_OUT: "sign-out", SystemEvent.SESSION_EXPIRED: "timer", SystemEvent.EXPORT: "download-simple",
     SystemEvent.PASSWORD_CHANGED: "lock-key", SystemEvent.ROLE_CHANGED: "user-gear", SystemEvent.USER_DEACTIVATED: "user-gear", SystemEvent.USER_REACTIVATED: "user-gear",
     SystemEvent.UNDO: "arrow-counter-clockwise", SystemEvent.UNDO_ALL: "arrow-counter-clockwise", SystemEvent.AUDIT_PRUNED: "minus",
-    SystemEvent.CODE_EDIT: "code",
+    SystemEvent.CODE_EDIT: "code", SystemEvent.MAILING_SCHEDULED: "timer", SystemEvent.MAILING_SENT: "pencil-simple",
+    SystemEvent.MAILING_CANCELLED: "x", SystemEvent.INVITES_SENT: "pencil-simple", SystemEvent.EMAIL_TEST: "pencil-simple",
 }
 CATEGORY_WORDS = {"change": "Change", "security": "Security", "undo": "Undo", "failure": "Failure"}
 OUTCOME_WORDS = {SystemEvent.SIGN_IN_FAILED: "wrong password", SystemEvent.UNLOCK_FAILED: "wrong password",

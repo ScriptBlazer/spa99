@@ -1,9 +1,0 @@
-{% extends "notifications/emails/_base.html" %}
-{% block title %}Welcome to Spa 99{% endblock %}
-{% block content %}
-<p style="margin:0 0 12px;">Hello {{ first_name }},</p>
-<p style="margin:0 0 12px;">Thank you for confirming your email. {% if plan_name %}We have noted your registration for {{ plan_name }}.{% else %}We have noted your registration.{% endif %}</p>
-<p style="margin:0 0 12px;">There is nothing to pay and nothing more to do right now. We will write to you before booking opens{% if opening_text %}, {{ opening_text }}{% endif %}.</p>
-{% if discount_url %}<p style="margin:0 0 12px;">Looking for a better rate? <a href="{{ discount_url }}">Message us on WhatsApp</a>.</p>
-{% endif %}<p style="margin:0;">Your account ID is <strong>{{ account_id }}</strong>.</p>
-{% endblock %}

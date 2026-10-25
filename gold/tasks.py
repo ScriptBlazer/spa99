@@ -46,7 +46,7 @@ def send_gold_emails(application_id, acknowledge=True):
     application.save(update_fields=["email_sent_at", "email_error", "updated_at"])
     if acknowledge and application.email:
         send_templated(
-            "gold_ack", [application.email], subject_for("gold_ack"),
+            "gold_ack", [application.email], subject_for("gold_ack", first_name=application.first_name),
             {"first_name": application.first_name, "reference": application.reference},
             subject_email=application.email,
         )
@@ -99,7 +99,7 @@ def send_gold_invite_email(invite_id):
     application = invite.application
     url = f"{settings.SITE_URL}/gold/invite/{make_token(invite)}/"
     log = send_templated(
-        "gold_invite", [application.email], subject_for("gold_invite"),
+        "gold_invite", [application.email], subject_for("gold_invite", first_name=application.first_name),
         {"first_name": application.first_name, "url": url, "valid_days": INVITE_DAYS},
         subject_email=application.email,
     )
@@ -116,7 +116,7 @@ def send_gold_active_email(application_id):
     if application is None:
         return None
     log = send_templated(
-        "gold_active", [application.email], subject_for("gold_active"),
+        "gold_active", [application.email], subject_for("gold_active", first_name=application.first_name),
         {"first_name": application.first_name, "url": f"{settings.SITE_URL}/account/"},
         subject_email=application.email,
     )

@@ -256,7 +256,7 @@ def undo_all(request, batch):
     return redirect(safe_next(request, "system_changes"))
 
 
-def _edit_site(request, form_class, template, section):
+def _edit_site(request, form_class, template, section, extra=None):
     site = SiteSettings.load()
     form = form_class(request.POST or None, instance=site)
     if request.method == "POST" and form.is_valid():
@@ -268,14 +268,16 @@ def _edit_site(request, form_class, template, section):
             return redirect(request.path)
         except ValidationError as error:  # a model rule, or the row changed since the page was made
             form.add_error(None, error)
-    context = {"form": form, "risky_fields": RISKY.get(section, [])}
+    context = {"form": form, "risky_fields": RISKY.get(section, []), **(extra() if extra else {})}
     return page(request, template, section, context, status=form_status(form) if request.method == "POST" else 200)
 
 
 @unlocked
 @require_http_methods(["GET", "POST"])
 def emails(request):
-    return _edit_site(request, EmailsForm, "system/emails.html", "emails")
+    from . import emails as emails_logic
+
+    return _edit_site(request, EmailsForm, "system/emails.html", "emails", extra=emails_logic.overview)
 
 
 @unlocked

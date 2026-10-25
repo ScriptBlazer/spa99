@@ -5,12 +5,16 @@ from common.models import BaseModel
 
 
 class NotificationTemplate(BaseModel):
-    """The wording of an email that staff can change: today the subject line. The body layout stays in
+    """The wording of an email that staff can change: the subject line and the body text. The layout stays in
     notifications/templates/notifications/emails/. Placeholders in {braces} are filled in when sending."""
 
     key = models.SlugField(unique=True, help_text="Stable name the code asks for, e.g. verify. Do not rename.")
     subject = models.CharField(max_length=300, help_text="May contain {name}, {potential}.")
     note = models.CharField(max_length=200, blank=True, help_text="When this email is sent.")
+    body = models.TextField(
+        blank=True,
+        help_text="The wording: paragraphs separated by a blank line, {placeholders}, {button} for the main link. Blank = the built-in default (notifications/emailbody.py).",
+    )
 
     history = HistoricalRecords()
 
@@ -41,6 +45,7 @@ class EmailLog(BaseModel):
     status = models.CharField(max_length=12, choices=STATUS_CHOICES)
     error = models.TextField(blank=True)
     sent_at = models.DateTimeField(null=True, blank=True)
+    message_id = models.CharField(max_length=100, blank=True, help_text="Amazon SES message id, when the backend returned one.")
 
     class Meta:
         ordering = ["-created_at"]

@@ -1,0 +1,34 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title=mailing.name description=mailing.get_kind_display %}
+{% include "system/_emails_tabs.html" with tab="mailings" %}
+{% include "system/_ses_state.html" %}
+<section class="sys-panel" data-system-mailing-detail="{{ mailing.pk }}" data-status="{{ mailing.status }}" data-progress-url="{{ progress_url }}">
+  <header><h2>{{ mailing.get_status_display }}</h2></header>
+  <p>Group: {{ group.label|default:mailing.group }}{% if mailing.params %} ({{ mailing.params }}){% endif %}.
+    {% if live_count is not None %}<strong data-live-count>{{ live_count }}</strong> people would get it now.{% endif %}</p>
+  <p data-system-progress>Total <span data-p="total">{{ progress.total }}</span>, sent <span data-p="sent">{{ progress.sent }}</span>, skipped <span data-p="skipped">{{ progress.skipped }}</span>, failed <span data-p="failed">{{ progress.failed }}</span>, waiting <span data-p="queued">{{ progress.queued }}</span> (<span data-p="percent">{{ progress.percent }}</span>%)</p>
+  {% if mailing.scheduled_at and mailing.status == "scheduled" %}<p data-system-scheduled>Scheduled for {{ mailing.scheduled_at|date:"j M Y H:i" }}.</p>{% endif %}
+  {% if mailing.error %}<p class="sys-note error" data-system-mailing-error>{{ mailing.error }}</p>{% endif %}
+  {% for field, texts in blockers.items %}{% for t in texts %}<p class="sys-note error" data-blocker="{{ field }}">{{ t }}</p>{% endfor %}{% endfor %}
+</section>
+<section class="sys-panel" data-system-mailing-actions>
+  {% if mailing.status == "draft" %}
+    <a class="sys-btn" href="{% url 'system_mailing_edit' mailing.pk %}">Edit</a>
+    <form method="post" action="{% url 'system_mailing_test' mailing.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="sys-btn">Send me a test</button></form>
+    <form method="post" action="{% url 'system_mailing_send' mailing.pk %}" style="display:inline" data-system-confirm="mailing">{% csrf_token %}<input type="hidden" name="expected_count" value="{{ live_count }}"><button type="submit" class="sys-btn primary"{% if not can_send %} disabled{% endif %}>Send to {{ live_count }} people</button></form>
+    <form method="post" action="{% url 'system_mailing_schedule' mailing.pk %}" style="display:inline">{% csrf_token %}<input type="datetime-local" name="scheduled_at" required><button type="submit" class="sys-btn"{% if not can_send %} disabled{% endif %}>Schedule</button></form>
+    <form method="post" action="{% url 'system_mailing_delete' mailing.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="sys-btn">Delete draft</button></form>
+  {% elif mailing.status == "scheduled" or mailing.status == "sending" %}
+    <form method="post" action="{% url 'system_mailing_cancel' mailing.pk %}" style="display:inline" data-system-confirm="mailing">{% csrf_token %}<button type="submit" class="sys-btn">Cancel</button></form>
+    {% if mailing.status == "sending" %}<form method="post" action="{% url 'system_mailing_resume' mailing.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="sys-btn">Carry on sending</button></form>{% endif %}
+  {% endif %}
+</section>
+<section class="sys-panel" data-system-mailing-preview><header><h2>Preview</h2></header><p>{{ preview.subject }}</p><pre>{{ preview.text }}</pre></section>
+<section class="sys-panel" aria-label="People"><div class="sys-scroll"><table class="sys-table" data-system-recipients>
+  <thead><tr><th scope="col">Email</th><th scope="col">Status</th><th scope="col">Why</th><th scope="col">Sent</th></tr></thead>
+  <tbody>{% for r in recipients %}<tr><td class="mono">{{ r.email }}</td><td>{{ r.get_status_display }}</td><td>{{ r.reason }}</td><td>{{ r.sent_at|date:"j M H:i" }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="sys-muted">{% if mailing.status == "draft" or mailing.status == "scheduled" %}The list is made when sending starts.{% else %}Nobody.{% endif %}</td></tr>{% endfor %}</tbody>
+</table></div></section>
+{% if recipients.has_other_pages %}<p>{% if recipients.has_previous %}<a href="?page={{ recipients.previous_page_number }}&status={{ status_filter }}">Previous</a>{% endif %} {% if recipients.has_next %}<a href="?page={{ recipients.next_page_number }}&status={{ status_filter }}">Next</a>{% endif %}</p>{% endif %}
+{% endblock %}

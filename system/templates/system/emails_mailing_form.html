@@ -1,0 +1,21 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title=mailing|yesno:"Edit mailing,New mailing" %}
+{% include "system/_emails_tabs.html" with tab="mailings" %}
+<form method="post" data-problems data-system-form="mailing" data-count-url="{{ count_url }}" data-preview-url="{{ preview_url }}">{% csrf_token %}
+  <section class="sys-panel"><div class="sys-group">
+    {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
+    {% for field in form.visible_fields %}{% include "system/_field_row.html" %}{% endfor %}
+    <div data-system-group-options>
+      {% for g in groups %}{% for p in g.params %}
+      <div class="sys-row" data-group-param="{{ p.name }}" data-for-group="{{ g.key }}"><label>{{ p.label }}</label>
+        {% if p.type == "choice" %}<select name="{{ p.name }}">{% for value, label in p.choices %}<option value="{{ value }}"{% if p.value == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+        {% else %}<input type="date" name="{{ p.name }}" value="{{ p.value }}">{% endif %}</div>
+      {% endfor %}{% endfor %}
+    </div>
+    <p class="sys-muted" data-system-placeholders>In the subject and the text: {% for p in placeholders %}<code>{{ "{" }}{{ p.name }}{{ "}" }}</code> {% endfor %}</p>
+    <p data-system-count aria-live="polite"></p>
+  </div></section>
+  <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save draft</button></div>
+</form>
+{% endblock %}

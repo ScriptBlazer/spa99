@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load pages_tags %}
+{% block head_title %}{% include "common/_head.html" with title="Unsubscribe | Spa 99" %}{% endblock %}
+{% block main %}
+{% signin_shell as shell %}
+{% include "users/_shell_top.html" %}
+      {% if done %}
+      <h1 data-unsubscribe-done>You are unsubscribed</h1>
+      <p class="signin-lead">{{ email }} will not get news from Spa 99 any more.{% if has_account %} You can change this any time in My Spa 99.{% endif %} You may still get messages about your account and bookings.</p>
+      {% else %}
+      <h1 data-unsubscribe-confirm>Unsubscribe from Spa 99 news?</h1>
+      <p class="signin-lead">Stop news emails to {{ email }}.</p>
+      <form method="post" action="{% url 'unsubscribe' token %}">{% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-block">Unsubscribe</button>
+      </form>
+      {% endif %}
+      <div class="signin-actions"><a class="btn-quiet small" href="{% url 'home' %}">Back to home</a></div>
+{% include "users/_shell_bottom.html" %}
+{% endblock %}

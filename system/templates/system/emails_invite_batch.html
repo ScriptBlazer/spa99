@@ -1,0 +1,14 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Invites" description="One import." %}
+{% include "system/_emails_tabs.html" with tab="invites" %}
+<section class="sys-panel" data-system-invite-batch-detail="{{ batch }}" data-progress-url="{{ progress_url }}">
+  <p data-system-invite-summary>{% for key, label in status_choices %}<span data-s="{{ key }}">{{ label }}: <b data-n="{{ key }}">{% for k, n in summary.items %}{% if k == key %}{{ n }}{% endif %}{% endfor %}</b></span> {% endfor %}</p>
+  {% if summary.queued %}<form method="post" action="{% url 'system_invite_resume' batch %}">{% csrf_token %}<button type="submit" class="sys-btn">Carry on sending</button></form>{% endif %}
+</section>
+<section class="sys-panel"><div class="sys-scroll"><table class="sys-table" data-system-invites>
+  <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Status</th><th scope="col">Sent</th><th scope="col">Opened</th><th scope="col">Registered</th><th scope="col">Why</th></tr></thead>
+  <tbody>{% for i in invites %}<tr><td>{{ i.name }}</td><td class="mono">{{ i.email }}</td><td>{{ i.get_status_display }}</td><td>{{ i.sent_at|date:"j M H:i" }}</td><td>{{ i.opened_at|date:"j M H:i" }}</td><td>{{ i.registered_at|date:"j M H:i" }}</td><td>{{ i.reason }}</td></tr>{% endfor %}</tbody>
+</table></div></section>
+{% if invites.has_other_pages %}<p>{% if invites.has_previous %}<a href="?page={{ invites.previous_page_number }}&status={{ status_filter }}">Previous</a>{% endif %} {% if invites.has_next %}<a href="?page={{ invites.next_page_number }}&status={{ status_filter }}">Next</a>{% endif %}</p>{% endif %}
+{% endblock %}

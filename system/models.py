@@ -175,6 +175,8 @@ class SystemEvent(AuditRow):
     SUPPRESSION_REMOVED = "suppress_removed"
     PASSWORD_CHANGED = "password_changed"
     CODE_EDIT = "code_edit"
+    MAILING_SCHEDULED, MAILING_SENT, MAILING_CANCELLED = "mailing_scheduled", "mailing_sent", "mailing_cancelled"
+    INVITES_SENT, EMAIL_TEST = "invites_sent", "email_test"
     KIND_CHOICES = [
         (SIGN_IN, "Signed in"), (SIGN_IN_FAILED, "Sign-in failed"), (UNLOCK, "Unlocked"), (UNLOCK_FAILED, "Unlock failed"),
         (UNLOCK_RATE_LIMITED, "Unlock blocked (too many tries)"), (LOCK_MANUAL, "Locked"), (LOCK_IDLE, "Locked (idle)"),
@@ -182,7 +184,8 @@ class SystemEvent(AuditRow):
         (ROLE_CHANGED, "Roles changed"), (USER_DEACTIVATED, "Account deactivated"), (USER_REACTIVATED, "Account reactivated"),
         (UNDO, "Undo"), (UNDO_ALL, "Undo all"), (EXPORT, "Export"), (AUDIT_PRUNED, "Old log removed"), (AUDIT_CHECK, "Chain checked"), (JOB_RUN, "Job run now"),
         (SUPPRESSION_REMOVED, "Email suppression removed"), (PASSWORD_CHANGED, "Password changed"),
-        (CODE_EDIT, "Edited as code"),
+        (CODE_EDIT, "Edited as code"), (MAILING_SCHEDULED, "Mailing scheduled"), (MAILING_SENT, "Mailing sent"),
+        (MAILING_CANCELLED, "Mailing cancelled"), (INVITES_SENT, "Invites sent"), (EMAIL_TEST, "Test email sent"),
     ]
     OK, FAILED, BLOCKED = "ok", "failed", "blocked"
     OUTCOME_CHOICES = [(OK, "OK"), (FAILED, "Failed"), (BLOCKED, "Blocked")]

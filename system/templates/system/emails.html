@@ -1,6 +1,30 @@
 {% extends "system/base.html" %}
 {% block main %}
-{% include "system/_page_header.html" with title="Emails" description="Who is copied on Gold application emails and where replies go. Sender address and mail transport stay in the server settings." %}
+{% include "system/_page_header.html" with title="Emails" description="The state of sending, the automatic emails, sends to a group and invites. Sender address and mail transport stay in the server settings." %}
+{% include "system/_emails_tabs.html" with tab="overview" %}
+{% include "system/_ses_state.html" %}
+<section class="sys-panel" data-system-emails-stats aria-label="Sending">
+  <header><h2>Sending</h2>
+    {% if ses.mode != "dev" %}<form method="post" action="{% url 'system_ses_refresh' %}" style="display:inline">{% csrf_token %}<button type="submit" class="sys-btn sm">Check again</button></form>{% endif %}</header>
+  <dl class="sys-stats">
+    <div><dt>Sent today</dt><dd data-stat="sent_today">{{ stats.sent_today }}</dd></div>
+    <div><dt>Sent this week</dt><dd data-stat="sent_week">{{ stats.sent_week }}</dd></div>
+    <div><dt>Failed this week</dt><dd data-stat="failed_week">{{ stats.failed_week }}</dd></div>
+    <div><dt>Bounces this week</dt><dd data-stat="bounces_week">{{ stats.bounces_week }}</dd></div>
+    <div><dt>Complaints this week</dt><dd data-stat="complaints_week">{{ stats.complaints_week }}</dd></div>
+    <div><dt>Suppressed addresses</dt><dd data-stat="suppressed_total"><a href="{% url 'system_suppressions' %}">{{ stats.suppressed_total }}</a></dd></div>
+    <div><dt>Unsubscribed (no account)</dt><dd data-stat="unsubscribed_no_account">{{ stats.unsubscribed_no_account }}</dd></div>
+    {% if ses.max_24h %}<div><dt>SES quota (24 h)</dt><dd data-stat="quota">{{ ses.sent_24h|default:0 }} of {{ ses.max_24h }}, {{ ses.max_rate }} a second</dd></div>{% endif %}
+  </dl>
+</section>
+<section class="sys-panel" aria-label="Recent group sends">
+  <header><h2>Recent group sends</h2><a href="{% url 'system_mailings' %}">All</a></header>
+  <ul data-system-recent-mailings>{% for m in recent_mailings %}<li><a href="{% url 'system_mailing' m.pk %}">{{ m.name }}</a> {{ m.get_status_display }}, {{ m.total_count }} people</li>{% empty %}<li class="sys-muted">None yet.</li>{% endfor %}</ul>
+</section>
+<section class="sys-panel" aria-label="Recent invites">
+  <header><h2>Recent invites</h2><a href="{% url 'system_invites' %}">All</a></header>
+  <ul data-system-recent-invites>{% for b in recent_invite_batches %}<li><a href="{% url 'system_invite_batch' b.batch_id %}">{{ b.created|date:"j M Y H:i" }}</a> {{ b.total }} people, {{ b.registered }} registered</li>{% empty %}<li class="sys-muted">None yet.</li>{% endfor %}</ul>
+</section>
 <form method="post" data-problems data-system-form="emails" data-system-risky="{{ risky_fields|join:',' }}">{% csrf_token %}
   <section class="sys-panel">
     <header><h2>Copies and contact</h2></header>

@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from plans.models import SiteSettings
 
-from . import suppression
+from . import emailbody, suppression
 from .models import EmailLog, NotificationTemplate
 from .seed import DEFAULT_SUBJECTS, LEGACY_KEYS
 
@@ -34,15 +34,59 @@ def subject_for(key, **values):
     if row is None and key in LEGACY_KEYS:  # an install not yet backfilled still has the old row name
         row = NotificationTemplate.objects.filter(key=LEGACY_KEYS[key]).first()
     text = row.subject if row else DEFAULT_SUBJECTS[key][0]
+    return fill_subject(text, values)
+
+
+def body_for(key):
+    """The stored body text of an editable email ('' = use the default)."""
+    row = NotificationTemplate.objects.filter(key=key).only("body").first()
+    return row.body if row else ""
+
+
+def render_editable(key, context, body=None, values=None, button_url=None):
+    """(body_html, body_text) of an email whose wording is editable. `body` overrides the stored one (a group mailing's own
+    text, a preview); `values` overrides the placeholder values (a preview uses the samples)."""
+    spec = emailbody.spec_for(key)
+    text = emailbody.effective_body(spec, body if body is not None else body_for(key))
+    if values is None:
+        values = emailbody.values_for(spec, context)
+    url = button_url if button_url is not None else (context or {}).get("url", "")
+    return emailbody.render(spec, text, values, button_url=url)
+
+
+def render_email(template, ctx, body=None, values=None, button_url=None):
+    """(html, text) of the whole email for a ready context (the layout around the body). `body` and `values` as in render_editable;
+    the context is given the rendered body as `body_html` / `body_text`."""
+    layout = template
+    spec = emailbody.spec_for(template)
+    if spec is not None and spec.editable:
+        ctx["body_html"], ctx["body_text"] = render_editable(template, ctx, body=body, values=values, button_url=button_url)
+        layout = "_body"
+    return render_to_string(f"notifications/emails/{layout}.html", ctx), render_to_string(f"notifications/emails/{layout}.txt", ctx)
+
+
+def preview_email(key, subject, body, extra=None):
+    """The email as it would look with the sample values: {"subject", "html", "text"}. `body` blank = the default; `extra` is added to
+    the context (the unsubscribe link and notice of a News mailing)."""
+    spec = emailbody.spec_for(key)
+    values = emailbody.sample_values(spec)
+    ctx = {**base_context(), "subject": fill_subject(subject, values), "url": f"{settings.SITE_URL}/example-link/", **(extra or {})}
+    html, text = render_email(key, ctx, body=body if body and body.strip() else spec.default_body, values=values)
+    return {"subject": ctx["subject"], "html": html, "text": text}
+
+
+def fill_subject(text, values):
     for name, value in values.items():
         text = text.replace("{" + name + "}", str(value))
     return text
 
 
-def send_templated(template, to, subject, context=None, cc=None, subject_email=""):
-    """Render notifications/emails/<template>.html and .txt, send, and log. Returns the EmailLog.
+def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None):
+    """Render the email, send, and log. Returns the EmailLog. Editable emails (notifications/emailbody.py) use the shared
+    layout `_body` and the stored or default wording; the Gold approver emails render their own template files.
     `to` and `cc` are lists of addresses. `subject_email` is the person the message is about when it goes to
-    someone else (Barry's Gold email), so deleting that person's data finds the log row."""
+    someone else (Barry's Gold email), so deleting that person's data finds the log row.
+    `headers` are extra mail headers (List-Unsubscribe); `body` replaces the stored wording (a group mailing)."""
     to, cc = list(to or []), list(cc or [])
     try:
         blocked = suppression.suppressed_set(to + cc)  # THE guard: every email goes through here
@@ -64,14 +108,13 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
                 to=", ".join(sorted(blocked)), subject=subject[:300], template=template, status=EmailLog.SUPPRESSED,
                 subject_email=(subject_email or "").strip().lower(), error="Address is on the suppression list (bounce or complaint).")
             return log
-    ctx = {**base_context(), **(context or {})}
+    ctx = {**base_context(), "subject": subject, **(context or {})}
     log = EmailLog(
         to=", ".join(to), cc=", ".join(cc), subject=subject[:300], template=template,
         subject_email=(subject_email or "").strip().lower(),
     )
     try:
-        text = render_to_string(f"notifications/emails/{template}.txt", ctx)
-        html = render_to_string(f"notifications/emails/{template}.html", ctx)
+        html, text = render_email(template, ctx, body=body)
         message = EmailMultiAlternatives(
             subject=subject,
             body=text,
@@ -79,10 +122,12 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
             to=to,
             cc=cc,
             reply_to=[ctx["contact_email"]],
+            headers=headers or None,
         )
         message.attach_alternative(html, "text/html")
         message.send(fail_silently=False)
         log.status, log.sent_at = EmailLog.SENT, timezone.now()
+        log.message_id = str(getattr(message, "ses_message_id", ""))[:100]
     except Exception as error:  # noqa: BLE001 - any failure is recorded, then the caller carries on
         log.status, log.error = EmailLog.FAILED, f"{type(error).__name__}: {error}"[:1000]
     log.save()

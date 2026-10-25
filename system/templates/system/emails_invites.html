@@ -1,0 +1,12 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Invites" description="Invite people to register with a personal link. Paste or upload a list of names and addresses." %}
+{% include "system/_emails_tabs.html" with tab="invites" %}
+{% include "system/_ses_state.html" %}
+<p><a class="sys-btn primary" href="{% url 'system_invites_new' %}" data-system-new-invites>Import a list</a></p>
+<section class="sys-panel"><div class="sys-scroll"><table class="sys-table" data-system-invite-batches>
+  <thead><tr><th scope="col">Imported</th><th scope="col">By</th><th scope="col">People</th><th scope="col">Sent</th><th scope="col">Opened</th><th scope="col">Registered</th><th scope="col">Bounced</th><th scope="col">Skipped</th></tr></thead>
+  <tbody>{% for b in batches %}<tr data-system-invite-batch="{{ b.batch_id }}"><td><a href="{% url 'system_invite_batch' b.batch_id %}">{{ b.created|date:"j M Y H:i" }}</a></td><td>{{ b.by }}</td><td>{{ b.total }}</td><td>{{ b.sent }}</td><td>{{ b.opened }}</td><td>{{ b.registered }}</td><td>{{ b.bounced }}</td><td>{{ b.skipped }}</td></tr>
+  {% empty %}<tr><td colspan="8" class="sys-muted">No invites yet.</td></tr>{% endfor %}</tbody>
+</table></div></section>
+{% endblock %}

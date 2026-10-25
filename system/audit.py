@@ -37,6 +37,9 @@ KINDS = {
     SystemEvent.AUDIT_PRUNED: ("security", "changes", "ok"), SystemEvent.AUDIT_CHECK: ("security", "changes", "ok"), SystemEvent.JOB_RUN: ("security", "security", "ok"),
     SystemEvent.SUPPRESSION_REMOVED: ("security", "security", "ok"), SystemEvent.PASSWORD_CHANGED: ("security", "security", "ok"),
     SystemEvent.CODE_EDIT: ("change", "changes", "ok"),
+    SystemEvent.MAILING_SCHEDULED: ("change", "emails", "ok"), SystemEvent.MAILING_SENT: ("change", "emails", "ok"),
+    SystemEvent.MAILING_CANCELLED: ("change", "emails", "ok"), SystemEvent.INVITES_SENT: ("change", "emails", "ok"),
+    SystemEvent.EMAIL_TEST: ("change", "emails", "ok"),
 }
 CATEGORIES = [("change", "Changes"), ("security", "Security"), ("undo", "Undos"), ("failure", "Failures")]
 EVENT_SECTION_LABELS = {"security": "Security", "changes": "Change log"}

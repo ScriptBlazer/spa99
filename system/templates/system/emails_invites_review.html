@@ -1,0 +1,22 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Check the list" %}
+{% include "system/_emails_tabs.html" with tab="invites" %}
+{% include "system/_ses_state.html" %}
+{% for error in report.errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ error }}</p>{% endfor %}
+{% if not report.errors %}
+<section class="sys-panel" data-system-invite-report data-ok="{{ report.ok }}">
+  <header><h2>{{ report.ok }} of {{ report.total }} can be invited</h2></header>
+  <ul data-system-invite-counts>{% for key, label in status_labels.items %}{% if key != "ok" %}{% for k, n in report.counts.items %}{% if k == key and n %}<li data-count="{{ key }}">{{ n }}: {{ label }}</li>{% endif %}{% endfor %}{% endif %}{% endfor %}</ul>
+  <div class="sys-scroll"><table class="sys-table" data-system-invite-rows>
+    <thead><tr><th scope="col">Line</th><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Result</th></tr></thead>
+    <tbody>{% for r in report.rows %}<tr data-status="{{ r.status }}"><td>{{ r.line }}</td><td>{{ r.name }}</td><td class="mono">{{ r.email }}</td><td>{{ r.message|default:"Will be invited" }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+<form method="post" action="{% url 'system_invites_send' %}" data-system-confirm="invites">{% csrf_token %}
+  <input type="hidden" name="expected_ok" value="{{ report.ok }}"><textarea name="text" hidden>{{ text }}</textarea>
+  <button type="submit" class="sys-btn primary"{% if not report.ok or not ses.allowed %} disabled{% endif %}>Send {{ report.ok }} invites</button>
+  <a class="sys-btn" href="{% url 'system_invites_new' %}">Back</a>
+</form>
+{% else %}<p><a class="sys-btn" href="{% url 'system_invites_new' %}">Back</a></p>{% endif %}
+{% endblock %}
