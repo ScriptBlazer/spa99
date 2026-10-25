@@ -39,7 +39,7 @@ Mobile-usable, fast, calm. Same shared buttons, modal, messages and validation a
 | **Content** | Site copy and images per page/section; facilities and their descriptions; "Register" vs "Join" wording; booking placeholder text |
 | **Gold rules** | Potential weights and thresholds; which answers count as property |
 | **Notifications** | Gold alert recipients; email templates preview; send log |
-| **Settings** | Opening date (when set), stage switches (register interest / subscribe / book), contact details |
+| **Settings** | Opening date (when set), stage switches (registration / subscribe / book), contact details |
 | **Team** | Users who can access Control and their role |
 
 Every change is recorded (who, when, before and after) via `django-simple-history` and shown on the item (ADM-11).

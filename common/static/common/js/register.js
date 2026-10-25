@@ -1,4 +1,4 @@
-/* Register interest: plan picker and membership card, date of birth in three fields, password checks. The shared validate.js
+/* Register: plan picker and membership card, date of birth in three fields, password checks. The shared validate.js
    does the live feedback (see form.spaValidation); this adds the parts only this form has. */
 import './forms.js';
 

@@ -6,8 +6,8 @@ Decided by Moishe 2026-10-23 (PROJECT.md). This replaces the old Owner / Manager
 
 | Type | What it is |
 |---|---|
-| **Visitor** | Not signed in. The public website, the journey, registering interest, the Gold application, the tour |
-| **Member** | A person with a membership (registered interest in a tier, later a paid plan). The website plus the member area (`/account/`) |
+| **Visitor** | Not signed in. The public website, the journey, registering, the Gold application, the tour |
+| **Member** | A person with a membership (registered for a tier, later a paid plan). The website plus the member area (`/account/`) |
 | **Gold member** | A member whose membership is Gold (approved application). Same member area; Gold cannot be changed there |
 | **Team** | People who work on Spa 99, at one of four levels (U2). Being on the team never makes you a member |
 

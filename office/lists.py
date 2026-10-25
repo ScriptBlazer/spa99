@@ -84,7 +84,7 @@ def people_csv(filters):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="spa99-people.csv"'
     writer = csv.writer(response)
-    writer.writerow(["account_id", "first_name", "last_name", "email", "mobile", "plan_interest", "source", "email_verified",
+    writer.writerow(["account_id", "first_name", "last_name", "email", "mobile", "membership", "source", "email_verified",
                      "marketing_consent", "registered_at"])
     for user in people_queryset(filters).iterator():
         interest = user.interest

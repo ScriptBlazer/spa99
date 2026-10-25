@@ -34,7 +34,7 @@
             <p class="plan-empty" data-plan-empty{% if chosen %} hidden{% endif %}>Choose one. You can change it later.</p>
           </div>
           <fieldset class="plan-picker">
-            <legend class="sr-only">Membership you are interested in</legend>
+            <legend class="sr-only">Choose your membership</legend>
             <div class="plan-chips">
               {% for card in cards %}
               <label class="plan-chip"><input type="radio" name="plan" value="{{ card.slug }}" form="register-form"

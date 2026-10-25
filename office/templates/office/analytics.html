@@ -40,7 +40,7 @@
     <div class="o-pills" data-series-pills hidden role="group" aria-label="Series shown">
       <button type="button" class="o-pill" data-series="visitors" aria-pressed="true"><span class="o-swatch" aria-hidden="true"></span>Visitors</button>
       <button type="button" class="o-pill" data-series="journeys_started" aria-pressed="true"><span class="o-swatch" aria-hidden="true"></span>Started the journey</button>
-      <button type="button" class="o-pill" data-series="people_registered" aria-pressed="true"><span class="o-swatch" aria-hidden="true"></span>Registered interest</button>
+      <button type="button" class="o-pill" data-series="people_registered" aria-pressed="true"><span class="o-swatch" aria-hidden="true"></span>Registered</button>
       <button type="button" class="o-pill" data-series="page_views" aria-pressed="false"><span class="o-swatch" aria-hidden="true"></span>Page views</button>
     </div>
     <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
@@ -53,7 +53,7 @@
     <details class="o-table" data-table="visitors"{% if not data.series.visitors.total and not data.series.page_views.total and not data.series.journeys_started.total and not data.series.people_registered.total %} hidden{% endif %}><summary>View as table</summary>
       <div class="o-table-wrap" data-region="table-visitors" data-fade>
         <table><caption class="sr-only">Visitors, page views, people started and registrations, {{ data.range|range_label }}</caption>
-          <thead><tr><th scope="col">{% if data.granularity == "week" %}Week{% else %}Date{% endif %}</th><th scope="col">Visitors</th><th scope="col">Page views</th><th scope="col">People started</th><th scope="col">Registered interest</th>{% if data.previous_labels %}<th scope="col">Previous visitors</th>{% endif %}</tr></thead>
+          <thead><tr><th scope="col">{% if data.granularity == "week" %}Week{% else %}Date{% endif %}</th><th scope="col">Visitors</th><th scope="col">Page views</th><th scope="col">People started</th><th scope="col">Registered</th>{% if data.previous_labels %}<th scope="col">Previous visitors</th>{% endif %}</tr></thead>
           <tbody>{% zip_lists data.labels data.series.visitors.values data.series.page_views.values data.series.visitors.previous data.series.journeys_started.values data.series.people_registered.values as vrows %}{% for r in vrows %}
             <tr><th scope="row">{% if data.granularity == "week" %}{{ r.0|week_label }}{% else %}{{ r.0|day_label }}{% endif %}</th><td>{{ r.1|num }}</td><td>{{ r.2|num }}</td><td>{{ r.4|num }}</td><td>{{ r.5|num }}</td>{% if data.previous_labels %}<td>{{ r.3|num }}</td>{% endif %}</tr>{% endfor %}
           </tbody></table>
@@ -65,7 +65,7 @@
   <div class="o-kpis o-span-12" data-office-kpis>
     {% include "office/_kpi.html" with key="visitors" label="Visitors" hue="slate" anchor="visitors" %}
     {% include "office/_kpi.html" with key="journeys_started" label="Started the journey" hue="sage" anchor="journeys" %}
-    {% include "office/_kpi.html" with key="people_registered" label="Registered interest" hue="clay" anchor="registrations" %}
+    {% include "office/_kpi.html" with key="people_registered" label="Registered" hue="clay" anchor="registrations" %}
     {% include "office/_kpi.html" with key="gold_applications" label="Gold applications" hue="ochre" anchor="gold" %}
   </div>
 

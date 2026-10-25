@@ -360,7 +360,7 @@ def _tier_message(request, outcome, plan):
     elif outcome == "same":
         messages.info(request, f"{plan.name} is already your membership.")
     else:
-        messages.success(request, f"Saved. You're interested in {plan.name}.")
+        messages.success(request, f"Saved. Your membership is {plan.name}.")
     return outcome
 
 

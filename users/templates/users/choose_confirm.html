@@ -5,7 +5,7 @@
   <div class="m-title" data-reveal="hero">
     <h1>Choose {{ plan.name }}</h1>
     <p class="lead num">&pound;{{ card.price_whole }} a month, ex VAT (&pound;{{ card.price_inc }} inc VAT)</p>
-    <p class="muted">Interest only. Nothing to pay now.</p>
+    <p class="muted">Nothing to pay now.</p>
   </div>
   <form method="post" action="{% url 'account_interest' %}" data-choose-confirm>{% csrf_token %}
     <input type="hidden" name="plan" value="{{ plan.slug }}">

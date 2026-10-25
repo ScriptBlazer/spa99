@@ -17,7 +17,7 @@ A real account, created now, without payment (LC-09, ACC-03). Called "Register" 
    - Date of birth (must be 18+, ACC-08)
    - Men-only policy acceptance tick (ACC-09)
    - Privacy notice link; marketing opt-in (unticked, separate)
-   - Interested tier (pre-selected, changeable)
+   - Membership (tier, pre-selected, changeable)
 3. Submit → account created, journey session linked, "Check your email" screen.
 4. Verification email → link → verified → signed in → account page.
 5. Unverified accounts can sign in but see a banner to verify; resend link available.
@@ -40,7 +40,7 @@ Shown right under the field, calm wording, no red shouting until he leaves the f
 
 ## Account page (Phase 1, superseded: now the member dashboard, see `member-dashboard.md`)
 
-- "You're registered for Tier 2 interest" with the option to change interest.
+- "Your membership is Tier 2" with the option to switch membership.
 - Profile: name, email, mobile, change password.
 - Account ID (shareable, for future guest invites, ACC-05).
 - Placeholders that look finished: Visits, Bookings, Membership — "Opening January 2027".
@@ -100,3 +100,6 @@ From Spa 99, Reply-To `hello@spa99.uk`. Branded, plain and short. No email to Mo
 - Account created, linked to the journey session, verification email sent (mocked in tests).
 - Export gives all of a person's data (account, interest, journey answers). Delete removes or anonymises it.
 - Switching "Register" to "Join" is a setting/wording change in Control.
+
+## Wording note (2026-10-25)
+People see "Register", "Registered", "Your membership"; never "interest". Code and database names (`InterestRegistration`, `register_interest_open`, `/account/interest/`) are unchanged. The Terms page row `part_4` still says "which membership interests you" (stored in the database, legal text, left for Moishe to rewrite). Seeded text from the 2026-10-23 rename already reached existing rows via `backfill_site_data`; nothing new is stored in the database by this change.

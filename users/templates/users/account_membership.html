@@ -21,7 +21,7 @@
   </div>
   <form id="interest-form" class="m-choose" method="post" action="{% url 'account_interest' %}" data-interest data-current="{{ interest_plan.slug }}" data-reveal>
     {% csrf_token %}
-    <div class="m-choices" role="radiogroup" aria-label="Membership you're interested in">
+    <div class="m-choices" role="radiogroup" aria-label="Your membership">
       {% for tile in plan_tiles %}<label class="m-choice" data-plan-tile="{{ tile.slug }}" data-plan-name="{{ tile.name }}"><input type="radio" name="plan" value="{{ tile.slug }}"{% if interest_plan.slug == tile.slug %} checked{% endif %}><span class="m-choice-name">{{ tile.name }}</span><span class="m-choice-tag">{{ tile.tagline }}</span><span class="m-choice-price num">&pound;{{ tile.price_whole }} ex VAT (&pound;{{ tile.price_inc }} inc VAT)</span><span class="m-choice-check">{% include "common/_icon.html" with name="check" %}</span></label>{% endfor %}
     </div>
     <button type="submit" class="btn btn-primary m-keep" data-working-text="Saving" data-keep>{% if interest_plan %}Switch membership{% else %}Choose membership{% endif %}</button>

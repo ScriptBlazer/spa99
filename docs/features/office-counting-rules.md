@@ -20,7 +20,7 @@ Bots (`is_bot`), the staff hosts (Office, Control, System), and journeys by staf
 | Visitors | Unique per day: salted daily hash of IP + browser, never stored, wiped daily. A range shows the sum of daily uniques ("unique visitors per day"). Everyone who starts the journey that day is counted as a visitor too | Visitor counter (not rebuildable) |
 | Started the journey | People (C1) with a journey started in the range | `JourneySession` (yes) |
 | Finished the journey | People with a journey finished in the range | `JourneySession` (yes) |
-| Registered interest | Registrations created in the range (one per account) | `InterestRegistration` (yes) |
+| Registered | Registrations created in the range (one per account) | `InterestRegistration` (yes) |
 | Answers (facility, time, how often, who with) | One vote per person: each person's latest finished journey in the range | `JourneySession` answers (yes) |
 | Suggested tier | Same: each person's latest finished journey | `JourneySession` (yes) |
 | Picked tier | Registrations in the range by plan; denominator = all registrations in the range | `InterestRegistration` (yes) |

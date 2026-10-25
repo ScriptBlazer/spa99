@@ -106,7 +106,7 @@ def visitor(w):
 def tier(w):
     email, first, last, mobile = "tier@example.com", "Tobias", "Tierney", "07123 456781"
     page = w.page()
-    with w.step("Register interest in Tier 2", page):
+    with w.step("Register for Tier 2", page):
         register_member(page, email, first, last, mobile, plan_name="Tier 2")
         assert "email" in body_text(page).lower()
     with w.step("The verification email arrives", page):

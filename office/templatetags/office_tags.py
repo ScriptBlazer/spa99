@@ -248,12 +248,12 @@ def sum_of(values):
 
 
 GOAL_WORDS = {"journeys_started": ("started the journey", "started the journey"), "journeys_completed": ("finished the journey", "finished the journey"),
-              "registrations": ("registered interest", "registered interest")}
+              "registrations": ("registered", "registered")}
 
 
 @register.simple_tag
 def ring_sentence(rings):
-    """One sentence for the three rings: '42 started the journey, goal 60. 31 finished the journey, goal 40. 18 registered interest, goal 25.'"""
+    """One sentence for the three rings: '42 started the journey, goal 60. 31 finished the journey, goal 40. 18 registered, goal 25.'"""
     parts = []
     for ring in rings or []:
         words = GOAL_WORDS.get(ring.get("key"), (ring.get("label", ""), ring.get("label", "")))[0]

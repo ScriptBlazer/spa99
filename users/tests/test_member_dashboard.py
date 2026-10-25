@@ -219,8 +219,8 @@ class ChooseTierTests(TestCase):
             self.assertEqual(InterestRegistration.objects.get(user=user).plan.slug, slug)
         self.assertRedirects(self.client.get("/register/?plan=tier-2"), "/account/", fetch_redirect_response=False)  # already theirs
         page = self.client.get("/account/")
-        self.assertContains(page, "Tier 2 interest")
-        self.assertContains(page, "Saved. You&#x27;re interested in Tier 2.")
+        self.assertContains(page, "Tier 2")
+        self.assertContains(page, "Saved. Your membership is Tier 2.")
 
     def test_gold_member_cannot_switch(self):
         user = make_user(plan=plan("gold"))

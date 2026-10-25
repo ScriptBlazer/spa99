@@ -218,4 +218,4 @@ class TeamAndDashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         health = response.context["health"]
         self.assertEqual((health["database_ok"], health["queue_size"], health["counts"]), (True, 0, {"registrations": 12, "gold_applications": 3}))
-        self.assertEqual(response.context["stages"][0], ("Register interest", True))
+        self.assertEqual(response.context["stages"][0], ("Registration", True))

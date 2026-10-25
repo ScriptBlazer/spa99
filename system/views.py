@@ -149,7 +149,7 @@ def sign_out(request):
 def dashboard(request):
     site = SiteSettings.load()
     context = {"health": services.health_report(), "recent": services.recent_changes(10), "site": site,
-               "stages": [("Register interest", site.register_interest_open), ("Subscribe", site.subscribe_open), ("Book", site.booking_open)]}
+               "stages": [("Registration", site.register_interest_open), ("Subscribe", site.subscribe_open), ("Book", site.booking_open)]}
     return page(request, "system/dashboard.html", "dashboard", context)
 
 

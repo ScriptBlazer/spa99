@@ -58,7 +58,7 @@ def chart_sentences(name, today, plans, options, waiting, figures):
     if visitors:
         trend = change(visitors, total(K.VISITORS, before))
         out["visitors"] = f"{plural(visitors, 'visitor')} {PERIOD[name]}" + (f", {trend} {THAN[name]}." if trend else ".")
-        out["funnel"] = (f"Of {visitors:,} visitors, {started:,} started the journey, {done:,} finished the journey and {registered:,} registered interest.")
+        out["funnel"] = (f"Of {visitors:,} visitors, {started:,} started the journey, {done:,} finished the journey and {registered:,} registered.")
     top = _top(sums, K.REGISTRATIONS_BY_PLAN, plans)
     if top:
         out["registrations_by_plan"] = f"{top[0]} leads with {top[1]:,} of {plural(top[2], 'registration')}."
@@ -89,13 +89,13 @@ def chart_sentences(name, today, plans, options, waiting, figures):
     return {chart: out.get(chart, NOTHING[chart]) for chart in CHARTS}
 
 
-WORDS = ((people.REGISTERED, "person registered interest", "people registered interest"),
+WORDS = ((people.REGISTERED, "person registered", "people registered"),
          (people.STARTED, "person started the journey", "people started the journey"),
          (people.FINISHED, "person finished the journey", "people finished the journey"))
 
 
 def dashboard_sentence(name, today, waiting, figures):
-    """Plain counts only: '5 people registered interest in the last 7 days, 2 more than last week. 9 people started the journey, ...'"""
+    """Plain counts only: '5 people registered in the last 7 days, 2 more than last week. 9 people started the journey, ...'"""
     start, end = reader.range_dates(name, today)
     now = figures.overlay({}, start, end)
     prev = reader.previous_dates(name, today)

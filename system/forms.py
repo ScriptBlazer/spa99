@@ -25,6 +25,7 @@ class EmailsForm(forms.ModelForm):
 class SettingsForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["register_interest_open"].label = "Registration open"
         for name, low, high in (("lock_idle_minutes", 1, 240), ("max_sign_in_hours", 1, 72)):
             self.fields[name].widget.attrs.update({"min": low, "max": high})
             self.fields[name].min_value, self.fields[name].max_value = low, high
