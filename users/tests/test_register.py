@@ -347,5 +347,5 @@ class SignUpNeedsATierTests(TestCase):
         seed_all()
         response = self.client.post("/register/", signup_data(plan=""))
         self.assertEqual(response.status_code, 400)
-        self.assertContains(response, "Choose a membership to continue.")
+        self.assertContains(response, "Choose a membership to continue.", status_code=400)
         self.assertFalse(User.objects.filter(email="hugo@example.com").exists())
