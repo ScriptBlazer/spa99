@@ -30,6 +30,10 @@ CERT_URL = "https://sns.eu-west-2.amazonaws.com/SimpleNotificationService-test.p
 User = get_user_model()
 
 
+def now_stamp(delta=datetime.timedelta()):
+    return (datetime.datetime.now(datetime.timezone.utc) + delta).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
 def make_signed(message_type="Notification", version="2", **extra):
     """(message dict, certificate PEM): a message signed by a throwaway key, like SNS would."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -38,7 +42,7 @@ def make_signed(message_type="Notification", version="2", **extra):
     cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
             .serial_number(1).not_valid_before(now - datetime.timedelta(days=1)).not_valid_after(now + datetime.timedelta(days=1))
             .sign(key, hashes.SHA256()))
-    message = {"Type": message_type, "MessageId": "m1", "TopicArn": TOPIC, "Timestamp": "2026-10-25T10:00:00.000Z",
+    message = {"Type": message_type, "MessageId": "m1", "TopicArn": TOPIC, "Timestamp": now_stamp(),
                "Message": "{}", "SignatureVersion": version, "SigningCertURL": CERT_URL, **extra}
     algorithm = hashes.SHA256() if version == "2" else hashes.SHA1()
     message["Signature"] = base64.b64encode(key.sign(sns.string_to_sign(message), padding.PKCS1v15(), algorithm)).decode()
@@ -46,10 +50,11 @@ def make_signed(message_type="Notification", version="2", **extra):
 
 
 def ses_message(body):
-    return {"Type": "Notification", "MessageId": "m1", "TopicArn": TOPIC, "Timestamp": "t", "Message": json.dumps(body)}
+    return {"Type": "Notification", "MessageId": "m1", "TopicArn": TOPIC, "Timestamp": now_stamp(), "Message": json.dumps(body)}
 
 
 @unittest.skipIf(x509 is None, "cryptography is not installed")
+@override_settings(SES_SNS_TOPIC_ARN=TOPIC)
 class SignatureTests(TestCase):
     def setUp(self):
         cache.clear()
@@ -82,14 +87,17 @@ class SignatureTests(TestCase):
             self.verify({**message, "Signature": "not base64!"}, pem)
 
 
+@override_settings(SES_SNS_TOPIC_ARN=TOPIC)
 class CertificateUrlTests(TestCase):
     def test_only_sns_https_hosts_are_trusted(self):
-        for good in (CERT_URL, "https://sns.us-east-1.amazonaws.com/x.pem"):
-            self.assertTrue(sns.trusted_sns_url(good), good)
+        self.assertTrue(sns.trusted_sns_url(CERT_URL))
         for bad in ("http://sns.eu-west-2.amazonaws.com/x.pem", "https://sns.eu-west-2.amazonaws.com.evil.com/x.pem",
                     "https://evil.com/sns.eu-west-2.amazonaws.com/x.pem", "https://xsns.eu-west-2.amazonaws.com/x.pem",
                     "https://sns.eu-west-2.amazonaws.com@evil.com/x.pem", "https://user@sns.eu-west-2.amazonaws.com/x.pem",
-                    "https://sns.eu-west-2.amazonaws.com:8443/x.pem", "https://s3.eu-west-2.amazonaws.com/x.pem", "ftp://sns.eu-west-2.amazonaws.com/x.pem", ""):
+                    "https://sns.eu-west-2.amazonaws.com:8443/x.pem", "https://s3.eu-west-2.amazonaws.com/x.pem",
+                    "https://sns.s3.amazonaws.com/x.pem", "https://sns.s3-eu-west-1.amazonaws.com/x.pem",
+                    "https://sns.execute-api.amazonaws.com/x.pem", "https://sns.us-east-1.amazonaws.com/x.pem",  # last one: wrong region
+                    "ftp://sns.eu-west-2.amazonaws.com/x.pem", ""):
             self.assertFalse(sns.trusted_sns_url(bad), bad)
 
     def test_an_evil_certificate_url_is_never_downloaded(self):
@@ -121,13 +129,24 @@ class EndpointTests(TestCase):
 
     def test_bad_requests_are_refused(self):
         self.assertEqual(Client().get("/ses/notifications/").status_code, 405)
-        self.assertEqual(self.post("not json").status_code, 403)
-        self.assertEqual(self.post("[1]").status_code, 403)
+        self.assertEqual(self.post("not json").status_code, 400)
+        self.assertEqual(self.post("[1]").status_code, 400)
+        self.assertEqual(self.post("[" * 100000).status_code, 400)  # deep nesting must not crash
         with mock.patch("notifications.sns.verify_signature") as verify:
             self.assertEqual(self.post({**ses_message({}), "TopicArn": "arn:aws:sns:eu-west-2:1:other"}).status_code, 403)
         verify.assert_not_called()  # the wrong topic is refused before any certificate is fetched
         self.assertEqual(self.post({**ses_message({}), "SignatureVersion": "2", "Signature": "AAAA", "SigningCertURL": "https://evil.com/c.pem"}).status_code, 403)
         self.assertEqual(self.post(" " * (sns.MAX_BODY_BYTES + 1)).status_code, 413)
+        self.assertEqual(EmailSuppression.objects.count(), 0)
+
+    def test_old_and_future_messages_are_refused_so_a_captured_one_cannot_be_replayed(self):
+        hour = datetime.timedelta(hours=1, minutes=1)
+        for stamp in (now_stamp(-hour), now_stamp(hour), "garbage"):
+            with mock.patch("notifications.sns.verify_signature") as verify:
+                message = {**ses_message(self.bounce()), "Timestamp": stamp}
+                message["Message"] = json.dumps(self.bounce())
+                self.assertEqual(self.post(message).status_code, 403, stamp)
+            verify.assert_not_called()
         self.assertEqual(EmailSuppression.objects.count(), 0)
 
     def test_subscription_confirmation_calls_the_subscribe_url(self):

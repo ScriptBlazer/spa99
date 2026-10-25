@@ -6,6 +6,7 @@ Flow: SES publishes to the SNS topic, SNS POSTs to /ses/notifications/. We trust
 Then a permanent bounce or a complaint puts each address on the suppression list (notifications.suppression); the central
 sender (notifications.services.send_templated) never emails a suppressed address. Transient bounces are not stored."""
 import base64
+import datetime
 import json
 import logging
 import re
@@ -21,7 +22,9 @@ from .models import EmailSuppression
 
 logger = logging.getLogger("spa99.email")
 
-SNS_HOST = re.compile(r"^sns\.[a-z0-9-]+\.amazonaws\.com$")
+SNS_HOST = re.compile(r"^sns\.(?P<region>[a-z]{2}(?:-gov)?-[a-z]+-\d)\.amazonaws\.com$")  # region-shaped only: not sns.s3.amazonaws.com
+MAX_AGE = datetime.timedelta(hours=1)  # older messages are refused (replay after an address was removed)
+MAX_FUTURE = datetime.timedelta(minutes=5)
 MAX_BODY_BYTES = 256 * 1024  # SNS's own limit
 CERT_CACHE_SECONDS = 24 * 3600
 
@@ -33,12 +36,23 @@ class Rejected(Exception):
     """The message is not acceptable; the text is for the log only."""
 
 
-def trusted_sns_url(url):
-    """True only for an https URL on sns.<region>.amazonaws.com (exact host, default port, no credentials)."""
+class Malformed(Rejected):
+    """The body is not a usable SNS envelope at all (answered 400; other refusals are 403)."""
+
+
+def topic_region():
+    parts = (settings.SES_SNS_TOPIC_ARN or "").split(":")
+    return parts[3] if len(parts) > 3 else ""
+
+
+def trusted_sns_url(url, region=None):
+    """True only for an https URL on sns.<region>.amazonaws.com (exact host, default port, no credentials), where the
+    region is the one in our topic ARN (`region` overrides, for tests)."""
     try:
         parts = urlsplit(url or "")
-        return (parts.scheme == "https" and parts.username is None and parts.port in (None, 443)
-                and bool(SNS_HOST.match(parts.hostname or "")))
+        match = SNS_HOST.match(parts.hostname or "")
+        return (parts.scheme == "https" and parts.username is None and parts.port in (None, 443) and bool(match)
+                and match.group("region") == (region or topic_region()))
     except ValueError:
         return False
 
@@ -112,11 +126,24 @@ def parse(body):
         raise Rejected("body too large")
     try:
         message = json.loads(body)
-    except ValueError:
-        raise Rejected("body is not JSON")
+    except (ValueError, RecursionError):
+        raise Malformed("body is not JSON")
     if not isinstance(message, dict):
-        raise Rejected("body is not an object")
+        raise Malformed("body is not an object")
     return message
+
+
+def check_fresh(message, now=None):
+    """Refuse a message whose Timestamp is more than an hour old (or in the future): a captured one cannot be replayed."""
+    try:
+        sent = datetime.datetime.fromisoformat(str(message.get("Timestamp", "")))
+    except ValueError:
+        raise Rejected("Timestamp is not valid")
+    if sent.tzinfo is None:
+        sent = sent.replace(tzinfo=datetime.timezone.utc)
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    if now - sent > MAX_AGE or sent - now > MAX_FUTURE:
+        raise Rejected("message is too old or from the future")
 
 
 def confirm_subscription(message):
@@ -167,6 +194,7 @@ def handle(body):
     message = parse(body)
     if message.get("TopicArn") != settings.SES_SNS_TOPIC_ARN:
         raise Rejected("wrong topic")
+    check_fresh(message)
     verify_signature(message)
     kind = message["Type"]
     if kind == "SubscriptionConfirmation":
@@ -175,7 +203,7 @@ def handle(body):
     if kind == "Notification":
         try:
             ses = json.loads(message.get("Message", ""))
-        except ValueError:
+        except (ValueError, RecursionError):
             raise Rejected("Message is not JSON")
         if not isinstance(ses, dict):
             raise Rejected("Message is not an object")

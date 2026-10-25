@@ -23,6 +23,9 @@ def ses_notifications(request):
         return HttpResponse(status=413)
     try:
         sns.handle(request.body)
+    except sns.Malformed as error:
+        logger.warning("SES feedback refused: %s", error)
+        return HttpResponse(status=400)
     except sns.Rejected as error:
         logger.warning("SES feedback refused: %s", error)
         return HttpResponse(status=403)

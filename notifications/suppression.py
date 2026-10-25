@@ -30,6 +30,9 @@ def add(email, reason, feedback_id="", detail=""):
     email = clean(email)
     if not email or "@" not in email:
         return False
+    if len(email) > 254:  # cannot be a real address (and would not fit the column)
+        logger.warning("Suppression skipped: address longer than 254 characters")
+        return False
     now = timezone.now()
     detail = (detail or "")[:300]
     for _attempt in range(2):  # two deliveries can race to create the row: the loser updates it
