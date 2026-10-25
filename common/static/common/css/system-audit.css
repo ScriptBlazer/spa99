@@ -8,7 +8,7 @@
 .au-export { gap: var(--sys-1); }
 .au-chain { display: inline-flex; align-items: center; gap: var(--sys-1); height: 24px; padding: 0 var(--sys-2); border-radius: var(--sys-radius); background: var(--sys-subtle); color: var(--sys-text-2); font-size: var(--sys-fs-sm); font-weight: 600; }
 .au-chain.ok { background: var(--sys-ok-bg); color: var(--sys-ok); } .au-chain.bad { background: var(--sys-danger); color: var(--sys-surface); }
-.au-banner { margin-bottom: var(--sys-3); padding: var(--sys-3) var(--sys-4); background: var(--sys-danger-bg); box-shadow: inset 3px 0 0 var(--sys-danger); color: var(--sys-text); }
+.au-banner { margin-bottom: var(--sys-3); padding: var(--sys-3) var(--sys-4); background: var(--sys-danger-bg); border-radius: var(--sys-radius); box-shadow: inset 0 0 0 1px var(--sys-danger); color: var(--sys-text); }
 
 /* sticky filter bar */
 .au-bar { position: sticky; top: var(--au-top); z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-2); padding: var(--sys-2) var(--sys-3); background: var(--sys-surface); border: 1px solid var(--sys-line); border-radius: var(--sys-radius-lg) var(--sys-radius-lg) 0 0; }
@@ -47,7 +47,7 @@ html:not(.js) .au-dates { display: flex; } html:not(.js) .au-custom-btn { displa
 
 /* group */
 .au-group { position: relative; scroll-margin-top: calc(var(--au-top) + var(--au-bar-h) + 36px); outline-offset: -2px; }
-.au-group[data-category=failure] { box-shadow: inset 2px 0 0 var(--sys-danger); }
+.au-group[data-category=failure] { background: var(--sys-danger-bg); }
 .au-group:target, .au-group[data-flash] { animation: au-flash 1.5s ease-out; }
 @keyframes au-flash { from { background: var(--sys-selected); } to { background: transparent; } }
 .au-group[data-current] { background: var(--sys-subtle); }

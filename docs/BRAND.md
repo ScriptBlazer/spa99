@@ -128,6 +128,10 @@ Smooth and restrained. Built with CSS and one small shared script (IntersectionO
 
 **Visual consistency:** forms and journey use the same type scale, colours, header and page transition as the marketing pages, so moving from a scene into the journey feels like the same building, just quieter.
 
+## Components: accents
+
+Never a one-sided accent (left/right stripe, inset side shadow, or a ::before bar). Use no border with a soft shadow, a tinted background, or a full hairline. Selected/active states use background tint, weight or an icon.
+
 ## 8. CSS tokens
 
 Kept in sync with `common/static/common/css/tokens.css`. Brand values are the four colours, the two fonts and the type/space scale. Everything commented "derived" was added by the designer (Phase 1 design brief, `docs/design/BRIEF.md` section 11, which lists every contrast ratio). Nothing in the starting set was changed or removed.

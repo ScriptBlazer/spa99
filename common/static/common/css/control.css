@@ -469,7 +469,7 @@ body.control .ctl-m-label { position: absolute; left: 0; top: 0; width: max-cont
 .ctl-zone-state { font-size: var(--ctl-fs-xs); color: var(--ctl-text-2); align-self: start; }
 @media (hover: hover) and (pointer: fine) { .ctl-zone:hover { background: var(--ctl-surface); } }
 .ctl-zone.is-selected { background: var(--ctl-selected); }
-.ctl-zone.is-selected::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--ctl-accent); }
+.ctl-zone.is-selected .ctl-zone-name { font-weight: 600; }
 .ctl-mute-all { width: 100%; }
 .ctl-pl-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--ctl-4); flex-wrap: wrap; margin-bottom: var(--ctl-5); }
 .ctl-pl-head h2 { font: 500 var(--ctl-fs-xl)/1.15 var(--ctl-display); letter-spacing: var(--tracking-display); margin-top: var(--ctl-1); }
@@ -849,7 +849,6 @@ body.has-selbar .ctl-mini { bottom: 88px; }
   .ctl-zone { grid-template-columns: 32px auto; min-height: 48px; padding: 6px 12px 6px 8px; background: var(--ctl-surface); border-radius: 999px; }
   .ctl-zone .ctl-art-sm { width: 32px; height: 32px; border-radius: 50%; }
   .ctl-zone .ctl-zone-name { font-size: var(--ctl-fs); }
-  .ctl-zone.is-selected::before { display: none; }
   .ctl-zone.is-selected { box-shadow: inset 0 0 0 1px var(--ctl-accent); }
   .ctl-zones-head { margin-bottom: var(--ctl-2); }
   .ctl-mute-all { width: auto; }

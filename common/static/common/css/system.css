@@ -57,7 +57,6 @@ body.system.live { --sys-stripe: 3px; }
 .sys-nav a, .sys-nav .sys-soon { position: relative; display: flex; align-items: center; justify-content: space-between; height: var(--sys-row); padding: 0 var(--sys-3); border-radius: var(--sys-radius); color: var(--sys-text-2); font-weight: 500; text-decoration: none; transition: background-color .1s ease-out; }
 .sys-nav a:hover { background: var(--sys-subtle); }
 .sys-nav a[aria-current] { background: var(--sys-selected); color: var(--sys-text); font-weight: 600; }
-.sys-nav a[aria-current]::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px; background: var(--sys-gold); }
 .sys-nav .sys-soon { color: var(--sys-text-3); font-weight: 400; cursor: default; }
 .sys-nav .sys-soon small { font-size: var(--sys-fs-sm); }
 .sys-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--sys-warn); }
@@ -107,7 +106,8 @@ body.system.live { --sys-stripe: 3px; }
 .sys-row input[type=number] { width: 112px; } .sys-row input[type=date] { width: 148px; }
 .sys-row input[type=text], .sys-row input[type=email], .sys-row input:not([type]) { width: 320px; }
 .sys-row[data-wide] input[type=text] { width: 480px; }
-.sys-row[data-dirty] { background: var(--sys-warn-bg); box-shadow: -16px 0 0 var(--sys-warn-bg), inset 2px 0 0 var(--sys-warn); }
+.sys-row[data-dirty] { position: relative; background: var(--sys-warn-bg); border-radius: var(--sys-radius); box-shadow: inset 0 0 0 1px var(--sys-warn); }
+.sys-row[data-dirty]::after { content: "Edited"; position: absolute; top: var(--sys-1); right: var(--sys-2); color: var(--sys-warn); font-size: var(--sys-fs-sm); font-weight: 600; }
 .sys-row .sys-unit { color: var(--sys-text-2); }
 /* the one switch: a real checkbox drawn as a 36x20 track with the knob inside; On/Off text beside it where there is room */
 .sys-toggle { display: inline-flex; align-items: center; gap: var(--sys-2); cursor: pointer; vertical-align: middle; }
