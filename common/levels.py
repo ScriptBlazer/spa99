@@ -10,8 +10,10 @@ LABELS = {NONE: "No team access", OFFICE: "Office", ADMIN: "Admin", DEVELOPER: "
 GROUP_FOR = {OFFICE: "Office", ADMIN: "Admin", DEVELOPER: "Developer"}
 LEVEL_FOR_GROUP = {name: level for level, name in GROUP_FOR.items()}
 APPROVER_GROUP = "Approver"
+FINAL_APPROVER_GROUP = "Final approver"
 LEVEL_GROUPS = tuple(GROUP_FOR.values())
-TEAM_GROUPS = LEVEL_GROUPS + (APPROVER_GROUP,)
+TEAM_GROUPS = LEVEL_GROUPS + (APPROVER_GROUP, FINAL_APPROVER_GROUP)
+APPROVER_MIN_LEVEL, FINAL_APPROVER_MIN_LEVEL = OFFICE, ADMIN  # who may hold each role (docs/features/user-rules.md U2)
 
 
 def rank(level):
@@ -31,6 +33,14 @@ def held(user):
     if user.is_superuser:
         level = SUPERUSER
     return level, APPROVER_GROUP in names
+
+
+def held_roles(user):
+    """(approver_group, final_approver_group) as stored: the extra permissions on the Team and Approval screens."""
+    if user is None or not getattr(user, "pk", None):
+        return False, False
+    names = _group_names(user)
+    return APPROVER_GROUP in names, FINAL_APPROVER_GROUP in names
 
 
 def held_level(user):
@@ -58,6 +68,25 @@ def is_approver(user):
     if level == SUPERUSER:
         return True
     return level != NONE and held(user)[1]
+
+
+def can_hold_approver(user):
+    """The one guard for the Approver role: Office level or higher (a superuser counts). Not signed-in state: what is stored."""
+    return rank(held_level(user)) >= rank(APPROVER_MIN_LEVEL)
+
+
+def can_hold_final_approver(user):
+    """The one guard for the Final approver role: Admin level or higher (Admin, Developer, Superuser); never Office."""
+    return rank(held_level(user)) >= rank(FINAL_APPROVER_MIN_LEVEL)
+
+
+def is_final_approver(user):
+    """May confirm or send back a Gold application awaiting final approval: the Final approver group on top of an Admin
+    level or higher, or a superuser (U3: a superuser may act; they only get the emails when they hold the group)."""
+    level = level_of(user)
+    if level == SUPERUSER:
+        return True
+    return rank(level) >= rank(FINAL_APPROVER_MIN_LEVEL) and held_roles(user)[1]
 
 
 def can_assign(actor, level):

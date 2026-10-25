@@ -1,0 +1,75 @@
+/* System > Approval: two compact panels (people rows, delivery choice, searchable add dropdown). docs/design/SYSTEM.md "Approval". Tokens only; no one-sided accent borders. */
+.system .sys-approval-note { margin-bottom: var(--sys-4); }
+.system .sys-approval-cc { margin-top: var(--sys-4); }
+.sys-approval > header { justify-content: flex-start; }
+.system .sys-panel.sys-approval > .sys-panel-intro { margin: 0; padding: var(--sys-3) var(--sys-4) 0; color: var(--sys-text-2); max-width: 72ch; }
+
+/* add people: label above, one line with the dropdown and the Add button */
+.sys-add-people { padding: var(--sys-3) var(--sys-4) var(--sys-4); border-bottom: 1px solid var(--sys-line); }
+.system .sys-add-label { display: block; font-weight: 500; margin-bottom: var(--sys-1); }
+.sys-add-line { display: flex; align-items: flex-start; gap: var(--sys-2); }
+.system .sys-add-line > .sys-combo-source { width: 100%; max-width: 520px; height: auto; min-height: 96px; padding: var(--sys-1); }
+.sys-add-line > .sys-btn { flex: none; }
+.system .sys-add-none { padding: var(--sys-3) var(--sys-4); border-bottom: 1px solid var(--sys-line); }
+.system .sys-combo-source[hidden] { display: none; }
+
+/* the combobox */
+.sys-combo { position: relative; flex: 1 1 auto; max-width: 520px; min-width: 0; }
+.system .sys-combo-box { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-1); min-height: var(--sys-ctl); padding: 2px var(--sys-2) 2px 3px; border: 1px solid var(--sys-control); border-radius: var(--sys-radius); background: var(--sys-surface); cursor: text; transition: border-color .1s ease-out; }
+.sys-combo-box:focus-within { outline: 2px solid var(--sys-accent); outline-offset: 2px; }
+.sys-combo-box[data-invalid] { border-color: var(--sys-danger); }
+.sys-chips { display: contents; }
+.sys-chip { display: inline-flex; align-items: center; gap: 2px; height: 22px; padding: 0 2px 0 var(--sys-2); border-radius: var(--sys-radius); background: var(--sys-selected); color: var(--sys-text); font-size: var(--sys-fs-sm); font-weight: 500; max-width: 100%; }
+.sys-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.system .sys-chip button { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: var(--sys-radius); background: none; color: var(--sys-text-2); cursor: pointer; }
+.system .sys-chip button:hover { background: var(--sys-control); color: var(--sys-surface); }
+.system .sys-chip button:focus-visible { outline: 2px solid var(--sys-accent); outline-offset: 0; }
+.system .sys-combo-box input[role=combobox] { flex: 1 1 140px; min-width: 120px; height: 22px; padding: 0 0 0 var(--sys-1); border: 0; border-radius: 0; background: none; outline: none; }
+.sys-combo-list { position: absolute; z-index: 25; inset: calc(100% + 4px) 0 auto 0; max-height: 252px; overflow-y: auto; overscroll-behavior: contain; padding: var(--sys-1); background: var(--sys-surface); border-radius: var(--sys-radius-lg); box-shadow: var(--sys-shadow-pop); }
+.system .sys-combo-list[hidden] { display: none; }
+.sys-combo-opt { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--sys-3); min-height: 36px; padding: 3px var(--sys-2); border-radius: var(--sys-radius); cursor: pointer; }
+.sys-combo-opt > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sys-combo-opt .mono { color: var(--sys-text-3); }
+.sys-combo-opt .sys-badge { grid-row: 1 / span 2; grid-column: 2; }
+.sys-combo-opt[data-active], .sys-combo-opt:hover { background: var(--sys-subtle); }
+.sys-combo-opt[data-active] { box-shadow: inset 0 0 0 1px var(--sys-control); }
+.sys-combo-none { padding: var(--sys-2); color: var(--sys-text-2); }
+.sys-combo mark { background: none; color: inherit; font-weight: 700; }
+
+/* people rows */
+.sys-people { margin: 0; }
+.sys-person { display: grid; grid-template-columns: 260px 84px minmax(0, 1fr) 84px; align-items: center; column-gap: var(--sys-4); min-height: 44px; padding: var(--sys-2) var(--sys-4); border-bottom: 1px solid var(--sys-line); }
+.sys-person:last-child { border-bottom: 0; }
+.sys-person:hover { background: var(--sys-subtle); }
+.sys-person-id { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sys-person-name { font-weight: 600; }
+.sys-person-email { color: var(--sys-text-3); margin-left: var(--sys-1); }
+.sys-level { justify-self: start; }
+.sys-person-act { justify-self: end; } .sys-person-act form { margin: 0; }
+.sys-person-mail { min-width: 0; }
+.sys-deliver { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-2); margin: 0; }
+.system .sys-deliver input[type=email] { width: 260px; }
+.js .sys-deliver[data-account] input[type=email] { display: none; }
+.js .sys-deliver:not([data-dirty]) [data-delivery-save] { display: none; }
+.sys-people-empty { list-style: none; padding: var(--sys-5) var(--sys-4); text-align: center; color: var(--sys-text-2); }
+
+@media (max-width: 64em) { .sys-person { grid-template-columns: 200px 84px minmax(0, 1fr) 84px; column-gap: var(--sys-3); } }
+@media (max-width: 48em) {
+  .system .sys-panel.sys-approval > .sys-panel-intro { padding-inline: var(--sys-3); }
+  .sys-add-people { padding-inline: var(--sys-3); }
+  .system .sys-combo-box input[role=combobox] { font-size: 1rem; height: 28px; }
+  .sys-chip { height: 28px; font-size: var(--sys-fs); }
+  .system .sys-chip button { width: 28px; height: 28px; }
+  .sys-combo-opt { min-height: 44px; }
+  .sys-person { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "id level act" "mail mail mail"; row-gap: var(--sys-2); padding: var(--sys-3); }
+  .sys-person-id { grid-area: id; } .sys-level { grid-area: level; justify-self: end; } .sys-person-act { grid-area: act; } .sys-person-mail { grid-area: mail; }
+  .system .sys-deliver input[type=email] { width: 100%; }
+  .sys-person-id .sys-person-email { display: block; margin-left: 0; }
+}
+
+/* Emails: the pointer under the fields. Team and merge: the add form on one line */
+.system .sys-emails-pointer { margin-top: var(--sys-2); }
+.sys-team-add { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sys-2) var(--sys-3); padding: var(--sys-3) var(--sys-4); }
+.sys-team-add > label { display: grid; gap: var(--sys-1); font-weight: 500; }
+.system .sys-team-add > p { flex-basis: 100%; }
+@media (max-width: 48em) { .sys-team-add { padding: var(--sys-3); } .sys-team-add > label { flex: 1 1 100%; } .system .sys-team-add input:not([type=checkbox]) { width: 100%; } }

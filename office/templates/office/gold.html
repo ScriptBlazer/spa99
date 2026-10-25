@@ -3,6 +3,7 @@
 {% block title %}Gold | Spa 99 Office{% endblock %}
 {% block main %}
 <h1 class="sr-only">Gold</h1>
+{% if final_approver_missing and office_can.can_act %}<p class="o-callout o-callout--calm" role="status" data-final-approver-missing><strong>No final approver is set.</strong> Low-potential approvals go straight through.</p>{% endif %}
 <form class="o-filters" method="get" action="{% url 'office_gold' %}" data-filter-form data-list="gold" role="search" aria-label="Find applications">
   <div class="o-filters-bar">
     <div class="o-search">
@@ -34,6 +35,7 @@
   </div>
   <p class="o-totalline"><span data-total data-region="total">{{ total_applications|num }} application{{ total_applications|pluralize }}, {{ waiting|num }} waiting</span>
     <a class="o-quiet" href="{% url 'office_gold' %}" data-clear{% if not filters.q and not filters.potential and filters.status == "waiting" %} hidden{% endif %}>Clear</a>
+    {% if awaiting_final_count or filters.status == "awaiting_final" %}<label class="o-chip" data-awaiting-final-filter><input type="radio" name="status" value="awaiting_final"{% if filters.status == "awaiting_final" %} checked{% endif %}><span>Awaiting final ({{ awaiting_final_count|num }})</span></label>{% endif %}
     <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button></p>
   <dialog class="o-sheet" data-filter-sheet aria-labelledby="sheet-h">
     <div class="o-sheet-head"><h2 id="sheet-h">Filters</h2></div>

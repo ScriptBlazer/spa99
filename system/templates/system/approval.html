@@ -1,0 +1,11 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Approval" description="Who approves Gold applications, and who gives the final approval to Low-potential ones. Team only shows these roles; they are set here." %}
+{% if final_approver_missing %}<p class="sys-note warn sys-approval-note" role="status" data-final-approver-missing><strong>No final approver:</strong> Low-potential approvals go straight through.</p>{% endif %}
+
+{% url 'system_approval_approvers_add' as approvers_add %}{% url 'system_approval_final_add' as final_add %}
+{% include "system/_approval_panel.html" with role="approver" title="Approvers" intro="Office level and above. They approve, decline and resend Gold applications, and get an email for each one." people=approvers candidates=approver_candidates add_url=approvers_add add_label="Add approvers" field_label="Team members to add as approvers" %}
+{% include "system/_approval_panel.html" with role="final" title="Final approvers" intro="Admin level and above. Low-potential approvals wait for a final approver before the applicant hears anything." people=final_approvers candidates=final_candidates add_url=final_add add_label="Add final approvers" field_label="Team members to add as final approvers" %}
+
+<p class="sys-muted sys-approval-cc" data-system-approval-cc>Copied on each Gold application email: {% if cc %}<span class="mono">{{ cc|join:", " }}</span>{% else %}nobody{% endif %}. Change it in <a href="{% url 'system_emails' %}">Emails</a>.</p>
+{% endblock %}

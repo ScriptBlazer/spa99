@@ -127,7 +127,11 @@ class GoldApplication(BaseModel):
     CONTACTED = "contacted"
     APPROVED = "approved"
     DECLINED = "declined"
-    STATUS_CHOICES = [(NEW, "New"), (CONTACTED, "Contacted"), (APPROVED, "Approved"), (DECLINED, "Declined")]
+    AWAITING_FINAL = "awaiting_final"  # a Low potential approval waiting for a final approver (docs/features/gold-final-approval.md)
+    STATUS_CHOICES = [(NEW, "New"), (CONTACTED, "Contacted"), (APPROVED, "Approved"), (DECLINED, "Declined"),
+                      (AWAITING_FINAL, "Awaiting final approval")]
+    WAITING = (NEW, CONTACTED)  # in the approvers' queue
+    NOTE_MAX = 1000
 
     reference = models.CharField(max_length=12, unique=True, default=new_reference, editable=False)
 
@@ -160,7 +164,7 @@ class GoldApplication(BaseModel):
     potential_score = models.SmallIntegerField(null=True, blank=True)
     potential_reasons = models.JSONField(default=list, blank=True)
 
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=NEW, db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=NEW, db_index=True)
     internal_notes = models.TextField(blank=True)
     repeat_of = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="repeats")
 
@@ -176,6 +180,17 @@ class GoldApplication(BaseModel):
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", editable=False)
 
+    # Final approval (Low potential only). Every step is also a history row (who, when, the note).
+    final_requested_at = models.DateTimeField(null=True, blank=True, help_text="When an approver sent it for final approval.")
+    final_requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", editable=False)
+    final_previous_status = models.CharField(max_length=20, blank=True, editable=False, help_text="The status before it went to final approval; a send-back restores it.")
+    sent_back_at = models.DateTimeField(
+        null=True, blank=True, help_text="When a final approver sent it back. Once set, the next approval goes through at once.")
+    sent_back_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", editable=False)
+    sent_back_note = models.CharField(max_length=NOTE_MAX, blank=True, help_text="The final approver's optional note.")
+
     history = HistoricalRecords()
 
     class Meta:
@@ -183,6 +198,11 @@ class GoldApplication(BaseModel):
 
     def __str__(self):
         return f"{self.reference} {self.first_name} {self.last_name}"
+
+    @property
+    def final_review_done(self):
+        """True once a final approver has looked at it and sent it back: the next approval is not reviewed again."""
+        return self.sent_back_at is not None
 
     @property
     def full_name(self):
@@ -215,3 +235,26 @@ class GoldInvite(BaseModel):
         from django.utils import timezone
 
         return self.used_at is None and self.revoked_at is None and self.expires_at > timezone.now()
+
+
+class ApproverDelivery(BaseModel):
+    """Where one person's approval emails go (System > Approval). They apply to both roles a person holds (Approver and
+    Final approver). No row = their account email. Lives in `gold` because the Gold emails read it; the roles themselves
+    are the Approver and Final approver groups (common.levels). Erased with the account."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="approver_delivery")
+    use_account_email = models.BooleanField(default=True, help_text="Send to the account email. Untick to use the other address.")
+    other_email = models.EmailField(blank=True, help_text="Used only when the account email box is unticked.")
+
+    # No history table: the address is personal data and the change is already in the System audit log.
+
+    def __str__(self):
+        return f"approval emails for {self.user_id}"
+
+    def clean(self):
+        if not self.use_account_email and not self.other_email:
+            raise ValidationError({"other_email": "Enter the other address, or send to the account email."})
+
+    @property
+    def address(self):
+        return self.user.email if self.use_account_email or not self.other_email else self.other_email

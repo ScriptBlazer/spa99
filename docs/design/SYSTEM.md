@@ -358,3 +358,13 @@ Plain, short, exact. Sentence case. Name the thing and the value: "Save", "Disca
 14. Reduced motion removes all transforms; nothing animates on load.
 15. Phone at 375px: menu sheet, stacked field rows, sideways-scrolling tables with sticky first column, save bar and dialogs usable; no page-level horizontal scroll.
 16. Screenshots at 375 and 1440 of Dashboard, Plans and pricing (with drafts and the confirm open), Audit log (with a collapsed group, an open drawer, and the broken-chain banner forced on DEV), Unlock, and the 404 sent for design review.
+
+---
+
+## Approval page (2026-10-25)
+
+Two panels, "Approvers" and "Final approvers" (header: title and a count badge; one intro line; the add row; the people list). Same hairlines, 4-6px corners and 13px type as the rest of System; no new colours.
+- **People rows** (`system-approval.css`): name (bold) and mono email, level chip, "Send to their account email" switch (a real checkbox), Remove. Untick the switch and an address box appears with Save (Save shows only while the choice differs from what is saved). Your own row and anyone you may not change are read-only ("Emails go to ..."). Remove asks in the shared modal: "Remove {name} as approver?" with one consequence line. Phone: name, level and Remove on one line, the email choice under it.
+- **Add people** is a searchable multi-select (`system-combobox.js`, ARIA combobox + listbox): chosen people are chips in the box, the list only opens while you type or press Down, filtered by name, email or level, chosen people leave the list. Keys: arrows, Home/End, Enter chooses, Esc closes, Backspace in an empty box removes the last chip, Enter never submits (the Add button does; disabled until someone is chosen). Without JS it is a plain multiple `<select>` and a submit. Everyone already chosen: "Everyone who can hold this role is already here."
+- **No final approver**: a warn-tinted note at the top ("No final approver: Low-potential approvals go straight through."), no stripe.
+- Below the panels: the CC note linking to Emails. Emails keeps CC and contact and ends with "Approvers are set in Approval." Team shows "Approver" / "Final approver" as read-only info chips beside the level.

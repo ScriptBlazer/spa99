@@ -1,6 +1,9 @@
 /* Small shell behaviours: header shadow once scrolled, the person menu, segmented thumbs, and the phone's filter sheet. */
 
+import { noteModal } from './feedback.js';
+
 export function initOfficeUi() {
+  sendBack();
   header();
   personMenu();
   segmented();
@@ -79,5 +82,26 @@ function wants() {
     const done = () => { stage.style.overflow = ''; running = null; };
     running.onfinish = done;
     running.oncancel = done;
+  });
+}
+
+/** "Send back for review": the optional note is asked for in the shared dialog, then the form posts as it always did
+ *  (the plain textarea in the rail is what a page without JS uses; with JS it is hidden and this writes into it). */
+function sendBack() {
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest?.('[data-send-back]');
+    if (!button?.form) return;
+    event.preventDefault();
+    const d = button.dataset;
+    const form = button.form;
+    const text = await noteModal({
+      title: d.noteTitle, body: d.noteBody, label: d.noteLabel, max: Number(d.noteMax) || 1000,
+      confirmLabel: d.noteConfirm || 'Send back', cancelLabel: d.noteCancel || 'Cancel', opener: button,
+    });
+    if (text === null) return;
+    let field = form.elements.note;
+    if (!field) { field = document.createElement('input'); field.type = 'hidden'; field.name = 'note'; form.append(field); }
+    field.value = text;
+    form.requestSubmit(button);
   });
 }

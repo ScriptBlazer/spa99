@@ -22,7 +22,12 @@ One login per person (the email address). The same login can be a team member an
 | **Developer** | View and act | ✓ | ✓ (password + code) | ✗ | only with a membership |
 | **Superuser** | Everything | ✓ | ✓ (password + code) | ✓ | ✓ always (an empty membership if none) |
 
-**Approver** is an extra permission, not a level: may approve, decline and resend Gold applications. It can only be given to someone at Office level or higher (e.g. Barry = Office + Approver).
+Two extra permissions sit on top of a level (set in **System > Approval**, shown read only on Team; 2026-10-25):
+
+- **Approver**: may approve, decline and resend Gold applications, and gets the email for each one. Office level or higher (e.g. Barry = Office + Approver).
+- **Final approver**: may confirm or send back a Gold application that an approver approved with Low potential (it cannot decline). **Admin level or higher only** (Admin, Developer, Superuser), never Office. Guard: `common.levels.can_hold_final_approver`.
+
+Each person's approval emails go to their account email, or to another address chosen in System > Approval.
 
 ## U3. What "act" means in the Office
 
@@ -30,13 +35,15 @@ One login per person (the email address). The same login can be a team member an
 |---|---|---|---|---|
 | See dashboard, analytics, people, Gold | ✓ | ✓ | ✓ | ✓ |
 | Approve / decline / resend Gold | only with Approver | only with Approver | only with Approver | ✓ |
+| Confirm / send back a Low potential approval (final approval; cannot decline) | ✗ (never) | only with Final approver | only with Final approver | ✓ (emailed only if they hold the role) |
 | Export members (CSV, a person's data) | ✗ | ✓ | ✓ | ✓ |
 | Delete a member | ✗ | ✓ | ✓ | ✓ |
 
 ## U4. Managing the team
 
 - Only **Developers and the superuser** add team members and set levels, in **System > Team** (behind the System unlock, every change in the audit log).
-- Adding someone: email, level, Approver yes/no. They get an email to set their own password; nobody types a password for someone else.
+- Adding someone: email and level (Approver and Final approver are not asked here; they are set in **System > Approval**, and Team shows them as read-only labels). They get an email to set their own password; nobody types a password for someone else.
+- **System > Approval** (Developer level, behind the unlock) adds and removes Approvers and Final approvers and sets where their emails go. It follows the same `can_manage` guard as Team (never yourself, strictly below you, a superuser may change another superuser), with one addition: a superuser may set their own approval roles (it adds no power; it only decides who is emailed). Changing a level in Team keeps these roles, except that a level below Admin drops Final approver and removing someone from the team drops both. Every change is in the audit log (`role_changed`).
 - **Nobody can delete or edit someone higher than them**, and below superuser nobody can delete or edit someone at their own level either. A Developer can change Office and Admin people; only a superuser can change a Developer. **Superusers are the exception: a superuser can delete or edit another superuser** (so a lost or departed superuser can always be removed).
 - Nobody can remove their own access or deactivate themselves.
 

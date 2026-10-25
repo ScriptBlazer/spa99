@@ -22,6 +22,7 @@ Source: `Spa 99 - Rules and System Spec.pdf` v1.0, 16 Oct 2026 (255 rules, 53 sc
 |---|---|---|
 | LC-26 | Phase 1: Gold application needs no account and has no approval flow on the site. Barry is emailed. Approval route decided 2026-10-23: Barry approves in the admin, the applicant gets an invite link to set up an account (see docs/PROJECT.md and docs/features/gold-application.md, "Approval and invite"). | 2026-10-22 |
 | ACC-07 | Phase 1: mobile collected but not SMS-verified. Email verification only. | 2026-10-22 |
+| LC-28 | Approvers are the team members picked in System > Approval (not typed addresses); Low potential approvals need a final approver first (see LC-28a below). | 2026-10-25 |
 | MEM-02 | Gold targets property people. Everyone can apply; property people are nudged. | 2026-10-22 |
 
 ## Glossary
@@ -259,6 +260,7 @@ Freed places come only from cancellations before the deadline, expired invites, 
 | LC-26 | Gold needs Barry's approval. Applicants must already have an account. **Overridden for Phase 1: no account needed.** | CONFIRMED | 1 |
 | LC-27 | Gold's month starts on the approval date. Guest visits and penalties reset on that anniversary. | CONFIRMED | 2 |
 | LC-28 | Barry (and one named deputy) approve or decline in admin. Applicant emailed either way. | PROPOSED | 2 |
+| LC-28a | Gold approvers are team members with the Approver permission (Office level or higher), set in System > Approval, each emailed at their account email or another address. An approval of a Low potential application waits for a final approver (Admin level or higher), who confirms or sends it back; after a send-back the next approval goes through at once. Without a final approver, Low is approved as normal. Added 2026-10-25 (docs/features/gold-final-approval.md). | CONFIRMED | 1 |
 | LC-29 | Gold can be revoked any time. Future bookings and guests cancelled; a visit in progress is not interrupted. | PROPOSED | 3 |
 
 ## 09 Single visits and credits

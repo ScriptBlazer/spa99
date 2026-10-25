@@ -72,7 +72,7 @@ class VersionedForm(forms.ModelForm):
 class EmailsForm(VersionedForm):
     class Meta:
         model = SiteSettings
-        fields = ["gold_approver_emails", "gold_approver_cc", "contact_email"]
+        fields = ["gold_approver_cc", "contact_email"]
 
     def clean(self):
         data = super().clean()

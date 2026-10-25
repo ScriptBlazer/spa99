@@ -27,6 +27,7 @@ class Command(BaseCommand):
         parser.add_argument("--email", required=True)
         parser.add_argument("--level", required=True, choices=sorted(levels.GROUP_FOR))
         parser.add_argument("--approver", action="store_true", help="May also approve, decline and resend Gold applications.")
+        parser.add_argument("--final-approver", action="store_true", help="Also gives the final approval to Low potential Gold applications (Admin level or higher; otherwise ignored).")
         parser.add_argument("--invite", action="store_true", help="New account: no password; email a link to choose one.")
         parser.add_argument("--first-name", default="")
         parser.add_argument("--last-name", default="")
@@ -50,7 +51,8 @@ class Command(BaseCommand):
                 password = None if options["invite"] else self._ask_password(email)
                 user = User.objects.create_user(email, password, first_name=options["first_name"], last_name=options["last_name"])
             try:
-                apply_level(user, options["level"], options["approver"], actor=None)
+                final = options["final_approver"] or levels.held_roles(user)[1]  # an existing Final approver keeps it
+                apply_level(user, options["level"], options["approver"], actor=None, final=final)
             except ChangeRefused as error:
                 raise CommandError(str(error)) from error
             label = levels.LABELS[options["level"]] + (" and Approver" if options["approver"] else "")

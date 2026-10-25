@@ -12,6 +12,7 @@ from django.db.models import Q
 from common import levels
 from common.tasks import enqueue
 from common.validators import normalise_email
+from gold.models import ApproverDelivery
 from users import merge as user_merge
 
 from . import audit
@@ -23,8 +24,9 @@ User = get_user_model()
 ASSIGNABLE = (levels.OFFICE, levels.ADMIN, levels.DEVELOPER, levels.SUPERUSER)
 
 
-def describe(level, approver):
-    return levels.LABELS[level] + (" and Approver" if approver and level != levels.NONE else "")
+def describe(level, approver, final=False):
+    roles = [name for name, held in ((levels.APPROVER_GROUP, approver), (levels.FINAL_APPROVER_GROUP, final)) if held and level != levels.NONE]
+    return levels.LABELS[level] + (" and " + " and ".join(roles) if roles else "")
 
 
 def team_queryset():
@@ -37,11 +39,15 @@ def members():
 
 
 def rows(actor):
-    """The Team table: each person with their level, Approver flag and whether `actor` may change them."""
+    """The Team table: each person with their level, their approval roles (read only labels: they are set in System >
+    Approval) and whether `actor` may change them."""
     result = []
     for user in members():
         level, approver = levels.held(user)
-        result.append({"user": user, "level": level, "level_label": levels.LABELS[level], "approver": approver,
+        final = levels.held_roles(user)[1] and levels.can_hold_final_approver(user)
+        approver = approver and levels.can_hold_approver(user)
+        result.append({"user": user, "level": level, "level_label": levels.LABELS[level], "approver": approver, "final_approver": final,
+                       "role_labels": [name for name, held in ((levels.APPROVER_GROUP, approver), (levels.FINAL_APPROVER_GROUP, final)) if held],
                        "can_manage": levels.can_manage(actor, user), "invite_pending": not user.has_usable_password()})
     return result
 
@@ -84,9 +90,12 @@ def _log(actor, target, field, old, new, sentence, kind=SystemEvent.ROLE_CHANGED
     audit.log_event(kind, user=actor, detail={"person": target.email, "old": old, "new": new, **(detail or {})}, sentence=sentence)
 
 
-def apply_level(target, level, approver, actor=None):
-    """Make the groups and flags say `level` (+ Approver, only valid on a level). Never touches membership or password."""
-    names = ([levels.GROUP_FOR[level]] if level in levels.GROUP_FOR else []) + ([levels.APPROVER_GROUP] if approver and level != levels.NONE else [])
+def apply_level(target, level, approver, actor=None, final=False):
+    """Make the groups and flags say `level` (+ Approver on any level, Final approver on Admin and above; both are
+    dropped when the level does not allow them). Never touches membership or password."""
+    approver = bool(approver) and level != levels.NONE
+    final = bool(final) and levels.rank(level) >= levels.rank(levels.FINAL_APPROVER_MIN_LEVEL)
+    names = ([levels.GROUP_FOR[level]] if level in levels.GROUP_FOR else []) + ([levels.APPROVER_GROUP] if approver else []) + ([levels.FINAL_APPROVER_GROUP] if final else [])
     groups = {g.name: g for g in Group.objects.filter(name__in=levels.TEAM_GROUPS)}
     if any(name not in groups for name in names):
         raise ChangeRefused("The levels do not exist yet. Run: manage.py setup_roles")
@@ -96,21 +105,31 @@ def apply_level(target, level, approver, actor=None):
     target.save(update_fields=["is_staff", "is_superuser", "updated_at"])
 
 
+def _drop_delivery_if_unused(target):
+    """No approval role left: the other-address setting goes too (personal data with no use)."""
+    if not any(levels.held_roles(target)):
+        ApproverDelivery.objects.filter(user=target).delete()
+
+
 @transaction.atomic
-def set_access(actor, target, level, approver=False, added=False):
-    """Change someone's level and Approver permission. Approver needs a level. `added`: worded as joining the team."""
+def set_access(actor, target, level, added=False):
+    """Change someone's level. Their approval roles (set in System > Approval) stay, unless the new level cannot hold them
+    (no level: neither; below Admin: not Final approver). `added`: worded as joining the team."""
     superusers = _lock_superusers(actor, target)
     _guard(actor, target)
     if level not in ASSIGNABLE or not levels.can_assign(actor, level):
         raise ChangeRefused("You can only give a level below your own.")
     old_level, old_approver = levels.held(target)
-    approver = bool(approver)
-    if (old_level, old_approver) == (level, approver):
+    old_final = levels.held_roles(target)[1]
+    approver = old_approver and level != levels.NONE
+    final = old_final and levels.rank(level) >= levels.rank(levels.FINAL_APPROVER_MIN_LEVEL)
+    if (old_level, old_approver, old_final) == (level, approver, final):
         return False
     if target.is_superuser and level != levels.SUPERUSER:
         _keep_a_superuser(superusers, target)
-    apply_level(target, level, approver, actor)
-    old, new = describe(old_level, old_approver), describe(level, approver)
+    apply_level(target, level, approver, actor, final=final)
+    _drop_delivery_if_unused(target)
+    old, new = describe(old_level, old_approver, old_final), describe(level, approver, final)
     _log(actor, target, "level", old, new, f"Added {target.email} to the team as {new}" if added else f"Changed access for {target.email} from {old} to {new}")
     return True
 
@@ -121,12 +140,14 @@ def remove_from_team(actor, target):
     superusers = _lock_superusers(actor, target)
     _guard(actor, target, team_only=True)
     old_level, old_approver = levels.held(target)
-    if old_level == levels.NONE and not old_approver and not target.is_staff:
+    old_final = levels.held_roles(target)[1]
+    if old_level == levels.NONE and not old_approver and not old_final and not target.is_staff:
         return False
     if target.is_superuser:
         _keep_a_superuser(superusers, target)
     apply_level(target, levels.NONE, False, actor)
-    old = describe(old_level, old_approver)
+    ApproverDelivery.objects.filter(user=target).delete()  # nothing to deliver any more
+    old = describe(old_level, old_approver, old_final)
     _log(actor, target, "level", old, "No team access", f"Removed {target.email} from the team (was {old})")
     return True
 
@@ -154,7 +175,7 @@ def _send_invite(user):
         logger.exception("Could not queue the team invite for %s", user.pk)
 
 
-def add_member(actor, email, level, approver=False):
+def add_member(actor, email, level):
     """Give someone a team level. No account yet: one is made with no password and they are emailed a link to choose their own.
     An existing account just gains the level and keeps its password. Returns (user, created)."""
     try:
@@ -170,7 +191,7 @@ def add_member(actor, email, level, approver=False):
             user = User.objects.create_user(email, None)  # no password: they choose it from the email
         elif not user.is_active:
             raise ChangeRefused("That account is deactivated. Reactivate it first.")
-        set_access(actor, user, level, approver, added=not user.is_staff)
+        set_access(actor, user, level, added=not user.is_staff)
     if created:
         _send_invite(user)
     return user, created

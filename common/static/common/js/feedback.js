@@ -421,6 +421,51 @@ export function formModal(build, options = {}) {
   }, null, opener), null);
 }
 
+/** A note box in the same dialog (Office "Send back for review"). Resolves with the text (may be '') when confirmed, or null when
+ *  it is cancelled, closed with Esc or the backdrop. The text is cut to `max` by the box itself. */
+export function noteModal(options = {}) {
+  const { title, body, label = 'Note', max = 1000, confirmLabel = 'Send', cancelLabel = 'Cancel' } = options;
+  const opener = options.opener || document.activeElement;
+  return formModal((form, close) => {
+    const heading = document.createElement('h2');
+    heading.className = 'fb-modal-title';
+    heading.id = 'fb-note-title';
+    heading.textContent = title || '';
+    form.append(heading);
+    if (body) { const text = document.createElement('p'); text.className = 'fb-modal-body'; text.textContent = body; form.append(text); }
+    const field = document.createElement('label');
+    field.className = 'fb-modal-field';
+    const name = document.createElement('span');
+    name.textContent = label;
+    const box = document.createElement('textarea');
+    box.className = 'fb-modal-textarea';
+    box.rows = 4;
+    box.maxLength = max;
+    box.setAttribute('autofocus', '');
+    const count = document.createElement('span');
+    count.className = 'fb-modal-count';
+    count.setAttribute('aria-hidden', 'true');
+    const paint = () => { count.textContent = `${box.value.length} / ${max}`; };
+    box.addEventListener('input', paint);
+    paint();
+    field.append(name, box, count);
+    const actions = document.createElement('div');
+    actions.className = 'fb-modal-actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'fb-btn fb-btn--secondary';
+    cancel.textContent = cancelLabel;
+    cancel.addEventListener('click', () => close(null));
+    const ok = document.createElement('button');
+    ok.type = 'submit';
+    ok.className = 'fb-btn fb-btn--primary';
+    ok.textContent = confirmLabel;
+    actions.append(cancel, ok);
+    form.append(field, actions);
+    form.addEventListener('submit', (event) => { event.preventDefault(); close(box.value.trim()); });
+  }, { opener });
+}
+
 /** [data-confirm] on a button or link: ask first, then do what it would have done. */
 export function initConfirm(root = document) {
   root.addEventListener('click', async (event) => {
@@ -464,4 +509,4 @@ export function initFeedback() {
   initConfirm();
 }
 
-window.spa99Feedback = { toast, dismiss, confirmModal, alertModal, formModal };
+window.spa99Feedback = { toast, dismiss, confirmModal, alertModal, formModal, noteModal };

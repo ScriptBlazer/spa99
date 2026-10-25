@@ -75,7 +75,7 @@ class StalePageTests(RulesTestCase):
         self.assertEqual(SiteSettings.load().opening_text, "January 2027")
         base = form_data(capacity_form, "capacity", capacity="30")  # made before the settings save: still current
         self.assertEqual(self.client.post("/hours/capacity/", base).status_code, 302)
-        emails = {"gold_approver_emails": "a@example.test", "gold_approver_cc": "", "contact_email": "", "row_token": "not-the-current-one"}
+        emails = {"gold_approver_cc": "", "contact_email": "", "row_token": "not-the-current-one"}
         self.assertEqual(self.client.post("/emails/", emails).status_code, 409)
 
 

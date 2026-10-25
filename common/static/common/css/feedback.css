@@ -272,6 +272,13 @@ dialog.fb-modal:not([open]) { display: none; }
 .fb-problems { display: grid; gap: var(--space-2); margin: var(--space-3) 0 0; padding: 0; list-style: none; font-size: var(--text-base); line-height: var(--leading-snug); color: var(--fb-muted); }
 .fb-problems strong { color: var(--fb-text); font-weight: 600; }
 .system .fb-problems { font-size: var(--sys-fs-md); }
+.fb-modal-field { display: grid; gap: var(--space-1); margin-top: var(--space-3); font-size: var(--text-sm); color: var(--fb-muted); }
+.fb-modal-textarea {
+  box-sizing: border-box; width: 100%; min-height: 6.5rem; padding: var(--space-2); border: 1px solid var(--fb-line); border-radius: var(--fb-btn-radius);
+  background: transparent; color: var(--fb-text); font: inherit; font-size: var(--text-base); line-height: var(--leading-snug); resize: vertical; border-radius: 0.75rem;
+}
+.fb-modal-textarea:focus-visible { outline: 2px solid var(--fb-focus); outline-offset: 2px; box-shadow: none; }
+.fb-modal-count { justify-self: end; font-variant-numeric: tabular-nums; }
 .fb-modal-custom { margin: 0; }
 .fb-modal-custom h2 { margin: 0 0 var(--space-2); font-family: var(--fb-title-font); font-size: var(--text-lg); font-weight: 500; line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
 .fb-modal-custom h3 { margin: var(--space-3) 0 var(--space-2); font-size: var(--text-sm); }

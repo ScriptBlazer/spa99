@@ -1,6 +1,7 @@
 """Office access by team level (common.levels, docs/features/user-rules.md U2/U3). Superusers pass everything.
   reader    any team level (Office and up): sees everything, view only
   approver  approve, decline, resend Gold: the Approver permission on top of a level (superusers always)
+  final     confirm or send back a Low potential Gold approval: the Final approver permission on top of Admin level or higher
   admin     Admin and up: export members, delete a member
 Login is enforced first by LoginRequiredMiddleware. Someone with no team level at all gets a plain 404 (U5: the staff
 address never admits what is there). A team member who lacks the permission for an action gets a 403, and the
@@ -31,10 +32,11 @@ def _guard(allowed):
 reader = _guard(lambda user: True)
 admin = _guard(lambda user: levels.at_least(user, levels.ADMIN))
 approver = _guard(levels.is_approver)
+final_approver = _guard(levels.is_final_approver)
 
 
 def abilities(user):
     """What the signed-in person may do, for the templates (buttons they cannot use are not rendered)."""
     level = levels.level_of(user)
     admin_up = levels.rank(level) >= levels.rank(levels.ADMIN)
-    return {"can_act": levels.is_approver(user), "can_see_all": level != levels.NONE, "can_export": admin_up, "can_delete": admin_up}
+    return {"can_act": levels.is_approver(user), "can_final": levels.is_final_approver(user), "can_see_all": level != levels.NONE, "can_export": admin_up, "can_delete": admin_up}

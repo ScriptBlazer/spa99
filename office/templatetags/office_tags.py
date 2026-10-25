@@ -169,7 +169,7 @@ def first_word(value):
 
 @register.filter
 def status_label(value):
-    return {"new": "Waiting", "contacted": "Waiting", "approved": "Approved", "declined": "Declined"}.get(value, str(value).title())
+    return {"new": "Waiting", "contacted": "Waiting", "approved": "Approved", "declined": "Declined", "awaiting_final": "Awaiting final approval"}.get(value, str(value).title())
 
 
 @register.filter

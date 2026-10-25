@@ -123,19 +123,20 @@ def person_detail(user):
 
 # ---------- gold ----------
 
-WAITING = [GoldApplication.NEW, GoldApplication.CONTACTED]
+WAITING = list(GoldApplication.WAITING)  # the approvers' queue
+UNDECIDED = [*WAITING, GoldApplication.AWAITING_FINAL]  # the "waiting" list also shows what is waiting for a final approver
 
 
 def gold_filters(request):
     status = request.GET.get("status", "waiting")
-    return {"q": request.GET.get("q", "").strip(), "status": status if status in ("waiting", "approved", "declined", "all") else "waiting",
+    return {"q": request.GET.get("q", "").strip(), "status": status if status in ("waiting", "awaiting_final", "approved", "declined", "all") else "waiting",
             "potential": request.GET.get("potential", "")}
 
 
 def gold_queryset(filters):
     applications = GoldApplication.objects.prefetch_related("invites").order_by("-created_at")
     if filters["status"] == "waiting":
-        applications = applications.filter(status__in=WAITING)
+        applications = applications.filter(status__in=UNDECIDED)
     elif filters["status"] != "all":
         applications = applications.filter(status=filters["status"])
     if filters["potential"] in ("high", "medium", "low"):
@@ -163,7 +164,8 @@ def invite_state(application):
 def gold_row(application):
     return {"id": str(application.pk), "reference": application.reference, "name": application.full_name, "email": application.email,
             "potential": application.potential_level, "score": application.potential_score, "status": application.status,
-            "can_approve": application.status in WAITING, "invite": invite_state(application), "applied": application.created_at.isoformat()}
+            "can_approve": application.status in WAITING, "awaiting_final": application.status == GoldApplication.AWAITING_FINAL,
+            "sent_back": application.sent_back_at is not None, "invite": invite_state(application), "applied": application.created_at.isoformat()}
 
 
 def gold_page(filters, page):
@@ -179,16 +181,26 @@ def gold_history(application):
         if previous is None:
             entries.append({"at": record.history_date.isoformat(), "text": "Applied", "status": record.status, "who": ""})
         elif record.status != previous:
-            entries.append({"at": record.history_date.isoformat(), "text": f"{record.get_status_display()}" + (f" by {who}" if who else ""),
+            if record.status == GoldApplication.AWAITING_FINAL:
+                text = "Sent for final approval"
+            elif previous == GoldApplication.AWAITING_FINAL and record.status in WAITING:
+                text = "Sent back"
+            else:
+                text = record.get_status_display()
+            entries.append({"at": record.history_date.isoformat(), "text": text + (f" by {who}" if who else ""),
                             "status": record.status, "who": who})
         previous = record.status
     return entries
 
 
+def _name(user):
+    return (user.get_full_name() or user.email) if user is not None else ""
+
+
 def gold_detail(application):
     sections = [{"title": s["title"], "rows": [{"label": label, "value": value} for label, value in s["rows"]]}
                 for s in gold_services.application_sections(application)]
-    application = GoldApplication.objects.prefetch_related("invites").get(pk=application.pk)
+    application = GoldApplication.objects.select_related("approved_by", "final_requested_by", "sent_back_by").prefetch_related("invites").get(pk=application.pk)
     state = invite_state(application)
     history = gold_history(application)
     decided = next((h for h in reversed(history) if h["status"] == application.status and h["text"] != "Applied"), None)
@@ -201,6 +213,13 @@ def gold_detail(application):
         "person_id": str(application.user_id) if application.user_id else "",
         "can_approve": application.status in WAITING,
         "can_decline": application.status in WAITING,
+        "awaiting_final": application.status == GoldApplication.AWAITING_FINAL,
+        "can_final": application.status == GoldApplication.AWAITING_FINAL,
+        "final_requested_at": application.final_requested_at.isoformat() if application.final_requested_at else "",
+        "final_requested_by": _name(application.final_requested_by),
+        "sent_back": {"at": application.sent_back_at.isoformat(), "by": _name(application.sent_back_by), "note": application.sent_back_note}
+                     if application.sent_back_at else None,
+        "note_max": GoldApplication.NOTE_MAX,
         "can_resend": application.status == GoldApplication.APPROVED and state["state"] != "account_set_up" and not application.user_id,
     }
 
@@ -212,4 +231,6 @@ def gold_confirm(application):
     line = [about.get("What he does", ""), about.get("Link to property", ""), about.get("Size", ""), about.get("Where", "")]
     return {"id": str(application.pk), "name": application.full_name, "first_name": application.first_name, "status": application.status,
             "potential": application.potential_level, "property_line": " · ".join(p for p in line if p and p != "Not given"),
-            "applied": application.created_at, "can_approve": application.status in WAITING}
+            "applied": application.created_at, "can_approve": application.status in WAITING,
+            "awaiting_final": application.status == GoldApplication.AWAITING_FINAL, "sent_back": application.sent_back_at is not None,
+            "final_requested_by": _name(application.final_requested_by), "final_requested_at": application.final_requested_at.isoformat() if application.final_requested_at else ""}

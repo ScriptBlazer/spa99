@@ -75,7 +75,7 @@ class SubmitTests(TestCase):
         session = self.journey_session()
         application, created = services.submit_application(application_data(), session=session)
         self.assertTrue(created)
-        self.assertEqual(User.objects.count(), 0)  # applying never creates an account
+        self.assertEqual(User.objects.filter(is_staff=False).count(), 0)  # applying never creates an account (the approver is a team account)
         self.assertEqual((application.potential_level, application.potential_score), ("high", 12))
         self.assertEqual(application.journey_session, session)
         self.assertEqual(session.gold_applications.count(), 1)
@@ -108,6 +108,7 @@ class SubmitTests(TestCase):
         self.assertEqual(EmailLog.objects.filter(status="sent").count(), 2)
 
     def test_recipients_come_from_settings_and_a_double_click_sends_nothing_new(self):
+        User.objects.filter(email="approver@example.test").update(is_active=False)
         set_recipients("a@bml.example, b@bml.example", "")
         first, _ = services.submit_application(application_data())
         again, created = services.submit_application(application_data())
@@ -130,14 +131,14 @@ class SubmitTests(TestCase):
         self.assertEqual(len(mail.outbox), 2)  # one email to the approver, one thank-you
 
     def test_no_approver_configured_sends_nothing_to_anyone_but_still_thanks_the_applicant(self):
-        set_recipients("")
+        User.objects.filter(email="approver@example.test").update(is_active=False)  # nobody left to approve
         gold_tasks._warned.clear()  # the warning is logged once per process; other tests may have used it up
         with self.assertLogs("spa99.email", "WARNING"):
             application, _ = services.submit_application(application_data())
         self.assertEqual([m.to for m in mail.outbox], [["dan@example.com"]])
         application.refresh_from_db()
         self.assertIsNone(application.email_sent_at)
-        self.assertIn("System > Emails", application.email_error)
+        self.assertIn("System > Approval", application.email_error)
 
     def test_repeat_applications_are_linked_and_flagged(self):
         first, _ = services.submit_application(application_data())

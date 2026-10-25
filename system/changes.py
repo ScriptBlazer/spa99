@@ -38,7 +38,7 @@ FIELD_SECTIONS = {
 }
 SECTION_LABELS = {
     "plans": "Plans and pricing", "hours": "Hours and closures", "gold": "Gold rules", "journey": "Journey",
-    "emails": "Emails", "settings": "Settings", "team": "Team",
+    "emails": "Emails", "settings": "Settings", "team": "Team", "approval": "Approval",
 }
 SKIP_FIELDS = {"id", "created_at", "updated_at", "singleton_key"}
 

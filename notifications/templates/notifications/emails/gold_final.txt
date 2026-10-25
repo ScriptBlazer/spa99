@@ -1,0 +1,14 @@
+{% autoescape off %}Final approval: {{ name }}
+{{ potential_label }} potential
+
+An approver has approved this Gold Card application, but the potential is Low, so it needs your final approval. The applicant has not been told anything yet.
+
+Confirm approval: {{ confirm_url }}
+Send back: {{ send_back_url }}
+View the whole application: {{ view_url }}
+(Both open a page in the Office. Nothing happens until you tap the button there. Sending it back asks the approvers whether they are sure, and you can add a note.)
+{% for section in sections %}
+{{ forloop.counter }}. {{ section.title|upper }}
+{% for label, value in section.rows %}{{ label }}: {{ value }}
+{% endfor %}{% endfor %}
+{% endautoescape %}

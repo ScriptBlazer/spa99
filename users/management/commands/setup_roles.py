@@ -1,4 +1,4 @@
-"""Create (or refresh) the team groups: Office, Admin, Developer and the extra permission Approver (docs/features/user-rules.md).
+"""Create (or refresh) the team groups: Office, Admin, Developer and the extra permissions Approver and Final approver (docs/features/user-rules.md).
 The groups hold no model permissions: the level IS the membership, checked by common.levels (the hidden Django admin is
 superuser only). Safe to run again; `--dry-run` only prints.
 
@@ -11,12 +11,12 @@ from django.db import transaction
 
 from common import levels
 
-NEW_GROUPS = (*levels.LEVEL_GROUPS, levels.APPROVER_GROUP)
+NEW_GROUPS = (*levels.LEVEL_GROUPS, levels.APPROVER_GROUP, levels.FINAL_APPROVER_GROUP)
 RETIRED_GROUPS = ("Owner", "Manager", "Viewer", "System")
 
 
 class Command(BaseCommand):
-    help = "Create or refresh the Office, Admin, Developer and Approver groups; remove the retired ones once empty."
+    help = "Create or refresh the Office, Admin, Developer, Approver and Final approver groups; remove the retired ones once empty."
 
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true", help="Show what would happen; change nothing.")

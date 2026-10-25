@@ -223,9 +223,11 @@ def export_user_data(user):
         }
         for row in User.history.filter(id=user.pk).order_by("history_date")
     ]
+    delivery = getattr(user, "approver_delivery", None)
     return {
         "id": str(user.pk),
         "profile": profile,
+        **({"approval_emails": {"use_account_email": delivery.use_account_email, "other_email": delivery.other_email}} if delivery else {}),
         "interest": _export_interest(user),
         "journey_sessions": _export_sessions(user),
         "gold_applications": gold_services.export_applications(user.email),

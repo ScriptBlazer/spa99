@@ -18,6 +18,9 @@ urlpatterns = [
     path("gold/<uuid:pk>/", views.gold_application, name="office_gold_application"),
     path("gold/<uuid:pk>/approve/confirm/", views.gold_approve_confirm, name="office_gold_approve_confirm"),
     path("gold/<uuid:pk>/approve/", views.gold_approve, name="office_gold_approve"),
+    path("gold/<uuid:pk>/final/confirm/", views.gold_final_confirm, name="office_gold_final_confirm"),
+    path("gold/<uuid:pk>/final/send-back/", views.gold_final_send_back, name="office_gold_final_send_back"),
+    path("gold/<uuid:pk>/final/<str:token>/", views.gold_final_page, name="office_gold_final"),
     path("gold/<uuid:pk>/resend/", views.gold_resend, name="office_gold_resend"),
     path("gold/<uuid:pk>/decline/", views.gold_decline, name="office_gold_decline"),
 ]
