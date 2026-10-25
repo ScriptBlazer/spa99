@@ -1,6 +1,6 @@
 /* Relaxing zone (docs/design/VIRTUAL-TOUR.md 2.4). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
  * Shell 3.6 x 8.0 x 2.7 (x -1.8..1.8, z -4..4): travertine walls with vertical LED lines on the east wall, an oak pilaster with round moss panels on the west,
- * a coffered ceiling with an LED cove, six cushioned loungers on curved oak frames, the backlit gold stacked lockup on the east wall, and (round 2) a TV on the west wall facing the loungers. */
+ * a coffered ceiling with an LED cove, six cushioned loungers on curved oak frames, the backlit gold stacked lockup on the east wall, and (round 2) a TV on the west wall facing the loungers. Doorways: south (back to the kitchenette), north at the deep end (wet sauna on the left, dry sauna on the right as you face north). */
 
 export async function build(scene, ctx) {
   const { THREE, K, T, S, tier } = ctx, PI = Math.PI, WHITE = new THREE.Color(1, 1, 1), r = T.rng(21);
@@ -22,13 +22,14 @@ export async function build(scene, ctx) {
   const led = K.basic('--color-led-warm'), ledD = K.basic('--color-led-warm', { side: THREE.DoubleSide });
   const gold = K.std('--color-gold-metal', { r: 0.35, m: 0.85, emissive: K.col('--color-gold-metal'), emissiveIntensity: 0.16, envMapIntensity: 1.8, side: THREE.DoubleSide });
 
-  /* ----- shell: floor, walls (one doorway), coffered ceiling ----- */
+  /* ----- shell: floor, walls (three doorways), coffered ceiling ----- */
   K.plane(3.6, 8, floor, 0, 0, 0, 'up', { tile: 2.4 });
-  K.plane(3.6, 2.7, wall, 0, 1.35, -4, 's', { tile: 2.4 });
+  K.plane(0.35, 2.7, wall, -1.625, 1.35, -4, 's', { tile: 2.4 }); K.plane(1.1, 2.7, wall, 0, 1.35, -4, 's', { tile: 2.4 }); K.plane(0.35, 2.7, wall, 1.625, 1.35, -4, 's', { tile: 2.4 });   // north: two doorways, wet sauna left (x -1.0), dry sauna right (x 1.0)
+  K.plane(0.9, 0.6, wall, -1.0, 2.4, -4, 's', { tile: 2.4 }); K.plane(0.9, 0.6, wall, 1.0, 2.4, -4, 's', { tile: 2.4 });
   K.plane(8, 2.7, wall, 1.8, 1.35, 0, 'w', { tile: 2.4 });                                              // east, the lockup wall
   K.plane(8, 2.7, wall, -1.8, 1.35, 0, 'e', { tile: 2.4 });                                              // west: plain wall (round 2: no gym doorway; the TV hangs here)
   K.plane(1.3, 2.7, wall, -1.15, 1.35, 4, 'n', { tile: 2.4 }); K.plane(1.3, 2.7, wall, 1.15, 1.35, 4, 'n', { tile: 2.4 });
-  K.plane(1.0, 0.5, wall, 0, 2.45, 4, 'n', { tile: 2.4 });                                               // south: the lounge doorway at x 0
+  K.plane(1.0, 0.5, wall, 0, 2.45, 4, 'n', { tile: 2.4 });                                               // south: the kitchenette doorway at x 0
 
   const hole = [[-1.2, -3.4], [1.2, -3.4], [1.2, 3.4], [-1.2, 3.4]].map((p) => new THREE.Vector2(p[0], p[1]));
   const outer = new THREE.Shape([[-1.8, -4], [1.8, -4], [1.8, 4], [-1.8, 4]].map((p) => new THREE.Vector2(p[0], p[1])));
@@ -96,8 +97,10 @@ export async function build(scene, ctx) {
   [-3.0, -1.85, -0.7, 0.45, 1.6, 2.75].forEach((z) => lounger(0.45, z, 0.26));
   K.flush();
 
-  /* ----- doorway seen through: the lounge (travertine) ----- */
+  /* ----- doorways seen through: back to the kitchenette (south) and on to the saunas (north) ----- */
   K.vista('--color-travertine', [0, 4], 's', 1.0, 2.2, 1.0);
+  K.vista('--color-cedar', [-1.0, -4], 'n', 0.9, 2.1, 1.0); K.vista('--color-cedar', [1.0, -4], 'n', 0.9, 2.1, 1.0);   // wet sauna (left) and dry sauna (right)
+  [-1.0, 1.0].forEach((x) => K.box(0.9, 0.012, 0.012, led, x, 2.1, -3.99));
 
   /* ----- light (2700K) ----- */
   K.hemi('--color-led', '--color-caramel', 0.45);
@@ -108,6 +111,6 @@ export async function build(scene, ctx) {
   return {
     view: { pos: [-0.6, 1.6, 3.4], yaw: 10, pitch: -8 },
     exposure: 0.92,
-    markers: [{ to: 'lounge', at: [0, 1.1, 3.95] }],
+    markers: [{ to: 'kitchenette', at: [0, 1.1, 3.95] }, { to: 'wet-sauna', at: [-1.0, 1.1, -3.95] }, { to: 'dry-sauna', at: [1.0, 1.1, -3.95] }],
   };
 }

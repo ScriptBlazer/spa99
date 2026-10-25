@@ -1,6 +1,6 @@
 /* Lounge (docs/design/VIRTUAL-TOUR.md 2.1, with the 2026-10-23 layout corrections). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
  * Shell 10.6 x 6.0 x 3.0 (x -7..3.6, z -3..3). North: the reef tank flush in a travertine slab, its long bench and the curved sofa, armchairs and table to the
- * RIGHT (east) of it, a frosted window and fluted panelling beyond, then a passage to the relaxing zone (east wall, z 2.0). To the LEFT (west): the reception
+ * RIGHT (east) of it, a frosted window and fluted panelling beyond, then a plain east wall. To the LEFT (west): the reception
  * desk, curved cream stone that grows out of the west wall and runs straight down to the south wall (it sits in the south-west corner, the corner opposite the tank),
  * its front carrying the backlit gold stacked lockup, under a gold ceiling cove. In the SAME west wall, immediately north of the desk (between it and the tank-wall
  * corner), a long straight corridor (6 m, z -2.7..-1.1, running west parallel to the tank wall; warm cove, travertine, bench, doors) leads to the rooms; the gym marker
@@ -59,7 +59,7 @@ export async function build(scene, ctx) {
   K.plane(3.6, 3, wall, -5.2, 1.5, -3, 's', { tile: 3 });                                                                  // north, left of the tank slab: plain (no passage in the tank wall)
   K.plane(2.2, 3, wall, 2.5, 1.5, -3, 's', { tile: 3 });                                                                   // north, right of the tank slab
   K.plane(XW, 3, wall, XC, 1.5, 3, 'n', { tile: 3 });                                                                      // south: plain
-  K.plane(4.5, 3, wall, 3.6, 1.5, -0.75, 'w', { tile: 3 }); K.plane(0.5, 3, wall, 3.6, 1.5, 2.75, 'w', { tile: 3 }); K.plane(1.0, 0.8, wall, 3.6, 2.6, 2.0, 'w', { tile: 3 });   // east, with the relaxing-zone passage at z 2.0
+  K.plane(6, 3, wall, 3.6, 1.5, 0, 'w', { tile: 3 });   // east: plain (the relaxing zone is far deeper in the spa, no door to it here)
   K.plane(0.3, 3, wall, X0, 1.5, -2.85, 'e', { tile: 3 }); K.plane(4.1, 3, wall, X0, 1.5, 0.95, 'e', { tile: 3 }); K.plane(1.6, 0.6, wall, X0, 2.7, -1.9, 'e', { tile: 3 });   // west: the desk's wall, with the corridor opening at z -2.7..-1.1 (north of the desk, towards the tank wall), 2.4 high
 
   /* ceiling: dropped to 2.75 with a round recess (the gold cove) over reception, clipped by the walls, its roof gold leaf at 3.0 */
@@ -134,7 +134,7 @@ export async function build(scene, ctx) {
   K.glowPlane(1.2, 1.2, 1.4, 2.2, -0.3, 'down', 0.3);
 
   /* east wall: fluted panelling (real flutes, merged), sconce, frosted window in a walnut frame (a window, no door) */
-  for (let i = 0; i < 24; i++) { const z = 0.38 + i * 0.11; if (z < 1.45 || z > 2.55) K.box(0.04, 1.0, 0.07, oak, 3.57, 0.5, z); }   // flutes stop short of the passage
+  for (let i = 0; i < 24; i++) { const z = 0.38 + i * 0.11; K.box(0.04, 1.0, 0.07, oak, 3.57, 0.5, z); }
   K.put(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 12), led, { x: 3.55, y: 1.7, z: 1.2 }); K.glowPlane(0.7, 1.0, 3.585, 1.7, 1.2, 'w', 0.35);
   K.plane(2.6, 1.7, frost, 3.59, 1.3, -1.2, 'w');
   K.glowPlane(3.6, 2.6, 3.5, 1.3, -1.2, 'w', 0.2, '--color-cream');
@@ -179,8 +179,6 @@ export async function build(scene, ctx) {
   K.plane(0.9, 2.2, K.basic(K.col('--color-caramel').clone().multiplyScalar(1.15)), CX0 - CL + 0.02, 1.1, CZ, 'e');   // the lit door at the far end
   K.glowPlane(1.6, 2.4, CX0 - CL + 0.05, 1.2, CZ, 'e', 0.3, '--color-led-warm');
 
-  /* doorway seen through: relaxing zone (travertine, east wall past the seating) */
-  K.vista('--color-travertine', [3.6, 2.0], 'e', 1.0, 2.2, 1.0);           // relaxing zone, past the seating
   /* grounding: the dark line where floor meets wall, and under the bench */
   K.edge(X0, -3, 1, 0, XW, 0, 1, 0.55, 0.55); K.edge(X0, 3, 1, 0, XW, 0, -1, 0.55, 0.5); K.edge(3.6, -3, 0, 1, 6, -1, 0, 0.55, 0.5); K.edge(X0, -3, 0, 1, 0.3, 1, 0, 0.55, 0.5); K.edge(X0, -1.1, 0, 1, 4.1, 1, 0, 0.55, 0.5);
   K.shadow(4.0, 1.1, -1.0, -2.2, 0.55); K.shadow(2.2, 2.2, 1.9, -1.3, 0.35);
@@ -215,7 +213,7 @@ export async function build(scene, ctx) {
     view: { pos: [2.9, 1.6, -0.8], yaw: -97, pitch: -5 },     // looks across the room to the desk in the corner and the corridor beside it
     arrive: { pos: [3.3, 1.6, -0.5], yaw: -93, pitch: -8, ms: 1400 },
     exposure: 0.8, ambient: true, update,
-    markers: [{ to: 'gym', at: [X0 - 3.0, 1.1, CZ] }, { to: 'relaxing-zone', at: [3.55, 1.1, 2.0] }],
+    markers: [{ to: 'gym', at: [X0 - 3.0, 1.1, CZ] }],
     tier(name) { if (name === 'low') { frozen = true; school.count = Math.min(school.count, 6); } },
   };
 }
