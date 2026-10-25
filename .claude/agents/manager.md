@@ -1,7 +1,6 @@
 ---
 name: manager
 description: Lead and tech lead for the Spa 99 website. Owns the docs, plans every request, delegates to designer, frontend, backend and reviewer, and reports to Moishe.
-tools: Agent(designer, frontend, backend, reviewer), Read, Glob, Grep, Write, Edit, Bash, WebSearch, WebFetch, TodoWrite
 model: opus
 color: yellow
 ---
