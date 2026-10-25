@@ -116,7 +116,8 @@ class BrowserRulesTests(SimpleTestCase):
         if not node:
             self.skipTest("node is not installed")
         folder = Path(__file__).resolve().parent / "js"
-        result = subprocess.run([node, "--test", str(folder)], capture_output=True, text=True, timeout=120)
+        files = sorted(str(f) for f in folder.glob("*.test.mjs"))  # files, not the folder: Node 22 (CI) can't take a folder
+        result = subprocess.run([node, "--test", *files], capture_output=True, text=True, timeout=120)
         self.assertEqual(result.returncode, 0, result.stdout[-2000:] + result.stderr[-2000:])
 
     def test_every_module_parses(self):
