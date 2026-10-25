@@ -64,6 +64,7 @@ def _text(key, scope):
 
 
 ANALYTICS_RANK = 6  # Analytics shows up to six options per insight
+HIDDEN_INSIGHTS = {"source"}  # still worked out and stored; not shown in the Office (Moishe 2026-10-25: not useful for now)
 
 
 def insights_for(range_name, max_rank):
@@ -75,7 +76,7 @@ def insights_for(range_name, max_rank):
     out = []
     for key in facts.ORDER:
         rows = grouped.get(key)
-        if not rows:
+        if not rows or key in HIDDEN_INSIGHTS:
             continue
         options = [{"rank": r.rank, "label": r.label, "value": r.value, "of_total": r.of_total,
                     "share_bp": basis_points(r.value, r.of_total) or 0} for r in rows]
