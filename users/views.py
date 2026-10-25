@@ -20,6 +20,8 @@ from common.audit import client_ip
 from common.ratelimit import hit, rate_limited_json
 from common.validators import normalise_email
 from journey import services as journey_services
+from pages import services as pages_services
+from plans import services as plan_services
 from plans.models import SiteSettings
 
 from . import member, services, tokens
@@ -116,13 +118,29 @@ class LogoutView(auth_views.LogoutView):
 
 # ---------- register interest ----------
 
+def _confirm_tier(request, slug):
+    """A signed-in person arrives from a public page with ?plan=: nothing is saved on a GET. Already theirs or Gold goes
+    straight to the dashboard; otherwise a one-button confirm screen that POSTs to account_interest."""
+    plan = services.interest_plans().filter(slug=slug).first()
+    if plan is None:
+        return redirect("account")
+    interest = getattr(request.user, "interest", None)
+    if interest is not None and interest.plan_id == plan.pk:
+        messages.info(request, "That's already your membership.")
+        return redirect("account")
+    if interest is not None and interest.plan is not None and interest.plan.slug == "gold":
+        _tier_message(request, "gold", interest.plan)
+        return redirect("account")
+    site = SiteSettings.load()
+    card = pages_services.plan_card(plan, site.vat_rate, plan_services.hours_ranges())
+    return render(request, "users/choose_confirm.html", {**member.base_context(request.user), "plan": plan, "card": card})
+
+
 @login_not_required  # PUBLIC: anyone can register interest
 @require_http_methods(["GET", "POST"])
 def register(request):
     if request.user.is_authenticated:  # every "choose this tier" link ends here (compare page, journey result, Gold page): save it
-        if request.GET.get("plan"):
-            _tier_message(request, *services.choose_tier(request.user, request.GET["plan"]))
-        return redirect("account")
+        return _confirm_tier(request, request.GET.get("plan", ""))
     if not SiteSettings.load().register_interest_open:
         return _message(request, "Not open yet", "Registration is not open yet.", status=403)
     session = journey_services.session_from_cookies(request.COOKIES, request.user)

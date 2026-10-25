@@ -205,12 +205,16 @@ class ChooseTierTests(TestCase):
         user = make_user()
         InterestRegistration.objects.create(user=user, plan=None)  # signed up before a tier was required
         self.client.force_login(user)
-        paths = [("get", "/register/?plan=tier-1", "tier-1"),  # compare page, journey result, memberships page, Gold page links
-                 ("post", "/account/interest/", "tier-2")]  # the member area's own tier cards
-        for method, url, slug in paths:
-            response = self.client.get(url) if method == "get" else self.client.post(url, {"plan": slug})
+        # a link from a public page (compare, journey result, Gold page): a GET saves nothing and shows the confirm screen
+        page = self.client.get("/register/?plan=tier-1")
+        self.assertContains(page, "data-choose-confirm")
+        self.assertIsNone(InterestRegistration.objects.get(user=user).plan)
+        # the confirm button and the member area's own tier cards are the same POST
+        for slug in ("tier-1", "tier-2"):
+            response = self.client.post("/account/interest/", {"plan": slug})
             self.assertRedirects(response, "/account/", fetch_redirect_response=False)
             self.assertEqual(InterestRegistration.objects.get(user=user).plan.slug, slug)
+        self.assertRedirects(self.client.get("/register/?plan=tier-2"), "/account/", fetch_redirect_response=False)  # already theirs
         page = self.client.get("/account/")
         self.assertContains(page, "Tier 2 interest")
         self.assertContains(page, "Saved. You&#x27;re interested in Tier 2.")
@@ -218,7 +222,7 @@ class ChooseTierTests(TestCase):
     def test_gold_member_cannot_switch(self):
         user = make_user(plan=plan("gold"))
         self.client.force_login(user)
-        self.client.get("/register/?plan=tier-1")
+        self.assertRedirects(self.client.get("/register/?plan=tier-1"), "/account/", fetch_redirect_response=False)
         self.client.post("/account/interest/", {"plan": "tier-1"})
         self.assertEqual(InterestRegistration.objects.get(user=user).plan.slug, "gold")
 
