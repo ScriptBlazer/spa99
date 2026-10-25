@@ -1,1 +1,8 @@
-{ "agent": "manager" }
+{
+  "agent": "manager",
+  "sandbox": {
+    "network": {
+      "allowLocalBinding": true
+    }
+  }
+}
