@@ -15,7 +15,7 @@ Design read: luxury hospitality marketing for men in London, dark editorial maga
 | Espresso intro: "The spa." left, a square boxed door picture right, a lot of empty space | **The door**: the door picture full screen with the heading on it; on scroll it shrinks into a tall portrait frame bleeding off the right edge (Home's window effect, short pin). Facts and room chips arrive beside it |
 | Cream rooms list: index left, eight equal square pictures in a column | **The rooms in four compositions**: a large edge-bleed feature, a row of small portrait tiles (the ad), a wide bleed with a companion inset, a second feature with a companion inset. Every room: picture, name, one line, pills from data |
 | Steps as three big words and a 21:9 square picture | **How a visit works**: compact, numbered, with pills from plan and hours data, a scrubbed gold line joining the steps |
-| Cream "Find the right way to visit." | Compact espresso closing band, "Tailor your membership" and "See memberships", the lowest monthly price from data |
+| Cream "Find the right way to visit." | Compact espresso closing band, "Tailor your membership" only (2026-10-25: "See memberships" removed), the lowest monthly price from data |
 | About 5 tall sections, every picture square | About **6.5 screens** at 1440x800, **8** at 375x667, one short pin, no square boxed pictures |
 
 The whole page is espresso (one theme, as Home's dark chapters). No cream scene: cream renders on cream go flat, and this page is one walk through one building.
