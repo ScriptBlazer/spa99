@@ -2,7 +2,7 @@
 .system .sys-approval-note { margin-bottom: var(--sys-4); }
 .system .sys-approval-cc { margin-top: var(--sys-4); }
 .sys-approval > header { justify-content: flex-start; }
-.system .sys-panel-intro { padding: var(--sys-3) var(--sys-4) 0; color: var(--sys-text-2); max-width: 72ch; }
+.system .sys-panel.sys-approval > .sys-panel-intro { margin: 0; padding: var(--sys-3) var(--sys-4) 0; color: var(--sys-text-2); max-width: 72ch; }
 
 /* add people: label above, one line with the dropdown and the Add button */
 .sys-add-people { padding: var(--sys-3) var(--sys-4) var(--sys-4); border-bottom: 1px solid var(--sys-line); }
@@ -55,7 +55,7 @@
 
 @media (max-width: 64em) { .sys-person { grid-template-columns: 200px 84px minmax(0, 1fr) 84px; column-gap: var(--sys-3); } }
 @media (max-width: 48em) {
-  .system .sys-panel-intro { padding-inline: var(--sys-3); }
+  .system .sys-panel.sys-approval > .sys-panel-intro { padding-inline: var(--sys-3); }
   .sys-add-people { padding-inline: var(--sys-3); }
   .system .sys-combo-box input[role=combobox] { font-size: 1rem; height: 28px; }
   .sys-chip { height: 28px; font-size: var(--sys-fs); }
