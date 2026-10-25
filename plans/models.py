@@ -131,7 +131,7 @@ class SiteSettings(BaseModel):
     # From address is used.
     gold_approver_emails = models.CharField(
         max_length=500, blank=True, validators=[validate_email_list],
-        help_text="Comma separated. Who gets each Gold application email (whoever is here acts as the approver). Empty = no email is sent.")
+        help_text="DEPRECATED, no longer used for sending: approvers are the team members picked in System > Approval. Kept until the old addresses are imported (manage.py import_approvers_from_emails).")
     gold_approver_cc = models.CharField(
         max_length=500, blank=True, validators=[validate_email_list], help_text="Comma separated. Copied on each Gold application email.")
     contact_email = models.CharField(
@@ -188,10 +188,6 @@ class SiteSettings(BaseModel):
         from django.conf import settings
 
         return (split_emails(self.contact_email) or [parseaddr(settings.DEFAULT_FROM_EMAIL)[1]])[0]
-
-    @property
-    def approver_list(self):
-        return split_emails(self.gold_approver_emails)
 
     @property
     def approver_cc_list(self):

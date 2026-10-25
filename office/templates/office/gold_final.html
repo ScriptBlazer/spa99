@@ -1,0 +1,36 @@
+{% extends "office/base.html" %}
+{% load office_tags %}
+{% block title %}Final approval | Spa 99 Office{% endblock %}
+{% block header_left %}<a class="o-back" href="{% url 'office_gold' %}">{% include "office/_icon.html" with name="chevron-left" %}<span>Gold</span></a>{% endblock %}
+{% block main %}
+{% if state == "invalid" %}
+<section class="o-card o-confirm" data-gold-final data-state="invalid" aria-labelledby="final-h">
+  <h1 id="final-h">This link can't be used</h1>
+  <p class="o-state o-confirm-state" data-final-state>It has expired, or the application was already dealt with. Open the Gold list to see where it stands.</p>
+  <p class="o-confirm-links"><a class="o-quiet" href="{% url 'office_gold' %}">Open the Gold list</a></p>
+</section>
+{% else %}
+{% with a=application %}
+<section class="o-card o-confirm" data-gold-final data-state="open" data-action="{{ action }}" aria-labelledby="final-h">
+  <p class="o-sub">Final approval, Low potential</p>
+  <h1 id="final-h">{{ a.name }}</h1>
+  <p class="o-badges">{% include "office/_badge.html" with potential=a.potential %}</p>
+  {% if a.property_line %}<p class="o-confirm-line">{{ a.property_line }}</p>{% endif %}
+  <p class="o-sub">Applied {{ a.applied|dmy }}</p>
+  <form method="post" action="{% url 'office_gold_final_confirm' a.id %}" class="o-confirm-form" data-final-confirm-form>{% csrf_token %}
+    <input type="hidden" name="token" value="{{ token }}">
+    <button type="submit" class="btn btn-primary btn-block o-confirm-go">Confirm approval</button>
+    <p class="o-sub">He gets an email to set up his account, or Gold is added to his existing account.</p>
+  </form>
+  <form method="post" action="{% url 'office_gold_final_send_back' a.id %}" class="o-confirm-form" data-final-send-back-form>{% csrf_token %}
+    <input type="hidden" name="token" value="{{ token }}">
+    <label class="o-sub" for="final-note">Note for the approvers (optional)</label>
+    <textarea id="final-note" name="note" rows="3" maxlength="{{ note_max }}"></textarea>
+    <button type="submit" class="btn btn-secondary btn-block">Send back</button>
+    <p class="o-sub">Every approver is emailed to ask if they are sure. The applicant is told nothing.</p>
+  </form>
+  <p class="o-confirm-links"><a class="o-quiet" href="{% url 'office_gold_application' a.id %}">Open full application</a></p>
+</section>
+{% endwith %}
+{% endif %}
+{% endblock %}

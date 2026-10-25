@@ -9,7 +9,7 @@ from django.utils.cache import patch_vary_headers
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
-from gold import invites
+from gold import approval, invites
 from gold.models import GoldApplication
 from insights.metrics import K
 from plans.models import Plan
@@ -18,7 +18,7 @@ from users import views as user_views
 from users.models import User
 
 from . import lists, selectors
-from .permissions import admin, approver, reader
+from .permissions import admin, approver, final_approver, reader
 
 
 def _greeting(user):
@@ -145,6 +145,7 @@ def gold(request):
     rows, has_next = lists.gold_page(filters, page)
     stored = selectors.counters(K.GOLD_APPLICATIONS, K.GOLD_BY_STATUS)
     context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "section": "gold",
+               "final_approver_missing": not approval.final_approver_exists(),
                "total_applications": stored.get((K.GOLD_APPLICATIONS, ""), 0), "waiting": selectors.waiting_count(stored)}
     return _varied(render(request, _fragment(request, "office/gold.html", "office/_gold_rows.html"), context))
 
@@ -154,7 +155,8 @@ def gold(request):
 @never_cache
 def gold_application(request, pk):
     application = get_object_or_404(GoldApplication, pk=pk)
-    return render(request, "office/gold_detail.html", {"application": lists.gold_detail(application), "section": "gold"})
+    context = {"application": lists.gold_detail(application), "section": "gold", "final_approver_missing": not approval.final_approver_exists()}
+    return render(request, "office/gold_detail.html", context)
 
 
 @approver
@@ -164,7 +166,8 @@ def gold_approve_confirm(request, pk):
     """The page Barry's email button opens: sign-in and Owner/Manager come first (middleware, then @admin). GET only
     shows the application; the tap POSTs to gold_approve, which holds the approval logic."""
     application = get_object_or_404(GoldApplication, pk=pk)
-    return render(request, "office/gold_confirm.html", {"application": lists.gold_confirm(application), "section": "gold"})
+    context = {"application": lists.gold_confirm(application), "section": "gold", "final_approver_missing": not approval.final_approver_exists()}
+    return render(request, "office/gold_confirm.html", context)
 
 
 def _act(request, pk, action):
@@ -177,13 +180,77 @@ def _act(request, pk, action):
 @require_POST
 def gold_approve(request, pk):
     def run(request, application):
-        result = invites.approve_and_invite(application, request.user)
+        result = approval.approve(application, request.user)
         first = application.first_name or "He"
-        text = {invites.INVITED: f"{first} is approved. His invite is on its way.",
+        text = {approval.AWAITING: "Sent for final approval.",
+                invites.INVITED: f"{first} is approved. His invite is on its way.",
                 invites.ACTIVATED: f"{first} is approved. Gold was added to his existing account.",
                 invites.SKIPPED: "Nothing changed: it was already decided, or Gold could not be activated."}[result]
         messages.success(request, text) if result != invites.SKIPPED else messages.warning(request, text)
     return _act(request, pk, run)
+
+
+# ---------- final approval (Low potential): Admin level or higher with the Final approver permission ----------
+
+def _final_context(application, token, action, state, **extra):
+    return {"application": lists.gold_confirm(application), "token": token, "action": action, "state": state, "section": "gold",
+            "note_max": GoldApplication.NOTE_MAX, **extra}
+
+
+@final_approver
+@require_GET
+@never_cache
+def gold_final_page(request, pk, token):
+    """The page the one-tap links in the final approval email open (sign-in first, then the role). Shows Confirm approval and
+    Send back (with an optional note); the buttons POST to gold_final_confirm / gold_final_send_back with the token. A bad,
+    expired or already used link answers 410 and shows nothing about the application."""
+    application = get_object_or_404(GoldApplication, pk=pk)
+    action = request.GET.get("do") if request.GET.get("do") in ("confirm", "send_back") else ""
+    if not approval.token_is_valid(token, application):
+        return render(request, "office/gold_final.html", {"state": "invalid", "section": "gold", "application": None}, status=410)
+    return render(request, "office/gold_final.html", _final_context(application, token, action, "open"))
+
+
+def _final_act(request, pk, run):
+    """Shared by the two final approval buttons. A posted token (from the email page) must be valid; the Office detail page
+    posts without one. Either way the application must still be awaiting final approval."""
+    application = get_object_or_404(GoldApplication, pk=pk)
+    token = request.POST.get("token", "")
+    if token and not approval.token_is_valid(token, application):
+        return render(request, "office/gold_final.html", {"state": "invalid", "section": "gold", "application": None}, status=410)
+    run(application)
+    return redirect("office_gold_application", pk=application.pk)
+
+
+@final_approver
+@require_POST
+def gold_final_confirm(request, pk):
+    def run(application):
+        result = approval.final_confirm(application, request.user)
+        first = application.first_name or "He"
+        if result == invites.INVITED:
+            messages.success(request, f"{first} is approved. His invite is on its way.")
+        elif result == invites.ACTIVATED:
+            messages.success(request, f"{first} is approved. Gold was added to his existing account.")
+        else:
+            messages.warning(request, "Nothing changed: it is not waiting for final approval any more.")
+    return _final_act(request, pk, run)
+
+
+@final_approver
+@require_POST
+def gold_final_send_back(request, pk):
+    def run(application):
+        try:
+            sent = approval.send_back(application, request.user, request.POST.get("note", ""))
+        except approval.NoteTooLong as error:
+            messages.error(request, str(error))
+            return
+        if sent:
+            messages.success(request, "Sent back. The approvers have been emailed.")
+        else:
+            messages.warning(request, "Nothing changed: it is not waiting for final approval any more.")
+    return _final_act(request, pk, run)
 
 
 @approver

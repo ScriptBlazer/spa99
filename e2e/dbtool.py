@@ -4,7 +4,7 @@ Run as `python -m e2e.dbtool <command> ...` with the e2e environment (scripts/e2
 an event loop, where Django refuses database calls, so the run calls this in a child process instead.
 
   create-staff EMAIL PASSWORD LEVEL [--approver] [--first NAME] [--last NAME]   Office, Admin or Developer team account
-  set-approver EMAIL        who receives Gold applications (the same field as System > Emails)
+  set-approver EMAIL        gives the account the Approver role (who receives Gold applications; System > Approval)
   registrations             number of registration rows
   user EMAIL                {"exists", "count", "plan", "verified", "active"}
   gold EMAIL                {"status" (newest), "statuses", "waiting", "has_user", "count", "invites", "invites_used"}
@@ -54,10 +54,11 @@ def main(argv):
             email, password, first_name=options.first, last_name=options.last)
         apply_level(user, level, options.approver, actor=None)
         return {"created": email, "level": level, "approver": options.approver}
-    if cmd == "set-approver":
-        site = SiteSettings.load()
-        site.gold_approver_emails = args[0]
-        site.save()
+    if cmd == "set-approver":  # approvers are team members now (the Approver group); this makes that person one
+        from django.contrib.auth.models import Group
+
+        user = User.objects.get(email__iexact=args[0])
+        user.groups.add(Group.objects.get_or_create(name="Approver")[0])
         return {"approver": args[0]}
     if cmd == "registrations":
         return {"count": InterestRegistration.objects.count()}

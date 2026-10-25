@@ -2,7 +2,7 @@
 <tr class="o-row" data-gold-row data-status="{{ g.status }}" data-potential="{{ g.potential }}">
   <td class="c-name" data-col="name"><a class="o-rowlink" href="{% url 'office_gold_application' g.id %}">{{ g.name }}</a></td>
   <td class="c-potential" data-col="potential">{% include "office/_badge.html" with potential=g.potential %}</td>
-  <td class="c-status" data-col="status">{% include "office/_badge.html" with status=g.status %}</td>
+  <td class="c-status" data-col="status">{% include "office/_badge.html" with status=g.status %}{% if g.sent_back %} <span class="o-badge o-badge--s-sent-back" data-sent-back>Sent back</span>{% endif %}</td>
   <td class="c-invite" data-col="invite" data-invite-state="{{ g.invite.state }}">{% include "office/_invite_state.html" with invite=g.invite %}</td>
   <td class="c-date num" data-col="applied"><span class="o-only-wide">{{ g.applied|dt }}</span><span class="o-only-narrow">{{ g.applied|relative }}</span></td>
   <td class="c-action" data-col="action">{% if office_can.can_act and g.can_approve %}

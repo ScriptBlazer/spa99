@@ -19,8 +19,8 @@ from plans.models import SiteSettings
 from users.forms import SignInForm
 from users.views import LoginView, TeamPasswordView
 
-from common import levels
 
+from . import approval as approval_service
 from . import audit, changes, codeview, feed, services
 from . import team as team_service
 from .forms import EmailsForm, SettingsForm
@@ -29,7 +29,7 @@ from .models import SystemChange, SystemEvent
 from .permissions import signed_in, unlocked
 
 NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", "system_plans"), ("hours", "Hours and closures", "system_hours"),
-       ("gold", "Gold rules", "system_gold"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("suppressions", "Email suppressions", "system_suppressions"),
+       ("gold", "Gold rules", "system_gold"), ("approval", "Approval", "system_approval"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("suppressions", "Email suppressions", "system_suppressions"),
        ("settings", "Settings", "system_settings"), ("team", "Team", "system_team"), ("changes", "Audit log", "system_changes")]
 
 
@@ -305,7 +305,7 @@ def site_settings(request):
 @unlocked
 @require_GET
 def team(request):
-    context = {"staff": team_service.rows(request.user), "level_choices": team_service.level_choices(request.user), "approver_label": levels.APPROVER_GROUP}
+    context = {"staff": team_service.rows(request.user), "level_choices": team_service.level_choices(request.user)}
     return page(request, "system/team.html", "team", context)
 
 
@@ -326,8 +326,8 @@ def _person(request, pk):
 @unlocked
 @require_POST
 def team_access(request, pk):
-    target, level, approver = _person(request, pk), request.POST.get("level", ""), request.POST.get("approver") == "1"
-    return _team_action(request, lambda: team_service.set_access(request.user, target, level, approver))
+    target, level = _person(request, pk), request.POST.get("level", "")
+    return _team_action(request, lambda: team_service.set_access(request.user, target, level))
 
 
 @unlocked
@@ -354,10 +354,10 @@ def team_invite(request, pk):
 @unlocked
 @require_POST
 def team_add(request):
-    email, level, approver = request.POST.get("email", ""), request.POST.get("level", ""), request.POST.get("approver") == "1"
+    email, level = request.POST.get("email", ""), request.POST.get("level", "")
 
     def run():
-        user, created = team_service.add_member(request.user, email, level, approver)
+        user, created = team_service.add_member(request.user, email, level)
         messages.info(request, "An email is on its way for them to choose a password." if created else "They already had an account, so they keep their password.")
     return _team_action(request, run, "Added to the team.")
 
@@ -379,6 +379,47 @@ def team_merge(request):
         except services.ChangeRefused as error:
             messages.error(request, str(error))
     return page(request, "system/team_merge.html", "team", context)
+
+
+# ---------- approval: who approves Gold, and who gives the final approval ----------
+
+@unlocked
+@require_GET
+def approval(request):
+    return page(request, "system/approval.html", "approval", approval_service.context(request.user))
+
+
+def _approval_action(request, action, text="Saved."):
+    """Run an Approval change; a refusal is an error toast, never a crash."""
+    try:
+        done = action()
+        saved(request, text) if done is not False else messages.info(request, "Nothing changed.")
+    except services.ChangeRefused as error:
+        messages.error(request, str(error))
+    return redirect("system_approval")
+
+
+def _ids(request):
+    return request.POST.getlist("user") or request.POST.getlist("users") or request.POST.getlist("user_ids")
+
+
+@unlocked
+@require_POST
+def approval_add(request, role):
+    return _approval_action(request, lambda: approval_service.add(request.user, role, _ids(request)), "Added.")
+
+
+@unlocked
+@require_POST
+def approval_remove(request, role, pk):
+    return _approval_action(request, lambda: approval_service.remove(request.user, role, pk), "Removed.")
+
+
+@unlocked
+@require_POST
+def approval_delivery(request, pk):
+    return _approval_action(request, lambda: approval_service.set_delivery(
+        request.user, pk, request.POST.get("use_account_email") == "1", request.POST.get("other_email", "")), "Saved.")
 
 
 # ---------- change password (behind the unlock) ----------

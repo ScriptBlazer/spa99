@@ -5,7 +5,7 @@ from simple_history.admin import SimpleHistoryAdmin
 from common.admin import ExportCsvMixin
 
 from . import invites
-from .models import GoldApplication, GoldChoice, GoldInvite, GoldRule, GoldSignalSource
+from .models import ApproverDelivery, GoldApplication, GoldChoice, GoldInvite, GoldRule, GoldSignalSource
 from .services import resend_approver_email
 
 
@@ -38,7 +38,8 @@ class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
     list_display = ("reference", "full_name", "email", "potential_level", "potential_score", "status", "email_sent_at", "created_at")
     list_filter = ("status", "potential_level", "industry", "property_link")
     search_fields = ("reference", "first_name", "last_name", "email", "company")
-    readonly_fields = ("reference", "created_at", "updated_at", "email_sent_at", "email_error", "approved_at", "approved_by")
+    readonly_fields = ("reference", "created_at", "updated_at", "email_sent_at", "email_error", "approved_at", "approved_by",
+                       "final_requested_at", "final_requested_by", "sent_back_at", "sent_back_by", "sent_back_note")
     inlines = [GoldInviteInline]
     actions = ["resend_email", "approve_and_invite", "resend_invite"]
 
@@ -54,7 +55,7 @@ class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
         if done[invites.ACTIVATED]:
             self.message_user(request, f"Approved, Gold added to their existing account: {done[invites.ACTIVATED]}.", messages.SUCCESS)
         if done[invites.SKIPPED]:
-            self.message_user(request, f"Skipped (declined or already approved): {done[invites.SKIPPED]}.", messages.WARNING)
+            self.message_user(request, f"Skipped (declined, already approved or awaiting final approval): {done[invites.SKIPPED]}.", messages.WARNING)
 
     @admin.action(description="Resend invite (the old link stops working)", permissions=["change"])
     def resend_invite(self, request, queryset):
@@ -93,6 +94,20 @@ class GoldInviteAdmin(admin.ModelAdmin):
     list_display = ("application", "created_at", "sent_at", "expires_at", "used_at", "revoked_at")
     list_filter = ("used_at", "revoked_at")
     search_fields = ("application__reference", "application__email")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ApproverDelivery)
+class ApproverDeliveryAdmin(ExportCsvMixin, admin.ModelAdmin):
+    """Where a person's approval emails go. Set in System > Approval; the admin only shows it."""
+
+    list_display = ("user", "use_account_email", "other_email")
+    readonly_fields = ("user", "use_account_email", "other_email", "created_at", "updated_at")
 
     def has_add_permission(self, request):
         return False

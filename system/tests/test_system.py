@@ -144,20 +144,20 @@ class RecipientsTests(TestCase):
         self.client = unlocked_client(make_user())
 
     def test_recipients_are_validated_saved_in_the_database_and_logged(self):
-        bad = self.client.post("/emails/", {"gold_approver_emails": "a@example.test, nonsense", "gold_approver_cc": "", "contact_email": ""})
+        bad = self.client.post("/emails/", {"gold_approver_cc": "a@example.test, nonsense", "contact_email": ""})
         self.assertEqual(bad.status_code, 400)
         self.assertContains(bad, "nonsense is not a valid email address", status_code=400)
-        self.client.post("/emails/", {"gold_approver_emails": "a@example.test, b@example.test", "gold_approver_cc": "c@example.test", "contact_email": "hello@example.test"})
+        self.client.post("/emails/", {"gold_approver_cc": "c@example.test", "contact_email": "hello@example.test"})
         site = SiteSettings.load()
-        self.assertEqual((site.approver_list, site.approver_cc_list, site.contact_address), (["a@example.test", "b@example.test"], ["c@example.test"], "hello@example.test"))
-        self.assertEqual(SystemChange.objects.filter(section="emails").count(), 3)
+        self.assertEqual((site.approver_cc_list, site.contact_address), (["c@example.test"], "hello@example.test"))
+        self.assertEqual(SystemChange.objects.filter(section="emails").count(), 2)
+        self.assertNotContains(self.client.get("/emails/"), "gold_approver_emails")  # typed approver addresses are retired
 
     def test_no_approver_means_nothing_sent_and_no_crash_and_env_settings_are_gone(self):
         from django.conf import settings
         from gold import tasks
 
         self.assertFalse(any(hasattr(settings, n) for n in ("GOLD_APPROVER_EMAILS", "GOLD_APPROVER_CC", "CONTACT_EMAIL")))
-        self.assertEqual(SiteSettings.load().approver_list, [])
         self.assertTrue(callable(tasks.send_gold_emails))  # empty list behaviour is covered in gold.tests (sends nothing, logs once)
 
 

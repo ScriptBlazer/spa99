@@ -118,14 +118,18 @@ class _Rollback(Exception):
     pass
 
 
-def approve_and_invite(application, approved_by):
+def approve_and_invite(application, approved_by, from_final=False):
     """Approve one application. Returns INVITED, ACTIVATED (existing account) or SKIPPED (declined, already approved,
-    or Gold could not be activated: nothing is changed or sent then). Safe against two people approving at once."""
+    or Gold could not be activated: nothing is changed or sent then). Safe against two people approving at once.
+    An application awaiting final approval is only approved by `from_final=True` (a final approver's Confirm), and
+    `from_final` only works on an application that is awaiting final approval. The review rule itself is in gold.approval."""
     existing = get_user_model().objects.filter(email__iexact=application.email).first()
     try:
         with transaction.atomic():
             fresh = GoldApplication.objects.select_for_update().get(pk=application.pk)
             if fresh.status in (GoldApplication.DECLINED, GoldApplication.APPROVED):
+                return SKIPPED
+            if (fresh.status == GoldApplication.AWAITING_FINAL) != from_final:
                 return SKIPPED
             fresh.status = GoldApplication.APPROVED
             fresh.approved_at = timezone.now()

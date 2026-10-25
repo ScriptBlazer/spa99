@@ -21,9 +21,10 @@ Branch `feature/system`. Decisions: PROJECT.md rows 2026-10-23 (three staff fron
 | **Hours and closures** | Opening rules (periods, daily closure, Shabbos/Yom Tov offsets), one-off closures, capacity |
 | **Gold rules** | Potential weights and thresholds; which answers count as property |
 | **Journey** | Questions and options: labels, order, hidden, plan and Gold points per option |
-| **Emails** | Recipients (Gold approver list, CC, contact email); template wording for each notification. Transport and secrets stay in env |
+| **Emails** | Gold approver CC and contact email; template wording for each notification. Transport and secrets stay in env |
+| **Approval** (2026-10-25) | Who approves Gold (Approver, Office+) and who gives the final approval to Low potential ones (Final approver, Admin+), and where each person's emails go. See `docs/features/gold-final-approval.md` |
 | **Settings** | Opening date, stage switches (registration / subscribe / book), wording |
-| **Team** | Team members with level (Office, Admin, Developer, Superuser) and Approver; add, change level, deactivate, remove from team, merge duplicate accounts |
+| **Team** | Team members with level (Office, Admin, Developer, Superuser) and read-only Approver / Final approver labels (set in Approval); add, change level, deactivate, remove from team, merge duplicate accounts |
 
 Later (own phases): stay periods, RFID and Face ID rules, access windows, sales and offers (need the access hardware), content and images.
 

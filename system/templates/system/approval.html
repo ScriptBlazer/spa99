@@ -1,0 +1,31 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Approval" description="Who approves Gold applications, and who gives the final approval to Low potential ones. Team only shows these roles; they are set here." %}
+{% if final_approver_missing %}<p class="sys-note" data-final-approver-missing>No final approver is set, so a Low potential application is approved at once by one approver.</p>{% endif %}
+
+<section class="sys-panel" aria-label="Approvers" data-system-approval="approver">
+  <header><h2>Approvers</h2><p class="sys-muted">Office level or higher. They approve, decline and resend Gold applications and get an email for each one.</p></header>
+  <form method="post" action="{% url 'system_approval_approvers_add' %}" data-problems data-system-add-form data-system-candidates="approver">{% csrf_token %}
+    <label>Add approvers
+      <select name="user" multiple aria-label="Team members to add as approvers">{% for c in approver_candidates %}<option value="{{ c.id }}">{{ c.name }} ({{ c.email }}, {{ c.level_label }})</option>{% endfor %}</select>
+    </label>
+    <button type="submit" class="sys-btn primary sm">Add</button>
+  </form>
+  {% include "system/_approval_people.html" with people=approvers role="approver" %}
+</section>
+
+<section class="sys-panel" aria-label="Final approvers" data-system-approval="final">
+  <header><h2>Final approvers</h2><p class="sys-muted">Admin level or higher. They confirm or send back an application the approvers approved with Low potential. They cannot decline.</p></header>
+  <form method="post" action="{% url 'system_approval_final_add' %}" data-problems data-system-add-form data-system-candidates="final">{% csrf_token %}
+    <label>Add final approvers
+      <select name="user" multiple aria-label="Team members to add as final approvers">{% for c in final_candidates %}<option value="{{ c.id }}">{{ c.name }} ({{ c.email }}, {{ c.level_label }})</option>{% endfor %}</select>
+    </label>
+    <button type="submit" class="sys-btn primary sm">Add</button>
+  </form>
+  {% include "system/_approval_people.html" with people=final_approvers role="final" %}
+</section>
+
+<section class="sys-panel" aria-label="Copies">
+  <p class="sys-muted" data-system-approval-cc>Copied on each Gold application email: {% if cc %}{{ cc|join:", " }}{% else %}nobody{% endif %}. Change it in <a href="{% url 'system_emails' %}">Emails</a>.</p>
+</section>
+{% endblock %}

@@ -1,7 +1,7 @@
 {% extends "office/base.html" %}
 {% load office_tags %}
 {% block title %}{{ application.name }} | Spa 99 Office{% endblock %}
-{% block body_attrs %}data-office-detail{% if office_can.can_act %} data-has-bar{% endif %}{% endblock %}
+{% block body_attrs %}data-office-detail{% if office_can.can_act or office_can.can_final %} data-has-bar{% endif %}{% endblock %}
 {% block header_left %}<a class="o-back" href="{% url 'office_gold' %}">{% include "office/_icon.html" with name="chevron-left" %}<span>Gold</span></a>{% endblock %}
 {% block main %}
 {% with a=application %}
@@ -26,16 +26,23 @@
         <p class="o-sub">{% include "office/_invite_state.html" with invite=a.invite %}</p>
       {% elif a.status == "declined" %}
         <p class="o-state">Declined {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>
+      {% elif a.awaiting_final %}
+        <p class="o-state" data-awaiting-final>Awaiting final approval{% if a.final_requested_by %}. Approved by {{ a.final_requested_by|first_word }} {{ a.final_requested_at|dm }}, but the potential is Low.{% endif %}</p>
       {% endif %}
+      {% if a.sent_back %}<div class="o-note" data-sent-back>
+        <p class="o-state">Sent back {{ a.sent_back.at|dm }}{% if a.sent_back.by %} by {{ a.sent_back.by|first_word }}{% endif %}</p>
+        {% if a.sent_back.note %}<p class="o-sub" data-sent-back-note>{{ a.sent_back.note|linebreaksbr }}</p>{% endif %}
+      </div>{% endif %}
+      {% if final_approver_missing and a.potential == "low" and a.can_approve and office_can.can_act %}<p class="o-state o-state--warn" data-final-approver-missing>No final approver is set, so a Low potential approval goes through at once. Set one in System, Approval.</p>{% endif %}
       <div class="o-actions-rail">{% include "office/_gold_actions.html" %}</div>
-      {% if office_can.can_act and a.can_approve %}<p class="o-sub">He gets an email to set up his account. The link lasts 14 days.</p>{% endif %}
+      {% if office_can.can_act and a.can_approve %}<p class="o-sub">He gets an email to set up his account. The link lasts 14 days.{% if a.potential == "low" and not final_approver_missing and not a.sent_back %} The potential is Low, so a final approver confirms first.{% endif %}</p>{% endif %}
       {% if a.person_id and office_can.can_see_all %}<a class="o-quiet" href="{% url 'office_person' a.person_id %}">Open his account</a>{% endif %}
       <h3 class="o-h4">History</h3>
       <ul class="o-history" data-gold-history>{% for h in a.history %}<li>{{ h.at|dt }} &middot; {{ h.text }}</li>{% endfor %}</ul>
     </section>
   </aside>
 </div>
-{% if office_can.can_act %}
+{% if office_can.can_act or office_can.can_final %}
 <div class="o-bar" data-region="decision-bar" data-office-bar>
   {% if a.status == "approved" %}<p class="o-state">Approved {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>
   {% elif a.status == "declined" %}<p class="o-state">Declined {{ a.decided_at|dm }}{% if a.decided_by %} by {{ a.decided_by|first_word }}{% endif %}</p>{% endif %}

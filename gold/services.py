@@ -235,6 +235,8 @@ def export_applications(email):
             **({"internal_notes": a.internal_notes} if a.internal_notes else {}),
             "spa_interest": a.spa_interest,
             "approved_at": a.approved_at.isoformat() if a.approved_at else None,
+            "sent_back_at": a.sent_back_at.isoformat() if a.sent_back_at else None,
+            **({"sent_back_note": a.sent_back_note} if a.sent_back_note else {}),
             "invites": [
                 {"created_at": i.created_at.isoformat(), "sent_at": i.sent_at.isoformat() if i.sent_at else None,
                  "expires_at": i.expires_at.isoformat(), "used_at": i.used_at.isoformat() if i.used_at else None,

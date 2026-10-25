@@ -55,10 +55,10 @@ class TeamManagementTests(TestCase):
 
     def test_a_new_email_gets_an_account_without_a_password_and_an_invite(self):
         with self.captureOnCommitCallbacks(execute=True):
-            user, created = team.add_member(self.dev, "New.Person@Example.com", "office", approver=True)
+            user, created = team.add_member(self.dev, "New.Person@Example.com", "office")
         self.assertTrue(created)
         self.assertEqual((user.email, user.is_staff, user.has_usable_password()), ("new.person@example.com", True, False))
-        self.assertEqual(levels.held(user), ("office", True))
+        self.assertEqual(levels.held(user), ("office", False))  # approval roles are set in System > Approval, never here
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("added to the Spa 99 team", mail.outbox[0].subject)
         self.assertIn("/reset/", mail.outbox[0].body)
@@ -97,9 +97,12 @@ class TeamManagementTests(TestCase):
 
     def test_the_team_screen_posts_use_the_same_guards(self):
         client = unlocked_client(self.dev)
-        other = at("admin", "other@example.com")
-        client.post(f"/team/{other.pk}/access/", {"level": "office", "approver": "1"})
-        self.assertEqual(levels.held(other), ("office", True))
+        other = at("admin", "other@example.com", approver=True)
+        client.post(f"/team/{other.pk}/access/", {"level": "office", "approver": "0"})  # the old Approver toggle is gone: ignored
+        self.assertEqual(levels.held(other), ("office", True))  # level changed, the Approver role is untouched
+        page = client.get("/team/")
+        self.assertNotContains(page, 'name="approver"')
+        self.assertContains(page, 'data-system-role="Approver"')
         client.post("/team/add/", {"email": "fresh@example.com", "level": "admin"})
         self.assertTrue(User.objects.filter(email="fresh@example.com", is_staff=True).exists())
         client.post("/team/add/", {"email": "bad@example.com", "level": "developer"})  # not above your own level
@@ -167,7 +170,7 @@ class MigrateRolesTests(TestCase):
         call_command("migrate_roles", stdout=StringIO())
         self.assertEqual([levels.held(u) for u in (owner, viewer, approver, dev)], [("admin", False), ("office", False), ("office", True), ("developer", False)])
         call_command("setup_roles", stdout=StringIO())
-        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {"Office", "Admin", "Developer", "Approver"})
+        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {"Office", "Admin", "Developer", "Approver", "Final approver"})
         self.assertEqual(levels.held(dev), ("developer", False))
 
 

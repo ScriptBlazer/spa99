@@ -184,9 +184,9 @@ function riskSpec(changes) {
 function specFor(form) {
   if (form.matches('form[data-system-form]') && initial.has(form)) return riskSpec(changesOf(form));
   if (form.matches('[data-system-access-form]')) {
-    const select = $('select[name=level]', form), box = $('input[name=approver]', form);
-    const describe = (level, approver) => (select.querySelector(`option[value="${level}"]`)?.textContent || level) + (approver && level !== 'none' ? ' and Approver' : '');
-    const was = describe(form.dataset.level, form.dataset.approver === '1'), now = describe(select.value, box.checked);
+    const select = $('select[name=level]', form);
+    const describe = (level) => select.querySelector(`option[value="${level}"]`)?.textContent || level;
+    const was = describe(form.dataset.level), now = describe(select.value);
     if (was === now) return null;
     return { title: `Change access on ${ENV}?`, rows: [{ label: form.dataset.systemPersonLabel, old: was, now }], line: form.dataset.line, action: 'Change 1 access' };
   }
