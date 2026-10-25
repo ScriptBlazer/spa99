@@ -10,7 +10,7 @@
     <tbody>
     {% for row in rows %}{% with pk=row.obj.pk f=row.form %}
       <tr data-system-gold-rule="{{ row.obj.group }}:{{ row.obj.match_value }}" data-row-label="{{ row.obj.get_group_display }} {{ row.obj.match_value }}"{% if not row.obj.active %} data-hidden{% endif %}>
-        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_gold_save' pk %}" data-system-form="gold-rule" data-system-risky="{{ risky_fields|join:',' }}" data-noun="Gold rule" data-plural="Gold rules" data-line="Gold applications are judged on the new value at once.">{% csrf_token %}</form>
+        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_gold_save' pk %}" data-system-form="gold-rule" data-system-risky="{{ risky_fields|join:',' }}" data-noun="Gold rule" data-plural="Gold rules" data-line="Gold applications are judged on the new value at once.">{% csrf_token %}</form>{% token f.row_token pk %}
           {{ row.obj.get_group_display }} · <span class="mono">{{ row.obj.match_value }}</span></td>
         <td>{% cell f.label pk "Label" %}</td>
         <td class="sys-num">{% cell f.points pk "Points" %}</td>

@@ -170,6 +170,12 @@ def cell(field, pk, label=""):
 
 
 @register.simple_tag
+def token(field, pk):
+    """The row's version token (hidden), tied to the row's own `<form id="f-<pk>">` like `cell`. Empty when the form has none."""
+    return field.as_widget(attrs={"form": f"f-{pk}"}) if field is not None and field != "" else ""
+
+
+@register.simple_tag
 def switch(field, text=True):
     """The one switch: a real checkbox (role=switch) with a 36x20 track, and On/Off beside it (system.js keeps it current)."""
     from django.utils.html import format_html

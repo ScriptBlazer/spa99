@@ -372,6 +372,6 @@ html:has(.register) { scroll-padding-top: calc(var(--header-h) + var(--space-4))
 /* Virtual tour: see tour.css (linked on the tour pages only). */
 
 /* Sign-up money reassurance and the discount contact line (register and choose-membership screens) */
-.no-payment { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--s-muted); text-align: center; }
+.no-payment { margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--s-muted); text-align: center; }
 .discount-line { margin-top: var(--space-3); text-align: center; max-width: none; }
 .m-title .discount-line { text-align: left; }

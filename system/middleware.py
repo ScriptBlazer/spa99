@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user
 from django.http import Http404
 from django.shortcuts import redirect
+from django.utils.cache import add_never_cache_headers
 from django.views.defaults import page_not_found
 
 from . import audit, changes, services
@@ -8,6 +9,25 @@ from . import audit, changes, services
 OPEN_PATHS = ("/login/", "/health/", "/robots.txt")
 # browsers ask for these on their own: still a plain 404, but never written to the audit log as an access attempt
 QUIET_PATHS = ("/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png")
+
+
+SYSTEM_URLCONF = "config.urls_system"
+
+
+class SystemHeadersMiddleware:
+    """Every response on the System host (404s, redirects, the CSV included) is never cached, by the browser or a proxy, and
+    may not be framed (`frame-ancestors 'none'`, beside Caddy's header). Sits right after HostRoutingMiddleware, outside
+    the gate, so the gate's own 404 carries them too. Static files are served before it and stay cacheable."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if getattr(request, "urlconf", "") == SYSTEM_URLCONF:
+            add_never_cache_headers(response)
+            response["Content-Security-Policy"] = "frame-ancestors 'none'"
+        return response
 
 
 class SystemGateMiddleware:
@@ -20,7 +40,7 @@ class SystemGateMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if getattr(request, "urlconf", "") == "config.urls_system" and request.path not in OPEN_PATHS:
+        if getattr(request, "urlconf", "") == SYSTEM_URLCONF and request.path not in OPEN_PATHS:
             user = get_user(request)
             if not services.may_use_system(user) or not request.session.get(services.SIGNED_IN_KEY):
                 request.user = user  # for the log row (CSRF and auth middleware have not set it yet)

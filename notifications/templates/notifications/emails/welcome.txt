@@ -3,7 +3,9 @@
 Thank you for confirming your email. {% if plan_name %}We have noted your registration for {{ plan_name }}.{% else %}We have noted your registration.{% endif %}
 
 There is nothing to pay and nothing more to do right now. We will write to you before booking opens{% if opening_text %}, {{ opening_text }}{% endif %}.
-
+{% if discount_url %}
+Looking for a better rate? Message us on WhatsApp: {{ discount_url }}
+{% endif %}
 Your account ID is {{ account_id }}.
 
 {{ site_name }}, {{ address }}

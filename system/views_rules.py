@@ -13,7 +13,7 @@ from plans.models import Closure, OpeningRule, Plan, SiteSettings
 from . import forms_rules as f
 from . import services
 from .permissions import unlocked
-from .views import page, saved
+from .views import form_status, page, saved
 from django.views.decorators.http import require_GET, require_POST
 
 
@@ -36,9 +36,9 @@ def _save(request, model, form_class, pk, key, url_name, build, **kwargs):
             else:
                 messages.info(request, "Nothing changed.")
             return redirect(url_name)
-        except ValidationError as error:  # a rule only the whole row can check
+        except ValidationError as error:  # a rule only the whole row can check, or the row changed since the page was made
             form.add_error(None, error)
-    return build(request, {key: form}, 400)
+    return build(request, {key: form}, form_status(form))
 
 
 # ---------- plans ----------

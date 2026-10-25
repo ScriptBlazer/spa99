@@ -1,5 +1,5 @@
 {% extends "users/member_base.html" %}
-{% load pages_tags %}
+{% load pages_tags content_tags %}
 {% block head_title %}{% include "common/_head.html" with title="Membership | My Spa 99" %}{% endblock %}
 {% block main %}
 <section class="m-screen" data-screen="membership">
@@ -16,6 +16,7 @@
     <h1>{% if current_plan %}{{ current_plan.name }}{% else %}Choose your membership{% endif %}</h1>
     {% if current_plan %}<p class="lead num" data-price>&pound;{{ current_plan.price_whole }} a month, ex VAT (&pound;{{ current_plan.price_inc }} inc VAT)</p>
     <p class="muted">Nothing to pay now. Billing opens in {{ opening }}.</p>{% endif %}
+    {% discount_line %}
     {% if suggested_plan %}<p class="muted" data-suggestion>Your journey suggested {{ suggested_plan.name }}.</p>
     {% if suggestion_differs %}<form method="post" action="{% url 'account_interest' %}">{% csrf_token %}<input type="hidden" name="plan" value="{{ suggested_plan.slug }}"><button type="submit" class="btn-quiet" data-working-text="Saving">Switch to {{ suggested_plan.name }}</button></form>{% endif %}{% endif %}
   </div>

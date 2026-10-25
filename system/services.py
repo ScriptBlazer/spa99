@@ -1,4 +1,6 @@
 """System logic: saving with a person recorded, undo, the change list, the dashboard figures and Team. Views stay short."""
+import hashlib
+import json
 import time
 from datetime import date, timedelta
 
@@ -116,6 +118,29 @@ def note_idle_lock(request):
 
 # ---------- saving and undo ----------
 
+STALE_MESSAGE = "Changed since you opened it. Reload to see the latest."
+
+
+def row_fingerprint(obj, fields):
+    """A short fingerprint of a row's editable values (the named model fields, as plain JSON). It is the page's version of
+    the row: every System form carries it in a hidden field, and a save is refused when the row no longer has it (someone
+    else changed it since the page was opened). Used on the unlocked rule forms, Settings and Emails, and by the code view.
+    Chosen over updated_at because every row has these values, and two forms on one row (Settings and Capacity both edit the
+    site settings row) only clash when they change the same fields."""
+    parts = []
+    for name in fields:
+        field = obj._meta.get_field(name)
+        parts.append([name, changes.to_json(getattr(obj, field.attname))])
+    text = json.dumps(parts, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(text.encode()).hexdigest()[:24]
+
+
+def current_row(obj, lock=False):
+    """The row as it is in the database now (optionally locked until the transaction ends), or None. No joins."""
+    queryset = type(obj)._default_manager.select_for_update() if lock else type(obj)._default_manager
+    return queryset.filter(pk=obj.pk).first()
+
+
 @transaction.atomic
 def save_logged(obj, user, fields=None):
     """Save a row with the person recorded in its history (the log entries are written from that history row)."""
@@ -125,13 +150,17 @@ def save_logged(obj, user, fields=None):
     return obj
 
 
+@transaction.atomic
 def save_form(form, user):
-    """Save a valid ModelForm through the change log: a new row is created, an existing one saves only the fields that
-    changed. Returns True when something was written."""
+    """Save a valid form through the change log: a new row is created, an existing one saves only the fields that changed.
+    Returns True when something was written. A form with a version token (system.forms.VersionedForm) is checked again
+    against the locked row first, so two saves at once cannot both pass; a stale form raises ValidationError (form.stale)."""
     obj = form.instance
     if obj._state.adding:
         save_logged(obj, user)
         return True
+    if hasattr(form, "ensure_current"):
+        form.ensure_current(lock=True)
     if not form.changed_data:
         return False
     save_logged(obj, user, fields=form.changed_data)
@@ -158,7 +187,7 @@ def undo_change(change, user):
         change = SystemChange.objects.select_for_update().get(pk=change.pk)  # no select_related: Postgres cannot lock nullable joins
         if change.undone_by.exists():
             raise ChangeRefused("This change has already been undone.")
-        obj = model.objects.filter(pk=change.object_pk).first()
+        obj = model.objects.select_for_update().filter(pk=change.object_pk).first()  # locked: no joins
         if obj is None:
             raise ChangeRefused("That row no longer exists.")
         if changes.to_json(getattr(obj, field.attname)) != change.new_value:
@@ -167,8 +196,8 @@ def undo_change(change, user):
         try:
             with changes.undoing(change.pk):
                 save_logged(obj, user, fields=[field.name])
-        except ValidationError as error:
-            raise ChangeRefused(" ".join(error.messages)) from error
+        except ValidationError as error:  # the old value now breaks a rule (the model's clean(): same rules as the forms)
+            raise ChangeRefused(f"The old value now breaks a rule, so it was not put back. {' '.join(error.messages)}") from error
     return obj
 
 
@@ -346,7 +375,8 @@ def run_job_now(name):
 def remove_suppression(request, row):
     """Take an address off the email suppression list (Developer level, behind the unlock) and write it to the audit log.
     The audit event is written first: if it cannot be written the address stays suppressed."""
-    event = audit.log_event(SystemEvent.SUPPRESSION_REMOVED, request, user=request.user, detail={"email": row.email, "reason": row.reason})
-    if event is None:
-        raise ChangeRefused("The audit log could not be written, so nothing was removed.")
-    row.delete()
+    with transaction.atomic():  # the event and the delete stand or fall together
+        event = audit.log_event(SystemEvent.SUPPRESSION_REMOVED, request, user=request.user, detail={"email": row.email, "reason": row.reason})
+        if event is None:
+            raise ChangeRefused("The audit log could not be written, so nothing was removed.")
+        row.delete()

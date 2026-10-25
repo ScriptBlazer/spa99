@@ -228,7 +228,7 @@ def _plural(n, word):
 EVENT_ICONS = {
     SystemEvent.SIGN_IN: "sign-in", SystemEvent.UNLOCK: "lock-key-open", SystemEvent.LOCK_MANUAL: "lock-key", SystemEvent.LOCK_IDLE: "timer",
     SystemEvent.SIGN_OUT: "sign-out", SystemEvent.SESSION_EXPIRED: "timer", SystemEvent.EXPORT: "download-simple",
-    SystemEvent.ROLE_CHANGED: "user-gear", SystemEvent.USER_DEACTIVATED: "user-gear", SystemEvent.USER_REACTIVATED: "user-gear",
+    SystemEvent.PASSWORD_CHANGED: "lock-key", SystemEvent.ROLE_CHANGED: "user-gear", SystemEvent.USER_DEACTIVATED: "user-gear", SystemEvent.USER_REACTIVATED: "user-gear",
     SystemEvent.UNDO: "arrow-counter-clockwise", SystemEvent.UNDO_ALL: "arrow-counter-clockwise", SystemEvent.AUDIT_PRUNED: "minus",
 }
 CATEGORY_WORDS = {"change": "Change", "security": "Security", "undo": "Undo", "failure": "Failure"}

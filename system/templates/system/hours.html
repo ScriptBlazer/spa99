@@ -8,7 +8,7 @@
   <section class="sys-panel" data-system-capacity><header><h2>Capacity and slots</h2></header>
     <div class="sys-group">
       {% if capacity_form.non_field_errors %}<p class="sys-note error" role="alert">{{ capacity_form.non_field_errors|join:" " }}</p>{% endif %}
-      {% for field in capacity_form %}{% include "system/_field_row.html" %}{% endfor %}
+      {% for field in capacity_form.visible_fields %}{% include "system/_field_row.html" %}{% endfor %}{{ capacity_form.row_token }}
     </div>
   </section>
   <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>
@@ -20,7 +20,7 @@
     <tbody>
     {% for row in rules %}{% with pk=row.obj.pk f=row.form %}
       <tr data-system-rule="{{ row.obj.key }}" data-row-label="{{ row.obj.key }}"{% if not row.obj.active %} data-hidden{% endif %}>
-        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_rule_save' pk %}" data-system-form="rule" data-system-risky="{{ risky_fields|join:',' }}" data-noun="opening rule setting" data-plural="opening rule settings" data-line="Opening hours change at once.">{% csrf_token %}</form>
+        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_rule_save' pk %}" data-system-form="rule" data-system-risky="{{ risky_fields|join:',' }}" data-noun="opening rule setting" data-plural="opening rule settings" data-line="Opening hours change at once.">{% csrf_token %}</form>{% token f.row_token pk %}
           <span class="sys-name"><span class="mono">{{ row.obj.key }}</span><span class="sys-muted">{{ row.obj.get_kind_display }}</span></span></td>
         <td>{% cell f.label pk "Label" %}</td>
         <td>{% cell f.start_time pk "Start" %}</td>
@@ -49,7 +49,7 @@
     <tbody>
     {% for row in closures %}{% with pk=row.obj.pk f=row.form %}
       <tr data-system-closure="{{ pk }}" data-row-label="{{ row.obj.name }}"{% if not row.obj.active %} data-hidden{% endif %}>
-        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_closure_save' pk %}" data-system-form="closure" data-system-risky="{{ risky_fields|join:',' }}" data-noun="closure setting" data-plural="closure settings" data-line="Booking is blocked or opened for these dates at once.">{% csrf_token %}</form>
+        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_closure_save' pk %}" data-system-form="closure" data-system-risky="{{ risky_fields|join:',' }}" data-noun="closure setting" data-plural="closure settings" data-line="Booking is blocked or opened for these dates at once.">{% csrf_token %}</form>{% token f.row_token pk %}
           <form id="d-{{ pk }}" method="post" action="{% url 'system_closure_delete' pk %}" data-system-form="closure-delete" data-system-confirm="closure" data-system-confirm-label="Remove closure" data-system-confirm-what="{{ row.obj.name }}" data-noun="closure" data-plural="closures" data-line="Booking opens for these dates at once. This is logged but cannot be undone.">{% csrf_token %}</form>
           {% cell f.name pk "Name" %}</td>
         <td>{% cell f.starts_at pk "Starts" %}</td>

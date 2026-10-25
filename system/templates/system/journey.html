@@ -17,7 +17,7 @@
     <tbody>
     {% for row in q.options %}{% with pk=row.obj.pk f=row.form %}
       <tr data-system-option="{{ row.obj.value }}" data-row-label="{{ row.obj.value }}"{% if not row.obj.active %} data-hidden{% endif %}>
-        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_option_save' pk %}" data-system-form="option" data-system-risky="{{ risky_fields|join:',' }}" data-noun="option setting" data-plural="option settings" data-line="Suggestions change at once.">{% csrf_token %}</form><span class="mono">{{ row.obj.value }}</span></td>
+        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_option_save' pk %}" data-system-form="option" data-system-risky="{{ risky_fields|join:',' }}" data-noun="option setting" data-plural="option settings" data-line="Suggestions change at once.">{% csrf_token %}</form>{% token f.row_token pk %}<span class="mono">{{ row.obj.value }}</span></td>
         <td>{% cell f.label pk "Label" %}</td>
         <td class="sys-num">{% cell f.order pk "Order" %}</td>
         <td>{% cell f.plan_points pk "Plan points" %}</td>

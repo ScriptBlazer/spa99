@@ -11,7 +11,7 @@
         <td>{{ row.get_reason_display }}</td>
         <td>{{ row.last_seen|date:"j M Y H:i" }}</td>
         <td>{{ row.count }}</td>
-        <td><form method="post" action="{% url 'system_suppression_remove' row.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="sys-btn sm">Remove</button></form></td>
+        <td><form method="post" action="{% url 'system_suppression_remove' row.pk %}" style="display:inline" data-system-form="suppression-remove" data-system-confirm="email suppression" data-system-confirm-label="Remove suppression" data-system-confirm-what="{{ row.email }}" data-noun="suppression" data-plural="suppressions" data-line="This address can be emailed again. This is logged in the audit log.">{% csrf_token %}<button type="submit" class="sys-btn sm">Remove</button></form></td>
       </tr>
     {% empty %}
       <tr><td colspan="5" class="sys-muted">No suppressed addresses.</td></tr>

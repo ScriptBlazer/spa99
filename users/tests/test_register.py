@@ -356,21 +356,40 @@ class NoPaymentAndDiscountLineTests(TestCase):
     def setUpTestData(cls):
         seed_all()
 
-    def test_register_says_nothing_is_paid_and_no_card_is_taken(self):
-        self.assertContains(Client().get("/register/"), "Nothing to pay now. No card details needed.")
+    def _member_client(self):
+        user = User.objects.create_user(email="m@example.com", password=PASSWORD, first_name="Moe", email_verified_at=timezone.now())
+        from plans.models import Plan
+        InterestRegistration.objects.create(user=user, plan=Plan.objects.get(slug="tier-2"))
+        client = Client()
+        client.force_login(user)
+        return client, user
 
-    def test_discount_link_shows_when_set_opens_in_a_new_tab_and_is_marked_on_dev_when_blank(self):
+    def test_register_says_registering_is_free_and_shows_no_whatsapp_line(self):
+        SiteSettings.objects.update(discount_contact_url="https://wa.me/447000000000")
+        html = Client().get("/register/").content.decode()
+        self.assertIn("Registering is free. Payment will be taken before your first booking.", html)
+        self.assertNotIn("better rate", html)
+
+    def test_whatsapp_line_is_on_the_signed_in_membership_page(self):
         url = "https://wa.me/447000000000"
         SiteSettings.objects.update(discount_contact_url=url)
-        html = Client().get("/register/").content.decode()
+        client, _ = self._member_client()
+        html = client.get("/account/membership/").content.decode()
+        self.assertIn("Message us on WhatsApp", html)
         self.assertIn(f'href="{url}" target="_blank" rel="noopener noreferrer"', html)
+        self.assertNotIn("Barry", html)
         SiteSettings.objects.update(discount_contact_url="")
         with override_settings(DEBUG=True):
-            self.assertContains(Client().get("/register/"), "WhatsApp link to come")
+            self.assertContains(client.get("/account/membership/"), "WhatsApp link to come")
+        with override_settings(DEBUG=False):
+            self.assertNotContains(client.get("/account/membership/"), "better rate")
 
-    @override_settings(DEBUG=False)
-    def test_discount_line_is_hidden_on_live_while_blank(self):
+    def test_welcome_email_carries_the_whatsapp_line_only_when_set(self):
+        from users.tasks import send_welcome_email
+        _, user = self._member_client()
+        SiteSettings.objects.update(discount_contact_url="https://wa.me/447000000000")
+        send_welcome_email(user.pk)
+        self.assertIn("Message us on WhatsApp: https://wa.me/447000000000", mail.outbox[-1].body)
         SiteSettings.objects.update(discount_contact_url="")
-        html = Client().get("/register/").content.decode()
-        self.assertNotIn("better rate", html)
-        self.assertNotIn("link to come", html)
+        send_welcome_email(user.pk)
+        self.assertNotIn("WhatsApp", mail.outbox[-1].body)

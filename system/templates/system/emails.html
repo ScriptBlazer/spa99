@@ -6,7 +6,7 @@
     <header><h2>Recipients</h2></header>
     <div class="sys-group">
       {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error>{{ form.non_field_errors|join:" " }}</p>{% endif %}
-      {% for field in form %}{% include "system/_field_row.html" %}{% endfor %}
+      {% for field in form.visible_fields %}{% include "system/_field_row.html" %}{% endfor %}{{ form.row_token }}
     </div>
   </section>
   <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>

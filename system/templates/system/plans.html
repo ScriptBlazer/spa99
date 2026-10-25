@@ -11,7 +11,7 @@
     <tbody>
     {% for row in rows %}{% with pk=row.obj.pk f=row.form %}
       <tr data-system-plan="{{ row.obj.slug }}" data-row-label="{{ row.obj.slug }}"{% if not row.obj.visible %} data-hidden{% endif %}>
-        <td class="sys-nameCell"><form id="f-{{ pk }}" method="post" action="{% url 'system_plan_save' pk %}" data-system-form="plan" data-system-risky="{{ risky_fields|join:',' }}" data-noun="plan setting" data-plural="plan settings" data-line="Members see the changes at once.">{% csrf_token %}</form>
+        <td class="sys-nameCell"><form id="f-{{ pk }}" method="post" action="{% url 'system_plan_save' pk %}" data-system-form="plan" data-system-risky="{{ risky_fields|join:',' }}" data-noun="plan setting" data-plural="plan settings" data-line="Members see the changes at once.">{% csrf_token %}</form>{% token f.row_token pk %}
           <span class="sys-name">{% cell f.name pk "Name" %}<span class="mono sys-muted" data-system-plan-name>{{ row.obj.slug }}{% if not row.obj.visible %} <span class="sys-badge">Hidden</span>{% endif %}</span></span></td>
         <td class="sys-num">£ {% cell f.price_ex_vat pk "Price ex VAT" %}</td>
         <td class="sys-num" data-system-price-inc-vat>£{{ row.obj.price_ex_vat|inc_vat:vat_rate }}</td>

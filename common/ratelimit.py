@@ -1,9 +1,11 @@
 """Small fixed-window rate limiter on Django's cache. No extra packages.
 
-Note: the default cache is per process (LocMem). With several gunicorn workers the real limit is
-roughly workers x limit. Point CACHES at the database or Redis later if a hard global limit is needed.
+The cache is the database cache (config.settings.base CACHES), so every gunicorn worker shares the count. If the cache
+cannot be reached (for example the table was never created) the limiter lets the request through and logs it: a broken
+cache must not lock everyone out of sign-in.
 """
 import hashlib
+import logging
 from functools import wraps
 
 from django.core.cache import cache
@@ -11,17 +13,23 @@ from django.http import JsonResponse
 
 from .audit import client_ip
 
+logger = logging.getLogger("spa99.ratelimit")
+
 
 def hit(scope, identifier, limit, window_seconds):
     """Count one hit. Returns True if the caller is still within `limit` per `window_seconds`."""
     digest = hashlib.sha256(str(identifier).encode()).hexdigest()[:32]
     key = f"rl:{scope}:{digest}"
-    if cache.add(key, 1, window_seconds):
-        return True
     try:
-        return cache.incr(key) <= limit
-    except ValueError:  # key expired between add and incr
-        cache.add(key, 1, window_seconds)
+        if cache.add(key, 1, window_seconds):
+            return True
+        try:
+            return cache.incr(key) <= limit
+        except ValueError:  # key expired between add and incr
+            cache.add(key, 1, window_seconds)
+            return True
+    except Exception:  # noqa: BLE001 - fail open, loudly
+        logger.exception("Rate limit cache unavailable for %s", scope)
         return True
 
 

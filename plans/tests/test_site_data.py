@@ -51,11 +51,13 @@ class HoursAndLabelsTests(TestCase):
     def setUpTestData(cls):
         seed_all()
 
-    def test_shabbos_line_is_a_field_on_the_rule(self):
-        self.assertIn(("Shabbos and Yom Tov", "Closed from Friday afternoon until Saturday night"), pages.opening_hours())
-        OpeningRule.objects.filter(key="shabbos-close").update(public_note="Closed on Shabbos")
-        self.assertIn(("Shabbos and Yom Tov", "Closed on Shabbos"), pages.opening_hours())
-        OpeningRule.objects.filter(key="shabbos-close").update(public_note="")
+    def test_shabbos_line_is_worked_out_from_the_offsets(self):
+        self.assertIn(("Shabbos and Yom Tov", "Closes 2 hours before Shabbos and Yom Tov begin. Opens 1 hour after they end."),
+                      pages.opening_hours())
+        OpeningRule.objects.filter(key="shabbos-close").update(offset_minutes=90)
+        self.assertIn(("Shabbos and Yom Tov", "Closes 90 minutes before Shabbos and Yom Tov begin. Opens 1 hour after they end."),
+                      pages.opening_hours())
+        OpeningRule.objects.filter(key__startswith="shabbos").update(offset_minutes=None, public_note="")
         self.assertFalse([row for row in pages.opening_hours() if "Shabbos" in row[0]])
         self.assertEqual(pages.hours_summary(), "Open 5am to 3am")
 
