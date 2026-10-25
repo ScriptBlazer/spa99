@@ -9,7 +9,7 @@ Decided 2026-10-24 (PROJECT.md): instead of hundreds of tests, one run drives a 
 | # | Name | Covers |
 |---|---|---|
 | 1 | `visitor` | home, the spa, tour, the journey through to a suggested tier, privacy, terms; no console errors, no 5xx |
-| 2 | `tier` | register interest in Tier 2, verification email link, sign in, `/account/` shows the tier, Book a visit opens |
+| 2 | `tier` | register for Tier 2, verification email link, sign in, `/account/` shows the tier, Book a visit opens |
 | 3 | `gold_approved` | Gold application, approver email, one-tap approve link (Office sign-in first), invite email, new member is Gold on the dashboard |
 | 4 | `gold_declined` | decline in the Office; declined state, not Gold, no account, no invite |
 | 5 | `account` | change password, reset by email link, delete account, deleted account cannot sign in |

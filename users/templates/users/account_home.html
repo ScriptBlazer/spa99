@@ -4,7 +4,7 @@
 <section class="m-screen" data-screen="home">
   <div class="m-title" data-reveal="hero">
     <h1>{{ greeting }}</h1>
-    <p class="lead muted" data-status="{{ status }}">{% if status == "gold" %}Gold member. We open in {{ opening }}.{% elif status == "registered" %}{{ status_name }} interest. We open in {{ opening }}.{% else %}No membership chosen yet. <a href="{% url 'account_membership' %}">Choose one</a>{% endif %}</p>
+    <p class="lead muted" data-status="{{ status }}">{% if status == "gold" %}Gold member. We open in {{ opening }}.{% elif status == "registered" %}{{ status_name }}. We open in {{ opening }}.{% else %}No membership chosen yet. <a href="{% url 'account_membership' %}">Choose one</a>{% endif %}</p>
   </div>
   <div class="m-tiles" data-reveal="stagger">
     <div class="m-cell m-cell--next">
@@ -18,7 +18,7 @@
     <div class="m-cell">
       <a class="m-tile" href="{% url 'account_membership' %}" data-tile="membership">
         <span class="m-tile-label">Membership</span>
-        <span class="m-tile-value">{% if is_gold %}Gold member{% elif interest_plan %}{{ interest_plan.name }} interest{% else %}Not chosen yet{% endif %}</span>
+        <span class="m-tile-value">{% if is_gold %}Gold member{% elif interest_plan %}{{ interest_plan.name }}{% else %}Not chosen yet{% endif %}</span>
       </a>
     </div>
     <div class="m-cell">

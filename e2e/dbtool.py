@@ -5,7 +5,7 @@ an event loop, where Django refuses database calls, so the run calls this in a c
 
   create-staff EMAIL PASSWORD LEVEL [--approver] [--first NAME] [--last NAME]   Office, Admin or Developer team account
   set-approver EMAIL        who receives Gold applications (the same field as System > Emails)
-  registrations             number of registered-interest rows
+  registrations             number of registration rows
   user EMAIL                {"exists", "count", "plan", "verified", "active"}
   gold EMAIL                {"status" (newest), "statuses", "waiting", "has_user", "count", "invites", "invites_used"}
   gold-total                number of Gold applications of any email

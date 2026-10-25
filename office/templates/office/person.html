@@ -23,7 +23,7 @@
       </dl>
     </section>
     {% if person.interest %}
-    <section class="o-card" data-person-interest aria-labelledby="p-plan"><h2 id="p-plan" class="o-h3">Plan interest</h2>
+    <section class="o-card" data-person-interest aria-labelledby="p-plan"><h2 id="p-plan" class="o-h3">Membership</h2>
       <dl class="o-rows">
         <div><dt>Plan</dt><dd>{{ person.interest.plan|default:"None chosen" }}</dd></div>
         <div><dt>Came from</dt><dd>{{ person.interest.source|default:"Not recorded"|capfirst }}</dd></div>

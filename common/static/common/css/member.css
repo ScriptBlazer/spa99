@@ -218,6 +218,9 @@ a.m-tile { touch-action: manipulation; -webkit-user-select: none; user-select: n
   }
   .m-nav--rail a[aria-current="page"] { color: var(--color-gold); background: var(--color-espresso-raised); }
   .m-rail-back { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 2.75rem; margin-top: auto; padding: 0 var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted-inverse); text-decoration: none; }
+  .m-rail-signout { margin: 0; }
+  .m-rail-signout button { min-height: 2.75rem; padding: 0 var(--space-3); font: inherit; font-size: var(--text-sm); color: var(--color-text-muted-inverse); background: none; border: 0; cursor: pointer; }
+  .m-rail-signout button:focus-visible { color: var(--color-cream); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.25em; }
   .m-rail-back .icon { width: 1rem; height: 1rem; rotate: 180deg; }
   .member main { grid-column: 2; grid-row: 1; padding: var(--space-6) var(--page-margin) var(--space-5) var(--space-7); }
   .m-legal { grid-column: 2; grid-row: 2; padding: 0 var(--page-margin) var(--space-4) var(--space-7); }
@@ -231,7 +234,7 @@ a.m-tile { touch-action: manipulation; -webkit-user-select: none; user-select: n
   .m-toasts { inset: var(--space-4) var(--space-5) auto auto; }
 }
 @media (hover: hover) and (pointer: fine) {
-  .m-nav--rail a:not([aria-current="page"]):hover, .m-rail-back:hover { color: var(--color-cream); }
+  .m-nav--rail a:not([aria-current="page"]):hover, .m-rail-back:hover, .m-rail-signout button:hover { color: var(--color-cream); }
 }
 
 @media (prefers-reduced-motion: reduce) {

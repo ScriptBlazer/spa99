@@ -50,7 +50,7 @@ class SignUpForm(forms.Form):
         widget=forms.CheckboxInput(attrs=_attrs("required", **{"data-required-message": "Please accept the privacy notice."})),
     )
     marketing_opt_in = forms.BooleanField(label="Send me news from Spa 99", required=False)
-    plan = forms.CharField(required=False, max_length=60, widget=forms.HiddenInput)
+    plan = forms.CharField(max_length=60, widget=forms.HiddenInput, error_messages={"required": "Choose a membership to continue."})
 
     def clean_first_name(self):
         return validate_person_name(self.cleaned_data["first_name"])

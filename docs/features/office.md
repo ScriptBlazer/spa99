@@ -11,8 +11,8 @@ Phase 1 sections:
 | Section | What it shows / does |
 |---|---|
 | **Dashboard** | Today and the last 7/30 days at a glance: people started, finished and registered (plain counts), Gold applications waiting, site visitors and page views. Rings for goals, sparklines, a short "what changed" line |
-| **Analytics** | Charts with a date range (7d, 30d, 90d, all): visitors and page views, the funnel (visitor, journey started, journey completed, registered), registrations by plan interest, journey answers (time of day, frequency, facilities, company), suggested plan split, journey drop-off by screen, Gold applications by potential and status, top pages and referrer sites |
-| **People** | Registrations list: search, filter (plan, verified, marketing), open a person (details, plan interest, journey answers, Gold link). CSV export. GDPR export and delete buttons (existing services) |
+| **Analytics** | Charts with a date range (7d, 30d, 90d, all): visitors and page views, the funnel (visitor, journey started, journey completed, registered), registrations by membership, journey answers (time of day, frequency, facilities, company), suggested plan split, journey drop-off by screen, Gold applications by potential and status, top pages and referrer sites |
+| **People** | Registrations list: search, filter (plan, verified, marketing), open a person (details, membership, journey answers, Gold link). CSV export. GDPR export and delete buttons (existing services) |
 | **Gold** | Applications list (potential, status, invite state), open one (the same three sections Barry's email has), Approve and invite, Resend invite, Decline (existing `gold.invites` services) |
 
 Content, plans, hours, notification templates and settings stay in the hidden Django admin for now (a later Office section).

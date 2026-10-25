@@ -22,7 +22,7 @@ Branch `feature/system`. Decisions: PROJECT.md rows 2026-10-23 (three staff fron
 | **Gold rules** | Potential weights and thresholds; which answers count as property |
 | **Journey** | Questions and options: labels, order, hidden, plan and Gold points per option |
 | **Emails** | Recipients (Gold approver list, CC, contact email); template wording for each notification. Transport and secrets stay in env |
-| **Settings** | Opening date, stage switches (register interest / subscribe / book), wording |
+| **Settings** | Opening date, stage switches (registration / subscribe / book), wording |
 | **Team** | Team members with level (Office, Admin, Developer, Superuser) and Approver; add, change level, deactivate, remove from team, merge duplicate accounts |
 
 Later (own phases): stay periods, RFID and Face ID rules, access windows, sales and offers (need the access hardware), content and images.

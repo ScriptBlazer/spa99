@@ -524,6 +524,7 @@ def beta_gold_lock(w):
                 """token => { const f = document.createElement('form'); f.method = 'post'; f.action = '/account/interest/';
                    f.innerHTML = '<input name="csrfmiddlewaretoken"><input name="plan" value="tier-1">';
                    f.elements.csrfmiddlewaretoken.value = token; document.body.append(f); f.submit(); }""", token)
+        page.goto(f"{SITE}/account/membership/")
         assert "Gold Card" in page.locator("h1").first.inner_text(), "The membership screen no longer shows Gold"
         assert dbtool("user", email)["plan"] == "gold"
 

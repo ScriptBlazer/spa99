@@ -246,7 +246,7 @@ def fill_date_of_birth(page, day="14", month="03", year="1985"):
 
 
 def register_member(page, email, first, last, mobile, plan_name="Tier 2", password=PASSWORD):
-    """Register interest in a tier through the real form, then wait for the 'check your email' screen."""
+    """Register for a tier through the real form, then wait for the 'check your email' screen."""
     page.goto(f"{SITE}/register/")
     page.locator("label.plan-chip", has_text=plan_name).first.click()
     page.locator("#id_first_name").fill(first)

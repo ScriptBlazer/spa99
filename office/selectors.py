@@ -157,10 +157,10 @@ def build_dashboard(range_name="7d", today=None, figures=None):
     rings = [
         ring("journeys_started", "Started the journey", OfficeGoal.JOURNEYS_STARTED, started, None if before is None else figures.started(*before)),
         ring("journeys_completed", "Finished the journey", OfficeGoal.JOURNEYS_FINISHED, done, None if before is None else figures.finished(*before)),
-        ring("registrations", "Registered interest", OfficeGoal.REGISTRATIONS, registered, None if before is None else figures.registered(*before)),
+        ring("registrations", "Registered", OfficeGoal.REGISTRATIONS, registered, None if before is None else figures.registered(*before)),
     ]
     funnel_values = [("visitors", "Visitors", visitors), ("started", "Started the journey", started),
-                     ("completed", "Finished the journey", done), ("registered", "Registered interest", registered)]
+                     ("completed", "Finished the journey", done), ("registered", "Registered", registered)]
     funnel = []
     for i, (key, label, value) in enumerate(funnel_values):
         funnel.append({"key": key, "label": label, "value": value,
@@ -259,7 +259,7 @@ def build_analytics(range_name="30d", today=None, figures=None):
     total = lambda key: series[key]["total"]  # noqa: E731
 
     funnel_def = [("visitors", "Visitors", total(K.VISITORS)), ("started", "Started the journey", total("journeys_started")),
-                  ("completed", "Finished the journey", total("journeys_completed")), ("registered", "Registered interest", total("registrations"))]
+                  ("completed", "Finished the journey", total("journeys_completed")), ("registered", "Registered", total("registrations"))]
     funnel = [{"key": k, "label": label, "value": v, "share_bp": min(basis_points(v, funnel_def[0][2]) or 0, 10000),
                "step_rate_bp": _share(v, funnel_def[i - 1][2]) if i else None,
                "partial": bool(i and v > funnel_def[i - 1][2])}
@@ -355,7 +355,7 @@ UPDATING = "Updating\u2026"
 
 
 def _empty_funnel():
-    steps = (("visitors", "Visitors"), ("started", "Started the journey"), ("completed", "Finished the journey"), ("registered", "Registered interest"))
+    steps = (("visitors", "Visitors"), ("started", "Started the journey"), ("completed", "Finished the journey"), ("registered", "Registered"))
     return [{"key": k, "label": label, "value": 0, "previous_value": None if i == 0 else 0, "share_bp": 0, "step_rate_bp": None, "partial": False}
             for i, (k, label) in enumerate(steps)]
 
@@ -369,7 +369,7 @@ def empty_dashboard(range_name):
     ring = lambda key, label: {"key": key, "label": label, "value": 0, "goal": None, "percent": None, "previous": 0, "change": 0}  # noqa: E731
     return {"range": range_name, "ranges": list(DASHBOARD_RANGES), "today": today.isoformat(), "what_changed": "", "gold_waiting": 0,
             "rings": [ring("journeys_started", "Started the journey"), ring("journeys_completed", "Finished the journey"),
-                      ring("registrations", "Registered interest")],
+                      ring("registrations", "Registered")],
             "stats": [stat(K.REGISTRATIONS, "Registrations", "registrations"), stat(K.VISITORS, "Site visitors", "visitors"),
                       stat(K.PAGE_VIEWS, "Page views", "pages")],
             "funnel": _empty_funnel(), "funnel_note": "", "insights": [], "totals": {"registrations": 0, "gold_applications": 0}}
