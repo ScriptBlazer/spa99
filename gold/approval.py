@@ -134,6 +134,7 @@ def approve(application, actor):
             fresh = GoldApplication.objects.select_for_update().get(pk=application.pk)
             sent = (fresh.status in GoldApplication.WAITING and fresh.potential_level == rating.LOW and not fresh.final_review_done)
             if sent:
+                fresh.final_previous_status = fresh.status
                 fresh.status, fresh.final_requested_at, fresh.final_requested_by = GoldApplication.AWAITING_FINAL, timezone.now(), actor
                 fresh.save()
         if sent:
@@ -168,9 +169,20 @@ def send_back(application, actor, note=""):
         fresh = GoldApplication.objects.select_for_update().get(pk=application.pk)
         if fresh.status != GoldApplication.AWAITING_FINAL:
             return False
-        fresh.status, fresh.sent_back_at, fresh.sent_back_by, fresh.sent_back_note = GoldApplication.NEW, timezone.now(), actor, note
+        restore = fresh.final_previous_status if fresh.final_previous_status in GoldApplication.WAITING else GoldApplication.NEW
+        fresh.status, fresh.sent_back_at, fresh.sent_back_by, fresh.sent_back_note = restore, timezone.now(), actor, note
         fresh.save()
     logger.info("Gold %s sent back by final approver %s", application.reference, actor.pk)
     _queue("gold.tasks.send_gold_sent_back_email", str(application.pk))
     application.refresh_from_db()
     return True
+
+
+def awaiting_final_count():
+    return GoldApplication.objects.filter(status=GoldApplication.AWAITING_FINAL).count()
+
+
+def send_pending_to(user):
+    """A new final approver: queue the final approval email, for this person only, for every application already waiting."""
+    for pk in GoldApplication.objects.filter(status=GoldApplication.AWAITING_FINAL).values_list("pk", flat=True):
+        _queue("gold.tasks.send_gold_final_email", str(pk), str(user.pk))

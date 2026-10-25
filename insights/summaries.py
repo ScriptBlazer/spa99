@@ -127,7 +127,7 @@ def _store(wanted):
 
 def _waiting():
     counters = {(c.key, c.dimension): c.value for c in MetricCounter.objects.filter(key=K.GOLD_BY_STATUS)}
-    return counters.get((K.GOLD_BY_STATUS, "new"), 0) + counters.get((K.GOLD_BY_STATUS, "contacted"), 0)
+    return sum(counters.get((K.GOLD_BY_STATUS, s), 0) for s in ("new", "contacted", "awaiting_final"))  # the Waiting list shows these too
 
 
 def write_all(today=None, figures=None):

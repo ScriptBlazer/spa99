@@ -184,6 +184,7 @@ class GoldApplication(BaseModel):
     final_requested_at = models.DateTimeField(null=True, blank=True, help_text="When an approver sent it for final approval.")
     final_requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", editable=False)
+    final_previous_status = models.CharField(max_length=20, blank=True, editable=False, help_text="The status before it went to final approval; a send-back restores it.")
     sent_back_at = models.DateTimeField(
         null=True, blank=True, help_text="When a final approver sent it back. Once set, the next approval goes through at once.")
     sent_back_by = models.ForeignKey(

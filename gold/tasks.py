@@ -53,11 +53,11 @@ def send_gold_emails(application_id, acknowledge=True):
     return status
 
 
-def _send_to_group(template, application_id, people_addresses, context_builder):
+def _send_to_group(template, application_id, people_addresses, context_builder, only_user_id=None):
     application = GoldApplication.objects.select_related("repeat_of", "sent_back_by").filter(pk=application_id).first()
     if application is None:
         return None
-    recipients = people_addresses()
+    recipients = people_addresses() if only_user_id is None else [approval.address_for(u) for u in approval.final_approvers() if str(u.pk) == str(only_user_id)]
     if not recipients:
         logger.warning("No one to email for %s (%s): check System > Approval.", template, application.reference)
         return "no_recipients"
@@ -67,13 +67,13 @@ def _send_to_group(template, application_id, people_addresses, context_builder):
     return log.status
 
 
-def send_gold_final_email(application_id):
+def send_gold_final_email(application_id, only_user_id=None):
     """To every final approver: Confirm / Send back, with signed links built now (no token sits in the queue). Only while
     the application is still awaiting final approval. Returns a status string, never the EmailLog."""
     application = GoldApplication.objects.filter(pk=application_id).first()
     if application is None or application.status != GoldApplication.AWAITING_FINAL:
         return None
-    return _send_to_group("gold_final", application_id, approval.final_approver_addresses, approval.final_email_context)
+    return _send_to_group("gold_final", application_id, approval.final_approver_addresses, approval.final_email_context, only_user_id)
 
 
 def send_gold_sent_back_email(application_id):

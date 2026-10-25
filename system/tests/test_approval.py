@@ -129,3 +129,75 @@ class ImportApproversTests(TestCase):
         self.assertIn("no account", out)
         self.assertEqual(levels.held_roles(no_level), (False, False))
         self.assertIn("Nothing to do", self.run_command())  # safe to run twice
+
+
+class ApprovalReviewTests(TestCase):
+    def setUp(self):
+        from gold import services as gold_services
+        from gold.models import GoldApplication
+        from gold.tests.test_gold import application_data
+        from plans.management.commands.seed_phase1 import seed_all
+
+        seed_all()
+        self.GoldApplication = GoldApplication
+        self.dev = dev()
+        self.approver = make_team_member("approver@example.com", levels.OFFICE, approver=True)
+        self.final = make_team_member("final@example.com", levels.ADMIN, final=True)
+        self.client = unlocked_client(self.dev)
+        self.application, _ = gold_services.submit_application(application_data())
+        GoldApplication.objects.filter(pk=self.application.pk).update(potential_level="low", status="contacted")
+        self.application.refresh_from_db()
+
+    def test_the_last_final_approver_cannot_leave_while_applications_wait_and_a_new_one_is_emailed_them(self):
+        from django.core import mail
+
+        approval.approve(self.application, self.approver)
+        with self.assertRaises(ChangeRefused) as caught:
+            service.remove(self.dev, service.FINAL, self.final.pk)
+        self.assertIn("1 application wait", str(caught.exception))
+        self.assertTrue(levels.held_roles(self.final)[1])
+        newcomer = make_team_member("second@example.com", levels.ADMIN)
+        mail.outbox.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            service.add(self.dev, service.FINAL, [newcomer.pk])
+        self.assertEqual([m.to for m in mail.outbox], [["second@example.com"]])  # only the new person, for the waiting application
+        self.assertIn("/final/", mail.outbox[0].body)
+        self.assertTrue(service.remove(self.dev, service.FINAL, self.final.pk))  # no longer the last
+
+    def test_the_django_admin_action_sends_low_potential_for_final_approval(self):
+        from gold.admin import GoldApplicationAdmin
+        from django.contrib.admin.sites import AdminSite
+        from django.test import RequestFactory
+
+        request = RequestFactory().post("/")
+        request.user = self.approver
+        request._messages = mock_messages()
+        GoldApplicationAdmin(self.GoldApplication, AdminSite()).approve_and_invite(request, self.GoldApplication.objects.all())
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status, "awaiting_final")
+
+    def test_adding_nobody_new_or_a_missing_id_is_refused_cleanly(self):
+        import uuid
+
+        service.add(self.dev, service.APPROVER, [self.approver.pk])
+        self.assertIs(service.add(self.dev, service.APPROVER, [self.approver.pk]), False)
+        with self.assertRaises(ChangeRefused):
+            service.add(self.dev, service.APPROVER, [self.final.pk, uuid.uuid4()])
+        self.assertFalse(levels.held_roles(User.objects.get(pk=self.final.pk))[0])  # all or nothing
+        page = self.client.post("/approval/approvers/add/", {"user": [str(self.approver.pk)]}, follow=True)
+        self.assertContains(page, "Nobody new to add.")
+
+    def test_a_send_back_restores_the_status_it_had(self):
+        approval.approve(self.application, self.approver)
+        approval.send_back(self.application, self.final)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status, "contacted")
+
+
+def mock_messages():
+    from django.contrib.messages.storage.fallback import FallbackStorage
+    from django.test import RequestFactory
+
+    request = RequestFactory().get("/")
+    request.session = {}
+    return FallbackStorage(request)

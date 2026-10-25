@@ -105,6 +105,12 @@ def apply_level(target, level, approver, actor=None, final=False):
     target.save(update_fields=["is_staff", "is_superuser", "updated_at"])
 
 
+def _drop_delivery_if_unused(target):
+    """No approval role left: the other-address setting goes too (personal data with no use)."""
+    if not any(levels.held_roles(target)):
+        ApproverDelivery.objects.filter(user=target).delete()
+
+
 @transaction.atomic
 def set_access(actor, target, level, added=False):
     """Change someone's level. Their approval roles (set in System > Approval) stay, unless the new level cannot hold them
@@ -122,6 +128,7 @@ def set_access(actor, target, level, added=False):
     if target.is_superuser and level != levels.SUPERUSER:
         _keep_a_superuser(superusers, target)
     apply_level(target, level, approver, actor, final=final)
+    _drop_delivery_if_unused(target)
     old, new = describe(old_level, old_approver, old_final), describe(level, approver, final)
     _log(actor, target, "level", old, new, f"Added {target.email} to the team as {new}" if added else f"Changed access for {target.email} from {old} to {new}")
     return True

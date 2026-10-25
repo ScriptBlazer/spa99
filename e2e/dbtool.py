@@ -73,7 +73,7 @@ def main(argv):
         first = rows.first()
         invites = GoldInvite.objects.filter(application__email__iexact=args[0])
         return {"status": first.status if first else None, "statuses": [r.status for r in rows],
-                "waiting": rows.filter(status__in=[GoldApplication.NEW, GoldApplication.CONTACTED]).count(),
+                "waiting": rows.filter(status__in=[*GoldApplication.WAITING, GoldApplication.AWAITING_FINAL]).count(),
                 "has_user": User.objects.filter(email__iexact=args[0]).exists(), "count": rows.count(),
                 "invites": invites.count(), "invites_used": invites.filter(used_at__isnull=False).count()}
     if cmd == "gold-total":
@@ -88,7 +88,7 @@ def main(argv):
     if cmd == "events":
         return {"count": SystemEvent.objects.filter(kind=args[0]).count()}
     if cmd == "waiting":
-        return {"count": GoldApplication.objects.filter(status__in=[GoldApplication.NEW, GoldApplication.CONTACTED]).count()}
+        return {"count": GoldApplication.objects.filter(status__in=[*GoldApplication.WAITING, GoldApplication.AWAITING_FINAL]).count()}
     if cmd == "price":
         return {"price": str(Plan.objects.get(slug=args[0]).price_ex_vat)}
     if cmd == "assets":

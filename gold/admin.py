@@ -4,7 +4,7 @@ from simple_history.admin import SimpleHistoryAdmin
 
 from common.admin import ExportCsvMixin
 
-from . import invites
+from . import approval, invites
 from .models import ApproverDelivery, GoldApplication, GoldChoice, GoldInvite, GoldRule, GoldSignalSource
 from .services import resend_approver_email
 
@@ -45,15 +45,17 @@ class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
 
     @admin.action(description="Approve and invite", permissions=["change"])
     def approve_and_invite(self, request, queryset):
-        done = {invites.INVITED: 0, invites.ACTIVATED: 0, invites.SKIPPED: 0}
+        done = {invites.INVITED: 0, invites.ACTIVATED: 0, invites.SKIPPED: 0, approval.AWAITING: 0}
         for application in queryset:
-            done[invites.approve_and_invite(application, request.user)] += 1
-            if application.status not in (GoldApplication.DECLINED, GoldApplication.APPROVED):
+            done[approval.approve(application, request.user)] += 1
+            if application.status not in (GoldApplication.DECLINED, GoldApplication.APPROVED, GoldApplication.AWAITING_FINAL):
                 self.message_user(request, f"{application.reference}: Gold could not be activated (is the Gold plan missing?). Nothing was changed or sent.", messages.ERROR)
         if done[invites.INVITED]:
             self.message_user(request, f"Approved and invited: {done[invites.INVITED]}.", messages.SUCCESS)
         if done[invites.ACTIVATED]:
             self.message_user(request, f"Approved, Gold added to their existing account: {done[invites.ACTIVATED]}.", messages.SUCCESS)
+        if done[approval.AWAITING]:
+            self.message_user(request, f"Sent for final approval (Low potential): {done[approval.AWAITING]}.", messages.SUCCESS)
         if done[invites.SKIPPED]:
             self.message_user(request, f"Skipped (declined, already approved or awaiting final approval): {done[invites.SKIPPED]}.", messages.WARNING)
 

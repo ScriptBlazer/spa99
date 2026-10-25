@@ -38,7 +38,7 @@
         {% if a.sent_back.note %}<p class="o-callout-note" data-sent-back-note>{{ a.sent_back.note|linebreaksbr }}</p>{% endif %}
         {% if a.status == "new" or a.status == "contacted" %}<p class="o-sub">The next approval goes straight through.</p>{% endif %}
       </div>{% endif %}
-      {% if final_approver_missing and a.potential == "low" and a.can_approve and office_can.can_act %}<p class="o-state o-state--warn" data-final-approver-missing>No final approver is set, so a Low potential approval goes through at once. Set one in System, Approval.</p>{% endif %}
+      {% if final_approver_missing and a.potential == "low" %}{% if a.can_approve or a.awaiting_final %}<p class="o-state o-state--warn" data-final-approver-missing>No final approver is set, so a Low potential approval goes through at once. Set one in System, Approval.</p>{% endif %}{% endif %}
       <div class="o-actions-rail">{% include "office/_gold_actions.html" %}</div>
       {% if office_can.can_act and a.can_approve %}<p class="o-sub">He gets an email to set up his account. The link lasts 14 days.{% if a.potential == "low" and not final_approver_missing and not a.sent_back %} The potential is Low, so a final approver confirms first.{% endif %}</p>{% endif %}
       {% if a.person_id and office_can.can_see_all %}<a class="o-quiet" href="{% url 'office_person' a.person_id %}">Open his account</a>{% endif %}

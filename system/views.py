@@ -389,11 +389,11 @@ def approval(request):
     return page(request, "system/approval.html", "approval", approval_service.context(request.user))
 
 
-def _approval_action(request, action, text="Saved."):
+def _approval_action(request, action, text="Saved.", nothing="Nothing changed."):
     """Run an Approval change; a refusal is an error toast, never a crash."""
     try:
         done = action()
-        saved(request, text) if done is not False else messages.info(request, "Nothing changed.")
+        saved(request, text) if done is not False else messages.info(request, nothing)
     except services.ChangeRefused as error:
         messages.error(request, str(error))
     return redirect("system_approval")
@@ -406,7 +406,7 @@ def _ids(request):
 @unlocked
 @require_POST
 def approval_add(request, role):
-    return _approval_action(request, lambda: approval_service.add(request.user, role, _ids(request)), "Added.")
+    return _approval_action(request, lambda: approval_service.add(request.user, role, _ids(request)), "Added.", "Nobody new to add.")
 
 
 @unlocked

@@ -26,7 +26,7 @@ def counters(*keys):
 
 def waiting_count(stored=None):
     stored = stored if stored is not None else counters(K.GOLD_BY_STATUS)
-    return stored.get((K.GOLD_BY_STATUS, "new"), 0) + stored.get((K.GOLD_BY_STATUS, "contacted"), 0)
+    return sum(stored.get((K.GOLD_BY_STATUS, s), 0) for s in ("new", "contacted", "awaiting_final"))  # same rows as the Waiting list
 
 
 def _days(end, count):
@@ -398,7 +398,7 @@ def dashboard(range_name="7d"):
 
     range_name = range_name if range_name in DASHBOARD_RANGES else "7d"
     data = _snapshot(OfficeSnapshot.DASHBOARD, range_name) or {**empty_dashboard(range_name), "what_changed": UPDATING, "updating": True}
-    waiting_rows = GoldApplication.objects.filter(status__in=[GoldApplication.NEW, GoldApplication.CONTACTED]).order_by("-created_at")[:5]
+    waiting_rows = GoldApplication.objects.filter(status__in=[*GoldApplication.WAITING, GoldApplication.AWAITING_FINAL]).order_by("-created_at")[:5]
     latest = InterestRegistration.objects.select_related("user", "plan").order_by("-created_at")[:5]
     return {**data,
             "waiting": {"count": data["gold_waiting"],

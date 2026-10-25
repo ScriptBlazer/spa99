@@ -116,17 +116,20 @@ def _check(actor, target, role, adding):
                             else "Only a superuser can change another superuser.")
 
 
-def _drop_delivery_if_unused(target):
-    if not any(levels.held_roles(target)):
-        ApproverDelivery.objects.filter(user=target).delete()
+_drop_delivery_if_unused = team_service._drop_delivery_if_unused
 
 
 @transaction.atomic
 def add(actor, role, user_ids):
-    """Give the role to each person. All or nothing: one refusal refuses the lot. Returns how many people gained it."""
-    targets = list(User.objects.filter(pk__in=_clean_ids(user_ids)).order_by("email"))
-    if not targets:
+    """Give the role to each person. All or nothing: one refusal refuses the lot (including an id that no longer exists).
+    Returns how many people gained it, or False when nobody was new. A new final approver is emailed every application
+    already waiting for final approval."""
+    ids = set(_clean_ids(user_ids))
+    if not ids and not user_ids:
         raise ChangeRefused("Pick at least one person.")
+    targets = list(User.objects.filter(pk__in=ids).order_by("email"))
+    if len(targets) != len(set(map(str, user_ids))) or len(targets) != len(ids):
+        raise ChangeRefused("Someone you picked is no longer available. Reload and try again.")
     for target in targets:
         _check(actor, target, role, adding=True)
     group, gained = _group(role), 0
@@ -136,7 +139,9 @@ def add(actor, role, user_ids):
         target.groups.add(group)
         _log(actor, target, ROLES[role]["group"], False, True, f"Made {target.email} {ROLES[role]['noun']}")
         gained += 1
-    return gained
+        if role == FINAL:
+            transaction.on_commit(lambda target=target: approval.send_pending_to(target))
+    return gained or False
 
 
 @transaction.atomic
@@ -147,6 +152,10 @@ def remove(actor, role, user_id):
     _check(actor, target, role, adding=False)
     if not _holds(target, role):
         return False
+    if role == FINAL and len(_holders(FINAL)) <= 1:
+        waiting = approval.awaiting_final_count()
+        if waiting:
+            raise ChangeRefused(f"Can't remove the last final approver while {waiting} application{'s' if waiting != 1 else ''} wait{'' if waiting != 1 else 's'} for final approval.")
     target.groups.remove(_group(role))
     _drop_delivery_if_unused(target)
     _log(actor, target, ROLES[role]["group"], True, False, f"Removed {target.email} as {ROLES[role]['noun_plain']}")
