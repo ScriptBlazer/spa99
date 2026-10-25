@@ -1,5 +1,7 @@
 /* System audit log (docs/design/SYSTEM.md 7). Loaded on the audit log page only. Tokens only; no hex. */
-.au { --au-top: calc(var(--sys-top-h) + var(--sys-stripe)); --au-bar-h: 49px; position: relative; }
+/* --au-top lives on body.system: the detail drawer sits outside .au, and without it its top fell back to auto (cut off above the screen) */
+body.system { --au-top: calc(var(--sys-top-h) + var(--sys-stripe)); }
+.au { --au-bar-h: 49px; position: relative; }
 .au-svg { display: block; flex: none; fill: currentColor; }
 .au-mono, .au .mono { font-family: var(--sys-mono); font-size: var(--sys-fs-sm); }
 
