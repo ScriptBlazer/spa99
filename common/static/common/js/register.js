@@ -1,6 +1,8 @@
 /* Register: plan picker and membership card, date of birth in three fields, password checks. The shared validate.js
    does the live feedback (see form.spaValidation); this adds the parts only this form has. */
 import './forms.js';
+import { formModal } from './feedback.js';
+import { csrfToken } from './api.js';
 
 const form = document.getElementById('register-form');
 
@@ -35,13 +37,6 @@ if (panel) {
   const planError = document.querySelector('[data-plan-error]');
   document.querySelectorAll('input[name="plan"]').forEach((input) => input.addEventListener('change', () => { if (planError) planError.hidden = true; showPlan(true); }));
   showPlan(false);
-  // A tier is required: stop the submit and say so next to the chips (the server checks too).
-  form?.addEventListener('submit', (e) => {
-    if (document.querySelector('input[name="plan"]:checked') || !planError) return;
-    e.preventDefault();
-    planError.hidden = false;
-    planError.scrollIntoView({ block: 'center' });
-  }, true);
 }
 
 /* Date of birth: Day / Month / Year, auto-advance after 2 / 2 / 4 digits, one shared feedback line. The real field
@@ -86,4 +81,129 @@ if (form && dob) {
       }, 0);
     });
   });
+}
+
+/* Register: every problem in one dialog. On Register the browser checks, the live rules and the membership choice run
+   together; anything wrong opens the shared centred dialog with a list (label and short message) and nothing moves.
+   Closing it returns to the form with everything still filled in, and focuses the first problem. The server is asked
+   with fetch (never a reload), so its answers (an email or mobile already registered) come back the same way and the
+   password is not wiped. Without JavaScript the form posts normally and the page shows the errors beside the fields. */
+const LABELS = {
+  plan: 'Membership', first_name: 'First name', last_name: 'Last name', email: 'Email', mobile: 'Mobile', password: 'Password',
+  date_of_birth: 'Date of birth', men_only_accepted: 'Men-only policy', privacy_accepted: 'Privacy notice',
+};
+const PLAN_MESSAGE = 'Choose a membership to continue.';
+const FAILED = "We couldn't send that just now. Please check your connection and try again.";
+
+if (form?.hasAttribute('data-register-fetch')) { // only the register page (the Gold invite set-up shares this script and posts normally)
+  const button = form.querySelector('button[type="submit"]');
+  const planError = document.querySelector('[data-plan-error]');
+  const firstPlan = () => document.querySelector('input[name="plan"]:checked') || document.querySelector('input[name="plan"]');
+  const targetFor = (name) => {
+    if (name === 'plan') return firstPlan();
+    const field = form.elements[name];
+    return (field?.dataset?.focusTarget && form.querySelector(field.dataset.focusTarget)) || field || null;
+  };
+
+  const showProblems = (items, opener) => formModal((dialog, close) => {
+    const heading = document.createElement('h2');
+    heading.className = 'fb-modal-title';
+    heading.id = 'register-problems-title';
+    heading.textContent = items.length > 1 ? 'A few things to check' : 'One thing to check';
+    const list = document.createElement('ul');
+    list.className = 'register-problems';
+    items.forEach((item) => {
+      const row = document.createElement('li');
+      if (item.label) { const name = document.createElement('strong'); name.textContent = item.label; row.append(name, ' '); }
+      row.append(item.message);
+      list.append(row);
+    });
+    const actions = document.createElement('div');
+    actions.className = 'fb-modal-actions';
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = 'fb-btn fb-btn--primary';
+    ok.textContent = 'OK';
+    ok.setAttribute('autofocus', '');
+    ok.addEventListener('click', () => close(true));
+    actions.append(ok);
+    dialog.append(heading, list, actions);
+  }, { opener });
+
+  // After the dialog: first problem into view, gently, and focused. No jump if he asked for less motion.
+  const goToFirst = (items) => {
+    const target = items.map((item) => targetFor(item.field)).find(Boolean);
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    const box = target.closest('.field, .plan-picker') || target;
+    box.scrollIntoView({ block: 'center', behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+  };
+
+  const setWorking = (on) => {
+    if (!button) return;
+    if (on) {
+      button.dataset.label = button.textContent;
+      button.textContent = button.dataset.workingText || 'One moment';
+    } else if (button.dataset.label) {
+      button.textContent = button.dataset.label;
+    }
+    button.disabled = on;
+    if (on) button.setAttribute('aria-busy', 'true'); else button.removeAttribute('aria-busy');
+  };
+
+  const markPlan = (message) => { if (planError) { planError.textContent = message; planError.hidden = false; } };
+
+  /** The browser's own constraint checks plus the live rules plus the membership choice, in page order (membership first). */
+  const localProblems = async () => {
+    const found = (await form.spaValidation?.problems?.()) || [];
+    const items = found.map(({ name, message }) => ({ field: name, label: LABELS[name] || '', message }));
+    form.querySelectorAll(':invalid').forEach((el) => {
+      if (el.name && el.validationMessage && !items.some((item) => item.field === el.name)) items.push({ field: el.name, label: LABELS[el.name] || '', message: el.validationMessage });
+    });
+    if (!document.querySelector('input[name="plan"]:checked') && planError) {
+      markPlan(PLAN_MESSAGE);
+      items.unshift({ field: 'plan', label: LABELS.plan, message: PLAN_MESSAGE });
+    }
+    return items;
+  };
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation(); // validate.js's own submit handling is replaced by this one
+    if (form.dataset.sending === 'true') return;
+    form.dataset.sending = 'true';
+    let leaving = false;
+    setWorking(true);
+    try {
+      const local = await localProblems();
+      if (local.length) { setWorking(false); await showProblems(local, button); goToFirst(local); return; }
+
+      let items = null;
+      try {
+        const response = await fetch(form.action || window.location.href, {
+          method: 'POST', credentials: 'same-origin', body: new FormData(form),
+          headers: { 'X-Requested-With': 'fetch', Accept: 'application/json', 'X-CSRFToken': form.elements.csrfmiddlewaretoken?.value || csrfToken() },
+        });
+        let data = null;
+        try { data = await response.json(); } catch { /* not JSON: a gateway or CSRF page */ }
+        if (data?.ok && data.redirect) { leaving = true; window.location.assign(data.redirect); return; } // stays "working" while the next page loads
+        items = (data?.errors || []).map((e) => ({ field: e.field, label: e.label || '', message: e.message }));
+        if (!items.length) items = [{ field: '__all__', label: '', message: FAILED }];
+      } catch {
+        items = [{ field: '__all__', label: '', message: FAILED }];
+      }
+      items.forEach((item) => {
+        if (item.field === 'plan') markPlan(item.message);
+        else if (item.field !== '__all__') form.spaValidation?.showError(item.field, item.message);
+      });
+      setWorking(false);
+      await showProblems(items, button);
+      goToFirst(items);
+    } finally {
+      if (!leaving) delete form.dataset.sending;
+    }
+  }, true);
+
+  // Back button after a successful register (bfcache): the button must work again.
+  window.addEventListener('pageshow', () => { delete form.dataset.sending; if (button?.disabled) setWorking(false); });
 }

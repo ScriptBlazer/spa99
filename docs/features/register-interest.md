@@ -107,3 +107,10 @@ People see "Register", "Registered", "Your membership"; never "interest". Code a
 ## No payment and discount contact (2026-10-25)
 
 The register page says "Registering is free. Payment will be taken before your first booking." under the submit button; the choose-membership confirm screen says "Nothing to pay now. No card details needed." (2026-10-25: no WhatsApp line on either, so nobody stops to message before registering.) "Looking for a better rate? Message us on WhatsApp." (`{% discount_line %}`, `users/_discount_line.html`, no name) shows on My Spa 99 > Membership and in the welcome email (`discount_url` in its context), linking to `SiteSettings.discount_contact_url` in a new tab (`rel="noopener noreferrer"`). Blank link: dev shows the line with a dashed "[WhatsApp link to come]" marker on the membership page, live hides it; the email leaves the line out.
+
+## Errors in a modal (2026-10-25)
+
+Pressing Register with anything wrong no longer "jumps". `register.js` runs the browser constraint checks, the live rules (`validate.js`, `spaValidation.problems()`) and the membership choice together; if anything fails the shared centred dialog (`formModal`) lists every problem as label plus short message (membership first, then page order). OK or Esc returns to the form, nothing reset; the first problem is focused and scrolled into view (smooth, instant under reduced motion).
+- The form is sent with `fetch` (POST, same URL, CSRF, `X-Requested-With: fetch`, `Accept: application/json`), so server answers never reload the page and the password stays. The `register` view returns JSON for those requests: 400 `{ok:false, errors:[{field, label, message}]}` (non-field errors use field `__all__`, label empty), success `{ok:true, redirect}`, 429 (rate limit) and 403 (registration closed) the same error shape. Honeypot answers like success. Same wording as before, so no new account-existence leak.
+- A plain POST (no JS) is unchanged: full page re-render with errors beside the fields.
+- The button uses `data-working-text` while sending and is re-enabled on error and on back (bfcache).

@@ -136,12 +136,43 @@ def _confirm_tier(request, slug):
     return render(request, "users/choose_confirm.html", {**member.base_context(request.user), "plan": plan, "card": card})
 
 
+REGISTER_LABELS = {
+    "plan": "Membership", "first_name": "First name", "last_name": "Last name", "email": "Email", "mobile": "Mobile",
+    "password": "Password", "date_of_birth": "Date of birth", "men_only_accepted": "Men-only policy", "privacy_accepted": "Privacy notice",
+}
+
+
+def _wants_json(request):
+    """The register page sends its form with fetch so a mistake never reloads it (and empties the password)."""
+    return request.headers.get("X-Requested-With") == "fetch" or "application/json" in request.headers.get("Accept", "")
+
+
+def _register_errors(form):
+    """[{field, label, message}] in page order (membership first), one entry per field; the same wording as the page."""
+    order = ["plan", *[name for name in form.fields if name != "plan"]]
+    out = []
+    for name in order:
+        texts = [text for text in form.errors.get(name, [])]
+        if texts:
+            out.append({"field": name, "label": REGISTER_LABELS.get(name, ""), "message": " ".join(texts)})
+    if form.non_field_errors():
+        out.append({"field": "__all__", "label": "", "message": " ".join(form.non_field_errors())})
+    return out
+
+
+def _register_json_failure(message, status):
+    return JsonResponse({"ok": False, "errors": [{"field": "__all__", "label": "", "message": message}]}, status=status)
+
+
 @login_not_required  # PUBLIC: anyone can register interest
 @require_http_methods(["GET", "POST"])
 def register(request):
     if request.user.is_authenticated:  # every "choose this tier" link ends here (compare page, journey result, Gold page): save it
         return _confirm_tier(request, request.GET.get("plan", ""))
+    as_json = request.method == "POST" and _wants_json(request)
     if not SiteSettings.load().register_interest_open:
+        if as_json:
+            return _register_json_failure("Registration is not open yet.", 403)
         return _message(request, "Not open yet", "Registration is not open yet.", status=403)
     session = journey_services.session_from_cookies(request.COOKIES, request.user)
     suggested = session.suggested_plan.slug if session and session.suggested_plan_id else ""
@@ -149,9 +180,13 @@ def register(request):
     plans = services.interest_plans()
     if request.method == "POST":
         if _throttled(request, "register", 20, 3600):
+            if as_json:
+                return _register_json_failure("Too many attempts. Please try again later.", 429)
             return _message(request, "Please wait", "Too many attempts. Please try again later.", status=429)
         form = SignUpForm(request.POST)
         if request.POST.get(HONEYPOT_FIELD):  # a bot: look like success, create nothing
+            if as_json:
+                return JsonResponse({"ok": True, "redirect": reverse("register_sent")})
             return redirect("register_sent")
         if form.is_valid():
             try:
@@ -161,10 +196,16 @@ def register(request):
                     for text in texts:
                         form.add_error(field if field in form.fields else None, text)
             except services.RegistrationClosed:
+                if as_json:
+                    return _register_json_failure("Registration is not open yet.", 403)
                 return _message(request, "Not open yet", "Registration is not open yet.", status=403)
             else:
                 request.session[PENDING_EMAIL_KEY] = result.user.email
+                if as_json:
+                    return JsonResponse({"ok": True, "redirect": reverse("register_sent")})
                 return redirect("register_sent")
+        if as_json:
+            return JsonResponse({"ok": False, "errors": _register_errors(form)}, status=400)
         status = 400
     else:
         form, status = SignUpForm(initial={"plan": plan_slug}), 200

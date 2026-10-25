@@ -41,7 +41,8 @@ STAFF = {
 # Chrome's own messages, not our scripts. The last one: the robot clicks faster than a page-to-page fade can run,
 # so Chrome skips the fade and reports it; a person never sees anything.
 IGNORED_CONSOLE = [r"GPU stall", r"GL Driver", r"WebGL", r"swiftshader", r"GroupMarker",
-                   r"Transition was aborted because of invalid state"]
+                   r"Transition was aborted because of invalid state",
+                   r"status of (400|429) .*/register/"]  # the register form is sent with fetch: Chrome logs its answered 4xx (the dialog shows them)
 
 
 class StepFailed(Exception):

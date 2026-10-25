@@ -50,7 +50,7 @@
       </div>
     </aside>
 
-    <form class="form-panel register-panel form-stack" data-reveal method="post" id="register-form" data-live-validate novalidate
+    <form class="form-panel register-panel form-stack" data-reveal method="post" id="register-form" data-register-fetch data-live-validate novalidate
           data-check-email-url="{% url 'check_email' %}" data-login-url="{% url 'login' %}">
       {% csrf_token %}
       <div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
