@@ -124,22 +124,7 @@
     </div>
   </section>
 
-  {# From visit to registration #}
-  <section class="o-card o-funnel" data-reveal data-office-funnel aria-labelledby="funnel-h">
-    <h2 id="funnel-h" class="o-h3">From visit to registration</h2>
-    <ol class="o-funnel-steps" data-region="funnel" data-fade>
-      {% for step in data.funnel %}
-      {% funnel_of data.funnel forloop.counter0 as of_line %}
-      <li class="o-funnel-step o-funnel-step--{{ step.key }}" data-funnel-step="{{ step.key }}" data-share-bp="{{ step.share_bp }}" data-step-rate-bp="{{ step.step_rate_bp|default_if_none:'' }}" style="--i: {{ forloop.counter0 }}">
-        <span class="o-funnel-label">{{ step|step_label }}</span>
-        <span class="o-funnel-num">{{ step.value|num }}</span>
-        <span class="o-funnel-bar" role="presentation">{% bar_share step.value step.share_bp as share %}<span class="o-funnel-fill" data-morph="funnel-{{ step.key }}" style="--share: {{ share }}"></span></span>
-        <span class="o-funnel-of">{{ of_line }}</span>
-      </li>
-      {% endfor %}
-    </ol>
-    <p class="o-sub o-funnel-note" data-region="funnel-note" data-fade>{{ data.funnel_note }}</p>
-  </section>
+  {# From visit to registration: hidden 2026-10-25 (Moishe: the journey card already shows it). Still in the snapshot (data.funnel); restore from git history to bring it back. #}
 
   {# Site visitors and Page views #}
   {% for stat in data.stats %}{% if stat.key == "visitors" or stat.key == "page_views" %}
