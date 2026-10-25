@@ -11,7 +11,7 @@ from pages import services
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import Facility
 
-ROOMS = ["lounge", "gym", "kitchenette", "massage-room", "dry-sauna", "wet-sauna", "relaxing-zone"]
+ROOMS = ["lounge", "gym", "massage-room", "kitchenette", "relaxing-zone", "wet-sauna", "dry-sauna"]
 
 
 class TourTests(TestCase):
@@ -45,9 +45,9 @@ class TourTests(TestCase):
         config = json.loads(response.content.decode().split('id="tour-config" type="application/json">')[1].split("</script>")[0])
         self.assertEqual(config["current"], "dry-sauna")
         self.assertEqual([r["slug"] for r in config["rooms"]], ROOMS)
-        dry = config["rooms"][4]
+        dry = config["rooms"][6]
         self.assertEqual((dry["name"], dry["order"], dry["tour_url"], dry["spa_url"]),
-                         ("Dry sauna", 5, "/tour/dry-sauna/", "/the-spa/#dry-sauna"))
+                         ("Dry sauna", 7, "/tour/dry-sauna/", "/the-spa/#dry-sauna"))
         self.assertEqual(dry["line"], "Pale wood, low light and a slow, dry heat.")
         self.assertTrue(dry["photo"].endswith(".jpg") or dry["photo"].endswith(".webp"))
         self.assertTrue(dry["alt"])

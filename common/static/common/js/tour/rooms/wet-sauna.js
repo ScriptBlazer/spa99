@@ -1,6 +1,6 @@
 /* Wet sauna (docs/design/VIRTUAL-TOUR.md 2.3). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
  * Travertine steam room 4.5 x 4.0 (x -2.25..2.25, z -2..2): walls to 2.2 under a low barrel vault (crown 2.6), a single-tier bench in a U on the north, west and east walls with
- * its light underneath, the gold swan on the north wall, five small downlights, a bronze-framed glass door and sidelight in the south wall (the way back to the massage room), a bronze steam
+ * its light underneath, the gold swan on the north wall, five small downlights, a bronze-framed glass door and sidelight in the south wall (the way back to the relaxing zone), a bronze steam
  * outlet low in the front of the north bench with a plume coming out of it, and soft steam at knee height.
  * Kept warm and low: a little fog, light only from the downlights and under the bench. Animated (steam, fog breathing), 30 fps at rest. */
 
@@ -118,7 +118,7 @@ export async function build(scene, ctx) {
   return {
     view: { pos: [1.3, 1.55, 1.5], yaw: -31, pitch: -11 },     // from the door side: the swan wall, the bench and the steam outlet in frame
     exposure: 0.85, ambient: true, update,
-    markers: [{ to: 'massage-room', at: [1.65, 1.1, Z1] }, { to: 'dry-sauna', at: [0.75, 1.1, Z1] }],
+    markers: [{ to: 'relaxing-zone', at: [1.65, 1.1, Z1] }],
     tier(name) { if (name === 'low') { steam.forEach((p) => { if (p.i >= 3) p.m.visible = false; }); plume.forEach((p) => { if (p.i >= 3) p.m.visible = false; }); } },
   };
 }

@@ -1,7 +1,7 @@
 /* Kitchenette (round 2 addition; look from .private/fal-renders/kitchenette.png). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
  * Interior 4.4 x 5.0 x 2.7 (x -2.2..2.2, z -2.5..2.5). The counter runs along the north wall: walnut cabinets, a travertine top and splashback, a bronze built-in coffee machine and tap,
  * one open oak shelf of cream cups (one instanced mesh), the gold swan on the walnut panel above, a warm LED wash under the ceiling. Two low caramel bouclé chairs round a travertine table
- * under a frosted pendant. Cream fluted panelling low on the other walls. Doorways: south (back to the gym), east (on to the massage room). */
+ * under a frosted pendant. Cream fluted panelling low on the other walls. Doorways: east (back to the massage room) and west (on to the relaxing zone); the south wall is plain. */
 
 export async function build(scene, ctx) {
   const { THREE, K, T, S } = ctx, PI = Math.PI, WHITE = new THREE.Color(1, 1, 1), wrap = { wrap: true };
@@ -24,19 +24,19 @@ export async function build(scene, ctx) {
   /* ----- shell: floor, ceiling, walls (two doorways), low fluted panelling ----- */
   K.plane(4.4, 5, floor, 0, 0, 0, 'up', { tile: 2.4 }); K.plane(4.4, 5, ceil, 0, H, 0, 'down');
   K.plane(3.7, H, walnut, -0.35, H / 2, Z0, 's', { tile: 1.4 }); K.plane(0.7, H, wall, 1.85, H / 2, Z0, 's', { tile: 2.4 });   // north: walnut behind the counter
-  K.plane(5, H, wall, X0, H / 2, 0, 'e', { tile: 2.4 }); K.plane(5, 1.0, fluted, X0 + 0.01, 0.5, 0, 'e', { tile: 0.8 });
   const wallDoor = (face, fixed, a, b, c) => {                                                  // a..b wall run, door centred on c: the pieces, the lintel and the panelling
     const d0 = c - DW / 2, d1 = c + DW / 2, put = (u0, u1, y0, y1, m, o = 0) => {
       const w = u1 - u0, h = y1 - y0, u = (u0 + u1) / 2, y = (y0 + y1) / 2, tile = m === fluted ? 0.8 : 2.4;
-      if (face === 'w') K.plane(w, h, m, fixed - o, y, u, 'w', { tile }); else K.plane(w, h, m, u, y, fixed - o, 'n', { tile });
+      if (face === 'w') K.plane(w, h, m, fixed - o, y, u, 'w', { tile }); else if (face === 'e') K.plane(w, h, m, fixed + o, y, u, 'e', { tile }); else K.plane(w, h, m, u, y, fixed - o, 'n', { tile });
     };
     put(a, d0, 0, H, wall); put(d1, b, 0, H, wall); put(d0, d1, 2.1, H, wall);
     put(a, d0, 0, 1.0, fluted, 0.01); put(d1, b, 0, 1.0, fluted, 0.01);
   };
   wallDoor('w', X1, Z0, Z1, -0.9);                                                               // east wall (faces west), door to the massage room
-  wallDoor('n', Z1, X0, X1, -1.0);                                                               // south wall (faces north), door back to the gym
-  K.vista('--color-travertine', [X1, -0.9], 'e', DW, 2.1, 1.0); K.vista('--color-travertine', [-1.0, Z1], 's', DW, 2.1, 1.0);
-  [[X1 - 0.01, -0.9], [-1.0, Z1 - 0.01]].forEach(([x, z], i) => K.box(i ? DW : 0.012, 0.012, i ? 0.012 : DW, led, x, 2.1, z));
+  wallDoor('e', X0, Z0, Z1, 0.4);                                                                // west wall (faces east), door on to the relaxing zone
+  K.plane(4.4, H, wall, 0, H / 2, Z1, 'n', { tile: 2.4 }); K.plane(4.4, 1.0, fluted, 0, 0.5, Z1 - 0.01, 'n', { tile: 0.8 });   // south: plain
+  K.vista('--color-travertine', [X1, -0.9], 'e', DW, 2.1, 1.0); K.vista('--color-travertine', [X0, 0.4], 'w', DW, 2.1, 1.0);
+  [[X1 - 0.01, -0.9], [X0 + 0.01, 0.4]].forEach(([x, z]) => K.box(0.012, 0.012, DW, led, x, 2.1, z));
 
   /* ----- the counter wall ----- */
   K.box(3.1, 0.88, 0.58, walnut, -0.65, 0.44, Z0 + 0.29, { tile: 1.4 });                       // base cabinets x -2.2..0.9
@@ -93,6 +93,6 @@ export async function build(scene, ctx) {
   return {
     view: { pos: [-0.3, 1.6, 1.9], yaw: -6, pitch: -5 },
     exposure: 0.92,
-    markers: [{ to: 'gym', at: [-1.0, 1.1, 2.45] }, { to: 'massage-room', at: [2.15, 1.1, -0.9] }],
+    markers: [{ to: 'relaxing-zone', at: [-2.15, 1.1, 0.4] }, { to: 'massage-room', at: [2.15, 1.1, -0.9] }],
   };
 }

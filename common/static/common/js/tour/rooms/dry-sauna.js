@@ -1,5 +1,5 @@
 /* Dry sauna (docs/design/VIRTUAL-TOUR.md 2.2). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
- * Interior 4.5 x 4.0 x 2.6 (x -2.25..2.25, z -2..2), glass front on the south side with a corridor beyond (the door to the massage room). Cedar boards, a U of two-tier pale aspen
+ * Interior 4.5 x 4.0 x 2.6 (x -2.25..2.25, z -2..2), glass front on the south side with a corridor beyond (the door back to the relaxing zone). Cedar boards, a U of two-tier pale aspen
  * benches on the west, north and east walls (one instanced mesh of boards), warm LED lines under every bench lip and in a curved ceiling cove, the swan etched on the OUTSIDE
  * face of the glass only. The stove stands against the east wall: dark stone cladding, a glowing coal window, hot stones on top; a wooden bucket with a ladle holds coals and stones.
  * Low, warm and moody on purpose. Animated only by the fire's slow flicker (30 fps at rest). */
@@ -150,6 +150,6 @@ export async function build(scene, ctx) {
     view: { pos: [-0.6, 1.6, 1.7], yaw: 42, pitch: -12 },
     exposure: 0.9, ambient: true, update,
     arrive: { pos: [1.7, 1.6, 4.35], yaw: 0, pitch: -1, ms: 2400, input: 1200 },     // from the corridor, through the open door, then the turn toward the benches and the stove
-    markers: [{ to: 'massage-room', at: [1.7, 1.1, Z1] }, { to: 'wet-sauna', at: [0.5, 1.1, Z1] }],
+    markers: [{ to: 'relaxing-zone', at: [1.7, 1.1, Z1] }],
   };
 }

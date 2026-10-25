@@ -1,7 +1,7 @@
 /* Gym (docs/design/VIRTUAL-TOUR.md 2.5, round 2: furnished). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
  * Shell 7.0 x 8.0 x 2.8 (x -3.5..3.5, z -5..3). West: smoked oak panels with the gold stacked lockup, a rubber floor zone with the free weights (dumbbell rack, power rack
  * with a barbell, two adjustable benches, kettlebells, plates, a cable machine at the north wall). East: a night window, three treadmills in a row facing it, two exercise
- * bikes and a rower. North: mirrors, and in the middle a short passage whose back wall has one door on to the kitchenette (then the massage room, then the saunas). The way in is the
+ * bikes and a rower. North: mirrors, and in the middle a short passage whose back wall has one door on to the massage room (then the kitchenette, the relaxing zone and the saunas). The way in is the
  * lounge door in the south wall (x 1.0). Everything repeated is instanced or merged per material, so the room stays at about 30 draw calls. */
 
 export async function build(scene, ctx) {
@@ -33,7 +33,7 @@ export async function build(scene, ctx) {
   K.plane(8, 2.8, wall, -3.5, 1.4, ZC, 'e');                                                                // west, behind the panels
   K.plane(8, 2.8, wall, 3.5, 1.4, ZC, 'w');                                                                 // east, behind the window
   K.plane(4.0, 2.8, wall, -1.5, 1.4, 3, 'n'); K.plane(2.0, 2.8, wall, 2.5, 1.4, 3, 'n'); K.plane(1.0, 0.6, wall, 1.0, 2.5, 3, 'n');   // south, around the lounge door at x 1.0
-  // passage: side walls, back wall with one door (to the kitchenette, x 0), ceiling
+  // passage: side walls, back wall with one door (to the massage room, x 0), ceiling
   K.plane(1.2, 2.8, wall, -1.2, 1.4, -5.6, 'e'); K.plane(1.2, 2.8, wall, 1.2, 1.4, -5.6, 'w');
   K.plane(0.7, 2.2, wall, -0.85, 1.1, -6.2, 's'); K.plane(0.7, 2.2, wall, 0.85, 1.1, -6.2, 's'); K.plane(2.4, 0.6, wall, 0, 2.5, -6.2, 's');
   K.plane(2.4, 1.2, ceil, 0, 2.8, -5.6, 'down'); K.plane(2.4, 0.5, ledD, 0, 2.55, -5.0 - 0.001, 's');
@@ -183,9 +183,9 @@ export async function build(scene, ctx) {
   }
   K.flush();
 
-  /* ----- doorways seen through: the lounge (south) and, at the far end, the kitchenette ----- */
+  /* ----- doorways seen through: the lounge (south) and, at the far end, the massage room ----- */
   K.vista('--color-travertine', [1.0, 3], 's', 1.0, 2.2, 1.0);
-  K.vista('--color-travertine', [0, -6.2], 'n', 1.0, 2.2, 0.9);                  // far end: the kitchenette
+  K.vista('--color-travertine', [0, -6.2], 'n', 1.0, 2.2, 0.9);                  // far end: the massage room
   K.edge(-3.5, 3, 0, -1, 8, 1, 0, 0.5, 0.5); K.edge(3.5, 3, 0, -1, 8, -1, 0, 0.5, 0.5);
 
   /* ----- light (2700K), lifted so the room never goes black ----- */
@@ -198,6 +198,6 @@ export async function build(scene, ctx) {
   return {
     view: { pos: [1.0, 1.6, 2.4], yaw: -10, pitch: -3 },
     exposure: 1.0,
-    markers: [{ to: 'lounge', at: [1.0, 1.1, 2.95] }, { to: 'kitchenette', at: [0, 1.1, -6.15] }],
+    markers: [{ to: 'lounge', at: [1.0, 1.1, 2.95] }, { to: 'massage-room', at: [0, 1.1, -6.15] }],
   };
 }

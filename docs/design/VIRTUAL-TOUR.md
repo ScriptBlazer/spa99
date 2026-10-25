@@ -503,3 +503,5 @@ Icons: add Phosphor `hand-grabbing` and `device-rotate` (regular weight) to `ico
 10. Performance: first room visible within 3s on Lighthouse mobile throttling; 60 fps while dragging on an M1 Air and an iPhone 12-class phone; no long task over 50ms after arrival; draw calls and triangles within 4.2 (`renderer.info`); JS sizes within caps; no console errors.
 11. Leaving the page or switching to the photo mode disposes everything (`renderer.info.memory` 0); never more than one WebGL context.
 12. Copy: every string from section 7.1, no exclamation marks, no em dashes.
+
+**Doorway graph, round 3 (2026-10-25) supersedes round 2 above.** Chain from the real plan: lounge, gym, massage room, kitchenette, relaxing zone, then wet sauna (left) and dry sauna (right). See `docs/features/virtual-tour.md`, "Door chain".

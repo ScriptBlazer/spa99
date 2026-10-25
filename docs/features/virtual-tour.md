@@ -68,7 +68,17 @@ Files: `common/static/common/js/tour/{boot,engine,kit,textures}.js`, `tour/rooms
 - Adding a room: drop `rooms/<slug>.js`; its slug must be in `TOUR_ROOMS`. Markers to it from other rooms then work with no engine change.
 
 ## Round 2: kitchenette and massage room (2026-10-23)
-- `TOUR_ROOMS` order: lounge, gym, kitchenette, massage-room, dry-sauna, wet-sauna, relaxing-zone. Routes `/tour/kitchenette/` and `/tour/massage-room/` work like the others; The spa shows "Take the tour" for them from the Facility rows (kitchenette as a tile, massage room as the gym's companion, whose template now also shows the link).
+- `TOUR_ROOMS` order (superseded 2026-10-25, see the door chain below): lounge, gym, kitchenette, massage-room, dry-sauna, wet-sauna, relaxing-zone. Routes `/tour/kitchenette/` and `/tour/massage-room/` work like the others; The spa shows "Take the tour" for them from the Facility rows (kitchenette as a tile, massage room as the gym's companion, whose template now also shows the link).
 - Content rows `room_kitchenette` and `room_massage_room` are in the seed and created if missing by `backfill_site_data` (never overwritten). Photos: none yet (a `room_<slug>` section image, or a manifest render named `kitchenette` / `massage-room`, fills the no-WebGL fallback).
 - Modules: `rooms/kitchenette.js` (about 3 KB gzip) and `rooms/massage-room.js` (about 3.8 KB gzip, ambient fireplace). Doorway graph: gym to kitchenette to massage room, then dry sauna (left) and wet sauna (right); the lounge's relaxing zone is unchanged. Details in `docs/design/VIRTUAL-TOUR.md` 2.7.
 - Room sizes after round 2 (gzip -9, KB): lounge 6.3, dry sauna 5.2, gym 4.9, wet sauna 4.2, massage room 3.8, relaxing zone 3.2, kitchenette 3.0 (budget 6.5 per room, VIRTUAL-TOUR 4.2).
+
+## Door chain (2026-10-25, Moishe: the doors follow the real plan, `control/plan.py`)
+`TOUR_ROOMS` order (room list, URLs, `order` field): lounge, gym, massage-room, kitchenette, relaxing-zone, wet-sauna, dry-sauna. Every 3D door matches one chain, and the room list and prefetch (markers) follow it. Rooms keep their look; only doorways changed.
+- Lounge: on to the gym (corridor in the west wall beside reception). No door to the relaxing zone (east wall is plain now; the relaxing zone is far deeper).
+- Gym: back to the lounge (south), on to the massage room (north passage).
+- Massage room: back to the gym (east wall), on to the kitchenette (west wall); south wall plain.
+- Kitchenette: back to the massage room (east wall), on to the relaxing zone (west wall, new); south wall plain.
+- Relaxing zone: back to the kitchenette (south), wet sauna (north wall, left as you face deeper), dry sauna (north wall, right).
+- Wet sauna and dry sauna: back to the relaxing zone only (the glass door).
+The no-WebGL photo page has no door links of its own: it shows the room list in the same order, so it matches the 3D chain.

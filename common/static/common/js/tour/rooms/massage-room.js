@@ -1,7 +1,7 @@
 /* Massage room (round 2 addition; look from .private/fal-renders/massage-room.png). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
  * Interior 3.6 x 6.4 x 2.7 (x -1.8..1.8, z -3.2..3.2). North: the oak slatted wall with the gold swan. East: three cream-leather massage chairs with walnut sides stand against the wall
  * facing west, with gaps between them (instanced). West: a stone chimney breast with a flush linear fireplace (a gently animated flame and glow) and a large TV above it, facing the chairs.
- * Warm, low light with LED coves along both side walls. Doorways: south (back to the kitchenette), west near the north end (dry sauna, left), east near the north end (wet sauna, right). */
+ * Warm, low light with LED coves along both side walls. Doorways: east near the north end (back to the gym, as on the plan) and west near the north end (on to the kitchenette); the south wall is plain. */
 
 export async function build(scene, ctx) {
   const { THREE, K, T, S } = ctx, PI = Math.PI, WHITE = new THREE.Color(1, 1, 1), wrap = { wrap: true };
@@ -30,10 +30,9 @@ export async function build(scene, ctx) {
     };
     put(a, d0, 0, H); put(d1, b, 0, H); put(d0, d1, 2.1, H);
   };
-  wallDoor('e', X0, Z0, Z1, -2.1); wallDoor('w', X1, Z0, Z1, -2.4); wallDoor('n', Z1, X0, X1, -0.5);
-  K.vista('--color-cedar', [X0, -2.1], 'w', DW, 2.1, 1.0); K.vista('--color-travertine', [X1, -2.4], 'e', DW, 2.1, 1.0); K.vista('--color-walnut', [-0.5, Z1], 's', DW, 2.1, 1.0);
+  wallDoor('e', X0, Z0, Z1, -2.1); wallDoor('w', X1, Z0, Z1, -2.4); K.plane(3.6, H, wall, 0, H / 2, Z1, 'n', { tile: 2.4 });   // south: plain (the doors are the west and east ones)
+  K.vista('--color-cedar', [X0, -2.1], 'w', DW, 2.1, 1.0); K.vista('--color-travertine', [X1, -2.4], 'e', DW, 2.1, 1.0);
   [[X0 + 0.01, -2.1, 0.012, DW], [X1 - 0.01, -2.4, 0.012, DW]].forEach(([x, z, w, d]) => K.box(w, 0.012, d, led, x, 2.1, z));
-  K.box(DW, 0.012, 0.012, led, -0.5, 2.1, Z1 - 0.01);
   [X0 + 0.03, X1 - 0.03].forEach((x) => { K.box(0.03, 0.014, 6.3, led, x, H - 0.05, 0); K.glowPlane(0.6, 6.3, x < 0 ? x + 0.2 : x - 0.2, H - 0.01, 0, 'down', 0.3); });
   K.box(3.5, 0.014, 0.03, led, 0, H - 0.04, Z0 + 0.03); K.glowPlane(3.4, 0.5, 0, 2.45, Z0 + 0.02, 's', 0.3);
 
@@ -114,6 +113,6 @@ export async function build(scene, ctx) {
   return {
     view: { pos: [0.1, 1.6, 2.6], yaw: -10, pitch: -6 },
     exposure: 0.9, ambient: true, update,
-    markers: [{ to: 'kitchenette', at: [-0.5, 1.1, 3.15] }, { to: 'dry-sauna', at: [-1.75, 1.1, -2.1] }, { to: 'wet-sauna', at: [1.75, 1.1, -2.4] }],
+    markers: [{ to: 'kitchenette', at: [-1.75, 1.1, -2.1] }, { to: 'gym', at: [1.75, 1.1, -2.4] }],
   };
 }
