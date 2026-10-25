@@ -13,3 +13,4 @@ django-storages==1.14.6
 boto3==1.43.117
 phonenumbers==9.0.41
 sentry-sdk==2.73.0
+cryptography==50.0.2  # verifies the signature on Amazon SNS messages (notifications/sns.py)

@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from plans.models import SiteSettings
 
+from . import suppression
 from .models import EmailLog, NotificationTemplate
 from .seed import DEFAULT_SUBJECTS, LEGACY_KEYS
 
@@ -43,6 +44,16 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
     `to` and `cc` are lists of addresses. `subject_email` is the person the message is about when it goes to
     someone else (Barry's Gold email), so deleting that person's data finds the log row."""
     to, cc = list(to or []), list(cc or [])
+    blocked = suppression.suppressed_set(to + cc)  # THE guard: every email goes through here
+    if blocked:
+        to = [a for a in to if suppression.clean(a) not in blocked]
+        cc = [a for a in cc if suppression.clean(a) not in blocked]
+        logger.warning("Email %s: %d suppressed address(es) skipped", template, len(blocked))
+        if not to:  # nobody left to email (a CC alone is not a reason to send)
+            log = EmailLog.objects.create(
+                to=", ".join(sorted(blocked)), subject=subject[:300], template=template, status=EmailLog.SUPPRESSED,
+                subject_email=(subject_email or "").strip().lower(), error="Address is on the suppression list (bounce or complaint).")
+            return log
     ctx = {**base_context(), **(context or {})}
     log = EmailLog(
         to=", ".join(to), cc=", ".join(cc), subject=subject[:300], template=template,
