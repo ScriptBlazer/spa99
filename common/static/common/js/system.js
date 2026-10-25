@@ -1,5 +1,7 @@
 /* Spa 99 System behaviour (docs/design/SYSTEM.md). Everything here is an enhancement: every page works as plain forms.
-   Sections: helpers, dirty state and save bar, confirm dialog, submit interception, toasts, lock countdown, keyboard, audit log, menu. */
+   Sections: helpers, dirty state and save bar, confirm dialog, submit interception, lock countdown, keyboard, audit log, menu.
+   Toasts and the confirm modal are the shared ones (feedback.js, docs/design/FEEDBACK.md). */
+import { toast, confirmModal, initFeedback } from './feedback.js';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -141,28 +143,19 @@ async function save() {
 
 /* ---------- confirm dialog ---------- */
 
-const dialog = $('[data-system-confirm]');
-
-/** spec: {title, rows: [{label, old, now}], line, action, guard (true = type LIVE), danger} -> Promise<boolean> */
+/** spec: {title, rows: [{label, old, now}], line, action, guard (true = type LIVE), danger} -> Promise<boolean>
+ *  The shared confirm modal: the diff goes in `details`, the consequence line is the body, LIVE is the guard word. */
 function confirmDialog(spec) {
-  if (!dialog?.showModal) return Promise.resolve(window.confirm(spec.title));
-  $('[data-system-confirm-title]', dialog).textContent = spec.title;
-  $('[data-system-confirm-diff]', dialog).replaceChildren(...(spec.rows || []).map((r) => diffLine(r.label, r.old, r.now)));
-  $('[data-system-confirm-line]', dialog).textContent = spec.line || '';
-  const ok = $('[data-system-confirm-ok]', dialog);
-  ok.textContent = spec.action;
-  ok.className = `sys-btn ${IS_LIVE ? 'danger' : 'primary'}`;
-  const guardBox = $('[data-system-confirm-guard]', dialog);
-  const input = $('[data-system-confirm-input]', dialog);
-  guardBox.hidden = !spec.guard; input.value = '';
-  ok.disabled = !!spec.guard;
-  input.oninput = () => { ok.disabled = input.value.trim() !== 'LIVE'; };
-  $('[data-system-confirm-cancel]', dialog).onclick = () => dialog.close('cancel');
-  return new Promise((resolve) => {
-    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'ok'), { once: true });
-    dialog.returnValue = '';
-    dialog.showModal();
-    $('[data-system-confirm-cancel]', dialog).focus();
+  const details = document.createElement('div');
+  details.className = 'sys-diff';
+  details.replaceChildren(...(spec.rows || []).map((r) => diffLine(r.label, r.old, r.now)));
+  return confirmModal({
+    title: spec.title,
+    details: spec.rows?.length ? details : undefined,
+    body: spec.line || '',
+    confirmLabel: spec.action,
+    tone: IS_LIVE || spec.danger ? 'danger' : 'neutral',
+    guard: spec.guard ? 'LIVE' : undefined,
   });
 }
 
@@ -229,38 +222,11 @@ function begin(form) {
   if (button && form.matches('[data-system-form]:not([data-system-add])')) { button.disabled = true; button.textContent = 'Saving...'; }
 }
 
-/* ---------- toasts ---------- */
+/* ---------- toasts: the shared ones; a server message carrying an undo link shows Undo (feedback.js) ---------- */
 
-const toasts = $('[data-system-toasts]');
-function toast(text, { kind = 'success', undoUrl = '' } = {}) {
-  const el = document.createElement('div');
-  el.className = 'sys-toast'; el.dataset.kind = kind;
-  const message = document.createElement('span'); message.textContent = text; el.append(message);
-  if (undoUrl) {
-    const undo = document.createElement('button'); undo.type = 'button'; undo.textContent = 'Undo';
-    undo.addEventListener('click', () => {
-      const f = document.createElement('form'); f.method = 'post'; f.action = undoUrl;
-      const token = $('#system-csrf')?.content.querySelector('input')?.cloneNode(); if (token) f.append(token);
-      const next = document.createElement('input'); next.type = 'hidden'; next.name = 'next'; next.value = location.pathname + location.search; f.append(next);
-      document.body.append(f); submitting = true; f.submit();
-    });
-    el.append(undo);
-  }
-  let timer;
-  const close = () => { el.dataset.out = ''; setTimeout(() => el.remove(), 130); };
-  const start = () => { clearTimeout(timer); timer = setTimeout(close, 6000); };
-  el.addEventListener('mouseenter', () => clearTimeout(timer)); el.addEventListener('mouseleave', start);
-  el.addEventListener('focusin', () => clearTimeout(timer)); el.addEventListener('focusout', start);
-  toasts.append(el); start();
-}
-window.systemToast = toast;
-
-function initMessages() {
-  const list = $('[data-system-messages]');
-  if (!list || !toasts) return;
-  $$('li', list).forEach((li) => toast(li.textContent.trim(), { kind: li.dataset.systemMessage === 'error' ? 'error' : 'success', undoUrl: li.dataset.undo || '' }));
-  list.remove();
-}
+initFeedback();
+document.addEventListener('spa99:leaving', () => { submitting = true; });
+$('[data-system-keys]')?.addEventListener('click', (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }); // backdrop closes the shortcuts list
 
 /* ---------- lock countdown: the server is the clock; activity slides it ---------- */
 
@@ -328,7 +294,7 @@ function initKeys() {
       if (forms().length) { event.preventDefault(); if (isDirty()) save(); }
       return;
     }
-    if (event.metaKey || event.ctrlKey || event.altKey || typing(event.target) || $('dialog[open]')) return;
+    if (event.metaKey || event.ctrlKey || event.altKey || typing(event.target) || ($('dialog[open]') || $('.fb-overlay'))) return;
     if (event.key === '/') {
       const search = $('[data-system-search]') || $('input[type=search]');
       if (search) { event.preventDefault(); search.focus(); }
@@ -553,7 +519,7 @@ function initAudit() {
       else if (sheet.hasAttribute('data-open')) setSheet(false);
       return;
     }
-    if (event.metaKey || event.ctrlKey || event.altKey || typing(event.target) || $('dialog[open]') || (drawer() && !drawer().hidden)) return;
+    if (event.metaKey || event.ctrlKey || event.altKey || typing(event.target) || ($('dialog[open]') || $('.fb-overlay')) || (drawer() && !drawer().hidden)) return;
     const list = groups();
     if (event.key === 'j' || event.key === 'k') {
       if (!list.length) return;
@@ -569,7 +535,7 @@ function initAudit() {
       const group = current(); if (!group) return;
       const item = document.activeElement.closest('.au-item');
       const form = $('form[data-system-undo-form]', item || group) || $('form[data-system-undo-form]', group);
-      if (form) { event.preventDefault(); form.requestSubmit(); } else toast('Nothing to undo here.', { kind: 'error' });
+      if (form) { event.preventDefault(); form.requestSubmit(); } else toast('Nothing to undo here.', { kind: 'info' });
     }
   });
 
@@ -603,4 +569,4 @@ function initExpand() {
   $$('[data-system-expand][aria-expanded=true]').forEach((b) => { b.textContent = 'Less'; });
 }
 
-initForms(); initExpand(); initSubmit(); initMessages(); initTimer(); initKeys(); initAudit(); initMenu(); refreshBar();
+initForms(); initExpand(); initSubmit(); initTimer(); initKeys(); initAudit(); initMenu(); refreshBar();

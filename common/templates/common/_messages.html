@@ -1,12 +1,6 @@
-<ul class="messages" id="messages" aria-live="polite">
-  {% for message in messages %}
-    {% with level=message.level_tag %}
-    <li class="message message-{% if level == 'success' or level == 'info' %}success{% else %}error{% endif %}" data-message
-        data-level="{% if level == 'success' or level == 'info' %}success{% else %}error{% endif %}"
-        role="{% if level == 'success' or level == 'info' %}status{% else %}alert{% endif %}">
-      <span>{{ message }}</span>
-      <button type="button" class="message-close" data-message-close>Dismiss</button>
-    </li>
-    {% endwith %}
-  {% endfor %}
-</ul>
+{% load feedback_tags %}{# The toast regions (live from page load) and the server's Django messages. Included once per page, by _feedback.html. feedback.js shows each <li> as a toast 100ms after load. #}
+<section class="toasts" aria-label="Notifications">
+  <ol class="toasts-list" role="status" aria-live="polite" data-toasts-polite></ol>
+  <ol class="toasts-list" role="alert" aria-live="assertive" data-toasts-assertive></ol>
+</section>
+{% if messages %}<template data-server-messages>{% for message in messages %}<li data-kind="{{ message.level_tag|toast_kind }}" data-undo="{{ message.extra_tags|undo_url }}">{{ message }}</li>{% endfor %}</template>{% endif %}

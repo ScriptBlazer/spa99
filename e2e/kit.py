@@ -327,7 +327,7 @@ def apply_gold(page, first, last, email, mobile, note=""):
 
 def confirm_office_modal(page):
     """Confirm the Office/website confirm dialog (Approve, Decline, Delete ...)."""
-    page.locator("#confirm-modal [data-modal-confirm]").click()
+    page.locator("dialog.fb-modal[open] [data-fb-ok]").click()
 
 
 def no_horizontal_overflow(page):

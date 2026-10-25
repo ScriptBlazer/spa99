@@ -341,3 +341,12 @@ def run_job_now(name):
     except Exception as error:
         return False, f"{RUNNABLE[name][1]} failed: {type(error).__name__}: {error}"[:300], time.monotonic() - started
     return True, str(result)[:300], time.monotonic() - started
+
+
+def remove_suppression(request, row):
+    """Take an address off the email suppression list (Developer level, behind the unlock) and write it to the audit log.
+    The audit event is written first: if it cannot be written the address stays suppressed."""
+    event = audit.log_event(SystemEvent.SUPPRESSION_REMOVED, request, user=request.user, detail={"email": row.email, "reason": row.reason})
+    if event is None:
+        raise ChangeRefused("The audit log could not be written, so nothing was removed.")
+    row.delete()

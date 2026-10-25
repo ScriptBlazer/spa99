@@ -109,3 +109,16 @@ class EnvLabelTests(TestCase):
             self.assertContains(client.get("/"), 'data-env="live"')
         public = Client(HTTP_HOST="localhost").get("/")
         self.assertNotIn("system_env", public.context or {})
+
+
+class DiscountLinkSettingTests(TestCase):
+    def setUp(self):
+        self.client = unlocked_client(make_user())
+
+    def test_only_https_is_accepted_and_the_change_is_logged(self):
+        bad = self.client.post("/settings/", SETTINGS_POST | {"discount_contact_url": "http://wa.me/447000000000"})
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(SiteSettings.load().discount_contact_url, "")
+        self.client.post("/settings/", SETTINGS_POST | {"discount_contact_url": "https://wa.me/447000000000"})
+        self.assertEqual(SiteSettings.load().discount_contact_url, "https://wa.me/447000000000")
+        self.assertEqual(SystemChange.objects.get().field, "discount_contact_url")

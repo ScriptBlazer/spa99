@@ -187,6 +187,8 @@ Contrast used: gold on espresso 6.17, gold on espresso-raised 5.32, muted invers
 - Toast: opacity in 240 ms, out 240 ms.
 - Reduced motion: everything visible at once; no view transition.
 
+**Accents and states.** Never a one-sided accent (left/right stripe, inset side shadow, or a ::before bar). Use no border with a soft shadow, a tinted background, or a full hairline. Selected/active states use background tint, weight or an icon. The "confirm your email" banner: no border, `--shadow-toast`, raised cream, info icon.
+
 ## 11. Accessibility
 
 - `<nav aria-label="My Spa 99">` for both sidebar and tab bar (only one in the DOM per breakpoint, or the other `hidden`). `aria-current="page"` on the current item. Labels always visible.

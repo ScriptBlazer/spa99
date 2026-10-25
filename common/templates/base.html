@@ -10,11 +10,11 @@
 <a class="skip-link" href="#main">Skip to content</a>
 {% block header %}{% include "common/_header.html" %}{% endblock %}
 <main id="main" tabindex="-1">
-  {% block messages %}<div class="container">{% include "common/_messages.html" %}</div>{% endblock %}
+  {% block messages %}{% endblock %}
   {% block main %}{% endblock %}
 </main>
 {% block footer %}{% include "common/_footer.html" %}{% endblock %}
-{% include "common/_modal.html" %}
+{% block feedback %}{% include "common/_feedback.html" %}{% endblock %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

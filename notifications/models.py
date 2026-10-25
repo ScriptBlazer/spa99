@@ -27,7 +27,8 @@ class EmailLog(BaseModel):
 
     SENT = "sent"
     FAILED = "failed"
-    STATUS_CHOICES = [(SENT, "Sent"), (FAILED, "Failed")]
+    SUPPRESSED = "suppressed"  # every recipient is on the suppression list: nothing was sent
+    STATUS_CHOICES = [(SENT, "Sent"), (FAILED, "Failed"), (SUPPRESSED, "Not sent (suppressed)")]
 
     to = models.TextField(help_text="Comma separated")
     subject_email = models.EmailField(
@@ -37,7 +38,7 @@ class EmailLog(BaseModel):
     cc = models.TextField(blank=True)
     subject = models.CharField(max_length=300)
     template = models.CharField(max_length=60)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES)
     error = models.TextField(blank=True)
     sent_at = models.DateTimeField(null=True, blank=True)
 
@@ -47,3 +48,27 @@ class EmailLog(BaseModel):
 
     def __str__(self):
         return f"{self.template} to {self.to} ({self.status})"
+
+
+class EmailSuppression(BaseModel):
+    """An address we must not email: SES reported a permanent bounce or a spam complaint (Amazon SNS feedback,
+    notifications/sns.py). Kept even if the person deletes their account: it holds only the address, and sending again
+    would harm our sender reputation. Soft (transient) bounces are never stored here."""
+
+    HARD_BOUNCE = "hard_bounce"
+    COMPLAINT = "complaint"
+    REASON_CHOICES = [(HARD_BOUNCE, "Permanent bounce"), (COMPLAINT, "Spam complaint")]
+
+    email = models.EmailField(unique=True, help_text="Lower case.")
+    reason = models.CharField(max_length=12, choices=REASON_CHOICES)
+    first_seen = models.DateTimeField()
+    last_seen = models.DateTimeField()
+    count = models.PositiveIntegerField(default=1, help_text="Different feedback messages received for this address.")
+    last_feedback_id = models.CharField(max_length=100, blank=True, help_text="SES feedback id of the last message; a repeat of it is ignored.")
+    detail = models.CharField(max_length=300, blank=True, help_text="Short subtype / diagnostic from SES.")
+
+    class Meta:
+        ordering = ["-last_seen"]
+
+    def __str__(self):
+        return f"{self.email} ({self.reason})"

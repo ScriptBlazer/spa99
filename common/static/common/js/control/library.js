@@ -1,6 +1,6 @@
 /* The Library page (REAL): files, playlists, uploads. Everything here is stored on the server through /library/... (libdata.js).
    Playback into rooms and screens is pretend; previews here play the real files in this browser. */
-import { $, $$, S, esc, icon, toast, announce, bus, fmtDur, fmtSize, fmtTotal, plural, confirmDialog, formDialog, MOTION, FINE, XWIDE } from "./core.js";
+import { $, $$, S, esc, icon, toast, toastError, toastInfo, announce, bus, fmtDur, fmtSize, fmtTotal, plural, confirmDialog, formDialog, MOTION, FINE, XWIDE } from "./core.js";
 import { L, asset, playlist, loadLibrary, postJSON, replaceAsset, replacePlaylist, dropAsset, dropPlaylist, refreshUsedIn, itemSeconds, playlistSeconds } from "./libdata.js";
 import { addFiles, limits, uploading } from "./upload.js";
 import { openPanel, closePanel, panelKey } from "./panel.js";
@@ -193,7 +193,7 @@ async function movePlaylistItem(p, from, to) {
   const hs = $$("[data-pl-items] [data-handle]", root);
   if (hs[focusIdx]) hs[focusIdx].focus({ preventScroll: true });
   try { replacePlaylist(await postJSON(`/library/playlists/${p.id}/items/reorder/`, { item_ids: p.items.map((i) => i.id) })); }
-  catch (e) { p.items = before; renderRoute(); toast(e.message); }
+  catch (e) { p.items = before; renderRoute(); toastError(e.message); }
 }
 
 /* ---------- routing inside the page ---------- */
@@ -264,7 +264,7 @@ function togglePreview(id) {
   stopPreview();
   playing = id;
   el.src = a.url;
-  el.play().catch(() => { toast("This browser could not play that file."); stopPreview(); });
+  el.play().catch(() => { toastError("This browser could not play that file."); stopPreview(); });
   markPlaying();
 }
 
@@ -337,7 +337,7 @@ async function addItemsDialog(p) {
   const kinds = p.kind === "music" ? ["audio"] : ["video", "image"];
   const pool = L.assets.filter((a) => kinds.includes(a.kind));
   const inList = new Set(p.items.map((i) => i.asset.id));
-  if (!pool.length) { toast(p.kind === "music" ? "No music in the Library yet." : "No videos or pictures in the Library yet."); return; }
+  if (!pool.length) { toastInfo(p.kind === "music" ? "No music in the Library yet." : "No videos or pictures in the Library yet."); return; }
   const picked = await formDialog((form, close) => {
     const chosen = new Set();
     form.innerHTML = `<h2 id="ctl-dialog-h">Add to ${esc(p.name)}</h2><ul class="ctl-addlist">${pool.map((a) => `<li><label class="ctl-addrow"><input type="checkbox" data-add="${a.id}"${inList.has(a.id) ? " checked disabled" : ""}>
@@ -360,7 +360,7 @@ async function addItemsDialog(p) {
     replacePlaylist(latest);
     renderRoute();
     toast(`Added ${plural(picked.length, "item")} to ${p.name}.`);
-  } catch (e) { toast(e.message); renderRoute(); }
+  } catch (e) { toastError(e.message); renderRoute(); }
 }
 
 /* ---------- item panel ---------- */
@@ -458,7 +458,7 @@ async function saveAsset(id, patch) {
     refreshItem(id);
     renderRoute();
     return true;
-  } catch (e) { toast(e.message); refreshItem(id); return false; }
+  } catch (e) { toastError(e.message); refreshItem(id); return false; }
 }
 
 function startEdit(box, id) {
@@ -529,7 +529,7 @@ async function deleteAssets(ids) {
       lib.sel.delete(a.id);
       dropAsset(a.id);
       done += 1;
-    } catch (e) { toast(e.message); break; }
+    } catch (e) { toastError(e.message); break; }
   }
   if (done) toast(done === 1 ? `${title} deleted.` : `${done} files deleted.`);
   renderRoute();
@@ -553,7 +553,7 @@ async function selectionAction(name) {
     });
     if (!tag) return;
     let n = 0;
-    for (const a of list) { if (!a.tags.includes(tag)) { try { replaceAsset(await postJSON(`/library/assets/${a.id}/update/`, { tags: [...a.tags, tag] })); n += 1; } catch (e) { toast(e.message); break; } } }
+    for (const a of list) { if (!a.tags.includes(tag)) { try { replaceAsset(await postJSON(`/library/assets/${a.id}/update/`, { tags: [...a.tags, tag] })); n += 1; } catch (e) { toastError(e.message); break; } } }
     refreshUsedIn();
     renderRoute();
     toast(`Tagged ${plural(n, "file")}.`);
@@ -561,7 +561,7 @@ async function selectionAction(name) {
   }
   if (name === "playlist") {
     const kinds = new Set(list.map((a) => (a.kind === "audio" ? "music" : "screens")));
-    if (kinds.size !== 1) { toast("Pick music or screen files, not both."); return; }
+    if (kinds.size !== 1) { toastInfo("Pick music or screen files, not both."); return; }
     const kind = [...kinds][0];
     const lists = L.playlists.filter((p) => p.kind === kind);
     const pick = await chooseOne("Add to playlist", [...lists.map((p) => ({ value: p.id, label: p.name, sub: plural(p.items.length, "item") })), { value: "__new__", label: "New playlist" }]);
@@ -576,7 +576,7 @@ async function selectionAction(name) {
       lib.sel.clear();
       renderRoute();
       toast(`Added ${plural(list.length, "file")} to ${target.name}.`);
-    } catch (e) { toast(e.message); }
+    } catch (e) { toastError(e.message); }
   }
 }
 
@@ -590,7 +590,7 @@ async function playlistAction(event, t) {
   const remove = t.closest("[data-pl-remove]");
   if (remove) {
     try { replacePlaylist(await postJSON(`/library/playlists/${p.id}/items/remove/`, { item_id: Number(remove.dataset.plRemove) })); renderRoute(); }
-    catch (e) { toast(e.message); }
+    catch (e) { toastError(e.message); }
     return true;
   }
   const secs = t.closest("[data-secs]");
@@ -600,7 +600,7 @@ async function playlistAction(event, t) {
     if (next === (item.seconds || 8)) return true;
     item.seconds = next;
     renderRoute();
-    try { replacePlaylist(await postJSON(`/library/playlists/${p.id}/items/seconds/`, { item_id: item.id, seconds: next })); } catch (e) { toast(e.message); }
+    try { replacePlaylist(await postJSON(`/library/playlists/${p.id}/items/seconds/`, { item_id: item.id, seconds: next })); } catch (e) { toastError(e.message); }
     const again = $(`[data-secs][data-item-id="${item.id}"][data-secs="${secs.dataset.secs}"]`, root);
     if (again) again.focus({ preventScroll: true });
     return true;
@@ -620,7 +620,7 @@ async function playlistAction(event, t) {
     const ok = await confirmDialog({ title: `Delete ${p.name}?`, body: "The files stay in the Library.", ok: "Delete playlist", danger: true });
     if (!ok) return true;
     try { await postJSON(`/library/playlists/${p.id}/delete/`); dropPlaylist(p.id); toast("Playlist deleted."); go("?tab=playlists"); }
-    catch (e) { toast(e.message); }
+    catch (e) { toastError(e.message); }
     return true;
   }
   const editBtn = t.closest("[data-edit='plname'] [data-edit-btn]");
@@ -633,7 +633,7 @@ async function playlistAction(event, t) {
     const finish = async (save) => {
       if (done) return; done = true;
       const name = input.value.trim();
-      if (save && name && name !== p.name) { try { replacePlaylist(await postJSON(`/library/playlists/${p.id}/update/`, { name })); } catch (e) { toast(e.message); } }
+      if (save && name && name !== p.name) { try { replacePlaylist(await postJSON(`/library/playlists/${p.id}/update/`, { name })); } catch (e) { toastError(e.message); } }
       renderRoute();
     };
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); finish(true); } else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); } });

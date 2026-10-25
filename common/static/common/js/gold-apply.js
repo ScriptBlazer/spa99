@@ -11,7 +11,7 @@ import { observeReveals } from './reveal.js';
 import { attachValidation } from './validate.js';
 import { setWorking, clearWorking } from './buttons.js';
 import { arrowIcon as makeArrow, clearableTiles, companyGlyphs, reducedMotion, segmentedEl, settle, tileEl } from './choices.js';
-import { dismiss, showMessage } from './messages.js';
+import { dismiss, toast } from './feedback.js';
 
 const config = JSON.parse(document.getElementById('gold-config').textContent);
 const copy = config.copy;
@@ -62,7 +62,7 @@ function saveJourney(key) {
     const result = await postWithRetry('/journey/answer/', payload);
     if (result.ok) { if (errorMessage) { dismiss(errorMessage); errorMessage = null; } }
     else if (result.status >= 500 || result.status === 0 || result.status === 429) {
-      if (!errorMessage?.isConnected) errorMessage = showMessage('error', "We couldn't save that just now. Your answers are safe on this page.");
+      if (!errorMessage?.isConnected) errorMessage = toast("We couldn't save that just now. Your answers are safe on this page.", { kind: 'error' });
     }
   }).catch(() => {});
 }
@@ -338,9 +338,9 @@ async function onSubmit(event) {
   } else if (result?.status === 403) {
     root.replaceChildren(renderClosed());
   } else if (result?.status === 429) {
-    showMessage('error', 'That was a lot at once. Please wait a minute and try again.');
+    toast('That was a lot at once. Please wait a minute and try again.', { kind: 'error' });
   } else {
-    showMessage('error', "We couldn't send that just now. Everything you typed is still here. Please try again.");
+    toast("We couldn't send that just now. Everything you typed is still here. Please try again.", { kind: 'error' });
   }
 }
 

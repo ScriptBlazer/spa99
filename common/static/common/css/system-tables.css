@@ -9,7 +9,7 @@
 .sys-table .mono, .sys-table time { font-family: var(--sys-mono); font-size: var(--sys-fs-sm); }
 .sys-table td.wrap { white-space: normal; padding-block: var(--sys-1); }
 .sys-table tr[data-hidden] td { color: var(--sys-text-3); }
-.sys-table td[data-edited] { background: var(--sys-warn-bg); box-shadow: inset 2px 0 0 var(--sys-warn); }
+.sys-table td[data-edited] { background: var(--sys-warn-bg); box-shadow: inset 0 0 0 1px var(--sys-warn); }
 .sys-table td[data-editable] { cursor: text; } .sys-table td[data-editable]:hover { box-shadow: inset 0 0 0 1px var(--sys-control); }
 .sys-table td[data-editable] input { width: 100%; }
 .sys-table .sys-empty { height: 64px; text-align: center; color: var(--sys-text-2); }

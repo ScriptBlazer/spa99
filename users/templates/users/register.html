@@ -89,7 +89,9 @@
       </fieldset>
 
       <div class="form-submit">
+        <p class="no-payment">Nothing to pay now. No card details needed.</p>
         <button type="submit" class="btn btn-primary btn-block" data-working-text="One moment">{{ site_settings.wording }}</button>
+        {% discount_line %}
         <p class="form-foot small"><span class="muted">Already registered?</span> <a class="btn-quiet small" href="{% url 'login' %}">Sign in</a></p>
       </div>
     </form>

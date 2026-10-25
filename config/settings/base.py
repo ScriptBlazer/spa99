@@ -137,6 +137,8 @@ DEFAULT_FROM_EMAIL = ENV.get("DEFAULT_FROM_EMAIL", "")
 SERVER_EMAIL = ENV.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 # Recipients (Gold approver, CC, contact email) are not here: developers edit them in System (SiteSettings).
 AWS_SES_REGION_NAME = ENV.get("AWS_SES_REGION_NAME", "eu-west-2")
+# SES bounce/complaint feedback arrives from this one SNS topic at POST /ses/notifications/. Empty = that endpoint is off (404).
+SES_SNS_TOPIC_ARN = (ENV.get("SES_SNS_TOPIC_ARN", "") or "").strip()
 # Absolute links used in emails (no trailing slash).
 SITE_WEBGL = ENV.bool("SITE_WEBGL", True)  # false = the 3D Gold Card never loads (CSS card only); read by base.html as data-webgl
 SITE_URL = ENV.get("SITE_URL", f"https://{DOMAIN}").rstrip("/")

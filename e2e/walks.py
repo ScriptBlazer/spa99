@@ -28,6 +28,15 @@ def goto_ok(page, url, h1=True):
     return response
 
 
+def toast_text(page, words, timeout=3000):
+    """Server messages show as toasts a moment after load (feedback.js): wait for one containing `words`."""
+    try:
+        page.locator(".toasts-list li", has_text=re.compile(re.escape(words), re.I)).first.wait_for(timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+
 def body_text(page):
     return page.locator("body").text_content() or ""
 
@@ -233,7 +242,7 @@ def account(w):
         with page.expect_navigation():
             page.locator("form.m-form button[type=submit]").click()
         page.wait_for_url(re.compile(r"/account/you/$"))
-        assert "password has been changed" in body_text(page).lower(), f"No success message. {form_errors(page)}"
+        assert toast_text(page, "password has been changed"), f"No success message. {form_errors(page)}"
     with w.step("Sign out and sign in with the new password", page):
         sign_out_member(page)
         sign_in(page, SITE, email, NEW_PASSWORD, expect_path="/account/")
@@ -335,7 +344,7 @@ def office_levels(w):
         admin.locator("[data-delete-person] button").click()
         confirm_office_modal(admin)
         admin.wait_for_url(re.compile(r"/people/$"))
-        assert "were deleted" in body_text(admin), "No confirmation message after deleting"
+        assert toast_text(admin, "were deleted"), "No confirmation message after deleting"
         assert dbtool("user", members[0][0])["exists"] is False, "The member is still in the database"
 
     # --- Approver: can approve (the same direct request that was refused above now works) ---
@@ -397,9 +406,9 @@ def system(w):
         field.fill("311")
         page.wait_for_selector("[data-system-savebar]:not([hidden])")
         page.locator("[data-system-save]").click()
-        page.wait_for_selector("[data-system-confirm][open]")
+        page.wait_for_selector("dialog.fb-modal[open]")
         with page.expect_navigation():
-            page.locator("[data-system-confirm-ok]").click()
+            page.locator("dialog.fb-modal[open] [data-fb-ok]").click()
         page.wait_for_selector("[data-system-plans]")
         shown = page.locator('tr[data-system-plan="tier-1"] input[aria-label="Price ex VAT"]').input_value()
         assert float(shown) == 311, f"The page shows {shown}"
@@ -497,8 +506,8 @@ def control(w):
         page.locator("a[data-open-item]:has-text('e2e')").first.click()
         page.wait_for_selector("[data-item-panel]")
         page.locator("[data-item-delete]").click()
-        page.wait_for_selector("[data-dialog][open]")
-        page.locator("[data-dialog] button[value=ok]").click()
+        page.wait_for_selector("dialog.fb-modal[open]")
+        page.locator("dialog.fb-modal[open] [data-fb-ok]").click()
         page.wait_for_selector("a[data-open-item]:has-text('e2e')", state="detached")
         assert dbtool("assets")["count"] == 0, "The file is still in the database"
 

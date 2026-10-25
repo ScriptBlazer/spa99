@@ -14,6 +14,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from common.audit import client_ip
 from common.ratelimit import hit
+from notifications.models import EmailSuppression
 from plans.models import SiteSettings
 from users.views import LoginView, TeamPasswordView
 
@@ -27,7 +28,7 @@ from .models import SystemChange, SystemEvent
 from .permissions import signed_in, unlocked
 
 NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", "system_plans"), ("hours", "Hours and closures", "system_hours"),
-       ("gold", "Gold rules", "system_gold"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"),
+       ("gold", "Gold rules", "system_gold"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("suppressions", "Email suppressions", "system_suppressions"),
        ("settings", "Settings", "system_settings"), ("team", "Team", "system_team"), ("changes", "Audit log", "system_changes")]
 
 
@@ -262,6 +263,24 @@ def _edit_site(request, form_class, template, section):
 @require_http_methods(["GET", "POST"])
 def emails(request):
     return _edit_site(request, EmailsForm, "system/emails.html", "emails")
+
+
+@unlocked
+@require_GET
+def suppressions(request):
+    return page(request, "system/suppressions.html", "suppressions", {"rows": EmailSuppression.objects.all()[:500]})
+
+
+@unlocked
+@require_POST
+def suppression_remove(request, pk):
+    row = get_object_or_404(EmailSuppression, pk=pk)
+    try:
+        services.remove_suppression(request, row)
+        messages.success(request, "Removed. This address can be emailed again.")
+    except services.ChangeRefused as error:
+        messages.error(request, str(error))
+    return redirect("system_suppressions")
 
 
 @unlocked

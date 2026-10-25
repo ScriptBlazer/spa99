@@ -203,9 +203,9 @@ html:has(.gold-apply) { scroll-padding-top: calc(var(--header-h) + var(--space-4
 .gold-apply .question .tiles, .gold-apply .question .segmented, .gold-apply .question .field { margin-top: var(--space-3); }
 .gold-apply .question-title + .field-pair { margin-top: var(--space-3); }
 
-/* follow-ups on a gold thread; the Other text sits straight under the industry tiles */
+/* follow-ups on a soft tinted panel, indented; the Other text sits straight under the industry tiles */
 .gold-apply .sub-question { margin-top: var(--space-5); }
-.gold-apply [data-group="property_link"], .gold-apply [data-group="size_range"] { padding-left: var(--space-4); border-left: 1px solid var(--color-thread); }
+.gold-apply [data-group="property_link"], .gold-apply [data-group="size_range"] { margin-left: var(--space-4); padding: var(--space-4); background: var(--color-cream-raised); border-radius: var(--radius-md); }
 .gold-apply [data-group="property_link"] > legend::before, .gold-apply [data-group="size_range"] > legend::before { display: none; }
 .gold-apply [data-group="property_link"] .question-help, .gold-apply [data-group="size_range"] .question-help { padding-left: 0; }
 .gold-apply .sub-question[data-sub="industry_other"] { margin-top: var(--space-3); }

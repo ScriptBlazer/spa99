@@ -842,9 +842,9 @@ def beta_system_refusals(w):
             page.locator('tr[data-system-plan="tier-2"] input[aria-label="Price ex VAT"]').fill(typed)
             page.wait_for_selector("[data-system-savebar]:not([hidden])")
             page.locator("[data-system-save]").click()
-            page.wait_for_selector("[data-system-confirm][open]")
+            page.wait_for_selector("dialog.fb-modal[open]")
             with page.expect_navigation() as nav:
-                page.locator("[data-system-confirm-ok]").click()
+                page.locator("dialog.fb-modal[open] [data-fb-ok]").click()
             assert nav.value.status == 400, f"Saving '{typed}' answered {nav.value.status} (expected 400)"
             assert page.locator(".sys-rowerr").count() >= 1 and page.locator(".sys-rowerr").first.inner_text().strip(), "No error message is shown"
             assert dbtool("price", "tier-2")["price"] == before, f"The price changed to {dbtool('price', 'tier-2')['price']}"

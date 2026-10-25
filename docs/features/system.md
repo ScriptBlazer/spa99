@@ -119,3 +119,10 @@ Audit fixes: `verify()` walks only up to the head it read first (a write during 
 
 Unlocking System asks for the password AND a lock code (digits only, 6 to 12) from the env var `SYSTEM_UNLOCK_CODE`, so a stolen password alone is not enough. Both are always checked (the code with `hmac.compare_digest`); a failure shows one generic message, "Password or code is wrong."; every failure counts against the same rate limit (5 per 5 minutes). The audit event `unlock_failed` records `detail.reason` as `password` or `code`, never the typed values; the code is never logged or printed. Prod refuses to start when the variable is missing or not 6 to 12 digits. Dev and CI: unset or invalid means password only, the code field is hidden and the startup line warns "SYSTEM_UNLOCK_CODE not set: System unlock uses the password only".
 
+### Email suppressions (2026-10-25)
+
+`/suppressions/` (Developer level, behind the unlock; nav "Email suppressions"): read-only list of `notifications.EmailSuppression` (email, reason, last seen, count) with a **Remove** button (`POST /suppressions/<id>/remove/`). Removing writes a `suppress_removed` security event (detail: email, reason) first; if the event cannot be written nothing is removed. Background: docs/features/email.md.
+
+### Discount contact link (2026-10-25)
+
+`SiteSettings.discount_contact_url` (migration `plans.0012`, blank default, no backfill): "Discount contact link (WhatsApp)" in System > Settings > Wording and tax. https only (the form refuses http); saved through the normal logged path, so it is in the audit log with undo. Shown on the register and choose-membership screens (see `register-interest.md`).

@@ -246,38 +246,9 @@ body:has(dialog[open]) { overflow: hidden; }
 
 
 
-/* ---------- messages (one component for Django messages and scripts) ---------- */
-.messages { list-style: none; margin: 0; padding: 0; }
-.messages:has(.message) { padding-top: var(--space-4); }
-.message {
-  position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
-  padding: var(--space-3) var(--space-4); margin-bottom: var(--space-2); border-radius: var(--radius-md);
-  background: var(--s-raised); color: var(--s-text); box-shadow: inset 2px 0 0 var(--color-espresso);
-  animation: fade-in var(--duration-base) var(--ease-soft); transition: opacity var(--duration-base) var(--ease-soft);
-}
-.on-dark .message { box-shadow: inset 2px 0 0 var(--color-gold); }
-.message.message-error { box-shadow: inset 2px 0 0 var(--s-danger); }
-.message.is-hiding { opacity: 0; }
-.message-close { flex: none; min-height: 2.75rem; padding: 0 var(--space-2); background: none; border: 0; color: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 0.25em; text-decoration-thickness: 1px; }
+/* Messages, toasts and the modal live in feedback.css (docs/design/FEEDBACK.md). */
+/* Shared keyframes (the member tiles' Keep button and the Office sheet use them) */
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-
-/* ---------- modal: opens with a short rise, closes instantly ---------- */
-.modal {
-  width: min(30rem, 100%); max-width: 30rem; padding: var(--space-5); border: 0; border-radius: var(--radius-md);
-  background: var(--color-bg); color: var(--color-text); box-shadow: var(--shadow-raised);
-}
-.modal::backdrop { background: var(--color-overlay); }
-.modal[open] { animation: modal-in var(--duration-base) var(--ease-soft); }
-.modal-title { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); margin: 0; }
-.modal-title:focus { outline: none; }
-.modal p { margin-top: var(--space-3); }
-.modal-actions { display: flex; flex-direction: column-reverse; gap: var(--space-3); margin-top: var(--space-5); }
-.modal-actions .btn { width: 100%; }
-.modal-confirm.is-danger { background: var(--color-danger); color: var(--color-cream); }
-@media (min-width: 48em) { .modal-actions { flex-direction: row; justify-content: flex-end; } .modal-actions .btn { width: auto; } }
-@media (max-width: 47.99em) {
-  .modal { position: fixed; inset: auto 0 0 0; margin: 0; width: 100%; max-width: none; border-radius: var(--radius-md) var(--radius-md) 0 0; padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom)); }
-}
 @keyframes modal-in { from { opacity: 0; transform: translateY(var(--rise)); } to { opacity: 1; transform: none; } }
 
 /* ---------- panels ---------- */

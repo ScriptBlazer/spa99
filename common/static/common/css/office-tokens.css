@@ -16,6 +16,7 @@
   --office-bar: rgb(255 253 249 / 0.92);         /* phone tab bar */
   --office-bar-strong: rgb(255 253 249 / 0.94);  /* phone decision bar */
   --office-overlay: rgb(73 46 33 / 0.32);        /* modal and sheet backdrop */
+  --office-toast-edge: rgb(73 46 33 / 0.08);     /* approved 2026-10-25, FEEDBACK: 1px edge of a toast, decoration only */
   --office-caramel-tint: #F3E8DB;                /* caramel at 18%: "Medium" badge, espresso 10.25 */
 
   --office-shadow-1: 0 1px 2px rgb(73 46 33 / 0.04), 0 8px 24px -12px rgb(73 46 33 / 0.10);   /* every card at rest */

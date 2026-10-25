@@ -57,7 +57,6 @@ body.system.live { --sys-stripe: 3px; }
 .sys-nav a, .sys-nav .sys-soon { position: relative; display: flex; align-items: center; justify-content: space-between; height: var(--sys-row); padding: 0 var(--sys-3); border-radius: var(--sys-radius); color: var(--sys-text-2); font-weight: 500; text-decoration: none; transition: background-color .1s ease-out; }
 .sys-nav a:hover { background: var(--sys-subtle); }
 .sys-nav a[aria-current] { background: var(--sys-selected); color: var(--sys-text); font-weight: 600; }
-.sys-nav a[aria-current]::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px; background: var(--sys-gold); }
 .sys-nav .sys-soon { color: var(--sys-text-3); font-weight: 400; cursor: default; }
 .sys-nav .sys-soon small { font-size: var(--sys-fs-sm); }
 .sys-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--sys-warn); }
@@ -70,7 +69,7 @@ body.system.live { --sys-stripe: 3px; }
 
 /* panels, buttons, badges */
 .sys-panel { background: var(--sys-surface); border: 1px solid var(--sys-line); border-radius: var(--sys-radius-lg); min-width: 0; }
-.sys-panel + .sys-panel, .sys-stack > * + * { margin-top: var(--sys-4); }
+.sys-panel + .sys-panel { margin-top: var(--sys-4); }
 .sys-panel > header { display: flex; align-items: center; justify-content: space-between; gap: var(--sys-3); min-height: 40px; padding: 0 var(--sys-4); border-bottom: 1px solid var(--sys-line); }
 .sys-panel > header h2 { font-size: var(--sys-fs-md); font-weight: 600; }
 .sys-pad { padding: var(--sys-4); }
@@ -107,7 +106,8 @@ body.system.live { --sys-stripe: 3px; }
 .sys-row input[type=number] { width: 112px; } .sys-row input[type=date] { width: 148px; }
 .sys-row input[type=text], .sys-row input[type=email], .sys-row input:not([type]) { width: 320px; }
 .sys-row[data-wide] input[type=text] { width: 480px; }
-.sys-row[data-dirty] { background: var(--sys-warn-bg); box-shadow: -16px 0 0 var(--sys-warn-bg), inset 2px 0 0 var(--sys-warn); }
+.sys-row[data-dirty] { position: relative; background: var(--sys-warn-bg); border-radius: var(--sys-radius); box-shadow: inset 0 0 0 1px var(--sys-warn); }
+.sys-row[data-dirty]::after { content: "Edited"; position: absolute; top: var(--sys-1); right: var(--sys-2); color: var(--sys-warn); font-size: var(--sys-fs-sm); font-weight: 600; }
 .sys-row .sys-unit { color: var(--sys-text-2); }
 /* the one switch: a real checkbox drawn as a 36x20 track with the knob inside; On/Off text beside it where there is room */
 .sys-toggle { display: inline-flex; align-items: center; gap: var(--sys-2); cursor: pointer; vertical-align: middle; }
@@ -131,23 +131,10 @@ body.system.live { --sys-stripe: 3px; }
 .sys-inline-save { margin-top: var(--sys-4); } .js .sys-inline-save { display: none; }
 .sys-changes-list { position: absolute; bottom: 52px; left: 0; right: 0; max-height: 40vh; overflow: auto; background: var(--sys-surface); border-radius: var(--sys-radius-lg); box-shadow: var(--sys-shadow-pop); padding: var(--sys-2) var(--sys-4); }
 .sys-changes-list li { padding: 3px 0; }
-.sys-toasts { position: fixed; right: var(--sys-4); bottom: var(--sys-4); z-index: 80; display: flex; flex-direction: column; gap: var(--sys-2); align-items: flex-end; }
-.sys-toast { display: flex; align-items: center; gap: var(--sys-3); min-height: 40px; padding: var(--sys-2) var(--sys-3); background: var(--sys-text); color: var(--sys-surface); border-radius: var(--sys-radius-lg); box-shadow: var(--sys-shadow-pop); animation: sys-up .15s ease-out; }
-.sys-toast[data-kind=error] { background: var(--sys-danger); }
-.sys-toast button { background: none; border: 0; color: inherit; font: 600 var(--sys-fs)/1 var(--sys-font); text-decoration: underline; cursor: pointer; padding: var(--sys-1); }
-.sys-toast[data-out] { opacity: 0; transition: opacity .12s; }
-.sys-dialog { width: 480px; max-width: calc(100vw - 32px); padding: 0; border: 0; border-radius: var(--sys-radius-lg); box-shadow: var(--sys-shadow-pop); color: var(--sys-text); background: var(--sys-surface); font: inherit; }
-.sys-dialog::backdrop { background: var(--sys-overlay); }
-.sys-dialog[open] { animation: sys-pop .12s ease-out; }
-.sys-dialog form { margin: 0; } .sys-dialog .sys-body { padding: var(--sys-4); display: grid; gap: var(--sys-3); }
-.sys-dialog h2 { font-size: var(--sys-fs-md); font-weight: 600; }
-.sys-dialog footer { display: flex; justify-content: flex-end; gap: var(--sys-2); padding: var(--sys-3) var(--sys-4); border-top: 1px solid var(--sys-line); }
 .sys-diff { display: grid; gap: var(--sys-1); font-family: var(--sys-mono); font-size: var(--sys-fs-sm); }
 .sys-diff > div { overflow-wrap: anywhere; } .sys-diff b { font-weight: 600; font-family: var(--sys-font); color: var(--sys-text); }
-.sys-keys dl { display: grid; grid-template-columns: auto 1fr; gap: var(--sys-2) var(--sys-4); } .sys-keys dt { font-family: var(--sys-mono); }
+.sys-keys dl { margin-top: var(--sys-3); display: grid; grid-template-columns: auto 1fr; gap: var(--sys-2) var(--sys-4); } .sys-keys dt { font-family: var(--sys-mono); }
 .system kbd { font: 600 var(--sys-fs-sm) var(--sys-mono); padding: 1px 5px; border: 1px solid var(--sys-control); border-radius: var(--sys-radius); background: var(--sys-subtle); }
-@keyframes sys-up { from { opacity: 0; transform: translateY(8px); } }
-@keyframes sys-pop { from { opacity: 0; transform: scale(.98); } }
 
 /* dashboard */
 .sys-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: var(--sys-2); margin-bottom: var(--sys-4); }
@@ -182,9 +169,7 @@ body.system.live { --sys-stripe: 3px; }
   .system input:not([type=checkbox], [type=radio]), .system select { height: 36px; font-size: 1rem; }
   .system textarea { font-size: 1rem; } .sys-row input[type=text], .sys-row input[type=email], .sys-row input:not([type]), .sys-row[data-wide] input[type=text] { width: 100%; }
   .sys-btn { height: 36px; } .sys-btn.sm { height: 32px; }
-  .sys-toasts { left: var(--sys-4); } .sys-toast { width: 100%; }
   .sys-savebar { margin-inline: calc(-1 * var(--sys-3)); border-radius: 0; padding-bottom: env(safe-area-inset-bottom); height: calc(48px + env(safe-area-inset-bottom)); }
-  .sys-dialog { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: var(--sys-radius-lg) var(--sys-radius-lg) 0 0; }
   .sys-tiles { grid-template-columns: repeat(2, 1fr); }
 }
 @media (pointer: coarse) { .sys-nav a { height: 40px; } }

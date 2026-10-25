@@ -282,6 +282,8 @@ Opened by the 24px `info` icon button on any item or security group, or Enter on
 - **Integrity**: Entry hash and Previous hash, mono, middle-truncated (`a3f91c…e209bc`) with copy for the full value; "Verified" ok text or "Does not match" danger text.
 - Links: "Undo of 14:05 change", "Undone by Moishe · 14:40", "Open Plans and pricing". Undo button here too, same disabled rules.
 
+**Accents and states.** Never a one-sided accent (left/right stripe, inset side shadow, or a ::before bar). Use no border with a soft shadow, a tinted background, or a full hairline. Selected/active states use background tint, weight or an icon. Dirty and edited: warn tint, a full hairline and a text label.
+
 ### 7.7 States and paging
 
 - Loading a swap: the list keeps its height and drops to 50% opacity, no spinner; under 150ms nothing changes.

@@ -244,3 +244,11 @@ html[data-page="marketing"] {
   --member-content-max: 52rem;            /* content column, desktop */
   --color-tabbar: rgb(73 46 33 / 0.96);   /* tab bar over content; gold 6.0+, muted inverse 6.2+ over cream content */
 }
+
+/* Feedback: toasts and the one modal (docs/design/FEEDBACK.md section 4). Approved 2026-10-25 (FEEDBACK). */
+:root {
+  --shadow-toast: 0 2px 4px rgb(73 46 33 / 0.12), 0 12px 32px -12px rgb(73 46 33 / 0.45); /* approved 2026-10-25, FEEDBACK: toasts only */
+  --color-overlay-soft: rgb(73 46 33 / 0.32);  /* approved 2026-10-25, FEEDBACK: modal backdrop, with 4px blur; same value as --office-overlay */
+  --toast-w: 22.5rem;                          /* approved 2026-10-25, FEEDBACK: toast width from 64em */
+  --modal-w: 26.25rem;                         /* approved 2026-10-25, FEEDBACK: the one modal */
+}

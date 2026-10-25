@@ -103,3 +103,7 @@ From Spa 99, Reply-To `hello@spa99.uk`. Branded, plain and short. No email to Mo
 
 ## Wording note (2026-10-25)
 People see "Register", "Registered", "Your membership"; never "interest". Code and database names (`InterestRegistration`, `register_interest_open`, `/account/interest/`) are unchanged. The Terms page row `part_4` still says "which membership interests you" (stored in the database, legal text, left for Moishe to rewrite). Seeded text from the 2026-10-23 rename already reached existing rows via `backfill_site_data`; nothing new is stored in the database by this change.
+
+## No payment and discount contact (2026-10-25)
+
+The register page (above the submit button) and the choose-membership confirm screen say "Nothing to pay now. No card details needed." Under it, "Looking for a better rate? Message Barry on WhatsApp." (`{% discount_line %}`, `users/_discount_line.html`) links to `SiteSettings.discount_contact_url` in a new tab (`rel="noopener noreferrer"`). Blank link: dev shows the line with a dashed "[WhatsApp link to come]" marker (same `.legal-todo` look as the ICO row), live hides the line. The link comes from Moishe; until then it stays blank.

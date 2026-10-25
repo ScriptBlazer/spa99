@@ -1,8 +1,16 @@
-<dialog id="confirm-modal" class="modal" aria-labelledby="confirm-modal-title">
-  <h2 class="modal-title" id="confirm-modal-title" data-modal-title tabindex="-1"></h2>
-  <p data-modal-message></p>
-  <div class="modal-actions">
-    <button type="button" class="btn btn-secondary" data-modal-cancel>Cancel</button>
-    <button type="button" class="btn btn-primary modal-confirm" data-modal-confirm>Confirm</button>
+{# The one modal: confirm, alert and small forms. feedback.js fills it (confirmModal, alertModal, formModal). Themed per host by feedback.css. #}
+<dialog class="fb-modal" data-fb-modal aria-labelledby="fb-modal-title" aria-describedby="fb-modal-body">
+  <div class="fb-modal-wrap">
+    <div data-fb-standard>
+      <h2 class="fb-modal-title" id="fb-modal-title"><svg class="fb-modal-icon" data-fb-icon hidden aria-hidden="true" focusable="false"></svg><span data-fb-title></span></h2>
+      <div class="fb-modal-details" data-fb-details hidden></div>
+      <p class="fb-modal-body" id="fb-modal-body" data-fb-body></p>
+      <label class="fb-modal-guard" data-fb-guard hidden><span>Type <b data-fb-word></b> to confirm</span><input type="text" autocomplete="off" spellcheck="false" data-fb-input></label>
+      <div class="fb-modal-actions">
+        <button type="button" class="fb-btn fb-btn--secondary" data-fb-cancel>Cancel</button>
+        <button type="button" class="fb-btn fb-btn--primary" data-fb-ok>Confirm</button>
+      </div>
+    </div>
+    <div class="fb-modal-custom" data-fb-custom hidden></div>
   </div>
 </dialog>

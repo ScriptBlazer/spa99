@@ -399,6 +399,8 @@ Side panel (phone: sheet), `?item=id`:
 - Writes are POSTs, Admin level and up, CSRF, logged in the change history like other edits. Uploads use XHR (fetch has no upload progress). Recommendation: on live, video goes from the browser straight to S3 with a presigned POST so the web server never holds 500 MB; locally, through Django.
 - This ends v1's "nothing is sent after load" rule for the Library only. Pretend state still never reaches the server. If a zone or screen points at a deleted file, it falls back (music stops with "This file was deleted"; screens show Welcome).
 
+**Accents and states.** Never a one-sided accent (left/right stripe, inset side shadow, or a ::before bar). Use no border with a soft shadow, a tinted background, or a full hairline. Selected/active states use background tint, weight or an icon.
+
 ## 11. Empty states (copy)
 
 | Where | Copy | Action |

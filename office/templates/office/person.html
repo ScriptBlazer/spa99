@@ -51,7 +51,7 @@
       {% if office_can.can_delete and not person.is_staff %}
       <form method="post" action="{% url 'office_person_delete' person.id %}" data-delete-person>{% csrf_token %}
         <button type="submit" class="o-danger-link" data-working-text="Deleting" data-confirm data-confirm-danger data-confirm-title="Delete {{ person.name }}?"
-                data-confirm-message="This removes his registration, journey answers and Gold application. It cannot be undone." data-confirm-label="Delete for good" data-confirm-cancel="Keep">Delete this person</button>
+                data-confirm-body="This removes his registration, journey answers and Gold application. It cannot be undone." data-confirm-label="Delete for good" data-confirm-cancel="Keep">Delete this person</button>
       </form>{% endif %}
     </section>
   </aside>{% endif %}

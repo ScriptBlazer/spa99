@@ -1,6 +1,7 @@
 /* Control shell: boots the state, wires every module, swaps the page when you change tab (so music keeps playing and
    uploads keep going), and handles the keys and clicks that belong to the whole shell. */
 import { $, $$, S, MOTION, WIDE, bus } from "./core.js";
+import { confirmModal, initFeedback } from "../feedback.js";
 import { restore, save, writeNow, resetDemo } from "./state.js";
 import { initLights, renderLights, runSim, haltSim, onVisible, openRoom, closePop, alertsOpen, closeAlerts } from "./lights.js";
 import { initScreens, renderScreens, renderSchedLane, runScreens, haltScreens, pruneMounts, openScreen, reconcile } from "./screens.js";
@@ -158,8 +159,8 @@ function onClick(event) {
   if (t.closest("[data-backdrop]")) { closePanel(); return; }
   if (t.closest("[data-reset]")) {
     if (panelKey() === "more") closePanel();
-    const d = $("[data-reset-dialog]");
-    if (d && d.showModal) d.showModal();
+    confirmModal({ title: "Reset demo", body: "Put rooms, music and screens back to their starting values? Library files and playlists stay.", confirmLabel: "Reset" })
+      .then((ok) => { if (ok) resetDemo(); });
     return;
   }
   if (t.closest("[data-more-open]")) {
@@ -174,7 +175,7 @@ function onClick(event) {
 function onKeydown(event) {
   if (event.key === " " && event.target instanceof Element && event.target.matches("[data-open-room]")) { event.preventDefault(); openRoom(event.target.dataset.openRoom); return; }
   if (event.key === "Escape") {
-    if ($("[data-reset-dialog]")?.open || $("[data-dialog]")?.open) return;
+    if ($("dialog.fb-modal[open], .fb-overlay")) return; // the modal closes itself
     if ($("[data-pop]") && !$("[data-pop]").hidden) { closePop(); return; }
     if (alertsOpen()) { closeAlerts(); return; }
     const who = $("[data-who]");
@@ -182,6 +183,7 @@ function onKeydown(event) {
     if (panelKey()) { closePanel(); return; }
     return;
   }
+  if ($("dialog.fb-modal[open], .fb-overlay")) return; // the modal traps focus itself
   trapTab(event);
 }
 
@@ -193,6 +195,7 @@ export function boot() {
   S.st = restore(server);
   S.save = save;
   S.render = renderAll;
+  initFeedback();
   initLights();
   initScenes();
   initScreens();
@@ -213,11 +216,6 @@ export function boot() {
     onVisible();
     runScreens();
   });
-  const dialog = $("[data-reset-dialog]");
-  if (dialog) {
-    dialog.addEventListener("close", () => { if (dialog.returnValue === "reset") resetDemo(); });
-    dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close("cancel"); });
-  }
   window.addEventListener("pagehide", writeNow);
   mount();
   runSim();

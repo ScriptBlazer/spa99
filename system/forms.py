@@ -26,6 +26,8 @@ class SettingsForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["register_interest_open"].label = "Registration open"
+        self.fields["discount_contact_url"].assume_scheme = "https"
+        self.fields["discount_contact_url"].widget.attrs.update({"placeholder": "https://wa.me/..."})
         for name, low, high in (("lock_idle_minutes", 1, 240), ("max_sign_in_hours", 1, 72)):
             self.fields[name].widget.attrs.update({"min": low, "max": high})
             self.fields[name].min_value, self.fields[name].max_value = low, high
@@ -39,5 +41,5 @@ class SettingsForm(forms.ModelForm):
     class Meta:
         model = SiteSettings
         fields = ["opening_date", "opening_text", "register_interest_open", "subscribe_open", "booking_open",
-                  "join_wording", "vat_rate", "lock_idle_minutes", "max_sign_in_hours"]
+                  "join_wording", "vat_rate", "discount_contact_url", "lock_idle_minutes", "max_sign_in_hours"]
         widgets = {"opening_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}

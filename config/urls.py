@@ -2,10 +2,12 @@
 from django.urls import include, path
 
 from common.views import check_mobile, health
+from notifications.views import ses_notifications
 
 urlpatterns = [
     path("health/", health, name="health"),  # public: monitoring
     path("validate/mobile/", check_mobile, name="check_mobile"),  # public: live mobile check, rate limited
+    path("ses/notifications/", ses_notifications, name="ses_notifications"),  # public: Amazon SNS, signature checked
     path("journey/", include("journey.urls")),
     path("gold/", include("gold.urls")),
     path("", include("users.urls")),  # login, logout

@@ -3,7 +3,7 @@ Nothing in this file is a rule: values come from rows (see docs/SPA99_RULES.md "
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
 from django.db import models
 from simple_history.models import HistoricalRecords
 
@@ -151,6 +151,11 @@ class SiteSettings(BaseModel):
     max_sign_in_hours = models.PositiveSmallIntegerField(
         "Longest sign-in (hours)", default=12, validators=[MinValueValidator(1), MaxValueValidator(72)],
         help_text="A System sign-in ends after this many hours, however active the person is (1 to 72).")
+
+    discount_contact_url = models.URLField(
+        "Discount contact link (WhatsApp)", max_length=300, blank=True, validators=[URLValidator(schemes=["https"])],
+        help_text="Barry's personal WhatsApp link (https only), shown as 'Looking for a better rate?' on the sign-up and "
+                  "choose-membership screens. Empty = the line is hidden on live (dev shows a 'link to come' marker).")
 
     history = HistoricalRecords()
 

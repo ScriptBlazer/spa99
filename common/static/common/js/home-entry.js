@@ -1,7 +1,6 @@
 /* The first journey question on the home page. Tapping a time saves the answer and opens the journey on screen 1
    with it selected. */
 import { getJson, postWithRetry } from './api.js';
-import { showMessage } from './messages.js';
 
 const root = document.querySelector('[data-home-entry]');
 const status = root?.querySelector('[data-entry-status]');
