@@ -15,6 +15,7 @@ Any `<form data-system-form="<section>">` gets the save bar, dirty marks, Cmd/Ct
 <link rel="stylesheet" href="{% static 'common/css/tokens.css' %}">
 <link rel="stylesheet" href="{% static 'common/css/system.css' %}">
 <link rel="stylesheet" href="{% static 'common/css/system-tables.css' %}">
+<link rel="stylesheet" href="{% static 'common/css/feedback.css' %}">
 <script>document.documentElement.classList.add('js')</script>
 <script type="module" src="{% static 'common/js/system.js' %}"></script>
 {% block head_extra %}{% endblock %}
@@ -59,13 +60,12 @@ Any `<form data-system-form="<section>">` gets the save bar, dirty marks, Cmd/Ct
   </nav>
   <div class="sys-scrim" data-system-scrim hidden></div>
   <main class="sys-main" id="system-main" data-system-main>
-    {% if messages %}<ul class="sys-stack" data-system-messages>{% for message in messages %}<li class="sys-note {{ message.level_tag }}" data-system-message="{{ message.level_tag }}" data-undo="{{ message.extra_tags|split_extra:'undo' }}">{{ message }}</li>{% endfor %}</ul>{% endif %}
     {% block main %}{% endblock %}
     {% include "system/_save_bar.html" %}
   </main>
 </div>
-{% include "system/_confirm.html" %}
-<div class="sys-toasts" data-system-toasts role="status" aria-live="polite"></div>
+{% include "common/_feedback.html" %}
+{% include "system/_keys.html" %}
 <template id="system-csrf">{% csrf_token %}</template>
 </body>
 </html>

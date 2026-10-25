@@ -293,6 +293,11 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --frame-h-feature: min(68svh, 34rem);        /* derived: max height of a feature frame, desktop */
   --tile-w-phone: 72vw;                        /* derived: a tile in the phone scroll row */
   --ratio-tile: 3 / 4;                         /* derived */
+  /* Feedback: toasts and the one modal (docs/design/FEEDBACK.md section 4). */
+  --shadow-toast: 0 2px 4px rgb(73 46 33 / 0.12), 0 12px 32px -12px rgb(73 46 33 / 0.45); /* approved 2026-10-25, FEEDBACK: toasts only */
+  --color-overlay-soft: rgb(73 46 33 / 0.32);  /* approved 2026-10-25, FEEDBACK: modal backdrop, with 4px blur; same value as --office-overlay */
+  --toast-w: 22.5rem;                          /* approved 2026-10-25, FEEDBACK: toast width from 64em */
+  --modal-w: 26.25rem;                         /* approved 2026-10-25, FEEDBACK: the one modal */
 }
 
 @media (min-width: 48em) {
@@ -361,7 +366,7 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
 The designer refines these per task. Frontend uses only tokens, never raw values. Breakpoints are constants (CSS variables can't be used in media queries): `48em` (tablet) and `64em` (desktop).
 
 ### Office tokens
-The Office (staff back office) is light and has its own `--office-*` tokens, defined in `common/static/common/css/office-tokens.css` under `.office`, never in `tokens.css`. Spec and values: `docs/design/OFFICE.md`.
+The Office (staff back office) is light and has its own `--office-*` tokens, defined in `common/static/common/css/office-tokens.css` under `.office`, never in `tokens.css`. Spec and values: `docs/design/OFFICE.md`. `--office-toast-edge: rgb(73 46 33 / 0.08)` (approved 2026-10-25, FEEDBACK): the 1px edge of an Office toast, decoration only.
 
 ### Round 3 layout tokens (The spa, 2026-10-23, derived)
 - `--mount-gap` 0.375rem (0.5rem from 48em): margin between a mount's gold line and its photo.

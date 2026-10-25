@@ -397,9 +397,9 @@ def system(w):
         field.fill("311")
         page.wait_for_selector("[data-system-savebar]:not([hidden])")
         page.locator("[data-system-save]").click()
-        page.wait_for_selector("[data-system-confirm][open]")
+        page.wait_for_selector("dialog.fb-modal[open]")
         with page.expect_navigation():
-            page.locator("[data-system-confirm-ok]").click()
+            page.locator("dialog.fb-modal[open] [data-fb-ok]").click()
         page.wait_for_selector("[data-system-plans]")
         shown = page.locator('tr[data-system-plan="tier-1"] input[aria-label="Price ex VAT"]').input_value()
         assert float(shown) == 311, f"The page shows {shown}"
@@ -497,8 +497,8 @@ def control(w):
         page.locator("a[data-open-item]:has-text('e2e')").first.click()
         page.wait_for_selector("[data-item-panel]")
         page.locator("[data-item-delete]").click()
-        page.wait_for_selector("[data-dialog][open]")
-        page.locator("[data-dialog] button[value=ok]").click()
+        page.wait_for_selector("dialog.fb-modal[open]")
+        page.locator("dialog.fb-modal[open] [data-fb-ok]").click()
         page.wait_for_selector("a[data-open-item]:has-text('e2e')", state="detached")
         assert dbtool("assets")["count"] == 0, "The file is still in the database"
 

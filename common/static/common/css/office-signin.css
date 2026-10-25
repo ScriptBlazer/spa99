@@ -23,5 +23,4 @@
 .office-signin :focus-visible { outline: 2px solid var(--office-text); outline-offset: 2px; }
 .office-signin .btn-primary { background: var(--color-espresso); color: var(--color-cream); }
 @media (hover: hover) and (pointer: fine) { .office-signin .btn-primary:hover { background: var(--color-espresso-raised); } }
-.office-signin .message { background: var(--office-surface); box-shadow: var(--office-shadow-2); }
 .office-foot { margin: 0; font-size: var(--text-sm); color: var(--office-muted); text-align: center; }

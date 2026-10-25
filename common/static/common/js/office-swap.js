@@ -6,7 +6,7 @@
  *   Show more         appends the next 50 rows.
  *   Actions           Approve, Decline, Resend post in the background, show the server's message as a toast and refresh the page parts.
  * If anything fails the plain link or form still works. The chart script listens for 'office:series'. */
-import { showMessage } from './messages.js';
+import { toastsFromDocument } from './feedback.js';
 import { clearWorking } from './buttons.js';
 
 const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -64,12 +64,6 @@ function syncRange(value) {
     const inputs = [...form.querySelectorAll('input[name="range"]')];
     inputs.forEach((input) => { input.checked = input.value === value; });
     form.querySelector('.o-seg')?.style.setProperty('--i', String(Math.max(inputs.findIndex((i) => i.value === value), 0)));
-  });
-}
-
-function toasts(doc) {
-  doc.querySelectorAll('#messages [data-message]').forEach((item) => {
-    showMessage(item.dataset.level, item.querySelector('span')?.textContent || '');
   });
 }
 
@@ -198,7 +192,7 @@ function actions() {
       const response = await fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } });
       if (!response.ok) throw new Error(String(response.status));
       const doc = parse(await response.text());
-      toasts(doc);
+      toastsFromDocument(doc);
       if (new URL(response.url).pathname === location.pathname) apply(doc);
       else apply(parse((await fetchDoc(location.href)).text));
     } catch {

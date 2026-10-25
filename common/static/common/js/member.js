@@ -1,10 +1,9 @@
 /* My Spa 99: the small behaviours. Everything works without this file; it only removes steps.
    - the tab bar hides while a field has focus (never floats over the keyboard)
-   - toasts leave after 4 seconds
    - choosing a membership tile marks it at once and offers "Switch to ..." (or "Choose ..." with no tier yet)
    - the marketing switch saves as it is flipped */
 import { csrfToken } from './api.js';
-import { dismiss, showMessage } from './messages.js';
+import { toast } from './feedback.js';
 
 const FIELD = 'input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]), textarea, select';
 
@@ -14,18 +13,6 @@ function initTabbar() {
   document.addEventListener('focusout', (event) => {
     if (!event.relatedTarget?.matches?.(FIELD)) set(false);
   });
-}
-
-function initToasts() {
-  const list = document.getElementById('messages');
-  if (!list) return;
-  const arm = (item) => {
-    if (item.dataset.level !== 'success' || item.dataset.timed) return;
-    item.dataset.timed = 'true';
-    setTimeout(() => { if (item.isConnected) dismiss(item); }, 4000);
-  };
-  list.querySelectorAll('[data-message]').forEach(arm);
-  new MutationObserver((records) => records.forEach((r) => r.addedNodes.forEach((n) => n.nodeType === 1 && arm(n)))).observe(list, { childList: true });
 }
 
 function initInterest() {
@@ -61,10 +48,10 @@ function initEmails() {
         body: new URLSearchParams({ marketing: wanted ? '1' : '0' }),
       });
       if (!response.ok) throw new Error(String(response.status));
-      showMessage('success', 'Saved.');
+      toast('Saved.');
     } catch {
       box.checked = !wanted;
-      showMessage('error', 'We could not save that. Please try again.');
+      toast('We couldn\'t save that. Please try again.', { kind: 'error' });
     } finally {
       box.disabled = false;
     }
@@ -72,6 +59,5 @@ function initEmails() {
 }
 
 initTabbar();
-initToasts();
 initInterest();
 initEmails();

@@ -5,6 +5,7 @@
 @import "fonts.css";
 @import "base.css";
 @import "components.css";
+@import "feedback.css";
 @import "office-tokens.css";
 @import "office-dashboard.css";
 @import "office-analytics.css";
@@ -152,20 +153,6 @@
 .o-badge--s-waiting { background: var(--office-text); color: var(--color-cream); }
 .o-badge--s-declined { padding: 0; color: var(--office-muted); }
 .o-badges { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); max-width: none; }
-
-/* ---------- toasts and the light confirm modal ---------- */
-.o-toasts { position: fixed; z-index: 50; left: var(--page-margin); right: var(--page-margin); bottom: calc(var(--office-tabbar-h) + env(safe-area-inset-bottom) + var(--space-3)); pointer-events: none; }
-body[data-office-detail] .o-toasts { bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); }
-body[data-has-bar] .o-toasts { bottom: calc(var(--control-h) + var(--space-5) * 2 + env(safe-area-inset-bottom)); }
-.o-toasts .messages, .o-toasts .messages:has(.message) { padding: 0; }
-.o-toasts .message, .o-toasts .message.message-error { pointer-events: auto; background: var(--office-surface); box-shadow: var(--office-shadow-2); border-radius: var(--office-radius); }
-.o-toasts .message-error { color: var(--office-danger); }
-@media (min-width: 64em) { .o-toasts { left: auto; right: var(--space-5); bottom: var(--space-5); width: 26rem; } body[data-office-detail] .o-toasts, body[data-has-bar] .o-toasts { bottom: var(--space-5); } }
-.office .modal { background: var(--office-surface); color: var(--office-text); border-radius: var(--office-radius-lg); box-shadow: var(--office-shadow-3); max-width: 28rem; }
-.office .modal::backdrop { background: var(--office-overlay); }
-.office .modal p { color: var(--office-muted); }
-.office .modal[open] { animation-duration: var(--office-dur-swap); }
-@media (max-width: 47.99em) { .office .modal { border-radius: var(--office-radius-lg) var(--office-radius-lg) 0 0; } }
 
 /* ---------- reveal: Office content is visible by default (a paused or hidden tab never shows a blank page); the rise is CSS-only ---------- */
 .js .office [data-reveal], .js .office [data-reveal="stagger"] > * { opacity: 1; transform: none; }

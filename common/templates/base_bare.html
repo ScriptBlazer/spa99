@@ -8,11 +8,10 @@
 <body class="{% if office %}office office-signin{% else %}on-dark{% endif %}">
 {% if control %}{% include "control/_demo_banner.html" with hide_reset=True %}{% endif %}
 <main id="main" class="bare" tabindex="-1">
-  <div class="container">{% include "common/_messages.html" %}</div>
   {% block main %}{% endblock %}
   {% if office %}<p class="office-foot">Spa 99 &middot; BML Group</p>{% endif %}
 </main>
-{% include "common/_modal.html" %}
+{% include "common/_feedback.html" %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

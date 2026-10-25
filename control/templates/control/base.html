@@ -15,6 +15,7 @@ common/js/control/ own it after that and swap `main` when you change tab (so the
 <link rel="stylesheet" href="{% static 'common/css/fonts.css' %}">
 <link rel="stylesheet" href="{% static 'common/css/tokens.css' %}">
 <link rel="stylesheet" href="{% static 'common/css/control.css' %}">
+<link rel="stylesheet" href="{% static 'common/css/feedback.css' %}">
 <script>document.documentElement.classList.add('js')</script>
 <script type="module" src="{% static 'common/js/control.js' %}"></script>
 </head>
@@ -42,7 +43,6 @@ common/js/control/ own it after that and swap `main` when you change tab (so the
 </header>
 <div class="ctl-alerts" id="ctl-alerts" role="dialog" aria-label="Open alerts" hidden></div>
 <main class="ctl-main" id="ctl-main" tabindex="-1">
-{% if messages %}<ul class="ctl-messages">{% for message in messages %}<li role="status">{{ message }}</li>{% endfor %}</ul>{% endif %}
 {% block main %}{% endblock %}
 </main>
 <aside class="ctl-mini" data-mini aria-label="Now playing" hidden></aside>
@@ -56,10 +56,8 @@ common/js/control/ own it after that and swap `main` when you change tab (so the
   <div class="ctl-panel-body" data-panel-body></div>
 </aside>
 <aside class="ctl-tray" data-tray aria-label="Uploads" hidden></aside>
-<div class="ctl-toasts" data-toasts></div>
 <p class="ctl-sr" role="status" aria-live="polite" data-live></p>
-{% include "control/_reset_dialog.html" %}
-<dialog class="ctl-dialog" data-dialog aria-labelledby="ctl-dialog-h"><form method="dialog" data-dialog-form></form></dialog>
+{% include "common/_feedback.html" %}
 <template id="ctl-more-tpl">
   <div class="ctl-pn-body">
     <h2 class="ctl-pn-title" id="ctl-panel-title" tabindex="-1">More</h2>

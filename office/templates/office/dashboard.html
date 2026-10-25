@@ -73,7 +73,7 @@
         {% if office_can.can_act %}
         <form method="post" action="{% url 'office_gold_approve' item.id %}" class="o-wait-action" data-office-action data-approve>{% csrf_token %}
           <button type="submit" class="btn btn-primary btn-sm" data-working-text="Approving" data-confirm
-                  data-confirm-title="Approve {{ item.name }} for Gold?" data-confirm-message="He gets an invite to set up his account. His Gold month starts today, {% now 'j F' %}."
+                  data-confirm-title="Approve {{ item.name }} for Gold?" data-confirm-body="He gets an invite to set up his account. His Gold month starts today, {% now 'j F' %}."
                   data-confirm-label="Approve and invite" data-confirm-cancel="Not now">Approve and invite<span class="sr-only"> {{ item.name }}</span></button>
         </form>
         {% endif %}

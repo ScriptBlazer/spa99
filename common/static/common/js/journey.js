@@ -8,7 +8,7 @@
 import { el, getJson, postJson, postWithRetry } from './api.js';
 import { observeReveals } from './reveal.js';
 import { arrowIcon as makeArrow, clearableTiles, companyGlyphs, reducedMotion, segmentedEl, settle, tileEl } from './choices.js';
-import { dismiss, showMessage } from './messages.js';
+import { dismiss, toast } from './feedback.js';
 
 const config = JSON.parse(document.getElementById('journey-config').textContent);
 const copy = config.copy;
@@ -105,7 +105,7 @@ function applyServerVisibility(visible) {
 
 function showSaveError() {
   if (saveErrorMessage && saveErrorMessage.isConnected) return;
-  saveErrorMessage = showMessage('error', copyOf('save_error').body);
+  saveErrorMessage = toast(copyOf('save_error').body, { kind: 'error' });
 }
 function clearSaveError() {
   if (saveErrorMessage) { dismiss(saveErrorMessage); saveErrorMessage = null; }
@@ -381,7 +381,7 @@ async function show(step) {
       node = renderResult(reply.data);
     } catch {
       const failed = copyOf('result_error');
-      showMessage('error', failed.heading);
+      toast(failed.heading, { kind: 'error' });
       node = el('section', { class: 'result' }, el('p', { class: 'lead' }, `${failed.body} `, el('a', { href: config.urls.memberships, text: failed.cta }), '.'));
     }
   } else {

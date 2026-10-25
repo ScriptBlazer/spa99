@@ -1,7 +1,7 @@
 /* Music: zones, players, queue, the source picker (Library or Spotify demo), the mini player, "Listen here".
    Playback into the rooms is pretend (this browser only). The files are real: Library tracks play for real when you press
    "Listen here". The queue rules live in music-model.js. */
-import { $, $$, S, esc, icon, toast, announce, bus, fmtDur, fmtTotal, spoken, plural, clamp, formDialog, confirmDialog, MOTION, FIELDS } from "./core.js";
+import { $, $$, S, esc, icon, toast, toastInfo, announce, bus, fmtDur, fmtTotal, spoken, plural, clamp, formDialog, confirmDialog, MOTION, FIELDS } from "./core.js";
 import { save, normalizeZones } from "./state.js";
 import { L, asset, loadLibrary } from "./libdata.js";
 import { openPanel, closePanel, panelKey } from "./panel.js";
@@ -146,7 +146,7 @@ function syncAudio() {
   if (a.dataset.uid !== cur.uid) { a.dataset.uid = cur.uid; a.src = file.url; a.currentTime = 0; try { a.currentTime = z.pos; } catch (e) { /* not ready yet */ } }
   a.volume = z.muted ? 0 : clamp(z.vol / 100, 0, 1);
   if (a.readyState > 0 && Math.abs(a.currentTime - z.pos) > 1.5) a.currentTime = z.pos;
-  if (a.paused) { const p = a.play(); if (p && p.catch) p.catch(() => { z.listen = false; toast("Press play to listen here."); S.render(); }); }
+  if (a.paused) { const p = a.play(); if (p && p.catch) p.catch(() => { z.listen = false; toastInfo("Press play to listen here."); S.render(); }); }
 }
 
 function setListen(zone, on) {
@@ -188,7 +188,7 @@ function addTracks(zone, tracks) {
   if (first) zone.src = { kind: tracks[0].kind === "spot" ? "spotify" : "library", label: tracks[0].kind === "spot" ? `Spotify, ${tracks[0].plName}` : "Library", name: tracks[0].plName || tracks[0].title };
   touch(zone);
   syncAudio();
-  toast(`Added to ${zone.name} queue`);
+  toast(`Added to the ${zone.name} queue.`);
 }
 
 /* ---------- the ticker: real time, silent unless Listen here ---------- */
@@ -678,7 +678,7 @@ export function initMusic() {
   bus.on("asset-deleted", (id) => {
     let stopped = null;
     for (const z of M().zones) { const r = Q.dropAsset(z, id); if (r.stopped) stopped = z; if (r.changed && z.listen) z.listen = false; }
-    if (stopped) toast("This file was deleted. Music stopped.");
+    if (stopped) toastInfo("This file was deleted. Music stopped.");
     touchAll();
   });
   bus.on("library", () => {
@@ -689,7 +689,7 @@ export function initMusic() {
       const ids = new Set(z.queue.filter((e) => e.assetId).map((e) => e.assetId));
       for (const id of ids) if (!known.has(id)) { if (Q.dropAsset(z, id).stopped) stopped = true; }
     }
-    if (stopped) toast("This file was deleted. Music stopped.");
+    if (stopped) toastInfo("This file was deleted. Music stopped.");
     syncGroup();
     S.render();
   });

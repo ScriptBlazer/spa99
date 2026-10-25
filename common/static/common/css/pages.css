@@ -190,7 +190,7 @@ html.motion .scene-failed .gstep-line { transform: none; }
 }
 
 @media print {
-  .site-header, .site-footer, .skip-link, .legal-toc, .messages { display: none !important; }
+  .site-header, .site-footer, .skip-link, .legal-toc { display: none !important; }
   body, .legal { background: none; color: var(--color-espresso); }
   .legal { padding: 0; }
   .legal-grid { display: block; }

@@ -21,7 +21,6 @@
 </header>
 {% endblock %}
 {% block messages %}
-<div class="m-toasts">{% include "common/_messages.html" %}</div>
 {% if not verified %}
   <div class="m-banner" role="status" data-verify-banner>
     <span>Please confirm your email. We sent a link to {{ email }}.</span>

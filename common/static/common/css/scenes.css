@@ -26,9 +26,6 @@ html.motion body[data-header="overlay"] .site-header:not(.is-solid)::before { op
   html[data-page="marketing"] .site-header::before { background: var(--color-bg-inverse); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (prefers-reduced-motion: reduce) { html[data-page="marketing"] .site-header::before { transition: none; } }
-/* Messages float under the fixed header instead of pushing the first scene down. */
-html[data-page="marketing"] main > .container:first-child { position: fixed; z-index: 50; top: var(--header-h); left: 0; right: 0; pointer-events: none; }
-html[data-page="marketing"] main > .container:first-child .message { pointer-events: auto; }
 
 /* ---------- Lenis (off by default: html[data-smooth="on"] turns it back on) ---------- */
 html.lenis, html.lenis body { height: auto; }

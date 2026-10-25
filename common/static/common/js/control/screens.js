@@ -1,7 +1,7 @@
 /* Screens: six pretend screens that show REAL Library video, pictures and screen playlists (or the built-in slides).
    Live previews are the real files at small size: muted looping video (at most 3 playing at once, only while on screen),
    pictures, playlists that advance at their real timings, and the slides as scaled HTML. State is pretend (this browser). */
-import { $, $$, S, MOTION, FINE, esc, icon, toast, announce, bus, fmtDur, plural, DAY, clock, formDialog } from "./core.js";
+import { $, $$, S, MOTION, FINE, esc, icon, toast, toastInfo, announce, bus, fmtDur, plural, DAY, clock, formDialog } from "./core.js";
 import { save } from "./state.js";
 import { L, asset, playlist, loadLibrary, itemSeconds } from "./libdata.js";
 import { openPanel, closePanel, panelKey } from "./panel.js";
@@ -524,7 +524,7 @@ function fallBackIfMissing(announceIt) {
     if (gone(s.show)) { s.show = { t: "slide", k: "welcome" }; n += 1; }
     for (const r of s.sched.rows) if (gone(r.show)) r.show = { t: "slide", k: "welcome" };
   }
-  if (n && announceIt) toast(n === 1 ? "A screen was showing a deleted file. It shows Welcome now." : `${n} screens were showing deleted files. They show Welcome now.`);
+  if (n && announceIt) toastInfo(n === 1 ? "A screen was showing a deleted file. It shows Welcome now." : `${n} screens were showing deleted files. They show Welcome now.`);
   if (n) { save(); S.render(); }
 }
 

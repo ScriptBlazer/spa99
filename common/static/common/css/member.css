@@ -45,11 +45,6 @@ body.member--sub .m-tabbar, body.m-typing .m-tabbar { display: none; }
 .m-nav--tabs a[aria-current="page"] { color: var(--color-gold); }
 .m-nav--tabs a[aria-current="page"] .icon { background: var(--color-espresso-raised); }
 
-.m-toasts { position: fixed; inset: auto var(--page-margin) calc(var(--member-tabbar-h) + env(safe-area-inset-bottom) + var(--space-3)) var(--page-margin); z-index: 50; pointer-events: none; }
-body.member--sub .m-toasts, body.m-typing .m-toasts { bottom: calc(env(safe-area-inset-bottom) + var(--space-3)); }
-.m-toasts .messages, .m-toasts .messages:has(.message) { padding: 0; }
-.m-toasts .message { pointer-events: auto; margin: var(--space-2) 0 0; background: var(--color-espresso); color: var(--color-cream); box-shadow: var(--shadow-raised), inset 2px 0 0 var(--color-gold); animation-duration: var(--duration-ack); transition-duration: var(--duration-ack); }
-.m-toasts .message.message-error { color: var(--color-cream); box-shadow: var(--shadow-raised), inset 2px 0 0 var(--color-danger-inverse); }
 
 /* page changes: the shell stays put, only the content fades */
 .m-rail { view-transition-name: m-rail; }
@@ -195,7 +190,6 @@ a.m-tile { touch-action: manipulation; -webkit-user-select: none; user-select: n
   .m-form .btn { justify-self: start; min-width: 14rem; }
   .m-signout .btn { justify-self: start; }
   .m-card { justify-self: start; }
-  .m-toasts { inset: var(--space-4) var(--space-4) auto auto; width: min(24rem, calc(100% - 2 * var(--space-4))); }
 }
 
 /* ---------- desktop: the sidebar ---------- */
@@ -231,7 +225,6 @@ a.m-tile { touch-action: manipulation; -webkit-user-select: none; user-select: n
   .m-cell--next { grid-column: 1; grid-row: 1 / span 2; }
   .m-tile--next { min-height: 18rem; padding: var(--space-5); }
   .m-how { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
-  .m-toasts { inset: var(--space-4) var(--space-5) auto auto; }
 }
 @media (hover: hover) and (pointer: fine) {
   .m-nav--rail a:not([aria-current="page"]):hover, .m-rail-back:hover, .m-rail-signout button:hover { color: var(--color-cream); }

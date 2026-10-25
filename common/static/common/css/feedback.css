@@ -1,0 +1,287 @@
+/* Feedback: the one toast and the one modal, for every host (docs/design/FEEDBACK.md).
+   Structure and behaviour are shared; each host only maps the --fb-* variables (section 4 of the brief):
+   public site and My Spa 99 (the default), the Office (.office), System (.system), Control (.control).
+   Markup: common/_feedback.html. Script: feedback.js. Loaded by app.css, office.css, system and Control pages. */
+
+/* ---------- per-host variables: toasts ---------- */
+.toasts {
+  --fb-surface: var(--color-espresso);
+  --fb-text: var(--color-cream);
+  --fb-muted: var(--color-text-muted-inverse);
+  --fb-edge: var(--color-hairline-inverse);
+  --fb-shadow: var(--shadow-toast);
+  --fb-ok: var(--color-gold);
+  --fb-info: var(--color-cream);
+  --fb-warn: var(--color-gold);
+  --fb-danger: var(--color-danger-inverse);
+  --fb-radius: var(--radius-md);
+  --fb-focus: var(--color-focus-inverse);
+  --fb-hover: var(--color-hairline-inverse);
+  --fb-bar: 0px;
+}
+body.on-dark .toasts, body:has([data-journey]) .toasts { --fb-surface: var(--color-espresso-raised); }
+body.member .toasts { --fb-bar: var(--member-tabbar-h); }
+body.member--sub .toasts, body.m-typing .toasts { --fb-bar: 0px; }
+
+.office .toasts {
+  --fb-surface: var(--office-surface);
+  --fb-text: var(--office-text);
+  --fb-muted: var(--office-muted);
+  --fb-edge: var(--office-toast-edge);
+  --fb-shadow: var(--office-shadow-2);
+  --fb-ok: var(--color-espresso);
+  --fb-info: var(--color-espresso);
+  --fb-warn: var(--office-gold-text);
+  --fb-danger: var(--office-danger);
+  --fb-radius: var(--office-radius);
+  --fb-focus: var(--color-espresso);
+  --fb-hover: var(--office-sunken);
+  --fb-bar: var(--office-tabbar-h);
+}
+body.office-signin .toasts { --fb-bar: 0px; }
+body[data-office-detail] .toasts { --fb-bar: 0px; }
+body[data-has-bar] .toasts { --fb-bar: calc(var(--control-h) + var(--space-5) * 2); }
+
+.system .toasts {
+  --fb-surface: var(--sys-surface);
+  --fb-text: var(--sys-text);
+  --fb-muted: var(--sys-text-2);
+  --fb-edge: var(--sys-line);
+  --fb-shadow: var(--sys-shadow-pop);
+  --fb-ok: var(--sys-ok);
+  --fb-info: var(--sys-info);
+  --fb-warn: var(--sys-warn);
+  --fb-danger: var(--sys-danger);
+  --fb-radius: var(--sys-radius-lg);
+  --fb-focus: var(--sys-accent);
+  --fb-hover: var(--sys-subtle);
+}
+
+.control .toasts {
+  --fb-surface: var(--ctl-raised);
+  --fb-text: var(--ctl-text);
+  --fb-muted: var(--ctl-text-2);
+  --fb-edge: var(--ctl-track);
+  --fb-shadow: 0 0 0 0 transparent; /* edge only */
+  --fb-ok: var(--ctl-ok);
+  --fb-info: var(--ctl-accent);
+  --fb-warn: var(--ctl-warn);
+  --fb-danger: var(--ctl-danger);
+  --fb-radius: var(--ctl-radius-lg);
+  --fb-focus: var(--ctl-accent);
+  --fb-hover: var(--ctl-selected);
+}
+@media (max-width: 47.99em) {
+  .control .toasts { --fb-bar: var(--ctl-tab-h); }
+  .control.has-mini .toasts { --fb-bar: calc(var(--ctl-tab-h) + 64px); }
+}
+
+/* ---------- per-host variables: the modal ---------- */
+.fb-modal, .fb-overlay {
+  --fb-surface: var(--color-cream-raised);
+  --fb-text: var(--color-espresso);
+  --fb-muted: var(--color-text-muted);
+  --fb-warn: var(--color-chart-2);          /* gold has no contrast on cream: caramel deep (4.07) for the icon; shapes differ too */
+  --fb-danger: var(--color-danger);
+  --fb-modal-radius: var(--radius-md);
+  --fb-modal-shadow: var(--shadow-raised);
+  --fb-overlay: var(--color-overlay-soft);
+  --fb-primary: var(--color-espresso);
+  --fb-on-primary: var(--color-cream);
+  --fb-danger-fill: var(--color-danger);
+  --fb-on-danger: var(--color-cream);
+  --fb-line: var(--color-control-line);
+  --fb-btn-radius: var(--radius-sm);
+  --fb-title-font: var(--font-display);
+  --fb-focus: var(--color-focus);
+  --fb-hover: var(--color-hairline);
+}
+.office .fb-modal, .office .fb-overlay {
+  --fb-surface: var(--office-surface);
+  --fb-text: var(--office-text);
+  --fb-muted: var(--office-muted);
+  --fb-warn: var(--office-gold-text);
+  --fb-danger: var(--office-danger);
+  --fb-modal-radius: var(--office-radius-lg);
+  --fb-modal-shadow: var(--office-shadow-3);
+  --fb-overlay: var(--office-overlay);
+  --fb-danger-fill: var(--office-danger);
+  --fb-btn-radius: var(--office-pill);
+  --fb-focus: var(--color-espresso);
+  --fb-hover: var(--office-sunken);
+}
+.system .fb-modal, .system .fb-overlay {
+  --fb-surface: var(--sys-surface);
+  --fb-text: var(--sys-text);
+  --fb-muted: var(--sys-text-2);
+  --fb-warn: var(--sys-warn);
+  --fb-danger: var(--sys-danger);
+  --fb-modal-radius: var(--sys-radius-lg);
+  --fb-modal-shadow: var(--sys-shadow-pop);
+  --fb-overlay: var(--sys-overlay);
+  --fb-primary: var(--sys-accent);
+  --fb-on-primary: var(--sys-surface);
+  --fb-danger-fill: var(--sys-danger);
+  --fb-on-danger: var(--sys-surface);
+  --fb-line: var(--sys-control);
+  --fb-btn-radius: var(--sys-radius);
+  --fb-title-font: var(--font-body);
+  --fb-focus: var(--sys-accent);
+  --fb-hover: var(--sys-subtle);
+}
+.control .fb-modal, .control .fb-overlay {
+  --fb-surface: var(--ctl-raised);
+  --fb-text: var(--ctl-text);
+  --fb-muted: var(--ctl-text-2);
+  --fb-warn: var(--ctl-warn);
+  --fb-danger: var(--ctl-danger);
+  --fb-modal-radius: var(--ctl-radius-lg);
+  --fb-modal-shadow: 0 0 0 1px var(--ctl-track);
+  --fb-overlay: var(--ctl-overlay);
+  --fb-primary: var(--ctl-accent);
+  --fb-on-primary: var(--ctl-bg);
+  --fb-danger-fill: var(--ctl-danger);
+  --fb-on-danger: var(--ctl-bg);
+  --fb-line: var(--ctl-control);
+  --fb-btn-radius: var(--ctl-radius);
+  --fb-title-font: var(--ctl-display);
+  --fb-focus: var(--ctl-accent);
+  --fb-hover: var(--ctl-selected);
+}
+
+/* ---------- toasts ---------- */
+.toasts {
+  position: fixed; z-index: 100; display: flex; flex-direction: column; gap: var(--space-2);
+  left: calc(var(--space-3) + env(safe-area-inset-left)); right: calc(var(--space-3) + env(safe-area-inset-right));
+  bottom: calc(var(--fb-bar) + env(safe-area-inset-bottom) + var(--space-3));
+  margin: 0; padding: 0; pointer-events: none;
+}
+@media (min-width: 64em) {
+  .toasts { left: auto; right: var(--space-4); bottom: var(--space-4); width: var(--toast-w); }
+}
+/* Both live regions flow into one column; each toast is ordered by arrival, so the newest is always at the bottom. */
+.toasts-list { display: contents; margin: 0; padding: 0; list-style: none; }
+.toasts [hidden], .fb-modal [hidden], .fb-overlay [hidden] { display: none !important; }
+
+.toast {
+  position: relative; display: flex; align-items: center; gap: var(--space-2); min-height: 3rem;
+  margin: 0; padding: var(--space-2) var(--space-1) var(--space-2) var(--space-3); list-style: none;
+  border-radius: var(--fb-radius); background: var(--fb-surface); color: var(--fb-text);
+  box-shadow: inset 0 0 0 1px var(--fb-edge), var(--fb-shadow); pointer-events: auto;
+  font-family: var(--font-body); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-snug); letter-spacing: var(--tracking-body);
+  opacity: 0; transform: translateY(var(--rise));
+  transition: opacity var(--duration-ack) var(--ease-soft), transform var(--duration-ack) var(--ease-soft);
+}
+.toast[data-in] { opacity: 1; transform: none; }
+.toast[data-leaving] { opacity: 0; transform: none; transition: opacity 160ms var(--ease-soft); } /* the one sanctioned exit fade */
+.system .toast { font-size: var(--sys-fs); }
+
+.toast-icon { display: grid; place-items: center; flex: none; width: 1.25rem; height: 1.25rem; }
+.toast[data-kind="success"] .toast-icon { color: var(--fb-ok); }
+.toast[data-kind="info"] .toast-icon { color: var(--fb-info); }
+.toast[data-kind="warning"] .toast-icon { color: var(--fb-warn); }
+.toast[data-kind="error"] .toast-icon { color: var(--fb-danger); }
+.toast-text { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.toasts .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+.toast-action {
+  flex: none; min-height: 2.75rem; margin: calc(-1 * var(--space-2)) 0; padding: 0 var(--space-2); border: 0; background: none;
+  color: var(--fb-text); font: inherit; font-weight: 600; cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) { .toast-action:hover { text-decoration: underline; text-underline-offset: 0.25em; } }
+.toast-action:focus-visible { outline: 2px solid var(--fb-focus); outline-offset: 2px; }
+
+/* the close: a 12px x in a 44px hit area; the 28px disc shows on hover and focus */
+.toast-close {
+  position: relative; display: grid; place-items: center; flex: none; width: 2.75rem; height: 2.75rem; margin: calc(-1 * var(--space-2)) 0;
+  padding: 0; border: 0; background: none; color: var(--fb-muted); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.toast-close::before { content: ""; position: absolute; inset: 50% auto auto 50%; width: 1.75rem; height: 1.75rem; margin: -0.875rem 0 0 -0.875rem; border-radius: 50%; }
+.toast-close svg { position: relative; }
+@media (hover: hover) and (pointer: fine) { .toast-close:hover::before { background: var(--fb-hover); } }
+.toast-close:focus-visible { outline: none; }
+.toast-close:focus-visible::before { background: var(--fb-hover); outline: 2px solid var(--fb-focus); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast, .toast[data-leaving] { transition: none; transform: none; }
+}
+
+/* ---------- the modal ---------- */
+body:has(dialog.fb-modal[open]), body:has(.fb-overlay) { overflow: hidden; }
+dialog.fb-modal:not([open]) { display: none; }
+.fb-modal {
+  box-sizing: border-box; width: min(var(--modal-w), 100vw - 2 * var(--space-3)); max-width: none; max-height: calc(100dvh - 2 * var(--space-4));
+  margin: auto; padding: 0; border: 0; overflow-y: auto; overscroll-behavior: contain;
+  border-radius: var(--fb-modal-radius); background: var(--fb-surface); color: var(--fb-text); box-shadow: var(--fb-modal-shadow);
+  font-family: var(--font-body); font-size: var(--text-base); line-height: var(--leading-snug); letter-spacing: var(--tracking-body);
+}
+.fb-modal::backdrop { background: var(--fb-overlay); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+@media (prefers-reduced-transparency: reduce) { .fb-modal::backdrop, .fb-overlay { -webkit-backdrop-filter: none; backdrop-filter: none; } }
+.fb-modal[open] { animation: fb-modal-in 200ms var(--ease-soft); }
+.fb-modal[open]::backdrop { animation: fb-fade-in 200ms var(--ease-soft); }
+@keyframes fb-modal-in { from { opacity: 0; transform: scale(0.98); } }
+@keyframes fb-fade-in { from { opacity: 0; } }
+
+/* no <dialog>.showModal: the same markup in a fixed overlay (feedback.js) */
+.fb-overlay {
+  position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: var(--space-3);
+  background: var(--fb-overlay); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); animation: fb-fade-in 200ms var(--ease-soft);
+}
+.fb-modal--fallback { position: relative; display: block; margin: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .fb-modal[open], .fb-modal[open]::backdrop, .fb-overlay { animation: none; }
+}
+
+.fb-modal-wrap { display: block; margin: 0; padding: var(--space-4); }
+.fb-modal-title {
+  display: flex; align-items: flex-start; gap: var(--space-2); margin: 0;
+  font-family: var(--fb-title-font); font-size: var(--text-lg); font-weight: 500; line-height: var(--leading-tight); letter-spacing: var(--tracking-display);
+}
+.fb-modal-icon { flex: none; width: 1.25rem; height: 1.25rem; margin-top: 0.0625rem; }
+.fb-modal-icon[data-kind="warning"] { color: var(--fb-warn); }
+.fb-modal-icon[data-kind="error"] { color: var(--fb-danger); }
+.fb-modal-body { margin: var(--space-2) 0 0; font-size: var(--text-base); line-height: var(--leading-snug); color: var(--fb-muted); }
+.fb-modal-details { margin-top: var(--space-2); }
+.fb-modal-guard { display: grid; gap: var(--space-1); margin-top: var(--space-3); font-size: var(--text-sm); color: var(--fb-muted); }
+.fb-modal-guard input {
+  box-sizing: border-box; width: 100%; min-height: var(--chip-h); padding: 0 var(--space-2); border: 1px solid var(--fb-line); border-radius: var(--fb-btn-radius);
+  background: transparent; color: var(--fb-text); font: inherit;
+}
+.fb-modal-guard input:focus-visible { outline: 2px solid var(--fb-focus); outline-offset: 2px; }
+.fb-modal-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-4); }
+@media (max-width: 29.99em) {
+  /* both buttons share the row; if a label would wrap, they stack with the action on top */
+  .fb-modal-actions { flex-wrap: wrap-reverse; }
+  .fb-modal-actions .fb-btn { flex: 1 1 calc(50% - var(--space-1)); min-width: max-content; }
+}
+
+.fb-btn {
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 6rem; min-height: var(--chip-h); padding: 0 var(--space-3);
+  border: 0; border-radius: var(--fb-btn-radius); font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; line-height: 1; letter-spacing: var(--tracking-body);
+  white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.fb-btn--primary { background: var(--fb-primary); color: var(--fb-on-primary); }
+.fb-btn--danger { background: var(--fb-danger-fill); color: var(--fb-on-danger); }
+.fb-btn--secondary { background: transparent; color: var(--fb-text); box-shadow: inset 0 0 0 1px var(--fb-line); }
+.fb-btn:focus-visible { outline: 2px solid var(--fb-focus); outline-offset: 2px; }
+.fb-btn[disabled] { opacity: 0.45; cursor: default; }
+@media (hover: hover) and (pointer: fine) { .fb-btn:not([disabled]):hover { opacity: 0.9; } }
+.fb-btn:not([disabled]):active { opacity: 0.8; }
+
+/* the small forms Control opens in this same dialog (formModal) */
+.fb-modal-custom { margin: 0; }
+.fb-modal-custom h2 { margin: 0 0 var(--space-2); font-family: var(--fb-title-font); font-size: var(--text-lg); font-weight: 500; line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
+.fb-modal-custom h3 { margin: var(--space-3) 0 var(--space-2); font-size: var(--text-sm); }
+.fb-modal-custom p + p { margin-top: var(--space-2); }
+
+/* ---------- host density ---------- */
+.system .fb-modal-wrap { padding: var(--sys-5); }
+.system .fb-modal-title { font-size: var(--sys-fs-md); font-weight: 600; letter-spacing: normal; }
+.system .fb-modal-body, .system .fb-modal-guard { font-size: var(--sys-fs); }
+.system .fb-modal-details { font-size: var(--sys-fs); }
+.system .fb-btn { min-width: 5rem; min-height: var(--sys-ctl); font-size: var(--sys-fs); }
+@media (pointer: coarse) { .system .fb-btn { min-height: 2.75rem; } }
+.control .fb-modal { font-size: var(--ctl-fs); line-height: 1.45; }
+.control .fb-modal-body { font-size: var(--ctl-fs); }
+
+@media print { .toasts, .fb-modal, .fb-overlay { display: none !important; } }
