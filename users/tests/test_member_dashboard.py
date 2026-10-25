@@ -107,7 +107,7 @@ class MemberAreaAccessTests(TestCase):
             self.assertEqual(response.status_code, 200, url)
             self.assertContains(response, "No membership on this account")
             self.assertContains(response, 'href="/"')
-        self.assertContains(self.client.post("/account/interest/", {"plan": "tier-1"}), "No membership on this account")
+        self.assertRedirects(self.client.post("/account/interest/", {"plan": "nonsense"}), "/memberships/", fetch_redirect_response=False)
         self.assertFalse(InterestRegistration.objects.filter(user=team).exists())  # being on the team never makes a membership
         self.client.force_login(make_user("root@example.com", is_staff=True, is_superuser=True))
         home = self.client.get("/account/")
@@ -257,3 +257,13 @@ class SignOutTests(TestCase):
         self.client.force_login(make_user(plan=plan("tier-1")))
         self.assertContains(self.client.get("/"), 'action="/logout/"')
         self.assertContains(self.client.get("/account/"), "data-member-signout")
+
+
+    def test_signed_in_account_without_a_membership_can_choose_one(self):
+        self.client.force_login(make_user("team@example.com", is_staff=True))
+        self.assertContains(self.client.get("/register/?plan=tier-1"), "data-choose-confirm")
+        self.assertFalse(InterestRegistration.objects.exists())
+        self.assertRedirects(self.client.post("/account/interest/", {"plan": "tier-1"}), "/account/", fetch_redirect_response=False)
+        self.assertEqual(InterestRegistration.objects.get().plan.slug, "tier-1")
+        self.assertEqual(self.client.get("/account/").status_code, 200)
+        self.assertNotContains(self.client.get("/account/"), "No membership on this account")

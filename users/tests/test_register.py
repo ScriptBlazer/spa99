@@ -342,3 +342,10 @@ class SignUpNeedsATierTests(TestCase):
         form = SignUpForm(signup_data(plan=""))
         self.assertFalse(form.is_valid())
         self.assertEqual(form.errors["plan"], ["Choose a membership to continue."])
+
+    def test_register_post_without_a_plan_shows_the_plan_error(self):
+        seed_all()
+        response = self.client.post("/register/", signup_data(plan=""))
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Choose a membership to continue.")
+        self.assertFalse(User.objects.filter(email="hugo@example.com").exists())

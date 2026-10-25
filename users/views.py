@@ -126,7 +126,7 @@ def _confirm_tier(request, slug):
         return redirect("account")
     interest = getattr(request.user, "interest", None)
     if interest is not None and interest.plan_id == plan.pk:
-        messages.info(request, "That's already your membership.")
+        messages.info(request, f"{plan.name} is already your membership.")
         return redirect("account")
     if interest is not None and interest.plan is not None and interest.plan.slug == "gold":
         _tier_message(request, "gold", interest.plan)
@@ -358,17 +358,18 @@ def _tier_message(request, outcome, plan):
     elif outcome == "invalid":
         messages.error(request, "Choose one of the memberships.")
     elif outcome == "same":
-        messages.info(request, f"{plan.name} is already your choice.")
+        messages.info(request, f"{plan.name} is already your membership.")
     else:
         messages.success(request, f"Saved. You're interested in {plan.name}.")
     return outcome
 
 
-@member_area
-@require_POST
+@require_POST  # any signed-in person (the login lock applies): choosing a tier is what gives a member area to someone without one
 def account_interest(request):
     outcome = _tier_message(request, *services.choose_tier(request.user, request.POST.get("plan", "")))
-    return redirect("account_membership" if outcome == "invalid" else "account")
+    if outcome == "invalid":
+        return redirect("account_membership" if member.can_open(request.user) else "memberships")
+    return redirect("account")
 
 
 @member_area
