@@ -37,12 +37,12 @@ class Plan(BaseModel):
         "price ex VAT", max_digits=8, decimal_places=2, validators=[MinValueValidator(Decimal("0"))],
         help_text="Per month for memberships, per visit for the single visit. VAT is added from Site settings.",
     )
-    visits_per_month = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Empty means unlimited.")
+    visits_per_month = models.PositiveSmallIntegerField(null=True, blank=True, validators=[MaxValueValidator(100)], help_text="Empty means unlimited.")
     hours = models.CharField(max_length=10, choices=HOURS_CHOICES, default=ANY_TIME)
-    booking_window_days = models.PositiveSmallIntegerField(default=1, help_text="Spa days ahead: 3 means today + 3.")
-    upcoming_limit = models.PositiveSmallIntegerField(default=1, help_text="Upcoming bookings at once.")
-    cancel_hours = models.PositiveSmallIntegerField(default=10, help_text="Cancel up to this many hours before the slot.")
-    guests_per_month = models.PositiveSmallIntegerField(default=0)
+    booking_window_days = models.PositiveSmallIntegerField(default=1, validators=[MaxValueValidator(365)], help_text="Spa days ahead: 3 means today + 3.")
+    upcoming_limit = models.PositiveSmallIntegerField(default=1, validators=[MaxValueValidator(50)], help_text="Upcoming bookings at once.")
+    cancel_hours = models.PositiveSmallIntegerField(default=10, validators=[MaxValueValidator(720)], help_text="Cancel up to this many hours before the slot.")
+    guests_per_month = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(50)])
     no_show_result = models.CharField(max_length=160, blank=True, help_text="Plain words, shown to staff.")
     perks = models.JSONField(
         default=list, blank=True,
@@ -60,7 +60,7 @@ class Plan(BaseModel):
         help_text="Name of a built render (content image manifest), used when no picture is uploaded.")
     image_alt = models.CharField(max_length=200, blank=True, help_text="Describes the picture. Empty = decorative.")
     highlight = models.BooleanField(default=False, help_text="Shown as the recommended plan (Tier 2).")
-    order = models.PositiveSmallIntegerField(default=0)
+    order = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(1000)])
     visible = models.BooleanField("visible on site", default=True)
 
     history = HistoricalRecords()
@@ -104,10 +104,10 @@ class SiteSettings(BaseModel):
     vat_rate = models.DecimalField(
         "VAT rate (%)", max_digits=5, decimal_places=2, default=Decimal("20.00"),
         validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))])
-    capacity = models.PositiveSmallIntegerField(default=25, help_text="Places in the spa at once (BK-03).")
-    slot_length_minutes = models.PositiveSmallIntegerField(default=120)
-    slot_step_minutes = models.PositiveSmallIntegerField(default=30)
-    booking_notice_minutes = models.PositiveSmallIntegerField(default=10)
+    capacity = models.PositiveSmallIntegerField(default=25, validators=[MinValueValidator(1), MaxValueValidator(500)], help_text="Places in the spa at once (BK-03).")
+    slot_length_minutes = models.PositiveSmallIntegerField(default=120, validators=[MinValueValidator(1), MaxValueValidator(1440)])
+    slot_step_minutes = models.PositiveSmallIntegerField(default=30, validators=[MinValueValidator(1), MaxValueValidator(1440)])
+    booking_notice_minutes = models.PositiveSmallIntegerField(default=10, validators=[MaxValueValidator(1440)])
     opening_date = models.DateField(null=True, blank=True, help_text="Leave empty until fixed.")
     opening_text = models.CharField(
         max_length=60, default="January 2027", blank=True,
@@ -152,6 +152,10 @@ class SiteSettings(BaseModel):
         "Longest sign-in (hours)", default=12, validators=[MinValueValidator(1), MaxValueValidator(72)],
         help_text="A System sign-in ends after this many hours, however active the person is (1 to 72).")
 
+    code_theme_default = models.CharField(
+        "Code view theme", max_length=5, choices=[("dark", "Dark"), ("light", "Light")], default="dark",
+        help_text="The look of the System code view for people who have not picked their own (the toggle in the code view remembers their choice).")
+
     discount_contact_url = models.URLField(
         "Discount contact link (WhatsApp)", max_length=300, blank=True, validators=[URLValidator(schemes=["https"])],
         help_text="Barry's personal WhatsApp link (https only), shown as 'Looking for a better rate?' on the sign-up and "
@@ -165,6 +169,11 @@ class SiteSettings(BaseModel):
 
     def __str__(self):
         return "Site settings"
+
+    def clean(self):
+        """Cross-field rule (forms, undo and the code view all go through full_clean): a slot is at least as long as the step."""
+        if self.slot_length_minutes and self.slot_step_minutes and self.slot_length_minutes < self.slot_step_minutes:
+            raise ValidationError({"slot_length_minutes": "A slot cannot be shorter than the step between slots."})
 
     @classmethod
     def load(cls):
@@ -227,7 +236,7 @@ class OpeningRule(BaseModel):
     kind = models.CharField(max_length=24, choices=KIND_CHOICES)
     start_time = models.TimeField(null=True, blank=True, help_text="Periods and daily closure. May run past midnight.")
     end_time = models.TimeField(null=True, blank=True)
-    offset_minutes = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Shabbos / Yom Tov rules only.")
+    offset_minutes = models.PositiveSmallIntegerField(null=True, blank=True, validators=[MaxValueValidator(720)], help_text="Shabbos / Yom Tov rules only.")
     public_title = models.CharField(
         max_length=80, blank=True, help_text="Heading for the public hours list (closure rules). Empty = the label."
     )
@@ -236,7 +245,7 @@ class OpeningRule(BaseModel):
         help_text='Plain words shown on the site for a Shabbos / Yom Tov rule, e.g. "Closed from Friday afternoon until Saturday night". Empty = not listed.',
     )
     active = models.BooleanField(default=True)
-    order = models.PositiveSmallIntegerField(default=0)
+    order = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(1000)])
 
     history = HistoricalRecords()
 
@@ -245,6 +254,20 @@ class OpeningRule(BaseModel):
 
     def __str__(self):
         return self.label
+
+    def clean(self):
+        """What each kind of rule needs (forms, undo and the code view all go through full_clean)."""
+        errors = {}
+        if self.kind in (self.PERIOD, self.DAILY_CLOSURE):
+            for name in ("start_time", "end_time"):
+                if getattr(self, name) is None:
+                    errors[name] = "Enter a time."
+            if self.start_time is not None and self.start_time == self.end_time:
+                errors["end_time"] = "Start and end cannot be the same time."
+        elif self.kind in (self.CLOSE_BEFORE_CANDLES, self.OPEN_AFTER_NIGHTFALL) and self.offset_minutes is None:
+            errors["offset_minutes"] = "Enter the number of minutes."
+        if errors:
+            raise ValidationError(errors)
 
 
 class Closure(BaseModel):
@@ -263,6 +286,10 @@ class Closure(BaseModel):
 
     def __str__(self):
         return self.name
+
+    def clean(self):
+        if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
+            raise ValidationError({"ends_at": "The end must be after the start."})
 
 
 def facility_image_path(instance, filename):

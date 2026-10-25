@@ -253,8 +253,8 @@
     </details>
   </section>
 
-  {# 8 Top pages and referring sites: ranked lists, not charts #}
-  <section class="o-card o-ranked o-span-6" id="pages" data-reveal aria-labelledby="h-pages">
+  {# 8 Top pages: a ranked list, not a chart #}
+  <section class="o-card o-ranked o-span-12" id="pages" data-reveal aria-labelledby="h-pages">
     <header class="o-card-head"><h2 id="h-pages">Top pages</h2></header>
     <p class="o-summary" data-region="summary-pages" data-fade>{{ pages.summaries.top_pages }}</p>
     <ol class="o-rank" data-region="rank-pages" data-fade data-top-pages>
@@ -263,15 +263,7 @@
       {% empty %}<li class="o-empty-line">No page views in this range yet.</li>{% endfor %}
     </ol>
   </section>
-  <section class="o-card o-ranked o-span-6" id="referrers" data-reveal aria-labelledby="h-refs">
-    <header class="o-card-head"><h2 id="h-refs">Referring sites</h2></header>
-    <p class="o-summary" data-region="summary-refs" data-fade>{{ pages.summaries.referrers }}</p>
-    <ol class="o-rank" data-region="rank-refs" data-fade data-referrers>
-      {% for r in pages.referrers %}
-      <li style="--share: {% ratio r.visits pages.referrers.0.visits %}"><span class="o-rank-name">{% if r.site == "direct" %}Direct or unknown{% else %}{{ r.site }}{% endif %}</span><span class="o-rank-num">{{ r.visits|num }}</span></li>
-      {% empty %}<li class="o-empty-line">No visits in this range yet.</li>{% endfor %}
-    </ol>
-  </section>
+  {# Referring sites: hidden 2026-10-25 (Moishe: not useful for now). Still counted and in the snapshot; to bring it back, restore this section from git history. #}
 </div>
 {{ data|json_script:"office-series" }}
 {{ pages|json_script:"office-pages" }}

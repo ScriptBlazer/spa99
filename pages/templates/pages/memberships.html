@@ -12,7 +12,7 @@
     <div class="mem-top">
       <h1 id="m-title" class="mem-title line-mask"><span class="mem-title-line">{{ m.intro.heading }}</span></h1>
       <p class="lead mem-fade">{{ m.intro.body }}</p>
-      <p class="mem-fade mem-notsure"><a class="btn-quiet" href="{% url 'journey' %}">{{ m.not_sure.heading }} {{ m.not_sure.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a></p>
+      <p class="mem-fade mem-notsure"><span class="mem-notsure-q">{{ m.not_sure.heading }}</span> <a class="btn-quiet mem-notsure-link" href="{% url 'journey' %}">{{ m.not_sure.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a></p>
     </div>
 
     <fieldset class="tiers" data-reveal>

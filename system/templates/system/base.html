@@ -18,7 +18,9 @@ Any `<form data-system-form="<section>">` gets the save bar, dirty marks, Cmd/Ct
 <link rel="stylesheet" href="{% static 'common/css/feedback.css' %}">
 <script>document.documentElement.classList.add('js')</script>
 <script type="module" src="{% static 'common/js/system.js' %}"></script>
-{% block head_extra %}{% endblock %}
+{% if code_url %}<link rel="stylesheet" href="{% static 'common/css/system-code.css' %}">
+<script type="module" src="{% static 'common/js/system-code.js' %}"></script>
+{% endif %}{% block head_extra %}{% endblock %}
 </head>
 <body class="system{% if env == 'live' %} live{% endif %}" data-system-section="{{ section }}" data-env="{{ env }}" data-system-idle="{% system_idle_seconds %}" data-system-remaining="{% system_remaining %}" data-system-ping="{% url 'system_unlock_ping' %}" data-system-unlock-url="{% url 'system_unlock' %}">
 {% if env == "live" %}<div class="sys-stripe" aria-hidden="true"></div>{% endif %}

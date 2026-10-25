@@ -15,7 +15,12 @@ html:has(.page-mem) { scroll-padding-bottom: calc(var(--bar-h) + var(--space-3))
 .mem-title-line { display: block; }
 .mem-top .lead { margin-top: var(--space-2); font-size: var(--text-body); color: var(--color-text-muted); max-width: 16rem; }
 .mem-notsure { margin-top: var(--space-3); }
-.mem-notsure .btn-quiet { gap: var(--space-2); font-size: var(--text-sm); }
+.mem-notsure { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); font-size: var(--text-base); }
+.mem-notsure-q { color: var(--s-muted); }
+.mem-notsure-link { gap: var(--space-2); font-size: var(--text-base); font-weight: 600; text-decoration-thickness: 1.5px; text-underline-offset: 0.3em; }
+.mem-notsure-link .icon { transition: transform 200ms var(--ease-soft); }
+@media (hover: hover) and (pointer: fine) { .mem-notsure-link:hover .icon { transform: translateX(3px); } }
+@media (prefers-reduced-motion: reduce) { .mem-notsure-link .icon { transition: none; } }
 @media (min-width: 48em) { .mem-top .lead { max-width: 28rem; } }
 @media (min-width: 64em) { .mem-grid { padding-block: var(--space-5) var(--space-4); } }
 @media (min-width: 80em) {

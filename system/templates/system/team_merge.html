@@ -2,7 +2,7 @@
 {% block main %}
 {% include "system/_page_header.html" with title="Merge accounts" description="Two accounts for one person: the one you keep gets the membership, journey sessions and Gold applications of the other, which is then deleted." %}
 <section class="sys-panel" aria-label="Choose the accounts">
-  <form method="post" action="{% url 'system_team_merge' %}" class="sys-team-add">{% csrf_token %}
+  <form method="post" action="{% url 'system_team_merge' %}" class="sys-team-add" data-problems>{% csrf_token %}
     <label>Keep this account (email) <input type="email" name="keep" value="{{ keep }}" required autocomplete="off"></label>
     <label>Merge this one into it (email) <input type="email" name="remove" value="{{ remove }}" required autocomplete="off"></label>
     <button type="submit" class="sys-btn sm">Show what would move</button>

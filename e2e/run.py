@@ -1,6 +1,7 @@
 """Run the walk-throughs: `python -m e2e.run [--only visitor,gold_approved] [--headed] [--list]`.
 Normally started by scripts/e2e.sh, which has already made the throwaway workspace and started the server."""
 import argparse
+import os
 import sys
 import time
 import urllib.request
@@ -47,7 +48,7 @@ def main(argv=None):
     setup_staff()
     results = []
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=not args.headed)
+        browser = playwright.chromium.launch(headless=not args.headed, args=os.environ.get("E2E_BROWSER_ARGS", "").split())  # e.g. --no-sandbox where Chromium cannot start otherwise
         for number, (key, title, function, allow) in chosen:
             print(f"[{number}/{len(WALKS)}] {title} ...", flush=True)
             walk = Walk(key, title, browser, headed=args.headed, allow_console=allow)

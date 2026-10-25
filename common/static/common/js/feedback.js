@@ -167,7 +167,7 @@ export function toast(text, { kind = 'success', action, timeout } = {}) {
 }
 
 /** Posts an undo link from a server message (System): a real form POST, so the server stays the one that undoes. */
-function postUndo(url) {
+export function postUndo(url) {
   if (!url.startsWith('/')) return;
   const form = document.createElement('form');
   form.method = 'post';

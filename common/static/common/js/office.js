@@ -3,12 +3,14 @@
 import { initButtons } from './buttons.js';
 import { initFeedback } from './feedback.js';
 import { initReveal } from './reveal.js';
+import { initFormProblems } from './form-problems.js';
 import { initOfficeUi } from './office-ui.js';
 import { initSwap } from './office-swap.js';
 import { initCounts } from './office-dashboard.js';
 
 initButtons();
 initFeedback();
+initFormProblems();
 initReveal();
 initOfficeUi();
 initSwap();

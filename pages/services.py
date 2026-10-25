@@ -40,10 +40,36 @@ def opening_hours():
     for rule in rules:
         if rule.kind == OpeningRule.DAILY_CLOSURE and rule.start_time and rule.end_time:
             rows.append(("Closed", f"{_clock(rule.start_time)} to {_clock(rule.end_time)}, every day"))
-    for rule in rules:  # Shabbos / Yom Tov rules that carry a public note (written in Control)
-        if rule.kind in (OpeningRule.CLOSE_BEFORE_CANDLES, OpeningRule.OPEN_AFTER_NIGHTFALL) and rule.public_note:
-            rows.append((rule.public_title or rule.label, rule.public_note))
+    shabbos = shabbos_hours_text(rules)
+    if shabbos:
+        rows.append(shabbos)
     return rows
+
+
+def _span(minutes):
+    """120 -> '2 hours', 60 -> '1 hour', 90 -> '90 minutes'."""
+    if minutes % 60 == 0:
+        hours = minutes // 60
+        return f"{hours} hour" if hours == 1 else f"{hours} hours"
+    return f"{minutes} minutes"
+
+
+def shabbos_hours_text(rules):
+    """The detailed Shabbos / Yom Tov row, worked out from the two offsets in System > Hours:
+    ('Shabbos and Yom Tov', 'Closes 2 hours before Shabbos and Yom Tov begin. Opens 1 hour after they end.').
+    Falls back to a rule's public note when an offset is missing; None when nothing is set."""
+    close = next((r for r in rules if r.kind == OpeningRule.CLOSE_BEFORE_CANDLES), None)
+    open_ = next((r for r in rules if r.kind == OpeningRule.OPEN_AFTER_NIGHTFALL), None)
+    title = next((r.public_title for r in (close, open_) if r and r.public_title), "") or "Shabbos and Yom Tov"
+    parts = []
+    if close and close.offset_minutes:
+        parts.append(f"Closes {_span(close.offset_minutes)} before Shabbos and Yom Tov begin.")
+    if open_ and open_.offset_minutes:
+        parts.append(f"Opens {_span(open_.offset_minutes)} after {'they' if parts else 'Shabbos and Yom Tov'} end.")
+    if parts:
+        return (title, " ".join(parts))
+    note = next((r for r in (close, open_) if r and r.public_note), None)
+    return (note.public_title or note.label, note.public_note) if note else None
 
 
 def hours_summary():

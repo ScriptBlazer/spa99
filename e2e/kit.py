@@ -41,7 +41,8 @@ STAFF = {
 # Chrome's own messages, not our scripts. The last one: the robot clicks faster than a page-to-page fade can run,
 # so Chrome skips the fade and reports it; a person never sees anything.
 IGNORED_CONSOLE = [r"GPU stall", r"GL Driver", r"WebGL", r"swiftshader", r"GroupMarker",
-                   r"Transition was aborted because of invalid state"]
+                   r"Transition was aborted because of invalid state",
+                   r"status of (400|429) .*/register/"]  # the register form is sent with fetch: Chrome logs its answered 4xx (the dialog shows them)
 
 
 class StepFailed(Exception):
@@ -225,6 +226,21 @@ def sign_in_fails(page, base, email, password):
         page.locator("form[data-live-validate] button[type=submit]").click()
     assert "/login/" in page.url, f"Expected to stay on the sign-in page, but landed on {page.url}"
     page.locator(".form-error").first.wait_for()
+    lines = problems_modal(page)
+    assert any("email or password is wrong" in line.lower() for line in lines), f"The problems dialog says: {lines}"
+    close_problems(page)
+
+
+def problems_modal(page, timeout=5000):
+    """The shared problems dialog (form-problems.js): waits for it and returns its lines (label and message, one per problem)."""
+    page.wait_for_selector("dialog.fb-modal[open] .fb-problems", timeout=timeout)
+    return page.locator("dialog.fb-modal[open] .fb-problems li").all_inner_texts()
+
+
+def close_problems(page):
+    """OK on the problems dialog. Everything typed stays; focus goes to the first problem."""
+    page.locator("dialog.fb-modal[open] .fb-modal-custom .fb-btn").click()
+    page.wait_for_function("!document.querySelector('dialog.fb-modal[open]')")
 
 
 def form_errors(page):

@@ -10,11 +10,10 @@
   .o-rings { grid-column: 1 / span 8; grid-row: 2; }
   .o-gold-tile { grid-column: 9 / span 4; grid-row: 2; }
   .o-wants { grid-column: 1 / -1; grid-row: 3; }
-  .o-funnel { grid-column: 1 / -1; grid-row: 4; }
-  .o-stat[data-stat="visitors"] { grid-column: 1 / span 6; grid-row: 5; }
-  .o-stat[data-stat="page_views"] { grid-column: 7 / span 6; grid-row: 5; }
-  .o-waiting { grid-column: 1 / span 7; grid-row: 6; }
-  .o-latest { grid-column: 8 / span 5; grid-row: 6; }
+  .o-stat[data-stat="visitors"] { grid-column: 1 / span 6; grid-row: 4; }
+  .o-stat[data-stat="page_views"] { grid-column: 7 / span 6; grid-row: 4; }
+  .o-waiting { grid-column: 1 / span 7; grid-row: 5; }
+  .o-latest { grid-column: 8 / span 5; grid-row: 5; }
 }
 
 /* ---------- the journey: three single rings, the count in the middle ---------- */

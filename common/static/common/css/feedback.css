@@ -269,6 +269,9 @@ dialog.fb-modal:not([open]) { display: none; }
 .fb-btn:not([disabled]):active { opacity: 0.8; }
 
 /* the small forms Control opens in this same dialog (formModal) */
+.fb-problems { display: grid; gap: var(--space-2); margin: var(--space-3) 0 0; padding: 0; list-style: none; font-size: var(--text-base); line-height: var(--leading-snug); color: var(--fb-muted); }
+.fb-problems strong { color: var(--fb-text); font-weight: 600; }
+.system .fb-problems { font-size: var(--sys-fs-md); }
 .fb-modal-custom { margin: 0; }
 .fb-modal-custom h2 { margin: 0 0 var(--space-2); font-family: var(--fb-title-font); font-size: var(--text-lg); font-weight: 500; line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
 .fb-modal-custom h3 { margin: var(--space-3) 0 var(--space-2); font-size: var(--text-sm); }

@@ -3,6 +3,7 @@ and the rules that turn answers into a suggested plan. See docs/features/journey
 import secrets
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
@@ -73,10 +74,10 @@ class Question(BaseModel):
     text = models.CharField(max_length=200)
     help_text = models.CharField(max_length=300, blank=True)
     type = models.CharField(max_length=10, choices=TYPE_CHOICES, default=SINGLE)
-    screen = models.PositiveSmallIntegerField(help_text="Screen number, from 1.")
-    order = models.PositiveSmallIntegerField(default=0)
+    screen = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(50)], help_text="Screen number, from 1.")
+    order = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(1000)])
     min_choices = models.PositiveSmallIntegerField(
-        default=0, help_text="At least this many choices are required (0 = optional, and it can be skipped). "
+        default=0, validators=[MaxValueValidator(20)], help_text="At least this many choices are required (0 = optional, and it can be skipped). "
                              "The journey cannot move on or finish until it is met.",
     )
     active = models.BooleanField(default=True, help_text="Retire by unticking. Never delete: old answers stay readable.")
@@ -100,10 +101,10 @@ class Option(BaseModel):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="options")
     label = models.CharField(max_length=120)
     value = models.SlugField(help_text="Stable value stored and used by rules. Do not rename.")
-    order = models.PositiveSmallIntegerField(default=0)
+    order = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(1000)])
     active = models.BooleanField(default=True)
     plan_points = models.JSONField(default=dict, blank=True, help_text='Points per plan slug, e.g. {"tier-2": 3, "tier-3": 1}.')
-    gold_points = models.SmallIntegerField(default=0, help_text="Extra Gold potential points on top of the Gold rules.")
+    gold_points = models.SmallIntegerField(default=0, validators=[MinValueValidator(-1000), MaxValueValidator(1000)], help_text="Extra Gold potential points on top of the Gold rules.")
     weight = models.DecimalField(
         max_digits=6, decimal_places=2, null=True, blank=True,
         help_text="Numeric meaning for statistics: visits a week for a frequency option.",
@@ -163,10 +164,10 @@ class SuggestionRule(BaseModel):
     )
     plan_slugs = models.JSONField(default=list, blank=True, help_text="Plans affected. For a tie-break: most preferred first.")
     target_daytime_only = models.BooleanField(default=False, help_text="Also affects every plan that is daytime only.")
-    points = models.SmallIntegerField(default=0, help_text="For add-points rules.")
+    points = models.SmallIntegerField(default=0, validators=[MinValueValidator(-1000), MaxValueValidator(1000)], help_text="For add-points rules.")
     reason = models.CharField(max_length=120, blank=True)
     active = models.BooleanField(default=True)
-    order = models.PositiveSmallIntegerField(default=0)
+    order = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(1000)])
 
     history = HistoricalRecords()
 

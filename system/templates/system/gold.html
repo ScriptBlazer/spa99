@@ -10,7 +10,7 @@
     <tbody>
     {% for row in rows %}{% with pk=row.obj.pk f=row.form %}
       <tr data-system-gold-rule="{{ row.obj.group }}:{{ row.obj.match_value }}" data-row-label="{{ row.obj.get_group_display }} {{ row.obj.match_value }}"{% if not row.obj.active %} data-hidden{% endif %}>
-        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_gold_save' pk %}" data-system-form="gold-rule" data-system-risky="{{ risky_fields|join:',' }}" data-noun="Gold rule" data-plural="Gold rules" data-line="Gold applications are judged on the new value at once.">{% csrf_token %}</form>
+        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_gold_save' pk %}" data-problems data-system-form="gold-rule" data-system-risky="{{ risky_fields|join:',' }}" data-noun="Gold rule" data-plural="Gold rules" data-line="Gold applications are judged on the new value at once.">{% csrf_token %}</form>{% token f.row_token pk %}
           {{ row.obj.get_group_display }} · <span class="mono">{{ row.obj.match_value }}</span></td>
         <td>{% cell f.label pk "Label" %}</td>
         <td class="sys-num">{% cell f.points pk "Points" %}</td>
@@ -18,13 +18,13 @@
         <td>{% cell f.active pk "Active" %}</td>
         <td><button type="submit" form="f-{{ pk }}" class="sys-btn sm sys-rowsave">Save</button></td>
       </tr>
-      {% if f.errors %}<tr class="sys-rowerr"><td colspan="6" class="sys-error" role="alert">{{ f|error_text }}</td></tr>{% endif %}
+      {% if f.errors %}<tr class="sys-rowerr" data-problem-form="f-{{ pk }}"><td colspan="6" class="sys-error" role="alert">{{ f|error_spans }}</td></tr>{% endif %}
     {% endwith %}{% empty %}<tr><td class="sys-empty" colspan="6">No rules yet.</td></tr>{% endfor %}
     </tbody>
   </table></div>
 </section>
 <details class="sys-panel" data-system-add="gold-rule"{% if add_form.errors %} open{% endif %}><summary class="sys-add">Add a rule</summary>
-  <form method="post" action="{% url 'system_gold_add' %}" data-system-form="gold-rule-add" data-system-add class="sys-group">{% csrf_token %}
+  <form method="post" action="{% url 'system_gold_add' %}" data-problems data-system-form="gold-rule-add" data-system-add class="sys-group">{% csrf_token %}
     {% include "system/_fields.html" with form=add_form %}
     <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add rule</button></div>
   </form>

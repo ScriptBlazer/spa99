@@ -1,7 +1,7 @@
 """Admin forms and the public sign-up forms. Validation comes from common/validators.py, the same rules the
 JS file common/static/common/js/validate.js mirrors (the data-validate attributes switch the JS checks on)."""
 from django import forms
-from django.contrib.auth.forms import AdminUserCreationForm, PasswordChangeForm, UserChangeForm as BaseUserChangeForm
+from django.contrib.auth.forms import AdminUserCreationForm, AuthenticationForm, PasswordChangeForm, UserChangeForm as BaseUserChangeForm
 from django.core.exceptions import ValidationError
 
 from common.validators import normalise_email, normalise_uk_mobile, password_problems, validate_adult, validate_person_name
@@ -19,6 +19,13 @@ class UserChangeForm(BaseUserChangeForm):
     class Meta:
         model = User
         fields = "__all__"
+
+
+class SignInForm(AuthenticationForm):
+    """Sign in (public site, Office, Control, System). One short answer for a wrong email, a wrong password or an account that
+    may not come in here: it is listed in the problems dialog, and never says which part was wrong."""
+
+    error_messages = {**AuthenticationForm.error_messages, "invalid_login": "Email or password is wrong."}
 
 
 def _attrs(rules, **extra):

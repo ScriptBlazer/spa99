@@ -1,12 +1,12 @@
 {% extends "system/base.html" %}
 {% block main %}
 {% include "system/_page_header.html" with title="Emails" description="Who receives Gold applications and where replies go. Sender address and mail transport stay in the server settings." %}
-<form method="post" data-system-form="emails" data-system-risky="{{ risky_fields|join:',' }}">{% csrf_token %}
+<form method="post" data-problems data-system-form="emails" data-system-risky="{{ risky_fields|join:',' }}">{% csrf_token %}
   <section class="sys-panel">
     <header><h2>Recipients</h2></header>
     <div class="sys-group">
-      {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error>{{ form.non_field_errors|join:" " }}</p>{% endif %}
-      {% for field in form %}{% include "system/_field_row.html" %}{% endfor %}
+      {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
+      {% for field in form.visible_fields %}{% include "system/_field_row.html" %}{% endfor %}{{ form.row_token }}
     </div>
   </section>
   <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>

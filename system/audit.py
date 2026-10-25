@@ -35,7 +35,8 @@ KINDS = {
     SystemEvent.USER_REACTIVATED: ("security", "team", "ok"), SystemEvent.UNDO: ("undo", "changes", "ok"),
     SystemEvent.UNDO_ALL: ("undo", "changes", "ok"), SystemEvent.EXPORT: ("security", "changes", "ok"),
     SystemEvent.AUDIT_PRUNED: ("security", "changes", "ok"), SystemEvent.AUDIT_CHECK: ("security", "changes", "ok"), SystemEvent.JOB_RUN: ("security", "security", "ok"),
-    SystemEvent.SUPPRESSION_REMOVED: ("security", "security", "ok"),
+    SystemEvent.SUPPRESSION_REMOVED: ("security", "security", "ok"), SystemEvent.PASSWORD_CHANGED: ("security", "security", "ok"),
+    SystemEvent.CODE_EDIT: ("change", "changes", "ok"),
 }
 CATEGORIES = [("change", "Changes"), ("security", "Security"), ("undo", "Undos"), ("failure", "Failures")]
 EVENT_SECTION_LABELS = {"security": "Security", "changes": "Change log"}
@@ -206,6 +207,8 @@ def default_sentence(kind, email, detail):
         SystemEvent.ACCESS_DENIED: f"Someone without access tried {detail.get('method', 'GET')} {detail.get('path', '')}".strip(),
         SystemEvent.UNDO: f"{who} undid a change",
         SystemEvent.UNDO_ALL: f"{who} undid {detail.get('count', 0)} changes saved together",
+        SystemEvent.PASSWORD_CHANGED: f"{who} changed their password",
+        SystemEvent.CODE_EDIT: f"{who} edited {detail.get('title', 'rules')} as code ({detail.get('changes', 0)} change{'' if detail.get('changes') == 1 else 's'})",
         SystemEvent.SUPPRESSION_REMOVED: f"{who} removed {detail.get('email', 'an address')} from the email suppression list",
         SystemEvent.EXPORT: f"{who} exported {detail.get('rows', 0)} audit rows to CSV",
     }.get(kind, f"{who}: {kind}")

@@ -9,6 +9,8 @@
 <link rel="stylesheet" href="{% static 'common/css/fonts.css' %}">
 <link rel="stylesheet" href="{% static 'common/css/tokens.css' %}">
 <link rel="stylesheet" href="{% static 'common/css/system.css' %}">
+<link rel="stylesheet" href="{% static 'common/css/feedback.css' %}">
+<script type="module" src="{% static 'common/js/system-bare.js' %}"></script>
 </head>
 <body class="system system-bare{% if env == 'live' %} live{% endif %}" data-system-section="{% block section %}signin{% endblock %}" data-env="{{ env }}">
 {% if env == "live" %}<div class="sys-stripe" aria-hidden="true"></div>{% endif %}
@@ -18,5 +20,6 @@
     {% block main %}{% endblock %}
   </div>
 </main>
+{% include "common/_feedback.html" %}
 </body>
 </html>

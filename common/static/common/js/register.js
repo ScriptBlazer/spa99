@@ -1,6 +1,8 @@
 /* Register: plan picker and membership card, date of birth in three fields, password checks. The shared validate.js
    does the live feedback (see form.spaValidation); this adds the parts only this form has. */
 import './forms.js';
+import { collectProblems, showProblems } from './form-problems.js';
+import { csrfToken } from './api.js';
 
 const form = document.getElementById('register-form');
 
@@ -32,16 +34,8 @@ if (panel) {
       [eyebrow, text].forEach((el) => el.animate({ opacity: [0, 1] }, { duration: parseFloat(fade) || 240, easing: 'ease-out' }));
     }
   };
-  const planError = document.querySelector('[data-plan-error]');
-  document.querySelectorAll('input[name="plan"]').forEach((input) => input.addEventListener('change', () => { if (planError) planError.hidden = true; showPlan(true); }));
+  document.querySelectorAll('input[name="plan"]').forEach((input) => input.addEventListener('change', () => showPlan(true))); // the membership problem line hides itself (form-problems.js)
   showPlan(false);
-  // A tier is required: stop the submit and say so next to the chips (the server checks too).
-  form?.addEventListener('submit', (e) => {
-    if (document.querySelector('input[name="plan"]:checked') || !planError) return;
-    e.preventDefault();
-    planError.hidden = false;
-    planError.scrollIntoView({ block: 'center' });
-  }, true);
 }
 
 /* Date of birth: Day / Month / Year, auto-advance after 2 / 2 / 4 digits, one shared feedback line. The real field
@@ -86,4 +80,70 @@ if (form && dob) {
       }, 0);
     });
   });
+}
+
+/* Register: every problem in one dialog (the shared piece, form-problems.js). On Register the browser checks, the live rules
+   and the membership choice run together; anything wrong opens the shared centred dialog with a list (label and short
+   message) and nothing moves. Closing it returns to the form with everything still filled in, and focuses the first problem.
+   The server is asked with fetch (never a reload), so its answers (an email or mobile already registered) come back the same
+   way and the password is not wiped. Without JavaScript the form posts normally and the page shows the errors beside the fields. */
+const FAILED = "We couldn't send that just now. Please check your connection and try again.";
+
+if (form?.hasAttribute('data-register-fetch')) { // only the register page (the Gold invite set-up shares this script and posts normally)
+  const button = form.querySelector('button[type="submit"]');
+  const setWorking = (on) => {
+    if (!button) return;
+    if (on) {
+      button.dataset.label = button.textContent;
+      button.textContent = button.dataset.workingText || 'One moment';
+    } else if (button.dataset.label) {
+      button.textContent = button.dataset.label;
+    }
+    button.disabled = on;
+    if (on) button.setAttribute('aria-busy', 'true'); else button.removeAttribute('aria-busy');
+  };
+
+  const markPlan = (message) => {
+    const line = document.querySelector('[data-group-error]');
+    if (line) { line.textContent = message; line.hidden = false; }
+  };
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation(); // validate.js's own submit handling is replaced by this one
+    if (form.dataset.sending === 'true') return;
+    form.dataset.sending = 'true';
+    let leaving = false;
+    setWorking(true);
+    try {
+      const local = await collectProblems(form);
+      if (local.length) { setWorking(false); await showProblems(form, local, { opener: button }); return; }
+
+      let items = null;
+      try {
+        const response = await fetch(form.action || window.location.href, {
+          method: 'POST', credentials: 'same-origin', body: new FormData(form),
+          headers: { 'X-Requested-With': 'fetch', Accept: 'application/json', 'X-CSRFToken': form.elements.csrfmiddlewaretoken?.value || csrfToken() },
+        });
+        let data = null;
+        try { data = await response.json(); } catch { /* not JSON: a gateway or CSRF page */ }
+        if (data?.ok && data.redirect) { leaving = true; window.location.assign(data.redirect); return; } // stays "working" while the next page loads
+        items = (data?.errors || []).map((e) => ({ field: e.field, label: e.label || '', message: e.message }));
+        if (!items.length) items = [{ field: '__all__', label: '', message: FAILED }];
+      } catch {
+        items = [{ field: '__all__', label: '', message: FAILED }];
+      }
+      items.forEach((item) => {
+        if (item.field === 'plan') markPlan(item.message);
+        else if (item.field !== '__all__') form.spaValidation?.showError(item.field, item.message);
+      });
+      setWorking(false);
+      await showProblems(form, items, { opener: button });
+    } finally {
+      if (!leaving) delete form.dataset.sending;
+    }
+  }, true);
+
+  // Back button after a successful register (bfcache): the button must work again.
+  window.addEventListener('pageshow', () => { delete form.dataset.sending; if (button?.disabled) setWorking(false); });
 }

@@ -1,6 +1,8 @@
 """Gold Card applications and the editable rules that rate them. See docs/features/gold-application.md.
 Phase 1: no account is created and there is no approval flow on the site; Barry decides outside the system."""
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from simple_history.models import HistoricalRecords
 
@@ -92,7 +94,7 @@ class GoldRule(BaseModel):
         max_length=40, help_text="The answer value this applies to. Thresholds: high or medium. Referred: yes."
     )
     label = models.CharField(max_length=120, blank=True, help_text='Plain words used in the reasons, e.g. "Owner or investor".')
-    points = models.SmallIntegerField(default=0)
+    points = models.SmallIntegerField(default=0, validators=[MinValueValidator(-1000), MaxValueValidator(1000)])
     is_property = models.BooleanField(default=False, help_text="Counts as a property person (statistics, nudges).")
     active = models.BooleanField(default=True)
 
@@ -104,6 +106,20 @@ class GoldRule(BaseModel):
 
     def __str__(self):
         return f"{self.group}:{self.match_value} = {self.points}"
+
+    def clean(self):
+        """Threshold rules (forms, undo and the code view all go through full_clean): at least 1 point, and High is not
+        below Medium."""
+        if self.group != self.THRESHOLD:
+            return
+        if self.points is not None and self.points < 1:
+            raise ValidationError({"points": "A threshold needs at least 1 point."})
+        if self.match_value in ("high", "medium") and self.points is not None:
+            other = type(self).objects.filter(group=self.THRESHOLD, match_value="medium" if self.match_value == "high" else "high").exclude(pk=self.pk).first()
+            if other is not None:
+                high, medium = (self.points, other.points) if self.match_value == "high" else (other.points, self.points)
+                if high < medium:
+                    raise ValidationError({"points": "The High threshold cannot be lower than the Medium threshold."})
 
 
 class GoldApplication(BaseModel):

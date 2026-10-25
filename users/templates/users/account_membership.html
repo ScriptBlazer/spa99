@@ -1,5 +1,5 @@
 {% extends "users/member_base.html" %}
-{% load pages_tags %}
+{% load pages_tags content_tags %}
 {% block head_title %}{% include "common/_head.html" with title="Membership | My Spa 99" %}{% endblock %}
 {% block main %}
 <section class="m-screen" data-screen="membership">
@@ -16,12 +16,13 @@
     <h1>{% if current_plan %}{{ current_plan.name }}{% else %}Choose your membership{% endif %}</h1>
     {% if current_plan %}<p class="lead num" data-price>&pound;{{ current_plan.price_whole }} a month, ex VAT (&pound;{{ current_plan.price_inc }} inc VAT)</p>
     <p class="muted">Nothing to pay now. Billing opens in {{ opening }}.</p>{% endif %}
+    {% discount_line %}
     {% if suggested_plan %}<p class="muted" data-suggestion>Your journey suggested {{ suggested_plan.name }}.</p>
     {% if suggestion_differs %}<form method="post" action="{% url 'account_interest' %}">{% csrf_token %}<input type="hidden" name="plan" value="{{ suggested_plan.slug }}"><button type="submit" class="btn-quiet" data-working-text="Saving">Switch to {{ suggested_plan.name }}</button></form>{% endif %}{% endif %}
   </div>
-  <form id="interest-form" class="m-choose" method="post" action="{% url 'account_interest' %}" data-interest data-current="{{ interest_plan.slug }}" data-reveal>
+  <form id="interest-form" class="m-choose" method="post" action="{% url 'account_interest' %}" data-problems data-interest data-current="{{ interest_plan.slug }}" data-reveal>
     {% csrf_token %}
-    <div class="m-choices" role="radiogroup" aria-label="Your membership">
+    <div class="m-choices" role="radiogroup" aria-label="Your membership" data-required-group data-label="Membership" data-required-message="Choose a membership to continue.">
       {% for tile in plan_tiles %}<label class="m-choice" data-plan-tile="{{ tile.slug }}" data-plan-name="{{ tile.name }}"><input type="radio" name="plan" value="{{ tile.slug }}"{% if interest_plan.slug == tile.slug %} checked{% endif %}><span class="m-choice-name">{{ tile.name }}</span><span class="m-choice-tag">{{ tile.tagline }}</span><span class="m-choice-price num">&pound;{{ tile.price_whole }} ex VAT (&pound;{{ tile.price_inc }} inc VAT)</span><span class="m-choice-check">{% include "common/_icon.html" with name="check" %}</span></label>{% endfor %}
     </div>
     <button type="submit" class="btn btn-primary m-keep" data-working-text="Saving" data-keep>{% if interest_plan %}Switch membership{% else %}Choose membership{% endif %}</button>

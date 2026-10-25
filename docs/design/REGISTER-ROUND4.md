@@ -248,3 +248,5 @@ Shots in `.private/shots/register-r4/` at 375 x 667, 1024 x 768, 1280 x 720 and 
 10. Contrast: muted label on the well 5.32; espresso on the well 10.95; field edge 3.54; gold eyebrow and price on espresso 6.17; chip border 3.09; chosen chip 6.17; danger 8.07. Nothing sits on `--color-espresso-raised`.
 11. Reduced motion: everything visible at once, no rise, scale or plan fade.
 12. No em dashes, no exclamation marks, no new colours, nothing animates except `transform` and `opacity`. Lighthouse accessibility 100, CLS under 0.1 (the photo box is sized before it loads).
+
+**Change 2026-10-25 (photo):** the register stage picture is now `dry-sauna` (focus `50% 70%`, alt "The dry sauna, glowing cedar benches behind a glass door etched with the Spa 99 swan") instead of `reception`, which showed mostly floor on a 1440 screen; the warm wood melts into the espresso stage and no signage shows. Sections above that say `reception` are superseded.

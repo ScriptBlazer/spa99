@@ -50,6 +50,25 @@ def level_choices(actor):
     return [(level, levels.LABELS[level]) for level in ASSIGNABLE if levels.can_assign(actor, level)]
 
 
+LAST_SUPERUSER = "Spa 99 must keep at least one superuser."
+
+
+def _lock_superusers(*people):
+    """Lock every active superuser row (no joins, in a fixed order) for the rest of the transaction, refresh `people` from
+    the database, and return the set of active superuser ids. Two superusers changing each other at once queue here, so the
+    count checked below is the true one. Must run inside transaction.atomic. SQLite ignores the lock (it serialises writes)."""
+    ids = set(User.objects.select_for_update().filter(is_superuser=True, is_active=True).order_by("pk").values_list("pk", flat=True))
+    for person in people:
+        person.refresh_from_db(fields=["is_superuser", "is_staff", "is_active"])
+    return ids
+
+
+def _keep_a_superuser(active_superusers, leaving):
+    """Refuse a change that would leave no active superuser. `leaving`: the person who would stop being one."""
+    if not (active_superusers - {leaving.pk}):
+        raise ChangeRefused(LAST_SUPERUSER)
+
+
 def _guard(actor, target, team_only=False):
     if team_only and not team_queryset().filter(pk=target.pk).exists():
         raise ChangeRefused("That person is not on the team. Members are managed in the Office.")
@@ -80,6 +99,7 @@ def apply_level(target, level, approver, actor=None):
 @transaction.atomic
 def set_access(actor, target, level, approver=False, added=False):
     """Change someone's level and Approver permission. Approver needs a level. `added`: worded as joining the team."""
+    superusers = _lock_superusers(actor, target)
     _guard(actor, target)
     if level not in ASSIGNABLE or not levels.can_assign(actor, level):
         raise ChangeRefused("You can only give a level below your own.")
@@ -87,6 +107,8 @@ def set_access(actor, target, level, approver=False, added=False):
     approver = bool(approver)
     if (old_level, old_approver) == (level, approver):
         return False
+    if target.is_superuser and level != levels.SUPERUSER:
+        _keep_a_superuser(superusers, target)
     apply_level(target, level, approver, actor)
     old, new = describe(old_level, old_approver), describe(level, approver)
     _log(actor, target, "level", old, new, f"Added {target.email} to the team as {new}" if added else f"Changed access for {target.email} from {old} to {new}")
@@ -96,10 +118,13 @@ def set_access(actor, target, level, approver=False, added=False):
 @transaction.atomic
 def remove_from_team(actor, target):
     """Takes away every level and the Approver permission. The account, its password and any membership stay."""
+    superusers = _lock_superusers(actor, target)
     _guard(actor, target, team_only=True)
     old_level, old_approver = levels.held(target)
     if old_level == levels.NONE and not old_approver and not target.is_staff:
         return False
+    if target.is_superuser:
+        _keep_a_superuser(superusers, target)
     apply_level(target, levels.NONE, False, actor)
     old = describe(old_level, old_approver)
     _log(actor, target, "level", old, "No team access", f"Removed {target.email} from the team (was {old})")
@@ -108,9 +133,12 @@ def remove_from_team(actor, target):
 
 @transaction.atomic
 def set_active(actor, target, active):
+    superusers = _lock_superusers(actor, target)
     _guard(actor, target, team_only=True)
     if target.is_active == active:
         return False
+    if not active and target.is_superuser:
+        _keep_a_superuser(superusers, target)
     target.is_active = active
     target._history_user = actor
     target.save(update_fields=["is_active", "updated_at"])
@@ -180,6 +208,9 @@ def merge_preview(actor, keep_email, remove_email):
 def merge_accounts(actor, keep_email, remove_email):
     """The merge, its change-list row and its audit event succeed or fail together."""
     keep, remove = find_user(keep_email), find_user(remove_email)
+    superusers = _lock_superusers(actor, keep, remove)
+    if remove.is_superuser:
+        _keep_a_superuser(superusers, remove)  # the removed account goes; someone else must still be a superuser
     try:
         moved = user_merge.merge(actor, keep, remove)
     except user_merge.MergeRefused as error:

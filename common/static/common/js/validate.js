@@ -311,6 +311,22 @@ export function attachValidation(form, { remote: extraRemote = {} } = {}) {
     return !firstBad;
   }
 
+  /** Check every field (errors shown on the page) and return what is wrong, in page order, without moving focus or
+   *  scrolling: [{ name, field, message }]. For forms that list every problem in one dialog (register). */
+  async function problems() {
+    const list = fields();
+    const results = await Promise.all(list.map((f) => validateField(f, { show: true })));
+    return list.map((field, index) => ({ field, name: field.name, message: results[index] ? '' : errorSlot(field).textContent.trim() })).filter((item) => item.message);
+  }
+
+  /** Show a server-side message on a field's feedback line, exactly as a local check would. Returns the field or null. */
+  function showError(name, text) {
+    const field = form.elements[name];
+    if (!field || !field.dataset || field.dataset.validate === undefined) return null;
+    render(field, { state: 'error', text });
+    return field;
+  }
+
   form.noValidate = true; // our messages replace the browser's bubbles
   form.addEventListener('submit', async (event) => {
     if (form.dataset.validated === 'true') return;
@@ -326,7 +342,7 @@ export function attachValidation(form, { remote: extraRemote = {} } = {}) {
   // Back button (bfcache): a restored form must validate again.
   window.addEventListener('pageshow', () => { delete form.dataset.validated; });
 
-  const api = { validateAll, validateField };
+  const api = { validateAll, validateField, problems, showError };
   form.spaValidation = api;
   return api;
 }

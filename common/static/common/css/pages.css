@@ -273,7 +273,7 @@ html:has(.register) { scroll-padding-top: calc(var(--header-h) + var(--space-4))
 .register-photo {
   position: relative; height: 10rem; margin-left: calc(var(--bleed) * -1); overflow: hidden; border-radius: 0 var(--radius-md) var(--radius-md) 0;
 }
-.register-photo .frame-media { --focus: 18% 90%; }   /* the lower part of the picture: the lit swan desk, never the wall signage above it */
+.register-photo .frame-media { --focus: 50% 70%; }   /* the dry sauna: glowing benches, the etched swan and the heater in the wide crop; no signage */
 .register-photo::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to bottom, transparent 35%, var(--color-espresso) 100%); }
 .register-stage-copy { max-width: var(--signin-w); }
 .register-stage h1 { margin-top: var(--space-4); font-size: var(--text-2xl); line-height: var(--leading-tight); }
@@ -337,7 +337,7 @@ html:has(.register) { scroll-padding-top: calc(var(--header-h) + var(--space-4))
     padding: var(--register-photo-h) var(--space-5) var(--space-5) var(--bleed);
   }
   .register-photo { position: absolute; top: 0; left: 0; right: 0; height: var(--register-photo-h); margin-left: 0; border-radius: 0; }
-  .register-photo .frame-media { --focus: 22% 100%; }
+  .register-photo .frame-media { --focus: 50% 70%; }
   .register-stage h1 { margin-top: 0; }
   .plan-card { margin-top: var(--space-5); padding: var(--space-5); max-width: none; }
   .register-panel { grid-column: 7 / span 6; grid-row: 1; margin-block: var(--space-6); padding: var(--space-6); }
@@ -349,7 +349,7 @@ html:has(.register) { scroll-padding-top: calc(var(--header-h) + var(--space-4))
 @media (min-width: 64em) and (min-height: 42em) {
   .register:not(.register--solo) .register-stage { position: sticky; top: var(--header-h); height: calc(100svh - var(--header-h)); align-self: start; }
 }
-@media (min-width: 48em) and (max-width: 63.99em) { .register-photo .frame-media { --focus: 18% 75%; } }
+@media (min-width: 48em) and (max-width: 63.99em) { .register-photo .frame-media { --focus: 50% 72%; } }
 
 /* ---------- account ---------- */
 .account-wrap > * { max-width: 48rem; }
@@ -372,6 +372,6 @@ html:has(.register) { scroll-padding-top: calc(var(--header-h) + var(--space-4))
 /* Virtual tour: see tour.css (linked on the tour pages only). */
 
 /* Sign-up money reassurance and the discount contact line (register and choose-membership screens) */
-.no-payment { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--s-muted); text-align: center; }
+.no-payment { margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--s-muted); text-align: center; }
 .discount-line { margin-top: var(--space-3); text-align: center; max-width: none; }
 .m-title .discount-line { text-align: left; }

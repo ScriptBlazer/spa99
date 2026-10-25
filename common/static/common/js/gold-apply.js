@@ -12,6 +12,7 @@ import { attachValidation } from './validate.js';
 import { setWorking, clearWorking } from './buttons.js';
 import { arrowIcon as makeArrow, clearableTiles, companyGlyphs, reducedMotion, segmentedEl, settle, tileEl } from './choices.js';
 import { dismiss, toast } from './feedback.js';
+import { labelOf as fieldLabel, showProblems } from './form-problems.js';
 
 const config = JSON.parse(document.getElementById('gold-config').textContent);
 const copy = config.copy;
@@ -179,7 +180,7 @@ function screenYou() {
   const note = el('textarea', { id: 'g-note', name: 'note', rows: '4', maxlength: '2000', autocomplete: 'off' });
   note.value = form.note || '';
   note.addEventListener('input', () => setField('note', note.value));
-  const privacy = el('input', { type: 'checkbox', id: 'g-privacy', name: 'privacy_accepted', 'data-validate': 'required', 'data-required-message': 'Please accept the privacy notice.' });
+  const privacy = el('input', { type: 'checkbox', id: 'g-privacy', name: 'privacy_accepted', 'data-label': 'Privacy notice', 'data-validate': 'required', 'data-required-message': 'Please accept the privacy notice.' });
   privacy.checked = Boolean(form.privacy_accepted);
   privacy.addEventListener('change', () => setField('privacy_accepted', privacy.checked));
   const marketing = el('input', { type: 'checkbox', id: 'g-marketing', name: 'marketing_opt_in' });
@@ -204,7 +205,7 @@ function renderStep(step) {
   const last = step === 3;
   const primary = el('button', { type: last ? 'submit' : 'button', class: 'btn btn-primary', 'data-primary': '', 'data-working-text': 'Sending' }, last ? 'Send application' : jc('continue').cta, last ? null : ' ', last ? null : arrowIcon());
   const bar = el('div', { class: 'action-bar' }, step > 1 ? el('button', { type: 'button', class: 'btn-quiet', 'data-back': '', text: jc('back').cta }) : null, primary);
-  const section = el(last ? 'form' : 'section', { class: 'screen', 'data-reveal': 'hero', novalidate: last ? '' : null, 'aria-label': head.heading },
+  const section = el(last ? 'form' : 'section', { class: 'screen', 'data-reveal': 'hero', novalidate: last ? '' : null, 'data-problems': last ? 'true' : null, 'aria-label': head.heading },
     el('div', { class: 'screen-head' }, el('h1', { class: 'screen-title', tabindex: '-1', text: head.heading }), head.body ? el('p', { class: 'lead muted', text: head.body }) : null),
     el('div', { class: 'screen-body' }, body), bar);
   if (last) {
@@ -268,17 +269,20 @@ function go(step, { replace = false, reference = '' } = {}) {
   show(step, reference);
 }
 
-function fail(name, message, focusName = name) {
+/** A missing choice on a screen: the line under the question, then the shared problems dialog (it focuses and scrolls to the first). */
+function markChoice(name, message) {
   const slot = root.querySelector(`[data-error-slot="${name}"]`);
   if (slot) { slot.dataset.state = 'error'; slot.textContent = message; }
-  const input = root.querySelector(`input[name="${focusName}"]`);
-  input?.focus();
-  input?.closest('fieldset')?.querySelector('legend')?.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  const group = root.querySelector(`[data-group="${name}"]`);
+  const legend = group?.querySelector('legend');
+  return { field: name, control: root.querySelector(`input[name="${name}"]`), label: (legend?.textContent || '').trim(), message };
 }
 function next() {
   if (current === 1) {
-    if (!form.industry) { fail('industry', 'Choose the one closest to what you do.'); return; }
-    if (isProperty() && !form.property_link) { fail('property_link', 'Choose your link to property.'); return; }
+    const missing = [];
+    if (!form.industry) missing.push(markChoice('industry', 'Choose the one closest to what you do.'));
+    if (isProperty() && !form.property_link) missing.push(markChoice('property_link', 'Choose your link to property.'));
+    if (missing.length) { showProblems(root, missing, { opener: root.querySelector('[data-primary]') }); return; }
   }
   go(current + 1);
 }
@@ -324,17 +328,21 @@ async function onSubmit(event) {
     const early = Object.keys(errors).find((name) => STEP_OF[name]);
     if (early && !errors.first_name && !errors.email) {
       go(STEP_OF[early]);
-      if (errors.industry) fail('industry', errors.industry.join(' '));
-      else if (errors.property_link) fail('property_link', errors.property_link.join(' '));
+      const missing = [];
+      if (errors.industry) missing.push(markChoice('industry', errors.industry.join(' ')));
+      else if (errors.property_link) missing.push(markChoice('property_link', errors.property_link.join(' ')));
+      if (missing.length) showProblems(root, missing);
       return;
     }
-    Object.entries(errors).forEach(([name, messages]) => {
+    const items = Object.entries(errors).map(([name, messages]) => {
       const slot = root.querySelector(`[data-error-for="${name}"]`);
       const input = root.querySelector(`[name="${name}"]`);
-      if (slot) { slot.dataset.state = 'error'; slot.textContent = messages.join(' '); }
+      const message = messages.join(' ');
+      if (slot) { slot.dataset.state = 'error'; slot.textContent = message; }
       if (input) input.setAttribute('aria-invalid', 'true');
+      return { field: name, control: input, label: input ? fieldLabel(input) : '', message };
     });
-    root.querySelector('[aria-invalid="true"]')?.focus();
+    showProblems(formEl, items, { opener: button });
   } else if (result?.status === 403) {
     root.replaceChildren(renderClosed());
   } else if (result?.status === 429) {

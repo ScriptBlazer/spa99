@@ -101,7 +101,6 @@
     </div>
     <div class="sp-band-actions actions" data-fade>
       <a class="btn btn-primary btn-block-phone" href="{% url 'journey' %}">{{ spa.next.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
-      <a class="btn btn-secondary btn-block-phone" href="{% url 'memberships' %}">{{ spa.next_link.cta_label }}</a>
     </div>
     {% if tote %}{% with t=tote.pictures.0 %}
     <div class="sp-tote">

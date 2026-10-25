@@ -11,7 +11,7 @@
     <tbody>
     {% for row in rows %}{% with pk=row.obj.pk f=row.form %}
       <tr data-system-plan="{{ row.obj.slug }}" data-row-label="{{ row.obj.slug }}"{% if not row.obj.visible %} data-hidden{% endif %}>
-        <td class="sys-nameCell"><form id="f-{{ pk }}" method="post" action="{% url 'system_plan_save' pk %}" data-system-form="plan" data-system-risky="{{ risky_fields|join:',' }}" data-noun="plan setting" data-plural="plan settings" data-line="Members see the changes at once.">{% csrf_token %}</form>
+        <td class="sys-nameCell"><form id="f-{{ pk }}" method="post" action="{% url 'system_plan_save' pk %}" data-problems data-system-form="plan" data-system-risky="{{ risky_fields|join:',' }}" data-noun="plan setting" data-plural="plan settings" data-line="Members see the changes at once.">{% csrf_token %}</form>{% token f.row_token pk %}
           <span class="sys-name">{% cell f.name pk "Name" %}<span class="mono sys-muted" data-system-plan-name>{{ row.obj.slug }}{% if not row.obj.visible %} <span class="sys-badge">Hidden</span>{% endif %}</span></span></td>
         <td class="sys-num">£ {% cell f.price_ex_vat pk "Price ex VAT" %}</td>
         <td class="sys-num" data-system-price-inc-vat>£{{ row.obj.price_ex_vat|inc_vat:vat_rate }}</td>
@@ -32,14 +32,14 @@
           <label class="grow">Perks (JSON) {% cell f.perks pk "Perks" %}</label>
         </div></td>
       </tr>
-      {% if f.errors %}<tr class="sys-rowerr"><td colspan="9" class="sys-error" role="alert">{{ row.obj.slug }}: {{ f|error_text }}</td></tr>{% endif %}
+      {% if f.errors %}<tr class="sys-rowerr" data-problem-form="f-{{ pk }}"><td colspan="9" class="sys-error" role="alert">{{ row.obj.slug }}: {{ f|error_spans:row.obj.slug }}</td></tr>{% endif %}
     {% endwith %}{% empty %}<tr><td class="sys-empty" colspan="9">No plans yet.</td></tr>{% endfor %}
     </tbody>
   </table></div>
 </section>
 <details class="sys-panel" data-system-add="plan"{% if add_form.errors %} open{% endif %}>
   <summary class="sys-add">Add a plan</summary>
-  <form method="post" action="{% url 'system_plan_add' %}" data-system-form="plan-add" data-system-add class="sys-group">{% csrf_token %}
+  <form method="post" action="{% url 'system_plan_add' %}" data-problems data-system-form="plan-add" data-system-add class="sys-group">{% csrf_token %}
     {% include "system/_fields.html" with form=add_form %}
     <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add plan</button></div>
   </form>

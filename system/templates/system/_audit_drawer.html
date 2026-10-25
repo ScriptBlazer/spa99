@@ -29,6 +29,11 @@
     {% elif not drawer.is_change and r.detail %}
     <section class="au-values" aria-label="Details"><div class="au-vblock"><div class="au-vhead"><h3 id="au-detail-label">Details</h3><button type="button" class="sys-btn sm au-copy" data-system-copy="#au-detail-json">Copy</button></div><pre class="au-json mono" id="au-detail-json" tabindex="0" aria-labelledby="au-detail-label">{{ drawer.detail_json }}</pre></div></section>
     {% endif %}
+    {% if drawer.diff_lines %}
+    <section class="au-values" aria-label="Code as typed"><div class="au-vblock"><div class="au-vhead"><h3 id="au-code-label">Code as typed{% if drawer.changed_fields %} · {{ drawer.changed_fields }} field change{{ drawer.changed_fields|pluralize }}{% endif %}</h3></div>
+      <div class="au-code" tabindex="0" role="group" aria-labelledby="au-code-label" data-system-code-diff><div class="au-cin">{% for l in drawer.diff_lines %}<div class="au-cr" data-type="{{ l.type }}">{% if l.type == "hunk" %}<span class="t">{{ l.text }}</span>{% else %}<span class="n" aria-hidden="true">{% if l.type == "del" %}{{ l.old }}{% else %}{{ l.new }}{% endif %}</span><span class="g" aria-hidden="true">{% if l.type == "add" %}+{% elif l.type == "del" %}−{% endif %}</span><span class="t">{% if l.type == "add" %}<span class="sr">added line {{ l.new }}: </span>{% elif l.type == "del" %}<span class="sr">removed line {{ l.old }}: </span>{% endif %}{{ l.text }}</span>{% endif %}</div>{% endfor %}</div></div>
+      {% if drawer.diff_truncated %}<p class="au-muted au-trunc">Diff truncated.</p>{% endif %}</div></section>
+    {% endif %}
     <section class="au-integrity" aria-label="Integrity">
       <h3>Integrity</h3>
       {% if r.seq is None %}<p class="au-muted">Not covered: this entry is older than the hash chain.</p>

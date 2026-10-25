@@ -61,6 +61,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "common.middleware.HostRoutingMiddleware",
+    "system.middleware.SystemHeadersMiddleware",  # System host: never cached, never framed (wraps the gate's 404 too)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "system.middleware.SystemGateMiddleware",  # System host: 404 for non-developers before CSRF can tell routes apart
     "django.middleware.common.CommonMiddleware",
@@ -69,7 +70,7 @@ MIDDLEWARE = [
     "common.observability.SentryContextMiddleware",  # Sentry host/staff tags and user id (no-op when Sentry is off)
     "system.middleware.AuditContextMiddleware",  # staff edits (admin too) are logged with IP and browser
     # Locked by default: every view needs a login unless marked @login_not_required.
-    "django.contrib.auth.middleware.LoginRequiredMiddleware",
+    "common.middleware.LoginRequiredMiddleware",  # Django's lock; background (JSON) requests get 401 instead of a redirect
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
@@ -101,6 +102,10 @@ TEMPLATES = [
 # Database: DATABASE_URL if set, else SQLite in .private/ (never in OneDrive).
 DATABASES = build_databases(ENV.get("DATABASE_URL"), BASE_DIR / ".private" / "db.sqlite3")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Cache: the database (table spa99_cache; `manage.py createcachetable`, run on start by entrypoint.sh), so the rate limits
+# (sign-in, unlock) are shared by every gunicorn worker. Works on SQLite and Postgres. Tests and the e2e run override it.
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.db.DatabaseCache", "LOCATION": "spa99_cache", "OPTIONS": {"MAX_ENTRIES": 10000}}}
 
 AUTH_USER_MODEL = "users.User"
 OFFICE_SESSION_AGE = 30 * 24 * 60 * 60  # staff sign-ins on the Office host last 30 days (SESSION_COOKIE_AGE stays Django's default for the public site)

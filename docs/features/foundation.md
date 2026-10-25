@@ -43,4 +43,4 @@ No visible pages. Everything later phases sit on.
 
 ## Known follow-ups
 - (Closed) Public login route: `/login/` now works on both hosts (see `register-interest.md`).
-- Rate limiting uses Django's default cache, which is per process: with 3 gunicorn workers the real limit is about 3x. Move `CACHES` to the database or Redis if a hard limit matters.
+- Rate limiting uses Django's database cache (`CACHES` in base settings, table `spa99_cache`), so all gunicorn workers share one count. Create the table with `manage.py createcachetable` (idempotent; `entrypoint.sh` runs it after `migrate`; locally run it once after `migrate`). Tests and the e2e run use a dummy or in-memory cache and need no table. If the cache cannot be reached, `common.ratelimit.hit` lets the request through and logs it. Postgres and SQLite both work; the count is not atomic under a burst (`incr` reads then writes), which is acceptable for throttling.

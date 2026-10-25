@@ -13,7 +13,7 @@ def page_content(page_key):
 
 @register.inclusion_tag("users/_discount_line.html", takes_context=True)
 def discount_line(context):
-    """{% discount_line %}: 'Looking for a better rate? Message Barry on WhatsApp.' with the Site settings link. Empty link:
+    """{% discount_line %}: 'Looking for a better rate? Message us on WhatsApp.' with the Site settings link. Empty link:
     a marked 'link to come' on dev, nothing on live (same rule as the legal fill-later rows)."""
     from django.conf import settings
 

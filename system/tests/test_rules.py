@@ -80,6 +80,16 @@ class PlansTests(RulesTestCase):
         self.assertNotEqual(plan.price_ex_vat, Decimal("-5"))
         self.assertFalse(SystemChange.objects.filter(model_label="plans.plan").exists())
 
+    def test_a_failed_row_marks_each_error_for_the_problems_dialog(self):
+        plan = Plan.objects.get(slug="tier-2")
+        form = next(r["form"] for r in self.client.get("/plans/").context["rows"] if r["obj"].pk == plan.pk)
+        response = self.client.post(f"/plans/{plan.pk}/", form_data(form, str(plan.pk), price_ex_vat="-5"))
+        html = response.content.decode()
+        self.assertIn(f'data-problem-form="f-{plan.pk}"', html)
+        self.assertIn(f'data-problem-field="{plan.pk}-price_ex_vat"', html)
+        self.assertIn('data-problem-label="tier-2 · Price ex VAT"', html)
+        self.assertIn("data-problems", html)  # the row forms opt in to the shared dialog
+
     def test_add_and_hide_a_plan_never_delete(self):
         add = {"new-slug": "tier-9", "new-kind": "monthly", "new-name": "Tier 9", "new-price_ex_vat": "9.00", "new-hours": "any",
                "new-booking_window_days": "1", "new-upcoming_limit": "1", "new-cancel_hours": "10", "new-guests_per_month": "0",

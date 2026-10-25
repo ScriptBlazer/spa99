@@ -5,10 +5,10 @@ import time
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_not_required
-from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
@@ -16,11 +16,12 @@ from common.audit import client_ip
 from common.ratelimit import hit
 from notifications.models import EmailSuppression
 from plans.models import SiteSettings
+from users.forms import SignInForm
 from users.views import LoginView, TeamPasswordView
 
 from common import levels
 
-from . import audit, changes, feed, services
+from . import audit, changes, codeview, feed, services
 from . import team as team_service
 from .forms import EmailsForm, SettingsForm
 from .forms_rules import RISKY
@@ -41,7 +42,15 @@ def saved(request, text="Saved."):
 def page(request, template, section, context=None, status=200):
     """Render a System page with the navigation (stubs have no link yet)."""
     context = {"section": section, "nav": NAV, "section_labels": changes.SECTION_LABELS, **(context or {})}
+    if codeview.section(section) is not None:  # the rule pages get the code view's address (the page header shows the </> icon)
+        context.setdefault("code_url", reverse("system_code", args=[section]))
+        context.setdefault("code_theme_default", SiteSettings.load().code_theme_default)
     return render(request, template, context, status=status)
+
+
+def form_status(form):
+    """409 when the row changed since the form was made (nothing saved; reload), else 400."""
+    return 409 if getattr(form, "stale", False) else 400
 
 
 def safe_next(request, default):
@@ -54,7 +63,7 @@ def safe_next(request, default):
 
 # ---------- sign-in, unlock, lock ----------
 
-class SystemAuthForm(AuthenticationForm):
+class SystemAuthForm(SignInForm):
     """Same sign-in form, but a person who may not use System gets the ordinary 'wrong email or password' answer."""
 
     def confirm_login_allowed(self, user):
@@ -98,7 +107,9 @@ def unlock(request):
     target = safe_next(request, "/")
     error = ""
     if request.method == "POST":
-        if not hit("system-unlock", f"{request.user.pk}:{client_ip(request) or 'unknown'}", 5, 300):
+        by_ip = hit("system-unlock", f"{request.user.pk}:{client_ip(request) or 'unknown'}", 5, 300)
+        by_person = hit("system-unlock-person", request.user.pk, 10, 900)  # whatever the IP: many addresses cannot multiply the tries
+        if not (by_ip and by_person):
             audit.log_event(SystemEvent.UNLOCK_RATE_LIMITED, request, user=request.user, dedupe_seconds=300)
             return render(request, "system/unlock.html", {"next": target, "error": "Too many attempts. Please wait a few minutes.", "code_required": services.code_required()}, status=429)
         password_ok = request.user.check_password(request.POST.get("password", ""))
@@ -249,14 +260,16 @@ def _edit_site(request, form_class, template, section):
     site = SiteSettings.load()
     form = form_class(request.POST or None, instance=site)
     if request.method == "POST" and form.is_valid():
-        if form.changed_data:
-            services.save_logged(form.instance, request.user, fields=form.changed_data)
-            saved(request)
-        else:
-            messages.info(request, "Nothing changed.")
-        return redirect(request.path)
+        try:
+            if services.save_form(form, request.user):
+                saved(request)
+            else:
+                messages.info(request, "Nothing changed.")
+            return redirect(request.path)
+        except ValidationError as error:  # a model rule, or the row changed since the page was made
+            form.add_error(None, error)
     context = {"form": form, "risky_fields": RISKY.get(section, [])}
-    return page(request, template, section, context, status=400 if request.method == "POST" else 200)
+    return page(request, template, section, context, status=form_status(form) if request.method == "POST" else 200)
 
 
 @unlocked
@@ -372,6 +385,11 @@ def team_merge(request):
 
 class SystemPasswordView(TeamPasswordView):
     template_name = "system/password.html"
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        audit.log_event(SystemEvent.PASSWORD_CHANGED, self.request, user=self.request.user)  # never the password itself
+        return response
 
     def get_context_data(self, **kwargs):
         return {**super().get_context_data(**kwargs), "section": "", "nav": NAV, "section_labels": changes.SECTION_LABELS}

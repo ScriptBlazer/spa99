@@ -48,7 +48,7 @@
       <a class="btn-quiet" href="{% url 'account_export' %}">Download my data</a>
       <button type="button" class="btn-quiet m-danger" data-delete-open aria-expanded="false" aria-controls="delete-form">Delete my account</button>
     </div>
-    <form id="delete-form" method="post" action="{% url 'account_delete' %}" hidden class="delete-form m-delete">
+    <form id="delete-form" method="post" action="{% url 'account_delete' %}" hidden data-problems class="delete-form m-delete">
       {% csrf_token %}
       <div class="field">
         <label for="delete-password">Your password</label>

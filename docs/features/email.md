@@ -19,7 +19,7 @@ Built 2026-10-25 (branch feature/email-signup). It is what we told AWS: bounce a
 
 1. SNS, Topics, Create topic, type **Standard**, name `spa99-ses-feedback`. Copy the topic ARN.
 2. SES, Identities, `spa99.uk`, Notifications tab, Feedback notifications, Edit: Bounce feedback and Complaint feedback each go to SNS topic `spa99-ses-feedback`; **Include original email headers: off**. Leave Delivery feedback unset.
-3. Put the ARN in the live `.env` as `SES_SNS_TOPIC_ARN=arn:aws:sns:eu-west-2:...:spa99-ses-feedback`, deploy, check that a POST to `https://spa99.uk/ses/notifications/` (for example `curl -X POST -d '{}' https://spa99.uk/ses/notifications/`) answers 400 or 403, not 404 (404 means the variable is not set; a GET answers 405 either way).
+3. Put the ARN in the live `.env` as `SES_SNS_TOPIC_ARN=arn:aws:sns:eu-west-2:137808120968:spa99-ses-feedback` (topic created 2026-10-25), deploy, check that a POST to `https://spa99.uk/ses/notifications/` (for example `curl -X POST -d '{}' https://spa99.uk/ses/notifications/`) answers 400 or 403, not 404 (404 means the variable is not set; a GET answers 405 either way).
 4. **Only once the site is live:** SNS, the topic, Create subscription, protocol **HTTPS**, endpoint `https://spa99.uk/ses/notifications/`. It confirms itself within seconds (status Confirmed); if it stays Pending, check the app logs for "SES feedback refused".
 5. SES, Configuration, Suppression list: confirm account-level suppression is on for Bounces and Complaints.
 6. The IAM role of the server needs nothing extra (SNS calls us; we do not call AWS SNS).
