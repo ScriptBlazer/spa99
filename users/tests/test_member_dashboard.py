@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.utils import timezone
 
 from journey.models import JourneySession
@@ -270,3 +270,17 @@ class SignOutTests(TestCase):
         self.assertEqual(InterestRegistration.objects.get().plan.slug, "tier-1")
         self.assertEqual(self.client.get("/account/").status_code, 200)
         self.assertNotContains(self.client.get("/account/"), "No membership on this account")
+
+
+class SignedOutBackgroundSaveTests(TestCase):
+    """A switch flipped after the session ended must not say "Saved.": background requests get 401, pages still redirect."""
+
+    def test_signed_out_fetch_gets_401_json_not_the_sign_in_page(self):
+        response = Client().post("/account/emails/", {"marketing": "1"}, HTTP_ACCEPT="application/json")
+        self.assertEqual(response.status_code, 401)
+        self.assertTrue(response.json()["signed_out"])
+
+    def test_signed_out_page_request_still_redirects_to_sign_in(self):
+        response = Client().get("/account/you/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response["Location"])

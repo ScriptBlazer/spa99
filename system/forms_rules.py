@@ -84,7 +84,7 @@ class PlanForm(VersionedForm):
         widgets = {"price_ex_vat": forms.TextInput(attrs={"inputmode": "decimal", "autocomplete": "off", "data-money": ""})}
 
     def clean_perks(self):
-        perks = self.cleaned_data.get("perks") or []
+        perks = shape.no_nul(self.cleaned_data.get("perks") or [])
         shape.need_list(perks, 'Perks must be a list, e.g. [{"key": "merch", "label": "Merch", "value": "Buy"}].')
         seen = set()
         for item in perks:  # type-check first: a list or object as a key would break the set
@@ -182,7 +182,7 @@ class OptionForm(VersionedForm):
         fields = ["label", "order", "active", "plan_points", "gold_points", "weight", "reason"]
 
     def clean_plan_points(self):
-        points = self.cleaned_data.get("plan_points") or {}
+        points = shape.no_nul(self.cleaned_data.get("plan_points") or {})
         shape.need_dict(points, 'Use an object like {"tier-2": 3}.')
         unknown = sorted(set(points) - _plan_slugs())  # JSON object keys are always text
         if unknown:
@@ -225,7 +225,7 @@ class SuggestionRuleForm(VersionedForm):
         fields = ["name", "kind", "conditions", "plan_slugs", "target_daytime_only", "points", "reason", "active", "order"]
 
     def clean_conditions(self):
-        conditions = self.cleaned_data.get("conditions") or []
+        conditions = shape.no_nul(self.cleaned_data.get("conditions") or [])
         keys = set(Question.objects.values_list("key", flat=True))
         shape.need_list(conditions, 'Use a list like [{"question": "time", "any_of": ["evening"]}].')
         message = "Each condition needs a real question key and a list of answers (any_of)."
@@ -236,7 +236,7 @@ class SuggestionRuleForm(VersionedForm):
         return conditions
 
     def clean_plan_slugs(self):
-        slugs = shape.need_text_list(self.cleaned_data.get("plan_slugs") or [], 'Use a list of plan slugs, e.g. ["tier-2"].')
+        slugs = shape.need_text_list(shape.no_nul(self.cleaned_data.get("plan_slugs") or []), 'Use a list of plan slugs, e.g. ["tier-2"].')
         unknown = sorted(set(slugs) - _plan_slugs())
         if unknown:
             raise ValidationError(f"Not a plan: {', '.join(unknown)}.")

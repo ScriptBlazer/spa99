@@ -27,7 +27,11 @@ def _fail(status, message):
 
 def _read(request):
     """(code, version, confirm_risky) from the JSON body, or a JsonResponse to send back."""
-    if int(request.META.get("CONTENT_LENGTH") or 0) > MAX_BYTES * 2:
+    try:
+        length = int(request.META.get("CONTENT_LENGTH") or 0)
+    except ValueError:
+        return _fail(400, "That request could not be read.")
+    if length > MAX_BYTES * 2:
         return _fail(413, "Over 128 KB. Shorten it to review.")
     try:
         body = json.loads(request.body or b"{}")

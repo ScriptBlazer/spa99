@@ -70,7 +70,7 @@ MIDDLEWARE = [
     "common.observability.SentryContextMiddleware",  # Sentry host/staff tags and user id (no-op when Sentry is off)
     "system.middleware.AuditContextMiddleware",  # staff edits (admin too) are logged with IP and browser
     # Locked by default: every view needs a login unless marked @login_not_required.
-    "django.contrib.auth.middleware.LoginRequiredMiddleware",
+    "common.middleware.LoginRequiredMiddleware",  # Django's lock; background (JSON) requests get 401 instead of a redirect
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",

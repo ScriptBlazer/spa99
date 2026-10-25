@@ -99,7 +99,7 @@ html:not(.js) .au-dates { display: flex; } html:not(.js) .au-custom-btn { displa
 .au-scrim { position: fixed; z-index: 49; inset: 0; background: transparent; }
 .au-dhead { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sys-3); padding: var(--sys-3) var(--sys-4); border-bottom: 1px solid var(--sys-line); }
 .au-dhead h2 { font-size: var(--sys-fs-md); font-weight: 600; overflow-wrap: anywhere; }
-.au-dbody { overflow: auto; padding: var(--sys-3) var(--sys-4) var(--sys-5); display: grid; gap: var(--sys-4); align-content: start; }
+.au-dbody { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: var(--sys-3) var(--sys-4) var(--sys-5); display: grid; gap: var(--sys-4); align-content: start; }
 .au-dl { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: var(--sys-2) var(--sys-3); }
 .au-dl dt { font-size: var(--sys-fs-sm); color: var(--sys-text-2); padding-top: 1px; } .au-dl dd { overflow-wrap: anywhere; }
 .au-ua { display: block; color: var(--sys-text-3); margin-top: 2px; }
@@ -108,7 +108,7 @@ html:not(.js) .au-dates { display: flex; } html:not(.js) .au-custom-btn { displa
 .au-vhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sys-1); }
 .au-vhead h3, .au-integrity h3 { font-size: var(--sys-fs-sm); font-weight: 600; color: var(--sys-text-2); }
 .au-integrity h3 { margin-bottom: var(--sys-2); }
-.au-json { margin: 0; padding: var(--sys-2); max-height: 240px; overflow: auto; background: var(--sys-subtle); border-radius: var(--sys-radius); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.au-json { overscroll-behavior: contain; margin: 0; padding: var(--sys-2); max-height: 240px; overflow: auto; background: var(--sys-subtle); border-radius: var(--sys-radius); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .au-copy { display: none; } .js .au-copy { display: inline-flex; }
 .au-links { display: grid; gap: var(--sys-2); }
 

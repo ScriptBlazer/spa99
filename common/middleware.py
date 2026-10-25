@@ -1,3 +1,5 @@
+from django.contrib.auth.middleware import LoginRequiredMiddleware as _DjangoLoginRequired
+from django.http import JsonResponse
 from django.conf import settings
 
 
@@ -27,3 +29,15 @@ class HostRoutingMiddleware:
         if staff_host:
             response["X-Robots-Tag"] = "noindex, nofollow"
         return response
+
+
+class LoginRequiredMiddleware(_DjangoLoginRequired):
+    """Django's login lock, except that a background request (fetch asking for JSON, or `X-Requested-With: fetch`) gets a
+    401 JSON answer instead of a redirect to the sign-in page. A fetch follows redirects, so a redirect would come back as
+    a 200 sign-in page and the script would wrongly say "Saved." after the session had ended."""
+
+    def handle_no_permission(self, request, view_func):
+        wants_json = "application/json" in request.headers.get("accept", "") or request.headers.get("x-requested-with") == "fetch"
+        if wants_json:
+            return JsonResponse({"ok": False, "signed_out": True, "message": "You've been signed out. Please sign in again."}, status=401)
+        return super().handle_no_permission(request, view_func)

@@ -228,7 +228,7 @@ async function onSubmit(event) {
   if (form.dataset.problemsOk === 'true' || form.dataset.validated === 'true') return; // our own (or validate.js's) re-submit
   event.preventDefault();
   event.stopImmediatePropagation();
-  if (form.dataset.problemsBusy === 'true') return;
+  if (form.dataset.problemsBusy === 'true' || form.dataset.problemsSent === 'true') return; // already on its way
   form.dataset.problemsBusy = 'true';
   const submitter = event.submitter && event.submitter.form === form ? event.submitter : undefined;
   try {
@@ -264,8 +264,11 @@ export function initFormProblems() {
   document.querySelectorAll('form[data-problems]').forEach((form) => { form.noValidate = true; });
   document.addEventListener('submit', onSubmit, true);
   document.addEventListener('click', onConfirmClick, true);
+  // A submit nobody stopped (no fetch handler took it) is a real page post: block a second click until the next page.
+  // Window is the last stop of the bubble, so fetch-saving handlers (System rows) have had their say by then.
+  window.addEventListener('submit', (event) => { if (wants(event.target) && !event.defaultPrevented) event.target.dataset.problemsSent = 'true'; });
   window.addEventListener('pageshow', () => {
-    document.querySelectorAll('form[data-problems]').forEach((form) => { delete form.dataset.problemsBusy; delete form.dataset.problemsOk; });
+    document.querySelectorAll('form[data-problems]').forEach((form) => { delete form.dataset.problemsBusy; delete form.dataset.problemsOk; delete form.dataset.problemsSent; });
   });
   // A server re-render with errors: the same dialog, once, for the first form that has any.
   setTimeout(() => {

@@ -25,6 +25,21 @@ def parse_whole(raw):
     return int(raw) if isinstance(raw, str) and WHOLE_NUMBER.fullmatch(raw) else raw
 
 
+def no_nul(value, message="Remove the hidden character (\\u0000)."):
+    """Postgres refuses the NUL character inside JSON text; refuse it here so it is a field error, not a 500."""
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, str) and "\x00" in item:
+            raise ValidationError(message)
+        if isinstance(item, dict):
+            stack.extend(item.keys())
+            stack.extend(item.values())
+        elif isinstance(item, list):
+            stack.extend(item)
+    return value
+
+
 def need_list(value, message):
     if not isinstance(value, list):
         raise ValidationError(message)

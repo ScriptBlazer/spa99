@@ -18,10 +18,10 @@ class UserAdmin(ExportCsvMixin, SimpleHistoryAdmin, BaseUserAdmin):
     list_filter = ("is_staff", "is_active", "marketing_consent")
     search_fields = ("email", "first_name", "last_name", "mobile", "public_id")
     # Verification and marketing choice feed the stored Office figures: changed by the services only, not by hand here.
-    # Team access (staff, superuser, groups) is changed in System > Team only: that is where the change is checked and audited.
+    # Team access (active, staff, superuser, groups, permissions) is changed in System > Team only: that is where the change is checked and audited.
     # The first superuser is made with `manage.py createsuperuser`.
     readonly_fields = ("public_id", "created_at", "updated_at", "last_login", "email_verified_at", "marketing_consent",
-                       "is_staff", "is_superuser", "groups")
+                       "is_active", "is_staff", "is_superuser", "groups", "user_permissions")
 
     def delete_model(self, request, obj):
         services.delete_user_data(obj)  # full erasure, and the stored figures move with it

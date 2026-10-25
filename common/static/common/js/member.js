@@ -47,7 +47,9 @@ function initEmails() {
         headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ marketing: wanted ? '1' : '0' }),
       });
-      if (!response.ok) throw new Error(String(response.status));
+      if (response.status === 401) { box.checked = !wanted; toast('You\'ve been signed out. Please sign in again.', { kind: 'error' }); return; }
+      const data = response.ok && !response.redirected ? await response.json().catch(() => null) : null;
+      if (!data || !data.saved) throw new Error(String(response.status));
       toast('Saved.');
     } catch {
       box.checked = !wanted;
