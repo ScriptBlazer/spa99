@@ -82,7 +82,7 @@ def filtered(params):
             edits |= Q(undo_of__isnull=True)
         if "undo" in cats:
             edits |= Q(undo_of__isnull=False)
-        kinds = [k for c in cats if c != "change" for k in audit.kinds_in(c)]
+        kinds = [k for c in cats for k in audit.kinds_in(c)]  # "change" adds the events that are edits (code_edit)
         changes = changes.filter(edits) if edits else changes.none()
         events = events.filter(kind__in=kinds) if kinds else events.none()
     if kind:
@@ -230,6 +230,7 @@ EVENT_ICONS = {
     SystemEvent.SIGN_OUT: "sign-out", SystemEvent.SESSION_EXPIRED: "timer", SystemEvent.EXPORT: "download-simple",
     SystemEvent.PASSWORD_CHANGED: "lock-key", SystemEvent.ROLE_CHANGED: "user-gear", SystemEvent.USER_DEACTIVATED: "user-gear", SystemEvent.USER_REACTIVATED: "user-gear",
     SystemEvent.UNDO: "arrow-counter-clockwise", SystemEvent.UNDO_ALL: "arrow-counter-clockwise", SystemEvent.AUDIT_PRUNED: "minus",
+    SystemEvent.CODE_EDIT: "code",
 }
 CATEGORY_WORDS = {"change": "Change", "security": "Security", "undo": "Undo", "failure": "Failure"}
 OUTCOME_WORDS = {SystemEvent.SIGN_IN_FAILED: "wrong password", SystemEvent.UNLOCK_FAILED: "wrong password",
@@ -265,7 +266,7 @@ def _event_group(event):
              if event.kind == SystemEvent.ROLE_CHANGED and isinstance(detail.get("old"), list) and isinstance(detail.get("new"), list) else None)
     return {"type": "event", "key": str(event.pk), "time": event.created_at, "user_label": event.user_label, "who": who, "rest": rest,
             "icon": "warning-octagon" if category == "failure" else EVENT_ICONS.get(event.kind, "sign-in"), "category_word": CATEGORY_WORDS[category],
-            "roles": roles, "meta": _meta(event.ip_address, event.user_agent, event.path),
+            "roles": roles, "changed_fields": detail.get("changed_fields", 0) if event.kind == SystemEvent.CODE_EDIT else 0, "meta": _meta(event.ip_address, event.user_agent, event.path),
             "sections": [section_label(event.section)], "section_label": section_label(event.section), "count": 1,
             "summary": summary, "category": category,
             "ip_address": event.ip_address, "user_agent": event.user_agent, "path": event.path, "kind": event.kind,
@@ -393,6 +394,11 @@ def entry_detail(raw_id):
                                else "This entry cannot be undone." if not row.undo_of_id else "")
     else:
         info.update(detail_json=pretty(row.detail), outcome_word=OUTCOME_WORDS.get(row.kind, ""))
+        if row.kind == SystemEvent.CODE_EDIT and isinstance(row.detail, dict):  # the code as typed: tinted rows in the drawer
+            from .codeview.service import diff_lines
+
+            info.update(diff_lines=diff_lines(row.detail.get("diff", "")), diff_truncated=bool(row.detail.get("diff_truncated")),
+                        changed_fields=row.detail.get("changed_fields", 0))
     return info
 
 

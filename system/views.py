@@ -9,6 +9,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
@@ -20,7 +21,7 @@ from users.views import LoginView, TeamPasswordView
 
 from common import levels
 
-from . import audit, changes, feed, services
+from . import audit, changes, codeview, feed, services
 from . import team as team_service
 from .forms import EmailsForm, SettingsForm
 from .forms_rules import RISKY
@@ -41,6 +42,8 @@ def saved(request, text="Saved."):
 def page(request, template, section, context=None, status=200):
     """Render a System page with the navigation (stubs have no link yet)."""
     context = {"section": section, "nav": NAV, "section_labels": changes.SECTION_LABELS, **(context or {})}
+    if codeview.section(section) is not None:  # the rule pages get the code view's address (the page header shows the </> icon)
+        context.setdefault("code_url", reverse("system_code", args=[section]))
     return render(request, template, context, status=status)
 
 

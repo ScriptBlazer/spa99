@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_rules as r
+from . import views, views_code as c, views_rules as r
 from .permissions import unlocked
 
 urlpatterns = [
@@ -26,6 +26,9 @@ urlpatterns = [
     path("team/<uuid:pk>/active/", views.team_active, name="system_team_active"),
     path("team/<uuid:pk>/remove/", views.team_remove, name="system_team_remove"),
     path("team/<uuid:pk>/invite/", views.team_invite, name="system_team_invite"),
+    path("code/<slug:section>/", c.code, name="system_code"),
+    path("code/<slug:section>/preview/", c.code_preview, name="system_code_preview"),
+    path("code/<slug:section>/apply/", c.code_apply, name="system_code_apply"),
     path("plans/", r.plans, name="system_plans"),
     path("plans/add/", r.plan_save, name="system_plan_add"),
     path("plans/<uuid:pk>/", r.plan_save, name="system_plan_save"),

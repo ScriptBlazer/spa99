@@ -174,6 +174,7 @@ class SystemEvent(AuditRow):
     UNDO, UNDO_ALL, EXPORT, AUDIT_PRUNED, AUDIT_CHECK, JOB_RUN = "undo", "undo_all", "export", "audit_pruned", "audit_check", "job_run"
     SUPPRESSION_REMOVED = "suppress_removed"
     PASSWORD_CHANGED = "password_changed"
+    CODE_EDIT = "code_edit"
     KIND_CHOICES = [
         (SIGN_IN, "Signed in"), (SIGN_IN_FAILED, "Sign-in failed"), (UNLOCK, "Unlocked"), (UNLOCK_FAILED, "Unlock failed"),
         (UNLOCK_RATE_LIMITED, "Unlock blocked (too many tries)"), (LOCK_MANUAL, "Locked"), (LOCK_IDLE, "Locked (idle)"),
@@ -181,6 +182,7 @@ class SystemEvent(AuditRow):
         (ROLE_CHANGED, "Roles changed"), (USER_DEACTIVATED, "Account deactivated"), (USER_REACTIVATED, "Account reactivated"),
         (UNDO, "Undo"), (UNDO_ALL, "Undo all"), (EXPORT, "Export"), (AUDIT_PRUNED, "Old log removed"), (AUDIT_CHECK, "Chain checked"), (JOB_RUN, "Job run now"),
         (SUPPRESSION_REMOVED, "Email suppression removed"), (PASSWORD_CHANGED, "Password changed"),
+        (CODE_EDIT, "Edited as code"),
     ]
     OK, FAILED, BLOCKED = "ok", "failed", "blocked"
     OUTCOME_CHOICES = [(OK, "OK"), (FAILED, "Failed"), (BLOCKED, "Blocked")]
