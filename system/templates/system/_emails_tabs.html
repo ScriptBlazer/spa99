@@ -1,7 +1,7 @@
-{# Sub-navigation of System > Emails. Context: tab (overview, automatic, mailings, invites). #}
-<nav class="sys-tabs" data-system-emails-tabs aria-label="Emails">
+{# Sub-navigation of System > Emails: real links, the current one has aria-current. Context: tab (overview, automatic, mailings, invites). #}
+<nav class="se-tabs" data-system-emails-tabs aria-label="Emails">
   <a href="{% url 'system_emails' %}" data-tab="overview"{% if tab == "overview" %} aria-current="page"{% endif %}>Overview</a>
   <a href="{% url 'system_email_list' %}" data-tab="automatic"{% if tab == "automatic" %} aria-current="page"{% endif %}>Automatic emails</a>
-  <a href="{% url 'system_mailings' %}" data-tab="mailings"{% if tab == "mailings" %} aria-current="page"{% endif %}>Send to a group</a>
+  <a href="{% url 'system_mailings' %}" data-tab="mailings"{% if tab == "mailings" %} aria-current="page"{% endif %}>Group sends</a>
   <a href="{% url 'system_invites' %}" data-tab="invites"{% if tab == "invites" %} aria-current="page"{% endif %}>Invites</a>
 </nav>

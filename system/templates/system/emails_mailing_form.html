@@ -1,21 +1,116 @@
-{% extends "system/base.html" %}
+{% extends "system/emails_base.html" %}
 {% block main %}
-{% include "system/_page_header.html" with title=mailing|yesno:"Edit mailing,New mailing" %}
+{% include "system/_page_header.html" with title="Emails" description="What the site sends, and what you send." %}
 {% include "system/_emails_tabs.html" with tab="mailings" %}
-<form method="post" data-problems data-system-form="mailing" data-count-url="{{ count_url }}" data-preview-url="{{ preview_url }}">{% csrf_token %}
-  <section class="sys-panel"><div class="sys-group">
-    {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
-    {% for field in form.visible_fields %}{% include "system/_field_row.html" %}{% endfor %}
-    <div data-system-group-options>
-      {% for g in groups %}{% for p in g.params %}
-      <div class="sys-row" data-group-param="{{ p.name }}" data-for-group="{{ g.key }}"><label>{{ p.label }}</label>
-        {% if p.type == "choice" %}<select name="{{ p.name }}">{% for value, label in p.choices %}<option value="{{ value }}"{% if p.value == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
-        {% else %}<input type="date" name="{{ p.name }}" value="{{ p.value }}">{% endif %}</div>
-      {% endfor %}{% endfor %}
-    </div>
-    <p class="sys-muted" data-system-placeholders>In the subject and the text: {% for p in placeholders %}<code>{{ "{" }}{{ p.name }}{{ "}" }}</code> {% endfor %}</p>
-    <p data-system-count aria-live="polite"></p>
-  </div></section>
-  <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save draft</button></div>
+<div class="se-title"><a class="se-back" href="{% if mailing %}{% url 'system_mailing' mailing.pk %}{% else %}{% url 'system_mailings' %}{% endif %}">{% if mailing %}Back to this send{% else %}Group sends{% endif %}</a><h2>{% if mailing %}Edit draft{% else %}New group send{% endif %}</h2></div>
+{% include "system/_ses_state.html" %}
+{{ placeholders|json_script:"se-placeholders" }}
+<form method="post" class="se-form" data-problems data-se-composer data-view="write" data-count-url="{{ count_url }}" data-preview-url="{{ preview_url }}" data-draft-id="{{ mailing.pk|default:'' }}"
+      data-send-base="{% url 'system_mailings' %}" data-allowed="{{ ses.allowed|yesno:'1,0' }}" data-gate="{{ ses.message }}" data-dev="{% if ses.mode == 'dev' %}1{% endif %}" novalidate>{% csrf_token %}
+  <div class="se-switch sys-seg" role="group" aria-label="Show">
+    <button type="button" aria-pressed="true" data-se-show="write">Write</button><button type="button" aria-pressed="false" data-se-show="preview">Preview</button>
+  </div>
+  <div class="se-compose">
+    <section class="sys-panel se-wording" aria-label="Group send" data-se-pane="write">
+      <div class="se-body">
+        {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
+
+        <fieldset class="se-block se-groups{% if form.group.errors %} invalid{% endif %}" data-required-group data-label="Who" data-required-message="Choose who gets it.">
+          <legend>Who</legend>
+          <div class="se-groups-grid">
+            {% for g in groups %}<div class="se-group" data-group="{{ g.key }}">
+              <label class="se-group-card"><input type="radio" name="group" value="{{ g.key }}"{% if form.group.value == g.key %} checked{% endif %}>
+                <span class="se-group-top"><span class="se-group-name">{{ g.label }}</span><span class="se-group-count mono" data-se-card-count></span></span>
+                <span class="se-group-desc">{{ g.description }}</span>
+                <svg class="se-check" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </label>
+              {% if g.params %}<div class="se-group-opts">{% for p in g.params %}<label class="se-opt">{{ p.label }}
+                {% if p.type == "choice" %}<select name="{{ p.name }}"{% if p.required %} required{% endif %} data-label="{{ g.label }}: {{ p.label }}"><option value="">Choose</option>{% for value, label in p.choices %}<option value="{{ value }}"{% if p.value == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+                {% else %}<input type="date" name="{{ p.name }}" value="{{ p.value }}" data-label="{{ g.label }}: {{ p.label }}">{% endif %}</label>{% endfor %}</div>{% endif %}
+            </div>{% endfor %}
+          </div>
+          {% if form.group.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="group" data-problem-label="Who">{{ form.group.errors|join:" " }}</p>{% endif %}
+          <p class="se-live-error" data-se-live="group" hidden></p>
+        </fieldset>
+
+        <fieldset class="se-block se-kind" data-required-group data-label="Kind">
+          <legend>Kind</legend>
+          <div class="sys-seg" role="radiogroup">
+            <label><input type="radio" name="kind" value="news"{% if form.kind.value != "service" %} checked{% endif %}> News</label>
+            <label><input type="radio" name="kind" value="service"{% if form.kind.value == "service" %} checked{% endif %}> Service message</label>
+          </div>
+          <p class="sys-muted se-help" data-se-kind-help aria-live="polite"></p>
+        </fieldset>
+
+        <div class="se-count" data-se-count role="status" aria-live="polite"></div>
+
+        <div class="se-block se-message">
+          <h3 class="se-label">Message</h3>
+          <div class="sys-row se-field{% if form.name.errors %} invalid{% endif %}" data-system-field="name">
+            <label for="{{ form.name.id_for_label }}">Name <small>Only you see this, in the list.</small></label>
+            <div><input type="text" name="name" id="{{ form.name.id_for_label }}" value="{{ form.name.value|default:'' }}" maxlength="200" required data-se-name autocomplete="off">
+              {% if form.name.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="name" data-problem-label="Name">{{ form.name.errors|join:" " }}</p>{% endif %}</div>
+          </div>
+          <div class="sys-row se-field{% if form.subject.errors %} invalid{% endif %}" data-system-field="subject">
+            <label for="{{ form.subject.id_for_label }}">Subject</label>
+            <div><input type="text" name="subject" id="{{ form.subject.id_for_label }}" value="{{ form.subject.value|default:'' }}" maxlength="300" required autocomplete="off" data-se-subject aria-describedby="se-subject-live">
+              <p class="se-live-error" id="se-subject-live" data-se-live="subject" hidden></p>
+              {% if form.subject.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="subject" data-problem-label="Subject">{{ form.subject.errors|join:" " }}</p>{% endif %}</div>
+          </div>
+          <div class="sys-row se-field{% if form.body.errors %} invalid{% endif %}" data-system-field="body">
+            <label for="{{ form.body.id_for_label }}">Body</label>
+            <div>
+              <div class="se-editor" data-se-body-editor>
+                <pre class="se-pre" aria-hidden="true"></pre>
+                <textarea name="body" id="{{ form.body.id_for_label }}" rows="12" required spellcheck="true" aria-describedby="se-body-live se-body-help" data-se-body>{{ form.body.value|default:'' }}</textarea>
+              </div>
+              <p class="se-live-error" id="se-body-live" data-se-live="body" hidden></p>
+              {% if form.body.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="body" data-problem-label="Body">{{ form.body.errors|join:" " }}</p>{% endif %}
+              <p class="sys-muted se-help" id="se-body-help">A blank line starts a new paragraph. News also gets an unsubscribe link in the footer, added for you.</p>
+            </div>
+          </div>
+          <div class="se-palette" data-se-palette aria-label="Placeholders">
+            <span class="se-palette-label">Placeholders</span>
+            {% for p in placeholders %}<button type="button" class="se-token" data-insert="{{ '{' }}{{ p.name }}{{ '}' }}" data-scope="both" title="{{ p.description }}"><code>{{ "{" }}{{ p.name }}{{ "}" }}</code><span class="sr">, {{ p.description }}</span></button>{% endfor %}
+          </div>
+        </div>
+
+        <fieldset class="se-block se-when">
+          <legend>When</legend>
+          <div class="sys-seg" role="radiogroup">
+            <label><input type="radio" name="when" value="now" checked> Send now</label>
+            <label><input type="radio" name="when" value="later"> Schedule</label>
+          </div>
+          <div class="se-when-fields" data-se-when-fields>
+            <label class="se-opt">Date <input type="date" data-se-date></label>
+            <label class="se-opt">Time <input type="time" data-se-time value="09:00"></label>
+            <span class="sys-muted">London time</span>
+          </div>
+          <p class="se-live-error" data-se-live="when" hidden></p>
+        </fieldset>
+      </div>
+    </section>
+    <section class="sys-panel se-preview" aria-label="Preview" data-se-pane="preview">
+      <header><h2>Preview</h2>
+        <div class="sys-seg se-width" role="group" aria-label="Preview width"><button type="button" aria-pressed="true" data-se-width="desktop">Desktop</button><button type="button" aria-pressed="false" data-se-width="phone">Phone</button></div>
+      </header>
+      <div class="se-stage">
+        <p class="se-meta"><span data-se-subject-line>Subject: {{ form.subject.value|default:'' }}</span><br><span data-se-sample>Sample: James</span></p>
+        <p class="se-preview-error" data-se-preview-error hidden>Could not draw the preview. Your wording is safe. <button type="button" class="sys-btn sm" data-se-retry>Retry</button></p>
+        <p class="se-preview-note" data-se-preview-note hidden></p>
+        <div class="se-frame-wrap" data-se-frame-wrap data-width="desktop">
+          <div class="se-frame-first" data-se-frame-first aria-hidden="true"></div>
+          <iframe class="se-frame" title="Email preview, desktop width" sandbox="allow-same-origin" hidden data-se-frame></iframe>
+        </div>
+      </div>
+    </section>
+  </div>
+  <div class="sys-savebar se-bar" data-se-bar>
+    <span class="sys-msg se-bar-note" data-se-bar-note aria-live="polite"></span>
+    <button type="button" class="sys-btn" data-se-save-draft>Save draft</button>
+    <button type="button" class="sys-btn" data-se-test>Send me a test</button>
+    <button type="button" class="sys-btn primary" data-se-send aria-disabled="true">Send</button>
+  </div>
 </form>
+<noscript><p class="sys-note warn">The group composer needs JavaScript to count people, preview and send.</p></noscript>
 {% endblock %}

@@ -59,7 +59,7 @@ def _edit(request, key, form=None, status=200):
     spec = _spec(key)
     row = logic.template_row(key, create=True)
     form = form or logic.TemplateForm(instance=row, spec=spec)
-    return page(request, "system/emails_edit.html", "emails", logic.edit_context(spec, form, row), status=status)
+    return page(request, "system/emails_edit.html", "emails", {**logic.edit_context(spec, form, row), "ses": ses.ses_status()}, status=status)
 
 
 @unlocked

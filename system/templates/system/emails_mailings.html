@@ -1,15 +1,22 @@
-{% extends "system/base.html" %}
+{% extends "system/emails_base.html" %}{% load system_ui %}
 {% block main %}
-{% include "system/_page_header.html" with title="Send to a group" description="Write a message, pick a group, see the count, send now or schedule." %}
+<div class="sys-head se-head"><div><h1>Emails</h1><p>What the site sends, and what you send.</p></div>
+  <div class="sys-actions"><a class="sys-btn primary" href="{% url 'system_mailing_new' %}" data-system-new-mailing>New group send</a></div></div>
 {% include "system/_emails_tabs.html" with tab="mailings" %}
 {% include "system/_ses_state.html" %}
-<p><a class="sys-btn primary" href="{% url 'system_mailing_new' %}" data-system-new-mailing>New mailing</a></p>
-<section class="sys-panel"><div class="sys-scroll"><table class="sys-table" data-system-mailings>
-  <thead><tr><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Status</th><th scope="col">People</th><th scope="col">Sent</th><th scope="col">When</th></tr></thead>
+<section class="sys-panel"><div class="sys-scroll"><table class="sys-table se-sends" data-system-mailings>
+  <thead><tr><th scope="col">Subject</th><th scope="col">Group</th><th scope="col">Kind</th><th scope="col">Status</th><th scope="col" class="sys-num">People</th><th scope="col">When</th></tr></thead>
   <tbody>{% for m in mailings %}
-    <tr data-system-mailing="{{ m.pk }}"><td><a href="{% url 'system_mailing' m.pk %}">{{ m.name }}</a></td><td>{{ m.get_kind_display }}</td><td>{{ m.get_status_display }}</td><td>{{ m.total_count }}</td><td>{{ m.sent_count }}</td>
-      <td>{% if m.scheduled_at and m.status == "scheduled" %}{{ m.scheduled_at|date:"j M Y H:i" }}{% else %}{{ m.started_at|default:m.created_at|date:"j M Y H:i" }}{% endif %}</td></tr>
-  {% empty %}<tr><td colspan="6" class="sys-muted">No mailings yet.</td></tr>{% endfor %}</tbody>
-</table></div></section>
-{% if mailings.has_other_pages %}<p>{% if mailings.has_previous %}<a href="?page={{ mailings.previous_page_number }}">Newer</a>{% endif %} {% if mailings.has_next %}<a href="?page={{ mailings.next_page_number }}">Older</a>{% endif %}</p>{% endif %}
+    <tr data-system-mailing="{{ m.pk }}" data-se-row>
+      <td class="se-name"><a href="{% url 'system_mailing' m.pk %}"><span class="se-ellipsis">{{ m.subject|default:m.name }}</span></a></td>
+      <td>{{ m.group|group_label }}</td>
+      <td>{% if m.kind == "news" %}News{% else %}Service{% endif %}</td>
+      <td>{% if m.status == "draft" %}<span class="sys-badge">Draft</span>{% elif m.status == "scheduled" %}<span class="sys-badge info">Scheduled</span>{% elif m.status == "sending" %}<span class="sys-badge info">Sending</span> <span class="se-progress se-progress-sm" aria-hidden="true"><i style="width: {% widthratio m.sent_count|add:m.skipped_count|add:m.failed_count m.total_count 100 %}%"></i></span>{% elif m.status == "sent" %}<span class="sys-badge ok">Sent</span>{% elif m.status == "failed" %}<span class="sys-badge danger">Stopped</span>{% elif m.status == "cancelled" %}<span class="sys-badge">Cancelled</span>{% else %}<span class="sys-badge">{{ m.get_status_display }}</span>{% endif %}</td>
+      <td class="sys-num">{% if m.status == "sending" %}{{ m.sent_count|add:m.skipped_count|add:m.failed_count|floatformat:"0g" }} / {{ m.total_count|floatformat:"0g" }}{% elif m.total_count %}{{ m.total_count|floatformat:"0g" }}{% else %}<span class="sys-muted">-</span>{% endif %}</td>
+      <td>{% if m.scheduled_at and m.status == "scheduled" %}{{ m.scheduled_at|date:"D j M, H:i" }}{% else %}{{ m.started_at|default:m.created_at|date:"j M Y, H:i" }}{% endif %}</td>
+    </tr>
+  {% empty %}<tr><td colspan="6" class="sys-empty">No group sends yet. <a class="sys-btn sm primary" href="{% url 'system_mailing_new' %}">New group send</a></td></tr>{% endfor %}</tbody>
+</table></div>
+{% if mailings.has_other_pages %}<div class="sys-more">{% if mailings.has_previous %}<a href="?page={{ mailings.previous_page_number }}">Newer</a>{% endif %}{% if mailings.has_next %}<a href="?page={{ mailings.next_page_number }}">Older</a>{% endif %}</div>{% endif %}
+</section>
 {% endblock %}

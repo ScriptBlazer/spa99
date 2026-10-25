@@ -1,22 +1,35 @@
-{% extends "system/base.html" %}
+{% extends "system/emails_base.html" %}
 {% block main %}
-{% include "system/_page_header.html" with title="Check the list" %}
+{% include "system/_page_header.html" with title="Emails" description="What the site sends, and what you send." %}
 {% include "system/_emails_tabs.html" with tab="invites" %}
+<div class="se-title"><a class="se-back" href="{% url 'system_invites_new' %}">Start again</a><h2>Check the list</h2></div>
 {% include "system/_ses_state.html" %}
 {% for error in report.errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ error }}</p>{% endfor %}
-{% if not report.errors %}
-<section class="sys-panel" data-system-invite-report data-ok="{{ report.ok }}">
-  <header><h2>{{ report.ok }} of {{ report.total }} can be invited</h2></header>
-  <ul data-system-invite-counts>{% for key, label in status_labels.items %}{% if key != "ok" %}{% for k, n in report.counts.items %}{% if k == key and n %}<li data-count="{{ key }}">{{ n }}: {{ label }}</li>{% endif %}{% endfor %}{% endif %}{% endfor %}</ul>
-  <div class="sys-scroll"><table class="sys-table" data-system-invite-rows>
-    <thead><tr><th scope="col">Line</th><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Result</th></tr></thead>
-    <tbody>{% for r in report.rows %}<tr data-status="{{ r.status }}"><td>{{ r.line }}</td><td>{{ r.name }}</td><td class="mono">{{ r.email }}</td><td>{{ r.message|default:"Will be invited" }}</td></tr>{% endfor %}</tbody>
+{% if report.errors %}<p><a class="sys-btn" href="{% url 'system_invites_new' %}">Start again</a></p>{% else %}
+<div data-se-review-root data-review-url="{% url 'system_invites_review' %}">
+<section class="sys-panel se-review-panel" data-system-invite-report data-ok="{{ report.ok }}" data-total="{{ report.total }}">
+  <header><h2><span class="mono">{{ report.ok|floatformat:"0g" }}</span> of <span class="mono">{{ report.total|floatformat:"0g" }}</span> can be invited</h2></header>
+  <div class="se-chips" role="group" aria-label="Show" data-system-invite-counts>
+    <button type="button" class="sys-pill" aria-pressed="true" data-filter="all">All {{ report.total }}</button>
+    {% for key, label in status_labels.items %}{% for k, n in report.counts.items %}{% if k == key and n %}<button type="button" class="sys-pill" aria-pressed="false" data-filter="{{ key }}" data-count="{{ key }}">{% if key == "ok" %}Ready{% elif key == "duplicate" %}Duplicate{% elif key == "member" %}Already a member{% elif key == "invited" %}Already invited{% elif key == "suppressed" %}Suppressed{% elif key == "opted_out" %}Unsubscribed{% else %}Invalid{% endif %} {{ n }}</button>{% endif %}{% endfor %}{% endfor %}
+  </div>
+  <div class="sys-scroll"><table class="sys-table se-review" data-system-invite-rows>
+    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Check</th></tr></thead>
+    <tbody>{% for r in report.rows %}<tr data-status="{{ r.status }}" data-line="{{ r.line }}">
+      <td>{{ r.name|default:"-" }}</td>
+      <td class="mono">{% if r.status == "invalid" %}<input type="text" class="se-fix" value="{{ r.email }}" aria-label="Fix the email address on line {{ r.line }}" data-se-fix data-old="{{ r.email }}" inputmode="email" autocomplete="off" spellcheck="false"> <button type="button" class="sys-btn sm" data-se-recheck>Check</button>{% else %}{{ r.email }}{% endif %}</td>
+      <td>{% if r.status == "ok" %}<span class="sys-badge ok">Ready</span>{% elif r.status == "duplicate" %}<span class="sys-badge">Duplicate</span> <span class="sys-muted">{{ r.message }}</span>{% elif r.status == "member" %}<span class="sys-badge info">Already a member</span>{% elif r.status == "invited" %}<span class="sys-badge info">Already invited</span>{% elif r.status == "suppressed" %}<span class="sys-badge danger">Suppressed</span>{% elif r.status == "opted_out" %}<span class="sys-badge">Unsubscribed</span>{% else %}<span class="sys-badge danger">Invalid email</span>{% endif %}</td>
+    </tr>{% endfor %}</tbody>
   </table></div>
+  <p class="se-skipnote sys-muted" data-se-skipnote>{% if report.total != report.ok %}{{ report.total|add:"0" }} rows, {{ report.ok }} ready. Everything not marked Ready is skipped.{% else %}Every row is ready.{% endif %}</p>
 </section>
-<form method="post" action="{% url 'system_invites_send' %}" data-system-confirm="invites">{% csrf_token %}
-  <input type="hidden" name="expected_ok" value="{{ report.ok }}"><textarea name="text" hidden>{{ text }}</textarea>
-  <button type="submit" class="sys-btn primary"{% if not report.ok or not ses.allowed %} disabled{% endif %}>Send {{ report.ok }} invites</button>
-  <a class="sys-btn" href="{% url 'system_invites_new' %}">Back</a>
+<form method="post" action="{% url 'system_invites_send' %}" class="se-formbar se-sendbar" data-se-send-form data-ok="{{ report.ok }}" data-skipped="{{ report.total|add:0 }}" data-allowed="{{ ses.allowed|yesno:'1,0' }}" data-gate="{{ ses.message }}">{% csrf_token %}
+  <input type="hidden" name="expected_ok" value="{{ report.ok }}"><textarea name="text" hidden data-se-list>{{ text }}</textarea>
+  <button type="button" class="sys-btn primary" data-se-send-invites{% if not report.ok or not ses.allowed %} aria-disabled="true"{% endif %}>Send {{ report.ok }} invite{{ report.ok|pluralize }}</button>
+  <a class="sys-btn" href="{% url 'system_invites_new' %}">Start again</a>
+  {% if not ses.allowed %}<span class="sys-muted se-reason">Off until Amazon approves production sending.</span>{% elif not report.ok %}<span class="sys-muted se-reason">Nobody in this list can be invited.</span>{% endif %}
+  <span class="sys-muted se-reason"><a href="{% url 'system_email_edit' 'invite' %}">Edit the invite wording</a></span>
 </form>
-{% else %}<p><a class="sys-btn" href="{% url 'system_invites_new' %}">Back</a></p>{% endif %}
+</div>
+{% endif %}
 {% endblock %}

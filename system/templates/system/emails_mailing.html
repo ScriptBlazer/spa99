@@ -1,34 +1,65 @@
-{% extends "system/base.html" %}
+{% extends "system/emails_base.html" %}{% load system_ui %}
 {% block main %}
-{% include "system/_page_header.html" with title=mailing.name description=mailing.get_kind_display %}
+<div class="sys-head se-head"><div><a class="se-back" href="{% url 'system_mailings' %}">Group sends</a><h1>{{ mailing.subject|default:mailing.name }}</h1>
+  <p>{% if mailing.kind == "news" %}News{% else %}Service message{% endif %} · {{ mailing.group|group_label }}</p></div>
+  <div class="sys-actions se-actions" data-system-mailing-actions>
+    {% if mailing.status == "draft" %}
+      <a class="sys-btn primary" href="{% url 'system_mailing_edit' mailing.pk %}">Edit draft</a>
+      <form method="post" action="{% url 'system_mailing_test' mailing.pk %}">{% csrf_token %}<button type="submit" class="sys-btn">Send me a test</button></form>
+      <form method="post" action="{% url 'system_mailing_delete' mailing.pk %}">{% csrf_token %}<button type="submit" class="sys-btn" data-confirm data-confirm-danger data-confirm-title="Delete this draft?" data-confirm-body="The draft is removed. This cannot be undone." data-confirm-label="Delete draft">Delete draft</button></form>
+    {% elif mailing.status == "scheduled" %}
+      <form method="post" action="{% url 'system_mailing_cancel' mailing.pk %}">{% csrf_token %}<button type="submit" class="sys-btn" data-confirm data-confirm-title="Cancel this send?" data-confirm-body="It will not go out at the scheduled time. Nobody gets it." data-confirm-label="Cancel send" data-confirm-cancel="Keep it">Cancel schedule</button></form>
+    {% elif mailing.status == "sending" %}
+      <form method="post" action="{% url 'system_mailing_cancel' mailing.pk %}" data-se-stop>{% csrf_token %}<button type="submit" class="sys-btn" data-confirm data-confirm-danger data-confirm-title="Stop sending?" data-confirm-body="{{ progress.queued|add:progress.sending|floatformat:'0g' }} people will not get it." data-confirm-label="Stop sending" data-confirm-cancel="Keep sending">Stop sending</button></form>
+    {% endif %}
+  </div>
+</div>
 {% include "system/_emails_tabs.html" with tab="mailings" %}
 {% include "system/_ses_state.html" %}
-<section class="sys-panel" data-system-mailing-detail="{{ mailing.pk }}" data-status="{{ mailing.status }}" data-progress-url="{{ progress_url }}">
-  <header><h2>{{ mailing.get_status_display }}</h2></header>
-  <p>Group: {{ group.label|default:mailing.group }}{% if mailing.params %} ({{ mailing.params }}){% endif %}.
-    {% if live_count is not None %}<strong data-live-count>{{ live_count }}</strong> people would get it now.{% endif %}</p>
-  <p data-system-progress>Total <span data-p="total">{{ progress.total }}</span>, sent <span data-p="sent">{{ progress.sent }}</span>, skipped <span data-p="skipped">{{ progress.skipped }}</span>, failed <span data-p="failed">{{ progress.failed }}</span>, waiting <span data-p="queued">{{ progress.queued }}</span> (<span data-p="percent">{{ progress.percent }}</span>%)</p>
-  {% if mailing.scheduled_at and mailing.status == "scheduled" %}<p data-system-scheduled>Scheduled for {{ mailing.scheduled_at|date:"j M Y H:i" }}.</p>{% endif %}
-  {% if mailing.error %}<p class="sys-note error" data-system-mailing-error>{{ mailing.error }}</p>{% endif %}
-  {% for field, texts in blockers.items %}{% for t in texts %}<p class="sys-note error" data-blocker="{{ field }}">{{ t }}</p>{% endfor %}{% endfor %}
-</section>
-<section class="sys-panel" data-system-mailing-actions>
+<div data-se-detail data-system-mailing-detail="{{ mailing.pk }}" data-status="{{ mailing.status }}" data-progress-url="{{ progress_url }}" data-total="{{ progress.total }}">
   {% if mailing.status == "draft" %}
-    <a class="sys-btn" href="{% url 'system_mailing_edit' mailing.pk %}">Edit</a>
-    <form method="post" action="{% url 'system_mailing_test' mailing.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="sys-btn">Send me a test</button></form>
-    <form method="post" action="{% url 'system_mailing_send' mailing.pk %}" style="display:inline" data-system-confirm="mailing">{% csrf_token %}<input type="hidden" name="expected_count" value="{{ live_count }}"><button type="submit" class="sys-btn primary"{% if not can_send %} disabled{% endif %}>Send to {{ live_count }} people</button></form>
-    <form method="post" action="{% url 'system_mailing_schedule' mailing.pk %}" style="display:inline">{% csrf_token %}<input type="datetime-local" name="scheduled_at" required><button type="submit" class="sys-btn"{% if not can_send %} disabled{% endif %}>Schedule</button></form>
-    <form method="post" action="{% url 'system_mailing_delete' mailing.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="sys-btn">Delete draft</button></form>
-  {% elif mailing.status == "scheduled" or mailing.status == "sending" %}
-    <form method="post" action="{% url 'system_mailing_cancel' mailing.pk %}" style="display:inline" data-system-confirm="mailing">{% csrf_token %}<button type="submit" class="sys-btn">Cancel</button></form>
-    {% if mailing.status == "sending" %}<form method="post" action="{% url 'system_mailing_resume' mailing.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="sys-btn">Carry on sending</button></form>{% endif %}
+    <p class="sys-note" data-se-state>Draft. {% if live_count is not None %}<strong data-live-count class="mono">{{ live_count|floatformat:"0g" }}</strong> {{ live_count|pluralize:"person,people" }} would get it now.{% endif %}</p>
+    {% for field, texts in blockers.items %}{% for t in texts %}<p class="sys-note error se-blocker" data-blocker="{{ field }}">{{ t }}</p>{% endfor %}{% endfor %}
+  {% elif mailing.status == "scheduled" %}
+    <p class="sys-note" data-system-scheduled data-se-state>Scheduled for {{ mailing.scheduled_at|date:"D j M, H:i" }} London time. You can cancel until then.{% if live_count is not None %} <span class="mono">{{ live_count|floatformat:"0g" }}</span> {{ live_count|pluralize:"person,people" }} would get it now.{% endif %}</p>
+    {% for field, texts in blockers.items %}{% for t in texts %}<p class="sys-note error se-blocker" data-blocker="{{ field }}">{{ t }}</p>{% endfor %}{% endfor %}
+  {% elif mailing.status == "sending" %}
+    <section class="sys-panel se-sending" aria-label="Sending" data-se-sending>
+      <div class="se-sending-body">
+        <div class="se-progress" role="progressbar" aria-label="Sending progress" aria-valuemin="0" aria-valuemax="{{ progress.total }}" aria-valuenow="{{ progress.sent|add:progress.bounced|add:progress.skipped|add:progress.failed }}" data-se-bar><i style="width: {{ progress.percent }}%"></i></div>
+        <p class="se-sending-text mono" data-se-progress-text>Sending {{ progress.sent|add:progress.bounced|add:progress.skipped|add:progress.failed|floatformat:"0g" }} of {{ progress.total|floatformat:"0g" }}</p>
+        <p class="sys-muted" data-se-eta></p>
+        {% if mailing.error %}<p class="sys-note error" data-system-mailing-error role="alert">{{ mailing.error }} Nothing was sent twice.</p>{% endif %}
+        <form method="post" action="{% url 'system_mailing_resume' mailing.pk %}" class="se-resume" data-se-resume>{% csrf_token %}<button type="submit" class="sys-btn sm">Carry on sending</button><span class="sys-muted">Use this if sending looks stuck. Nobody gets it twice.</span></form>
+      </div>
+      <p class="sr" role="status" aria-live="polite" data-se-announce></p>
+    </section>
+  {% elif mailing.status == "sent" %}
+    <p class="sys-note success" data-se-state>Sent to {{ progress.sent|add:progress.bounced|floatformat:"0g" }} on {{ mailing.finished_at|date:"j M" }} at {{ mailing.finished_at|date:"H:i" }}.{% if progress.skipped %} {{ progress.skipped|floatformat:"0g" }} skipped (suppressed or no longer eligible).{% endif %}{% if progress.failed %} {{ progress.failed|floatformat:"0g" }} could not be sent.{% endif %}
+      {% if progress.bounced %} <a href="{% url 'system_suppressions' %}">Bounces so far: {{ progress.bounced }}</a>{% endif %}</p>
+  {% elif mailing.status == "cancelled" %}
+    <p class="sys-note" data-se-state>Cancelled{% if progress.sent %}. It had gone to {{ progress.sent|floatformat:"0g" }} people before it stopped{% endif %}.</p>
+  {% elif mailing.status == "failed" %}
+    <p class="sys-note error" data-system-mailing-error role="alert">Sending stopped at {{ progress.sent|add:progress.bounced|add:progress.skipped|add:progress.failed|floatformat:"0g" }} of {{ progress.total|floatformat:"0g" }}{% if mailing.error %}: {{ mailing.error }}{% endif %} Nothing was sent twice.</p>
   {% endif %}
+  {% if mailing.error and mailing.status in "draft scheduled" %}<p class="sys-note error" data-system-mailing-error role="alert">{{ mailing.error }}</p>{% endif %}
+</div>
+<section class="sys-panel se-preview se-preview-static" aria-label="What it looks like" data-se-static-preview>
+  <header><h2>The email</h2>
+    <div class="sys-seg se-width" role="group" aria-label="Preview width"><button type="button" aria-pressed="true" data-se-width="desktop">Desktop</button><button type="button" aria-pressed="false" data-se-width="phone">Phone</button></div>
+  </header>
+  <div class="se-stage">
+    <p class="se-meta">Subject: {{ preview.subject }}</p>
+    <div class="se-frame-wrap" data-se-frame-wrap data-width="desktop"><iframe class="se-frame" title="Email preview, desktop width" sandbox="allow-same-origin" srcdoc="{{ preview.html|force_escape }}" data-se-frame></iframe></div>
+  </div>
 </section>
-<section class="sys-panel" data-system-mailing-preview><header><h2>Preview</h2></header><p>{{ preview.subject }}</p><pre>{{ preview.text }}</pre></section>
-<section class="sys-panel" aria-label="People"><div class="sys-scroll"><table class="sys-table" data-system-recipients>
+<section class="sys-panel" aria-label="People">
+  <header><h2>People</h2><span class="sys-muted mono">{{ progress.total|floatformat:"0g" }}</span></header>
+  <div class="sys-scroll"><table class="sys-table se-people" data-system-recipients>
   <thead><tr><th scope="col">Email</th><th scope="col">Status</th><th scope="col">Why</th><th scope="col">Sent</th></tr></thead>
-  <tbody>{% for r in recipients %}<tr><td class="mono">{{ r.email }}</td><td>{{ r.get_status_display }}</td><td>{{ r.reason }}</td><td>{{ r.sent_at|date:"j M H:i" }}</td></tr>
-  {% empty %}<tr><td colspan="4" class="sys-muted">{% if mailing.status == "draft" or mailing.status == "scheduled" %}The list is made when sending starts.{% else %}Nobody.{% endif %}</td></tr>{% endfor %}</tbody>
-</table></div></section>
-{% if recipients.has_other_pages %}<p>{% if recipients.has_previous %}<a href="?page={{ recipients.previous_page_number }}&status={{ status_filter }}">Previous</a>{% endif %} {% if recipients.has_next %}<a href="?page={{ recipients.next_page_number }}&status={{ status_filter }}">Next</a>{% endif %}</p>{% endif %}
+  <tbody>{% for r in recipients %}<tr><td class="mono">{{ r.email }}</td><td>{{ r.get_status_display }}</td><td>{{ r.reason }}</td><td>{{ r.sent_at|date:"j M, H:i" }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="sys-empty">{% if mailing.status == "draft" or mailing.status == "scheduled" %}The list of people is made when sending starts.{% else %}Nobody.{% endif %}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if recipients.has_other_pages %}<div class="sys-more">{% if recipients.has_previous %}<a href="?page={{ recipients.previous_page_number }}&status={{ status_filter }}">Previous</a>{% endif %}{% if recipients.has_next %}<a href="?page={{ recipients.next_page_number }}&status={{ status_filter }}">Next</a>{% endif %}</div>{% endif %}
+</section>
 {% endblock %}

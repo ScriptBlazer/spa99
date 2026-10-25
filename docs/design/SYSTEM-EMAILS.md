@@ -96,3 +96,12 @@ Empty (each list, one row + action), loading (counts "Counting", preview dimmed 
 ## 10. Copy (British English, calm, no exclamation marks)
 
 Buttons name the thing: "Send me a test", "Save draft", "Send to 312", "Schedule for Thu 5 Nov, 09:00", "Send 48 invites", "Stop sending", "Reset", "Check list", "Subscribe again". Never "Submit", "OK", "Blast", "Campaign". Times 24-hour London, dates `5 Nov 2026`, counts with thousands commas in mono.
+
+## Built (2026-10-25, frontend): deviations
+- Live preview, counts and progress use `fetch` (System has no HTMX); progress polls every 2 s (not 5 s).
+- URLs are the backend's (`/emails/mailings/...`), not `/emails/sends/`. No tab counts ("Group sends 2") and no "Checked 14:30" in the SES strip: the context has neither.
+- Button text in the automatic editor is shown read-only (the backend only edits subject and body). Group count line has no "872 not opted in" breakdown (endpoint returns the count only).
+- Group composer: Save draft, test, Send and Schedule save the draft first, then call the pk endpoints. The Name field is kept (the model needs it) and follows the subject until edited.
+- Invites: no per-person "Send again" (no endpoint): "coming soon" note. The list is per import; the invite table with status chips is on each import's page. Duplicate rows say "Repeated in this list" (no row number from the backend).
+- Unsubscribe: GET asks, one button POSTs (no auto-POST on load). Signed-in owners get "Subscribe again in My Spa 99" (a link; no re-subscribe endpoint). Headline sized `--text-2xl` at `--measure-display` as briefed.
+- The `</>` code toggle still shows on the Overview, list and composer pages: an existing test (`test_codeview`) requires it, though this brief says unset. One backend line added: the editor context carries `ses`.
