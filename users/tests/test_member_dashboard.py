@@ -152,10 +152,11 @@ class WebsiteMenuTests(TestCase):
         self.assertNotIn(">Sign in<", html)
         self.assertNotIn('href="/book/"', html)
 
-    def test_a_team_member_without_a_membership_gets_sign_in_not_my_spa_99(self):
+    def test_a_team_member_without_a_membership_gets_sign_out_not_my_spa_99(self):
         self.client.force_login(make_user("team@example.com", is_staff=True))
         html = self.client.get("/").content.decode()
-        self.assertIn(">Sign in<", html)
+        self.assertIn(">Sign out<", html)
+        self.assertNotIn(">Sign in<", html)  # header, menu and footer: never "Sign in" while signed in
         self.assertNotIn("My Spa 99</a>", html)
 
     def test_book_redirects_members_and_teases_visitors(self):
