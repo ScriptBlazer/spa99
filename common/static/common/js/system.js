@@ -2,6 +2,7 @@
    Sections: helpers, dirty state and save bar, confirm dialog, submit interception, lock countdown, keyboard, audit log, menu.
    Toasts and the confirm modal are the shared ones (feedback.js, docs/design/FEEDBACK.md). */
 import { toast, confirmModal, initFeedback } from './feedback.js';
+import { initFormProblems, collectProblems, showProblems } from './form-problems.js';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -124,6 +125,9 @@ async function save() {
   const dirty = forms().filter((f) => dirtyControls(f).length);
   if (!dirty.length) return;
   if (dirty.length === 1) { dirty[0].requestSubmit(); return; }
+  // Several rows edited: every problem in the rows goes in one dialog first (nothing is sent), then confirm once and save them one after another.
+  const found = (await Promise.all(dirty.map((form) => collectProblems(form)))).flat();
+  if (found.length) { await showProblems(dirty[0], found, { opener: $('[data-system-save]', bar) }); return; }
   // Several rows edited: confirm once, then save them one after another.
   const spec = riskSpec(dirty.flatMap(changesOf));
   if (spec && !(await confirmDialog(spec))) return;
@@ -225,6 +229,7 @@ function begin(form) {
 /* ---------- toasts: the shared ones; a server message carrying an undo link shows Undo (feedback.js) ---------- */
 
 initFeedback();
+initFormProblems(); // before initSubmit below: problems are listed before any "change this?" confirm
 document.addEventListener('spa99:leaving', () => { submitting = true; });
 $('[data-system-keys]')?.addEventListener('click', (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }); // backdrop closes the shortcuts list
 

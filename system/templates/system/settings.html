@@ -1,9 +1,9 @@
 {% extends "system/base.html" %}
 {% block main %}
 {% include "system/_page_header.html" with title="Settings" description="Opening date, stage switches and wording. Changes apply at once." %}
-<form method="post" data-system-form="settings" data-system-risky="{{ risky_fields|join:',' }}">{% csrf_token %}
+<form method="post" data-problems data-system-form="settings" data-system-risky="{{ risky_fields|join:',' }}">{% csrf_token %}
   <section class="sys-panel">
-    {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error>{{ form.non_field_errors|join:" " }}</p>{% endif %}
+    {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
     {{ form.row_token }}
     <div class="sys-group"><h3>Stages</h3>
       {% for field in form %}{% if field.name == "register_interest_open" or field.name == "subscribe_open" or field.name == "booking_open" or field.name == "opening_date" or field.name == "opening_text" %}{% include "system/_field_row.html" %}{% endif %}{% endfor %}

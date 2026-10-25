@@ -196,6 +196,22 @@ def error_text(form):
     return " ".join(parts)
 
 
+@register.filter
+def error_spans(form, prefix=""):
+    """The same sentence as error_text, but each error is a `data-problem` span the problems dialog can read (field, label,
+    message), so a failed row save lists its problems the way every other form does. `prefix` (the row name) leads the label."""
+    from django.utils.html import format_html, format_html_join
+
+    rows = []
+    for name, errors in form.errors.items():
+        known = name in form.fields
+        label = str(form.fields[name].label or "") if known else ""
+        rows.append((form.add_prefix(name) if known else "", " · ".join(part for part in (str(prefix), label) if part), " ".join(errors),
+                     f"{label}: " if label else ""))
+    return format_html_join(" ", '<span data-problem data-problem-field="{}" data-problem-label="{}" data-problem-message="{}">{}{}</span>',
+                            ((field, label, message, lead, message) for field, label, message, lead in rows))
+
+
 # ---------- audit log helpers ----------
 
 @register.filter

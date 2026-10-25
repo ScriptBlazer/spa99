@@ -1,6 +1,6 @@
 {% comment %}A consent row (72px, the whole row is the target). Usage: {% include "common/_check.html" with field=form.men_only_accepted %}
-Optional: text (replaces the field label), link_url + link_text (an underlined link after the text), text_after (plain text after the link), no_feedback=True (no error line, for optional boxes).{% endcomment %}
-<div class="field">
+Optional: short (the name used in the problems dialog, e.g. "Privacy notice"), text (replaces the field label), link_url + link_text (an underlined link after the text), text_after (plain text after the link), no_feedback=True (no error line, for optional boxes).{% endcomment %}
+<div class="field"{% if short %} data-label="{{ short }}"{% endif %}>
   <label class="check">
     {{ field }}
     <span>{% if text %}{{ text }}{% else %}{{ field.label }}{% endif %}{% if link_url %} <a href="{{ link_url }}">{{ link_text }}</a>{{ text_after }}{% endif %}</span>

@@ -6,7 +6,7 @@
 {% include "users/_shell_top.html" %}
       <h1 class="signin-title-sm">Forgotten your password?</h1>
       <p class="signin-lead">Enter your email and we'll send you a link to choose a new one.</p>
-      <form method="post" data-live-validate class="signin-fields" novalidate>{% csrf_token %}
+      <form method="post" data-problems data-live-validate class="signin-fields" novalidate>{% csrf_token %}
         {% include "common/_field.html" with field=form.email %}
         <button type="submit" class="btn btn-primary btn-block" data-working-text="Sending">Send the link</button>
       </form>

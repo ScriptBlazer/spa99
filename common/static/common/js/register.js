@@ -1,7 +1,7 @@
 /* Register: plan picker and membership card, date of birth in three fields, password checks. The shared validate.js
    does the live feedback (see form.spaValidation); this adds the parts only this form has. */
 import './forms.js';
-import { formModal } from './feedback.js';
+import { collectProblems, showProblems } from './form-problems.js';
 import { csrfToken } from './api.js';
 
 const form = document.getElementById('register-form');
@@ -34,8 +34,7 @@ if (panel) {
       [eyebrow, text].forEach((el) => el.animate({ opacity: [0, 1] }, { duration: parseFloat(fade) || 240, easing: 'ease-out' }));
     }
   };
-  const planError = document.querySelector('[data-plan-error]');
-  document.querySelectorAll('input[name="plan"]').forEach((input) => input.addEventListener('change', () => { if (planError) planError.hidden = true; showPlan(true); }));
+  document.querySelectorAll('input[name="plan"]').forEach((input) => input.addEventListener('change', () => showPlan(true))); // the membership problem line hides itself (form-problems.js)
   showPlan(false);
 }
 
@@ -83,62 +82,15 @@ if (form && dob) {
   });
 }
 
-/* Register: every problem in one dialog. On Register the browser checks, the live rules and the membership choice run
-   together; anything wrong opens the shared centred dialog with a list (label and short message) and nothing moves.
-   Closing it returns to the form with everything still filled in, and focuses the first problem. The server is asked
-   with fetch (never a reload), so its answers (an email or mobile already registered) come back the same way and the
-   password is not wiped. Without JavaScript the form posts normally and the page shows the errors beside the fields. */
-const LABELS = {
-  plan: 'Membership', first_name: 'First name', last_name: 'Last name', email: 'Email', mobile: 'Mobile', password: 'Password',
-  date_of_birth: 'Date of birth', men_only_accepted: 'Men-only policy', privacy_accepted: 'Privacy notice',
-};
-const PLAN_MESSAGE = 'Choose a membership to continue.';
+/* Register: every problem in one dialog (the shared piece, form-problems.js). On Register the browser checks, the live rules
+   and the membership choice run together; anything wrong opens the shared centred dialog with a list (label and short
+   message) and nothing moves. Closing it returns to the form with everything still filled in, and focuses the first problem.
+   The server is asked with fetch (never a reload), so its answers (an email or mobile already registered) come back the same
+   way and the password is not wiped. Without JavaScript the form posts normally and the page shows the errors beside the fields. */
 const FAILED = "We couldn't send that just now. Please check your connection and try again.";
 
 if (form?.hasAttribute('data-register-fetch')) { // only the register page (the Gold invite set-up shares this script and posts normally)
   const button = form.querySelector('button[type="submit"]');
-  const planError = document.querySelector('[data-plan-error]');
-  const firstPlan = () => document.querySelector('input[name="plan"]:checked') || document.querySelector('input[name="plan"]');
-  const targetFor = (name) => {
-    if (name === 'plan') return firstPlan();
-    const field = form.elements[name];
-    return (field?.dataset?.focusTarget && form.querySelector(field.dataset.focusTarget)) || field || null;
-  };
-
-  const showProblems = (items, opener) => formModal((dialog, close) => {
-    const heading = document.createElement('h2');
-    heading.className = 'fb-modal-title';
-    heading.id = 'register-problems-title';
-    heading.textContent = items.length > 1 ? 'A few things to check' : 'One thing to check';
-    const list = document.createElement('ul');
-    list.className = 'register-problems';
-    items.forEach((item) => {
-      const row = document.createElement('li');
-      if (item.label) { const name = document.createElement('strong'); name.textContent = item.label; row.append(name, ' '); }
-      row.append(item.message);
-      list.append(row);
-    });
-    const actions = document.createElement('div');
-    actions.className = 'fb-modal-actions';
-    const ok = document.createElement('button');
-    ok.type = 'button';
-    ok.className = 'fb-btn fb-btn--primary';
-    ok.textContent = 'OK';
-    ok.setAttribute('autofocus', '');
-    ok.addEventListener('click', () => close(true));
-    actions.append(ok);
-    dialog.append(heading, list, actions);
-  }, { opener });
-
-  // After the dialog: first problem into view, gently, and focused. No jump if he asked for less motion.
-  const goToFirst = (items) => {
-    const target = items.map((item) => targetFor(item.field)).find(Boolean);
-    if (!target) return;
-    target.focus({ preventScroll: true });
-    const box = target.closest('.field, .plan-picker') || target;
-    box.scrollIntoView({ block: 'center', behavior: reduceMotion.matches ? 'auto' : 'smooth' });
-  };
-
   const setWorking = (on) => {
     if (!button) return;
     if (on) {
@@ -151,20 +103,9 @@ if (form?.hasAttribute('data-register-fetch')) { // only the register page (the 
     if (on) button.setAttribute('aria-busy', 'true'); else button.removeAttribute('aria-busy');
   };
 
-  const markPlan = (message) => { if (planError) { planError.textContent = message; planError.hidden = false; } };
-
-  /** The browser's own constraint checks plus the live rules plus the membership choice, in page order (membership first). */
-  const localProblems = async () => {
-    const found = (await form.spaValidation?.problems?.()) || [];
-    const items = found.map(({ name, message }) => ({ field: name, label: LABELS[name] || '', message }));
-    form.querySelectorAll(':invalid').forEach((el) => {
-      if (el.name && el.validationMessage && !items.some((item) => item.field === el.name)) items.push({ field: el.name, label: LABELS[el.name] || '', message: el.validationMessage });
-    });
-    if (!document.querySelector('input[name="plan"]:checked') && planError) {
-      markPlan(PLAN_MESSAGE);
-      items.unshift({ field: 'plan', label: LABELS.plan, message: PLAN_MESSAGE });
-    }
-    return items;
+  const markPlan = (message) => {
+    const line = document.querySelector('[data-group-error]');
+    if (line) { line.textContent = message; line.hidden = false; }
   };
 
   form.addEventListener('submit', async (event) => {
@@ -175,8 +116,8 @@ if (form?.hasAttribute('data-register-fetch')) { // only the register page (the 
     let leaving = false;
     setWorking(true);
     try {
-      const local = await localProblems();
-      if (local.length) { setWorking(false); await showProblems(local, button); goToFirst(local); return; }
+      const local = await collectProblems(form);
+      if (local.length) { setWorking(false); await showProblems(form, local, { opener: button }); return; }
 
       let items = null;
       try {
@@ -197,8 +138,7 @@ if (form?.hasAttribute('data-register-fetch')) { // only the register page (the 
         else if (item.field !== '__all__') form.spaValidation?.showError(item.field, item.message);
       });
       setWorking(false);
-      await showProblems(items, button);
-      goToFirst(items);
+      await showProblems(form, items, { opener: button });
     } finally {
       if (!leaving) delete form.dataset.sending;
     }

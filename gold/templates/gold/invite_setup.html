@@ -8,8 +8,8 @@
     <div class="form-panel register-panel" data-reveal>
       <h1>Your Gold Card is approved.</h1>
       <p class="lead">Choose a password to set up your account. Your details are filled in.</p>
-      <form method="post" id="register-form" data-live-validate class="form-stack" novalidate>{% csrf_token %}
-        {% if form.non_field_errors %}<p class="form-error" role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+      <form method="post" id="register-form" data-problems data-live-validate class="form-stack" novalidate>{% csrf_token %}
+        {% if form.non_field_errors %}<p class="form-error" role="alert" data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
 
         <fieldset class="form-group">
           <legend>Your details</legend>
@@ -35,8 +35,8 @@
         <fieldset class="form-group">
           <legend>Before you continue</legend>
           {% url 'terms' as terms_url %}{% url 'privacy' as privacy_url %}
-          {% include "common/_check.html" with field=form.men_only_accepted text="I understand Spa 99 is a men-only spa." link_url=terms_url link_text="Our policy" %}
-          {% include "common/_check.html" with field=form.privacy_accepted text="Read how we use your details in our" link_url=privacy_url link_text="privacy notice" text_after=", and tick to accept it." %}
+          {% include "common/_check.html" with field=form.men_only_accepted text="I understand Spa 99 is a men-only spa." short="Men-only policy" link_url=terms_url link_text="Our policy" %}
+          {% include "common/_check.html" with field=form.privacy_accepted text="Read how we use your details in our" short="Privacy notice" link_url=privacy_url link_text="privacy notice" text_after=", and tick to accept it." %}
           {% include "common/_check.html" with field=form.marketing_opt_in text="Send me occasional news from Spa 99." no_feedback=True %}
         </fieldset>
 

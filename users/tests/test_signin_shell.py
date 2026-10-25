@@ -21,3 +21,19 @@ class SignInShellTests(TestCase):
         self.assertIn("control-login", html)
         self.assertIn("Spa 99 Control", html)
         self.assertNotIn("signin", html)
+
+
+class SignInProblemTests(TestCase):
+    """A wrong email or password is one short problem in the shared dialog, and never says which part was wrong."""
+
+    def test_wrong_password_and_unknown_email_get_the_same_single_problem(self):
+        from users.models import User
+
+        User.objects.create_user(email="real@example.com", password="Sauna-Steam-2026!")
+        answers = []
+        for email, password in (("real@example.com", "nope-nope-nope"), ("nobody@example.com", "nope-nope-nope")):
+            html = self.client.post("/login/", {"username": email, "password": password}).content.decode()
+            self.assertIn("<form method=\"post\" data-problems", html)
+            self.assertIn('role="alert" data-problem>Email or password is wrong.</p>', html)
+            answers.append(html.count("data-problem>"))
+        self.assertEqual(answers, [1, 1])

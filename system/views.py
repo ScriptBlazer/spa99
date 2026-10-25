@@ -5,7 +5,6 @@ import time
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_not_required
-from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -17,6 +16,7 @@ from common.audit import client_ip
 from common.ratelimit import hit
 from notifications.models import EmailSuppression
 from plans.models import SiteSettings
+from users.forms import SignInForm
 from users.views import LoginView, TeamPasswordView
 
 from common import levels
@@ -63,7 +63,7 @@ def safe_next(request, default):
 
 # ---------- sign-in, unlock, lock ----------
 
-class SystemAuthForm(AuthenticationForm):
+class SystemAuthForm(SignInForm):
     """Same sign-in form, but a person who may not use System gets the ordinary 'wrong email or password' answer."""
 
     def confirm_login_allowed(self, user):

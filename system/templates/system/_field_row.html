@@ -12,6 +12,6 @@ Booleans become the one switch (system_ui.switch) with On/Off beside it. Fields 
         {% if unit and unit_before %}<span class="sys-unit">{{ unit }}</span>{% endif %}{{ field }}{% if unit and not unit_before %}<span class="sys-unit">{{ unit }}</span>{% endif %}
       {% endif %}
     </div>
-    {% if field.errors %}<p class="sys-error" role="alert" id="{{ field.id_for_label }}_error">{{ field.errors|join:" " }}</p>{% endif %}
+    {% if field.errors %}<p class="sys-error" role="alert" id="{{ field.id_for_label }}_error" data-problem data-problem-field="{{ field.html_name }}" data-problem-label="{{ field.label }}">{{ field.errors|join:" " }}</p>{% endif %}
   </div>
 </div>

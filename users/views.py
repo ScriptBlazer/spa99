@@ -25,7 +25,7 @@ from plans import services as plan_services
 from plans.models import SiteSettings
 
 from . import member, services, tokens
-from .forms import ChangePasswordForm, ForgotPasswordForm, ResetPasswordForm, SignUpForm
+from .forms import ChangePasswordForm, ForgotPasswordForm, ResetPasswordForm, SignInForm, SignUpForm
 from .models import User
 
 PENDING_EMAIL_KEY = "pending_verification_email"
@@ -67,6 +67,7 @@ class LoginView(auth_views.LoginView):
     """Public sign-in (Django marks LoginView as login_not_required). Limited to 10 attempts per 5 minutes per IP."""
 
     template_name = "users/login.html"
+    authentication_form = SignInForm
     redirect_authenticated_user = True
 
     def get_context_data(self, **kwargs):

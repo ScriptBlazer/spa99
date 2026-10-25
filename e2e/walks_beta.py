@@ -17,7 +17,7 @@ from . import mailbox
 from .kit import (
     CONTROL, OFFICE, PASSWORD, PORT, RESET_PASSWORD, SITE, STAFF, STRICT_CONTROL, STRICT_SITE, SYSTEM, UNLOCK_CODE,
     NEW_PASSWORD, apply_gold, answer_journey, dbtool, fill_date_of_birth, form_errors, gold_fill_you, gold_to_last_screen, manage,
-    register_member, sign_in, sign_in_fails, strict_server_up, tick, verify_email_link,
+    close_problems, problems_modal, register_member, sign_in, sign_in_fails, strict_server_up, tick, verify_email_link,
 )
 from .walks import body_text, confirm_office_modal, wav_bytes
 
@@ -307,6 +307,9 @@ def beta_signup(w):
         tick(second, "men_only_accepted")
         tick(second, "privacy_accepted")
         second.locator("#register-form button[type=submit]").click()
+        lines = problems_modal(second)
+        assert any("already registered" in line.lower() for line in lines), f"The problems dialog says: {lines}"
+        close_problems(second)
         second.wait_for_selector(".feedback[data-state=error]")
         assert "register/sent" not in second.url
         assert any("already registered" in text.lower() for text in form_errors(second)), f"The form says: {form_errors(second)}"
@@ -629,9 +632,11 @@ def beta_bad_input(w):
         baseline["registrations"] = dbtool("registrations")["count"]
         page.goto(f"{SITE}/register/")
         page.locator("#register-form button[type=submit]").click()
-        page.wait_for_selector(".feedback[data-state=error]")
+        lines = problems_modal(page)
+        assert len(lines) >= 4 and "register/sent" not in page.url, f"The problems dialog says: {lines}"
+        close_problems(page)
         errors = form_errors(page)
-        assert len(errors) >= 4 and "register/sent" not in page.url, f"The form says: {errors}"
+        assert len(errors) >= 4, f"The form says: {errors}"
         assert dbtool("registrations")["count"] == baseline["registrations"]
     for label, overrides, expected in (
         ("a bad email", {"email": "not-an-email"}, "valid email"),
@@ -642,7 +647,9 @@ def beta_bad_input(w):
             values = {"email": "beta-bad@example.com", "first": "Barnaby", "last": "Badinput", "mob": mobile(901), **overrides}
             _fill_register(page, values["email"], values["first"], values["last"], values["mob"])
             page.locator("#register-form button[type=submit]").click()
-            page.wait_for_selector(".feedback[data-state=error]")
+            lines = problems_modal(page)
+            assert expected in " ".join(lines).lower(), f"Expected a message with '{expected}', the dialog says {lines}"
+            close_problems(page)
             assert expected in " ".join(form_errors(page)).lower(), f"Expected a message with '{expected}', the form says {form_errors(page)}"
             assert "register/sent" not in page.url
             assert dbtool("registrations")["count"] == baseline["registrations"]
@@ -679,15 +686,22 @@ def beta_bad_input(w):
         total = dbtool("gold-total")["count"]
         gold_to_last_screen(gold)
         gold.locator("[data-primary]").click()
-        gold.wait_for_selector(".feedback[data-state=error]")
+        lines = problems_modal(gold)
+        assert len(lines) >= 3, f"The empty form's dialog says: {lines}"
+        close_problems(gold)
         assert len(form_errors(gold)) >= 3, f"The empty form says: {form_errors(gold)}"
         gold_fill_you(gold, "Gus", "Goldbad", "nope", "123")
         gold.locator("[data-primary]").click()
+        lines = problems_modal(gold)
+        assert any("valid email" in line.lower() for line in lines), f"The dialog says: {lines}"
+        close_problems(gold)
         gold.wait_for_selector("[data-error-for=email][data-state=error]")
         text = " ".join(form_errors(gold)).lower()
         assert "valid email" in text and "valid uk mobile" in text, f"The form says: {form_errors(gold)}"
         gold_fill_you(gold, "A" * 300, "Goldbad", "beta-goldbad@example.com", mobile(904))
         gold.locator("[data-primary]").click()
+        assert any("too long" in line.lower() for line in problems_modal(gold))
+        close_problems(gold)
         gold.wait_for_selector("[data-error-for=first_name][data-state=error]")
         assert "too long" in " ".join(form_errors(gold)).lower()
         assert dbtool("gold-total")["count"] == total, "A refused application was saved"
@@ -820,6 +834,9 @@ def beta_system_refusals(w):
             with page.expect_navigation():
                 page.locator("[data-system-unlock] button[type=submit]").click()
             assert "wrong" in page.locator("[data-system-error]").inner_text().lower(), f"No refusal for {password!r} / {code!r}"
+            lines = problems_modal(page)  # the same refusal, listed in the shared dialog; closing it keeps the form
+            assert any("wrong" in line.lower() for line in lines), f"The problems dialog says: {lines}"
+            close_problems(page)
             assert page.locator("[data-system-unlock]").count() == 1
         page.goto(f"{SYSTEM}/plans/")
         assert page.locator("[data-system-plans]").count() == 0, "System opened after wrong codes"
@@ -847,6 +864,9 @@ def beta_system_refusals(w):
                 page.locator("dialog.fb-modal[open] [data-fb-ok]").click()
             assert nav.value.status == 400, f"Saving '{typed}' answered {nav.value.status} (expected 400)"
             assert page.locator(".sys-rowerr").count() >= 1 and page.locator(".sys-rowerr").first.inner_text().strip(), "No error message is shown"
+            lines = problems_modal(page)  # the failed row is listed in the shared dialog too
+            assert any("price ex vat" in line.lower() for line in lines), f"The problems dialog says: {lines}"
+            close_problems(page)
             assert dbtool("price", "tier-2")["price"] == before, f"The price changed to {dbtool('price', 'tier-2')['price']}"
 
 

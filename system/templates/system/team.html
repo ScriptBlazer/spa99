@@ -2,7 +2,7 @@
 {% block main %}
 {% include "system/_page_header.html" with title="Team" description="Who works on Spa 99, at what level. Being on the team never makes someone a member. Approver can be given to anyone with a level." %}
 <section class="sys-panel" aria-label="Add a team member">
-  <form method="post" action="{% url 'system_team_add' %}" class="sys-team-add" data-system-add-form>{% csrf_token %}
+  <form method="post" action="{% url 'system_team_add' %}" class="sys-team-add" data-problems data-system-add-form>{% csrf_token %}
     <label>Email <input type="email" name="email" required autocomplete="off" placeholder="name@example.com"></label>
     <label>Level <select name="level">{% for value, label in level_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
     <label class="sys-toggle"><input type="checkbox" name="approver" value="1"> <span>{{ approver_label }}</span></label>
@@ -20,7 +20,7 @@
         <td>{% if row.user.is_active %}<span class="sys-badge ok">Active</span>{% else %}<span class="sys-badge">Inactive</span>{% endif %}</td>
         <td class="sys-rolesCell">
           {% if row.can_manage %}
-          <form method="post" action="{% url 'system_team_access' row.user.pk %}" class="sys-team-roles" data-system-access-form data-level="{{ row.level }}" data-approver="{{ row.approver|yesno:'1,0' }}" data-line="Access changes at once." data-system-person-label="{{ row.user.email }}">{% csrf_token %}
+          <form method="post" action="{% url 'system_team_access' row.user.pk %}" class="sys-team-roles" data-problems data-system-access-form data-level="{{ row.level }}" data-approver="{{ row.approver|yesno:'1,0' }}" data-line="Access changes at once." data-system-person-label="{{ row.user.email }}">{% csrf_token %}
             <select name="level" aria-label="Level for {{ row.user.email }}">
               {% for value, label in level_choices %}<option value="{{ value }}"{% if value == row.level %} selected{% endif %}>{{ label }}</option>{% endfor %}
             </select>

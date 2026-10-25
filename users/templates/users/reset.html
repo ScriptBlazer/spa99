@@ -5,7 +5,7 @@
 {% signin_shell as shell %}
 {% include "users/_shell_top.html" %}
       <h1 class="signin-title-sm">Choose a new password.</h1>
-      <form method="post" data-live-validate class="signin-fields" novalidate>{% csrf_token %}
+      <form method="post" data-problems data-live-validate class="signin-fields" novalidate>{% csrf_token %}
         {% include "common/_field.html" with field=form.password toggle=True meter=True hint="At least 10 characters." %}
         <button type="submit" class="btn btn-primary btn-block" data-working-text="Saving">Save password</button>
       </form>

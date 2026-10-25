@@ -33,7 +33,7 @@
             </div>
             <p class="plan-empty" data-plan-empty{% if chosen %} hidden{% endif %}>Choose one. You can change it later.</p>
           </div>
-          <fieldset class="plan-picker">
+          <fieldset class="plan-picker" data-required-group data-label="Membership" data-required-message="Choose a membership to continue.">
             <legend class="sr-only">Choose your membership</legend>
             <div class="plan-chips">
               {% for card in cards %}
@@ -42,7 +42,7 @@
                 {% if card.slug == chosen %}checked{% endif %}><span>{{ card.name }}</span></label>
               {% endfor %}
             </div>
-            <p class="field-error" id="plan_error" role="alert" data-plan-error data-state="error"{% if not form.plan.errors %} hidden{% endif %}>{{ form.plan.errors|join:" "|default:"Choose a membership to continue." }}</p>
+            <p class="field-error" id="plan_error" role="alert" data-group-error data-state="error"{% if not form.plan.errors %} hidden{% endif %}>{{ form.plan.errors|join:" "|default:"Choose a membership to continue." }}</p>
           </fieldset>
           {% if from_journey %}<p class="plan-note"><span class="mark-glyph" aria-hidden="true"></span>{{ r.journey_note.body }}</p>{% endif %}
         </div>
@@ -50,11 +50,11 @@
       </div>
     </aside>
 
-    <form class="form-panel register-panel form-stack" data-reveal method="post" id="register-form" data-register-fetch data-live-validate novalidate
+    <form class="form-panel register-panel form-stack" data-reveal method="post" id="register-form" data-problems="manual" data-register-fetch data-live-validate novalidate
           data-check-email-url="{% url 'check_email' %}" data-login-url="{% url 'login' %}">
       {% csrf_token %}
       <div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
-      {% if form.non_field_errors %}<p class="form-error" role="alert">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+      {% if form.non_field_errors %}<p class="form-error" role="alert" data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
 
       <fieldset class="form-group">
         <legend>Your name</legend>
@@ -83,9 +83,9 @@
       <fieldset class="form-group">
         <legend>Before you register</legend>
         {% url 'terms' as terms_url %}{% url 'privacy' as privacy_url %}
-        {% include "common/_check.html" with field=form.men_only_accepted text="I understand Spa 99 is a men-only spa." link_url=terms_url link_text="Our policy" %}
+        {% include "common/_check.html" with field=form.men_only_accepted text="I understand Spa 99 is a men-only spa." short="Men-only policy" link_url=terms_url link_text="Our policy" %}
         {% include "common/_check.html" with field=form.marketing_opt_in text="Send me occasional news from Spa 99." no_feedback=True %}
-        {% include "common/_check.html" with field=form.privacy_accepted text="Read how we use your details in our" link_url=privacy_url link_text="privacy notice" text_after=", and tick to accept it." %}
+        {% include "common/_check.html" with field=form.privacy_accepted text="Read how we use your details in our" short="Privacy notice" link_url=privacy_url link_text="privacy notice" text_after=", and tick to accept it." %}
       </fieldset>
 
       <div class="form-submit">

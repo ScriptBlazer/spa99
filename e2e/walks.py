@@ -12,7 +12,7 @@ from . import mailbox
 from .kit import (
     CONTROL, NEW_PASSWORD, OFFICE, PASSWORD, RESET_PASSWORD, SITE, STAFF, SYSTEM, UNLOCK_CODE, WORKSPACE_DIR, answer_journey,
     apply_gold, confirm_office_modal, dbtool, fill_date_of_birth, form_errors, manage, no_horizontal_overflow, register_member,
-    sign_in, sign_in_fails, tick, verify_email_link,
+    problems_modal, sign_in, sign_in_fails, tick, verify_email_link,
 )
 
 
@@ -430,6 +430,7 @@ def system(w):
         with other.expect_navigation():
             other.locator("[data-system-signin] button[type=submit]").click()
         assert "/login/" in other.url and other.locator("[data-system-error]").count() == 1, "An Admin got past the System sign-in"
+        assert any("wrong" in line.lower() for line in problems_modal(other)), "The refusal is not listed in the problems dialog"
         for path in ("/", "/plans/", "/changes/"):
             status = other.goto(f"{SYSTEM}{path}").status
             assert status == 404, f"{path} answered {status} to an Admin (expected 404)"
