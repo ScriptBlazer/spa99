@@ -154,8 +154,8 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 .o-list .c-status .o-badge + .o-badge { margin-left: var(--space-1); }
 .o-callout { display: grid; gap: var(--space-1); max-width: none; margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--office-radius); background: var(--office-sunken); color: var(--office-text); font-size: var(--text-sm); line-height: var(--leading-snug); }
 .o-callout > * { margin: 0; max-width: none; }
-.o-callout--back, .o-callout--calm, .o-state--warn { background: var(--office-caramel-tint); }
-.o-state--warn { padding: var(--space-3) var(--space-4); border-radius: var(--office-radius); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-snug); color: var(--office-text); }
+.o-callout--back, .o-callout--calm, .o-warn { background: var(--office-caramel-tint); }
+.o-warn { margin-top: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--office-radius); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-snug); color: var(--office-text); }
 .o-callout--calm { margin-bottom: var(--space-4); }
 .o-callout-title { font-weight: 600; }
 .o-callout .o-sub { color: var(--office-muted); }   /* 5.44 on the caramel tint */

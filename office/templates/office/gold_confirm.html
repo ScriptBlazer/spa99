@@ -10,7 +10,7 @@
   <p class="o-badges">{% include "office/_badge.html" with potential=a.potential %}</p>
   {% if a.property_line %}<p class="o-confirm-line">{{ a.property_line }}</p>{% endif %}
   <p class="o-sub">Applied {{ a.applied|dmy }}</p>
-  {% if final_approver_missing and a.potential == "low" and a.can_approve %}<p class="o-state o-state--warn" data-final-approver-missing>No final approver is set, so a Low potential approval goes through at once. Set one in System, Approval.</p>{% endif %}
+  {% if final_approver_missing and a.potential == "low" and a.can_approve %}<p class="o-warn" data-final-approver-missing>No final approver is set, so a Low potential approval goes through at once. Set one in System, Approval.</p>{% endif %}
   {% if a.can_approve %}
   <form method="post" action="{% url 'office_gold_approve' a.id %}" class="o-confirm-form" data-confirm-form>{% csrf_token %}
     <button type="submit" class="btn btn-primary btn-block o-confirm-go">Approve and send invite</button>
