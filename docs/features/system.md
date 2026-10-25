@@ -122,3 +122,7 @@ Unlocking System asks for the password AND a lock code (digits only, 6 to 12) fr
 ### Email suppressions (2026-10-25)
 
 `/suppressions/` (Developer level, behind the unlock; nav "Email suppressions"): read-only list of `notifications.EmailSuppression` (email, reason, last seen, count) with a **Remove** button (`POST /suppressions/<id>/remove/`). Removing writes a `suppress_removed` security event (detail: email, reason) first; if the event cannot be written nothing is removed. Background: docs/features/email.md.
+
+### Discount contact link (2026-10-25)
+
+`SiteSettings.discount_contact_url` (migration `plans.0012`, blank default, no backfill): "Discount contact link (WhatsApp)" in System > Settings > Wording and tax. https only (the form refuses http); saved through the normal logged path, so it is in the audit log with undo. Shown on the register and choose-membership screens (see `register-interest.md`).

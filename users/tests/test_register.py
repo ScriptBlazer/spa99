@@ -349,3 +349,28 @@ class SignUpNeedsATierTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertContains(response, "Choose a membership to continue.", status_code=400)
         self.assertFalse(User.objects.filter(email="hugo@example.com").exists())
+
+
+class NoPaymentAndDiscountLineTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_register_says_nothing_is_paid_and_no_card_is_taken(self):
+        self.assertContains(Client().get("/register/"), "Nothing to pay now. No card details needed.")
+
+    def test_discount_link_shows_when_set_opens_in_a_new_tab_and_is_marked_on_dev_when_blank(self):
+        url = "https://wa.me/447000000000"
+        SiteSettings.objects.update(discount_contact_url=url)
+        html = Client().get("/register/").content.decode()
+        self.assertIn(f'href="{url}" target="_blank" rel="noopener noreferrer"', html)
+        SiteSettings.objects.update(discount_contact_url="")
+        with override_settings(DEBUG=True):
+            self.assertContains(Client().get("/register/"), "WhatsApp link to come")
+
+    @override_settings(DEBUG=False)
+    def test_discount_line_is_hidden_on_live_while_blank(self):
+        SiteSettings.objects.update(discount_contact_url="")
+        html = Client().get("/register/").content.decode()
+        self.assertNotIn("better rate", html)
+        self.assertNotIn("link to come", html)

@@ -11,6 +11,18 @@ def page_content(page_key):
     return services.page_content(page_key)
 
 
+@register.inclusion_tag("users/_discount_line.html", takes_context=True)
+def discount_line(context):
+    """{% discount_line %}: 'Looking for a better rate? Message Barry on WhatsApp.' with the Site settings link. Empty link:
+    a marked 'link to come' on dev, nothing on live (same rule as the legal fill-later rows)."""
+    from django.conf import settings
+
+    from plans.models import SiteSettings
+
+    site = context.get("site_settings") or SiteSettings.load()
+    return {"url": site.discount_contact_url, "show_placeholder": settings.DEBUG}
+
+
 @register.simple_tag
 def photo(name, alt="", sizes="100vw", eager=False, override=None, css_class=""):
     """{% photo "dry-sauna" alt="..." sizes="(min-width: 64em) 60vw, 100vw" override=section.image %}"""
