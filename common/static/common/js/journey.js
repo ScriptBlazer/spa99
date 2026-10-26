@@ -318,7 +318,9 @@ function renderResult(data) {
       data.others.map((plan) => el('div', { class: 'other-plan' },
         el('div', {}, el('strong', { text: plan.name }), ' ', el('span', { class: 'muted', text: plan.character_line }), plan.not_a_fit ? el('p', { class: 'not-fit', text: copyOf('not_a_fit').body }) : null),
         el('span', { class: 'num', text: `£${plan.price_whole}` }),
-        el('a', { class: 'btn-quiet', href: registerUrl(plan.slug), text: copyOf('others').cta.replace('{plan}', plan.name) }))))
+        el('a', { class: 'btn-quiet', href: registerUrl(plan.slug), text: copyOf('others').cta.replace('{plan}', plan.name) }))),
+      // he has given his email to get here, so the Memberships page is open to him
+      el('p', { class: 'explore-memberships' }, el('a', { class: 'btn-quiet', href: config.urls.membershipsPage, text: copyOf('explore_memberships').cta })))
     : null;
 
   const grid = el('div', { class: `result-grid${presentation === 'panel' ? ' has-gold' : ''}` }, main);

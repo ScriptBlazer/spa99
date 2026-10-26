@@ -37,11 +37,6 @@ class MembershipsSwitchTests(TestCase):
         self.assertEqual(self.client.get("/memberships/").status_code, 200)
         self.assertIn('href="/memberships/"', self.client.get("/visit/").content.decode())
 
-    def test_an_ordinary_signed_in_member_is_sent_to_the_journey_too(self):
-        member = get_user_model().objects.create_user("m@example.com", "x-Pass-123456")
-        self.client.force_login(member)
-        self.assertEqual(self.client.get("/memberships/").status_code, 302)
-
     def test_public_once_switched_on(self):
         open_memberships()
         self.assertEqual(self.client.get("/memberships/").status_code, 200)
@@ -70,3 +65,42 @@ class NoPricesBeforeTheGateTests(TestCase):
         open_memberships()
         self.assertIn("Memberships from £299 a month, £358.80 inc VAT.", self.client.get("/the-spa/").content.decode())
         self.assertIn("&pound;299", self.client.get("/").content.decode())
+
+
+class EmailUnlocksMembershipsTests(TestCase):
+    """2026-10-26: once he has given his email at the journey gate, Memberships is open to him in that browser."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def _journey_cookie(self, email):
+        from journey import services as journey_services
+        session = journey_services.create_session()
+        if email:
+            journey_services.save_lead(session, email, True)
+        self.client.cookies[journey_services.COOKIE_NAME] = session.key
+
+    def test_a_session_with_an_email_opens_the_page_and_the_links(self):
+        self._journey_cookie("lead@example.com")
+        self.assertEqual(self.client.get("/memberships/").status_code, 200)
+        self.assertIn('href="/memberships/"', self.client.get("/visit/").content.decode())
+
+    def test_a_session_without_an_email_is_still_sent_to_the_journey(self):
+        self._journey_cookie("")
+        self.assertEqual(self.client.get("/memberships/").status_code, 302)
+
+    def test_passing_the_gate_unlocks_it_in_the_same_browser(self):
+        import json
+        self.assertEqual(self.client.get("/memberships/").status_code, 302)
+        self.client.post("/journey/lead/", json.dumps({"email": "new@example.com", "consent": True}), content_type="application/json")
+        self.assertEqual(self.client.get("/memberships/").status_code, 200)
+
+    def test_a_signed_in_member_is_let_in(self):
+        self.client.force_login(get_user_model().objects.create_user("m2@example.com", "x-Pass-123456"))
+        self.assertEqual(self.client.get("/memberships/").status_code, 200)
+
+    def test_the_journey_page_gives_the_result_its_memberships_link(self):
+        html = self.client.get("/journey/").content.decode()
+        self.assertIn('"membershipsPage": "/memberships/"', html)
+        self.assertIn("Explore all memberships", html)

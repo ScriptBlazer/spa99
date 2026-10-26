@@ -131,6 +131,7 @@ PAGES = {
          "Apply for the Gold Card", "/gold-card/apply/"),
         ("gold_line", "", "In property? You may be eligible for the Gold Card.", "Apply", "/gold-card/apply/"),
         ("others", "Or choose another", "", "Choose {plan}", ""),
+        ("explore_memberships", "", "", "Explore all memberships", "/memberships/"),
         ("continue", "", "", "Continue", ""),
         ("skip", "", "", "Skip this part", ""),
         ("last", "", "", "See my tailored membership", ""),
