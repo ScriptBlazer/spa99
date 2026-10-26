@@ -307,30 +307,29 @@ class OneTapApprovalTests(OfficeTestCase):
         client.post("/login/", {"username": member.email, "password": "a-long-test-password-1"})
         self.assertEqual(client.session.get_expiry_age(), 1209600)  # Django's two weeks
 
-    def test_viewer_is_refused_and_get_never_approves(self):
+    def test_old_confirm_link_opens_the_full_application_and_get_never_approves(self):
         self.assertEqual(get(staff("Viewer"), self.url).status_code, 403)
         self.assertEqual(get(staff("Manager"), self.url).status_code, 403)  # Admin without Approver
-        self.assertEqual(get(staff("Approver", "ap@example.com"), self.url).status_code, 200)
+        response = get(staff("Approver", "ap@example.com"), self.url + "?t=abc")
+        self.assertEqual((response.status_code, response["Location"]), (302, f"/gold/{self.application.pk}/?t=abc"))
         self.application.refresh_from_db()
         self.assertEqual(self.application.status, "new")  # a GET (even a mail scanner's) changes nothing
         self.assertEqual(len(mail.outbox), 0)
 
     def test_post_approves_once_and_the_page_then_shows_the_state(self):
         owner = staff("Owner")
-        page = get(owner, self.url)
-        self.assertContains(page, "Approve and send invite")
+        page = get(owner, f"/gold/{self.application.pk}/")
         self.assertContains(page, "Dan Cohen")
+        self.assertContains(page, "data-approve")
         post(owner, f"/gold/{self.application.pk}/approve/")
         post(owner, f"/gold/{self.application.pk}/approve/")  # a second tap
         self.application.refresh_from_db()
         self.assertEqual((self.application.status, self.application.invites.count()), ("approved", 1))
-        again = get(owner, self.url)
-        self.assertContains(again, "Already approved")
-        self.assertNotContains(again, "Approve and send invite")
+        self.assertNotContains(get(owner, f"/gold/{self.application.pk}/"), "data-approve")
 
     def test_approver_decides_gold_and_sees_everything_view_only(self):
         approver = staff("Approver")
-        self.assertEqual(get(approver, self.url).status_code, 200)
+        self.assertEqual(get(approver, f"/gold/{self.application.pk}/").status_code, 200)
         self.assertEqual(get(approver, "/gold/").status_code, 200)
         self.assertEqual(post(approver, f"/gold/{self.application.pk}/approve/").status_code, 302)
         self.application.refresh_from_db()

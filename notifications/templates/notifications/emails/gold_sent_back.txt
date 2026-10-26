@@ -6,11 +6,10 @@ A final approver{% if sent_back_by %} ({{ sent_back_by }}){% endif %} has sent t
 Note from the final approver:
 {{ note }}
 {% endif %}
-Approve: {{ approve_url }}
+Review application (approve, decline or respond): {{ approve_url }}
 Decline (asks for a reason in the Office): {{ decline_url }}
 Respond (write to the applicant in the Office): {{ respond_url }}
 View the whole application: {{ view_url }}
-(Approve opens a confirm page in the Office. Nothing is sent until you tap the button there.)
 {% for section in sections %}
 {{ forloop.counter }}. {{ section.title|upper }}
 {% for label, value in section.rows %}{{ label }}: {{ value }}

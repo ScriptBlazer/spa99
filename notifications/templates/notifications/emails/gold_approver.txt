@@ -3,11 +3,10 @@
 {% endif %}Gold Card application: {{ name }}
 {{ potential_label }} potential
 
-Approve: {{ approve_url }}
+Review application (approve, decline or respond): {{ approve_url }}
 Decline (asks for a reason in the Office): {{ decline_url }}
 Respond (write to the applicant in the Office): {{ respond_url }}
 View application: {{ view_url }}
-(Approve opens a confirm page in the Office. Nothing is sent until you tap the button there.)
 {% for section in sections %}
 {{ forloop.counter }}. {{ section.title|upper }}
 {% for label, value in section.rows %}{{ label }}: {{ value }}

@@ -38,7 +38,7 @@ Recorded from every path: the application being saved (`submitted`), approve (Lo
 
 - `GET /gold/<id>/?do=decline|respond|note`: the detail page with that form open (anyone with a level can open the page; the forms only render for approvers).
 - `POST /gold/<id>/decline/` (`reason`, optional `email_applicant=1`, `email_message`), `POST /gold/<id>/respond/` (`message`), `POST /gold/<id>/note/` (`note`). Validation errors answer 400 with the detail page re-rendered, the form open and its text kept; the errors are shown by the shared form-problems modal. Success redirects to the detail page with a toast.
-- Existing: `approve/` (optional `channel=email_link` from the email's confirm page), `resend/`, `final/...` unchanged.
+- Existing: `approve/` (`token` from the email link marks it `email_link`), `resend/`, `final/...` unchanged.
 
 ## Office page
 
@@ -55,7 +55,7 @@ Two new editable emails (System > Emails > Automatic emails): `gold_respond` and
 ## Hardening (review round, 2026-10-26)
 
 - **Database trigger (migration `gold.0010`).** Any UPDATE of a `gold_applicationevent` row is refused by the database itself (so `_base_manager.update`, raw SQL and a shell cannot edit the trail). The single allowed update is Django's `ON DELETE SET NULL` of `actor_id` when a team member's account is deleted (nothing else changes; `actor_label` keeps who it was). **DELETE is still allowed**, because cascade and GDPR erasure need it, so a person with database access can still delete rows: the trigger stops edits, not deletes. Vendor-specific: SQLite (`CREATE TRIGGER ... RAISE(ABORT)`) and PostgreSQL (plpgsql function plus trigger) each have their own SQL; the PostgreSQL branch is not run by the local tests (SQLite only), CI's Postgres run exercises it.
-- **Email-link channel.** The approver email's Approve link carries a signed per-application token (`?t=`, 14 days); the confirm page posts it back and only a valid token records channel `email_link`. A posted `channel` is ignored.
+- **Email-link channel.** The approver email's Approve link carries a signed per-application token (`?t=`, 14 days); the application page (`/gold/<id>/?t=`) keeps it in the Approve form and posts it back and only a valid token records channel `email_link`. A posted `channel` is ignored.
 - **Admin status changes** are recorded whenever the stored status differs after saving, including a history Revert.
 - A form error on an application someone else decided meanwhile redirects with "Already decided by someone else. Nothing was sent."
 - Export includes the text emailed on a decline. Email sent or failed is logged for the approver, final, sent-back, invite, Gold-added, thank-you, respond and decline emails.

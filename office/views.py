@@ -1,7 +1,7 @@
 """Office views. Short: data comes from office.selectors (stored figures) and office.lists (source lists); actions call
 the existing services. Permissions are decorators on every view (see office.permissions)."""
 from datetime import datetime
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from django.contrib import messages
 from django.http import Http404, JsonResponse
@@ -285,8 +285,15 @@ def _gold_page(request, application, status=200, open_form="", form=None):
     context = {"application": lists.gold_detail(application), "section": "gold", "final_approver_missing": not approval.final_approver_exists(),
                "open_form": opened, "decline_prefill": gold_services.declined_prefill(application) if acts else "",
                "form_errors": {field: [str(m) for m in found] for field, found in form.errors.items()} if form is not None else {},
-               "form_values": form.data if form is not None else {}}
+               "form_values": form.data if form is not None else {},
+               # the approver email's signed token rides along so the audit says the approval came from the email link
+               "approve_token": _email_token(request, application) if acts else ""}
     return render(request, "office/gold_detail.html", context, status=status)
+
+
+def _email_token(request, application):
+    token = request.GET.get("t", "")
+    return token if token and approval.approve_token_is_valid(token, application) else ""
 
 
 @reader
@@ -301,13 +308,11 @@ def gold_application(request, pk):
 @require_GET
 @never_cache
 def gold_approve_confirm(request, pk):
-    """The page Barry's email button opens: sign-in and Owner/Manager come first (middleware, then @admin). GET only
-    shows the application; the tap POSTs to gold_approve, which holds the approval logic."""
+    """Old email links (before 2026-10-26) pointed here: send them to the full application page, keeping the token."""
     application = get_object_or_404(GoldApplication, pk=pk)
     token = request.GET.get("t", "")
-    context = {"application": lists.gold_confirm(application), "section": "gold", "final_approver_missing": not approval.final_approver_exists(),
-               "approve_token": token if approval.approve_token_is_valid(token, application) else ""}
-    return render(request, "office/gold_confirm.html", context)
+    url = reverse("office_gold_application", args=[application.pk])
+    return redirect(f"{url}?{urlencode({'t': token})}" if token else url)
 
 
 def _act(request, pk, action):
