@@ -23,6 +23,14 @@ def discount_line(context):
     return {"url": site.discount_contact_url, "show_placeholder": settings.DEBUG}
 
 
+@register.inclusion_tag("content/_gold_fee_note.html")
+def gold_fee_note(css_class="fee-note"):
+    """{% gold_fee_note %}: '*An annual admin fee of £299 + VAT applies.' from the Gold plan's annual fee; nothing while empty."""
+    from plans.services import gold_fee_note as note
+
+    return {"note": note(), "css_class": css_class}
+
+
 @register.simple_tag
 def photo(name, alt="", sizes="100vw", eager=False, override=None, css_class=""):
     """{% photo "dry-sauna" alt="..." sizes="(min-width: 64em) 60vw, 100vw" override=section.image %}"""

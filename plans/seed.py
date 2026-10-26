@@ -45,7 +45,7 @@ PLANS = [
     },
     {
         "slug": "gold", "name": "Gold Card", "kind": Plan.FREE_BY_APPLICATION, "price_ex_vat": Decimal("0.00"),
-        "annual_fee": Decimal("199.00"),  # ex VAT like every plan price; editable in System > Plans (2026-10-26)
+        "annual_fee": Decimal("299.00"),  # ex VAT like every plan price; editable in System > Plans (2026-10-26)
         "visits_per_month": None, "hours": Plan.ANY_TIME, "booking_window_days": 7, "upcoming_limit": 3,
         "cancel_hours": 5, "guests_per_month": 2, "no_show_result": "Booking window drops to today + 3",
         "perks": [
@@ -56,7 +56,7 @@ PLANS = [
             {"key": "events", "label": "BML members' events", "value": "Yes", "phrase": "BML members' events",
              "note": GOLD_PERK_NOTES["events"]},
         ],
-        "short_description": "Free, by application. For people in property.", "order": 4,
+        "short_description": "Free{gold_star}, by application. For people in property.", "order": 4,
     },
     {
         "slug": "single-visit", "name": "Single visit", "kind": Plan.ONE_OFF, "price_ex_vat": Decimal("99.00"),

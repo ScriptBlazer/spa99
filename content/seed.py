@@ -33,7 +33,7 @@ PAGES = {
         ("lounge_caption", "The lounge.", "", "", ""),
         ("journey_entry", "Which membership suits you?", "A few taps. Under two minutes.", "Tailor your membership", "/journey/"),
         ("memberships_teaser", "Three memberships. One single visit.", "", "Compare memberships", "/memberships/"),
-        ("gold_teaser", "The Gold Card.", "For people in property. Free, by application.", "About the Gold Card", "/gold-card/"),
+        ("gold_teaser", "The Gold Card.", "For people in property. Free{gold_star}, by application.", "About the Gold Card", "/gold-card/"),
         ("opening_label", "", "Launching", "", ""),
         ("opening", "{opening}.", "BML House, 99c Vale Road, London N4.", "Register", "/register/"),
     ]),
@@ -83,7 +83,7 @@ PAGES = {
         ("intro", "Memberships.", "Choose when you come and how often.", "", ""),
         ("not_sure", "Not sure?", "", "Tailor your membership", "/journey/"),
         ("compare", "Compare memberships.", "Every membership, side by side.", "Compare memberships", "#compare"),
-        ("gold_cta", "", "The Gold Card is free, by application.", "Apply for the Gold Card", "/gold-card/apply/"),
+        ("gold_cta", "", "The Gold Card is free{gold_star}, by application.", "Apply for the Gold Card", "/gold-card/apply/"),
         ("every_visit", "", "Every visit: every room and all areas, as long as you like. Free drinks and free ice lollies. Come with nothing: towels, robe, slippers, toiletries and trunks are supplied.", "See the spa", "/the-spa/"),
         ("gold_line", "", "There is also the Gold Card, for people in property.", "About the Gold Card", "/gold-card/"),
         ("price_note", "", "Prices including VAT are shown under each price.", "", ""),
@@ -92,8 +92,8 @@ PAGES = {
         ("recommended_label", "Recommended", "", "", ""),
         ("single_note", "", "Single visits open with booking.", "", ""),
     ]),
-    "gold": ("Gold Card", "The Spa 99 Gold Card: free, by application, for people in property.", [
-        ("hero", "The Gold Card.", "For people who own, build and manage property. Free, by application.", "Apply", "/gold-card/apply/"),
+    "gold": ("Gold Card", "The Spa 99 Gold Card: free{gold_star}, by application, for people in property.", [
+        ("hero", "The Gold Card.", "For people who own, build and manage property. Free{gold_star}, by application.", "Apply", "/gold-card/apply/"),
         ("who", "Who it is for.",
          "Owners and investors\nDevelopers\nBlock, estate and portfolio managers\nPeople at property and management firms\nAgents and brokers\nProperty lawyers", "", ""),
         ("who_note", "", "Not in property? You're still welcome to apply.", "", ""),
@@ -127,7 +127,7 @@ PAGES = {
         ("result_cta", "", "", "Register for {plan}", "/register/"),
         ("change_answers", "", "", "Start again", ""),  # same wording as start_again; the page reads start_again
         ("gold_panel", "The Gold Card.",
-         "With your line of work, you may be invited to hold the Gold Card. It's free, by application, and your answers come with you.",
+         "With your line of work, you may be invited to hold the Gold Card. It's free{gold_star}, by application, and your answers come with you.",
          "Apply for the Gold Card", "/gold-card/apply/"),
         ("gold_line", "", "You may be eligible for the Gold Card.", "Apply", "/gold-card/apply/"),
         ("others", "Or choose another", "", "Choose {plan}", ""),

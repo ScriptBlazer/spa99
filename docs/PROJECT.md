@@ -444,3 +444,4 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-26 | Moishe: Ice bucket is a room of its own (Facility), after Showers, on Home "What's inside" and The spa page, with its picture. |
 | 2026-10-26 | Moishe: in System > Audit log, Undo on a change made by a person works at once (as now); Undo on a change made by a script asks for the System code again before it runs. |
 | 2026-10-26 | Moishe: Gold Card annual admin fee is £299 + VAT (replaces £199). Wherever the site says the Gold Card is free, add an asterisk: "free*", with "*An annual admin fee of £299 + VAT applies." (amount from the plan's annual fee). |
+| 2026-10-26 | Moishe: add a note that images are for illustration only and will be updated mid-December; and on the virtual tour, that it is an impression and the real spa will look similar. |

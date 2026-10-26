@@ -15,6 +15,7 @@ from journey import services as journey_services
 from journey.copy import GATE as JOURNEY_GATE
 from journey.models import Option, Question
 from gold.models import GoldApplication
+from plans import services as plan_services
 from plans.models import SiteSettings
 
 from . import services
@@ -167,6 +168,7 @@ def journey(request, slug=""):
                  "memberships": reverse("memberships") if shown else reverse("journey"),
                  "membershipsPage": reverse("memberships")},  # the result link: he has passed the gate by then
         "membershipsHidden": not shown,
+        "goldFeeNote": plan_services.gold_fee_note(),  # shown under the Gold panel; '' while the fee is empty
     }
     if not shown:  # Memberships is hidden: fallbacks send him back into the journey, not to a page that is not there
         again = config["copy"]["start_again"]["cta"] or "Start again"

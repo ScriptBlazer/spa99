@@ -31,6 +31,7 @@ Source: `Spa 99 - Rules and System Spec.pdf` v1.0, 16 Oct 2026 (255 rules, 53 sc
 | EXT-06 | Moishe: Leil Shishi is hidden everywhere on the public site for now (cards, compare table, Register, Gold Card page). Data kept; Site settings "show Leil Shishi" (default off) brings it back. Status stays OPTIONAL: nothing is built. | 2026-10-26 |
 | MEM-02a | Moishe: the Gold Card has a yearly fee, amount not decided (£99 to £200 discussed). Stored as `Plan.annual_fee` (ex VAT), empty until decided. The compare table says "By application" while empty and "£X a year" once set. Gold is shown in the compare table as its own column. | 2026-10-26 |
 | MEM-02a | Moishe: the Gold Card annual fee is £199 a year by default (ex VAT, as stored in `Plan.annual_fee`; compare shows "£199 a year", inc VAT in the second row), editable in System > Plans. | 2026-10-26 |
+| MEM-02a | Moishe (update): the Gold Card annual admin fee default is £299 + VAT a year (was £199); compare shows "£299 a year" (£358.80 inc VAT). Wherever the site says the Gold Card is free it reads "free*" with the note "*An annual admin fee of £299 + VAT applies.", the amount taken from `Plan.annual_fee`; with no fee set it says plain "free" and no note. | 2026-10-26 |
 | CAL-07 | Moishe: bookings are allowed up to 1 hour before closing for Shabbos and Yom Tov. Applies when the booking system is built (status: decided, not built). | 2026-10-26 |
 
 ## Glossary

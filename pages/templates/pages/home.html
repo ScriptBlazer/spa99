@@ -217,6 +217,7 @@
       <div class="gold-text">
         <h2 id="gold-title" class="statement" data-rise>{{ home.gold_teaser.heading }}</h2>
         <p data-fade>{{ home.gold_teaser.body }}</p>
+        <div data-fade>{% gold_fee_note %}</div>
         {% if gold_perks %}<ul class="pills" aria-label="What the Gold Card holds">{% for perk in gold_perks %}<li class="pill" data-pill>{{ perk }}</li>{% endfor %}</ul>{% endif %}
         <a class="btn-quiet" data-fade href="{% url 'gold_card' %}">{{ home.gold_teaser.cta_label }}</a>
       </div>

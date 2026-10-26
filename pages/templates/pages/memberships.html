@@ -16,6 +16,7 @@
       {% if gold_cta and m.gold_cta.cta_label %}{% url 'gold_apply' as gold_apply_url %}
       <div class="mem-gold mem-fade">
         <p class="mem-gold-hook">{% include "common/_mark.html" %}<span>{{ m.gold_cta.body }}</span></p>
+        {% gold_fee_note %}
         <a class="btn btn-secondary mem-gold-btn" href="{{ m.gold_cta.cta_url|default:gold_apply_url }}">{{ m.gold_cta.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
       </div>
       {% endif %}

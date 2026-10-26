@@ -327,6 +327,7 @@ function renderResult(data) {
   if (presentation === 'panel') {
     grid.append(el('div', { class: 'result-gold', 'data-reveal': '' }, el('div', { class: 'gold-panel' },
       goldMark(), el('h2', { text: goldPanelCopy.heading }), el('p', { text: goldPanelCopy.body }),
+      config.goldFeeNote ? el('p', { class: 'fee-note', text: config.goldFeeNote }) : null,
       el('a', { class: 'btn btn-primary', href: config.urls.goldApply }, goldPanelCopy.cta, ' ', arrowIcon()))));
   }
   if (others) grid.append(others);

@@ -121,6 +121,25 @@ def annual_fee_text(plan, vat_rate=None, inc=False):
     return f"£{trim_price(amount)} a year"
 
 
+GOLD_STAR = "{gold_star}"
+
+
+def gold_annual_fee():
+    """The Gold plan's annual admin fee (ex VAT), or None while empty."""
+    return Plan.objects.filter(slug="gold").values_list("annual_fee", flat=True).first()
+
+
+def gold_star(fee=None):
+    """'*' after the word free in Gold copy while a fee is set (Moishe, 2026-10-26), else ''. Copy writes {gold_star}."""
+    return "*" if (fee if fee is not None else gold_annual_fee()) is not None else ""
+
+
+def gold_fee_note(fee=None):
+    """'*An annual admin fee of £299 + VAT applies.' from the Gold plan's annual fee (ex VAT); '' while it is empty."""
+    fee = fee if fee is not None else gold_annual_fee()
+    return "" if fee is None else f"*An annual admin fee of £{trim_price(fee)} + VAT applies."
+
+
 def plan_pills(plan, ranges=None):
     """The ordered chips for a tier on the memberships page: hours, booking window, bookings at a time, guests,
     then any perk with a `pill` text. All words come from the row and the opening rules."""
@@ -172,7 +191,7 @@ def plan_display(plan, vat_rate=None, ranges=None):
         "annual_fee": plan.annual_fee,
         "annual_fee_text": annual_fee_text(plan, vat_rate),
         "annual_fee_inc_text": annual_fee_text(plan, vat_rate, inc=True),
-        "short_description": plan.short_description,
+        "short_description": plan.short_description.replace(GOLD_STAR, gold_star(plan.annual_fee) if plan.slug == "gold" else ""),
         "highlight": plan.highlight,
         "interest_allowed": plan.interest_allowed,
         "facts": plan_facts(plan),

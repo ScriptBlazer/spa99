@@ -11,6 +11,7 @@
     <div class="gold-hero-text">
       <h1 id="gold-title" class="statement" data-rise>{{ g.hero.heading }}</h1>
       <p class="lead" data-fade>{{ g.hero.body }}</p>
+      <div data-fade>{% gold_fee_note %}</div>
       <div class="actions" data-fade><a class="btn btn-primary btn-block-phone" href="{% url 'gold_apply' %}">{{ g.hero.cta_label }}</a></div>
     </div>
     {% include "common/_gold_card.html" with variant="hero" %}
