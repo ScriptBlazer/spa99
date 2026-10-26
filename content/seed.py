@@ -64,10 +64,12 @@ PAGES = {
         ("next", "Find the right way to visit.", "", "Tailor your membership", "/journey/"),
         ("next_from", "", "Memberships from {price} a month, {price_inc} inc VAT.", "", ""),
         ("next_link", "", "", "See memberships", "/memberships/"),
+        ("images_note", "", "Images are for illustration only. Real photos from mid-December.", "", ""),  # 2026-10-26: shown once, before How a visit works
         ("tour_link", "", "", "Take the tour", ""),  # 2026-10-23: the link on each toured room (cta_url is built in code)
     ]),
     "tour": ("Virtual tour", "Look around the lounge, the saunas, the relaxing zone and the gym at Spa 99, BML House, 99c Vale Road, London N4.", [
         ("intro", "Virtual tour", "Look around the rooms, then walk through.", "", ""),
+        ("impression_note", "", "A 3D impression of Spa 99. The finished spa will look similar.", "", ""),  # 2026-10-26: under the room caption
         ("hint", "", "Drag to look around.", "", ""),
         ("hint_tilt", "", "Tilt or drag to look around.", "", ""),
         ("tilt", "", "Tilt is off in your settings. Drag to look around.", "Tilt", ""),
@@ -78,6 +80,9 @@ PAGES = {
         ("room_gym", "", "Free weights and machines, in low warm light.", "See it on The spa", ""),
         ("room_kitchenette", "", "A quiet corner for a warm drink and a low chair.", "See it on The spa", ""),
         ("room_massage_room", "", "Slatted oak, soft light and a fire to settle beside.", "See it on The spa", ""),
+    ]),
+    "site": ("Whole site", "Lines shared by every page.", [
+        ("images_note", "", "Images are for illustration only. Real photos from mid-December.", "", ""),  # 2026-10-26: public footer
     ]),
     "memberships": ("Memberships", "Spa 99 memberships and single visits, with prices ex VAT and inc VAT.", [
         ("intro", "Memberships.", "Choose when you come and how often.", "", ""),

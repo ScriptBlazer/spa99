@@ -1,4 +1,4 @@
-{% load pages_tags membership_tags %}<footer class="site-footer on-dark">
+{% load pages_tags membership_tags content_tags %}<footer class="site-footer on-dark">
   <div class="container footer-grid">
     <div class="footer-brand">
       <a class="brand" href="{% url 'home' %}" aria-label="Spa 99, home">{% include "common/_logo.html" %}</a>
@@ -19,6 +19,8 @@
       {% hours_note as hours_line %}{% if hours_line %}<span class="muted">{{ hours_line }}</span>{% endif %}
     </address>
   </div>
+  {% page_content "site" as site_copy %}
+  {% if site_copy.images_note.body %}<div class="container"><p class="images-note small muted">{{ site_copy.images_note.body }}</p></div>{% endif %}
   <div class="container footer-legal small muted">
     <span>Men only. 18 and over.</span>
     <a href="{% url 'privacy' %}">Privacy</a>
