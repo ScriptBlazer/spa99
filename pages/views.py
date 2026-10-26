@@ -13,6 +13,7 @@ from django.views.decorators.http import require_GET
 from content import services as content
 from journey import services as journey_services
 from journey.models import Option, Question
+from gold.models import GoldApplication
 from plans.models import SiteSettings
 
 from . import services
@@ -70,7 +71,8 @@ def spa(request):
 @require_GET
 def memberships(request):
     cards = services.purchasable_plans()
-    return _page(request, "pages/memberships.html", "memberships", cards=cards, table=services.compare_table(cards),
+    gold_cta = not (request.user.is_authenticated and GoldApplication.objects.filter(user=request.user).exists())
+    return _page(request, "pages/memberships.html", "memberships", cards=cards, gold_cta=gold_cta, table=services.compare_table(cards),
                  tiers=[c for c in cards if c["interest_allowed"]], single=next((c for c in cards if c["is_single"]), None),
                  selected_slug=services.selected_plan_slug(request, cards), every_visit=services.every_visit(),
                  vat_rate=SiteSettings.load().vat_rate.normalize())

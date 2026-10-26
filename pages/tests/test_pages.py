@@ -111,6 +111,30 @@ class PageTests(TestCase):
         self.assertIn("Every visit: every room, as long as you like.", html)
         self.assertIn('href="/the-spa/">See the spa', html)
 
+    def test_memberships_round_4_gold_invitation_and_compare_section(self):
+        from content.models import Section
+        from gold.models import GoldApplication
+        html = self.client.get("/memberships/").content.decode()
+        self.assertIn('class="mem-gold', html)
+        self.assertIn("Apply for the Gold Card", html)
+        self.assertIn('href="/gold-card/apply/"', html)
+        self.assertIn('id="compare"', html)
+        self.assertNotIn("<details", html)
+        self.assertNotIn("gold-aside", html)
+        self.assertLess(html.index('id="compare"'), html.index("every-visit"))
+        # off switch: clearing the button label in Control hides it
+        Section.objects.filter(page__key="memberships", key="gold_cta").update(cta_label="")
+        self.assertNotIn('class="mem-gold', self.client.get("/memberships/").content.decode())
+        Section.objects.filter(page__key="memberships", key="gold_cta").update(cta_label="Apply for the Gold Card")
+        # any application on the signed-in account hides it; a signed-in user without one still sees it
+        user = get_user_model().objects.create_user(email="gold-r4@example.com", password="x-Strong-pass-1")
+        self.client.force_login(user)
+        self.assertTrue(self.client.get("/memberships/").context["gold_cta"])
+        GoldApplication.objects.create(first_name="A", last_name="B", email="gold-r4@example.com", user=user, status=GoldApplication.DECLINED)
+        resp = self.client.get("/memberships/")
+        self.assertFalse(resp.context["gold_cta"])
+        self.assertNotIn('class="mem-gold', resp.content.decode())
+
     def test_spa_page_lists_every_facility_with_a_finished_image_or_placeholder(self):
         Facility.objects.filter(slug="wet-sauna").update(image_name="")
         html = self.client.get("/the-spa/").content.decode()

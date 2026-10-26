@@ -80,7 +80,8 @@ PAGES = {
     "memberships": ("Memberships", "Spa 99 memberships and single visits, with prices ex VAT and inc VAT.", [
         ("intro", "Memberships.", "Choose when you come and how often.", "", ""),
         ("not_sure", "Not sure?", "", "Tailor your membership", "/journey/"),
-        ("compare", "Compare everything", "", "", ""),
+        ("compare", "Compare memberships.", "Every membership, side by side.", "Compare memberships", "#compare"),
+        ("gold_cta", "", "The Gold Card is free, by application.", "Apply for the Gold Card", "/gold-card/apply/"),
         ("every_visit", "", "Every visit: every room, as long as you like.", "See the spa", "/the-spa/"),
         ("gold_line", "", "There is also the Gold Card, for people in property.", "About the Gold Card", "/gold-card/"),
         ("price_note", "", "Prices including VAT are shown under each price.", "", ""),
