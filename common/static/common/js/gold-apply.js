@@ -47,6 +47,9 @@ function loadForm() {
 function saveForm() {
   try { sessionStorage.setItem(STORE, JSON.stringify(form)); } catch { /* private mode: it still works on this page */ }
 }
+/** What he does is a list (multi-select). Older saved forms and links hold one value: that counts as a list of one. */
+const industries = () => (Array.isArray(form.industry) ? form.industry : form.industry ? [form.industry] : []);
+
 function setField(name, value) {
   form[name] = value;
   saveForm();
@@ -84,12 +87,12 @@ function field(name, label, { optional = true, help = '', type = 'text', autocom
     el('p', { class: 'feedback', 'data-error-for': name, id: `error-${name}`, 'aria-live': 'polite', 'data-hint': help || hint, 'data-good': rules ? 'Looks right' : '', 'data-state': 'hint', text: help || hint }));
 }
 
-function choiceGroup(name, title, optionList, { kind = '', help = '', layout = 'tiles', cls = 'tiles tiles--stack', sub = false, hidden = false } = {}) {
+function choiceGroup(name, title, optionList, { kind = '', help = '', layout = 'tiles', cls = 'tiles tiles--stack', sub = false, hidden = false, multi = false } = {}) {
   const labelId = `l-${name}`;
-  const isChecked = (value) => form[name] === value;
+  const isChecked = (value) => (multi ? industries().includes(value) : form[name] === value);
   const controls = layout === 'segmented'
     ? segmentedEl({ name, options: optionList, labelledby: labelId, isChecked, dataset: { g: name } })
-    : el('div', { class: cls }, optionList.map((o) => tileEl({ name, value: o.value, label: o.label, kind, checked: isChecked(o.value), dataset: { g: name } })));
+    : el('div', { class: cls }, optionList.map((o) => tileEl({ name, value: o.value, label: o.label, kind, multi, checked: isChecked(o.value), dataset: { g: name } })));
   return el('fieldset', { class: `question${sub ? ' sub-question' : ''}`, dataset: { group: name }, hidden },
     el('legend', {}, el('span', { id: labelId, text: title })),
     help ? el('span', { class: 'question-help', text: help }) : null,
@@ -97,8 +100,8 @@ function choiceGroup(name, title, optionList, { kind = '', help = '', layout = '
     el('p', { class: 'feedback flow-error', 'data-error-slot': name, 'aria-live': 'polite', 'data-state': 'hint' }));
 }
 
-const isProperty = () => (options.property_when?.any_of || ['property']).includes(form.industry);
-const isOther = () => form.industry === (options.industry.other_value || 'other');
+const isProperty = () => industries().some((v) => (options.property_when?.any_of || ['property']).includes(v));
+const isOther = () => industries().includes(options.industry.other_value || 'other');
 
 function screenAbout() {
   const ind = options.industry;
@@ -110,12 +113,12 @@ function screenAbout() {
   const other = el('div', { class: 'question sub-question', dataset: { sub: 'industry_other' }, hidden: !isOther() },
     el('div', { class: 'field' }, el('label', { for: otherId }, ind.other_label || 'Tell us more', el('span', { class: 'optional' }, ' (optional)')), otherInput));
   return [
-    choiceGroup('industry', ind.question, ind.options, { cls: 'tiles tiles--4' }),
+    choiceGroup('industry', ind.question, ind.options, { cls: 'tiles tiles--4', multi: true, help: 'Choose at least one.' }),
     other,
     choiceGroup('property_link', 'Your link to property', options.property_link.filter((o) => o.value !== 'none'), { cls: 'tiles tiles--stack', sub: true, hidden: !isProperty() }),
     choiceGroup('size_range', 'How large?', options.size_range, { layout: 'segmented', help: 'Units or properties', sub: true, hidden: !isProperty() }),
     choiceGroup('location', 'Where?', options.location, { cls: 'tiles tiles--2' }),
-    choiceGroup('bml_relationship', 'Do you work with BML?', options.bml_relationship, { layout: 'segmented' }),
+    choiceGroup('bml_relationship', 'Are you BML staff?', options.bml_relationship, { layout: 'segmented' }),
     el('div', { class: 'question' },
       el('p', { class: 'question-title', text: 'Company and role' }),
       el('div', { class: 'field-pair fieldset-gap' }, field('company', 'Company'), field('role', 'Role'))),
@@ -280,7 +283,7 @@ function markChoice(name, message) {
 function next() {
   if (current === 1) {
     const missing = [];
-    if (!form.industry) missing.push(markChoice('industry', 'Choose the one closest to what you do.'));
+    if (!industries().length) missing.push(markChoice('industry', 'Choose at least one.'));
     if (isProperty() && !form.property_link) missing.push(markChoice('property_link', 'Choose your link to property.'));
     if (missing.length) { showProblems(root, missing, { opener: root.querySelector('[data-primary]') }); return; }
   }
@@ -361,8 +364,12 @@ root.addEventListener('change', (event) => {
   if (input.dataset?.g) {
     setField(input.dataset.g, input.value);
     if (input.dataset.g === 'industry') {
-      journeyAnswers.industry = { options: [input.value], skipped: false };
-      saveJourney('industry');
+      const picked = [...root.querySelectorAll('input[data-g="industry"]:checked')].map((i) => i.value);
+      setField('industry', picked);
+      if (picked.length) { // the journey needs at least one choice: an empty list is not saved (the form still asks)
+        journeyAnswers.industry = { options: picked, skipped: false };
+        saveJourney('industry');
+      }
       syncAbout();
       revealFollowUp();
     }
@@ -405,9 +412,10 @@ async function boot() {
   journey.screens.flatMap((s) => s.questions).forEach((q) => {
     if (q.answer) journeyAnswers[q.key] = { options: q.answer.options || [], text: q.answer.text || undefined, skipped: Boolean(q.answer.skipped) };
   });
-  if (!form.industry && journeyAnswers.industry?.options?.length) form.industry = journeyAnswers.industry.options[0];
-  if (!form.industry && form.property_link && form.property_link !== 'none') form.industry = 'property';
-  if (form.industry && form.industry_other === undefined && journeyAnswers.industry_other?.text) form.industry_other = journeyAnswers.industry_other.text;
+  form.industry = industries(); // a form saved before the multi-select held one value
+  if (!form.industry.length && journeyAnswers.industry?.options?.length) form.industry = [...journeyAnswers.industry.options];
+  if (!form.industry.length && form.property_link && form.property_link !== 'none') form.industry = ['property'];
+  if (form.industry.length && form.industry_other === undefined && journeyAnswers.industry_other?.text) form.industry_other = journeyAnswers.industry_other.text;
   const slug = location.pathname.split('/').filter(Boolean).pop();
   let step = stepForSlug(slug) || 1;
   if (step === SENT_STEP && !sessionStorage.getItem(SENT)) step = 1;

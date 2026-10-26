@@ -12,7 +12,7 @@
     </div>
   </div>
   <div class="container flow-note"><p class="small muted"><a href="{% url 'privacy' %}">How we use your answers</a></p></div>
-  <noscript><div class="container flow-container"><p class="lead">The guided journey needs JavaScript. You can <a href="{% url 'memberships' %}">see the memberships</a> instead.</p></div></noscript>
+  <noscript><div class="container flow-container"><p class="lead">The guided journey needs JavaScript. Please turn JavaScript on to see your membership.</p></div></noscript>
 </div>
 {{ journey_config|json_script:"journey-config" }}
 {% endblock %}

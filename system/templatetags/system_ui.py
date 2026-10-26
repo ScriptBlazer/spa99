@@ -11,8 +11,10 @@ register = template.Library()
 RISKY = {
     "price_ex_vat": ("price", "prices", "Members see the new price at once."),
     "price": ("price", "prices", "Members see the new price at once."),
+    "annual_fee": ("annual fee", "annual fees", "The Gold Card fee on the compare table changes at once."),
     "vat_rate": ("VAT rate", "VAT rates", "Every price shown includes the new rate at once."),
     "register_interest_open": ("stage switch", "stage switches", "The public site changes at once."),
+    "memberships_public": ("stage switch", "stage switches", "The Memberships page and its links appear or disappear for the public at once."),
     "subscribe_open": ("stage switch", "stage switches", "The public site changes at once."),
     "booking_open": ("stage switch", "stage switches", "Booking opens or closes to the public at once."),
     "opening_date": ("opening date", "opening dates", "The date shown to the public changes at once."),

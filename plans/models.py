@@ -29,7 +29,7 @@ class Plan(BaseModel):
     ]
     DAYTIME_ONLY = "daytime"
     ANY_TIME = "any"
-    HOURS_CHOICES = [(DAYTIME_ONLY, "Daytime only"), (ANY_TIME, "Any time")]
+    HOURS_CHOICES = [(DAYTIME_ONLY, "Off-peak only"), (ANY_TIME, "Any time")]
 
     slug = models.SlugField(unique=True, help_text="Stable key used by the journey and rules, e.g. tier-2. Do not rename.")
     name = models.CharField(max_length=60)
@@ -51,9 +51,12 @@ class Plan(BaseModel):
                   'Flexible: add any perk. "phrase" is the short line on the Gold Card page (empty = the label). '
                   '"pill" is the short chip on the memberships page (empty = no chip).',
     )
+    annual_fee = models.DecimalField(
+        "annual fee ex VAT", max_digits=8, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal("0"))],
+        help_text="Gold Card only, per year. Empty = not decided: the compare table says 'By application'. Set it and it shows 'a year'.")
     short_description = models.CharField(max_length=200, blank=True)
     tagline = models.CharField(
-        max_length=80, blank=True, help_text="One calm line under the name. Empty = Daytime / Any time / Unlimited.")
+        max_length=80, blank=True, help_text="One calm line under the name. Empty = Off-peak / Any time / Unlimited.")
     image = models.FileField(
         upload_to=plan_image_path, blank=True, help_text="Picture on the memberships page. Wins over the render.")  # default storage: S3 on live
     render = models.CharField(
@@ -114,11 +117,19 @@ class SiteSettings(BaseModel):
         max_length=60, default="January 2027", blank=True,
         help_text='Shown as the opening time while the opening date is empty, e.g. "January 2027". Used by the {opening} placeholder in site copy.',
     )
-    address_street = models.CharField(max_length=120, default="99 Vale Road")
+    address_street = models.CharField(max_length=120, default="BML House, 99c Vale Road")
     address_town = models.CharField(max_length=80, default="London")
     address_postcode = models.CharField(max_length=12, default="N4 1PR")
 
+    show_leil_shishi = models.BooleanField(
+        "show Leil Shishi", default=False,
+        help_text="Off for now (Moishe, 2026-10-26): Leil Shishi is hidden on the cards, the compare table, Register and the Gold Card page. Nothing is deleted; turn on to show it again.")
+
     register_interest_open = models.BooleanField(default=True, help_text="Stage A: accounts and Gold applications.")
+    memberships_public = models.BooleanField(
+        default=False,
+        help_text="Off until opening: the Memberships page and its links are hidden and the journey is the way in (the journey asks for an email "
+                  "first). Team members can still open the page to check it.")
     subscribe_open = models.BooleanField(default=False, help_text="Stage B: checkout (Phase 2).")
     booking_open = models.BooleanField(default=False, help_text="Stage C: bookings (Phase 3).")
     notify_booking_open = models.BooleanField(
@@ -200,7 +211,7 @@ class SiteSettings(BaseModel):
 
     @property
     def address_one_line(self):
-        """'99 Vale Road, London N4 1PR'."""
+        """'BML House, 99c Vale Road, London N4 1PR'."""
         town_line = " ".join(part for part in (self.address_town, self.address_postcode) if part)
         return ", ".join(part for part in (self.address_street, town_line) if part)
 
@@ -222,8 +233,8 @@ class OpeningRule(BaseModel):
     CLOSE_BEFORE_CANDLES = "close_before_candles"
     OPEN_AFTER_NIGHTFALL = "open_after_end"
     KIND_CHOICES = [
-        (PERIOD, "Open period (daytime, evening)"),
-        (DAILY_CLOSURE, "Closed every day"),
+        (PERIOD, "Open period (off-peak, peak)"),
+        (DAILY_CLOSURE, "Cleaning hours (every day)"),
         (CLOSE_BEFORE_CANDLES, "Close before candle lighting (Friday, Yom Tov)"),
         (OPEN_AFTER_NIGHTFALL, "Open after Shabbos / Yom Tov ends"),
     ]
@@ -303,10 +314,12 @@ class Facility(BaseModel):
     FEATURE = "feature"
     TILE = "tile"
     COMPANION = "companion"
+    COMPACT = "compact"
     DISPLAY_CHOICES = [
         (FEATURE, "Feature (large picture, own section)"),
         (TILE, "Tile (small portrait, in a row)"),
         (COMPANION, "Companion (small, beside the feature before it)"),
+        (COMPACT, "Compact (one smaller picture, own short section)"),
     ]
     FACTS_MAX = 4
     FACT_MAX_LENGTH = 32

@@ -3,12 +3,14 @@ from django.test import TestCase
 
 from plans import sales
 from plans.management.commands.seed_phase1 import seed_all
+from plans.tests.helpers import open_memberships
 from plans.tests.test_sales import make_sale
 
 
 class SalePageTests(TestCase):
     def setUp(self):
         seed_all()
+        open_memberships()
 
     def test_no_sale_no_bar(self):
         html = self.client.get("/").content.decode()

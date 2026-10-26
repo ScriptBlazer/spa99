@@ -39,6 +39,11 @@ class JourneySession(BaseModel):
     completed = models.BooleanField(default=False, help_text="Reached the result.")
     completed_at = models.DateTimeField(null=True, blank=True)
 
+    # The email gate before the result (docs/features/journey.md "Email gate"). Empty for people who were signed in.
+    lead_email = models.EmailField(blank=True, db_index=True, help_text="Left before seeing the suggested membership. Personal data: never shown publicly.")
+    lead_at = models.DateTimeField(null=True, blank=True, help_text="When the address was given (and the 'we may email you about opening' line accepted).")
+    lead_privacy_version = models.CharField(max_length=20, blank=True, help_text="Privacy notice version in force when the address was given.")
+
     # A Gold application points back at the session (GoldApplication.journey_session); see session.gold_applications.
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="journey_sessions"

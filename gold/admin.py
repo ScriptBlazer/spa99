@@ -35,13 +35,17 @@ class GoldInviteInline(admin.TabularInline):
 
 @admin.register(GoldApplication)
 class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
-    list_display = ("reference", "full_name", "email", "potential_level", "potential_score", "status", "email_sent_at", "created_at")
+    list_display = ("reference", "full_name", "email", "what_he_does", "potential_level", "potential_score", "status", "email_sent_at", "created_at")
     list_filter = ("status", "potential_level", "industry", "property_link")
     search_fields = ("reference", "first_name", "last_name", "email", "company")
     readonly_fields = ("reference", "created_at", "updated_at", "email_sent_at", "email_error", "approved_at", "approved_by",
                        "final_requested_at", "final_requested_by", "sent_back_at", "sent_back_by", "sent_back_note")
     inlines = [GoldInviteInline]
     actions = ["resend_email", "approve_and_invite", "resend_invite"]
+
+    @admin.display(description="What he does")
+    def what_he_does(self, obj):
+        return ", ".join(obj.industry_values)
 
     @admin.action(description="Approve and invite", permissions=["change"])
     def approve_and_invite(self, request, queryset):

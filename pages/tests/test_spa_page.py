@@ -29,12 +29,12 @@ class SpaSectionsTests(TestCase):
     def test_seed_gives_the_compositions_with_alternating_sides(self):
         self.assertEqual(layout(self.sections()), [
             ("dry-sauna", None, "left"), ["wet-sauna", "cold-plunge", "showers", "kitchenette"],
-            ("relaxing-zone", "massage-room", "right"), ("gym", None, "left")])
+            ("relaxing-zone", None, "right"), ("massage-room", None, "left"), ("gym", None, "right")])
 
     def test_hiding_rooms_never_breaks_the_layout(self):
         Facility.objects.filter(slug__in=["dry-sauna", "gym", "wet-sauna"]).update(visible=False)
         self.assertEqual(layout(self.sections()), [
-            ["cold-plunge", "showers", "kitchenette"], ("relaxing-zone", "massage-room", "left")])
+            ["cold-plunge", "showers", "kitchenette"], ("relaxing-zone", None, "left"), ("massage-room", None, "right")])
 
     def test_extra_and_lonely_companions_become_tiles_and_long_runs_split(self):
         Facility.objects.update(display="tile")
@@ -79,10 +79,12 @@ class VisitPillsTests(TestCase):
         self.assertEqual(pills["book"][0], "Book 1 to 7 days ahead")  # the tiers' windows differ, cancel hours do not all agree
         self.assertNotIn("Cancel", " ".join(pills["book"]))
         self.assertEqual(pills["book"][-1], "Booking opens with membership")
-        self.assertEqual(pills["arrive"][-1], "Phones stay in the locker")
-        self.assertEqual(pills["stay"][0], "Open 5am to 3am")
-        self.assertIn("Closed for Shabbos and Yom Tov", pills["stay"])
-        self.assertEqual(pills["stay"][-1], "Every room is part of the visit")
+        self.assertEqual(pills["arrive"][-1], "Free ice lollies")
+        self.assertIn("No phones in the spa: they stay in your locker", pills["arrive"])
+        self.assertEqual(pills["stay"][0], "Open 24 hours a day")
+        self.assertIn("Cleaning hours 3am to 5am", pills["stay"])
+        self.assertIn("Closed Shabbos and Yom Tov", pills["stay"])
+        self.assertEqual(pills["stay"][-1], "All areas included")
 
     def test_pills_follow_the_data(self):
         Plan.objects.filter(kind=Plan.MONTHLY).update(booking_window_days=2, cancel_hours=12)

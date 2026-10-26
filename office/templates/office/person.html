@@ -33,7 +33,7 @@
     <section class="o-card" data-person-journeys aria-labelledby="p-journey"><h2 id="p-journey" class="o-h3">Journey answers</h2>
       {% for j in person.journeys %}
       <div class="o-journey" data-journey data-completed="{{ j.completed }}">
-        <p class="o-sub">Started {{ j.started|dt }}{% if j.completed %}, completed{% else %}, not completed{% endif %}{% if j.suggested_plan %}. Suggested {{ j.suggested_plan }}.{% endif %}</p>
+        <p class="o-sub">Started {{ j.started|dt }}{% if j.completed %}, completed{% else %}, not completed{% endif %}{% if j.suggested_plan %}. Suggested {{ j.suggested_plan }}.{% endif %}{% if j.lead_email and j.lead_email != person.email %} Left {{ j.lead_email }} before the result.{% endif %}</p>
         <dl class="o-rows">{% for a in j.answers %}<div><dt>{{ a.question }}</dt><dd>{% if a.skipped %}Skipped{% else %}{{ a.options|join:", " }}{{ a.text }}{% endif %}</dd></div>{% endfor %}</dl>
       </div>
       {% empty %}<p class="o-empty-line">He has not started the journey.</p>{% endfor %}

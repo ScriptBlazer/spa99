@@ -33,7 +33,7 @@ export async function postWithRetry(url, body) {
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
     try {
       last = await postJson(url, body);
-      if (last.ok || (last.status >= 400 && last.status < 500 && last.status !== 429 && last.status !== 403)) return last;
+      if (last.ok || last.data?.needs_email || (last.status >= 400 && last.status < 500 && last.status !== 429 && last.status !== 403)) return last;
     } catch { last = null; }
     if (attempt < RETRY_DELAYS_MS.length) await sleep(RETRY_DELAYS_MS[attempt]);
   }

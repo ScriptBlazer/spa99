@@ -75,6 +75,7 @@ class RegisterInterestTests(TestCase):
         journey.save_answer(session, "time", options=["evening"])
         journey.save_answer(session, "frequency", options=["two_three"])
         journey.save_answer(session, "facilities", options=["gym"])
+        journey.save_answer(session, "industry", options=["tech"])
         engine.complete(session)
 
         result = services.register_interest(cleaned(marketing_opt_in="on"), journey_session=session)

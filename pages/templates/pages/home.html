@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static content_tags pages_tags pages_media %}
+{% load static content_tags pages_tags pages_media membership_tags %}
 {% block html_attrs %} data-page="marketing"{% endblock %}
 {% block body_class %}page-home{% endblock %}
 {% block header_mode %}overlay{% endblock %}
@@ -7,7 +7,7 @@
 {% block head_extra %}
 {% hero_video as hv_head %}{% if hv_head.poster %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="{{ hv_head.poster }}" media="(min-width: 48em)">
 <link rel="preload" as="image" type="image/webp" fetchpriority="high" href="{{ hv_head.poster_portrait }}" media="(max-width: 47.99em)">{% endif %}
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"DaySpa","name":"Spa 99","description":"A private spa for men in North London.","url":"{{ request.scheme }}://{{ request.get_host }}/","email":"{{ site_settings.contact_address }}","address":{"@type":"PostalAddress","streetAddress":"{{ site_settings.address_street|default:"99 Vale Road"|escapejs }}","addressLocality":"{{ site_settings.address_town|default:"London"|escapejs }}","postalCode":"{{ site_settings.address_postcode|default:"N4 1PR"|escapejs }}","addressCountry":"GB"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"DaySpa","name":"Spa 99","description":"A private spa for men in North London.","url":"{{ request.scheme }}://{{ request.get_host }}/","email":"{{ site_settings.contact_address }}","address":{"@type":"PostalAddress","streetAddress":"{{ site_settings.address_street|default:"BML House, 99c Vale Road"|escapejs }}","addressLocality":"{{ site_settings.address_town|default:"London"|escapejs }}","postalCode":"{{ site_settings.address_postcode|default:"N4 1PR"|escapejs }}","addressCountry":"GB"}}</script>
 {% endblock %}
 {% block main %}
 {% page_content "home" as home %}
@@ -115,8 +115,13 @@
         </figure>
         {% if facts %}
         <ul class="facts">
+          {% if facts.all_day %}
+          <li><b class="fact-value num"><span data-count>{{ facts.hours }}</span></b><span class="fact-label small">{{ home.facts_hours_count_label.body|default:"hours a day" }}</span></li>
+          {% if facts.cleaning %}<li><b class="fact-value num">{{ facts.cleaning }}</b><span class="fact-label small">{{ home.facts_cleaning_label.body|default:"Cleaning hours" }}</span></li>{% endif %}
+          {% else %}
           <li><b class="fact-value num">{{ facts.range }}</b><span class="fact-label small">{{ home.facts_hours_label.body|default:"Open every day" }}</span></li>
           <li><b class="fact-value num"><span data-count>{{ facts.hours }}</span></b><span class="fact-label small">{{ home.facts_hours_count_label.body|default:"hours a day" }}</span></li>
+          {% endif %}
           {% if home.facts_capacity_label.body %}<li><b class="fact-value num"><span data-count>{{ site_settings.capacity }}</span></b><span class="fact-label small">{{ home.facts_capacity_label.body }}</span></li>{% endif %}
         </ul>
         {% endif %}
@@ -182,7 +187,7 @@
     <div class="container grid">
       <div class="plans-head">
         <h2 id="teaser-title" class="statement" data-rise>{{ home.memberships_teaser.heading }}</h2>
-        <div class="actions" data-fade><a class="btn-quiet" href="{% url 'memberships' %}">{{ home.memberships_teaser.cta_label }}</a></div>
+        <div class="actions" data-fade><a class="btn-quiet" href="{% memberships_url %}">{{ home.memberships_teaser.cta_label }}</a></div>
       </div>
       <div class="plans-list">
         <ul class="plans-rows">
@@ -225,7 +230,7 @@
         {% if home.opening_label.body %}<p class="launch-label" data-fade>{{ home.opening_label.body }}</p>{% endif %}
         <h2 id="opening-title" class="opening-date" data-rise>{{ home.opening.heading }}</h2>
         <p class="lead opening-address" data-fade>{{ site_settings.address_one_line }}</p>
-        <p class="small opening-hours" data-fade>{% hours_summary %}, every day.{% if closure %} Closed for {{ closure }}.{% endif %}</p>
+        <p class="small opening-hours" data-fade>{% hours_note %}</p>
       </div>
       <div class="opening-action actions" data-fade><a class="btn btn-primary btn-block-phone" href="{% url 'register' %}">{{ home.opening.cta_label }}</a></div>
     </div>

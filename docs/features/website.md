@@ -23,7 +23,7 @@ All copy and images come from `content` (editable in Control). Plan details come
 | **Journey** | See `journey.md` |
 | **Book** | Finished-looking placeholder: "Booking opens soon." Register to hear first. No fake working buttons |
 | **Register / Sign in / Account** | See `register-interest.md` |
-| **Visit us** | 99 Vale Road, London N4 1PR. Map (static image, no third-party tracking). Contact: hello@spa99.uk |
+| **Visit us** | BML House, 99c Vale Road, London N4 1PR (2026-10-26). Map (static image, no third-party tracking). Contact: hello@spa99.uk |
 | **Privacy, Terms** | Legal text (to be supplied) |
 | **404 / error** | Branded, plain words, back to home |
 
@@ -89,3 +89,16 @@ Spec: `docs/design/SPA-PAGE.md`. Context of `pages.views.spa`:
 Content rows on page `spa`: `intro` (body uses `{rooms}`, replaced with the visible room count in words: "Eight spaces, one quiet visit."), `facts_rooms`, `facts_hours`, `facts_men`, `tiles_intro`, `how_it_works`, `step_1..3`, `step_1_pills`, `step_2_pills`, `step_3_pills` (one pill per line), `booking_pending`, `next` (button "Tailor your membership"), `next_from`, `next_link`. Read them with `{% page_content "spa" as spa %}`.
 
 Facility fields (Control): `display, image_name, image_focus, detail_image, detail_image_name, detail_alt, facts`. Control rejects image names that are not in the manifest and facts that are not up to 4 texts of 32 characters or fewer. Seed values are in `plans/seed.py` (`FACILITY_SPA_PAGE`); existing databases get them with `backfill_site_data` (empty slots only).
+
+## Review round, 2026-10-26 (Moishe + Barry)
+
+Decisions are in docs/PROJECT.md (row dated 2026-10-26) and docs/SPA99_RULES.md (project overrides). What the backend does:
+
+- **Hours.** `plans.services.open_all_day()` is true when the open periods plus the daily cleaning window fill 24 hours. Then `pages.hours_summary()` says "Open 24 hours a day", `pages.hours_note()` says "Open 24 hours a day. Cleaning hours 3am to 5am. Closed Shabbos and Yom Tov." (Home, footer), `opening_hours()` starts with ("Open", "24 hours a day") and lists the window as "Cleaning hours", and `hours_facts()` returns `{"range": "24 hours a day", "hours": 24, "all_day": True, "cleaning": "3am to 5am"}`. If someone edits the rules so they no longer fill the day, the old words ("Open 5am to 2am") come back, so the site never says something untrue. The spa opener row takes a new `{cleaning}` placeholder.
+- **Off-peak and Peak.** Labels only (the stored keys `daytime` and `evening` and `Plan.hours` values are unchanged). Pills, facts, compare "When" row, Gold figure and journey copy say Off-peak / Peak.
+- **Facility facts.** Dry sauna 110-120°C, wet sauna 60-80°C, cold plunge 9-11°C (seed; edit in Control). The gym has display `compact` (one smaller picture, shorter section, no bottle inset); the massage room is a full `feature` section.
+- **Leil Shishi switch.** Site settings "show Leil Shishi" (`SiteSettings.show_leil_shishi`, default off). `plans.services.shown_perks()` filters the perk out of plan cards, pills, the compare table, Register and the Gold Card page. The perks stay on the plans.
+- **Gold in the compare table.** `pages.services.compare_cards(cards)` adds the Gold Card as the last column (the template reads it with `{% compare_columns cards as columns %}`). `Plan.annual_fee` (ex VAT, empty = not decided) is edited in System > Plans (More row of the Gold Card). Empty shows "By application" in both price rows; set shows "£X a year" (inc VAT in the second row).
+- **Tier 3** card says "Unlimited" (smaller numeral, `.tier-num--word`).
+- **Address.** `SiteSettings.address_street` default "BML House, 99c Vale Road". Existing installs: edit it in the admin (no backfill written; a new live database gets it from the model default).
+- **Every visit.** The kit row is Towels, Robe, Slippers, Ice bucket, Toiletries (the ice bucket has no picture yet, so it shows on the swan tile). Free drinks and free ice lollies are pills on the Arrive step and in the Memberships "Every visit" line.

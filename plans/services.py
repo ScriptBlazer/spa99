@@ -34,7 +34,7 @@ def plan_facts(plan):
     elif plan.visits_per_month is not None:
         visits = plan.visits_per_month
         facts.append(f"{visits} visit{'s' if visits != 1 else ''} a month")
-    facts.append("Daytime visits" if plan.is_daytime_only else "Day or evening, any time")
+    facts.append("Off-peak visits" if plan.is_daytime_only else "Off-peak or peak, any time")
     if plan.guests_per_month:
         guests = plan.guests_per_month
         facts.append(f"Bring {guests} guest{'s' if guests != 1 else ''} a month")
@@ -53,8 +53,8 @@ def _count(n, word):
 
 
 def character_line(plan):
-    """'Daytime, 6 visits a month.' / 'Any time, unlimited visits.' (for the journey result)."""
-    when = "Daytime" if plan.is_daytime_only else "Any time"
+    """'Off-peak, 6 visits a month.' / 'Any time, unlimited visits.' (for the journey result)."""
+    when = "Off-peak" if plan.is_daytime_only else "Any time"
     visits = "unlimited visits" if plan.is_unlimited else f"{_count(plan.visits_per_month, 'visit')} a month"
     return f"{when}, {visits}."
 
@@ -75,15 +75,50 @@ def _open_periods():
     return [r for r in OpeningRule.objects.filter(active=True, kind=OpeningRule.PERIOD) if r.start_time and r.end_time]
 
 
+def _minutes(rule):
+    return ((rule.end_time.hour * 60 + rule.end_time.minute) - (rule.start_time.hour * 60 + rule.start_time.minute)) % 1440 or 1440
+
+
+def cleaning_rules():
+    return [r for r in OpeningRule.objects.filter(active=True, kind=OpeningRule.DAILY_CLOSURE) if r.start_time and r.end_time]
+
+
+def open_all_day():
+    """True when the open periods plus the daily cleaning window fill the whole day (Moishe, 2026-10-26: open 24 hours a day;
+    the short window is Cleaning hours, not Closed). Worked out from the rules, so editing them in System > Hours changes the words."""
+    periods = _open_periods()
+    return bool(periods) and sum(_minutes(r) for r in periods) + sum(_minutes(r) for r in cleaning_rules()) >= 1440
+
+
 def hours_ranges():
-    """{'daytime': '5am to 6pm', 'full': '5am to 3am'} from the open periods ('' when none is set).
-    Daytime is the period with key 'daytime'; full runs from the first period's start to the last one's end."""
+    """{'daytime': '5am to 6pm', 'full': '5am to 3am', 'all_day': bool} from the open periods ('' when none is set).
+    Daytime (shown as Off-peak) is the period with key 'daytime'; full runs from the first period's start to the last one's end."""
     periods = _open_periods()
     day = next((r for r in periods if r.key == "daytime"), None) or (periods[0] if periods else None)
     return {
         "daytime": f"{clock(day.start_time)} to {clock(day.end_time)}" if day else "",
         "full": f"{clock(periods[0].start_time)} to {clock(periods[-1].end_time)}" if periods else "",
+        "all_day": open_all_day(),
     }
+
+
+def leil_shishi_shown():
+    return SiteSettings.load().show_leil_shishi
+
+
+def shown_perks(plan, show_leil=None):
+    """A plan's perks without the ones switched off. Leil Shishi is hidden everywhere while Site settings 'show Leil Shishi'
+    is off (default); the data stays on the plan."""
+    show = leil_shishi_shown() if show_leil is None else show_leil
+    return [p for p in plan.perks or [] if show or p.get("key") != "leil_shishi"]
+
+
+def annual_fee_text(plan, vat_rate=None, inc=False):
+    """Gold Card fee: 'By application' while empty, else '£150 a year' (ex VAT; `inc` = with VAT)."""
+    if plan.annual_fee is None:
+        return "By application"
+    amount = price_inc_vat(plan.annual_fee, vat_rate) if inc else plan.annual_fee
+    return f"£{trim_price(amount)} a year"
 
 
 def plan_pills(plan, ranges=None):
@@ -92,14 +127,16 @@ def plan_pills(plan, ranges=None):
     ranges = ranges if ranges is not None else hours_ranges()
     pills = []
     if plan.is_daytime_only:
-        pills.append(f"Daytime, {ranges['daytime']}" if ranges["daytime"] else "Daytime")
+        pills.append(f"Off-peak, {ranges['daytime']}" if ranges["daytime"] else "Off-peak")
+    elif ranges.get("all_day"):
+        pills.append("Off-peak and peak, 24 hours a day")
     else:
-        pills.append(f"Day and evening, {ranges['full']}" if ranges["full"] else "Day and evening")
+        pills.append(f"Off-peak and peak, {ranges['full']}" if ranges["full"] else "Off-peak and peak")
     pills.append(f"Book up to {_count(plan.booking_window_days, 'day')} ahead")
     pills.append(f"{_count(plan.upcoming_limit, 'booking')} at a time")
     if plan.guests_per_month:
         pills.append(f"{_count(plan.guests_per_month, 'guest')} a month")
-    pills.extend(perk["pill"] for perk in plan.perks or [] if perk.get("pill"))
+    pills.extend(perk["pill"] for perk in shown_perks(plan) if perk.get("pill"))
     return pills
 
 
@@ -131,7 +168,10 @@ def plan_display(plan, vat_rate=None, ranges=None):
         "upcoming_limit": plan.upcoming_limit,
         "cancel_hours": plan.cancel_hours,
         "guests_per_month": plan.guests_per_month,
-        "perks": plan.perks,
+        "perks": shown_perks(plan),
+        "annual_fee": plan.annual_fee,
+        "annual_fee_text": annual_fee_text(plan, vat_rate),
+        "annual_fee_inc_text": annual_fee_text(plan, vat_rate, inc=True),
         "short_description": plan.short_description,
         "highlight": plan.highlight,
         "interest_allowed": plan.interest_allowed,

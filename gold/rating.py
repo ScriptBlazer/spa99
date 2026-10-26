@@ -87,6 +87,19 @@ def industry_label(value):
     return row.label if row else (value or "")
 
 
+def industry_labels(values):
+    """Labels for several stored industry values, in the order given."""
+    return [industry_label(v) for v in values or []]
+
+
+def industry_extra_points(values):
+    """Extra Gold points for the industries chosen: the HIGHEST option's points, never the sum, so ticking every
+    industry cannot inflate the rating. (The journey uses the same rule per question: journey.engine.gold_signals.)"""
+    from journey.models import Option
+    points = Option.objects.filter(question__key=INDUSTRY_QUESTION, value__in=list(values or [])).values_list("gold_points", flat=True)
+    return max(points, default=0)
+
+
 # ---------- choices and journey signals (rows, edited in Control) ----------
 
 def choices(group, include_inactive=False):

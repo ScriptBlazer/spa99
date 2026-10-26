@@ -66,11 +66,11 @@ def options(request):
         answers = journey_services.effective_answers(session)
         industry = answers.get(rating.INDUSTRY_QUESTION)
         if industry is not None and industry.values():
-            prefill["industry"] = industry.values()[0]
+            prefill["industry"] = industry.values()  # a list: what he does is multi-select
         other = answers.get(rating.INDUSTRY_OTHER_QUESTION)
-        if other is not None and other.text_value and prefill.get("industry") == rating.OTHER_INDUSTRY:
+        if other is not None and other.text_value and rating.OTHER_INDUSTRY in prefill.get("industry", []):
             prefill["industry_other"] = other.text_value
-        if prefill.get("industry") == rating.PROPERTY_INDUSTRY:  # the property questions are only for Property
+        if rating.PROPERTY_INDUSTRY in prefill.get("industry", []):  # the property questions are only for Property
             signals, _ = journey_engine.gold_signals(session)
             if signals.get("property_link"):
                 prefill["property_link"] = signals["property_link"]

@@ -1,4 +1,5 @@
 {% extends "users/member_base.html" %}
+{% load membership_tags %}
 {% load sale_tags %}
 {% load pages_tags content_tags %}
 {% block head_title %}{% include "common/_head.html" with title="Membership | My Spa 99" %}{% endblock %}
@@ -29,7 +30,7 @@
     </div>
     <button type="submit" class="btn btn-primary m-keep" data-working-text="Saving" data-keep>{% if interest_plan %}Switch membership{% else %}Choose membership{% endif %}</button>
   </form>
-  <a class="btn-quiet" href="{% url 'memberships' %}">Compare memberships</a>
+  <a class="btn-quiet" href="{% memberships_url %}">Compare memberships</a>
   {% endif %}
 </section>
 {% endblock %}

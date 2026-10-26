@@ -1,9 +1,9 @@
-{% load static sale_tags %}{% if sale_bar %}{% sale_bar_view sale_bar as sb %}
+{% load static sale_tags membership_tags %}{% if sale_bar %}{% sale_bar_view sale_bar as sb %}
 {# The sale bar (docs/design/SYSTEM-SALES.md 1). Server decides if it shows; sale-bar.js only counts down, dismisses and removes it at the end. #}
 <link rel="stylesheet" href="{% static 'common/css/sale-bar.css' %}">
 <div class="sale-bar on-dark" data-sale-bar data-sale="{{ sale_bar.id }}" data-ends="{{ sale_bar.ends_at }}" data-now="{{ sb.now }}"{% if sb.upcoming %} data-upcoming{% endif %}>
   <div class="container sale-bar-inner">
-    <a class="sale-bar-link" href="{% url 'memberships' %}#plans">
+    {% memberships_shown as show_memberships %}<a class="sale-bar-link" href="{% if show_memberships %}{% url 'memberships' %}#plans{% else %}{% url 'journey' %}{% endif %}">
       {% if sale_bar.preview %}<span class="sale-bar-preview">Preview</span>{% endif %}
       <span class="sale-bar-name">{{ sale_bar.name }}</span>
       <span class="sale-bar-sep" aria-hidden="true">&middot;</span>

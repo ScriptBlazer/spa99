@@ -57,6 +57,10 @@ def _bad(message, status=400, missing=None):
     return JsonResponse(body, status=status)
 
 
+def _needs_email():
+    return JsonResponse({"error": "Leave your email to see your membership.", "needs_email": True}, status=403)
+
+
 def _progress(session):
     return {
         "current_step": session.current_step,
@@ -73,7 +77,7 @@ def _progress(session):
 def state(request):
     """Session, screens with questions and options, saved answers and the current step (resume)."""
     session, _ = _session_for(request)
-    return _with_cookie(JsonResponse(services.build_state(session)), session)
+    return _with_cookie(JsonResponse(services.build_state(session, request.user)), session)
 
 
 def _save_one(session, item):
@@ -102,7 +106,7 @@ def answer(request):
         saved = [_save_one(session, item) for item in items if isinstance(item, dict)]
     except services.AnswerError as error:
         return _bad(str(error))
-    state_now = services.build_state(session)
+    state_now = services.build_state(session, request.user)
     visible = {q["key"]: q["visible"] for screen in state_now["screens"] for q in screen["questions"]}
     return _with_cookie(JsonResponse({"saved": True, "answers": saved, "visible": visible, **_progress(session)}), session)
 
@@ -134,13 +138,37 @@ def result(request):
         session = services.session_from_cookies(request.COOKIES, request.user)
         if session is None:
             return _bad("No journey yet.", status=404)
+        if services.lead_required(session, request.user):
+            return _needs_email()
         return JsonResponse(engine.preview(session))
     session, _ = _session_for(request)
+    if services.lead_required(session, request.user):  # the email gate: no suggested membership or price before it
+        return _needs_email()
     try:
         data = engine.complete(session)
         return _with_cookie(JsonResponse(data), session)
     except services.AnswerError as error:
         return _bad(str(error), missing=error.missing)
+
+
+@login_not_required  # PUBLIC: see state(). The email gate before the result.
+@require_POST
+@rate_limited_json("journey-lead", 20, 60)
+def lead(request):
+    """The email gate: {"email", "consent": true}. Stored on the journey session; shown to nobody publicly.
+    400 {"errors": {field: message}} for a bad address or a missing consent."""
+    data = _body(request)
+    if data is None:
+        return _bad("Send JSON.")
+    session, _ = _session_for(request)
+    if data.get(HONEYPOT_FIELD):  # a bot: pretend it worked, keep it out of the statistics, store nothing
+        type(session).objects.filter(pk=session.pk).update(is_bot=True)
+        return _with_cookie(JsonResponse({"saved": True}), session)
+    try:
+        services.save_lead(session, data.get("email"), data.get("consent"))
+    except services.LeadError as error:
+        return _with_cookie(JsonResponse({"errors": error.errors}, status=400), session)
+    return _with_cookie(JsonResponse({"saved": True}), session)
 
 
 @login_not_required  # PUBLIC: see state()
@@ -155,4 +183,4 @@ def restart(request):
         utm={name: getattr(old, name) for name in services.UTM_FIELDS}, user=request.user, previous=old,
     )
     visitors.record_journey_start(request)
-    return _with_cookie(JsonResponse(services.build_state(fresh)), fresh)
+    return _with_cookie(JsonResponse(services.build_state(fresh, request.user)), fresh)

@@ -35,9 +35,9 @@
           <span class="tier-tagline">{{ t.tagline }}</span>
         </span>
         <span class="tier-num-row" id="tf-{{ t.slug }}">
-          {# Signika has no infinity glyph (checked 2026-10-22), so Tier 3 says "All" in the numeral style. #}
-          <span class="tier-num">{% if t.visits_count %}<span class="num" data-count>{{ t.visits_count }}</span>{% else %}All{% endif %}</span>
-          <span class="tier-num-side">{% if t.visits_count %}visit{{ t.visits_count|pluralize }}<br>a month{% else %}visits<br>you like{% endif %}</span>
+          {# Signika has no infinity glyph (checked 2026-10-22), so Tier 3 says "Unlimited" (Moishe, 2026-10-26), a little smaller. #}
+          <span class="tier-num{% if not t.visits_count %} tier-num--word{% endif %}">{% if t.visits_count %}<span class="num" data-count>{{ t.visits_count }}</span>{% else %}Unlimited{% endif %}</span>
+          <span class="tier-num-side">{% if t.visits_count %}visit{{ t.visits_count|pluralize }}<br>a month{% else %}visits<br>a month{% endif %}</span>
         </span>
         <ul class="tier-list" role="list">{% for p in t.pills %}<li>{{ p }}</li>{% endfor %}</ul>
         <span class="tier-price-group" id="tp-{{ t.slug }}">
@@ -74,12 +74,13 @@
       <p class="compare-lead">{{ m.compare.body }}</p>
     </div>
     <div class="compare-body" data-compare>
+      {% compare_columns cards as columns %}
       <div class="segmented segmented--wrap compare-picker" role="radiogroup" aria-label="Choose a membership to compare">
-        {% for card in cards %}<label class="seg"><input type="radio" name="compare" value="{{ forloop.counter0 }}" data-slug="{{ card.slug }}"{% if card.slug == selected_slug %} checked{% elif forloop.first and not selected_slug %} checked{% endif %}><span>{{ card.name }}</span></label>{% endfor %}
+        {% for card in columns %}<label class="seg"><input type="radio" name="compare" value="{{ forloop.counter0 }}" data-slug="{{ card.slug }}"{% if card.slug == selected_slug %} checked{% elif forloop.first and not selected_slug %} checked{% endif %}><span>{{ card.name }}</span></label>{% endfor %}
       </div>
-      <table class="compare-table" data-active="{% for card in cards %}{% if card.slug == selected_slug %}{{ forloop.counter0 }}{% endif %}{% endfor %}">
+      <table class="compare-table" data-active="{% for card in columns %}{% if card.slug == selected_slug %}{{ forloop.counter0 }}{% endif %}{% endfor %}">
         <caption class="sr-only">Compare memberships</caption>
-        <thead><tr><th scope="col"><span class="sr-only">Feature</span></th>{% for card in cards %}<th scope="col" data-col="{{ forloop.counter0 }}" data-slug="{{ card.slug }}"{% if card.slug == selected_slug %} class="is-selected"{% endif %}><span class="cmp-head">{{ card.name }}<svg class="icon cmp-check" aria-hidden="true" focusable="false"><use href="{% static 'common/img/icons.svg' %}#check"/></svg></span></th>{% endfor %}</tr></thead>
+        <thead><tr><th scope="col"><span class="sr-only">Feature</span></th>{% for card in columns %}<th scope="col" data-col="{{ forloop.counter0 }}" data-slug="{{ card.slug }}"{% if card.slug == selected_slug %} class="is-selected"{% endif %}><span class="cmp-head">{{ card.name }}<svg class="icon cmp-check" aria-hidden="true" focusable="false"><use href="{% static 'common/img/icons.svg' %}#check"/></svg></span></th>{% endfor %}</tr></thead>
         <tbody>
           {% for row in table %}<tr{% if forloop.counter0 == 2 or forloop.counter0 == 4 or forloop.counter0 == 8 %} class="grp-start"{% endif %}><th scope="row">{{ row.label }}</th>{% for cell in row.cells %}<td data-col="{{ forloop.counter0 }}" data-slug="{{ cell.slug }}" class="num{% if cell.slug == selected_slug %} is-selected{% endif %}">{{ cell.text }}</td>{% endfor %}</tr>{% endfor %}
         </tbody>

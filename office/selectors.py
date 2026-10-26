@@ -276,13 +276,14 @@ def build_analytics(range_name="30d", today=None, figures=None):
         whole = sum(item["value"] for item in out)
         return [{**item, "share_bp": basis_points(item["value"], whole) or 0} for item in out]
 
-    option_labels = {(q, v): (facts.clean_label(label), order) for q, v, label, order in Option.objects.filter(question__key__in=JOURNEY_QUESTIONS, active=True)
-                     .order_by("order").values_list("question__key", "value", "label", "order")}
+    # Retired options (for example Showers, now Ice bucket) stay in the chart while they still have votes.
+    option_labels = {(q, v): (facts.clean_label(label), active) for q, v, label, active in Option.objects.filter(question__key__in=JOURNEY_QUESTIONS)
+                     .order_by("order").values_list("question__key", "value", "label", "active")}
     voters, answers_found, suggested_found = figures.vote_counts(start, end)  # one vote per person
     answers = {}
     for q in JOURNEY_QUESTIONS:
         items = [{"value": v, "label": label, "count": answers_found.get(f"{q}:{v}", 0)}
-                 for (qk, v), (label, _) in option_labels.items() if qk == q]
+                 for (qk, v), (label, active) in option_labels.items() if qk == q and (active or answers_found.get(f"{q}:{v}", 0))]
         whole = sum(item["count"] for item in items)
         answers[q] = [{**item, "share_bp": basis_points(item["count"], whole) or 0} for item in items]
 

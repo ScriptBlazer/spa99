@@ -100,6 +100,7 @@ html:has(.page-mem) { scroll-padding-bottom: calc(var(--bar-h) + var(--space-3))
 .tier-num-row { display: flex; align-items: baseline; gap: var(--space-2); margin-top: var(--space-4); }
 .cur { font-size: 0.58em; vertical-align: 0.62em; margin-right: 0.06em; font-weight: 400; }   /* the pound sign as on a price tag; still read as one price */
 .tier-num { font-family: var(--font-display); font-weight: 300; font-size: var(--tier-num-size); line-height: 0.85; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.tier-num--word { font-size: calc(var(--tier-num-size) * 0.6); line-height: 1; letter-spacing: -0.02em; }  /* "Unlimited" is a word, not a numeral */
 .tier-num-side { font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--color-text-muted); }
 
 .tier-list { display: grid; gap: 0.375rem; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-hairline); font-size: var(--text-sm); line-height: 1.5; list-style: none; padding-inline: 0; align-content: start; }
@@ -254,7 +255,7 @@ html[data-input="pointer"] .tier:has(input:focus-visible) { outline: none; }
 @media (max-width: 47.99em) {
   .compare-table [data-col] { display: none; }
   .compare-table[data-active="0"] [data-col="0"], .compare-table[data-active="1"] [data-col="1"],
-  .compare-table[data-active="2"] [data-col="2"], .compare-table[data-active="3"] [data-col="3"],
+  .compare-table[data-active="2"] [data-col="2"], .compare-table[data-active="3"] [data-col="3"], .compare-table[data-active="4"] [data-col="4"],
   .compare-table[data-active=""] [data-col="0"] { display: table-cell; }
   .compare-table thead { display: none; }
   .compare-table td.is-selected { background: none; }

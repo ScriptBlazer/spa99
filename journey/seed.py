@@ -21,7 +21,7 @@ FREQUENCY = [
     ("most_days", "Most days", {T3: 6, T2: 1}, Decimal("5"), "Most days of the week"),
 ]
 FACILITIES = [
-    ("dry_sauna", "Dry sauna"), ("wet_sauna", "Wet sauna"), ("cold_plunge", "Cold plunge"), ("showers", "Showers"),
+    ("dry_sauna", "Dry sauna"), ("wet_sauna", "Wet sauna"), ("cold_plunge", "Cold plunge"), ("ice_bucket", "Ice bucket"),
     ("relaxing_zone", "Relaxing zone"), ("gym", "Gym"), ("massage_room", "Massage room"), ("kitchenette", "Kitchenette"),
 ]
 COMPANY = [
@@ -56,7 +56,7 @@ GUEST_RULES = {  # 2026-10-23: "Sometimes with a friend" never yields Tier 1 and
         "conditions": [{"question": "company", "any_of": GUEST_COMPANY}],
     },
 }
-MIN_CHOICES = {"time": 1, "facilities": 1}  # 2026-10-23: "Choose at least one."
+MIN_CHOICES = {"time": 1, "facilities": 1, "industry": 1}  # 2026-10-23: "Choose at least one." (industry too, 2026-10-26: it is multi-select)
 
 # key, text, help, type, screen, order, condition, options
 QUESTIONS = [
@@ -64,7 +64,7 @@ QUESTIONS = [
     ("frequency", "How often?", "", Question.SCALE, 1, 2, {}, FREQUENCY),
     ("facilities", "What would you use?", "Choose at least one.", Question.MULTI, 2, 1, {}, FACILITIES),
     ("company", "Do you usually come alone?", "", Question.SINGLE, 3, 1, {}, COMPANY),
-    ("industry", "What do you do?", "", Question.SINGLE, 4, 1, {}, INDUSTRY),
+    ("industry", "What do you do?", "Choose at least one.", Question.MULTI, 4, 1, {}, INDUSTRY),
     ("property_link", "Your link to property", "", Question.SINGLE, 4, 2,
      {"question": "industry", "any_of": ["property"]}, PROPERTY_LINK),
     ("property_size", "How many properties or units?", "An approximate range is fine.", Question.SINGLE, 4, 3,

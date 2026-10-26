@@ -6,9 +6,11 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from content.models import Page, Section
+from content.seed import STEP_2_PILLS
 from pages import services as pages
 from plans.management.commands.seed_phase1 import seed_all
-from plans.models import Facility, OpeningRule, Plan
+from plans.models import Facility, OpeningRule, Plan, SiteSettings
+from plans.tests.helpers import open_memberships
 
 
 def moments(*keys):
@@ -32,16 +34,19 @@ class GoldFactsTests(TestCase):
     def test_seeded_figures_pills_and_perks(self):
         facts = pages.gold_facts()
         self.assertEqual([(f["value"], f["label"]) for f in facts["figures"]],
-                         [("Unlimited", "visits"), ("Any time", "5am to 3am"), ("7 days", "to book ahead"), ("2", "guests a month")])
+                         [("Unlimited", "visits"), ("Any time", "24 hours a day"), ("7 days", "to book ahead"), ("2", "guests a month")])
         self.assertEqual(facts["pills"], ["3 bookings at a time", "Cancel up to 5 hours before", "First call from the waitlist"])
         self.assertEqual([p["name"] for p in facts["perks"]],
-                         ["Each merch release", "Leil Shishi when offered", "BML members' events"])
+                         ["Each merch release", "BML members' events"])  # Leil Shishi is hidden for now (2026-10-26)
+        SiteSettings.objects.update(show_leil_shishi=True)
+        facts = pages.gold_facts()
+        self.assertEqual([p["name"] for p in facts["perks"]], ["Each merch release", "Leil Shishi when offered", "BML members' events"])
         self.assertEqual(facts["perks"][1]["note"], "The Thursday evening meal, included.")
 
     def test_figures_follow_the_plan(self):
         facts = self.gold(visits_per_month=4, hours=Plan.DAYTIME_ONLY, booking_window_days=1, guests_per_month=0, upcoming_limit=1)
         self.assertEqual([(f["value"], f["label"]) for f in facts["figures"]],
-                         [("4", "visits a month"), ("Daytime", "5am to 6pm"), ("1 day", "to book ahead")])
+                         [("4", "visits a month"), ("Off-peak", "5am to 6pm"), ("1 day", "to book ahead")])
         self.assertEqual(facts["pills"][0], "1 booking at a time")
         days = facts["figures"][2]
         self.assertEqual((days["number"], days["suffix"]), (1, " day"))
@@ -67,8 +72,9 @@ class OpenerTests(TestCase):
         seed_all()
 
     def test_hero_shows_only_the_first_line(self):
-        # Moishe 2026-10-23: only "Open 5am to 3am." in the hero; the other rows stay in the database
-        self.assertEqual(pages.opener_lines(), [{"statement": "Open 5am to 3am.", "note": "Every day. Closed for Shabbos and Yom Tov."}])
+        # Moishe 2026-10-23: only one line in the hero; the other rows stay in the database. 2026-10-26: open 24 hours a day.
+        self.assertEqual(pages.opener_lines(), [{"statement": "Open 24 hours a day.",
+                                                 "note": "Cleaning hours 3am to 5am. Closed Shabbos and Yom Tov."}])
         self.assertTrue(Section.objects.filter(page__key="spa", key="opener_4").exists())
 
     def test_full_set_fills_hours_closure_and_room_count(self):
@@ -85,7 +91,7 @@ class OpenerTests(TestCase):
 
     def test_missing_values_never_leave_a_gap(self):
         OpeningRule.objects.filter(kind=OpeningRule.CLOSE_BEFORE_CANDLES).update(public_title="")
-        self.assertEqual(pages.opener_lines()[0]["note"], "Every day.")
+        self.assertEqual(pages.opener_lines()[0]["note"], "Cleaning hours 3am to 5am.")
         OpeningRule.objects.filter(kind=OpeningRule.PERIOD).update(active=False)
         self.assertEqual(pages.opener_lines(), [])  # line 1 skipped, not "Open .", and no later line takes its place
 
@@ -166,7 +172,8 @@ class KitAndSigninTests(TestCase):
 
     def test_every_visit_sentence_has_no_amenity_list(self):
         visit = pages.every_visit()
-        self.assertEqual(visit["text"], "Every visit: every room, as long as you like.")
+        self.assertEqual(visit["text"], "Every visit: every room and all areas, as long as you like. Free drinks and free ice lollies. "
+                         "Come with nothing: towels, robe, slippers, toiletries and trunks are supplied.")
         self.assertEqual((visit["cta_label"], visit["cta_url"]), ("See the spa", "/the-spa/"))
         Section.objects.filter(page__key="memberships", key="every_visit").update(visible=False)
         self.assertIsNone(pages.every_visit())
@@ -174,13 +181,14 @@ class KitAndSigninTests(TestCase):
     def test_signin_shell_uses_rows_and_falls_back(self):
         shell = pages.signin_shell()
         self.assertEqual((shell["heading"], shell["caption"], shell["name"]), ("Welcome back.", "Your own locker, every visit.", "lockers"))
-        self.assertEqual(shell["address_line"][0], "99 Vale Road, London N4 1PR")
+        self.assertEqual(shell["address_line"][0], "BML House, 99c Vale Road, London N4 1PR")
         Page.objects.filter(key="signin").delete()
         self.assertEqual(pages.signin_shell()["lead"], "Sign in to your Spa 99 account.")
 
     def test_gym_detail_name_does_not_block_saving_before_it_is_built(self):
         gym = Facility.objects.get(slug="gym")
-        self.assertEqual(gym.detail_image_name, "bottle-gym")
+        self.assertEqual(gym.detail_image_name, "")  # the gym is a compact section with one picture (2026-10-26)
+        gym.detail_image_name = "bottle-gym"
         gym.full_clean()  # unchanged, not built yet: fine
         gym.detail_image_name = "nope"
         with self.assertRaises(Exception):
@@ -208,9 +216,10 @@ class BackfillRound3Tests(TestCase):
         self.assertTrue(Section.objects.filter(page__key="signin", key="caption").exists())
         self.assertTrue(Section.objects.filter(page__key="spa", key="opener_1").exists())
         self.assertEqual(Section.objects.get(page__key="spa", key="opener_2").heading, "Men only, hand edited.")
-        self.assertEqual(Section.objects.get(page__key="spa", key="step_2_pills").body, "Your own locker\nPhones stay in the locker")
+        self.assertEqual(Section.objects.get(page__key="spa", key="step_2_pills").body, STEP_2_PILLS)  # the old three-line text is swapped for the seed's
         # first run of round 3 (no signin page yet): the gym name and the notes are set
         self.assertEqual(Facility.objects.get(slug="gym").detail_image_name, "bottle-gym")
+        SiteSettings.objects.update(show_leil_shishi=True)  # hidden by default (2026-10-26); the note is still on the plan
         self.assertEqual(pages.gold_facts()["perks"][1]["note"], "The Thursday evening meal, included.")
         out = StringIO()
         call_command("backfill_site_data", stdout=out)
@@ -236,6 +245,7 @@ class ViewContextTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         seed_all()
+        open_memberships()
 
     def test_pages_give_the_templates_their_data(self):
         spa = self.client.get("/the-spa/").context

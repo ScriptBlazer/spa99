@@ -25,3 +25,10 @@ def set_recipients(approvers="approver@example.test", cc="cc@example.test", cont
     site = SiteSettings.load()
     site.gold_approver_cc, site.contact_email = cc, contact
     site.save()
+
+
+def open_memberships():
+    """Turn the Memberships page on for the public (it is hidden until opening: SiteSettings.memberships_public)."""
+    site = SiteSettings.load()
+    site.memberships_public = True
+    site.save()

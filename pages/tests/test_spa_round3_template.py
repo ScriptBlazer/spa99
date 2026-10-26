@@ -36,7 +36,7 @@ class SpaRound3TemplateTests(TestCase):
         self.assertIn('data-opener="door-gold"', html)  # the robe is not built yet: the old door stands in
         for hook in ("sp-moment", "sp-tote", "sp-detail", "home-slippers"):
             self.assertNotIn(hook, html)
-        self.assertEqual(html.count('class="kit-item"'), 4)  # the kit keeps its labels on swan tiles
+        self.assertEqual(html.count('class="kit-item"'), 5)  # the kit keeps its labels on swan tiles
         self.assertEqual(html.count("data-opener-line"), 1)  # one line in the hero (2026-10-23)
         self.assertNotIn("For men only.", html)
         self.assertNotIn("opener-tick", html)
@@ -61,7 +61,8 @@ class SpaRound3TemplateTests(TestCase):
         self.assertLess(flat.index("shower"), flat.index("relaxing-zone"))
         self.assertLess(flat.index("slippers"), flat.index("gym"))
         self.assertIn('class="scene sp-band sp-band--tote', html)
-        self.assertIn("sp-detail", html)  # the gym's bottle inset
+        self.assertNotIn("sp-detail", html)  # the gym keeps one picture only (2026-10-26)
+        self.assertIn("sp-feature--compact", html)
         with built("towel-rail"):
             html = self.spa()
         self.assertEqual((html.count("sp-pair-a"), html.count("sp-pair-b")), (0, 1))  # the shower pair stands on one picture

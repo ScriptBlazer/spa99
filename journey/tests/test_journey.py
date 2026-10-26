@@ -81,7 +81,7 @@ class SuggestionTests(TestCase):
         self.assertEqual(engine.compute_suggestion(session).plan.slug, "tier-1")  # next best by points
 
     def test_result_is_stored_and_marks_the_journey_complete(self):
-        session = make_session(time=["evening"], frequency="two_three", facilities=["gym"])
+        session = make_session(time=["evening"], frequency="two_three", facilities=["gym"], industry="tech")
         result = engine.complete(session)
         session.refresh_from_db()
         self.assertTrue(session.completed)
@@ -198,6 +198,91 @@ class AnswerTests(TestCase):
         self.assertEqual(session.furthest_step, 5)
 
 
+class MultiIndustryTests(TestCase):
+    """2026-10-26: "What do you do?" is multi-select; the facilities option Showers became Ice bucket."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_industry_is_multi_with_at_least_one_and_the_follow_ups_follow_the_choices(self):
+        question = services.visible_questions(services.create_session())[0]
+        industry = next(q for q in question if q.key == "industry")
+        self.assertEqual((industry.type, industry.min_choices), ("multi", 1))
+        session = services.create_session()
+        visible = lambda: [q.key for q in services.visible_questions(session)[0]]  # noqa: E731
+        with self.assertRaises(services.AnswerError):
+            services.save_answer(session, "industry", skipped=True)  # required: no "prefer not to say"
+        services.save_answer(session, "industry", options=["finance", "law"])
+        self.assertIn("property_law", visible())  # Law among the choices
+        self.assertNotIn("property_link", visible())
+        self.assertNotIn("industry_other", visible())
+        services.save_answer(session, "industry", options=["law", "property", "other"])
+        self.assertTrue({"property_link", "property_law", "industry_other"} <= set(visible()))
+        services.save_answer(session, "industry", options=["tech"])
+        self.assertFalse({"property_link", "property_law", "industry_other"} & set(visible()))
+
+    def test_gold_extra_points_use_the_highest_industry_not_the_sum(self):
+        one = engine.compute_gold(make_session(industry="finance"))
+        many = engine.compute_gold(make_session(industry=["finance", "business_owner", "law", "tech"]))
+        self.assertEqual((one.score, many.score), (3, 3))  # three occupations worth 3 each still give 3
+        Option.objects.filter(question__key="industry", value="tech").update(gold_points=4)
+        self.assertEqual(engine.compute_gold(make_session(industry=["finance", "tech"])).score, 4)
+
+    def test_every_chosen_industry_counts_as_a_vote(self):
+        session = make_session(industry=["finance", "law"])
+        self.assertEqual(engine.counted_answers(session), ["industry:finance", "industry:law"])
+
+    def test_ice_bucket_replaces_showers_and_old_answers_keep_their_label(self):
+        values = list(Option.objects.filter(question__key="facilities", active=True).values_list("value", flat=True))
+        self.assertIn("ice_bucket", values)
+        self.assertNotIn("showers", values)
+        self.assertEqual(Option.objects.get(question__key="facilities", value="ice_bucket").label, "Ice bucket")
+
+
+class LeadGateTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_signed_in_visitors_skip_the_gate_and_others_need_an_address_once(self):
+        session = make_session(time="evening", facilities="gym", industry="tech")
+        self.assertTrue(services.lead_required(session, None))
+        with self.assertRaises(services.LeadError):
+            services.save_lead(session, "nobody", True)
+        with self.assertRaises(services.LeadError) as caught:
+            services.save_lead(session, "a@example.com", False)
+        self.assertEqual(list(caught.exception.errors), ["consent"])
+        services.save_lead(session, "A@Example.com", True)
+        self.assertFalse(services.lead_required(session, None))
+        self.assertEqual(session.lead_email, "a@example.com")
+        member = User.objects.create_user(email="m@example.com", password="x-Strong-pass-1")
+        self.assertFalse(services.lead_required(make_session(), member))  # his account is his address
+
+    def test_a_restart_in_the_same_browser_keeps_the_address(self):
+        old = make_session()
+        services.save_lead(old, "a@example.com", True)
+        fresh = services.create_session(previous=old)
+        self.assertEqual(fresh.lead_email, "a@example.com")
+
+    def test_erasing_an_address_clears_it_from_sessions_and_history(self):
+        session = make_session()
+        services.save_lead(session, "a@example.com", True)
+        self.assertEqual(services.erase_lead("A@example.com"), 1)
+        session.refresh_from_db()
+        self.assertEqual((session.lead_email, session.lead_at), ("", None))
+        self.assertFalse(JourneySession.history.model.objects.filter(lead_email="a@example.com").exists())
+
+    def test_a_bot_filling_the_hidden_field_stores_nothing(self):
+        client = Client(enforce_csrf_checks=True)
+        token = client.get("/journey/state/").cookies["csrftoken"].value
+        response = client.post("/journey/lead/", json.dumps({"email": "a@example.com", "consent": True, "website": "x"}),
+                               content_type="application/json", headers={"X-CSRFToken": token})
+        self.assertEqual(response.status_code, 200)
+        session = JourneySession.objects.get()
+        self.assertEqual((session.lead_email, session.is_bot), ("", True))
+
+
 class EndpointTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -223,6 +308,7 @@ class EndpointTests(TestCase):
         self.assertEqual(saved.status_code, 200)
         self.post(client, "/journey/answer/", {"question": "time", "options": ["daytime"]}, token)
         self.post(client, "/journey/answer/", {"question": "facilities", "options": ["gym"]}, token)
+        self.post(client, "/journey/answer/", {"question": "industry", "options": ["tech", "creative"]}, token)
         self.assertEqual(self.post(client, "/journey/answer/", {"question": "frequency", "options": ["bogus"]}, token).status_code, 400)
         self.post(client, "/journey/step/", {"step": 2}, token)
 
@@ -233,6 +319,22 @@ class EndpointTests(TestCase):
         self.assertEqual(JourneySession.objects.count(), 1)
         session = JourneySession.objects.get()
         self.assertEqual((session.utm_source, session.device_type), ("instagram", "unknown"))
+
+        # The email gate: no suggested membership, price or completion until an address is left.
+        self.assertEqual(client.get("/journey/state/").json()["session"]["lead_required"], True)
+        blocked = client.get("/journey/result/")
+        self.assertEqual((blocked.status_code, blocked.json()["needs_email"]), (403, True))
+        self.assertEqual(self.post(client, "/journey/result/", {}, token).status_code, 403)
+        session.refresh_from_db()
+        self.assertFalse(session.completed)
+        bad = self.post(client, "/journey/lead/", {"email": "not an email", "consent": False}, token)
+        self.assertEqual((bad.status_code, sorted(bad.json()["errors"])), (400, ["consent", "email"]))
+        self.assertEqual(self.post(client, "/journey/lead/", {"email": "Hugo@Example.com", "consent": False}, token).status_code, 400)  # consent is required
+        ok = self.post(client, "/journey/lead/", {"email": " Hugo@Example.com ", "consent": True}, token)
+        self.assertEqual(ok.status_code, 200)
+        session.refresh_from_db()
+        self.assertEqual((session.lead_email, session.lead_privacy_version != "", session.lead_at is not None), ("hugo@example.com", True, True))
+        self.assertEqual(client.get("/journey/state/").json()["session"]["lead_required"], False)
 
         result = client.get("/journey/result/").json()  # a GET only reads: nothing is stored
         self.assertIn(result["suggested"]["slug"], {"tier-1", "tier-2", "tier-3"})
@@ -321,6 +423,10 @@ class RequiredAndReopenTests(TestCase):
             services.set_step(session, direction="next")
         self.assertEqual(caught.exception.missing, ["facilities"])
         services.save_answer(session, "facilities", options=["gym"])
+        with self.assertRaises(services.AnswerError) as caught:
+            engine.complete(session)  # what he does is required too (multi-select, at least one)
+        self.assertEqual(caught.exception.missing, ["industry"])
+        services.save_answer(session, "industry", options=["tech", "creative"])
         self.assertTrue(engine.complete(session)["suggested"])
         data = {q["key"]: q for s in services.build_state(session)["screens"] for q in s["questions"]}
         self.assertEqual((data["time"]["min_choices"], data["time"]["skippable"]), (1, False))
@@ -330,7 +436,7 @@ class RequiredAndReopenTests(TestCase):
         client = Client()
         client.get("/journey/state/")
         session = services.session_from_cookies({"spa99_journey": client.cookies["spa99_journey"].value})
-        for key, value in (("time", ["evening"]), ("frequency", ["two_three"]), ("facilities", ["gym"])):
+        for key, value in (("time", ["evening"]), ("frequency", ["two_three"]), ("facilities", ["gym"]), ("industry", ["tech"])):
             services.save_answer(session, key, options=value)
         engine.complete(session)
         state = client.get("/journey/state/").json()
@@ -349,7 +455,7 @@ class RequiredAndReopenTests(TestCase):
         client = Client(enforce_csrf_checks=True)
         token = client.get("/journey/state/").cookies["csrftoken"].value
         old = services.session_from_cookies({"spa99_journey": client.cookies["spa99_journey"].value})
-        for key, value in (("time", ["evening"]), ("facilities", ["gym"])):
+        for key, value in (("time", ["evening"]), ("facilities", ["gym"]), ("industry", ["tech"])):
             services.save_answer(old, key, options=value)
         engine.complete(old)
         self.assertEqual(client.post("/journey/restart/").status_code, 403)  # CSRF protected
@@ -359,7 +465,7 @@ class RequiredAndReopenTests(TestCase):
         self.assertEqual(client.get("/journey/state/").json()["session"]["id"], state["session"]["id"])  # new cookie
         old.refresh_from_db()
         self.assertTrue(old.completed)  # statistics and Gold links on the old one stay
-        self.assertEqual(old.answers.count(), 2)
+        self.assertEqual(old.answers.count(), 3)
 
 
 class PeopleCountTests(TestCase):

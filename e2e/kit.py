@@ -288,7 +288,7 @@ def verify_email_link(page, url):
     page.wait_for_url(re.compile(r"/account/"))
 
 
-def answer_journey(page, stop_before_result=False):
+def answer_journey(page, stop_before_result=False, email="journey-walker@example.test"):
     """Walk the guided journey: pick the first choice of every question on every screen until the suggested tier shows.
     Returns the suggested tier text (for example 'Tier 2.')."""
     page.goto(f"{SITE}/journey/")
@@ -296,6 +296,11 @@ def answer_journey(page, stop_before_result=False):
         page.wait_for_selector("[data-flow-root] .screen, [data-flow-root] .result")
         if page.locator("[data-flow-root] .result").count():
             break
+        if page.locator("[data-flow-root] .lead-gate").count():  # the email gate before the result (2026-10-26)
+            page.locator("#lead-email").fill(email)
+            page.locator("#lead-consent").check()
+            page.locator("[data-gate-primary]").click()
+            continue
         heading = page.locator("[data-flow-root] h1").first.inner_text()
         for _ in range(5):  # follow-up questions appear after an answer, so look again
             unanswered = page.locator("fieldset[data-question]:not([hidden])").filter(has_not=page.locator("input:checked"))

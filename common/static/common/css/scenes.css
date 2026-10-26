@@ -528,6 +528,18 @@ html.motion .frame-media, html.motion .window-media, html.motion .hero-window, h
   .sp-feature--right .sp-text { grid-column: 1 / span 4; grid-row: 1; }
 }
 
+/* compact room (the gym, Moishe 2026-10-26): one smaller picture, a shorter section; the picture never stands for more than it is */
+.sp-feature--compact { --sp-pad: var(--space-4); }
+.sp-feature--compact .sp-frame { aspect-ratio: 4 / 3; }
+@media (min-width: 48em) { .sp-feature--compact { --sp-pad: var(--space-5); } .sp-feature--compact .sp-frame { aspect-ratio: 4 / 3; } }
+@media (min-width: 64em) {
+  .sp-feature--compact .sp-frame { max-height: calc(var(--frame-h-feature) * 0.62); }
+  .sp-feature--compact.sp-feature--left .sp-pic { grid-column: 1 / span 5; }
+  .sp-feature--compact.sp-feature--left .sp-text { grid-column: 7 / -1; }
+  .sp-feature--compact.sp-feature--right .sp-pic { grid-column: 8 / -1; }
+  .sp-feature--compact.sp-feature--right .sp-text { grid-column: 1 / span 5; }
+}
+
 /* ---------- S3 how a visit works ---------- */
 .sp-visit-grid { align-items: start; }
 .sp-visit-head, .vsteps, .sp-hours, .sp-visit-frame { grid-column: 1 / -1; }

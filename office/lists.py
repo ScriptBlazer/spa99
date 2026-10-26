@@ -105,7 +105,7 @@ def person_detail(user):
                    for a in session.answers.select_related("question").prefetch_related("options").order_by("answered_at")]
         journeys.append({"started": session.created_at.isoformat(), "completed": session.completed, "device": session.device_type,
                          "suggested_plan": session.suggested_plan.name if session.suggested_plan_id else "",
-                         "gold_potential": session.gold_potential, "answers": answers})
+                         "gold_potential": session.gold_potential, "lead_email": session.lead_email, "answers": answers})
     return {
         "id": str(user.pk), "name": user.get_full_name() or user.email, "email": user.email, "mobile": user.mobile or "",
         "public_id": user.public_id_display, "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else "",

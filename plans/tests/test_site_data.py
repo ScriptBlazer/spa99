@@ -22,7 +22,7 @@ class SiteSettingsTests(TestCase):
 
     def test_address_and_opening_label_have_defaults_and_follow_the_date(self):
         site = SiteSettings.load()
-        self.assertEqual(site.address_one_line, "99 Vale Road, London N4 1PR")
+        self.assertEqual(site.address_one_line, "BML House, 99c Vale Road, London N4 1PR")
         self.assertEqual(site.opening_label, "January 2027")
         SiteSettings.objects.update(opening_date=date(2027, 2, 14), address_street="1 New Street", address_postcode="N4 9ZZ")
         site = SiteSettings.load()
@@ -59,7 +59,7 @@ class HoursAndLabelsTests(TestCase):
                       pages.opening_hours())
         OpeningRule.objects.filter(key__startswith="shabbos").update(offset_minutes=None, public_note="")
         self.assertFalse([row for row in pages.opening_hours() if "Shabbos" in row[0]])
-        self.assertEqual(pages.hours_summary(), "Open 5am to 3am")
+        self.assertEqual(pages.hours_summary(), "Open 24 hours a day")
 
     def test_facility_alt_and_gold_perk_phrases_come_from_rows(self):
         Facility.objects.filter(slug="gym").update(image_alt="A bright gym")
@@ -67,7 +67,7 @@ class HoursAndLabelsTests(TestCase):
         alts = {card["slug"]: card["alt"] for card in pages.facility_cards()}
         self.assertEqual((alts["gym"], alts["showers"]), ("A bright gym", "Showers"))
         beyond = dict(pages.gold_groups())["Beyond the spa"]
-        self.assertEqual(beyond, ["Each merch release", "Leil Shishi when offered", "BML members' events"])
+        self.assertEqual(beyond, ["Each merch release", "BML members' events"])  # Leil Shishi hidden (2026-10-26)
 
     def test_one_label_splitter(self):
         self.assertEqual(pages.split_label("Early morning (5 to 9am)"), ("Early morning", "5 to 9am"))

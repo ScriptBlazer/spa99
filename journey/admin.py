@@ -39,9 +39,9 @@ class AnswerInline(admin.TabularInline):
 
 @admin.register(JourneySession)
 class JourneySessionAdmin(ExportCsvMixin, SimpleHistoryAdmin):
-    list_display = ("created_at", "device_type", "current_step", "completed", "suggested_plan", "gold_potential", "user", "is_bot")
+    list_display = ("created_at", "device_type", "current_step", "completed", "suggested_plan", "gold_potential", "lead_email", "user", "is_bot")
     list_filter = ("completed", "device_type", "gold_potential", "is_bot")
-    search_fields = ("user__email", "utm_source", "referrer")
+    search_fields = ("user__email", "lead_email", "utm_source", "referrer")
     readonly_fields = ("created_at", "updated_at")
     export_exclude = ("key",)  # the cookie value is a secret: hidden from the form and from CSV
     exclude = ("key",)

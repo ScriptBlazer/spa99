@@ -1,6 +1,6 @@
 {% load content_tags %}{# A feature room (S2a, S2c, S2d): an edge-bleed frame on one side, the words on the other, an optional detail inset and one companion. Needs s (the section) and ratio (a|b|c). #}
 {% with f=s.feature c=s.companion %}
-<article class="scene sp-sec sp-feature sp-feature--{{ s.side }} sp-ratio-{{ ratio }} on-dark" id="{{ f.slug }}" data-scene="feature" data-glow>
+<article class="scene sp-sec sp-feature{% if s.compact %} sp-feature--compact{% endif %} sp-feature--{{ s.side }} sp-ratio-{{ ratio }} on-dark" id="{{ f.slug }}" data-scene="feature" data-glow>
   <div class="glow" aria-hidden="true"></div>
   <div class="container grid sp-grid">
     <div class="sp-pic">
@@ -9,7 +9,7 @@
         <div class="frame-media">{% include "pages/_spa_media.html" with f=f sizes="(min-width: 64em) 62vw, 100vw" %}</div>
         <div class="frame-tint" aria-hidden="true"></div>
       </figure>
-      {% if f.detail_image or f.detail_image_name %}
+      {% if not s.compact and f.detail_image or not s.compact and f.detail_image_name %}
       {# the detail inset (the steel bottle on the gym): a mount, no caption (docs/design/AMENITIES.md M4) #}
       {% include "pages/_spa_mount.html" with name=f.detail_image_name alt=f.detail_alt sizes="(min-width: 64em) 14vw, 40vw" focus="50% 50%" upload=f.detail_image depth="12" cls="sp-detail" %}
       {% endif %}

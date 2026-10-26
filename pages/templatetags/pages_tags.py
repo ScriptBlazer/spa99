@@ -10,6 +10,18 @@ def hours_summary():
     return services.hours_summary()
 
 
+@register.simple_tag
+def hours_note():
+    """'Open 24 hours a day. Cleaning hours 3am to 5am. Closed Shabbos and Yom Tov.'"""
+    return services.hours_note()
+
+
+@register.simple_tag
+def compare_columns(cards):
+    """The compare table's columns: the cards plus the Gold Card last."""
+    return services.compare_cards(cards)
+
+
 @register.filter
 def split_main(label):
     return services.split_label(label)[0]

@@ -33,13 +33,13 @@ _clock = plan_services.clock
 def opening_hours():
     """Opening hours as [(label, text)] from the rules (open periods first, then the closures)."""
     rules = list(OpeningRule.objects.filter(active=True))
-    rows = []
+    rows = [("Open", "24 hours a day")] if plan_services.open_all_day() else []
     for rule in rules:
         if rule.kind == OpeningRule.PERIOD and rule.start_time and rule.end_time:
             rows.append((rule.label, f"{_clock(rule.start_time)} to {_clock(rule.end_time)}"))
     for rule in rules:
         if rule.kind == OpeningRule.DAILY_CLOSURE and rule.start_time and rule.end_time:
-            rows.append(("Closed", f"{_clock(rule.start_time)} to {_clock(rule.end_time)}, every day"))
+            rows.append(("Cleaning hours", f"{_clock(rule.start_time)} to {_clock(rule.end_time)}, every day"))
     shabbos = shabbos_hours_text(rules)
     if shabbos:
         rows.append(shabbos)
@@ -73,7 +73,10 @@ def shabbos_hours_text(rules):
 
 
 def hours_summary():
-    """One short line for the footer and menu, e.g. 'Open 5am to 3am'."""
+    """One short line for the footer and menu: 'Open 24 hours a day' (Moishe, 2026-10-26), or 'Open 5am to 3am' when the
+    rules do not fill the day."""
+    if plan_services.open_all_day():
+        return "Open 24 hours a day"
     periods = [
         (_clock(r.start_time), _clock(r.end_time))
         for r in OpeningRule.objects.filter(active=True, kind=OpeningRule.PERIOD) if r.start_time and r.end_time
@@ -83,6 +86,23 @@ def hours_summary():
     return f"Open {periods[0][0]} to {periods[0][1]}" if periods else ""
 
 
+def cleaning_text():
+    """'3am to 5am' (the Cleaning hours window), or '' when none is set."""
+    rule = next(iter(plan_services.cleaning_rules()), None)
+    return f"{_clock(rule.start_time)} to {_clock(rule.end_time)}" if rule else ""
+
+
+def hours_note():
+    """The full public line: 'Open 24 hours a day. Cleaning hours 3am to 5am. Closed Shabbos and Yom Tov.' Parts without data are left out."""
+    summary = hours_summary()
+    parts = [summary if plan_services.open_all_day() or not summary else f"{summary}, every day"]
+    if cleaning_text():
+        parts.append(f"Cleaning hours {cleaning_text()}")
+    if closure_title():
+        parts.append(f"Closed {closure_title()}")
+    return ". ".join(p for p in parts if p) + ("." if any(parts) else "")
+
+
 def closure_title():
     """The public name of the weekly closure ('Shabbos and Yom Tov'), or '' when none is set in Control."""
     rule = OpeningRule.objects.filter(active=True, kind=OpeningRule.CLOSE_BEFORE_CANDLES).exclude(public_title="").first()
@@ -90,13 +110,18 @@ def closure_title():
 
 
 def hours_facts():
-    """The two numbers Home shows, from the open periods: {'range': '5am to 3am', 'hours': 22}. None when no period is set."""
+    """The numbers Home shows, from the open periods: {'range': '5am to 3am', 'hours': 22, 'all_day': False, 'cleaning': ''}.
+    When the rules fill the day: {'range': '24 hours a day', 'hours': 24, 'all_day': True, 'cleaning': '3am to 5am'}.
+    None when no period is set."""
     periods = [r for r in OpeningRule.objects.filter(active=True, kind=OpeningRule.PERIOD) if r.start_time and r.end_time]
     if not periods:
         return None
+    if plan_services.open_all_day():
+        return {"range": "24 hours a day", "hours": 24, "all_day": True, "cleaning": cleaning_text()}
     minutes = sum(((r.end_time.hour * 60 + r.end_time.minute) - (r.start_time.hour * 60 + r.start_time.minute)) % 1440 or 1440
                   for r in periods)
-    return {"range": f"{_clock(periods[0].start_time)} to {_clock(periods[-1].end_time)}", "hours": round(minutes / 60)}
+    return {"range": f"{_clock(periods[0].start_time)} to {_clock(periods[-1].end_time)}", "hours": round(minutes / 60),
+            "all_day": False, "cleaning": cleaning_text()}
 
 
 # ---------- greeting ----------
@@ -120,7 +145,7 @@ def character(plan):
         return "One visit"
     if plan.is_unlimited:
         return "Unlimited"
-    return "Daytime" if plan.is_daytime_only else "Any time"
+    return "Off-peak" if plan.is_daytime_only else "Any time"
 
 
 def plan_lines(plan):
@@ -132,7 +157,7 @@ def plan_lines(plan):
         lines.append("Unlimited visits")
     else:
         lines.append(f"{_plural(plan.visits_per_month, 'visit')} a month")
-    lines.append("Daytime visits" if plan.is_daytime_only else "Evenings and late nights")
+    lines.append("Off-peak visits" if plan.is_daytime_only else "Peak and off-peak, any time")
     lines.append(f"Book up to {_plural(plan.booking_window_days, 'day')} ahead")
     if plan.guests_per_month:
         lines.append(f"Bring {_plural(plan.guests_per_month, 'guest')} a month")
@@ -162,8 +187,24 @@ def purchasable_plans():
     return [plan_card(p, vat, ranges) for p in plan_services.visible_plans() if p.kind in (Plan.MONTHLY, Plan.ONE_OFF)]
 
 
+def gold_compare_card():
+    """The Gold Card as one more compare column (Moishe, 2026-10-26), or None when the plan is hidden or not there."""
+    plan = _gold_plan()
+    if plan is None:
+        return None
+    return plan_card(plan, SiteSettings.load().vat_rate, plan_services.hours_ranges())
+
+
+def compare_cards(cards):
+    """The purchasable cards plus the Gold Card column last (same list for the table's picker, head and cells)."""
+    gold = gold_compare_card()
+    return list(cards) + ([gold] if gold and all(c["slug"] != gold["slug"] for c in cards) else [])
+
+
 def compare_table(cards):
-    """Feature rows for the compare table: [{'label', 'cells': [text per card]}]."""
+    """Feature rows for the compare table: [{'label', 'cells': [text per card]}]. The Gold Card is added as the last column
+    (see compare_cards). Its price rows say 'By application' until an annual fee is set in System > Plans, then '£X a year'."""
+    cards = compare_cards(cards)
 
     def row(label, fn):
         return {"label": label, "cells": [{"text": fn(c), "featured": c["highlight"]} for c in cards]}
@@ -173,17 +214,23 @@ def compare_table(cards):
             return "1"
         return "Unlimited" if c["visits_per_month"] is None else str(c["visits_per_month"])
 
+    def price(c, inc=False):
+        if c["kind"] == Plan.FREE_BY_APPLICATION:
+            return c["annual_fee_inc_text" if inc else "annual_fee_text"]
+        return f"£{c['price_inc' if inc else 'price_ex_vat']}"
+
     rows = [
-        row("Price, ex VAT", lambda c: f"£{c['price_ex_vat']}"),
-        row("Price, inc VAT", lambda c: f"£{c['price_inc']}"),
+        row("Price, ex VAT", price),
+        row("Price, inc VAT", lambda c: price(c, inc=True)),
         row("Visits a month", visits),
-        row("When", lambda c: "Daytime" if c["hours"] == Plan.DAYTIME_ONLY else "Day and evening"),
+        row("When", lambda c: "Off-peak" if c["hours"] == Plan.DAYTIME_ONLY else "Off-peak and peak"),
         row("Book ahead", lambda c: _plural(c["booking_window_days"], "day")),
         row("Bookings at a time", lambda c: str(c["upcoming_limit"])),
         row("Guests a month", lambda c: str(c["guests_per_month"])),
         row("Cancel up to", lambda c: f"{c['cancel_hours']} hours before"),
     ]
-    # One row per perk any shown plan has (Merch, Leil Shishi, ...), in order of first appearance; "No" when a plan lacks it.
+    # One row per perk any shown plan has (Merch, ...), in order of first appearance; "No" when a plan lacks it. Leil Shishi
+    # is left out while Site settings 'show Leil Shishi' is off (the cards' perks are already filtered by plan_display).
     labels = {}
     for c in cards:
         for perk in c["perks"] or []:
@@ -231,7 +278,7 @@ def booking_lines(cards):
 def public_perks(plan):
     """A plan's perks that may be shown on the site. A perk with "public": false stays in the data (rules can use it)
     but is shown nowhere. Default is public."""
-    return [perk for perk in plan.perks or [] if perk.get("public", True)]
+    return [perk for perk in plan_services.shown_perks(plan) if perk.get("public", True)]
 
 
 def _gold_plan():
@@ -248,7 +295,7 @@ def gold_groups():
     if plan is None:
         return None
     visits = ["Unlimited visits" if plan.is_unlimited else f"{_plural(plan.visits_per_month, 'visit')} a month"]
-    visits.append("Daytime visits" if plan.is_daytime_only else "Any time")
+    visits.append("Off-peak visits" if plan.is_daytime_only else "Any time")
     visits.append(f"Book up to {_plural(plan.booking_window_days, 'day')} ahead")
     if plan.guests_per_month:
         visits.append(f"Bring {_plural(plan.guests_per_month, 'guest')} a month")
@@ -288,7 +335,7 @@ def gold_facts():
     if plan.is_daytime_only:
         daytime = _daytime_range()
         if daytime:
-            figures.append(_figure("Daytime", daytime))
+            figures.append(_figure("Off-peak", daytime))
     else:
         facts = hours_facts()
         if facts:
@@ -360,7 +407,7 @@ def spa_sections(cards):
     while index < len(cards):
         card = cards[index]
         index += 1
-        if card["display"] != Facility.FEATURE:
+        if card["display"] not in (Facility.FEATURE, Facility.COMPACT):
             tiles.append(card)  # tiles, and companions with no feature before them
             continue
         flush()
@@ -368,7 +415,7 @@ def spa_sections(cards):
         if index < len(cards) and cards[index]["display"] == Facility.COMPANION:
             companion, index = cards[index], index + 1
         sections.append({"kind": "feature", "side": "left" if features % 2 == 0 else "right",
-                         "feature": card, "companion": companion})
+                         "feature": card, "companion": companion, "compact": card["display"] == Facility.COMPACT})
         features += 1
     flush()
     return sections
@@ -399,8 +446,10 @@ def visit_pills(copy=None):
     facts = hours_facts()
     if facts:
         stay.append(f"Open {facts['range']}")
+    if facts and facts["cleaning"]:
+        stay.append(f"Cleaning hours {facts['cleaning']}")
     if closure_title():
-        stay.append(f"Closed for {closure_title()}")
+        stay.append(f"Closed {closure_title()}")
     return {"book": book + lines("step_1_pills"), "arrive": lines("step_2_pills"), "stay": stay + lines("step_3_pills")}
 
 
@@ -459,11 +508,11 @@ def _opener_values():
     facts = hours_facts()
     count = Facility.objects.filter(visible=True).count()
     rooms = content.NUMBER_WORDS[count] if 0 < count < len(content.NUMBER_WORDS) else (str(count) if count else "")
-    return {"hours": facts["range"] if facts else "", "closure": closure_title(), "rooms": rooms,
+    return {"hours": facts["range"] if facts else "", "closure": closure_title(), "cleaning": cleaning_text(), "rooms": rooms,
             "Rooms": rooms[:1].upper() + rooms[1:]}
 
 
-_PLACEHOLDER = re.compile(r"\{(hours|closure|rooms|Rooms)\}")
+_PLACEHOLDER = re.compile(r"\{(hours|closure|cleaning|rooms|Rooms)\}")
 
 
 def _fill_statement(text, values):

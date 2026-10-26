@@ -140,7 +140,8 @@ class GoldApplication(BaseModel):
     email = models.EmailField(db_index=True)
     mobile = models.CharField(max_length=16, blank=True, help_text="E.164")
 
-    industry = models.CharField(max_length=20, blank=True, help_text="What he does: a journey `industry` option value.")
+    industry = models.CharField(max_length=20, blank=True, help_text="First of the industries chosen (older applications: the only one). Use `industry_values` to read them all.")
+    industries = models.JSONField(default=list, blank=True, help_text="Everything he does: journey `industry` option values (multi-select). Empty on older applications: they have `industry` only.")
     industry_other = models.CharField(max_length=100, blank=True, help_text="Typed when the industry is Other.")
     property_link = models.CharField(max_length=20, blank=True, help_text="Only asked when the industry is Property.")
     size_range = models.CharField(max_length=10, blank=True)
@@ -203,6 +204,11 @@ class GoldApplication(BaseModel):
     def final_review_done(self):
         """True once a final approver has looked at it and sent it back: the next approval is not reviewed again."""
         return self.sent_back_at is not None
+
+    @property
+    def industry_values(self):
+        """Every industry chosen, in order. Older applications (before multi-select) only have `industry`."""
+        return list(self.industries or ([self.industry] if self.industry else []))
 
     @property
     def full_name(self):

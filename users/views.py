@@ -21,6 +21,7 @@ from common.ratelimit import hit, rate_limited_json
 from common.validators import normalise_email
 from journey import services as journey_services
 from pages import services as pages_services
+from pages.access import memberships_visible
 from plans import sales as sale_services
 from plans import services as plan_services
 from plans.models import SiteSettings
@@ -415,7 +416,7 @@ def _tier_message(request, outcome, plan):
 def account_interest(request):
     outcome = _tier_message(request, *services.choose_tier(request.user, request.POST.get("plan", "")))
     if outcome == "invalid":
-        return redirect("account_membership" if member.can_open(request.user) else "memberships")
+        return redirect("account_membership" if member.can_open(request.user) else ("memberships" if memberships_visible(request) else "journey"))
     return redirect("account")
 
 

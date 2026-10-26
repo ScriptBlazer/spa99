@@ -9,8 +9,9 @@ Multi-line text (steps, role lists) is one line per row in `body`."""
 from . import legal
 from .models import Page, Section
 
-KIT_BODY = "Towels | towel-bench-portrait | 50% 45%\nRobe | robe | 100% 38%\nSlippers | slippers | 62% 60%\nToiletries | toiletries | 50% 55%"
-STEP_2_PILLS = "Your own locker\nPhones stay in the locker"  # the kit row (arrive_kit) now says towel, robe and slippers
+KIT_BODY = "Towels | towel-bench-portrait | 50% 45%\nRobe | robe | 100% 38%\nSlippers | slippers | 62% 60%\nIce bucket | ice-bucket | 50% 50%\nToiletries | toiletries | 50% 55%"
+# Moishe 2026-10-26: the ice bucket is the featured fourth item (no picture is built yet: the swan tile shows); toiletries stay listed as supplied.
+STEP_2_PILLS = "Your own locker\nNo phones in the spa: they stay in your locker\nFree drinks\nFree ice lollies"
 
 # page key: (title, meta description, [(section key, heading, body, cta label, cta url)])
 PAGES = {
@@ -27,17 +28,18 @@ PAGES = {
         ("inside", "What's inside.", "", "", ""),
         ("facts_hours_label", "", "Open every day", "", ""),
         ("facts_hours_count_label", "", "hours a day", "", ""),
+        ("facts_cleaning_label", "", "Cleaning hours", "", ""),  # shown with the cleaning window when the spa is open 24 hours (2026-10-26)
         ("facts_capacity_label", "", "", "", ""),  # fill in Control (for example "guests at most, at any time") to show the capacity fact
         ("lounge_caption", "The lounge.", "", "", ""),
         ("journey_entry", "Which membership suits you?", "A few taps. Under two minutes.", "Tailor your membership", "/journey/"),
         ("memberships_teaser", "Three memberships. One single visit.", "", "Compare memberships", "/memberships/"),
         ("gold_teaser", "The Gold Card.", "For people in property. Free, by application.", "About the Gold Card", "/gold-card/"),
         ("opening_label", "", "Launching", "", ""),
-        ("opening", "{opening}.", "99 Vale Road, London N4.", "Register", "/register/"),
+        ("opening", "{opening}.", "BML House, 99c Vale Road, London N4.", "Register", "/register/"),
     ]),
-    "spa": ("The spa", "Sauna, cold plunge, relaxing zone, gym and massage at 99 Vale Road.", [
+    "spa": ("The spa", "Sauna, cold plunge, relaxing zone, massage room and gym at BML House, 99c Vale Road.", [
         ("intro", "The spa.", "{rooms} spaces, one quiet visit.", "", ""),
-        ("opener_1", "Open {hours}.", "Every day. Closed for {closure}.", "", ""),
+        ("opener_1", "Open {hours}.", "Cleaning hours {cleaning}. Closed {closure}.", "", ""),
         ("opener_2", "For men only.", "18 and over.", "", ""),
         ("opener_3", "Heat, steam, cold and rest.", "{Rooms} rooms, all part of the same visit.", "", ""),
         ("opener_4", "Stay as long as you like.", "Take your time. Nothing here is rushed.", "", ""),
@@ -45,8 +47,8 @@ PAGES = {
         ("facts_rooms", "", "rooms, one visit", "", ""),
         ("facts_hours", "", "every day", "", ""),
         ("facts_men", "Men only", "18 and over", "", ""),
-        ("tiles_intro", "Steam, cold, water.", "Between rounds of heat.", "", ""),
-        ("moment_shower", "Between rounds.", "Warm water, cool stone and a moment to yourself.", "", ""),
+        ("tiles_intro", "Steam, cold plunge, showers.", "Warm through, cool down, rinse off.", "", ""),
+        ("moment_shower", "After the heat.", "A warm shower, a fresh towel and a moment to yourself.", "", ""),
         ("moment_slippers", "Unhurried.", "From the lockers to the loungers, at your own pace.", "", ""),
         ("moment_tote", "Until next time.", "", "", ""),
         ("arrive_kit", "The details.",
@@ -55,16 +57,16 @@ PAGES = {
         ("step_1", "Book.", "Choose a time that suits you.", "", ""),
         ("step_1_pills", "", "", "", ""),
         ("booking_pending", "", "Booking opens with membership", "", ""),
-        ("step_2", "Arrive.", "Leave the day at the door.", "", ""),
+        ("step_2", "Arrive.", "Come with nothing. Towels, robe, slippers, toiletries and trunks are all supplied.", "", ""),
         ("step_2_pills", "", STEP_2_PILLS, "", ""),
-        ("step_3", "Stay.", "As long as you like, until closing.", "", ""),
-        ("step_3_pills", "", "Every room is part of the visit", "", ""),
+        ("step_3", "Stay.", "As long as you like.", "", ""),
+        ("step_3_pills", "", "Every room is part of the visit\nAll areas included", "", ""),
         ("next", "Find the right way to visit.", "", "Tailor your membership", "/journey/"),
         ("next_from", "", "Memberships from {price} a month, {price_inc} inc VAT.", "", ""),
         ("next_link", "", "", "See memberships", "/memberships/"),
         ("tour_link", "", "", "Take the tour", ""),  # 2026-10-23: the link on each toured room (cta_url is built in code)
     ]),
-    "tour": ("Virtual tour", "Look around the lounge, the saunas, the relaxing zone and the gym at Spa 99, 99 Vale Road, London N4.", [
+    "tour": ("Virtual tour", "Look around the lounge, the saunas, the relaxing zone and the gym at Spa 99, BML House, 99c Vale Road, London N4.", [
         ("intro", "Virtual tour", "Look around the rooms, then walk through.", "", ""),
         ("hint", "", "Drag to look around.", "", ""),
         ("hint_tilt", "", "Tilt or drag to look around.", "", ""),
@@ -82,7 +84,7 @@ PAGES = {
         ("not_sure", "Not sure?", "", "Tailor your membership", "/journey/"),
         ("compare", "Compare memberships.", "Every membership, side by side.", "Compare memberships", "#compare"),
         ("gold_cta", "", "The Gold Card is free, by application.", "Apply for the Gold Card", "/gold-card/apply/"),
-        ("every_visit", "", "Every visit: every room, as long as you like.", "See the spa", "/the-spa/"),
+        ("every_visit", "", "Every visit: every room and all areas, as long as you like. Free drinks and free ice lollies. Come with nothing: towels, robe, slippers, toiletries and trunks are supplied.", "See the spa", "/the-spa/"),
         ("gold_line", "", "There is also the Gold Card, for people in property.", "About the Gold Card", "/gold-card/"),
         ("price_note", "", "Prices including VAT are shown under each price.", "", ""),
         ("register_label", "", "", "Register", "/register/"),
@@ -131,7 +133,7 @@ PAGES = {
         ("others", "Or choose another", "", "Choose {plan}", ""),
         ("continue", "", "", "Continue", ""),
         ("skip", "", "", "Skip this part", ""),
-        ("last", "", "", "See my membership", ""),
+        ("last", "", "", "See my tailored membership", ""),
         ("back", "", "", "Back", ""),
         ("prefer_not", "", "", "Prefer not to say", ""),
         ("start_again", "", "", "Start again", ""),
@@ -142,7 +144,7 @@ PAGES = {
         ("result_loading", "", "One moment", "", ""),
         ("result_error", "We could not load your result just now. Please try again.", "Please try again.", "See the memberships", "/memberships/"),
         ("unavailable", "", "The guided journey is not available just now.", "See the memberships", "/memberships/"),
-        ("not_a_fit", "", "Daytime only", "", ""),
+        ("not_a_fit", "", "Off-peak only", "", ""),
         ("optional", "", "(optional)", "", ""),
     ]),
     "book": ("Book", "Booking at Spa 99 opens soon.", [
@@ -160,8 +162,8 @@ PAGES = {
         ("opening_soon", "Opens {opening}", "", "", ""),
         ("id_note", "", "Share it with a member who wants to bring you as a guest.", "", ""),
     ]),
-    "visit": ("Visit us", "Spa 99, 99 Vale Road, London N4 1PR.", [
-        ("address", "Visit us.", "99 Vale Road\nLondon N4 1PR", "", ""),
+    "visit": ("Visit us", "Spa 99, BML House, 99c Vale Road, London N4 1PR.", [
+        ("address", "Visit us.", "BML House\n99c Vale Road\nLondon N4 1PR", "", ""),
         ("men_only", "", "Men only. 18 and over.", "", ""),
         ("getting_here", "", "", "", ""),
     ]),

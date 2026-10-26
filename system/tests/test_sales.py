@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import Plan, Sale
+from plans.tests.helpers import open_memberships
 from plans.tests.test_sales import HOUR, make_sale
 from system.models import SystemChange
 from system.tests.test_system import make_user, sign_in, unlocked_client
@@ -28,6 +29,7 @@ def form(start=2, end=30, **over):
 class SalesTests(TestCase):
     def setUp(self):
         seed_all()
+        open_memberships()
         self.dev = make_user()
         self.client = unlocked_client(self.dev)
 
