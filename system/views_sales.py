@@ -40,12 +40,24 @@ def _form_page(request, form, sale, status=200):
     return page(request, "system/sales_form.html", "sales", context, status=status)
 
 
+def _copy_initial(request):
+    """New sale prefilled from another (`?copy=<id>`): percent, months and plans; the name and times start blank."""
+    try:
+        source = Sale.objects.filter(pk=request.GET.get("copy", "")).first()
+    except (ValidationError, ValueError):  # not a valid id
+        source = None
+    if source is None:
+        return None
+    return {"percent_off": source.percent_off, "months_at_price": source.months_at_price, "plans": list(source.plans.values_list("pk", flat=True))}
+
+
 @unlocked
 @require_http_methods(["GET", "POST"])
 def sale_edit(request, pk=None):
     """New (pk None) or edit. An upcoming sale is fully editable; a live one: name, end time and plans; an ended one is read-only."""
     sale = get_object_or_404(Sale, pk=pk) if pk else None
-    form = SaleForm(request.POST or None, instance=sale)
+    initial = _copy_initial(request) if sale is None and request.method == "GET" else None
+    form = SaleForm(request.POST or None, instance=sale, initial=initial)
     if request.method == "POST":
         if form.status == "ended":
             messages.error(request, "An ended sale cannot be edited.")

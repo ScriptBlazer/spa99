@@ -30,7 +30,7 @@ class SaleForm(VersionedForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["plans"].queryset = Plan.objects.all()
+        self.fields["plans"].queryset = Plan.objects.exclude(kind=Plan.FREE_BY_APPLICATION)
         self.fields["plans"].label_from_instance = lambda plan: plan.name
         status = "upcoming" if self.instance._state.adding else self.instance.status()
         self.status = status

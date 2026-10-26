@@ -92,7 +92,8 @@ def kept_price(interest, vat_rate=None):
     vat = SiteSettings.load().vat_rate if vat_rate is None else vat_rate
     unit = "month" if months == 1 else "months"
     return {
-        "name": interest.sale_name, "percent": percent, "months": months, "plan_name": plan.name, "locked_at": interest.sale_locked_at,
+        "name": interest.sale_name, "percent": percent, "months": months, "plan_name": plan.name,
+        "plan_slugs": [p.slug for p in interest.sale.plans.all()] if interest.sale_id else [plan.slug],  # plans that keep the price "locked_at": interest.sale_locked_at,
         **price_lines(plan, percent, vat),
         "text": f"You keep {percent}% off {plan.name} for {months} {unit} from your first payment.",
     }
@@ -199,6 +200,10 @@ def sale_from_token(token, max_age=PREVIEW_SECONDS):
 def start_preview(request):
     """A valid `?sale_preview=` token on a public page puts the sale in this browser's session for an hour (called by
     plans.middleware.SalePreviewMiddleware, so it works whether or not the page reads the bar)."""
+    if request.GET.get(PREVIEW_PARAM) == "end":  # the "End preview" link in the bar
+        if getattr(request, "session", None) is not None:
+            request.session.pop(PREVIEW_KEY, None)
+        return
     sale = sale_from_token(request.GET.get(PREVIEW_PARAM, ""))
     if sale is not None and getattr(request, "session", None) is not None:
         request.session[PREVIEW_KEY] = {"sale": str(sale.pk), "until": time.time() + PREVIEW_SECONDS}

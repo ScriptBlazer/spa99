@@ -183,6 +183,7 @@ function riskSpec(changes) {
 /* ---------- submit interception (confirm before risky saves, Team, undo, delete) ---------- */
 
 function specFor(form) {
+  if (form.matches('[data-sale-form]')) return saleSpec(form);
   if (form.matches('form[data-system-form]') && initial.has(form)) return riskSpec(changesOf(form));
   if (form.matches('[data-system-access-form]')) {
     const select = $('select[name=level]', form);
@@ -202,9 +203,32 @@ function specFor(form) {
   if (form.matches('[data-approval-remove]')) { // Approval: "Remove X as approver?" with the consequence, no diff
     return { title: form.dataset.confirmTitle, rows: [], line: form.dataset.confirmBody, action: 'Remove', danger: true };
   }
+  if (form.matches('[data-system-confirm][data-confirm-title]')) { // End now / Delete on Sales: the page words the whole question
+    const d = form.dataset;
+    return { title: d.confirmTitle, rows: [], line: d.confirmBody, action: d.confirmAction, danger: true };
+  }
   if (form.matches('[data-system-confirm]')) {
     const d = form.dataset;
     return { title: `Remove ${d.systemConfirm} on ${ENV}?`, rows: [{ label: d.systemConfirmWhat || d.systemConfirm, old: 'Present', now: 'Removed' }], line: d.line, action: d.systemConfirmLabel || 'Remove' };
+  }
+  return null;
+}
+
+/* Sales: saving a new sale, or moving the end of a live one, asks first (docs/design/SYSTEM-SALES.md 3.2). */
+const SALE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function saleWhen(value) { const m = /^\d{4}-(\d{2})-(\d{2})T(\d{2}:\d{2})/.exec(value || ''); return m ? { date: `${+m[2]} ${SALE_MONTHS[+m[1] - 1]}`, time: m[3], text: `${+m[2]} ${SALE_MONTHS[+m[1] - 1]}, ${m[3]}` } : null; }
+function saleSpec(form) {
+  const name = $('[name=name]', form)?.value.trim() || 'this sale';
+  const ends = $('[name=ends_at]', form);
+  if (form.hasAttribute('data-new')) {
+    const names = $$('input[name=plans]:checked', form).map((p) => p.closest('label').textContent.trim());
+    const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0] || 'the chosen plans';
+    const now = $('input[name=ss_starts_mode][value=now]', form)?.checked;
+    const start = saleWhen($('[name=starts_at]', form)?.value);
+    return { title: `Save ${name} on ${ENV}?`, rows: [], line: `${now || !start ? 'It starts now' : `It starts on ${start.date} at ${start.time}`} for ${list}. The bar appears on every page then.`, action: 'Save sale' };
+  }
+  if (form.dataset.state === 'live' && ends && form.dataset.endsWas && ends.value !== form.dataset.endsWas) {
+    return { title: `Change when ${name} ends?`, rows: [{ label: 'Ends', old: saleWhen(form.dataset.endsWas)?.text || '', now: saleWhen(ends.value)?.text || '' }], line: 'The countdown on the site changes at once.', action: 'Change end' };
   }
   return null;
 }

@@ -11,6 +11,7 @@ if (form) {
   const radios = [...form.querySelectorAll('input[name="plan"]')];
   const el = (name) => form.querySelector(`[data-summary-${name}]`);
   const [nameEl, priceEl, incEl] = [el('name'), el('price'), el('inc')];
+  const saleEl = el('sale');
   const cells = [...document.querySelectorAll('.compare-table [data-slug]')];
   const table = document.querySelector('.compare-table');
   const picker = [...document.querySelectorAll('input[name="compare"]')];
@@ -30,6 +31,7 @@ if (form) {
     nameEl.textContent = on ? on.dataset.name : form.dataset.emptyText;
     setPrice(priceEl, on ? on.dataset.price : '');
     setPrice(incEl, on ? on.dataset.inc : '');
+    if (saleEl) { saleEl.textContent = on?.dataset.sale || ''; saleEl.hidden = !saleEl.textContent; }
     if (ack) acknowledge();
     button.setAttribute('aria-disabled', on ? 'false' : 'true');
     cells.forEach((c) => c.classList.toggle('is-selected', !!on && c.dataset.slug === on.value));

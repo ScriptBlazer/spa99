@@ -1,27 +1,32 @@
-{# Context: rows, title, key (live, upcoming, past). #}
-<section class="sys-panel" aria-label="{{ title }} sales" data-system-sales="{{ key }}">
-  <h2>{{ title }}</h2>
-  <div class="sys-scroll"><table class="sys-table">
-    <thead><tr><th scope="col">Name</th><th scope="col">Status</th><th scope="col">% off</th><th scope="col">Plans</th><th scope="col">Starts</th><th scope="col">Ends</th><th scope="col">Months</th><th scope="col">Kept by</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
+{% load sale_tags %}{# Context: rows, title, key (live, upcoming, past). docs/design/SYSTEM-SALES.md 3.1. #}
+<section class="sys-panel ss-panel" aria-labelledby="ss-{{ key }}-h" data-system-sales="{{ key }}">
+  <header><h2 id="ss-{{ key }}-h">{{ title }}</h2><span class="ss-count mono">{{ rows|length }}</span></header>
+  <div class="sys-scroll"><table class="sys-table ss-list">
+    <thead><tr><th scope="col">Name</th><th scope="col" class="sys-num ss-col-off">Off</th><th scope="col" class="ss-col-plans">Plans</th><th scope="col" class="ss-col-runs">Runs</th><th scope="col" class="sys-num ss-col-months">Months</th><th scope="col" class="sys-num ss-col-held">Registered</th><th scope="col">Status</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
     <tbody>
     {% for sale in rows %}
-      <tr data-system-sale="{{ sale.pk }}">
-        <td><a href="{% url 'system_sale_edit' sale.pk %}">{{ sale.name }}</a></td>
-        <td>{{ sale.state }}{% if sale.ended_early_at %} (ended early){% endif %}</td>
-        <td>{{ sale.percent_off }}%</td>
-        <td>{{ sale.plans_label }}</td>
-        <td>{{ sale.starts_at|date:"j M Y H:i" }}</td>
-        <td>{{ sale.window_end|date:"j M Y H:i" }}</td>
-        <td>{{ sale.months_at_price }}</td>
-        <td>{{ sale.holders }}</td>
-        <td>{% if sale.state != "ended" %}
-          <form method="post" action="{% url 'system_sale_preview' sale.pk %}" style="display:inline" data-system-form="sale-preview">{% csrf_token %}<button type="submit" class="sys-btn sm">Preview link</button></form>
-          <form method="post" action="{% url 'system_sale_end' sale.pk %}" style="display:inline" data-system-form="sale-end" data-system-confirm="sale" data-system-confirm-label="End now" data-system-confirm-what="{{ sale.name }}" data-noun="sale" data-plural="sales" data-line="{% if sale.state == 'live' %}The bar disappears and the sale stops now. People who already registered keep their price.{% else %}This sale will never run.{% endif %} This is logged and can be undone while its original end time is in the future.">{% csrf_token %}<button type="submit" class="sys-btn sm">{% if sale.state == "live" %}End now{% else %}Cancel{% endif %}</button></form>
-        {% endif %}</td>
+      <tr data-system-sale="{{ sale.pk }}"{% if key == "past" and forloop.counter > 10 %} class="ss-extra" data-ss-extra{% endif %}>
+        <td class="ss-name"><a href="{% url 'system_sale_edit' sale.pk %}">{{ sale.name }}</a>
+          <span class="ss-sub">{{ sale.percent_off }}% off, {{ sale.plans_label }}</span></td>
+        <td class="sys-num ss-col-off">{{ sale.percent_off }}%</td>
+        <td class="ss-col-plans">{{ sale.plans_label }}</td>
+        <td class="mono ss-col-runs">{{ sale.starts_at|date:"j M, H:i" }} to {{ sale.window_end|date:"j M, H:i" }}</td>
+        <td class="sys-num ss-col-months">{{ sale.months_at_price }}</td>
+        <td class="sys-num ss-col-held">{{ sale.holders }}</td>
+        <td class="ss-status">{% if sale.state == "live" %}<span class="sys-badge ok">Live</span> <span class="ss-left mono">ends in {{ sale.window_end|ends_in }}</span>{% elif sale.state == "upcoming" %}<span class="sys-badge info">Starts {{ sale.starts_at|date:"j M" }}</span>{% elif sale.ended_early_at %}<span class="sys-badge">Ended early</span>{% else %}<span class="sys-badge">Ended</span>{% endif %}</td>
+        <td class="ss-actions">
+          {% if sale.state != "ended" %}
+          <form method="post" action="{% url 'system_sale_preview' sale.pk %}" data-ss-preview>{% csrf_token %}<button type="submit" class="sys-btn sm">Preview</button></form>
+          {% if sale.state == "live" %}
+          <form method="post" action="{% url 'system_sale_end' sale.pk %}" data-system-confirm="sale" data-confirm-title="End {{ sale.name }} now?" data-confirm-body="The bar and the sale prices leave the site at once. {% if sale.holders == 0 %}Nobody has registered during it yet.{% else %}The {{ sale.holders }} {% if sale.holders == 1 %}person who registered keeps{% else %}people who registered keep{% endif %} their price.{% endif %}" data-confirm-action="End sale now" data-line="">{% csrf_token %}<button type="submit" class="sys-btn sm">End now</button></form>
+          {% else %}
+          <form method="post" action="{% url 'system_sale_end' sale.pk %}" data-system-confirm="sale" data-confirm-title="Delete {{ sale.name }}?" data-confirm-body="It has not started, so nobody has this price." data-confirm-action="Delete sale" data-line="">{% csrf_token %}<button type="submit" class="sys-btn sm">Delete</button></form>
+          {% endif %}
+          {% else %}<a class="sys-btn sm" href="{% url 'system_sale_new' %}?copy={{ sale.pk }}">Copy</a>{% endif %}
+        </td>
       </tr>
-    {% empty %}
-      <tr><td colspan="9" class="sys-muted">None.</td></tr>
     {% endfor %}
     </tbody>
   </table></div>
+  {% if key == "past" and rows|length > 10 %}<div class="sys-more ss-more" data-ss-more hidden><button type="button" class="sys-btn sm" data-ss-show-all aria-expanded="false">Show all {{ rows|length }}</button></div>{% endif %}
 </section>

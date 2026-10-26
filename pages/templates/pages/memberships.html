@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static content_tags pages_tags %}
+{% load static content_tags pages_tags sale_tags %}
 {# Memberships round 2 (docs/design/MEMBERSHIPS-R2.md): slim key cards, tag column with the choice and Continue. Cream page (Moishe, 2026-10-22), selected card is espresso with a gold hairline. Sheen = the .tier-sheen span (delete it, or `.tier-sheen{display:none}`, to remove). SWITCHES: preselect = the `highlight` plan in plans/services (selected_plan_slug), or clear it by passing selected_slug="" from the view. #}
 {% block html_attrs %} data-page="marketing"{% endblock %}
 {% block body_class %}page-mem on-light{% endblock %}
@@ -7,7 +7,7 @@
 {% block main %}
 {% page_content "memberships" as m %}
 
-<form class="mem-stage" method="get" action="{% url 'register' %}" data-mem-form data-empty-text="Choose a membership">
+<form id="plans" class="mem-stage" method="get" action="{% url 'register' %}" data-mem-form data-empty-text="Choose a membership">
   <div class="container mem-grid">
     <div class="mem-top">
       <h1 id="m-title" class="mem-title line-mask"><span class="mem-title-line">{{ m.intro.heading }}</span></h1>
@@ -18,9 +18,10 @@
     <fieldset class="tiers" data-reveal>
       <legend class="sr-only">Choose your membership</legend>
       {% for t in tiers %}
+      {% sale_line t.slug as tier_sale %}{% sale_line t.slug 'short' as tier_sale_short %}
       <label class="tier">
         <span class="tier-shadow" aria-hidden="true"></span>
-        <input type="radio" name="plan" value="{{ t.slug }}"{% if t.slug == selected_slug %} checked{% endif %} aria-labelledby="tn-{{ t.slug }}" aria-describedby="tf-{{ t.slug }} tp-{{ t.slug }}" data-name="{{ t.name }}" data-price="&pound;{{ t.price_whole }} {{ t.period }}, ex VAT" data-inc="&pound;{{ t.price_inc }} inc VAT">
+        <input type="radio" name="plan" value="{{ t.slug }}"{% if t.slug == selected_slug %} checked{% endif %} aria-labelledby="tn-{{ t.slug }}" aria-describedby="tf-{{ t.slug }} tp-{{ t.slug }}" data-name="{{ t.name }}" data-price="&pound;{{ t.price_whole }} {{ t.period }}, ex VAT" data-inc="&pound;{{ t.price_inc }} inc VAT" data-sale="{{ tier_sale_short }}">
         <span class="tier-media">{% photo t.render alt=t.image_alt sizes="(min-width: 64em) 22vw, (min-width: 48em) 30rem, 92vw" override=t.image %}</span>
         <span class="tier-head">
           <span class="tier-name" id="tn-{{ t.slug }}">{{ t.name }}</span>
@@ -36,6 +37,7 @@
         <span class="tier-price-group" id="tp-{{ t.slug }}">
           <span class="tier-price num"><span class="cur">&pound;</span>{{ t.price_whole }}</span> <span class="tier-per">{{ t.period }}, ex VAT</span>
           <span class="tier-inc num">&pound;{{ t.price_inc }} inc VAT</span>
+          {% if tier_sale %}<span class="tier-sale"><span class="mark-glyph" aria-hidden="true"></span>{{ tier_sale }}</span>{% endif %}
         </span>
         <span class="tier-sheen" aria-hidden="true"></span>
       </label>
@@ -48,6 +50,7 @@
         <p class="continue-name" data-summary-name></p>
         <p class="continue-price num" data-summary-price></p>
         <p class="continue-inc num" data-summary-inc></p>
+        <p class="continue-sale" data-summary-sale hidden></p>
       </div>
       <button type="submit" class="btn btn-primary" data-continue>{{ m.continue.cta_label|default:"Continue" }}</button>
       <p class="continue-note">{{ m.continue.body }}</p>
@@ -73,6 +76,7 @@
         <h2>{{ single.name }}</h2>
         <p class="small num"><span class="cur">&pound;</span>{{ single.price_whole }} {{ single.period }}, ex VAT </p>
         <p class="small muted num">&pound;{{ single.price_inc }} inc VAT</p>
+        {% sale_line single.slug "single" as single_sale %}{% if single_sale %}<p class="small plan-aside-sale"><span class="mark-glyph" aria-hidden="true"></span>{{ single_sale }}</p>{% endif %}
         <p class="plan-aside-meta">{% if single.pills %}<span class="small">{{ single.pills.0 }}</span>{% endif %}<span class="small muted">{{ m.single_note.body }}</span></p>
       </div>
     </div>

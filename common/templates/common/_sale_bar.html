@@ -1,0 +1,22 @@
+{% load static sale_tags %}{% if sale_bar %}{% sale_bar_view sale_bar as sb %}
+{# The sale bar (docs/design/SYSTEM-SALES.md 1). Server decides if it shows; sale-bar.js only counts down, dismisses and removes it at the end. #}
+<link rel="stylesheet" href="{% static 'common/css/sale-bar.css' %}">
+<div class="sale-bar on-dark" data-sale-bar data-sale="{{ sale_bar.id }}" data-ends="{{ sale_bar.ends_at }}" data-now="{{ sb.now }}"{% if sb.upcoming %} data-upcoming{% endif %}>
+  <div class="container sale-bar-inner">
+    <a class="sale-bar-link" href="{% url 'memberships' %}#plans">
+      {% if sale_bar.preview %}<span class="sale-bar-preview">Preview</span>{% endif %}
+      <span class="sale-bar-name">{{ sale_bar.name }}</span>
+      <span class="sale-bar-sep" aria-hidden="true">&middot;</span>
+      <span class="sale-bar-offer"><span class="sale-bar-pct">{{ sale_bar.percent }}% off</span><span class="sale-bar-plans"> {{ sale_bar.plans_text }}</span></span>
+      <span class="sale-bar-sep" aria-hidden="true">&middot;</span>
+      {% if sb.upcoming %}<span class="sale-bar-time sale-bar-starts" aria-hidden="true">starts {{ sb.starts_label }}</span>
+      {% else %}<span class="sale-bar-time" aria-hidden="true"><span class="sale-bar-ends">ends in </span><span data-sale-count>{{ sb.lead }}{% if sb.tail %}{% if sb.has_days %}<span class="sale-bar-m">{{ sb.tail }}</span>{% else %}{{ sb.tail }}{% endif %}{% endif %}</span></span>{% endif %}
+      <span class="sr-only">{% if sb.upcoming %}Starts {{ sb.starts_label }}.{% else %}Ends {{ sb.ends_sr }}.{% endif %}</span>
+      {% include "common/_icon.html" with name="arrow-right" %}
+    </a>
+    {% if sale_bar.preview %}<a class="sale-bar-end-preview" href="?sale_preview=end">End preview</a>{% endif %}
+    <button type="button" class="sale-bar-close" data-sale-close aria-label="Hide the sale bar">{% include "common/_icon.html" with name="x" %}</button>
+  </div>
+</div>
+<script type="module" src="{% static 'common/js/sale-bar.js' %}"></script>
+{% endif %}
