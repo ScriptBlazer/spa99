@@ -225,14 +225,39 @@ def audit_export(request):
     return response
 
 
+SCRIPT_CODE_ASK = "Enter the System code to undo a script change."
+
+
+def _script_code_gate(request, section):
+    """Undoing a script's change asks for the System code again. None = go ahead, else the JSON refusal. Same code check and
+    same rate limit buckets as /unlock/ (so the two cannot be brute-forced side by side); wrong tries are written to the log."""
+    if not services.code_required():
+        return None  # no code configured (dev, CI): nothing to ask, the same as the unlock
+    typed = request.POST.get("code", "")
+    if not typed.strip():
+        return JsonResponse({"ok": False, "needs_code": True, "message": SCRIPT_CODE_ASK}, status=403)
+    by_ip = hit("system-unlock", f"{request.user.pk}:{client_ip(request) or 'unknown'}", 5, 300)
+    by_person = hit("system-unlock-person", request.user.pk, 10, 900)
+    if not (by_ip and by_person):
+        audit.log_event(SystemEvent.UNDO_RATE_LIMITED, request, user=request.user, section=section, dedupe_seconds=300)
+        return JsonResponse({"ok": False, "needs_code": True, "message": "Too many attempts. Please wait a few minutes."}, status=429)
+    if not services.code_matches(typed):
+        audit.log_event(SystemEvent.UNDO_CODE_FAILED, request, user=request.user, section=section)
+        return JsonResponse({"ok": False, "needs_code": True, "message": "That code is wrong."}, status=403)
+    return None
+
+
 @unlocked
 @require_POST
 def undo(request, pk):
     change = get_object_or_404(SystemChange, pk=pk)
+    script = services.made_by_script(change)
+    if script and (refusal := _script_code_gate(request, change.section)):
+        return refusal
     try:
-        services.undo_change(change, request.user)
+        services.undo_change(change, request.user)  # the new entry's actor is whoever is signed in: the developer, not a script
         audit.log_event(SystemEvent.UNDO, request, user=request.user, section=change.section,
-                        detail={"change": str(change.pk), "was": change.sentence},
+                        detail={"change": str(change.pk), "was": change.sentence, **({"script_change": True} if script else {})},
                         sentence=f"{request.user.email} undid: {change.sentence}"[:1000])
         messages.success(request, "Put back as a new change.")
     except services.ChangeRefused as error:
@@ -243,7 +268,11 @@ def undo(request, pk):
 @unlocked
 @require_POST
 def undo_all(request, batch):
-    sections = set(SystemChange.objects.filter(batch_id=batch).values_list("section", flat=True))
+    entries = SystemChange.objects.filter(batch_id=batch)
+    sections = set(entries.values_list("section", flat=True))
+    script = entries.filter(kind=SystemChange.UPDATED, undo_of__isnull=True, undone_by__isnull=True, user__isnull=True, user_label="").exists()
+    if script and (refusal := _script_code_gate(request, next(iter(sections)) if len(sections) == 1 else "changes")):
+        return refusal
     done, refused = services.undo_batch(batch, request.user)
     if done:
         audit.log_event(SystemEvent.UNDO_ALL, request, user=request.user, section=sections.pop() if len(sections) == 1 else "changes",

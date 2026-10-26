@@ -1,1 +1,1 @@
-{% load static %}<svg class="au-svg" width="16" height="16" aria-hidden="true" focusable="false"><use href="{% static 'common/img/system-icons.svg' %}#{{ name }}"></use></svg>
+{% load static %}<svg class="au-svg{% if cls %} {{ cls }}{% endif %}" width="16" height="16" aria-hidden="true" focusable="false"><use href="{% static 'common/img/system-icons.svg' %}#{{ name }}"></use></svg>

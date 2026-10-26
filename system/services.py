@@ -174,6 +174,11 @@ def delete_logged(obj, user):
     obj.delete()
 
 
+def made_by_script(change):
+    """Recorded with no person at all (manage.py shell, commands, seed, backfill). A deleted account keeps its email text, so is not a script."""
+    return not change.user_id and not change.user_label
+
+
 def undo_change(change, user):
     """Put the old value back as a new logged change. Refused unless the field still holds the value this change set
     (otherwise undo the newer change first), and for created, deleted or file entries."""

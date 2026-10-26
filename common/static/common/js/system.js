@@ -1,7 +1,7 @@
 /* Spa 99 System behaviour (docs/design/SYSTEM.md). Everything here is an enhancement: every page works as plain forms.
    Sections: helpers, dirty state and save bar, confirm dialog, submit interception, lock countdown, keyboard, audit log, menu.
    Toasts and the confirm modal are the shared ones (feedback.js, docs/design/FEEDBACK.md). */
-import { toast, confirmModal, initFeedback } from './feedback.js';
+import { toast, confirmModal, formModal, initFeedback } from './feedback.js';
 import { initFormProblems, collectProblems, showProblems } from './form-problems.js';
 import { initApproval } from './system-combobox.js';
 
@@ -233,10 +233,56 @@ function saleSpec(form) {
   return null;
 }
 
+/* Undo on a change a script made asks for the System code again, in the shared modal. The code goes to the same undo URL;
+ * a wrong one comes back as 403 JSON {needs_code, message} and the message stays in the modal (nothing is undone). */
+async function askCodeAndUndo(form, opener) {
+  const next = $('[name=next]', form)?.value || location.href;
+  const done = await formModal((dialog, close) => {
+    const heading = document.createElement('h2');
+    heading.className = 'fb-modal-title'; heading.id = 'sys-undo-code-title';
+    heading.textContent = 'Enter the System code to undo a script change.';
+    const field = document.createElement('label');
+    field.className = 'fb-modal-field';
+    const name = document.createElement('span'); name.textContent = 'System code';
+    const input = document.createElement('input');
+    Object.assign(input, { type: 'password', name: 'code', autocomplete: 'off', maxLength: 64, className: 'fb-modal-input' });
+    input.setAttribute('inputmode', 'numeric'); input.setAttribute('pattern', '[0-9]*'); input.setAttribute('autofocus', '');
+    const error = document.createElement('p');
+    error.className = 'fb-modal-error'; error.setAttribute('role', 'alert'); error.hidden = true;
+    field.append(name, input);
+    const actions = document.createElement('div');
+    actions.className = 'fb-modal-actions';
+    const cancel = document.createElement('button');
+    Object.assign(cancel, { type: 'button', className: 'fb-btn fb-btn--secondary', textContent: 'Cancel' });
+    cancel.addEventListener('click', () => close(null));
+    const ok = document.createElement('button');
+    Object.assign(ok, { type: 'submit', className: 'fb-btn fb-btn--primary', textContent: 'Undo' });
+    actions.append(cancel, ok);
+    dialog.append(heading, field, error, actions);
+    dialog.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!input.value.trim()) { error.textContent = 'Enter the System code.'; error.hidden = false; input.focus(); return; }
+      ok.disabled = true;
+      try {
+        const data = new FormData(form); data.set('code', input.value);
+        const response = await fetch(form.action, { method: 'POST', body: data, credentials: 'same-origin', redirect: 'manual', headers: { 'X-Requested-With': 'fetch' } });
+        if (response.type === 'opaqueredirect' || response.ok) { close(true); return; }
+        let message = 'Could not undo. Try again.';
+        try { message = (await response.json()).message || message; } catch (e) { /* not JSON: keep the plain line */ }
+        error.textContent = message; error.hidden = false; input.value = ''; input.focus();
+      } catch (e) {
+        error.textContent = 'Could not reach the server. Try again.'; error.hidden = false;
+      } finally { ok.disabled = false; }
+    });
+  }, { opener });
+  if (done) { submitting = true; location.assign(next); }
+}
+
 function initSubmit() {
   document.addEventListener('submit', async (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || form.method !== 'post') return;
+    if (form.matches('[data-system-needs-code]')) { event.preventDefault(); askCodeAndUndo(form, event.submitter || document.activeElement); return; }
     if (form._confirmed) { form._confirmed = false; begin(form); return; }
     const spec = specFor(form);
     if (spec) {

@@ -23,7 +23,7 @@ from django.db.models.functions import Coalesce
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
-from . import audit
+from . import audit, services
 from .changes import SECTION_LABELS
 from .models import SystemChange, SystemEvent
 
@@ -213,6 +213,7 @@ def _decorate(rows):
                     row.blocked_at, row.blocked_key, row.blocked_pk = nxt.created_at, _key_of(nxt), nxt.pk
     for row in rows:
         row.can_undo = bool(row.undoable and not row.undo_of_id and not row.undone_label and not row.blocked_at)
+        row.needs_code = services.made_by_script(row) and services.code_required()
 
 
 def person(label):
@@ -235,7 +236,8 @@ EVENT_ICONS = {
 }
 CATEGORY_WORDS = {"change": "Change", "security": "Security", "undo": "Undo", "failure": "Failure"}
 OUTCOME_WORDS = {SystemEvent.SIGN_IN_FAILED: "wrong password", SystemEvent.UNLOCK_FAILED: "wrong password",
-                 SystemEvent.UNLOCK_RATE_LIMITED: "rate limited", SystemEvent.ACCESS_DENIED: "denied"}
+                 SystemEvent.UNLOCK_RATE_LIMITED: "rate limited", SystemEvent.ACCESS_DENIED: "denied",
+                 SystemEvent.UNDO_CODE_FAILED: "wrong code", SystemEvent.UNDO_RATE_LIMITED: "rate limited"}
 
 
 def _meta(group_ip, ua, tail):
@@ -315,7 +317,8 @@ def _batch_group(key, latest, rows):
             "verb": verb, "what": what, "sections": sections, "section_label": where, "count": len(rows), "summary": summary,
             "category": category, "ip_address": first.ip_address, "user_agent": first.user_agent, "path": first.path,
             "batch_id": batch_id, "outcome": "ok", "outcome_word": "", "open_count": len(open_rows), "undo_total": len(waiting), "origin": origin,
-            "undo_all_url": reverse("system_undo_batch", args=[batch_id]) if batch_id and len(open_rows) > 1 else "", "items": rows}
+            "undo_all_url": reverse("system_undo_batch", args=[batch_id]) if batch_id and len(open_rows) > 1 else "",
+            "undo_all_needs_code": any(r.needs_code for r in open_rows), "items": rows}
 
 
 def _by_day(groups):

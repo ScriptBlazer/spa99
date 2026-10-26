@@ -65,6 +65,7 @@ html:not(.js) .au-dates { display: flex; } html:not(.js) .au-custom-btn { displa
 .au-time { color: var(--sys-text-3); }
 .au-acts { display: inline-flex; align-items: center; gap: var(--sys-2); }
 .au-undo { display: inline; margin: 0; }
+.au-undo .au-lock { vertical-align: -2px; margin-left: 4px; opacity: .7; }
 .au-reason { font-size: var(--sys-fs-sm); color: var(--sys-text-3); }
 .au-info { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: var(--sys-radius); color: var(--sys-text-2); }
 .au-info:hover { background: var(--sys-subtle); color: var(--sys-text); }
