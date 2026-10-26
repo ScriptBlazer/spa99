@@ -174,7 +174,7 @@ Reference: dry-sauna.png. Plan from the old concept (`dry-sauna-concepts.html`, 
 | Walls, ceiling | Planes; vertical boards on walls, ceiling boards along the length (concept `planks`, 0.09 boards) | `--color-cedar`, roughness 0.8 |
 | Benches | L along the west and north walls. Lower seat at 0.45 (0.60 deep), upper at 0.90 (0.60 deep, against the wall). Seats as one `InstancedMesh` of slats 0.09 wide, 0.012 gaps; skirts as vertical boards; backrest slats on the wall from 0.95 to 1.40 above the upper bench | Seats and backrest `--color-aspen`; skirts `--color-aspen-shade`; bench ends `--color-walnut` |
 | LED lines | Under each seat lip, and one along the west and north walls at 1.75 (the light line in the photo), each with a halo plane | `--color-led-warm` |
-| Heater | East wall near the north corner, centre (1.0, 0, -1.4): oak frame 0.60 x 0.75 x 0.50 (boxes), steel tray on top, 80 instanced stones | Frame `--color-caramel`; tray `--color-walnut` metalness 0.4 roughness 0.5; stones `--color-stone` to `--color-stone-dark` |
+| Heater (as built, 2026-10-26) | East wall, facing west, centre (1.9, 0, 0.5), on its own steel feet so it stands on the floor: a dark steel box 0.50 w x 0.58 h x 0.60 d (y 0.11..0.69; `--color-iron` x 3, metalness 0.5, roughness 0.45), a top plate, and a steel stone basket (walls to y 0.87) with 54 to 80 instanced stones piled in it (y 0.75 to 0.92, kept inside the basket walls). A framed coal window in the front (0.30 x 0.22) with hot coals. Around it a slatted oak guard (`--color-caramel`): four 0.05 posts 0.84 high at x 1.5 and 2.2, z 0.05 and 0.95, a top and a foot rail on the front and both sides (the wall is the fourth side), vertical slats every 0.1. The earlier version floated because of a kit bug, not the geometry: `K.put` reused a shared helper object whose scale `K.inst` leaves at the last instance's (the bench boards, 4.5 x 0.09 x 0.04), so every box baked after the benches came out squashed; `K.put` now resets the scale | Box and basket `--color-iron` x 3, steel not metal-black; guard `--color-caramel`; stones `--color-stone` to `--color-stone-dark`; coals `--color-heater-glow` |
 | Glass front | South wall: fixed panel x -1.46..0.55, door opening x 0.55..1.25 (door leaf open flat against the inside east wall), frame | Glass `--color-glass-bronze`, roughness 0.05, `depthWrite: false`; frame `--color-walnut` |
 | Swan on the glass | On the fixed panel, 0.95 m tall, centre at 1.25 m, x -0.45. Drawn from the mark paths, on the **outside** face only (one-sided, facing the corridor) so it is never seen mirrored | `MeshBasicMaterial`, `--color-cream` at 0.85 (frosted etch, as in the photo) |
 | Floor | Aspen duckboard slats over `--color-floor-stone` | |
@@ -240,27 +240,33 @@ Reference: relaxing-zone.png (the new one: thick cushioned loungers with bolster
 
 Reference: gym.png. Dark room, smoked oak panel wall with the gold lockup, mirrors, a ceiling cove, dark oak floor, a few machines. Dark but lifted: never black.
 
-**Shell:** 7.0 w x 6.0 d x 2.8 h (x -3.5..3.5, z -3.0..3.0). Dropped ceiling with an LED cove 0.4 in from the walls.
+**Shell (as built, 2026-10-26: a compact gym):** 5.6 w x 5.8 d x 2.6 h (x -2.8..2.8, z -3.6..2.2), about 32 m2, so the equipment fills it. Dropped ceiling with an LED cove 0.4 in from the walls. A 1.2 m passage runs north from the middle of the north wall (x -1.2..1.2) to the one door on to the massage room (x 0, z -4.8). The lounge door is in the south wall at x 1.0.
 
 | Object | Build | Material |
 |---|---|---|
-| Oak panel wall | West wall, z -2.2..1.2: three tall panels (boxes, 3 mm reveals), 2.6 h | `--color-walnut` with oak grain, roughness 0.6 |
-| Lockup | On the middle panel, centre (-3.48, 1.55, -0.5), 1.3 m tall, 1.5 cm proud | `--color-gold-metal` metalness 0.9 roughness 0.3 |
-| Mirrors | North wall 1.0 to 2.4 m, full width, three panels with 6 mm joints. Not real reflections: glossy dark glass that picks up the room's PMREM | `--color-walnut`, metalness 1, roughness 0.08 |
-| Floor | Planks 0.18 wide, random lengths | `--color-walnut` grain lifted 10%, roughness 0.5 |
-| Dumbbell rack and bench | Rack (boxes) at (-0.5, 0, -2.4) with 10 instanced dumbbells (cylinder bar plus two heads); flat bench (boxes plus padded top) at (0, 0, -1.4) | Frames `--color-iron`; pad `--color-espresso` roughness 0.6 |
-| Cable tower | At (2.6, 0, -1.6): two uprights 2.3 h, top beam, 4 pulleys (cylinders), weight stack box, cables (thin cylinders) | `--color-iron`, metalness 0.6, roughness 0.45 |
+| Oak panel wall | West wall: four tall panels (boxes, 2 cm reveals), 2.4 h | `--color-walnut` with oak grain, roughness 0.6 |
+| Lockup | On the third panel, centre z 0.0 (the clear stretch between the dumbbell rack and the deadlift platform), 1.25 m tall, 1.5 cm proud | `--color-gold-metal` metalness 0.9 roughness 0.3 |
+| Mirrors | North wall 1.0 to 2.4 m either side of the passage, four panes with joints | `--color-caramel` x 0.6, metalness 1, roughness 0.08 |
+| Floor | Planks, walnut lifted 14% | roughness 0.5 |
+| Dumbbell rack | West wall at (-2.45, -2.4): uprights, two shelves, 12 instanced dumbbells, on a 1.2 x 2.4 rubber mat | Frames `--color-iron`; bars steel |
+| Bench press | Bar along x, centre (-0.6, -1.1): flat padded bench along z (0.30 x 1.25, top 0.48) on a frame with two feet; two rack uprights 1.35 high at z -1.2, x +/-0.55 with J-hooks; barbell on the hooks at y 1.17 with 2 x 0.45 m plates and a 0.30 m plate each side and collars; 2.2 x 2.0 rubber mat | Frames and plates `--color-iron`; pad `--color-walnut`; bar and collars steel |
+| Deadlift platform | Centre (-1.55, 1.25), 2.4 x 1.15, 6 cm high: oak centre 1.2 wide between two rubber ends; a loaded barbell lying on it along x (y 0.285: four 0.45 m / 0.28 m plates each side, collars) | Oak centre = the panel wood; rubber and plates `--color-iron` |
+| Treadmill and bike | East side facing the wall screen: treadmill (1.75, -2.7), upright bike (2.0, -1.0), each 1 m or more from the next piece | `--color-iron`, steel, lit displays |
+| Wall screen | East wall, 2.1 x 1.1 (off), centred z -1.85 between the treadmill and the bike, on a walnut panel | dark glass |
+| East window | South of the screen, z -0.15..2.05, a night window with walnut mullions | glass + faint glow |
 | Cove and downlights | LED line in the cove, 6 self-lit discs | `--color-led-warm` |
 
-**Light:** Hemisphere sky `--color-led` ground `--color-walnut`, 0.45. Points `--color-light-warm`: cove (0, 2.6, -1.0) and (0, 2.6, 1.8), i 4 d 6; lockup grazing (-2.6, 2.3, -0.5) i 2 d 2.5.
+Layout (x east, z south): north strip = dumbbell rack (west), open view to the passage (centre), treadmill (east); middle = bench press (centre), bike (east); south-west = deadlift platform; the south-east is clear in front of the lounge door. Nothing overlaps and every aisle is 0.4 m or more.
 
-**Camera:** (1.5, 1.6, 2.2). Initial look: yaw -38, pitch -4, at the panel wall and lockup, machines in the right half.
+**Light:** Hemisphere sky `--color-led` ground `--color-walnut`, 0.45. Points `--color-light-warm`: cove (0, 2.4, -1.9) and (0, 2.4, 0.9), i 4 d 6; lockup grazing (-1.9, 2.2, 0.0) i 2 d 2.5.
+
+**Camera:** (1.9, 1.6, 1.7), the south-east corner by the lounge door, more than 2.5 m from any equipment. Initial look: yaw -26, pitch -8, up the room: bench press centre-left, treadmill, bike and screen on the right, rack beyond.
 
 **Doorways:**
 | Where | Leads to |
 |---|---|
-| South wall, x 1.0, z 3.0 (behind you) | Lounge |
-| East wall, x 3.5, z 0.8 | Relaxing zone |
+| South wall, x 1.0, z 2.2 (behind you) | Lounge |
+| North passage, back wall x 0, z -4.8 | Massage room |
 
 ### 2.6 Animated details
 

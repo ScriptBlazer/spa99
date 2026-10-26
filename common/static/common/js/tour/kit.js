@@ -48,7 +48,7 @@ export function makeKit(scene, { tier = 'high' } = {}) {
     /* ----- static geometry (baked, merged by material at flush) ----- */
     /** Bake `geo` into the room. o: x y z (position), rx ry rz (radians), tile (metres per texture repeat: world-space UVs, so veins keep their scale across pieces). */
     put(geo, mat, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, tile = 0 } = {}) {
-      tmp.position.set(x, y, z); tmp.rotation.set(rx, ry, rz); tmp.updateMatrix();
+      tmp.position.set(x, y, z); tmp.rotation.set(rx, ry, rz); tmp.scale.set(1, 1, 1); tmp.updateMatrix();   // scale reset: K.inst leaves its last instance's scale on the shared helper
       geo.applyMatrix4(tmp.matrix);
       if (tile) K.worldUV(geo, tile);
       if (!pending.has(mat)) pending.set(mat, []);

@@ -1,7 +1,7 @@
 /* Dry sauna (docs/design/VIRTUAL-TOUR.md 2.2). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
  * Interior 4.5 x 4.0 x 2.6 (x -2.25..2.25, z -2..2), glass front on the south side with a corridor beyond (the door back to the relaxing zone). Cedar boards, a U of two-tier pale aspen
  * benches on the west, north and east walls (one instanced mesh of boards), warm LED lines under every bench lip and in a curved ceiling cove, the swan etched on the OUTSIDE
- * face of the glass only. The stove stands against the east wall: dark stone cladding, a glowing coal window, hot stones on top; a wooden bucket with a ladle holds coals and stones.
+ * face of the glass only. The stove stands against the east wall: a dark steel heater box with a glowing coal window, a basket of hot stones on top, a slatted oak guard round it; a wooden bucket with a ladle holds coals and stones.
  * Low, warm and moody on purpose. Animated only by the fire's slow flicker (30 fps at rest). */
 
 export async function build(scene, ctx) {
@@ -14,7 +14,7 @@ export async function build(scene, ctx) {
   /* ----- materials ----- */
   const cedar = K.std(WHITE, { r: 0.85, map: wallMap }), board = K.std(WHITE, { r: 0.7 }), skirt = K.std('--color-aspen-shade', { r: 0.8 });
   const walnut = K.std('--color-walnut', { r: 0.6 }), oak = K.std('--color-caramel', { r: 0.6 }), floor = K.std('--color-floor-stone', { r: 0.9 }), duck = K.std('--color-aspen-shade', { r: 0.85 });
-  const steel = K.std('--color-glass-bronze', { r: 0.3, m: 0.9 }), rock = K.std('--color-stone-dark', { r: 0.92 }), mortar = K.std(K.col('--color-stone-dark').clone().multiplyScalar(0.55), { r: 1 });
+  const steel = K.std('--color-glass-bronze', { r: 0.3, m: 0.9 }), rock = K.std('--color-stone-dark', { r: 0.92 }), iron = K.std(K.col('--color-iron').clone().multiplyScalar(4.5), { r: 0.4, m: 0.35, envMapIntensity: 1.4 });
   const led = K.basic('--color-led-warm'), ledD = K.basic('--color-led-warm', { side: THREE.DoubleSide }), fire = K.hot('--color-heater-glow', 1.25), fireBase = fire.color.clone();
   const glassCol = K.col('--color-glass-bronze'), glassA = K.alpha('--color-glass-bronze');
   const glass = K.std(glassCol, { r: 0.05, transparent: true, opacity: Math.max(0.2, glassA), depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.2 });
@@ -90,21 +90,30 @@ export async function build(scene, ctx) {
   K.shadow(1.4, 3.3, -1.5, -0.3, 0.45); K.shadow(2.5, 1.2, 0, -1.4, 0.4); K.shadow(1.4, 2.2, 1.5, -1.0, 0.4);
   [[-1.0, -0.6], [0.3, 0.6], [1.0, -0.6]].forEach(([x, z]) => K.put(new THREE.CircleGeometry(0.04, 14), led, { x, y: H - 0.003, z, rx: PI / 2 }));
 
-  /* ----- the stove, against the east wall, facing west: dark stone cladding on a steel plinth, a coal window, a basket of stones on top ----- */
-  const HX = 1.9, HZ = 0.5;
-  K.box(0.6, 0.78, 0.8, rock, HX, 0.41, HZ); K.box(0.64, 0.04, 0.84, steel, HX, 0.02, HZ);
-  [0.24, 0.44, 0.64].forEach((y) => K.box(0.61, 0.012, 0.81, mortar, HX, y, HZ));                       // courses of stone
-  K.box(0.012, 0.78, 0.012, mortar, HX - 0.3, 0.41, HZ - 0.13); K.box(0.012, 0.78, 0.012, mortar, HX - 0.3, 0.41, HZ + 0.15);
-  [[0, -0.4, 0.64, 0.04], [0, 0.4, 0.64, 0.04], [-0.3, 0, 0.04, 0.84], [0.3, 0, 0.04, 0.84]].forEach(([x, z, w, d]) => K.box(w, 0.06, d, steel, HX + x, 0.83, HZ + z));    // basket rim
-  K.box(0.04, 0.04, 0.56, steel, HX - 0.3, 0.17, HZ); K.box(0.04, 0.04, 0.56, steel, HX - 0.3, 0.49, HZ); K.box(0.04, 0.36, 0.04, steel, HX - 0.3, 0.33, HZ - 0.28); K.box(0.04, 0.36, 0.04, steel, HX - 0.3, 0.33, HZ + 0.28);   // coal window frame
-  K.plane(0.52, 0.3, fire, HX - 0.303, 0.33, HZ, 'w');                                                     // the coals, white-hot core
-  K.shadow(1.1, 1.2, HX - 0.1, HZ, 0.5);
-  const fglow = [K.glowPlane(1.0, 0.7, HX - 0.34, 0.33, HZ, 'w', 0.6, '--color-heater-glow'), K.glowPlane(1.1, 1.3, HX - 0.8, 0.01, HZ, 'up', 0.35, '--color-heater-glow'), K.glowPlane(0.6, 0.7, HX, 0.9, HZ, 'up', 0.35, '--color-heater-glow')];
+  /* ----- the stove, against the east wall, facing west: a dark steel heater box on short feet with a coal window, a steel basket of stones on top, and a slatted wooden guard round the front and sides ----- */
+  const HX = 1.9, HZ = 0.5, FX = HX - 0.25;                                  // FX = the heater's front face (x 1.65); its back is 0.05 off the wall (x 2.2)
+  K.box(0.5, 0.58, 0.6, iron, HX, 0.4, HZ);                                  // the box, y 0.11..0.69
+  [[-0.2, -0.25], [-0.2, 0.25], [0.2, -0.25], [0.2, 0.25]].forEach(([x, z]) => K.box(0.05, 0.11, 0.05, iron, HX + x, 0.055, HZ + z));   // feet
+  K.box(0.54, 0.03, 0.64, iron, HX, 0.705, HZ);                              // top plate
+  [[0, -0.3, 0.54, 0.03], [0, 0.3, 0.54, 0.03], [-0.25, 0, 0.03, 0.57], [0.25, 0, 0.03, 0.57]].forEach(([x, z, w, d]) => K.box(w, 0.16, d, iron, HX + x, 0.79, HZ + z));      // the stone basket's walls, y 0.72..0.87
+  K.box(0.02, 0.025, 0.36, iron, FX - 0.005, 0.5, HZ); K.box(0.02, 0.025, 0.36, iron, FX - 0.005, 0.28, HZ);        // coal window frame: top, bottom
+  K.box(0.02, 0.25, 0.025, iron, FX - 0.005, 0.39, HZ - 0.17); K.box(0.02, 0.25, 0.025, iron, FX - 0.005, 0.39, HZ + 0.17);   // and sides
+  K.plane(0.3, 0.22, fire, FX - 0.0065, 0.39, HZ, 'w');                      // the coals, white-hot core
+  /* the guard: four oak posts, a top rail and a foot rail on three sides (the wall is the fourth), and vertical slats between */
+  const GX0 = 1.5, GX1 = 2.2, GZ0 = HZ - 0.45, GZ1 = HZ + 0.45, GH = 0.84;
+  [[GX0, GZ0], [GX0, GZ1], [GX1, GZ0], [GX1, GZ1]].forEach(([x, z]) => K.box(0.05, GH, 0.05, oak, x, GH / 2, z));
+  [0.1, GH - 0.03].forEach((y) => {
+    K.box(0.04, 0.04, GZ1 - GZ0, oak, GX0, y, HZ); K.box(GX1 - GX0, 0.04, 0.04, oak, (GX0 + GX1) / 2, y, GZ0); K.box(GX1 - GX0, 0.04, 0.04, oak, (GX0 + GX1) / 2, y, GZ1);
+  });
+  for (let i = 0; i < 8; i++) K.box(0.025, GH - 0.2, 0.03, oak, GX0, 0.1 + (GH - 0.2) / 2 + 0.02, GZ0 + 0.1 * (i + 1));         // front slats
+  for (const z of [GZ0, GZ1]) for (let i = 0; i < 6; i++) K.box(0.03, GH - 0.2, 0.025, oak, GX0 + 0.1 * (i + 1), 0.1 + (GH - 0.2) / 2 + 0.02, z);   // side slats
+  K.shadow(1.3, 1.3, HX - 0.15, HZ, 0.5);
+  const fglow = [K.glowPlane(1.0, 0.7, FX - 0.1, 0.39, HZ, 'w', 0.6, '--color-heater-glow'), K.glowPlane(1.1, 1.3, HX - 0.8, 0.01, HZ, 'up', 0.35, '--color-heater-glow'), K.glowPlane(0.6, 0.7, HX, 0.92, HZ, 'up', 0.35, '--color-heater-glow')];
 
   /* the bucket: oak staves, steel hoops, a rope handle, coals and stones inside (the ladle lies beside it) */
   const BX = 1.15, BZ = 1.0;
   K.put(new THREE.CylinderGeometry(0.19, 0.16, 0.34, 14, 1, true), K.std('--color-caramel', { r: 0.6, side: THREE.DoubleSide }), { x: BX, y: 0.18, z: BZ });
-  K.put(new THREE.CircleGeometry(0.16, 12), walnut, { x: BX, y: 0.03, z: BZ, rx: -PI / 2 });
+  K.put(new THREE.CircleGeometry(0.16, 12), walnut, { x: BX, y: 0.03, z: BZ, rx: -PI / 2 }); K.put(new THREE.CircleGeometry(0.17, 12), rock, { x: BX, y: 0.255, z: BZ, rx: -PI / 2 });   // the bed the stones lie on
   [0.07, 0.28].forEach((y) => K.put(new THREE.CylinderGeometry(0.19 - (0.34 - y) * 0.088 + 0.004, 0.19 - (0.34 - y) * 0.088 + 0.004, 0.02, 14, 1, true), steel, { x: BX, y: y + 0.01, z: BZ }));
   K.put(new THREE.TorusGeometry(0.17, 0.008, 5, 14, PI), walnut, { x: BX, y: 0.35, z: BZ, rx: 0 });
   K.put(new THREE.CylinderGeometry(0.012, 0.012, 0.5, 6), oak, { x: BX + 0.55, y: 0.016, z: BZ, rz: PI / 2 });
@@ -112,10 +121,10 @@ export async function build(scene, ctx) {
   K.shadow(0.6, 0.6, BX, BZ, 0.4);
 
   /* stones (heater top and bucket) and embers (coal window and bucket): two instanced meshes, flickered in update() */
-  const nS = tier === 'high' ? 70 : 46, nB = 12, dark = K.col('--color-stone-dark'), pale = K.col('--color-stone');
+  const nS = tier === 'high' ? 80 : 54, nB = 12, dark = K.col('--color-stone-dark'), pale = K.col('--color-stone');
   const stones = K.inst(new THREE.SphereGeometry(1, 5, 4), K.std(WHITE, { r: 0.85, m: 0.05 }), nS + nB, (i, o) => {
     const a = r() * 6.28, rr = Math.sqrt(r()), k = 0.04 + r() * 0.03, B = i >= nS, R = B ? 0.11 : 0.27;
-    const px = (B ? BX : HX) + (B ? R : 0.4 * R) * rr * Math.cos(a), pz = (B ? BZ : HZ) + (B ? R : 1.2 * R) * rr * Math.sin(a), py = B ? 0.27 + 0.03 * (1 - rr * rr) : 0.86 + 0.06 * (1 - rr * rr);
+    const px = (B ? BX : HX) + (B ? R : 0.63 * R) * rr * Math.cos(a), pz = (B ? BZ : HZ) + (B ? R : 0.9 * R) * rr * Math.sin(a), py = B ? 0.27 + 0.03 * (1 - rr * rr) : 0.8 + 0.07 * (1 - rr * rr);
     o.position.set(px, py, pz); o.rotation.set(r() * 3, r() * 3, r() * 3); o.scale.set(k * (1 + r() * 0.4), k * 0.8, k * (1 + r() * 0.3));
   });
   for (let i = 0; i < nS + nB; i++) stones.setColorAt(i, dark.clone().lerp(pale, r() * r() * 0.8));
@@ -123,7 +132,7 @@ export async function build(scene, ctx) {
   const nE = 20, coalMat = K.basic(WHITE), hotC = K.col('--color-heater-glow');
   const coals = K.inst(new THREE.SphereGeometry(1, 5, 4), coalMat, nE, (i, o) => {
     const B = i >= 14, k = 0.03 + r() * 0.025;
-    if (B) o.position.set(BX + (r() - 0.5) * 0.18, 0.285, BZ + (r() - 0.5) * 0.18); else o.position.set(HX - 0.31, 0.2 + r() * 0.26, HZ + (r() - 0.5) * 0.44);
+    if (B) o.position.set(BX + (r() - 0.5) * 0.18, 0.285, BZ + (r() - 0.5) * 0.18); else o.position.set(FX - 0.005, 0.3 + r() * 0.18, HZ + (r() - 0.5) * 0.26);
     o.rotation.set(r() * 3, r() * 3, r() * 3); o.scale.set(k, k * 0.8, k);
   });
   for (let i = 0; i < nE; i++) coals.setColorAt(i, hotC.clone().multiplyScalar(i % 3 ? 0.6 + r() * 0.6 : 1.4));
