@@ -126,8 +126,7 @@ def register_interest(data, journey_session=None):
                 journey_session=journey_session, **sale_services.snapshot_fields(plan),
             )
             metrics.registered(plan.slug if plan else None, interest.source, interest.created_at, marketing=user.marketing_consent)
-            journey_services.link_user(journey_session, user)
-            gold_services.link_user_applications(user)
+            journey_services.link_user(journey_session, user)  # this browser's own session; Gold applications and other leads wait for the verify
     except IntegrityError:  # two people (or two clicks) raced for the same email or mobile
         raise SignUpError({"email": ["That email or mobile number is already registered."]}) from None
     _after_registration(user, bool(data.get("marketing_opt_in")))
@@ -262,10 +261,10 @@ def export_user_data(user):
         **({"approval_emails": {"use_account_email": delivery.use_account_email, "other_email": delivery.other_email}} if delivery else {}),
         "interest": _export_interest(user),
         "journey_sessions": _export_sessions(user),
-        "gold_applications": gold_services.export_applications(user.email),
+        "gold_applications": gold_services.export_applications(user.email) if user.email_verified_at else [],  # by email only once the address is proven his
         "emails": [
             {"template": e.template, "subject": e.subject, "status": e.status, "sent_at": _plain(e.sent_at)}
-            for e in _email_logs(user.email).order_by("created_at")
+            for e in _email_logs(user.email).order_by("created_at") if user.email_verified_at
         ],
         "group_emails": [
             {"mailing": r.mailing.subject, "status": r.status, "sent_at": _plain(r.sent_at)}
@@ -318,7 +317,8 @@ def _export_interest(user):
 
 
 def _export_sessions(user):
-    sessions = JourneySession.objects.filter(Q(user=user) | Q(lead_email__iexact=user.email)).select_related("suggested_plan").order_by("created_at")
+    by_email = Q(lead_email__iexact=user.email) if user.email_verified_at else Q(pk__in=[])  # an unproven address is not his
+    sessions = JourneySession.objects.filter(Q(user=user) | by_email).select_related("suggested_plan").order_by("created_at")
     result = []
     for session in sessions:
         if session.user_id != user.pk:  # matched only by the address he gave: his lead details, nothing more about that visit
@@ -370,13 +370,21 @@ def delete_user_data(user):
     Erasure overrides the "history is never deleted" rule because history holds personal data."""
     pk, email = user.pk, user.email
     anonymised = _anonymise_sessions(user)
-    journey_services.erase_lead(email)  # an address given at the journey gate before he had an account
+    proven = bool(user.email_verified_at)  # rows found only by email are his only once the address is proven (an unverified account may carry someone else's address)
+    if proven:
+        journey_services.erase_lead(email)  # an address given at the journey gate before he had an account
     removed_logins = _login_events(user).delete()[0]
-    removed_emails = _email_logs(email).delete()[0]
+    removed_emails = _email_logs(email).delete()[0] if proven else 0  # EmailLog has no account link: an unproven address deletes none
     from mailings.erasure import erase_address
 
-    removed_emails += erase_address(email, user)  # group sends, invites and the unsubscribe key hold the address too
-    gold = gold_services.delete_applications(email)
+    if proven:
+        removed_emails += erase_address(email, user)  # group sends, invites and the unsubscribe key hold the address too
+        gold = gold_services.delete_applications(email)
+    else:
+        from mailings.models import MailingRecipient
+
+        removed_emails += MailingRecipient.objects.filter(user=user).delete()[0]
+        gold = {"gold_applications": 0, "gold_history_rows": 0, "queue_records": 0}
     queue = erase_task_records([pk], ["users.tasks."])
     interest = InterestRegistration.objects.filter(user=user).select_related("plan").first()
     interest_ids = [interest.pk] if interest else []

@@ -199,7 +199,8 @@ def account_profile(user, interest=None):
     interest = interest if interest is not None else InterestRegistration.objects.filter(user=user).select_related("plan").first()
     sessions = list(sessions_with_answers(user.journey_sessions.all()).order_by("created_at"))
     applications = list(user.gold_applications.prefetch_related("events").order_by("created_at"))
-    pending = list(sessions_with_answers(JourneySession.objects.filter(lead_email__iexact=user.email, user__isnull=True)).order_by("created_at"))
+    pending = (list(sessions_with_answers(JourneySession.objects.filter(lead_email__iexact=user.email, user__isnull=True)).order_by("created_at"))
+               if user.email_verified_at else [])  # an unverified account never shows the address's other journeys (they may be someone else's)
     first = sessions[0] if sessions else None
     return {
         "journeys": [journey_item(s) for s in sessions],
@@ -213,7 +214,7 @@ def account_profile(user, interest=None):
 
 
 def lead_sessions_for(email):
-    return sessions_with_answers(JourneySession.objects.filter(lead_email__iexact=email, is_bot=False)).order_by("created_at")
+    return sessions_with_answers(JourneySession.objects.filter(lead_email__iexact=email, is_bot=False, user__isnull=True)).order_by("created_at")
 
 
 def lead_profile(email, session_id):

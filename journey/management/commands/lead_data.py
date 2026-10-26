@@ -20,10 +20,10 @@ class Command(BaseCommand):
         if not email:
             raise CommandError("--email is empty.")
         rows = services.export_lead(email)
-        self.stdout.write(json.dumps({"email": email, "sessions": rows}, indent=2))
+        self.stdout.write(json.dumps({"email": email, "sessions": rows, "emails": services.export_lead_emails(email)}, indent=2))
         if not options["erase"]:
             return
         if options["dry_run"]:
             self.stderr.write(f"Dry run: would clear the address from {len(rows)} session(s). Nothing changed.")
             return
-        self.stderr.write(f"Cleared the address from {services.erase_lead(email)} session(s).")
+        self.stderr.write(f"Cleared the address from {services.erase_lead_data(email)} session(s).")

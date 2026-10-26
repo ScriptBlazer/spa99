@@ -15,7 +15,7 @@
     <p class="o-leadsum-num">{{ summary.leads_registered|num }}</p>
     <p class="o-leadsum-line">{% if summary.registered_share_bp is None %}No leads in this range{% else %}{{ summary.registered_share_bp|bp_rate }} of these leads{% endif %}</p>
   </div>
-  <a class="o-leadsum-tile o-leadsum-tile--link" href="{% url 'office_leads' %}?potential=high&amp;show=lead&amp;range={{ summary.range }}" data-leads-hot>
+  <a class="o-leadsum-tile o-leadsum-tile--link" href="{% url 'office_leads' %}?hot=1&amp;range=all" data-leads-hot>
     <p class="o-leadsum-label"><span class="o-only-wide">Hot leads</span><span class="o-only-narrow">Hot</span></p>
     <p class="o-leadsum-num">{{ summary.hot_leads|num }}</p>
     <p class="o-leadsum-line">High potential, not registered</p>
@@ -27,6 +27,7 @@
     <div class="o-search">
       <label for="f-q" class="sr-only">Search email</label>
       {% include "office/_icon.html" with name="search" %}
+      {% if filters.hot %}<input type="hidden" name="hot" value="1">{% endif %}
       <input id="f-q" type="search" name="q" value="{{ filters.q }}" placeholder="Search email" autocomplete="off" enterkeyhint="search" data-search>
     </div>
     <button type="button" class="btn btn-secondary btn-sm o-filters-open" data-filters-open hidden>{% include "office/_icon.html" with name="sliders" %}Filters</button>

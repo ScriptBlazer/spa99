@@ -46,7 +46,9 @@ def _gate_sessions():
 
 def _accounts(staff=None):
     users = User.objects.annotate(account_key=Lower("email")).filter(account_key=OuterRef("email_key"))
-    return users if staff is None else users.filter(is_staff=staff)
+    # staff addresses are never leads; any other account takes the lead over only once its address is verified (an
+    # unverified account may carry someone else's address)
+    return users.filter(is_staff=True) if staff else users.filter(email_verified_at__isnull=False)
 
 
 def _applications():
@@ -82,13 +84,13 @@ def filters_from(request):
     show, sort, range_name = get.get("show", "lead"), get.get("sort", "last_seen"), get.get("range", "30d")
     return {"q": get.get("q", "").strip(), "range": range_name if range_name in RANGES else "30d", "show": show if show in SHOWS else "lead",
             "tier": get.get("tier", ""), "potential": get.get("potential", "") if get.get("potential") in POTENTIALS else "",
-            "industry": get.get("industry", ""), "gold": "yes" if get.get("gold") in ("yes", "1", "on") else "",
+            "industry": get.get("industry", ""), "gold": "yes" if get.get("gold") in ("yes", "1", "on") else "", "hot": "1" if get.get("hot") == "1" else "",
             "sort": sort if sort in SORTS else "last_seen"}
 
 
 def is_filtered(filters):
     """True when anything narrows the list beyond the defaults. The page shows no count then (counting rule C5)."""
-    return bool(filters["q"] or filters["tier"] or filters["potential"] or filters["industry"] or filters["gold"]
+    return bool(filters["q"] or filters["tier"] or filters["potential"] or filters["industry"] or filters["gold"] or filters["hot"]
                 or filters["show"] != "lead" or filters["range"] != "30d")
 
 
@@ -104,6 +106,8 @@ def filtered_queryset(filters):
         queryset = queryset.filter(answers__question__key="industry", answers__options__value=filters["industry"])
     if filters["gold"]:
         queryset = queryset.filter(has_application=True)
+    if filters["hot"]:  # exactly the Hot leads count: High potential, no account, no Gold application
+        queryset = queryset.filter(gold_potential="high", has_account=False, has_application=False)
     order = {"last_seen": [F("last_seen_at").desc()], "first_seen": [F("lead_at").desc(nulls_last=True)],
              "potential": [F("gold_score").desc(nulls_last=True), F("last_seen_at").desc()],
              "visits": [F("journeys_n").desc(nulls_last=True), F("last_seen_at").desc()]}[filters["sort"]]
@@ -148,7 +152,7 @@ def build_rows(page_sessions):
     statuses = {}
     for key, status in GoldApplication.objects.annotate(k=Lower("email")).filter(k__in=emails).values_list("k", "status"):
         statuses.setdefault(key, []).append(status)
-    accounts = dict(User.objects.annotate(k=Lower("email")).filter(k__in=emails).values_list("k", "pk"))
+    accounts = dict(User.objects.filter(email_verified_at__isnull=False).annotate(k=Lower("email")).filter(k__in=emails).values_list("k", "pk"))
     firsts = {}
     for key, referrer, utm, medium, campaign, device in (_gate_sessions().filter(email_key__in=emails).order_by("-created_at")
                                                          .values_list("email_key", "referrer", "utm_source", "utm_medium", "utm_campaign", "device_type")):
@@ -241,7 +245,7 @@ def activity(limit=10):
         out.append({"at": at, "kind": kind, "who": who, "label": label, "detail": detail, "href": href})
 
     seen = set()
-    sessions = (JourneySession.objects.filter(is_bot=False, lead_at__isnull=False).exclude(lead_email="")
+    sessions = (_gate_sessions().filter(lead_at__isnull=False).filter(~Exists(_accounts(staff=True)))
                 .filter(Q(user__isnull=True) | Q(user__is_staff=False)).select_related("suggested_plan").order_by("-lead_at")[:limit * 2])
     for s in sessions:
         if (s.lead_email.lower(), s.lead_at) in seen:  # a restart copies the address and time
@@ -280,7 +284,7 @@ def lead_for(session):
     email = (session.lead_email or "").strip().lower()
     if not email or session.is_bot:
         return None
-    account = User.objects.filter(email__iexact=email).first()
+    account = User.objects.filter(email__iexact=email, email_verified_at__isnull=False).first()
     if account is not None:
         return "account", account
     return "lead", profile.lead_profile(email, session.pk)

@@ -202,13 +202,12 @@
 .o-feed-row:focus-visible { outline-offset: -2px; }
 .o-feed-row:not([href]) { cursor: default; }
 
-/* What people want: Everyone or Leads */
-.o-wants-scope { width: 100%; max-width: 15rem; margin-bottom: var(--space-3); }
-.o-wants-scope .o-seg-item { min-height: calc(2.5rem - 6px); }
-@media (min-width: 64em) {
-  .o-wants .o-wants-scope { position: absolute; top: var(--space-4); right: calc(var(--space-4) + 2.75rem + var(--space-2)); width: 12rem; margin: 0; z-index: 1; }
-  .o-wants .o-h3 { padding-right: 17rem; }
-}
+/* What people want: Everyone or Leads. A flex head row (heading left, toggle right); the round plus stays absolute top right, so the row keeps its width clear. */
+.o-wants .o-wants-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-height: 2.75rem; margin-bottom: var(--space-3); padding-right: calc(2.75rem + var(--space-2)); }
+.o-wants .o-wants-head .o-h3 { flex: 1 1 8rem; margin: 0; padding: 0; }
+.o-wants .o-wants-head .o-wants-scope { flex: 0 0 auto; width: 12rem; max-width: 100%; margin: 0; }
+.o-wants .o-wants-head .o-wants-scope .o-seg-item { min-height: calc(2.5rem - 6px); }
+@media (max-width: 40em) { .o-wants .o-wants-head .o-wants-scope { flex-basis: 100%; width: 100%; order: 2; } }
 .o-wants:has(input[name="wants-scope"][value="leads"]:checked) [data-scope="everyone"],
 .o-wants:not(:has(input[name="wants-scope"][value="leads"]:checked)) [data-scope="leads"] { display: none; }
 

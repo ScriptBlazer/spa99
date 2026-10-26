@@ -168,5 +168,5 @@ def load():
         (metrics.day(created), slug or "none", source)
         for created, slug, source in InterestRegistration.objects.filter(user__is_staff=False).values_list("created_at", "plan__slug", "source")
     ]
-    registered_emails = {e.lower() for e in User.objects.filter(is_staff=False).values_list("email", flat=True)}
+    registered_emails = {e.lower() for e in User.objects.filter(is_staff=False, email_verified_at__isnull=False).values_list("email", flat=True)}  # verified only: the Leads list agrees
     return Figures(dict(started), dict(finished), registrations, votes, leads, lead_votes, registered_emails)

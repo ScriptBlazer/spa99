@@ -138,6 +138,9 @@ class RegisterInterestTests(TestCase):
         })
         user = services.register_interest(cleaned()).user
         application.refresh_from_db()
+        self.assertIsNone(application.user)  # registering proves nothing about the address
+        services.verify_email(tokens.make_verify_token(user))
+        application.refresh_from_db()
         self.assertEqual(application.user, user)
 
     def test_the_form_view_links_the_cookie_session(self):
@@ -269,6 +272,8 @@ class PersonDataTests(TestCase):
         session = journey.create_session("Mozilla/5.0 Safari", referrer="https://example.org/x")
         journey.save_answer(session, "frequency", options=["weekly"])
         user = services.register_interest(cleaned(), journey_session=session).user
+        services.verify_email(tokens.make_verify_token(user))
+        user.refresh_from_db()
         gold_services.submit_application({
             "first_name": "Hugo", "last_name": "B", "email": "hugo@example.com", "mobile": "+447912345678",
             "property_link": "developer",

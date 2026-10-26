@@ -9,6 +9,7 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from gold import services as gold_services
+from gold.models import GoldApplication
 from gold.tests.test_gold import application_data
 from insights import rollup
 from insights.tests.test_metrics import finished_journey
@@ -80,10 +81,12 @@ class LeadsListTests(OfficeTestCase):
         JourneySession.objects.filter(pk=hot.pk).update(gold_potential="high", gold_score=9)
         lead("three@example.com", finish=False)
         lead("reg@example.com")
-        User.objects.create_user("reg@example.com", "x")  # has an account (any case)
+        User.objects.create_user("reg@example.com", "x", email_verified_at=timezone.now())  # has a verified account (any case)
+        lead("unverified@example.com", finish=False)
+        User.objects.create_user("unverified@example.com", "x")  # an unverified account does not take the lead over
         lead("boss@example.com")
         staff("Office", "BOSS@example.com")
-        self.assertEqual(sorted(self.emails()), ["one@example.com", "three@example.com", "two@example.com"])
+        self.assertEqual(sorted(self.emails()), ["one@example.com", "three@example.com", "two@example.com", "unverified@example.com"])
         self.assertEqual(self.emails("show=registered"), ["reg@example.com"])
         self.assertEqual(self.emails("potential=high"), ["two@example.com"])
         self.assertEqual(self.emails("q=THREE"), ["three@example.com"])
@@ -140,9 +143,9 @@ class LeadPageTests(OfficeTestCase):
         anonymous = journey.create_session("Mozilla/5.0 Safari/605.1")  # no email: not a lead
         self.assertEqual(get(office, f"/leads/{anonymous.pk}/").status_code, 404)
         user = services.register_interest(cleaned(email="one@example.com")).user
-        redirect = get(office, f"/leads/{session.pk}/")
-        self.assertRedirects(redirect, f"/people/{user.pk}/", fetch_redirect_response=False)
+        self.assertEqual(get(office, f"/leads/{session.pk}/").status_code, 200)  # unverified: still a lead (the address may not be his)
         verify(user)
+        self.assertRedirects(get(office, f"/leads/{session.pk}/"), f"/people/{user.pk}/", fetch_redirect_response=False)
         person = get(office, f"/people/{user.pk}/")
         self.assertEqual(person.status_code, 200)
         data = person.context["person"]
@@ -188,3 +191,78 @@ class LeadFigureTests(OfficeTestCase):
         self.assertEqual([h["email"] for h in data["hot_lead_rows"]], ["two@example.com"])
         self.assertLessEqual(len(data["activity"]), 10)
         self.assertEqual({"lead", "registered", "verified", "journey_finished"} - {a["kind"] for a in data["activity"]}, set())
+
+
+class ReviewFixTests(OfficeTestCase):
+    def test_registering_with_someone_elses_email_exposes_and_erases_nothing_of_theirs(self):
+        lead("victim@example.com")
+        application, _ = gold_services.submit_application(application_data(email="victim@example.com"))
+        attacker = services.register_interest(cleaned(email="victim@example.com")).user  # never verified
+        application.refresh_from_db()
+        self.assertIsNone(application.user)
+        data = services.export_user_data(attacker)
+        self.assertEqual(data["gold_applications"], [])
+        self.assertEqual(data["journey_sessions"], [])
+        from notifications.models import EmailLog
+
+        EmailLog.objects.create(to="victim@example.com", subject="About you", template="welcome", status="sent", subject_email="victim@example.com")
+        self.assertEqual(services.export_user_data(attacker)["emails"], [])
+        services.delete_user_data(attacker)
+        self.assertTrue(EmailLog.objects.filter(to="victim@example.com").exists())
+        self.assertTrue(JourneySession.objects.filter(lead_email="victim@example.com").exists())
+        self.assertTrue(GoldApplication.objects.filter(pk=application.pk).exists())
+        office = staff("Office", "o@example.com")
+        self.assertEqual(get(office, "/leads/").context["rows"][0]["email"], "victim@example.com")
+
+    def test_unverified_account_page_shows_no_other_journeys_under_its_email(self):
+        lead("victim@example.com")
+        user = services.register_interest(cleaned(email="victim@example.com")).user
+        data = get(staff("Office", "o@example.com"), f"/people/{user.pk}/").context["person"]
+        self.assertEqual(data["unlinked_journeys"], [])
+
+    def test_merge_moves_a_verified_removed_accounts_leads_to_keep(self):
+        from system import team
+
+        from users.tests.test_register import cleaned as _c  # noqa: F401
+
+        keep = User.objects.create_user("keep@example.com", "x", email_verified_at=timezone.now())
+        gone = User.objects.create_user("gone@example.com", "x", email_verified_at=timezone.now())
+        session = lead("gone@example.com")
+        dev = staff("Developer", "dev@example.com")
+        team.merge_accounts(dev, "keep@example.com", "gone@example.com")
+        session.refresh_from_db()
+        self.assertEqual((session.user_id, session.lead_email), (keep.pk, "keep@example.com"))
+        services.delete_user_data(keep)
+        session.refresh_from_db()
+        self.assertEqual(session.lead_email, "")
+
+    def test_leads_total_follows_the_range_and_hot_filter_matches_the_count(self):
+        old = lead("old@example.com")
+        recent = lead("recent@example.com")
+        JourneySession.objects.update(gold_potential="high")
+        JourneySession.objects.filter(pk=old.pk).update(last_seen_at=timezone.now() - timedelta(days=60))
+        rollup.run()
+        office = staff("Office", "o@example.com")
+        self.assertEqual(get(office, "/leads/").context["summary"]["leads_total"], 1)  # 30 days
+        rows = get(office, "/leads/?hot=1&range=all").context["rows"]
+        self.assertEqual(len(rows), 2)
+        gold_services.submit_application(application_data(email="recent@example.com"))
+        self.assertEqual([r["email"] for r in get(office, "/leads/?hot=1&range=all").context["rows"]], ["old@example.com"])
+
+    def test_removing_a_lead_also_clears_emails_cookie_text_and_referrer(self):
+        from notifications.models import EmailLog
+
+        session = lead("one@example.com")
+        JourneySession.objects.filter(pk=session.pk).update(referrer="https://x.example/p")
+        EmailLog.objects.create(to="one@example.com", subject="Hi", template="welcome", status="sent")
+        old_key = session.key
+        self.assertEqual(journey.erase_lead_data("one@example.com"), 1)
+        session.refresh_from_db()
+        self.assertEqual((session.lead_email, session.referrer, session.person_key), ("", "", ""))
+        self.assertNotEqual(session.key, old_key)
+        self.assertFalse(EmailLog.objects.filter(to="one@example.com").exists())
+
+    def test_activity_leaves_out_staff_addresses(self):
+        lead("boss@example.com")
+        staff("Office", "boss@example.com")
+        self.assertEqual([a for a in lead_lists.activity() if a["kind"] == "lead"], [])

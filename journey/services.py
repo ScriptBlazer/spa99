@@ -180,6 +180,29 @@ def erase_lead(email):
     return len(ids)
 
 
+def erase_lead_data(email):
+    """The Office "remove this lead" path: everything held for an address given at the gate, except the Gold applications.
+    Sessions lose the address, consent, cookie value, person key and referrer, typed answer text goes (also in history),
+    emails sent to the address and group-send rows, invites and the unsubscribe key go. The choices stay as anonymous
+    statistics. Returns the number of sessions cleared."""
+    email = (email or "").strip()
+    if not email:
+        return 0
+    from mailings.erasure import erase_address
+    from notifications.models import EmailLog
+
+    ids = list(JourneySession.objects.filter(lead_email__iexact=email).values_list("pk", flat=True))
+    for pk in ids:
+        JourneySession.objects.filter(pk=pk).update(key=new_session_key(), person_key="", referrer="", lead_email="", lead_at=None, lead_privacy_version="")
+    Answer.objects.filter(session_id__in=ids).update(text_value="")
+    History = JourneySession.history.model
+    History.objects.filter(id__in=ids).update(key="", person_key="", referrer="", lead_email="", lead_at=None, lead_privacy_version="")
+    Answer.history.model.objects.filter(session_id__in=ids).update(text_value="")
+    EmailLog.objects.filter(to__iexact=email).delete()
+    erase_address(email)
+    return len(ids)
+
+
 # ---------- questions, visibility, screens ----------
 
 def screens_between(old_step, new_step):
@@ -464,7 +487,18 @@ def export_lead(email):
             "started_at": session.created_at.isoformat(), "device": session.device_type, "referrer": session.referrer,
             "utm_source": session.utm_source, "utm_medium": session.utm_medium, "utm_campaign": session.utm_campaign,
             "lead_email": session.lead_email, "lead_at": session.lead_at.isoformat() if session.lead_at else None,
+            "utm_term": session.utm_term, "utm_content": session.utm_content, "lead_privacy_version": session.lead_privacy_version,
             "completed": session.completed,
-            "suggested_plan": session.suggested_plan.name if session.suggested_plan else None, "answers": answers,
+            "suggested_plan": session.suggested_plan.name if session.suggested_plan else None,
+            "gold_potential": session.gold_potential, "gold_score": session.gold_score,
+            "gold_reasons": (session.suggestion_detail or {}).get("gold_reasons", []), "answers": answers,
         })
     return rows
+
+
+def export_lead_emails(email):
+    """Emails we sent to an address given at the gate (no bodies are stored): template, subject, status, time."""
+    from notifications.models import EmailLog
+
+    return [{"template": e.template, "subject": e.subject, "status": e.status, "sent_at": e.sent_at.isoformat() if e.sent_at else None}
+            for e in EmailLog.objects.filter(to__iexact=(email or "").strip()).order_by("created_at")]

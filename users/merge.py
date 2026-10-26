@@ -90,6 +90,14 @@ def merge(actor, keep, remove):
     sessions = list(JourneySession.objects.filter(user=remove).values_list("pk", flat=True))
     JourneySession.objects.filter(pk__in=sessions).update(user=keep)
     JourneySession.history.model.objects.filter(id__in=sessions).update(user=keep)
+    if remove.email_verified_at:  # the removed address was proven his: journeys that left it become keep's and carry keep's address,
+        # because export and erasure find them by email (an unverified address proves nothing, so its rows are left alone)
+        leads = list(JourneySession.objects.filter(lead_email__iexact=removed_email, user__isnull=True).values_list("pk", flat=True))
+        JourneySession.objects.filter(pk__in=leads).update(user=keep)
+        JourneySession.history.model.objects.filter(id__in=leads).update(user=keep)
+        both = [*sessions, *leads]
+        JourneySession.objects.filter(pk__in=both, lead_email__iexact=removed_email).update(lead_email=keep.email)
+        JourneySession.history.model.objects.filter(id__in=both, lead_email__iexact=removed_email).update(lead_email=keep.email)
     # Gold applications (linked to the removed account or made with its email) now belong to keep and carry keep's email,
     # because export and erasure find them by email; their history rows follow.
     apps = list(GoldApplication.objects.filter(Q(user=remove) | Q(email__iexact=removed_email)).values_list("pk", flat=True))

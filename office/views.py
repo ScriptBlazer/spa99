@@ -228,6 +228,7 @@ def lead_export(request, pk):
     if kind == "account":
         return redirect("office_person_export", pk=data.pk)
     body = {"email": data["email"], "sessions": journey_services.export_lead(data["email"]),
+            "emails": journey_services.export_lead_emails(data["email"]),
             "gold_applications": gold_services.export_applications(data["email"])}
     response = JsonResponse(body, json_dumps_params={"indent": 2})
     response["Content-Disposition"] = 'attachment; filename="spa99-lead.json"'
@@ -241,7 +242,7 @@ def lead_delete(request, pk):
     session, (kind, data) = _lead_session(pk)
     if kind == "account":
         return redirect("office_person", pk=data.pk)
-    cleared = journey_services.erase_lead(data["email"])
+    cleared = journey_services.erase_lead_data(data["email"])
     messages.success(request, f"The email was cleared from {cleared} journey{'s' if cleared != 1 else ''}. The answers stay, without it.")
     return redirect("office_leads")
 

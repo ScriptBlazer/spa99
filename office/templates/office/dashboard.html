@@ -122,7 +122,7 @@
         <span class="o-latest-when">{{ l.last_seen|relative }}</span>
       </a>
       {% empty %}<p class="o-empty-line">No hot leads right now. They appear when someone with a strong Gold profile leaves his email.</p>{% endfor %}
-      {% if data.hot_leads > 5 %}<a class="o-quiet o-more" href="{% url 'office_leads' %}?potential=high&amp;show=lead">See all hot leads</a>{% endif %}
+      {% if data.hot_leads > 5 %}<a class="o-quiet o-more" href="{% url 'office_leads' %}?hot=1&amp;range=all">See all hot leads</a>{% endif %}
     </div>
   </section>
 
@@ -142,6 +142,7 @@
 
   {% comment %}What people want: stored facts. Closed: six tiles. Open (the plus): every option of every question. Everyone or Leads (a stored second set). <details> is the base, JS only animates the height and fades the scope switch.{% endcomment %}
   <section class="o-card o-wants" data-reveal data-office-wants aria-labelledby="wants-h">
+    <div class="o-wants-head">
     <h2 id="wants-h" class="o-h3">What people want</h2>
     <fieldset class="o-seg o-seg--sm o-wants-scope" style="--n: 2; --i: 0" data-wants-scope>
       <legend class="sr-only">Who answered</legend>
@@ -149,6 +150,7 @@
       <label class="o-seg-item"><input type="radio" name="wants-scope" value="everyone" checked><span>Everyone</span></label>
       <label class="o-seg-item"><input type="radio" name="wants-scope" value="leads"><span>Leads</span></label>
     </fieldset>
+    </div>
     <div class="o-wants-stage" data-wants-stage>
       <details class="o-wants-details" data-wants-details>
         <summary class="o-plus" aria-label="Show all answers" aria-expanded="false" data-wants-toggle>
