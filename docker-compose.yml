@@ -1,8 +1,16 @@
 # Live stack: Caddy (HTTPS) -> web (gunicorn) + worker (background jobs). The database is managed PostgreSQL
 # (DATABASE_URL in .env), never a container. Image is built by GitHub Actions and pulled by tag.
+# Docker keeps each container's log in a file that otherwise grows forever: cap it at 5 x 10 MB per container.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   caddy:
     image: caddy:2
+    logging: *logging
     restart: unless-stopped
     ports: ["80:80", "443:443"]
     environment:
@@ -20,6 +28,7 @@ services:
 
   web:
     image: ${IMAGE}:${APP_TAG}
+    logging: *logging
     restart: unless-stopped
     env_file: .env
     environment:
@@ -35,6 +44,7 @@ services:
 
   worker:
     image: ${IMAGE}:${APP_TAG}
+    logging: *logging
     restart: unless-stopped
     env_file: .env
     environment:
