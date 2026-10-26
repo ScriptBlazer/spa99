@@ -1,0 +1,18 @@
+{# Context: form (SaleForm), sale (None when new), state (upcoming, live, ended), locked_fields (names), read_only. #}
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title=sale.name|default:"New sale" description="Times are London time. Once a sale is live, its % off, months and start are locked because people already hold them." %}
+{% if read_only %}<p class="sys-note" role="status" data-system-sale-readonly>This sale has ended. It is kept as a record.</p>{% endif %}
+<form method="post" data-system-form="sale" data-state="{{ state }}" novalidate>{% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for field in form.visible_fields %}
+    <div class="sys-field" data-field="{{ field.name }}"{% if field.field.disabled %} data-locked{% endif %}>
+      {{ field.label_tag }} {{ field }} {% if field.field.disabled and not read_only %}<span class="sys-muted">Locked</span>{% endif %}
+      {{ field.errors }}
+    </div>
+  {% endfor %}
+  {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+  {% if not read_only %}<button type="submit" class="sys-btn primary">Save</button>{% endif %}
+  <a href="{% url 'system_sales' %}">Back to sales</a>
+</form>
+{% endblock %}

@@ -1,0 +1,27 @@
+{# Context: rows, title, key (live, upcoming, past). #}
+<section class="sys-panel" aria-label="{{ title }} sales" data-system-sales="{{ key }}">
+  <h2>{{ title }}</h2>
+  <div class="sys-scroll"><table class="sys-table">
+    <thead><tr><th scope="col">Name</th><th scope="col">Status</th><th scope="col">% off</th><th scope="col">Plans</th><th scope="col">Starts</th><th scope="col">Ends</th><th scope="col">Months</th><th scope="col">Kept by</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
+    <tbody>
+    {% for sale in rows %}
+      <tr data-system-sale="{{ sale.pk }}">
+        <td><a href="{% url 'system_sale_edit' sale.pk %}">{{ sale.name }}</a></td>
+        <td>{{ sale.state }}{% if sale.ended_early_at %} (ended early){% endif %}</td>
+        <td>{{ sale.percent_off }}%</td>
+        <td>{{ sale.plans_label }}</td>
+        <td>{{ sale.starts_at|date:"j M Y H:i" }}</td>
+        <td>{{ sale.window_end|date:"j M Y H:i" }}</td>
+        <td>{{ sale.months_at_price }}</td>
+        <td>{{ sale.holders }}</td>
+        <td>{% if sale.state != "ended" %}
+          <form method="post" action="{% url 'system_sale_preview' sale.pk %}" style="display:inline" data-system-form="sale-preview">{% csrf_token %}<button type="submit" class="sys-btn sm">Preview link</button></form>
+          <form method="post" action="{% url 'system_sale_end' sale.pk %}" style="display:inline" data-system-form="sale-end" data-system-confirm="sale" data-system-confirm-label="End now" data-system-confirm-what="{{ sale.name }}" data-noun="sale" data-plural="sales" data-line="{% if sale.state == 'live' %}The bar disappears and the sale stops now. People who already registered keep their price.{% else %}This sale will never run.{% endif %} This is logged and can be undone while its original end time is in the future.">{% csrf_token %}<button type="submit" class="sys-btn sm">{% if sale.state == "live" %}End now{% else %}Cancel{% endif %}</button></form>
+        {% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="9" class="sys-muted">None.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>

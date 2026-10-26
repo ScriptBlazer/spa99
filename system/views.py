@@ -29,7 +29,7 @@ from .models import SystemChange, SystemEvent
 from .permissions import signed_in, unlocked
 
 NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", "system_plans"), ("hours", "Hours and closures", "system_hours"),
-       ("gold", "Gold rules", "system_gold"), ("approval", "Approval", "system_approval"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("suppressions", "Email suppressions", "system_suppressions"),
+       ("gold", "Gold rules", "system_gold"), ("approval", "Approval", "system_approval"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("sales", "Sales", "system_sales"), ("suppressions", "Email suppressions", "system_suppressions"),
        ("settings", "Settings", "system_settings"), ("team", "Team", "system_team"), ("changes", "Audit log", "system_changes")]
 
 

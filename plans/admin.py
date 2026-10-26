@@ -6,7 +6,7 @@ from common.admin import ExportCsvMixin
 
 from content import images
 
-from .models import Closure, Facility, OpeningRule, Plan, SiteSettings
+from .models import Closure, Facility, OpeningRule, Plan, Sale, SiteSettings
 
 
 class PlanForm(forms.ModelForm):
@@ -52,3 +52,18 @@ class FacilityAdmin(SimpleHistoryAdmin):
     list_display = ("name", "slug", "display", "order", "visible")
     list_editable = ("display", "order", "visible")
     prepopulated_fields = {"slug": ("name",)}
+
+
+@admin.register(Sale)
+class SaleAdmin(ExportCsvMixin, SimpleHistoryAdmin):
+    """See and export only: sales are made and ended in System > Sales (overlap and live locks, audit log, undo)."""
+    list_display = ("name", "percent_off", "starts_at", "ends_at", "ended_early_at", "months_at_price")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

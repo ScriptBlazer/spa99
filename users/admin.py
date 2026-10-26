@@ -49,7 +49,7 @@ class InterestRegistrationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
     list_filter = ("plan", "source")
     search_fields = ("user__email", "user__first_name", "user__last_name")
     date_hierarchy = "created_at"
-    readonly_fields = ("user", "source", "journey_session")  # the plan stays editable: its change is counted by a signal
+    readonly_fields = ("user", "source", "journey_session", "sale", "sale_name", "sale_percent_off", "sale_months", "sale_locked_at")  # the plan stays editable: its change is counted by a signal
 
     def has_add_permission(self, request):
         return False  # created by sign-up, which counts it

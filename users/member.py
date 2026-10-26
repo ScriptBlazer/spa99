@@ -2,6 +2,7 @@
 Used by the short views in views.py; the screens are described in docs/design/MEMBER.md and docs/features/member-dashboard.md."""
 from gold import invites as gold_invites
 from pages import services as pages_services
+from plans import sales as sale_services
 from plans import services as plan_services
 from plans.models import SiteSettings
 
@@ -41,6 +42,7 @@ def base_context(user):
         "greeting": pages_services.greeting(user), "site": site, "opening": site.opening_label, "opening_date": site.opening_date,
         "verified": bool(user.email_verified_at), "email": user.email, "account_id": user.public_id_display,
         "interest": interest, "interest_plan": plan, "is_gold": is_gold,
+        "kept_price": sale_services.kept_price(interest, site.vat_rate) if not is_gold else None,
         "gold_since": gold_invites.gold_since(user) if is_gold else None,
         "status": STATUS_GOLD if is_gold else STATUS_REGISTERED if plan is not None else STATUS_NONE,
         "status_name": "Gold member" if is_gold else plan.name if plan is not None else "",

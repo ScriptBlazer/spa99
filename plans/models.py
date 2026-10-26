@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
 from django.db import models
+from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from common.models import BaseModel
@@ -358,3 +359,95 @@ class Facility(BaseModel):
 
     def __str__(self):
         return self.name
+
+
+class Sale(BaseModel):
+    """A limited-time sale (System > Sales): a percentage off some plans, for the people who register while it is live.
+    Only one sale is live at a time. The window is starts_at to `window_end` (ended_early_at when End now was used, else ends_at).
+    A person's kept price is a snapshot on their InterestRegistration (users app), so editing or deleting a sale never changes it.
+    Lives in the plans app because it is pricing data for Plan rows."""
+
+    MAX_PERCENT = 90
+    MAX_MONTHS = 36
+
+    name = models.CharField(max_length=80, help_text='Shown on the site bar, e.g. "Christmas sale".')
+    percent_off = models.PositiveSmallIntegerField(
+        "% off", validators=[MinValueValidator(1), MaxValueValidator(MAX_PERCENT)], help_text="1 to 90. Locked once the sale is live.")
+    plans = models.ManyToManyField(Plan, related_name="sales")
+    starts_at = models.DateTimeField(db_index=True, help_text="London time.")
+    ends_at = models.DateTimeField(db_index=True, help_text="London time.")
+    months_at_price = models.PositiveSmallIntegerField(
+        "months at the sale price", validators=[MinValueValidator(1), MaxValueValidator(MAX_MONTHS)],
+        help_text="How long a person who registers during the sale keeps the sale price once billing starts. Locked once live.")
+    ended_early_at = models.DateTimeField(null=True, blank=True, help_text="Set by End now.")
+    created_by = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["-starts_at"]
+        indexes = [models.Index(fields=["starts_at", "ends_at"])]
+
+    def __str__(self):
+        return self.name
+
+    # ---- the window ----
+
+    @property
+    def window_end(self):
+        return self.ended_early_at or self.ends_at
+
+    def status(self, now=None):
+        """"upcoming", "live" or "ended" (ended early, or its end time has passed)."""
+        now = now or timezone.now()
+        if self.ended_early_at is not None and (self.ended_early_at <= now or self.ended_early_at <= self.starts_at):
+            return "ended"  # ended early (an upcoming sale ended early never runs)
+        if now >= self.ends_at:
+            return "ended"
+        return "upcoming" if now < self.starts_at else "live"
+
+    @classmethod
+    def overlapping(cls, starts_at, ends_at, exclude_pk=None):
+        """Other sales whose live window shares time with [starts_at, ends_at). A sale ended early frees the rest of its time; one
+        that was ended before it started has no window at all."""
+        queryset = cls.objects.filter(starts_at__lt=ends_at).filter(
+            models.Q(ended_early_at__isnull=True, ends_at__gt=starts_at) | models.Q(ended_early_at__gt=starts_at)
+        ).exclude(ended_early_at__lte=models.F("starts_at"))
+        return queryset.exclude(pk=exclude_pk) if exclude_pk else queryset
+
+    # ---- rules ----
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
+            errors["ends_at"] = "The sale must end after it starts."
+        if self.ended_early_at and self.ends_at and self.ended_early_at > self.ends_at:
+            errors["ended_early_at"] = "A sale cannot be ended after its end time."
+        if not errors and self.starts_at and self.ends_at:
+            other = self.overlapping(self.starts_at, self.window_end, self.pk if not self._state.adding else None).first()
+            if other is not None and self.window_end > self.starts_at:
+                errors["starts_at"] = f"This overlaps {other.name}. Only one sale can be live at a time."
+        if not self._state.adding:
+            stored = type(self).objects.filter(pk=self.pk).first()
+            if stored is not None:
+                self._clean_against_stored(stored, errors)
+                if not self.plans.exists():
+                    errors["plans"] = "Choose at least one plan."
+        if errors:
+            raise ValidationError(errors)
+
+    def _clean_against_stored(self, stored, errors):
+        """A live sale's % off, months and start are locked (people already hold them). An ended-early sale can only be put back
+        while its original end is still in the future."""
+        if stored.status() == "live":
+            for name in ("percent_off", "months_at_price", "starts_at"):
+                now_value, was = getattr(self, name), getattr(stored, name)
+                if name == "starts_at":  # forms drop microseconds
+                    now_value, was = now_value.replace(microsecond=0), was.replace(microsecond=0)
+                if now_value != was:
+                    errors[name] = "This cannot change once the sale is live: people already hold it."
+            if self.ends_at <= timezone.now() and self.ended_early_at is None:
+                errors["ends_at"] = "Use End now to end a live sale."
+        if stored.ended_early_at and self.ended_early_at is None and self.ends_at <= timezone.now():
+            errors["ended_early_at"] = "The original end time has passed, so this sale cannot be put back."

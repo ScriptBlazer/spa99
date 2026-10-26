@@ -16,6 +16,7 @@ from . import sentences
 MODEL_SECTIONS = {
     "plans.sitesettings": "settings",
     "plans.plan": "plans",
+    "plans.sale": "sales",
     "plans.openingrule": "hours",
     "plans.closure": "hours",
     "gold.goldchoice": "gold",
@@ -38,7 +39,7 @@ FIELD_SECTIONS = {
 }
 SECTION_LABELS = {
     "plans": "Plans and pricing", "hours": "Hours and closures", "gold": "Gold rules", "journey": "Journey",
-    "emails": "Emails", "settings": "Settings", "team": "Team", "approval": "Approval",
+    "emails": "Emails", "settings": "Settings", "team": "Team", "approval": "Approval", "sales": "Sales",
 }
 SKIP_FIELDS = {"id", "created_at", "updated_at", "singleton_key"}
 

@@ -39,7 +39,7 @@ class VersionedForm(forms.ModelForm):
                 field.to_python = self._ascii_only(field.to_python)
         if not self.instance._state.adding:
             self.fields[TOKEN] = TokenField()
-            self.initial[TOKEN] = services.row_fingerprint(self.instance, self.version_fields())
+            self.initial[TOKEN] = self.fingerprint(self.instance)
 
     @staticmethod
     def _ascii_only(original):
@@ -53,13 +53,17 @@ class VersionedForm(forms.ModelForm):
         names = {f.name for f in self.instance._meta.concrete_fields}
         return [name for name in self.fields if name in names]
 
+    def fingerprint(self, row):
+        """The row's version (a form with extra parts, like a many-to-many, adds them here)."""
+        return services.row_fingerprint(row, self.version_fields())
+
     def ensure_current(self, lock=False):
         """Raise ValidationError(STALE_MESSAGE) unless the row still has the version this form was made from."""
         token = self.cleaned_data.get(TOKEN) if TOKEN in self.fields else ""
         if not token:
             return
         row = services.current_row(self.instance, lock=lock)
-        if row is None or services.row_fingerprint(row, self.version_fields()) != token:
+        if row is None or self.fingerprint(row) != token:
             self.stale = True
             raise ValidationError(services.STALE_MESSAGE, code="stale")
 

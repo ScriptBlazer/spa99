@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_code as c, views_emails as e, views_rules as r
+from . import views, views_code as c, views_emails as e, views_rules as r, views_sales as sl
 from .permissions import unlocked
 
 urlpatterns = [
@@ -48,6 +48,11 @@ urlpatterns = [
     path("emails/invites/<uuid:batch>/", e.invite_batch, name="system_invite_batch"),
     path("emails/invites/<uuid:batch>/progress/", e.invite_progress, name="system_invite_progress"),
     path("emails/invites/<uuid:batch>/resume/", e.invite_resume, name="system_invite_resume"),
+    path("sales/", sl.sale_list, name="system_sales"),
+    path("sales/new/", sl.sale_edit, name="system_sale_new"),
+    path("sales/<uuid:pk>/", sl.sale_edit, name="system_sale_edit"),
+    path("sales/<uuid:pk>/end/", sl.sale_end, name="system_sale_end"),
+    path("sales/<uuid:pk>/preview/", sl.sale_preview, name="system_sale_preview"),
     path("suppressions/", views.suppressions, name="system_suppressions"),
     path("suppressions/<uuid:pk>/remove/", views.suppression_remove, name="system_suppression_remove"),
     path("settings/", views.site_settings, name="system_settings"),

@@ -1,0 +1,9 @@
+{# Context: live, upcoming, past (lists of Sale; each has .state, .plans_label, .holders). Minimal: the frontend restyles (docs/design/SYSTEM-SALES.md). #}
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Sales" description="Time-limited percentage-off sales. One can be live at a time. Everything here is logged in the audit log." %}
+<p><a class="sys-btn" href="{% url 'system_sale_new' %}" data-system-sale-new>New sale</a></p>
+{% include "system/_sales_table.html" with rows=live title="Live" key="live" %}
+{% include "system/_sales_table.html" with rows=upcoming title="Upcoming" key="upcoming" %}
+{% include "system/_sales_table.html" with rows=past title="Past" key="past" %}
+{% endblock %}

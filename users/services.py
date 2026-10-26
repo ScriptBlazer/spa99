@@ -19,6 +19,8 @@ from notifications.models import EmailLog
 from plans.models import Plan, SiteSettings
 
 from . import tokens
+from plans import sales as sale_services
+
 from .models import InterestRegistration, User
 
 logger = logging.getLogger("spa99.users")
@@ -121,7 +123,7 @@ def register_interest(data, journey_session=None):
             interest = InterestRegistration.objects.create(
                 user=user, plan=plan,
                 source=InterestRegistration.JOURNEY if journey_session else InterestRegistration.DIRECT,
-                journey_session=journey_session,
+                journey_session=journey_session, **sale_services.snapshot_fields(plan),
             )
             metrics.registered(plan.slug if plan else None, interest.source, interest.created_at, marketing=user.marketing_consent)
             journey_services.link_user(journey_session, user)
@@ -148,10 +150,12 @@ def _after_registration(user, opted_in):
 def set_interest(user, plan):
     """Change the plan a person is interested in (account page). History keeps the old one."""
     with transaction.atomic():
-        interest, created = InterestRegistration.objects.get_or_create(user=user, defaults={"plan": plan})
+        interest, created = InterestRegistration.objects.get_or_create(user=user, defaults={"plan": plan, **sale_services.snapshot_fields(plan)})
         if created:
             metrics.registered(plan.slug if plan else None, interest.source, interest.created_at, marketing=user.marketing_consent)
         elif interest.plan_id != (plan.pk if plan else None):
+            for name, value in sale_services.snapshot_fields(plan, held=interest).items():
+                setattr(interest, name, value)  # the kept sale price follows the plan rules (plans.sales.snapshot_fields)
             interest.plan = plan
             interest.save()  # the plan split follows this save (insights.signals), so the admin path counts too
     return interest
@@ -290,6 +294,8 @@ def _export_interest(user):
     return {
         "plan": interest.plan.name if interest.plan else None, "source": interest.source,
         "registered_at": interest.created_at.isoformat(),
+        "sale_price": {"sale": interest.sale_name, "percent_off": interest.sale_percent_off, "months": interest.sale_months,
+                       "locked_at": _plain(interest.sale_locked_at)} if interest.sale_percent_off else None,
         "changes": [
             {"at": row.history_date.isoformat(), "plan_id": row.plan_id} for row in interest.history.order_by("history_date")
         ],
