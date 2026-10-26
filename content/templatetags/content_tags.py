@@ -25,7 +25,7 @@ def discount_line(context):
 
 @register.inclusion_tag("content/_gold_fee_note.html")
 def gold_fee_note(css_class="fee-note"):
-    """{% gold_fee_note %}: '*An annual admin fee of £299 + VAT applies.' from the Gold plan's annual fee; nothing while empty."""
+    """{% gold_fee_note %}: '*An annual admin fee of £199 + VAT applies.' from the Gold plan's annual fee; nothing while empty."""
     from plans.services import gold_fee_note as note
 
     return {"note": note(), "css_class": css_class}

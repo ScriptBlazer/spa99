@@ -117,7 +117,7 @@ class MembershipsPageDataTests(TestCase):
             table = pages.compare_table(pages.purchasable_plans())
             return [next(r for r in table if r["label"] == label)["cells"][-1]["text"] for label in ("Price, ex VAT", "Price, inc VAT")]
 
-        self.assertEqual(gold_cells(), ["£299 a year", "£358.80 a year"])  # default £299 ex VAT (2026-10-26)
+        self.assertEqual(gold_cells(), ["£199 a year", "£238.80 a year"])  # default £199 ex VAT (2026-10-26)
         Plan.objects.filter(slug="gold").update(annual_fee=None)
         self.assertEqual(gold_cells(), ["By application", "By application"])  # no "TBC" text
         Plan.objects.filter(slug="gold").update(annual_fee=Decimal("150.00"))
@@ -133,7 +133,7 @@ class MembershipsPageDataTests(TestCase):
 
         gold_cta = page_content("memberships")["gold_cta"].body
         self.assertIn("free*, by application", gold_cta)
-        self.assertIn("*An annual admin fee of £299 + VAT applies.", render())
+        self.assertIn("*An annual admin fee of £199 + VAT applies.", render())
         Plan.objects.filter(slug="gold").update(annual_fee=Decimal("150.50"))
         self.assertIn("£150.50 + VAT", render())
         Plan.objects.filter(slug="gold").update(annual_fee=None)  # no fee: plain "free", no note

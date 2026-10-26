@@ -58,7 +58,7 @@ class NoPricesBeforeTheGateTests(TestCase):
         self.assertNotIn("£", spa)
         self.assertIn("Tailor your membership", spa)
         home = self.client.get("/").content.decode()
-        home = home.replace("*An annual admin fee of £299 + VAT applies.", "")  # the Gold "free*" footnote is the one allowed figure (2026-10-26)
+        home = home.replace("*An annual admin fee of £199 + VAT applies.", "")  # the Gold "free*" footnote is the one allowed figure (2026-10-26)
         self.assertNotIn("&pound;", home)
         self.assertNotIn("£", home)
 
