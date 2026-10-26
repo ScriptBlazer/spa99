@@ -205,7 +205,11 @@ html:has(.gold-apply) { scroll-padding-top: calc(var(--header-h) + var(--space-4
 
 /* follow-ups on a soft tinted panel, indented; the Other text sits straight under the industry tiles */
 .gold-apply .sub-question { margin-top: var(--space-5); }
-.gold-apply [data-group="property_link"], .gold-apply [data-group="size_range"] { margin-left: var(--space-4); padding: var(--space-4); background: var(--color-cream-raised); border-radius: var(--radius-md); }
+.gold-apply [data-group="property_link"], .gold-apply [data-group="size_range"] { margin-left: var(--space-4); padding: var(--space-4); background: var(--color-chosen-wash); border-radius: var(--radius-md); }
+/* the legend sits inside the tinted panel, not on its top edge */
+.gold-apply [data-group="property_link"] > legend, .gold-apply [data-group="size_range"] > legend { float: left; width: 100%; padding: 0; }
+.gold-apply [data-group="property_link"] > legend + *, .gold-apply [data-group="size_range"] > legend + * { clear: both; }
+.gold-apply [data-group="property_link"] > .flow-error:empty, .gold-apply [data-group="size_range"] > .flow-error:empty { display: none; }
 .gold-apply [data-group="property_link"] > legend::before, .gold-apply [data-group="size_range"] > legend::before { display: none; }
 .gold-apply [data-group="property_link"] .question-help, .gold-apply [data-group="size_range"] .question-help { padding-left: 0; }
 .gold-apply .sub-question[data-sub="industry_other"] { margin-top: var(--space-3); }
