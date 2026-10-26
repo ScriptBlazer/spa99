@@ -4,6 +4,7 @@ from unittest import mock
 
 from django.contrib import admin as django_admin
 from django.contrib.auth import get_user_model
+from django.db import DatabaseError, connection, transaction
 from django.core import mail
 from django.test import Client, RequestFactory, TestCase
 
@@ -50,8 +51,8 @@ class ActionsTestCase(TestCase):
 class TrailTests(ActionsTestCase):
     def test_every_step_is_recorded_with_who_how_and_the_status_change(self):
         application = self.application()
-        self.assertEqual([(e.action, e.channel, e.to_status) for e in events(application)], [("submitted", "system", "new"), ("email_sent", "system", "")])
-        office(self.approver, f"/gold/{application.pk}/approve/", {"channel": "email_link"})
+        self.assertEqual([(e.action, e.channel, e.to_status) for e in events(application)], [("submitted", "system", "new"), ("email_sent", "system", ""), ("email_sent", "system", "")])  # approver email, thank-you
+        office(self.approver, f"/gold/{application.pk}/approve/", {"token": approval.make_approve_token(application)})
         approved = events(application, "approved")[0]
         self.assertEqual((approved.actor, approved.channel, approved.from_status, approved.to_status, approved.meta["result"]),
                          (self.approver, "email_link", "new", "approved", "invited"))
@@ -86,7 +87,7 @@ class TrailTests(ActionsTestCase):
         other = self.application(email="other@example.com", mobile="+447911000222")
         request = RequestFactory().post("/")
         request.user = self.approver
-        form = mock.Mock(changed_data=["status"])
+        form = mock.Mock(changed_data=[])  # a history Revert reports no change, the status still moved
         other.status = "contacted"
         GoldApplicationAdmin(GoldApplication, django_admin.site).save_model(request, other, form, True)
         changed = events(other, "status_changed_admin")[0]
@@ -220,3 +221,45 @@ class ImmutabilityAndErasureTests(ActionsTestCase):
         self.assertGreater(ApplicationEvent.objects.count(), 0)
         gold_services.delete_applications("dan@example.com")
         self.assertEqual(ApplicationEvent.objects.count(), 0)
+
+
+class HardeningTests(ActionsTestCase):
+    def test_a_posted_channel_or_bad_token_never_makes_it_an_email_link(self):
+        application = self.application()
+        office(self.approver, f"/gold/{application.pk}/approve/", {"channel": "email_link", "token": "forged"})
+        self.assertEqual(events(application, "approved")[0].channel, "office")
+        other = self.application(email="o@example.com", mobile="+447911000444")
+        page = office(self.approver, f"/gold/{other.pk}/approve/confirm/?t={approval.make_approve_token(other)}")
+        self.assertContains(page, 'name="token"')
+        self.assertNotContains(office(self.approver, f"/gold/{other.pk}/approve/confirm/?t=junk"), 'name="token"')
+
+    def test_the_database_refuses_edits_but_allows_delete_and_an_account_going(self):
+        application = self.application()
+        event = audit.record(application, "note_added", actor=self.approver, message="kept")
+        with self.assertRaises(DatabaseError), transaction.atomic():
+            ApplicationEvent._base_manager.filter(pk=event.pk).update(message="x")
+        with self.assertRaises(DatabaseError), transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("UPDATE gold_applicationevent SET message = 'x'")
+        self.approver.delete()  # ON DELETE SET NULL on actor_id is the one update allowed
+        self.assertIsNone(ApplicationEvent.objects.get(pk=event.pk).actor_id)
+
+    def test_a_form_error_after_someone_else_decided_redirects_with_a_warning(self):
+        application = self.application()
+        invites.decline_application(application, self.reader, REASON, channel="office")
+        response = office(self.approver, f"/gold/{application.pk}/respond/", {"message": "x"})
+        self.assertEqual(response.status_code, 302)
+        follow = Client(HTTP_HOST=OFFICE)
+        follow.force_login(self.approver)
+        self.assertContains(follow.post(f"/gold/{application.pk}/respond/", {"message": "x"}, follow=True), "Already decided by someone else")
+
+    def test_export_has_the_declined_email_text_and_all_email_results_are_logged(self):
+        application = self.application()
+        invites.decline_application(application, self.approver, REASON, channel="office", email_message="Sorry Dan, not now")
+        exported = gold_services.export_applications("dan@example.com")[0]["history"]
+        self.assertIn("Sorry Dan, not now", [e.get("email_message") for e in exported])
+        self.assertTrue(any(e.meta.get("template") == "gold_ack" for e in events(application, "email_sent")))
+        low = self.application(email="l@example.com", mobile="+447911000555")
+        GoldApplication.objects.filter(pk=low.pk).update(potential_level="low")
+        office(self.approver, f"/gold/{low.pk}/approve/", {})
+        self.assertTrue(any(e.meta.get("template") == "gold_final" for e in events(low, "email_sent")))

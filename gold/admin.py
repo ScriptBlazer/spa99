@@ -69,7 +69,7 @@ class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
         with transaction.atomic():
             before = type(obj).objects.filter(pk=obj.pk).values_list("status", flat=True).first() if change else None
             super().save_model(request, obj, form, change)
-            if change and "status" in form.changed_data and before != obj.status:
+            if change and before != obj.status:  # not form.changed_data: a history Revert posts a different "before"
                 audit.record(obj, ApplicationEvent.STATUS_CHANGED_ADMIN, actor=request.user, channel=audit.ADMIN, from_status=before, to_status=obj.status)
 
     @admin.display(description="What he does")

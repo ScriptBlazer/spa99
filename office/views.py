@@ -196,7 +196,9 @@ def gold_approve_confirm(request, pk):
     """The page Barry's email button opens: sign-in and Owner/Manager come first (middleware, then @admin). GET only
     shows the application; the tap POSTs to gold_approve, which holds the approval logic."""
     application = get_object_or_404(GoldApplication, pk=pk)
-    context = {"application": lists.gold_confirm(application), "section": "gold", "final_approver_missing": not approval.final_approver_exists()}
+    token = request.GET.get("t", "")
+    context = {"application": lists.gold_confirm(application), "section": "gold", "final_approver_missing": not approval.final_approver_exists(),
+               "approve_token": token if approval.approve_token_is_valid(token, application) else ""}
     return render(request, "office/gold_confirm.html", context)
 
 
@@ -206,16 +208,16 @@ def _act(request, pk, action):
     return redirect("office_gold_application", pk=application.pk)
 
 
-def _approve_channel(request):
-    """The confirm page opened from the approver email posts channel=email_link; anything else is the Office."""
-    return audit.EMAIL_LINK if request.POST.get("channel") == audit.EMAIL_LINK else audit.OFFICE
+def _approve_channel(request, application):
+    """email_link only with the signed token from the approver email's Approve link; a posted channel is ignored."""
+    return audit.EMAIL_LINK if approval.approve_token_is_valid(request.POST.get("token", ""), application) else audit.OFFICE
 
 
 @approver
 @require_POST
 def gold_approve(request, pk):
     def run(request, application):
-        result = approval.approve(application, request.user, channel=_approve_channel(request))
+        result = approval.approve(application, request.user, channel=_approve_channel(request, application))
         first = application.first_name or "He"
         text = {approval.AWAITING: "Sent for final approval.",
                 invites.INVITED: f"{first} is approved. His invite is on its way.",
@@ -303,6 +305,9 @@ def _form_act(request, pk, name, form_class, run):
     """Decline, Respond and Add note: validate, then act. A mistake re-opens the form with its errors and the typed text (400)."""
     application = get_object_or_404(GoldApplication, pk=pk)
     form = form_class(request.POST)
+    if not form.is_valid() and not _can_open(application, name):  # decided by someone else meanwhile: no dialog to show it in
+        messages.warning(request, "Already decided by someone else. Nothing was sent.")
+        return redirect("office_gold_application", pk=application.pk)
     if not form.is_valid():
         return _gold_page(request, application, status=400, open_form=name, form=form)
     run(application, form.cleaned_data)

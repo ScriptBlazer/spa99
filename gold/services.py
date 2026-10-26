@@ -212,10 +212,16 @@ def link_user_applications(user):
     return GoldApplication.objects.filter(email__iexact=user.email, user__isnull=True).update(user=user)
 
 
+def approval_token(application):
+    from . import approval
+
+    return approval.make_approve_token(application)
+
+
 def approver_email_context(application):
     office = settings.OFFICE_URL  # links hold only the application id: the Office asks for sign-in and checks the role
     return {
-        "approve_url": f"{office}/gold/{application.pk}/approve/confirm/",
+        "approve_url": f"{office}/gold/{application.pk}/approve/confirm/?t={approval_token(application)}",
         "view_url": f"{office}/gold/{application.pk}/",
         "decline_url": f"{office}/gold/{application.pk}/?do=decline",  # Decline and Respond need typed text, so they open the Office form
         "respond_url": f"{office}/gold/{application.pk}/?do=respond",
@@ -264,7 +270,8 @@ def export_applications(email):
                 for i in a.invites.all().order_by("created_at")
             ],
             "history": [  # the audit trail: what happened and the text of each step (not which team member did it)
-                {"at": e.at.isoformat(), "action": e.action, "from_status": e.from_status, "to_status": e.to_status, "message": e.message}
+                {"at": e.at.isoformat(), "action": e.action, "from_status": e.from_status, "to_status": e.to_status, "message": e.message,
+                 **({"email_message": e.meta["email_message"]} if e.meta.get("email_message") else {})}  # the text emailed on a decline
                 for e in sorted(a.events.all(), key=lambda e: e.at)
             ],
         }

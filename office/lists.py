@@ -199,7 +199,7 @@ def _name(user):
 
 STATUS_NAMES = dict(GoldApplication.STATUS_CHOICES)
 EMAIL_NAMES = {"gold_approver": "Approver email", "gold_invite": "Invite email", "gold_active": "Gold-added email",
-               "gold_respond": "Response email", "gold_declined": "Decline email"}
+               "gold_respond": "Response email", "gold_ack": "Thank-you email", "gold_final": "Final approval email", "gold_sent_back": "Sent-back email", "gold_declined": "Decline email"}
 
 
 def _event_detail(event):

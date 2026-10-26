@@ -97,6 +97,22 @@ def token_is_valid(token, application):
             and data.get("id") == str(application.pk) and data.get("t") == int(application.final_requested_at.timestamp()))
 
 
+APPROVE_SALT = "spa99.gold.approve"
+
+
+def make_approve_token(application):
+    """Signed copy of the application id, in the approver email's Approve link: a valid one is what makes the audit channel
+    `email_link` (a posted field alone never does)."""
+    return signing.dumps(str(application.pk), salt=APPROVE_SALT)
+
+
+def approve_token_is_valid(token, application):
+    try:
+        return signing.loads(token or "", salt=APPROVE_SALT, max_age=FINAL_DAYS * 86400) == str(application.pk)
+    except signing.BadSignature:
+        return False
+
+
 def final_email_context(application):
     from . import services
 

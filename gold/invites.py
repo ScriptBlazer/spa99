@@ -184,6 +184,9 @@ def resend_invite(application, actor=None, channel=audit.SYSTEM):
     if get_user_model().objects.filter(email__iexact=application.email).exists():
         return SKIPPED
     with transaction.atomic():
+        application = GoldApplication.objects.select_for_update().get(pk=application.pk)
+        if application.status != GoldApplication.APPROVED or application.user_id is not None:
+            return SKIPPED
         audit.record(application, ApplicationEvent.INVITE_RESENT, actor=actor, channel=channel)
         _new_invite(application)
     return INVITED

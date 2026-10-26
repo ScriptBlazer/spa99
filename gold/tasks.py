@@ -56,11 +56,12 @@ def send_gold_emails(application_id, acknowledge=True):
         application.email_error = "There are no approvers (System > Approval)."
     application.save(update_fields=["email_sent_at", "email_error", "updated_at"])
     if acknowledge and application.email:
-        send_templated(
+        ack = send_templated(
             "gold_ack", [application.email], subject_for("gold_ack", first_name=application.first_name),
             {"first_name": application.first_name, "reference": application.reference},
             subject_email=application.email,
         )
+        _log_email(application, ack, "gold_ack")
     return status
 
 
@@ -75,6 +76,7 @@ def _send_to_group(template, application_id, people_addresses, context_builder, 
     subject = subject_for(template, name=application.full_name)
     log = send_templated(template, recipients, subject, context_builder(application),
                          cc=SiteSettings.load().approver_cc_list, subject_email=application.email)
+    _log_email(application, log, template)
     return log.status
 
 
