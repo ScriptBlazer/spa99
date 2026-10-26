@@ -1,0 +1,18 @@
+{% load office_tags %}
+<section class="o-card" data-person-answers><h2 class="o-h3">Their answers</h2>
+  <p data-tier>Suggested: {{ person.tier.suggested|default:"None" }}. Picked: {{ person.tier.picked|default:"Not yet" }}.{% if person.tier.match is True %} Took the suggestion.{% elif person.tier.match is False %} Chose differently.{% endif %}</p>
+  {% with latest=person.journeys|last %}{% if latest %}<dl class="o-rows">{% for a in latest.answers %}<div><dt>{{ a.question }}</dt><dd>{{ a.display }}</dd></div>{% endfor %}</dl>{% else %}<p class="o-empty-line">He has not answered any questions yet.</p>{% endif %}{% endwith %}
+</section>
+<section class="o-card" data-person-gold-potential><h2 class="o-h3">Gold potential</h2>
+  <p data-gold-potential>{{ person.gold.potential|default:"Not rated"|title }}{% if person.gold.score is not None %} (score {{ person.gold.score }}){% endif %}</p>
+  <ul>{% for r in person.gold.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+  {% for g in person.gold.applications %}<p data-gold-application><a href="{% url 'office_gold_application' g.id %}">{{ g.reference }}</a> {{ g.status_label }}, {{ g.potential|default:"unrated" }}</p>{% empty %}<p class="o-empty-line">He has not applied for Gold.</p>{% endfor %}
+</section>
+<section class="o-card" data-person-timeline><h2 class="o-h3">Timeline</h2>{% include "office/_timeline.html" %}</section>
+<section class="o-card" data-person-journeys><h2 class="o-h3">All journeys ({{ person.journeys|length }})</h2>
+  {% for j in person.journeys reversed %}
+  <details data-journey data-completed="{{ j.completed }}"><summary>{{ j.started|dt }}: {% if j.completed %}Finished{% else %}Not finished{% endif %}{% if j.suggested_plan %}, suggested {{ j.suggested_plan }}{% endif %}</summary>
+    <dl class="o-rows">{% for a in j.answers %}<div><dt>{{ a.question }}</dt><dd>{{ a.display }}</dd></div>{% endfor %}</dl>
+    <p class="o-sub">From {{ j.source.label }}{% if j.lead_email %}. Email given {{ j.lead_at|dt }}, privacy version {{ j.lead_privacy_version }}{% endif %}</p></details>
+  {% empty %}<p class="o-empty-line">He has not started the journey.</p>{% endfor %}
+</section>

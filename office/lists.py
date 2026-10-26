@@ -97,17 +97,13 @@ def people_csv(filters):
 
 
 def person_detail(user):
+    """The account person page. The long picture (journeys with every answer, tier, Gold, source, consent, timeline) comes
+    from office.profile; the keys the page always had are kept."""
+    from . import profile
+
     interest = InterestRegistration.objects.filter(user=user).select_related("plan").first()
-    journeys = []
-    sessions = user.journey_sessions.select_related("suggested_plan").order_by("created_at")
-    for session in sessions:
-        answers = [{"question": a.question.text, "options": [o.label for o in a.options.all()], "text": a.text_value, "skipped": a.skipped}
-                   for a in session.answers.select_related("question").prefetch_related("options").order_by("answered_at")]
-        journeys.append({"started": session.created_at.isoformat(), "completed": session.completed, "device": session.device_type,
-                         "suggested_plan": session.suggested_plan.name if session.suggested_plan_id else "",
-                         "gold_potential": session.gold_potential, "lead_email": session.lead_email, "answers": answers})
     return {
-        "id": str(user.pk), "name": user.get_full_name() or user.email, "email": user.email, "mobile": user.mobile or "",
+        "kind": "account", "id": str(user.pk), "name": user.get_full_name() or user.email, "email": user.email, "mobile": user.mobile or "",
         "public_id": user.public_id_display, "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else "",
         "verified_at": user.email_verified_at.isoformat() if user.email_verified_at else "",
         "marketing": user.marketing_consent, "privacy_version": user.privacy_accepted_version,
@@ -115,9 +111,9 @@ def person_detail(user):
         "is_staff": user.is_staff,
         "interest": None if interest is None else {"plan": interest.plan.name if interest.plan_id else "", "source": interest.source,
                                                    "registered": interest.created_at.isoformat()},
-        "journeys": journeys,
         "gold_applications": [{"id": str(a.pk), "reference": a.reference, "status": a.status, "potential": a.potential_level}
                               for a in user.gold_applications.all()],
+        **profile.account_profile(user, interest),
     }
 
 

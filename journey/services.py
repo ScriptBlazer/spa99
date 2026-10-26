@@ -104,6 +104,23 @@ def link_user(session, user):
     return session
 
 
+def link_leads(user):
+    """Tie every journey that left this account's email at the gate (any browser, any case) to the account, when it
+    belongs to nobody yet. Called once the address is proven (email verified). Sessions already linked to someone are
+    never taken; running it again changes nothing. A save per session, so history records the link. Returns the number
+    linked. (If an account later changes its email, old leads are not re-linked: see docs/features/office-leads.md.)"""
+    email = (user.email or "").strip()
+    if not email:
+        return 0
+    linked = 0
+    with transaction.atomic():
+        for session in JourneySession.objects.filter(lead_email__iexact=email, user__isnull=True):
+            session.user = user
+            session.save(update_fields=["user", "updated_at"])
+            linked += 1
+    return linked
+
+
 # ---------- the email gate (before the result) ----------
 
 CONSENT_MESSAGE = "Please tick the box so we may email you about Spa 99 opening."
@@ -145,6 +162,9 @@ def save_lead(session, email, consent):
     session.lead_privacy_version = SiteSettings.load().privacy_version
     session.save(update_fields=["lead_email", "lead_at", "lead_privacy_version", "updated_at"])
     touch(session)
+    from office import snapshots  # local: the Office job reads the journey tables
+
+    snapshots.request_refresh()  # a new lead moves the Office figures (debounced, after commit)
     return clean
 
 

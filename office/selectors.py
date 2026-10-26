@@ -93,6 +93,49 @@ def tier_pair(insights):
     return [{"label": x, "picked": picked.get(x, 0), "suggested": suggested.get(x, 0)} for x in labels]
 
 
+# ---------- leads on the dashboard (stored in the snapshot) ----------
+
+def lead_block(figures, now, before):
+    """The Leads keys of the Dashboard snapshot (merged into its payload), from the same Figures as everything else.
+    A lead is an email address given at the journey gate (cohort: first given in the range); `leads_registered` = those
+    whose address has an account now. `hot_leads` is the current number of hot leads (High potential, no account, no Gold
+    application). `insights_leads` has the shape of `insights`, one vote per lead that has not registered (latest finished
+    journey in the range)."""
+    from . import leads
+
+    voters, counts = figures.lead_answer_counts(*now)
+    labels = {f"{q}:{v}": facts.clean_label(label) for q, v, label in Option.objects.filter(question__key__in=JOURNEY_QUESTIONS).values_list("question__key", "value", "label")}
+    insights = []
+    for key, title, source, _ in facts.INSIGHTS:
+        if source[0] != "answer":
+            continue
+        prefix = source[1] + ":"
+        ranked = sorted(((d, n) for d, n in counts.items() if d.startswith(prefix)), key=lambda i: (-i[1], i[0]))[:facts.MAX_RANK]
+        if not ranked:
+            continue
+        options = [{"rank": i, "label": labels.get(d, d[len(prefix):]), "value": n, "of_total": voters, "share_bp": basis_points(n, voters) or 0}
+                   for i, (d, n) in enumerate(ranked, 1)]
+        insights.append({"key": key, "title": title, "sentence": f"{options[0]['label']}: {options[0]['value']} of {voters} leads.",
+                         "top": options[0], "runner_up": options[1] if len(options) > 1 else None, "options": options})
+    return {"leads_new": figures.new_lead_count(*now), "leads_new_previous": None if before is None else figures.new_lead_count(*before),
+            "leads_registered": figures.converted_leads(*now), "hot_leads": leads.hot_leads_queryset().count(), "insights_leads": insights}
+
+
+def build_leads(range_name="30d", today=None, figures=None):
+    """The stored figures of the Leads page for a range: the three tiles and the unfiltered total (current leads)."""
+    from insights import people
+    from . import leads
+
+    range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
+    today = today or metrics.day()
+    figures = figures or people.load()
+    window = reader.range_dates(range_name, today)
+    new, converted = figures.new_lead_count(*window), figures.converted_leads(*window)
+    return {"range": range_name, "ranges": list(ANALYTICS_RANGES), "today": today.isoformat(), "leads_new": new, "leads_registered": converted,
+            "registered_share_bp": basis_points(converted, new), "hot_leads": leads.hot_leads_queryset().count(),
+            "leads_total": leads.lead_queryset(show="lead").count()}
+
+
 # ---------- dashboard ----------
 
 def _spark_buckets(range_name, today):
@@ -173,6 +216,7 @@ def build_dashboard(range_name="7d", today=None, figures=None):
         "range": range_name, "ranges": list(DASHBOARD_RANGES), "today": today.isoformat(),
         "what_changed": _text("dashboard_changed", range_name),
         "gold_waiting": waiting_count(stored), "rings": rings, "stats": stats, "funnel": funnel, "funnel_note": FUNNEL_NOTE if any(f["partial"] for f in funnel) else "",
+        **lead_block(figures, now, before),
         "insights": insights_for(range_name, facts.MAX_RANK),  # every option: the closed card shows each one's top and runner-up, the open card lists them all
         "totals": {"registrations": stored.get((K.REGISTRATIONS, ""), 0), "gold_applications": stored.get((K.GOLD_APPLICATIONS, ""), 0)},
     }
@@ -362,6 +406,13 @@ def _empty_funnel():
             for i, (k, label) in enumerate(steps)]
 
 
+EMPTY_LEADS = {"leads_new": 0, "leads_new_previous": None, "leads_registered": 0, "hot_leads": 0, "insights_leads": []}
+
+
+def empty_leads(range_name):
+    return {"range": range_name, "ranges": list(ANALYTICS_RANGES), "leads_new": 0, "leads_registered": 0, "registered_share_bp": None, "hot_leads": 0, "leads_total": 0}
+
+
 def empty_dashboard(range_name):
     """What the Dashboard shows before its first snapshot exists (a fresh database): zeros, no text. Never computed from data."""
     today = metrics.day()
@@ -374,7 +425,8 @@ def empty_dashboard(range_name):
                       ring("registrations", "Registered")],
             "stats": [stat(K.REGISTRATIONS, "Registrations", "registrations"), stat(K.VISITORS, "Site visitors", "visitors"),
                       stat(K.PAGE_VIEWS, "Page views", "pages")],
-            "funnel": _empty_funnel(), "funnel_note": "", "insights": [], "totals": {"registrations": 0, "gold_applications": 0}}
+            "funnel": _empty_funnel(), "funnel_note": "", "insights": [], "totals": {"registrations": 0, "gold_applications": 0},
+            **EMPTY_LEADS}
 
 
 def empty_analytics(range_name):
@@ -397,13 +449,17 @@ def dashboard(range_name="7d"):
     from gold.models import GoldApplication
     from users.models import InterestRegistration
 
+    from . import leads
+
     range_name = range_name if range_name in DASHBOARD_RANGES else "7d"
     data = _snapshot(OfficeSnapshot.DASHBOARD, range_name) or {**empty_dashboard(range_name), "what_changed": UPDATING, "updating": True}
+    data = {**EMPTY_LEADS, **data}  # a snapshot from before Leads existed has none of these keys
     waiting_rows = GoldApplication.objects.filter(status__in=[*GoldApplication.WAITING, GoldApplication.AWAITING_FINAL]).order_by("-created_at")[:5]
     latest = InterestRegistration.objects.select_related("user", "plan").order_by("-created_at")[:5]
     return {**data,
             "waiting": {"count": data["gold_waiting"],
                         "items": [{"id": str(a.pk), "name": a.full_name, "potential": a.potential_level, "applied": a.created_at.isoformat()} for a in waiting_rows]},
+            "hot_lead_rows": leads.hot_leads(5), "activity": leads.activity(10),
             "latest": [{"id": str(i.user_id), "name": i.user.get_full_name() or i.user.email, "plan": i.plan.name if i.plan_id else "",
                         "registered": i.created_at.isoformat()} for i in latest]}
 
@@ -416,3 +472,9 @@ def analytics(range_name="30d"):
 def pages(range_name="30d"):
     range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
     return _snapshot(OfficeSnapshot.PAGES, range_name) or {**empty_pages(range_name), "updating": True}
+
+
+def leads_summary(range_name="30d"):
+    """The Leads page tiles and total: one stored snapshot row."""
+    range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
+    return _snapshot(OfficeSnapshot.LEADS, range_name) or {**empty_leads(range_name), "updating": True}

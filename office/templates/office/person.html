@@ -30,22 +30,12 @@
         <div><dt>Registered</dt><dd>{{ person.interest.registered|dt }}</dd></div>
       </dl>
     </section>{% endif %}
-    <section class="o-card" data-person-journeys aria-labelledby="p-journey"><h2 id="p-journey" class="o-h3">Journey answers</h2>
-      {% for j in person.journeys %}
-      <div class="o-journey" data-journey data-completed="{{ j.completed }}">
-        <p class="o-sub">Started {{ j.started|dt }}{% if j.completed %}, completed{% else %}, not completed{% endif %}{% if j.suggested_plan %}. Suggested {{ j.suggested_plan }}.{% endif %}{% if j.lead_email and j.lead_email != person.email %} Left {{ j.lead_email }} before the result.{% endif %}</p>
-        <dl class="o-rows">{% for a in j.answers %}<div><dt>{{ a.question }}</dt><dd>{% if a.skipped %}Skipped{% else %}{{ a.options|join:", " }}{{ a.text }}{% endif %}</dd></div>{% endfor %}</dl>
-      </div>
-      {% empty %}<p class="o-empty-line">He has not started the journey.</p>{% endfor %}
-    </section>
-    <section class="o-card" data-person-gold aria-labelledby="p-gold"><h2 id="p-gold" class="o-h3">Gold</h2>
-      {% for g in person.gold_applications %}
-      <a class="o-linkrow" href="{% url 'office_gold_application' g.id %}"><span>{{ g.reference }}</span> {% include "office/_badge.html" with potential=g.potential %} {% include "office/_badge.html" with status=g.status %}<span class="o-wait-go" aria-hidden="true">{% include "office/_icon.html" with name="chevron-right" %}</span></a>
-      {% empty %}<p class="o-empty-line">He has not applied for Gold.</p>{% endfor %}
-    </section>
+    {% include "office/_profile.html" %}
+    {% if person.unlinked_journeys %}<section class="o-card" data-person-unlinked><h2 class="o-h3">Left this email without signing in</h2><p class="o-sub">{{ person.unlinked_journeys|length }} journey(s) not linked to this account.</p></section>{% endif %}
   </div>
-  {% if office_can.can_export or office_can.can_delete %}
   <aside class="o-detail-rail">
+    {% include "office/_profile_rail.html" %}
+    {% if office_can.can_export or office_can.can_delete %}
     <section class="o-card" data-person-data aria-labelledby="p-data"><h2 id="p-data" class="o-h3">Data</h2>
       {% if office_can.can_export %}<a class="btn btn-secondary btn-block" href="{% url 'office_person_export' person.id %}" data-export-person>Export his data</a>{% endif %}
       {% if office_can.can_delete and not person.is_staff %}
@@ -53,7 +43,7 @@
         <button type="submit" class="o-danger-link" data-working-text="Deleting" data-confirm data-confirm-danger data-confirm-title="Delete {{ person.name }}?"
                 data-confirm-body="This removes his registration, journey answers and Gold application. It cannot be undone." data-confirm-label="Delete for good" data-confirm-cancel="Keep">Delete this person</button>
       </form>{% endif %}
-    </section>
-  </aside>{% endif %}
+    </section>{% endif %}
+  </aside>
 </div>
 {% endblock %}

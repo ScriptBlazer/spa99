@@ -230,6 +230,9 @@ def accept_invite(token, cleaned):
             application.user = user
             application.save(update_fields=["user", "updated_at"])
             GoldApplication.objects.filter(email__iexact=user.email, user__isnull=True).update(user=user)
+            from users.services import link_earlier_data
+
+            link_earlier_data(user)  # the invite proves the address: journeys left with it become his too
             session = application.journey_session
             if session is not None and session.user_id is None:
                 session.user = user

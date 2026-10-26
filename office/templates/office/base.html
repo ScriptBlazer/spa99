@@ -30,6 +30,7 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
     {% if office_can.can_see_all %}<li><a href="{% url 'office_dashboard' %}" data-office-nav-item="dashboard"{% if section == "dashboard" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="dashboard" %}<span>Dashboard</span></a></li>{% endif %}
     {% if office_can.can_see_all %}<li><a href="{% url 'office_analytics' %}" data-office-nav-item="analytics"{% if section == "analytics" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="analytics" %}<span>Analytics</span></a></li>{% endif %}
     {% if office_can.can_see_all %}<li><a href="{% url 'office_people' %}" data-office-nav-item="people"{% if section == "people" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="people" %}<span>People</span></a></li>{% endif %}
+    {% if office_can.can_see_all %}<li><a href="{% url 'office_leads' %}" data-office-nav-item="leads"{% if section == "leads" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="people" %}<span>Leads</span></a></li>{% endif %}
     <li><a href="{% url 'office_gold' %}" data-office-nav-item="gold"{% if section == "gold" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="gold" %}<span>Gold</span><span class="o-badge-count" data-region="nav-badge" data-office-badge="gold">{% if office_waiting %}{{ office_waiting }}<span class="sr-only"> waiting</span>{% endif %}</span></a></li>
   </ul>
   <div class="o-nav-foot">
@@ -40,7 +41,7 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
 <div class="o-body">
   <header class="o-header" data-office-header>
     <div class="o-header-left">
-      {% block header_left %}{% include "common/_mark.html" %}<span class="o-title">{% if section == "dashboard" %}Dashboard{% elif section == "analytics" %}Analytics{% elif section == "people" %}People{% elif section == "gold" %}Gold{% endif %}</span>{% endblock %}
+      {% block header_left %}{% include "common/_mark.html" %}<span class="o-title">{% if section == "dashboard" %}Dashboard{% elif section == "analytics" %}Analytics{% elif section == "people" %}People{% elif section == "leads" %}Leads{% elif section == "gold" %}Gold{% endif %}</span>{% endblock %}
     </div>
     <div class="o-header-right">
       {% block header_range %}{% endblock %}

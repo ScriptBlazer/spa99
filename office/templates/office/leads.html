@@ -1,0 +1,41 @@
+{% extends "office/base.html" %}
+{% load office_tags %}
+{% block title %}Leads | Spa 99 Office{% endblock %}
+{% block main %}
+<h1 class="sr-only">Leads</h1>
+<div data-leads-summary>
+  <p data-leads-new>{{ summary.leads_new|num }} gave their email</p>
+  <p data-leads-registered>{{ summary.leads_registered|num }} went on to register</p>
+  <p data-leads-hot>{{ summary.hot_leads|num }} hot leads</p>
+</div>
+<form class="o-filters" method="get" action="{% url 'office_leads' %}" data-filter-form data-list="leads" role="search" aria-label="Find leads">
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="Search email" data-search>
+  <select name="range">{% for r in summary.ranges %}<option value="{{ r }}"{% if filters.range == r %} selected{% endif %}>{{ r }}</option>{% endfor %}</select>
+  <select name="show">
+    <option value="lead"{% if filters.show == "lead" %} selected{% endif %}>Not registered</option>
+    <option value="registered"{% if filters.show == "registered" %} selected{% endif %}>Registered</option>
+    <option value="all"{% if filters.show == "all" %} selected{% endif %}>All</option></select>
+  <select name="tier"><option value="">All tiers</option>{% for t in choices.tiers %}<option value="{{ t.slug }}"{% if filters.tier == t.slug %} selected{% endif %}>{{ t.name }}</option>{% endfor %}</select>
+  <select name="potential"><option value="">Any potential</option>
+    <option value="high"{% if filters.potential == "high" %} selected{% endif %}>High</option>
+    <option value="medium"{% if filters.potential == "medium" %} selected{% endif %}>Medium</option>
+    <option value="low"{% if filters.potential == "low" %} selected{% endif %}>Low</option></select>
+  <select name="industry"><option value="">All industries</option>{% for i in choices.industries %}<option value="{{ i.value }}"{% if filters.industry == i.value %} selected{% endif %}>{{ i.label }}</option>{% endfor %}</select>
+  <label><input type="checkbox" name="gold" value="yes"{% if filters.gold %} checked{% endif %}> Applied for Gold</label>
+  <select name="sort">
+    <option value="last_seen"{% if filters.sort == "last_seen" %} selected{% endif %}>Last seen</option>
+    <option value="first_seen"{% if filters.sort == "first_seen" %} selected{% endif %}>First seen</option>
+    <option value="potential"{% if filters.sort == "potential" %} selected{% endif %}>Highest potential</option>
+    <option value="visits"{% if filters.sort == "visits" %} selected{% endif %}>Most visits</option></select>
+  {% if office_can.can_export %}<a class="btn btn-secondary btn-sm o-export" href="{% url 'office_leads_csv' %}?{{ request.GET.urlencode }}" data-export-csv>Export CSV</a>{% endif %}
+  <p class="o-totalline">{% if filtered %}Filtered <a class="o-quiet" href="{% url 'office_leads' %}" data-clear>Clear</a>{% else %}<span data-total>{{ total_leads|num }} leads</span>{% endif %}
+    <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button></p>
+</form>
+<div class="o-card o-tablecard" data-list-card>
+  <table class="o-list o-list--leads">
+    <caption class="sr-only">Leads</caption>
+    <thead><tr><th scope="col">Lead</th><th scope="col">Wants</th><th scope="col">Suggested</th><th scope="col">Potential</th><th scope="col">Industry</th><th scope="col">Source</th><th scope="col" class="num">Visits</th><th scope="col">Status</th><th scope="col" class="num">Last seen</th></tr></thead>
+    <tbody data-region="list" data-office-list="leads">{% include "office/_leads_rows.html" %}</tbody>
+  </table>
+</div>
+{% endblock %}

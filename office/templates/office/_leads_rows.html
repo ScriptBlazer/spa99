@@ -1,0 +1,14 @@
+{% load office_tags %}{% for l in rows %}
+<tr class="o-row" data-lead-row data-status="{{ l.status }}">
+  <td class="c-name" data-col="email"><a class="o-rowlink" href="{{ l.href }}">{{ l.email }}</a><br><small>First seen {{ l.first_seen|dt }}</small></td>
+  <td data-col="wants">{% for line in l.summary %}{{ line }}<br>{% endfor %}</td>
+  <td data-col="tier">{{ l.tier }}</td>
+  <td data-col="potential">{{ l.potential|title }}</td>
+  <td data-col="industry">{{ l.industries|join:", " }}</td>
+  <td data-col="source">{{ l.source.label }}{% if l.source.campaign %}<br><small>{{ l.source.campaign }}</small>{% endif %}</td>
+  <td class="num" data-col="visits">{{ l.journeys }}</td>
+  <td data-col="status">{{ l.status|capfirst }}</td>
+  <td class="num" data-col="last_seen">{{ l.last_seen|dt }}</td>
+</tr>
+{% empty %}<tr class="o-empty-row" data-empty><td colspan="9"><p>No leads match that. Try fewer filters.</p></td></tr>{% endfor %}
+{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="9"><a class="btn btn-secondary btn-sm" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}

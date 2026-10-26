@@ -1,0 +1,9 @@
+{% load office_tags %}
+<section class="o-card" data-person-source><h2 class="o-h3">Source</h2>
+  {% if person.source %}<dl class="o-rows"><div><dt>Came from</dt><dd>{{ person.source.label }}</dd></div>{% if person.source.utm_campaign %}<div><dt>Campaign</dt><dd>{{ person.source.utm_source }} {{ person.source.utm_medium }} {{ person.source.utm_campaign }}</dd></div>{% endif %}<div><dt>Device</dt><dd>{{ person.source.device|default:"Not recorded" }}</dd></div></dl>{% else %}<p class="o-empty-line">Not recorded.</p>{% endif %}
+</section>
+<section class="o-card" data-person-consent><h2 class="o-h3">Consent</h2>
+  {% for c in person.consent.lead %}<p>Email given {{ c.at|dt }}, privacy version {{ c.privacy_version }}.</p>{% empty %}<p>Journey email: not asked.</p>{% endfor %}
+  {% if person.consent.account %}<p>News emails: {% if person.consent.account.marketing %}yes{% else %}no{% endif %}.</p>{% endif %}
+  {% if person.consent.unsubscribed %}<p data-unsubscribed>Unsubscribed from emails.</p>{% endif %}
+</section>

@@ -147,6 +147,20 @@ def _after_registration(user, opted_in):
             logger.exception("Could not clear the unsubscribe for a new account")
 
 
+def link_earlier_data(user):
+    """The account's email is now its owner's: attach the journeys that left this email at the gate and the Gold
+    applications made with it (only those nobody owns). Idempotent; logs counts only. When something moved, the Office
+    figures are refreshed in the background so the person counts once (counting rule C1/C5). Returns (sessions, applications)."""
+    sessions = journey_services.link_leads(user)
+    applications = gold_services.link_user_applications(user)
+    if sessions or applications:
+        from office import snapshots
+
+        snapshots.request_refresh()
+        logger.info("Linked %s journey(s) and %s Gold application(s) to account %s", sessions, applications, user.pk)
+    return sessions, applications
+
+
 def set_interest(user, plan):
     """Change the plan a person is interested in (account page). History keeps the old one."""
     with transaction.atomic():
@@ -190,6 +204,7 @@ def verify_email(token):
         user.email_verified_at = timezone.now()
         user.save(update_fields=["email_verified_at", "updated_at"])
         metrics.email_verified(user.email_verified_at)
+        link_earlier_data(user)  # the address is proven: earlier leads and applications with it become his
     try:
         enqueue("users.tasks.send_welcome_email", str(user.pk))
     except Exception:  # noqa: BLE001

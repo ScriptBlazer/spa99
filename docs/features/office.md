@@ -84,3 +84,7 @@ The frontend styles the templates from `docs/design/OFFICE.md`; the templates ar
 New env vars: `OFFICE_DOMAIN`, `OFFICE_URL` (optional). Nothing is Postgres-only (ORM only, `select_for_update` is ignored by SQLite).
 
 **Review fixes.** Journey completion reads its old state from a row-locked copy (`select_for_update().get`), so two tabs count once (the lock only bites on Postgres; SQLite serialises writes). The visitor-sentence refresh is queued with `common.tasks.enqueue`, never run inside the page request. Roles also require `is_staff`. People and Gold lists send `Vary: HX-Request` and are `never_cache`. **Admin and the figures:** a plan change on an `InterestRegistration` is counted by a signal (`insights/signals.py`, the services save through it too); in the admin, `User.email_verified_at` and `marketing_consent` are read only, adding or deleting an `InterestRegistration` is off, deleting a User goes through `delete_user_data` (full erasure, figures move), and `JourneySession` is read only (add, change, delete off). Anything else that bypasses the services is repaired by `rebuild_metrics`.
+
+## Leads and the full person page (2026-10-26)
+
+See `docs/features/office-leads.md` (Leads list, lead page, linking of journeys to the account on verify, lead figures in the snapshots, richer dashboard).

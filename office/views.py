@@ -1,7 +1,7 @@
 """Office views. Short: data comes from office.selectors (stored figures) and office.lists (source lists); actions call
 the existing services. Permissions are decorators on every view (see office.permissions)."""
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -15,13 +15,16 @@ from gold import services as gold_services
 from gold.forms import DeclineForm, NoteForm, RespondForm
 from gold.models import GoldApplication
 from insights.metrics import K
+from journey import services as journey_services
+from journey.models import JourneySession
 from plans.models import Plan
 from common import levels
 from users import services as user_services
 from users import views as user_views
 from users.models import User
 
-from . import lists, selectors
+from . import lists, profile, selectors
+from . import leads as lead_lists
 from .permissions import admin, approver, final_approver, reader
 
 
@@ -108,11 +111,23 @@ def people_csv(request):
     return lists.people_csv(lists.people_filters(request))
 
 
+def _timeline_context(request, person):
+    """The timeline for the page: 20 events, grouped by day; ?tl=2 (HTMX 'Show earlier') asks for the next 20."""
+    try:
+        number = max(int(request.GET.get("tl", "1")), 1)
+    except ValueError:
+        number = 1
+    days, more = lead_lists.timeline_page(person["timeline"], number)
+    return {"timeline_days": days, "timeline_more": more, "timeline_next": number + 1}
+
+
 @reader
 @require_GET
 def person(request, pk):
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
-    return render(request, "office/person.html", {"person": lists.person_detail(user), "section": "people"})
+    person = lists.person_detail(user)
+    context = {"person": person, "section": "people", **_timeline_context(request, person)}
+    return render(request, "office/_timeline.html" if request.headers.get("HX-Request") and "tl" in request.GET else "office/person.html", context)
 
 
 @admin
@@ -137,6 +152,74 @@ def person_delete(request, pk):
     user_services.delete_user_data(user)
     messages.success(request, f"{name} and their data were deleted.")
     return redirect("office_people")
+
+
+# ---------- leads (an email given at the journey gate, no account yet) ----------
+
+@reader
+@require_GET
+@never_cache
+def leads(request):
+    filters, number = lead_lists.filters_from(request), lists.page_number(request)
+    rows, has_next = lead_lists.page(filters, number)
+    filtered = lead_lists.is_filtered(filters)
+    summary = selectors.leads_summary(filters["range"])
+    context = {"rows": rows, "has_next": has_next, "page": number, "filters": filters, "filtered": filtered, "summary": summary,
+               "total_leads": None if filtered else summary.get("leads_total"), "choices": lead_lists.filter_choices(), "section": "leads"}
+    return _varied(render(request, _fragment(request, "office/leads.html", "office/_leads_rows.html"), context))
+
+
+@admin
+@require_GET
+def leads_csv(request):
+    return lead_lists.csv_response(lead_lists.filters_from(request), request.user.pk)
+
+
+def _lead_session(pk):
+    session = get_object_or_404(JourneySession, pk=pk)
+    found = lead_lists.lead_for(session)
+    if found is None:
+        raise Http404
+    return session, found
+
+
+@reader
+@require_GET
+@never_cache
+def lead(request, pk):
+    """A lead's page by the opaque id of any of his sessions (never the address). Once the address has an account the same
+    link opens the account page."""
+    session, (kind, data) = _lead_session(pk)
+    if kind == "account":
+        return redirect("office_person", pk=data.pk)
+    context = {"person": data, "section": "leads", **_timeline_context(request, data)}
+    return render(request, "office/_timeline.html" if request.headers.get("HX-Request") and "tl" in request.GET else "office/lead.html", context)
+
+
+@admin
+@require_GET
+def lead_export(request, pk):
+    """UK GDPR: everything held for this address (journeys and answers, Gold applications), as a JSON download."""
+    session, (kind, data) = _lead_session(pk)
+    if kind == "account":
+        return redirect("office_person_export", pk=data.pk)
+    body = {"email": data["email"], "sessions": journey_services.export_lead(data["email"]),
+            "gold_applications": gold_services.export_applications(data["email"])}
+    response = JsonResponse(body, json_dumps_params={"indent": 2})
+    response["Content-Disposition"] = 'attachment; filename="spa99-lead.json"'
+    return response
+
+
+@admin
+@require_POST
+def lead_delete(request, pk):
+    """Erase the address from his journeys (the answers stay without it). Gold applications are not touched here."""
+    session, (kind, data) = _lead_session(pk)
+    if kind == "account":
+        return redirect("office_person", pk=data.pk)
+    cleared = journey_services.erase_lead(data["email"])
+    messages.success(request, f"The email was cleared from {cleared} journey{'s' if cleared != 1 else ''}. The answers stay, without it.")
+    return redirect("office_leads")
 
 
 # ---------- gold ----------

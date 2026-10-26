@@ -103,7 +103,7 @@ class OfficeSnapshot(models.Model):
     """The finished payload of one Office data view (page: dashboard, analytics or pages) for one range, written by the
     roll-up and by the debounced refresh after each event. Views read this one row; nothing is summed on page load."""
 
-    DASHBOARD, ANALYTICS, PAGES = "dashboard", "analytics", "pages"
+    DASHBOARD, ANALYTICS, PAGES, LEADS = "dashboard", "analytics", "pages", "leads"
 
     page = models.CharField(max_length=12)
     range = models.CharField(max_length=5)
