@@ -45,6 +45,7 @@ jobs:
           ADMIN_PATH: ci-only-admin/
           DEFAULT_FROM_EMAIL: "Spa 99 <ci@example.com>"
           SYSTEM_UNLOCK_CODE: "000000"  # dummy, CI only
+          AWS_STORAGE_BUCKET_NAME: ci-only-bucket  # dummy: prod refuses to start without a bucket
       - name: Tests
         run: python manage.py test
 
