@@ -277,7 +277,7 @@ PRIVACY = ("Privacy notice", "What Spa 99 collects, why, and the choices you hav
     ("body", "Privacy notice.", "What we collect when you use the Spa 99 website, why, and the choices you have. "
      "Plain words, nothing hidden.", "", ""),
     ("updated", "Last updated", UPDATED, "", ""),
-    ("ico", "ICO registration number", "", "", ""),  # fill in Control once registered; empty = placeholder on dev
+    ("ico", "ICO registration number", "ZC284282", "", ""),  # BML Spa 99 Limited, registered 2026-10-26
     ("hosting", "Hosting provider name", "", "", ""),  # fill in Control once chosen; empty = placeholder on dev
     *[(key, heading, body, "", "") for key, heading, body in PRIVACY_PARTS],
     ("contact", "Contact", "Write to {contact}, or by post to " + POSTAL + ".", "", ""),
