@@ -196,14 +196,16 @@ def gold_compare_card():
 
 
 def compare_cards(cards):
-    """The purchasable cards plus the Gold Card column last (same list for the table's picker, head and cells)."""
+    """The purchasable cards plus the Gold Card, then Single visit last on the right (Moishe, 2026-10-26).
+    Same list for the table's picker, head and cells."""
     gold = gold_compare_card()
-    return list(cards) + ([gold] if gold and all(c["slug"] != gold["slug"] for c in cards) else [])
+    cards = list(cards) + ([gold] if gold and all(c["slug"] != gold["slug"] for c in cards) else [])
+    return [c for c in cards if not c.get("is_single")] + [c for c in cards if c.get("is_single")]
 
 
 def compare_table(cards):
-    """Feature rows for the compare table: [{'label', 'cells': [text per card]}]. The Gold Card is added as the last column
-    (see compare_cards). Its price rows say 'By application' until an annual fee is set in System > Plans, then '£X a year'."""
+    """Feature rows for the compare table: [{'label', 'cells': [text per card]}]. The Gold Card is added before Single visit,
+    which sits last (see compare_cards). Its price rows say 'By application' until an annual fee is set in System > Plans, then '£X a year'."""
     cards = compare_cards(cards)
 
     def row(label, fn):
