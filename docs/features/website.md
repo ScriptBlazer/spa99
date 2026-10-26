@@ -101,7 +101,7 @@ Decisions are in docs/PROJECT.md (row dated 2026-10-26) and docs/SPA99_RULES.md 
 - **Gold in the compare table.** `pages.services.compare_cards(cards)` adds the Gold Card as the last column (the template reads it with `{% compare_columns cards as columns %}`). `Plan.annual_fee` (ex VAT, empty = not decided) is edited in System > Plans (More row of the Gold Card). Default £199 a year (2026-10-26, ex VAT). Empty shows "By application" in both price rows; set shows "£X a year" (inc VAT in the second row).
 - **Tier 3** card says "Unlimited" (smaller numeral, `.tier-num--word`).
 - **Address.** `SiteSettings.address_street` default "BML House, 99c Vale Road". Existing installs: edit it in the admin (no backfill written; a new live database gets it from the model default).
-- **Every visit.** The kit row is Towels, Robe, Slippers, Ice bucket, Toiletries (the ice bucket has no picture yet, so it shows on the swan tile). Free drinks and free ice lollies are pills on the Arrive step and in the Memberships "Every visit" line.
+- **Every visit.** The kit row is Towels, Robe, Slippers, Ice bucket, Toiletries (the ice bucket picture `ice-bucket` was added 2026-10-26; it is also the journey `ice_bucket` tile, via `JOURNEY_EXTRA_IMAGES` in `pages/services.py`). Free drinks and free ice lollies are pills on the Arrive step and in the Memberships "Every visit" line.
 
 ## To do for the booking build
 

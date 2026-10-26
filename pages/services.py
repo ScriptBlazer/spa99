@@ -482,6 +482,10 @@ def room_index():
     ]
 
 
+# Journey facility options that have no Facility row: option value -> (built image name, alt). 2026-10-26: Showers became Ice bucket.
+JOURNEY_EXTRA_IMAGES = {"ice_bucket": ("ice-bucket", "A wooden ice bucket on a bronze bracket beside the rain showers")}
+
+
 def journey_facility_images():
     """Option value (wet_sauna) -> {src, alt} for the journey tiles. src '' means the calm placeholder."""
     mapping = {}
@@ -494,6 +498,9 @@ def journey_facility_images():
         if not url and card["image_name"] and images.has_image(card["image_name"]):
             url = images.src(card["image_name"], 480)
         mapping[card["slug"].replace("-", "_")] = {"src": url, "alt": card["alt"]}
+    for value, (name, alt) in JOURNEY_EXTRA_IMAGES.items():  # options with no Facility row
+        if value not in mapping and images.has_image(name):
+            mapping[value] = {"src": images.src(name, 480), "alt": alt}
     return mapping
 
 
@@ -693,7 +700,7 @@ def signin_shell():
 # The slug is the Facility slug (and the photo name in the image manifest); the lounge has no Facility row.
 TOUR_ROOMS = [
     ("lounge", "Lounge", "The lounge, with the wide reef tank beside a long bench", "28% 55%"),
-    ("gym", "Gym", "The gym, free weights and machines in low warm light", "40% 55%"),
+    ("gym", "Gym", "The gym: a treadmill, an exercise bike, a dumbbell rack and a wall screen in low warm light", "50% 55%"),
     ("massage-room", "Massage room", "The massage room, leather chairs beside an oak slatted wall and the swan", "60% 60%"),
     ("kitchenette", "Kitchenette", "The kitchenette, a walnut counter and two caramel armchairs", "35% 55%"),
     ("relaxing-zone", "Relaxing zone", "The relaxing zone, with loungers and the swan on the wall", "55% 60%"),
@@ -701,6 +708,9 @@ TOUR_ROOMS = [
     ("dry-sauna", "Dry sauna", "The dry sauna, with pale wood benches in low light", "50% 55%"),
 ]
 TOUR_LOUNGE = TOUR_ROOMS[0][0]
+# A room whose tour photo is not its slug's render. 2026-10-26: the tour's gym is the small one (one treadmill, one bike,
+# one dumbbell rack, a wall screen); The spa page keeps the approved `gym` picture.
+TOUR_PHOTO_NAMES = {"gym": "gym-tour"}
 TOUR_CANVAS_KEYS = ("intro", "hint", "hint_tilt", "tilt")
 
 
@@ -727,7 +737,10 @@ def _tour_photo(slug, image):
             return image.url
         except ValueError:
             pass
-    return images.src(slug, 1600) if images.has_image(slug) else ""
+    name = TOUR_PHOTO_NAMES.get(slug, slug)
+    if not images.has_image(name):
+        name = slug
+    return images.src(name, 1600) if images.has_image(name) else ""
 
 
 def tour_rooms(copy=None):

@@ -1,8 +1,7 @@
-/* Gym (docs/design/VIRTUAL-TOUR.md 2.5, round 2: furnished). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
- * Shell 7.0 x 8.0 x 2.8 (x -3.5..3.5, z -5..3). West: smoked oak panels with the gold stacked lockup, a rubber floor zone with the free weights (dumbbell rack, power rack
- * with a barbell, two adjustable benches, kettlebells, plates, a cable machine at the north wall). East: a night window, three treadmills in a row facing it, two exercise
- * bikes and a rower. North: mirrors, and in the middle a short passage whose back wall has one door on to the massage room (then the kitchenette, the relaxing zone and the saunas). The way in is the
- * lounge door in the south wall (x 1.0). Everything repeated is instanced or merged per material, so the room stays at about 30 draw calls. */
+/* Gym (docs/design/VIRTUAL-TOUR.md 2.5; 2026-10-26 Moishe: a much smaller gym). Room module: no module statements, everything arrives in ctx (contract at the top of ../engine.js).
+ * Shell 7.0 x 8.0 x 2.8 (x -3.5..3.5, z -5..3). West: smoked oak panels with the gold stacked lockup and one dumbbell rack on a rubber mat. East: a walnut panel with a
+ * wall screen (off), one treadmill and one exercise bike facing it, and a shorter night window to the south. North: mirrors, and in the middle a short passage whose
+ * back wall has one door on to the massage room (then the kitchenette, the relaxing zone and the saunas). The way in is the lounge door in the south wall (x 1.0). */
 
 export async function build(scene, ctx) {
   const { THREE, K, T, S } = ctx, PI = Math.PI, WHITE = new THREE.Color(1, 1, 1);
@@ -58,11 +57,15 @@ export async function build(scene, ctx) {
     K.plane(lh * lock.aspect, lh, mark, -3.425, 1.55, -0.715, 'e');
   }
 
-  /* ----- east wall: a night window (dark glass, walnut mullions) the treadmills face ----- */
-  K.plane(5.6, 1.4, glass, 3.49, 1.55, -1.6, 'w');
-  for (let i = 0; i < 5; i++) K.box(0.05, 1.5, 0.06, walnut, 3.48, 1.55, -4.4 + i * 1.4);
-  K.box(0.05, 0.06, 5.7, walnut, 3.48, 2.27, -1.6); K.box(0.05, 0.06, 5.7, walnut, 3.48, 0.84, -1.6);
-  K.glowPlane(5.6, 1.4, 3.45, 1.55, -1.6, 'w', 0.12);
+  /* ----- east wall: a walnut panel with the wall screen (off) the treadmill and the bike face, then a shorter night window to the south ----- */
+  K.box(0.05, 2.6, 2.4, panel, 3.47, 1.3, -2.3, { tile: 1.5 });
+  K.box(0.04, 0.98, 1.68, iron, 3.43, 1.7, -2.3);
+  const tv = K.std(K.col('--color-iron').clone().multiplyScalar(0.55), { r: 0.12, m: 0.5, envMapIntensity: 1.2 });
+  K.plane(1.6, 0.9, tv, 3.405, 1.7, -2.3, 'w');
+  K.plane(3.2, 1.4, glass, 3.49, 1.55, 1.0, 'w');
+  for (const z of [-0.6, 1.0, 2.6]) K.box(0.05, 1.5, 0.06, walnut, 3.48, 1.55, z);
+  K.box(0.05, 0.06, 3.3, walnut, 3.48, 2.27, 1.0); K.box(0.05, 0.06, 3.3, walnut, 3.48, 0.84, 1.0);
+  K.glowPlane(3.2, 1.4, 3.45, 1.55, 1.0, 'w', 0.12);
 
   /* ----- machine helpers: a part is placed in a machine's local frame (local +x is its front), then turned by `a` about the vertical at (ox, oz) ----- */
   const at = (ox, oz, a) => {
@@ -85,7 +88,7 @@ export async function build(scene, ctx) {
     m.box(0.12, 0.24, 0.66, iron, 0.74, 1.22, 0); m.box(0.01, 0.12, 0.4, screen, 0.675, 1.24, 0); m.box(0.1, 0.05, 0.7, iron, 0.74, 1.05, 0);
     K.shadow(2.0, 1.0, x, z, 0.4);
   };
-  [-3.7, -2.55, -1.4].forEach((z) => treadmill(2.5, z));
+  treadmill(2.3, -2.9);
 
   // upright bike
   const bike = (x, z) => {
@@ -98,21 +101,10 @@ export async function build(scene, ctx) {
     m.box(0.05, 0.05, 0.05, iron, 0.2, 0.55, 0); m.box(0.05, 0.9, 0.05, iron, 0.0, 0.5, 0);
     K.shadow(1.3, 0.8, x, z, 0.4);
   };
-  bike(2.65, -0.15); bike(2.65, 0.75);
+  bike(2.5, -1.6);
 
-  // rower
-  const rower = (x, z) => {
-    const m = at(x, z, 0);
-    m.box(2.0, 0.05, 0.1, steel, 0, 0.26, 0); m.box(0.06, 0.26, 0.5, iron, -0.9, 0.13, 0); m.box(0.06, 0.26, 0.5, iron, 0.55, 0.13, 0);
-    m.box(0.3, 0.06, 0.26, padM, -0.3, 0.33, 0); m.cyl(0.24, 0.14, iron, 0.85, 0.5, 0, 'z', 18);
-    [-0.2, 0.2].forEach((s) => m.box(0.3, 0.02, 0.1, steel, 0.55, 0.42, s));
-    m.box(0.03, 0.5, 0.03, steel, 0.95, 0.85, 0); m.box(0.05, 0.04, 0.4, steel, 0.95, 1.1, 0); m.box(0.03, 0.12, 0.22, iron, 1.0, 0.95, 0); m.box(0.005, 0.07, 0.16, screen, 0.98, 0.95, 0);
-    K.shadow(2.3, 0.8, x, z, 0.38);
-  };
-  rower(2.4, 1.95);
-
-  // rubber floor zone for the free weights
-  K.put(new THREE.PlaneGeometry(2.65, 7.4).rotateX(-PI / 2), rubber, { x: -2.125, y: 0.006, z: -1.1 });
+  // a rubber mat under the dumbbell rack
+  K.put(new THREE.PlaneGeometry(1.4, 2.8).rotateX(-PI / 2), rubber, { x: -2.8, y: 0.006, z: -2.8 });
 
   // dumbbell rack on the west wall: two shelves, twelve dumbbells (heads instanced)
   {
@@ -125,62 +117,6 @@ export async function build(scene, ctx) {
     K.shadow(0.9, 2.2, -3.0, -2.8, 0.4);
   }
 
-  // power rack with a loaded barbell, on a platform
-  {
-    const m = at(-1.9, -2.4, -PI / 2);
-    m.box(1.7, 0.03, 2.4, rubber, 0, 0.02, 0);
-    [-0.55, 0.55].forEach((lx) => [-0.6, 0.6].forEach((lz) => m.box(0.07, 2.2, 0.07, iron, lx, 1.1, lz)));
-    [-0.6, 0.6].forEach((lz) => m.box(1.19, 0.07, 0.07, iron, 0, 2.2, lz)); [-0.55, 0.55].forEach((lx) => m.box(0.07, 0.07, 1.27, iron, lx, 2.2, 0));
-    [-0.55, 0.55].forEach((lx) => [-0.6, 0.6].forEach((lz) => m.box(0.12, 0.05, 0.1, steel, lx, 1.32, lz)));
-    [-0.6, 0.6].forEach((lz) => m.box(1.19, 0.05, 0.05, iron, 0, 0.45, lz));
-    m.cyl(0.016, 2.2, steel, 0, 1.38, 0, 'z', 8);
-    [-1, 1].forEach((s) => { [0.7, 0.76].forEach((lz) => m.cyl(0.22, 0.05, iron, 0, 1.38, s * lz, 'z', 20)); m.cyl(0.03, 0.04, steel, 0, 1.38, s * 0.82, 'z', 8); });
-    K.shadow(1.9, 2.2, -1.9, -2.4, 0.4);
-  }
-
-  // two adjustable benches, heads to the wall: one inclined, one flat
-  const bench = (x, z, tilt) => {
-    const m = at(x, z, PI);
-    m.box(0.5, 0.08, 0.3, padM, -0.2, 0.46, 0); m.box(1.2, 0.05, 0.06, iron, 0.05, 0.33, 0);
-    m.box(0.05, 0.05, 0.5, iron, -0.5, 0.03, 0); m.box(0.05, 0.05, 0.5, iron, 0.6, 0.03, 0);
-    m.box(0.05, 0.3, 0.05, iron, -0.45, 0.18, 0); m.box(0.05, 0.3, 0.05, iron, 0.55, 0.18, 0);
-    const [bx, bz] = m.wp(0.12 + 0.36 * Math.cos(tilt), 0);                                                 // the back pad hinges at the seat and rises toward the head
-    K.put(new THREE.BoxGeometry(0.72, 0.08, 0.3), padM, { x: bx, y: 0.46 + 0.36 * Math.sin(tilt), z: bz, ry: PI, rz: tilt });
-    if (tilt) m.box(0.04, 0.3, 0.04, iron, 0.4, 0.3, 0, { rz: -0.5 });
-    K.shadow(1.5, 0.7, x, z, 0.36);
-  };
-  bench(-1.55, 0.3, 0.7); bench(-1.55, 1.6, 0);
-
-  // kettlebells: a low rack on the west wall (five) and three on the floor, bodies instanced, handles merged
-  {
-    const m = at(-3.2, 1.2, 0), kb = [];
-    m.box(0.5, 0.04, 1.5, iron, 0, 0.25, 0); [-0.7, 0.7].forEach((lz) => [-0.22, 0.22].forEach((lx) => m.box(0.04, 0.25, 0.04, iron, lx, 0.125, lz)));
-    for (let i = 0; i < 5; i++) kb.push([-3.2, 0.25 + 0.02 + 0.105, 1.2 - 0.6 + i * 0.3]);
-    [[-2.7, 2.4], [-2.4, 2.5], [-2.05, 2.4]].forEach(([x, z]) => kb.push([x, 0.105 + 0.006, z]));
-    const handle = (x, y, z) => K.put(new THREE.TorusGeometry(0.06, 0.016, 6, 14), steel, { x, y: y + 0.17, z, ry: PI / 2 });
-    kb.forEach(([x, y, z]) => handle(x, y, z));
-    K.inst(new THREE.SphereGeometry(0.105, 14, 10), iron, kb.length, (i, o) => o.position.set(...kb[i]));
-    K.shadow(0.8, 1.8, -3.15, 1.2, 0.38);
-  }
-
-  // plates: two stacks on the floor by the rack (instanced discs of two sizes)
-  {
-    const pl = [], st = (x, z, n, sc) => { for (let i = 0; i < n; i++) pl.push([x, 0.012 + i * 0.03, z, sc]); };
-    st(-0.95, -4.0, 5, 1.0); st(-0.95, -3.45, 4, 0.82);
-    K.inst(new THREE.CylinderGeometry(0.225, 0.225, 0.028, 22), iron, pl.length, (i, o) => { o.position.set(pl[i][0], pl[i][1], pl[i][2]); o.scale.set(pl[i][3], 1, pl[i][3]); });
-    K.shadow(1.1, 1.8, -0.95, -3.7, 0.4);
-  }
-
-  // cable machine at the north wall: two uprights, beam, weight stacks, pulleys, cables, two handles (front faces south)
-  {
-    const m = at(-2.4, -4.55, -PI / 2);
-    [-0.65, 0.65].forEach((lz) => { m.box(0.08, 2.3, 0.08, iron, 0.1, 1.15, lz); m.box(0.8, 0.04, 0.12, iron, 0, 0.02, lz); m.box(0.3, 1.2, 0.3, iron, -0.25, 0.65, lz * 0.9); m.box(0.28, 0.9, 0.02, steel, -0.09, 0.62, lz * 0.9); });
-    m.box(0.1, 0.08, 1.38, iron, 0.1, 2.3, 0);
-    [-0.65, 0.65].forEach((lz) => [2.2, 0.35].forEach((ly) => m.cyl(0.07, 0.03, steel, 0.17, ly, lz, 'z', 14)));
-    [-0.65, 0.65].forEach((lz) => m.cyl(0.004, 1.85, steel, 0.17, 1.28, lz, 'y', 4));
-    [-0.65, 0.65].forEach((lz) => m.box(0.03, 0.03, 0.2, steel, 0.17, 0.35, lz));
-    K.shadow(1.1, 1.8, -2.35, -4.4, 0.4);
-  }
   K.flush();
 
   /* ----- doorways seen through: the lounge (south) and, at the far end, the massage room ----- */
