@@ -37,3 +37,8 @@
 {$SYSTEM_DOMAIN} {
 	import app
 }
+
+# www goes to the bare domain (needs a www DNS record pointing here too).
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}

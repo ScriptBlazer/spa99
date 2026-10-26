@@ -11,7 +11,7 @@ from pathlib import Path
 from . import mailbox
 from .kit import (
     CONTROL, NEW_PASSWORD, OFFICE, PASSWORD, RESET_PASSWORD, SITE, STAFF, SYSTEM, UNLOCK_CODE, WORKSPACE_DIR, answer_journey,
-    apply_gold, confirm_office_modal, dbtool, fill_date_of_birth, form_errors, manage, no_horizontal_overflow, register_member,
+    apply_gold, approve_on_application_page, confirm_office_modal, dbtool, fill_date_of_birth, form_errors, manage, no_horizontal_overflow, register_member,
     problems_modal, sign_in, sign_in_fails, tick, verify_email_link,
 )
 
@@ -154,22 +154,19 @@ def gold_approved(w):
         assert dbtool("gold", email)["status"] == "new"
     with w.step("The applicant gets the thank-you email", visitor_page):
         mailbox.wait_for(email, "Gold Card application")
-    with w.step("The approver gets the application email with a one-tap approve link", visitor_page):
+    with w.step("The approver gets the application email with a Review application link", visitor_page):
         message = mailbox.wait_for(barry["email"], f"Gold Card application: {first} {last}")
-        approve_url = mailbox.link(message, "/approve/confirm/")
+        approve_url = mailbox.link(message, "?t=")
         assert approve_url.startswith(OFFICE), f"The approve link does not point at the Office: {approve_url}"
     office = w.page()
-    with w.step("The approver taps the link: sign in, then the confirm page", office):
+    with w.step("The approver taps the link: sign in, then the full application page", office):
         office.goto(approve_url)
         office.wait_for_url(re.compile(r"/login/"))
         submit_login_form(office, barry["email"], PASSWORD)
-        office.wait_for_selector("[data-gold-confirm]")
-        assert f"{first} {last}" in office.locator("[data-gold-confirm]").inner_text()
-    with w.step("Approve and send invite", office):
-        with office.expect_navigation():
-            office.locator(".o-confirm-go").click()
         office.wait_for_selector("[data-gold-decision]")
-        assert "Approved" in office.locator("[data-gold-decision]").inner_text()
+        assert f"{first} {last}" in office.locator("h1").inner_text()
+    with w.step("Approve and invite on the application page", office):
+        approve_on_application_page(office)
         assert dbtool("gold", email)["status"] == "approved"
     with w.step("The approval email (invite) arrives", office):
         invite = mailbox.wait_for(email, "Gold Card is approved")
@@ -229,8 +226,8 @@ def gold_declined(w):
     with w.step("The application is declined and the person is not Gold", office):
         status = dbtool("gold", email)
         assert status["status"] == "declined" and not status["has_user"], f"Database says {status}"
-        office.goto(f"{OFFICE}/gold/{application_id}/approve/confirm/")
-        assert "declined" in office.locator("[data-confirm-state]").inner_text().lower(), "The approve page still offers to approve"
+        office.goto(f"{OFFICE}/gold/{application_id}/")
+        assert office.locator("[data-gold-decision] [data-approve]").count() == 0, "The application page still offers to approve"
         office.goto(f"{OFFICE}/gold/?status=declined")
         assert office.locator("[data-gold-row]", has_text=f"{first} {last}").count() == 1
     with w.step("Emails: the applicant got the thank-you only (this app sends no decline email and no invite)", office):

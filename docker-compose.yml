@@ -24,6 +24,7 @@ services:
     env_file: .env
     environment:
       APP_VERSION: ${APP_TAG}  # Sentry release
+      DJANGO_SETTINGS_MODULE: config.settings.prod  # beats .env, so a copied dev line can never run live on dev settings
     command: ["web"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/', timeout=4)"]
@@ -38,6 +39,7 @@ services:
     env_file: .env
     environment:
       APP_VERSION: ${APP_TAG}  # Sentry release
+      DJANGO_SETTINGS_MODULE: config.settings.prod
     command: ["worker"]
     depends_on:
       web:

@@ -218,6 +218,7 @@ Q_CLUSTER = {
     "workers": 2,
     "timeout": 120,
     "retry": 180,
+    "max_attempts": 3,  # a task that keeps dying is not retried forever (django-q2's default 0 = forever)
     "queue_limit": 50,
     "bulk": 5,
     "catch_up": False,
