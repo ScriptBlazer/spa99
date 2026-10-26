@@ -47,7 +47,7 @@ JOURNEY_SUMMARY = [
     ("time", "When he would come"),
     ("frequency", "How often"),
     ("facilities", "Facilities he wants"),
-    ("company", "Alone or with someone"),
+    ("company", "Alone or with a friend"),
     ("industry", "What he does"),
     ("heard_via", "How he heard about us"),
 ]

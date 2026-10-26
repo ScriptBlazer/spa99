@@ -33,7 +33,7 @@ Answers already given in the journey are reused, never asked twice.
 - Referred by (optional)
 
 **Spa interest** (from the journey if done, otherwise a short version)
-- When, how often, facilities, alone or with someone
+- When, how often, facilities, alone or with a friend
 
 **Anything else** (optional note)
 

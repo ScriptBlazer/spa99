@@ -28,7 +28,7 @@ Every answer is saved the moment it's given, from the first tap, even if the vis
 - Wet sauna · Dry sauna · Cold plunge · Showers · Relaxing zone · Gym · Massage room · Kitchenette / time to unwind
 
 **Screen 3 — Company**
-- Alone, or sometimes with a friend? Alone · Sometimes with someone (two answers only: guest visits are Tier 3 and Gold only, GST-01; "Often with someone" was retired 2026-10-23, kept inactive so old answers keep their label)
+- Alone, or sometimes with a friend? Alone · Sometimes with a friend (two answers only: guest visits are Tier 3 and Gold only, GST-01; "Often with a friend" was retired 2026-10-23, kept inactive so old answers keep their label)
 
 **Screen 4 — You**
 - What do you do? (tiles): Property · Finance · Business owner · Law · Medical · Tech · Creative · Other
@@ -52,7 +52,7 @@ Each option carries points per plan, stored in data. The plan with the most poin
 | "Most days" | Strong towards Tier 3 |
 | "2–3 times a week" | Towards Tier 2; Tier 3 if also evenings + guests |
 | "Once a week" / "Now and then" | Towards Tier 1 (daytime) or Tier 2 (evenings) |
-| "Sometimes with someone" | Towards Tier 3 (guest visits, Tier 3 and Gold only) |
+| "Sometimes with a friend" | Towards Tier 3 (guest visits, Tier 3 and Gold only) |
 | Ties | Prefer Tier 2 (MEM-03) |
 
 Points, constraints and tie-break are editable in Control. Plans and their features (visits, hours, guests) come from `plans`, so the reasons text updates when plans change.

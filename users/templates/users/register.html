@@ -15,7 +15,7 @@
         <p class="register-lead">{{ r.intro.body }}</p>
         {% if cards %}
         <div class="plan-card" data-plan-panel>
-          <p class="plan-eyebrow" data-plan-eyebrow data-suggested="{{ suggested_plan }}" data-suggested-text="Suggested by your answers">{% if chosen and chosen == suggested_plan %}Suggested by your answers{% else %}Your membership{% endif %}</p>
+          <p class="plan-eyebrow" data-plan-eyebrow data-suggested="{{ suggested_plan }}" data-suggested-text="Based on your answers">{% if chosen and chosen == suggested_plan %}Based on your answers{% else %}Your membership{% endif %}</p>
           <div class="plan-text" data-plan-text aria-live="polite">
             {% for card in cards %}{% if card.slug == chosen %}
             <div data-plan-body>

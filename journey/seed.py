@@ -27,7 +27,7 @@ FACILITIES = [
 COMPANY = [
     ("alone", "Alone (Time to myself.)", {T2: 1}, ""),
     # Guest visits are Tier 3 and Gold only (GST-01), so "sometimes" leans to Tier 3. "Often" was retired (2026-10-23).
-    ("sometimes", "Sometimes with someone (A friend now and then.)", {T3: 3}, "Sometimes with a friend"),
+    ("sometimes", "Sometimes with a friend (Now and then.)", {T3: 3}, "Sometimes with a friend"),
 ]
 INDUSTRY = [
     ("property", "Property"), ("finance", "Finance"), ("business_owner", "Business owner"), ("law", "Law"),
@@ -46,12 +46,12 @@ HEARD_VIA = [
 ]
 
 GUEST_COMPANY = ["sometimes", "often"]  # "often" was retired (2026-10-23); old sessions keep their points
-GUEST_RULES = {  # 2026-10-23: "Sometimes with someone" never yields Tier 1 and wins ties for Tier 3
-    "Sometimes with someone: not Tier 1": {
+GUEST_RULES = {  # 2026-10-23: "Sometimes with a friend" never yields Tier 1 and wins ties for Tier 3
+    "Sometimes with a friend: not Tier 1": {
         "kind": SuggestionRule.EXCLUDE, "order": 1, "plan_slugs": [T1],
         "conditions": [{"question": "company", "any_of": GUEST_COMPANY}],
     },
-    "Sometimes with someone: tie goes to Tier 3": {
+    "Sometimes with a friend: tie goes to Tier 3": {
         "kind": SuggestionRule.TIE_BREAK, "order": 3, "plan_slugs": [T3, T2, T1],
         "conditions": [{"question": "company", "any_of": GUEST_COMPANY}],
     },

@@ -119,7 +119,7 @@ PAGES = {
         ("screen_2", "What draws you.", "The parts of the spa you'd use.", "", ""),
         ("screen_3", "Company.", "Some come alone. Some bring a friend.", "", ""),
         ("screen_4", "About you.", "Optional, and only to suggest the right fit.", "", ""),
-        ("result_label", "", "Your membership", "", ""),
+        ("result_label", "", "Based on your answers", "", ""),
         ("why", "Why it suits you", "", "", ""),
         ("result_cta", "", "", "Register for {plan}", "/register/"),
         ("change_answers", "", "", "Start again", ""),  # same wording as start_again; the page reads start_again

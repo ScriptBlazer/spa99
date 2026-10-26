@@ -40,6 +40,10 @@ written by hand:
   (review round, same day) privacy parts still exactly as first written get the corrected text (Sentry wording, change
   history, Gold consents, optional details, tour storage, team sign-ins)
 
+- (2026-10-26) "with someone" becomes "with a friend" (journey Company options and their reasons, the two guest suggestion
+  rule names); the journey result label "Your membership" becomes "Based on your answers". Exact old wording only, so
+  hand edits are kept; saved one by one so the change is in the history
+
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 from collections import Counter
 
@@ -316,6 +320,7 @@ OLD_SECTION_TEXT = [  # page key, section key, field, old value, new value
     ("journey", "result_cta", "cta_label", "Register interest in {plan}", "Register for {plan}"),
     ("book", "placeholder", "cta_label", "Register interest", "Register"),
     ("register", "intro", "heading", "Register interest", "Register"),
+    ("journey", "result_label", "body", "Your membership", "Based on your answers"),  # 2026-10-26
 ]
 # (page key, field, old value, new value) for the Page row itself
 OLD_PAGE_TEXT = [
@@ -325,6 +330,16 @@ OLD_PAGE_TEXT = [
 # Retired, never deleted: hidden from new journeys, old answers keep their label. (question, value, old label)
 OLD_RETIRED_OPTIONS = [("company", "often", "Often with someone (Most visits.)"), ("heard_via", "instagram", "Instagram"),
                        ("heard_via", "walking_past", "Walking past")]
+# 2026-10-26: "with someone" becomes "with a friend". (question, value, field, old, new); exact old wording only.
+OLD_FRIEND_WORDING = [
+    ("company", "sometimes", "label", "Sometimes with someone (A friend now and then.)", "Sometimes with a friend (Now and then.)"),
+    ("company", "sometimes", "reason", "Sometimes with someone", "Sometimes with a friend"),
+    ("company", "often", "label", "Often with someone (Most visits.)", "Often with a friend (Most visits.)"),
+    ("company", "often", "reason", "Often with someone", "Often with a friend"),
+]
+OLD_TO_NEW_LABEL = {old: new for _, _, field, old, new in OLD_FRIEND_WORDING if field == "label"}
+OLD_FRIEND_RULES = {"Sometimes with someone: not Tier 1": "Sometimes with a friend: not Tier 1",
+                    "Sometimes with someone: tie goes to Tier 3": "Sometimes with a friend: tie goes to Tier 3"}
 OLD_SOMETIMES_POINTS = {"tier-2": 1, "tier-3": 1}
 
 
@@ -333,7 +348,7 @@ def _journey_options_2026_10_23():
     changed = Counter()
     for key, value, label in OLD_RETIRED_OPTIONS:
         changed["journey.Option (retired)"] += Option.objects.filter(
-            question__key=key, value=value, label=label, active=True).update(active=False)
+            question__key=key, value=value, label__in=[label, OLD_TO_NEW_LABEL.get(label, label)], active=True).update(active=False)
     for option in Option.objects.filter(question__key="company", value="sometimes", plan_points=OLD_SOMETIMES_POINTS):
         option.plan_points = {"tier-3": 3}
         option.save()
@@ -358,6 +373,22 @@ def _journey_options_2026_10_23():
     return +changed  # drop zero counts
 
 
+def _with_a_friend_2026_10_26():
+    """Journey options and guest rules: "with someone" becomes "with a friend" (saved via the model, so history records it)."""
+    changed = Counter()
+    for question, value, field, old, new in OLD_FRIEND_WORDING:
+        for option in Option.objects.filter(question__key=question, value=value, **{field: old}):
+            setattr(option, field, new)
+            option.save()
+            changed["journey.Option (with a friend wording)"] += 1
+    for old, new in OLD_FRIEND_RULES.items():
+        for rule in SuggestionRule.objects.filter(name=old):
+            rule.name = new
+            rule.save()
+            changed["journey.SuggestionRule (with a friend wording)"] += 1
+    return changed
+
+
 def _journey_and_gold_2026_10_23():
     """'Choose at least one.' on Your time / What draws you (and the rule behind it), Start again, Gold 'About you.'"""
     changed = Counter()
@@ -379,6 +410,7 @@ def _journey_and_gold_2026_10_23():
             setattr(page, field, new)
             page.save()
             changed["content.Page (Register wording)"] += 1
+    changed.update(_with_a_friend_2026_10_26())  # before the options step, so renamed rules are found, not re-created
     changed.update(_journey_options_2026_10_23())
     return changed
 

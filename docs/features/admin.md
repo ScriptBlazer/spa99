@@ -75,7 +75,7 @@ Filters: date range, source, completed vs not.
 | Demand by time | How many want early morning / daytime / evening / late night, weighted by frequency → expected visits per period per week |
 | Facilities | % interested in each facility (e.g. how many want the gym at all) |
 | Tier mix | Suggested vs chosen tiers; projected monthly revenue using current prices |
-| Company | Alone / sometimes / often with someone (guest demand) |
+| Company | Alone / sometimes / often with a friend (guest demand) |
 | Industries | Breakdown; property share; Gold potential spread |
 | Sources | Heard via, referrer, UTM |
 | Trend | Registrations and Gold applications per day/week |
