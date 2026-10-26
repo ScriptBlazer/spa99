@@ -121,8 +121,8 @@ Images are built by GitHub Actions on a version tag (`1.2.3`, no `v`) after the 
 Check `https://<domain>/health/` afterwards.
 Client IP: with Cloudflare in front, the `Caddyfile` trusts Cloudflare's ranges only (`trusted_proxies`), takes the visitor IP from
 `CF-Connecting-IP` (Cloudflare overwrites it, so a visitor cannot fake it) and passes it to the app as `X-Client-IP`. Without Cloudflare
-(DNS only) the same file still works: the IP is then the connection's. Re-check the range list at <https://www.cloudflare.com/ips/> now and then. GitHub Actions pushes the image to `ghcr.io/scriptblazer/spa99:<tag>` with its built-in token (nothing to set up).
-The server logs in once with `docker login ghcr.io` using a GitHub token that has `read:packages`.
+(DNS only) the same file still works: the IP is then the connection's. Re-check the range list at <https://www.cloudflare.com/ips/> now and then. GitHub Actions pushes the image to Docker Hub as `<user>/spa99:<tag>`; repo secrets `DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN` (Docker Hub access token). The server logs in once with `docker login` (a read-only token).
 
 ## Project layout
 
