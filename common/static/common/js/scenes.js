@@ -31,8 +31,8 @@ export function lineRise(el, { trigger = true, delay = 0 } = {}) {
     onSplit: (self) => {
       gsap.set(el, { opacity: 1 });
       // Hide the lines under their masks right now. A from() with a delay leaves them in place until the delay has run, so the heading flashed, dropped, then rose.
-      gsap.set(self.lines, { yPercent: 105 });
-      return gsap.fromTo(self.lines, { yPercent: 105 }, {
+      gsap.set(self.lines, { yPercent: 125 });
+      return gsap.fromTo(self.lines, { yPercent: 125 }, {
         yPercent: 0, stagger: 0.08, delay, immediateRender: true,
         scrollTrigger: trigger ? { trigger: el, start: 'top 80%', once: true } : undefined,
       });
@@ -260,8 +260,10 @@ SCENES.hero = (el, { desktop }) => {
   // the living still (one cycle per 48s), the optional video, (no Pause control: removed 2026-10-23)
   const media = q('.window-media');
   const still = q('.hero-still-wrap');
-  const loops = [gsap.to(still, { scale: 1.03, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' })];
   const video = q('.hero-video');
+  // With a video the poster holds still (it is the video's first frame, framed identically), so the hand-over is invisible; the still breathes only without one.
+  const willPlay = !!video?.dataset.sources && !navigator.connection?.saveData;
+  const loops = willPlay ? [] : [gsap.to(still, { scale: 1.03, duration: 24, yoyo: true, repeat: -1, ease: 'sine.inOut' })];
   let inView = true, playing = false;
   // The video loops by itself (v3, 2026-10-23: a 14 s file whose last 2 s cross-fade into its start, so the native loop is invisible).
   const sync = () => {

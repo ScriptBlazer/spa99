@@ -75,12 +75,12 @@ html.lenis, html.lenis body { height: auto; }
 .hero-first { position: relative; min-height: 100svh; display: flex; align-items: flex-end; padding: var(--header-h) 0 calc(4.5rem + env(safe-area-inset-bottom)); }
 .hero-window, .window-media { position: absolute; inset: 0; overflow: hidden; }
 .hero-window .frame-tint { display: none; }
-.hero-window .hero-still-wrap { inset: -9% 0 0 0; height: 109%; }                       /* phone: lifts the tank clear of the words under it */
+.hero-window .hero-still-wrap, .hero-window .hero-video-wrap { inset: -9% 0 0 0; height: 109%; }   /* phone: lifts the tank clear of the words under it (the video wrap too, so the video is framed exactly like its poster) */
 .hero-still { object-position: 40% 52%; }
 .hero-video-wrap { position: absolute; inset: 0; will-change: transform; } /* the end-of-video drift (scenes.js) moves this, never the video */
-.hero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1200ms var(--ease-soft); }
+.hero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 40% 52%; opacity: 0; transition: opacity 1200ms var(--ease-soft); }   /* same crop as .hero-still */
 .hero-video.is-playing { opacity: 1; }
-.window-media.has-video .hero-still-wrap { opacity: 0; transition: opacity 1200ms var(--ease-soft); }
+/* the poster stays put under the video (never faded out): two half-transparent layers would dip to the espresso behind them mid-fade */
 /* the veil: espresso under the header and under the words, clear over the tank. Cream on it is >= 4.5:1 over the brightest pixels (measured, see IMMERSIVE-R2 round 3) */
 .hero-veil { position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(to bottom, var(--color-veil) 0, var(--color-veil) var(--header-h), rgb(73 46 33 / 0) calc(var(--header-h) + 4rem)),
@@ -102,8 +102,8 @@ html.lenis, html.lenis body { height: auto; }
 .hero-target .frame-media .photo { object-position: 45% 52%; }
 @media (min-width: 64em) {
   .hero-first { align-items: center; padding-block: var(--header-h) var(--space-5); }
-  .hero-window .hero-still-wrap { inset: 0; height: 100%; }
-  .hero-still { object-position: 50% 54%; }
+  .hero-window .hero-still-wrap, .hero-window .hero-video-wrap { inset: 0; height: 100%; }
+  .hero-still, .hero-video { object-position: 50% 54%; }
   .hero-veil { background: linear-gradient(to bottom, var(--color-veil) 0, var(--color-veil) var(--header-h), rgb(73 46 33 / 0) calc(var(--header-h) + 4rem)),
                            linear-gradient(to right, var(--color-veil) 0, var(--color-veil) calc(var(--bleed) + 25rem), rgb(73 46 33 / 0) calc(var(--bleed) + 45rem)); }
   .hero-copy { max-width: 32rem; }
@@ -341,7 +341,7 @@ html.motion .hero-words { opacity: 0; visibility: hidden; align-self: start; }
 html.motion .scene-failed .hero-words { opacity: 1; visibility: visible; }
 /* first paint: the image fades up from espresso while the picture settles (CSS, so the first image never waits for scripts) */
 html.motion .hero-window { animation: frame-in 1200ms var(--ease-soft) backwards; }
-html.motion .hero-still { animation: media-in 1600ms var(--ease-soft) backwards; }
+html.motion .hero-still, html.motion .hero-video { animation: media-in 1600ms var(--ease-soft) backwards; }   /* the video settles in step with its poster, so the cross-fade never shows two scales */
 @keyframes frame-in { from { opacity: 0; } }
 @keyframes media-in { from { transform: scale(1.04); } }
 html.motion .hero-first .glow { z-index: 1; }
@@ -593,7 +593,7 @@ html.motion .sp-sec .glow, html.motion .door-scene .glow { z-index: 0; }
 html.motion .door-scene:not(.scene-failed) { min-height: 100svh; }
 html.motion .door-window { display: block; position: absolute; z-index: 0; top: 0; left: 0; width: 100%; height: 100svh; overflow: hidden; animation: frame-in 1200ms var(--ease-soft) backwards; }
 html.motion .door-window .frame-tint { opacity: 0; }                                   /* the lights come up as it lands (scenes) */
-html.motion .door-still { animation: media-in 1600ms var(--ease-soft) backwards; }
+html.motion .door-still, html.motion .door-video { animation: media-in 1600ms var(--ease-soft) backwards; }   /* the video settles in step with its poster */
 html.motion .door-target .frame-media, html.motion .door-target .frame-tint { display: none; }   /* only a measuring box: the window is the picture */
 html.motion .frame-media, html.motion .window-media, html.motion .sp-detail, html.motion .sp-thumb { will-change: transform; }
 /* if the door scene fails: no full-screen picture, the frame shows its own picture */
@@ -643,7 +643,7 @@ html.motion .door-scene.scene-failed .door-target .frame-media, html.motion .doo
 /* the robe's steam video (2026-10-23): framed exactly like its poster (the still under it), so the hand-over is invisible */
 .opener-scene[data-opener="robe"] .door-video { object-position: 64% 40%; }
 @media (max-width: 47.99em) { .opener-scene[data-opener="robe"][data-portrait] .door-video { object-position: 50% 30%; } }
-.window-media.has-video .door-zoom { opacity: 0; transition: opacity 1200ms var(--ease-soft); }
+/* the poster (.door-zoom) stays under the video; it is never faded out (a cross-fade of two half-transparent layers dips to the espresso behind) */
 
 /* ---------- the moments ---------- */
 .sp-bandwrap { position: relative; }
