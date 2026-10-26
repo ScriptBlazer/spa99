@@ -394,3 +394,22 @@ class NoPaymentAndDiscountLineTests(TestCase):
         SiteSettings.objects.update(discount_contact_url="")
         send_welcome_email(user.pk)
         self.assertNotIn("WhatsApp", mail.outbox[-1].body)
+
+
+class RegisterPrefillTests(TestCase):
+    """2026-10-26: the email given at the journey gate pre-fills Register (still editable)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_journey_email_prefills_the_register_form(self):
+        from journey.models import JourneySession
+
+        session = JourneySession.objects.create(lead_email="daniel@example.com", lead_at=timezone.now())
+        self.client.cookies[journey.COOKIE_NAME] = session.key
+        html = self.client.get("/register/").content.decode()
+        self.assertIn('value="daniel@example.com"', html)
+
+    def test_no_journey_email_leaves_it_empty(self):
+        self.assertNotIn("daniel@example.com", self.client.get("/register/").content.decode())

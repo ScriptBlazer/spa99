@@ -214,7 +214,11 @@ def register(request):
     else:
         from mailings import invites  # the personal invite link left the invite in the session: it only pre-fills name and email
 
-        form, status = SignUpForm(initial={"plan": plan_slug, **invites.prefill(request.session.get(invites.SESSION_KEY))}), 200
+        initial = {"plan": plan_slug}
+        if session and session.lead_email:  # he gave his email at the journey in this browser: pre-fill it, still editable
+            initial["email"] = session.lead_email
+        initial.update(invites.prefill(request.session.get(invites.SESSION_KEY)))  # a personal invite wins
+        form, status = SignUpForm(initial=initial), 200
     context = {"form": form, "plans": plans, "selected_plan": plan_slug, "suggested_plan": suggested, "from_journey": bool(session and session.completed),
                "register_sale": sale_services.register_offer(request=request)}
     return render(request, "users/register.html", context, status=status)
