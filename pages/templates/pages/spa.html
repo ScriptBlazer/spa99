@@ -55,9 +55,15 @@
 {% for s in sections %}
   {% if s.kind == "moment" %}
     {# the amenity moments, placed by the data (AMENITIES.md): a moment without a built picture never reaches here #}
-    {% if s.moment.key == "shower" %}{% include "pages/_spa_moment_shower.html" with m=s.moment %}
+    {% if s.moment.key == "shower" %}{% include "pages/_spa_moment_shower.html" with m=s.moment companion=s.companion %}
     {% elif s.moment.key == "slippers" %}{% include "pages/_spa_moment_inset.html" with m=s.moment %}
     {% else %}{% include "pages/_spa_moment_band.html" with m=s.moment over=False %}{% endif %}
+  {% elif s.kind == "aside" %}
+    {# a small companion room with no moment to sit beside (the shower moment is not built): its own quiet strip #}
+    <section class="scene sp-sec sp-aside on-dark" data-scene="moment" data-glow aria-label="{{ s.companion.name }}">
+      <div class="glow" aria-hidden="true"></div>
+      <div class="container grid sp-aside-grid">{% include "pages/_spa_companion.html" with c=s.companion plain=True %}</div>
+    </section>
   {% elif s.kind == "feature" %}
     {% cycle "a" "b" "c" as ratio silent %}
     {% include "pages/_spa_feature.html" with s=s ratio=ratio %}

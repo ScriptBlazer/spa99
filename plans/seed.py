@@ -120,7 +120,7 @@ FACILITY_SPA_PAGE = {
     "massage-room": {"display": "feature", "image_name": "massage-room", "image_focus": "50% 50%", "facts": ["Part of your visit"]},
     "gym": {"display": "compact", "image_name": "gym", "image_focus": "40% 55%",
             "facts": ["Free weights", "Machines", "Part of your visit"]},
-    "kitchenette": {"display": "tile", "image_name": "kitchenette", "image_focus": "55% 60%",
+    "kitchenette": {"display": "companion", "image_name": "kitchenette", "image_focus": "55% 60%",
                     "facts": ["Tea and coffee", "Somewhere to sit"]},
 }
 

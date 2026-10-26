@@ -524,10 +524,29 @@ PRE_ICE_BUCKET_ORDER = {"dry-sauna": 1, "wet-sauna": 2, "cold-plunge": 3, "showe
                         "massage-room": 7, "gym": 8}
 
 
+def _small_kitchenette(changed):
+    """2026-10-26: the kitchenette is the small companion beside the "After the heat." moment, the ice bucket a tile in the
+    first group. Changed only while each still has its seeded picture and facts and its old seeded display."""
+    seed = plans_seed.FACILITY_SPA_PAGE["kitchenette"]
+    kitchenette = Facility.objects.filter(slug="kitchenette").first()
+    if (kitchenette and kitchenette.display == Facility.TILE and kitchenette.image_name == seed["image_name"]
+            and kitchenette.facts == seed["facts"]):
+        kitchenette.display = Facility.COMPANION
+        kitchenette.save()
+        changed["plans.Facility (kitchenette is a small companion)"] += 1
+    ice = Facility.objects.filter(slug="ice-bucket").first()
+    ice_seed = plans_seed.FACILITY_SPA_PAGE["ice-bucket"]
+    if ice and ice.display == Facility.COMPANION and ice.image_name == ice_seed["image_name"] and ice.facts == ice_seed["facts"]:
+        ice.display = Facility.TILE
+        ice.save()
+        changed["plans.Facility (ice bucket is a tile)"] += 1
+
+
 def _ice_bucket_2026_10_26():
     """The Ice bucket room: created when missing, after the showers. The rooms after it move down one place only while
     the orders are still exactly the seeded ones from before (a rearranged set is left alone)."""
     changed = Counter()
+    _small_kitchenette(changed)
     if Facility.objects.filter(slug="ice-bucket").exists():
         return changed
     facilities = list(Facility.objects.all())

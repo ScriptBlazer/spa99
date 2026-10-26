@@ -470,6 +470,10 @@ html.motion .frame-media, html.motion .window-media, html.motion .hero-window, h
 .sp-thumb { aspect-ratio: 4 / 5; }
 .sp-cname { font-size: var(--text-lg); line-height: var(--leading-tight); }
 .sp-companion-copy p { margin-top: var(--space-1); }
+/* the companion beside a moment ("After the heat."), and on its own when no moment is built */
+.sp-shower-words .sp-companion { margin-top: var(--space-5); max-width: 22rem; }
+.sp-aside-grid > .sp-companion { grid-column: 1 / -1; margin-top: 0; max-width: 22rem; }
+@media (min-width: 64em) { .sp-aside-grid > .sp-companion { grid-column: 2 / span 4; } }
 
 /* the swan type tile: a room with no picture yet reads as a deliberate brand tile */
 .type-tile { position: absolute; inset: 0; display: grid; place-items: center; color: var(--color-gold);

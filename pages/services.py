@@ -393,8 +393,9 @@ def _tile_rows(tiles):
 def spa_sections(cards):
     """Group facility cards into the layouts of The spa page (docs/design/SPA-PAGE.md 3.1).
     Returns a list of {"kind": "feature", "side": "left"|"right", "feature": card, "companion": card|None}
-    and {"kind": "tiles", "tiles": [cards]}. A feature takes the companion straight after it; any other companion
-    is shown as a tile. Runs of tiles become rows of 2 to 4 (a single tile stays alone). The first feature is on
+    and {"kind": "tiles", "tiles": [cards]}. A feature takes the companion straight after it. A companion with no
+    feature before it (the kitchenette) is {"kind": "aside", "companion": card}, which place_moments tucks in with
+    the shower moment. Runs of tiles become rows of 2 to 4 (a single tile stays alone). The first feature is on
     the left (the opening frame is on the right) and sides alternate. Hiding or moving rooms never breaks this."""
     sections, tiles, features = [], [], 0
 
@@ -407,8 +408,12 @@ def spa_sections(cards):
     while index < len(cards):
         card = cards[index]
         index += 1
+        if card["display"] == Facility.COMPANION:
+            flush()  # a companion with no feature before it: a small aside, not a tile
+            sections.append({"kind": "aside", "companion": card})
+            continue
         if card["display"] not in (Facility.FEATURE, Facility.COMPACT):
-            tiles.append(card)  # tiles, and companions with no feature before them
+            tiles.append(card)
             continue
         flush()
         companion = None
@@ -610,7 +615,7 @@ def spa_moments(copy=None):
 
 def place_moments(sections, moments):
     """Insert moment items ({"kind": "moment", "moment": {...}}) into the room sections by rule, so hiding or moving
-    rooms never breaks the page: shower after the first tiles row (else after the first feature, else
+    rooms never breaks the page: shower (with a small companion room that follows the tiles) after the first tiles row (else after the first feature, else
     last); slippers after the first feature that follows the shower (else last, before 'How a visit works')."""
     sections = list(sections)
 
@@ -624,7 +629,10 @@ def place_moments(sections, moments):
     anchor = first("feature") if anchor is None else anchor
     at = len(sections) if anchor is None else anchor + 1  # where the shower moment goes (or would go)
     if "shower" in moments:
-        sections.insert(at, item("shower"))
+        shower = item("shower")
+        if at < len(sections) and sections[at]["kind"] == "aside":  # the small companion room travels with the moment
+            shower["companion"] = sections.pop(at)["companion"]
+        sections.insert(at, shower)
         at += 1
     if "slippers" in moments:
         anchor = first("feature", at)

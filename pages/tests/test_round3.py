@@ -132,6 +132,17 @@ class MomentTests(TestCase):
         self.assertEqual(order(pages.place_moments(sections, found)),
                          ["dry", "tiles", "shower", "relax", "slippers", "gym"])
 
+    def test_the_aside_after_the_tiles_travels_with_the_shower(self):
+        sections, found = self.sections("shower", "slippers")
+        sections.insert(2, {"kind": "aside", "companion": {"slug": "kit"}})
+        placed = pages.place_moments(sections, found)
+        self.assertEqual([s["kind"] for s in placed], ["feature", "tiles", "moment", "feature", "moment", "feature"])
+        self.assertEqual(placed[2]["companion"]["slug"], "kit")
+        sections, found = self.sections("slippers")  # no shower built: the aside stands alone
+        sections.insert(2, {"kind": "aside", "companion": {"slug": "kit"}})
+        self.assertEqual([s["kind"] for s in pages.place_moments(sections, found)],
+                         ["feature", "tiles", "aside", "feature", "moment", "feature"])
+
     def test_no_tiles_puts_the_shower_after_the_first_feature(self):
         sections, found = self.sections("shower", "slippers")
         sections = [s for s in sections if s["kind"] != "tiles"]

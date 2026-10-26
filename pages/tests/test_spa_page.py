@@ -16,6 +16,7 @@ from plans.models import Facility, Plan, SiteSettings
 
 def layout(sections):
     return [(s["feature"]["slug"], s["companion"]["slug"] if s["companion"] else None, s["side"]) if s["kind"] == "feature"
+            else ("aside", s["companion"]["slug"]) if s["kind"] == "aside"
             else [t["slug"] for t in s["tiles"]] for s in sections]
 
 
@@ -29,22 +30,26 @@ class SpaSectionsTests(TestCase):
 
     def test_seed_gives_the_compositions_with_alternating_sides(self):
         self.assertEqual(layout(self.sections()), [
-            ("dry-sauna", None, "left"), ["wet-sauna", "cold-plunge", "showers"], ["ice-bucket", "kitchenette"],
+            ("dry-sauna", None, "left"), ["wet-sauna", "cold-plunge", "showers", "ice-bucket"], ("aside", "kitchenette"),
             ("relaxing-zone", None, "right"), ("massage-room", None, "left"), ("gym", None, "right")])
 
     def test_hiding_rooms_never_breaks_the_layout(self):
         Facility.objects.filter(slug__in=["dry-sauna", "gym", "wet-sauna"]).update(visible=False)
         self.assertEqual(layout(self.sections()), [
-            ["cold-plunge", "showers", "ice-bucket", "kitchenette"], ("relaxing-zone", None, "left"), ("massage-room", None, "right")])
+            ["cold-plunge", "showers", "ice-bucket"], ("aside", "kitchenette"), ("relaxing-zone", None, "left"), ("massage-room", None, "right")])
 
-    def test_extra_and_lonely_companions_become_tiles_and_long_runs_split(self):
+    def test_lonely_companions_become_asides_and_long_runs_split(self):
         Facility.objects.update(display="tile")
         Facility.objects.filter(slug="gym").update(display="feature")
         Facility.objects.filter(slug__in=["massage-room", "kitchenette", "cold-plunge"]).update(display="companion")
         # order: dry-sauna wet-sauna cold-plunge showers ice-bucket kitchenette relaxing-zone massage-room gym
         self.assertEqual(layout(self.sections()), [
-            ["dry-sauna", "wet-sauna", "cold-plunge", "showers"], ["ice-bucket", "kitchenette", "relaxing-zone", "massage-room"],
-            ("gym", None, "left")])
+            ["dry-sauna", "wet-sauna"], ("aside", "cold-plunge"), ["showers", "ice-bucket"], ("aside", "kitchenette"),
+            ["relaxing-zone"], ("aside", "massage-room"), ("gym", None, "left")])
+
+    def test_long_runs_of_tiles_split_into_balanced_rows(self):
+        Facility.objects.update(display="tile")
+        self.assertEqual([len(r) for r in layout(self.sections())], [3, 3, 3])
 
     def test_ice_bucket_follows_showers_on_home_and_the_spa_page(self):
         self.assertEqual(list(Facility.objects.order_by("order").values_list("slug", flat=True)), [
@@ -143,27 +148,27 @@ class BackfillTests(TestCase):
         self.assertEqual(Facility.objects.get(slug="cold-plunge").image_name, "cold-plunge")
         self.assertEqual(Facility.objects.get(slug="kitchenette").image_name, "gym")
 
-    def test_backfill_keeps_cleared_facts_fixes_old_alts_and_tiles_the_kitchenette(self):
+    def test_backfill_keeps_cleared_facts_fixes_old_alts_and_makes_the_kitchenette_small(self):
         seed_all()
         Facility.objects.filter(slug="gym").update(facts=[])  # an admin chose "show none"
-        Facility.objects.filter(slug="kitchenette").update(display="companion")  # how it was seeded before
+        Facility.objects.filter(slug="kitchenette").update(display="tile")  # how it was seeded before 2026-10-26
         Facility.objects.filter(slug="showers").update(image_alt="Rain showers behind walnut slatted screens")
         Facility.objects.filter(slug="cold-plunge").update(image_alt="My own wording")  # hand edit
         out = StringIO()
         call_command("backfill_site_data", "--dry-run", stdout=out)
         self.assertIn("picture description", out.getvalue())
-        self.assertEqual(Facility.objects.get(slug="kitchenette").display, "companion")  # dry run saved nothing
+        self.assertEqual(Facility.objects.get(slug="kitchenette").display, "tile")  # dry run saved nothing
         call_command("backfill_site_data", stdout=StringIO())
         self.assertEqual(Facility.objects.get(slug="gym").facts, [])
-        self.assertEqual(Facility.objects.get(slug="kitchenette").display, "tile")
+        self.assertEqual(Facility.objects.get(slug="kitchenette").display, "companion")
         self.assertIn("black-framed", Facility.objects.get(slug="showers").image_alt)
         self.assertEqual(Facility.objects.get(slug="cold-plunge").image_alt, "My own wording")
 
-    def test_backfill_leaves_a_hand_edited_kitchenette_companion(self):
+    def test_backfill_leaves_a_hand_edited_kitchenette_tile(self):
         seed_all()
-        Facility.objects.filter(slug="kitchenette").update(display="companion", facts=["Mine"])
+        Facility.objects.filter(slug="kitchenette").update(display="tile", facts=["Mine"])
         call_command("backfill_site_data", stdout=StringIO())
-        self.assertEqual(Facility.objects.get(slug="kitchenette").display, "companion")
+        self.assertEqual(Facility.objects.get(slug="kitchenette").display, "tile")
 
     def test_backfill_moves_the_kitchenette_only_in_an_untouched_order(self):
         seed_all()
