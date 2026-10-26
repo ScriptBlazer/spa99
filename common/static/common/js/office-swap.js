@@ -2,8 +2,8 @@
  *
  *   Range picker      change a radio: fetch the page for that range, swap [data-region] parts in place (cross-fade), morph
  *                     [data-morph] parts (rings, sparkline paths, funnel bars) from their old values, push the URL, Back works.
- *   Filters           search (300ms) and filters fetch the rows partial (HX-Request header) into the table.
- *   Show more         appends the next 50 rows.
+ *   Filters           search (300ms) and filters fetch the rows partial (HX-Request header) into the table (Leads fetches the whole page, so its tiles and total follow).
+ *   Show more         appends the next page of rows; Show earlier (a person's timeline) adds the next 20 events.
  *   Actions           Approve, Decline, Resend post in the background, show the server's message as a toast and refresh the page parts.
  * If anything fails the plain link or form still works. The chart script listens for 'office:series'. */
 import { toastsFromDocument } from './feedback.js';
@@ -122,6 +122,7 @@ function lists() {
   const tbody = document.querySelector('[data-office-list]');
   if (!form || !tbody) return;
   const card = document.querySelector('[data-list-card]');
+  const full = form.hasAttribute('data-full');
   let timer; let run = 0;
   const refresh = async () => {
     const params = new URLSearchParams();
@@ -131,13 +132,23 @@ function lists() {
     const mine = ++run;
     const busy = setTimeout(() => card?.setAttribute('aria-busy', 'true'), BUSY_AFTER_MS);
     try {
-      const { text } = await fetchDoc(url, { 'HX-Request': 'true' });
+      const { text } = await fetchDoc(url, full ? {} : { 'HX-Request': 'true' });
       if (mine !== run) return;
-      setRows(tbody, text, false);
+      if (full) {   // the whole page: the rows go into the table, every other [data-region] (summary tiles, the total line) is replaced in place
+        const doc = parse(text);
+        setRows(tbody, doc.querySelector('[data-office-list]').innerHTML, false);
+        doc.querySelectorAll('[data-region]:not([data-office-list])').forEach((next) => {
+          const old = document.querySelector(`[data-region="${next.dataset.region}"]`);
+          if (!old) return;
+          const clone = document.importNode(next, true);
+          if (clone.hasAttribute('data-fade') && !reduced()) clone.classList.add('o-fade-in');
+          old.replaceWith(clone);
+        });
+        document.title = doc.title;
+      } else setRows(tbody, text, false);
       history.replaceState({ office: true }, '', url);
-      const exportLink = document.querySelector('[data-export-csv]');
-      if (exportLink) exportLink.href = `${exportLink.dataset.exportBase}${query ? `?${query}` : ''}`;
-      const clear = form.querySelector('[data-clear]');
+      document.querySelectorAll('[data-export-csv]').forEach((link) => { link.href = `${link.dataset.exportBase}${query ? `?${query}` : ''}`; });
+      const clear = full ? null : form.querySelector('[data-clear]');
       if (clear) {
         const changed = [...form.querySelectorAll('input[type="search"], select')].some((el) => el.value)
           || [...form.querySelectorAll('.o-seg')].some((seg) => (seg.querySelector('input:checked')?.value || '') !== (seg.dataset.default || ''));
@@ -155,9 +166,11 @@ function lists() {
   });
   form.addEventListener('change', (event) => { if (!event.target.matches('[data-search]')) refresh(); });
   form.addEventListener('submit', (event) => { event.preventDefault(); clearTimeout(timer); refresh(); });
-  form.querySelector('[data-clear]')?.addEventListener('click', (event) => {
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest?.('[data-clear]')) return;
     event.preventDefault();
     form.querySelectorAll('input[type="search"]').forEach((el) => { el.value = ''; });
+    form.querySelectorAll('input[type="checkbox"]').forEach((el) => { el.checked = false; });
     form.querySelectorAll('select').forEach((el) => { el.selectedIndex = 0; });
     form.querySelectorAll('.o-seg').forEach((seg) => {
       const wanted = seg.dataset.default || '';
@@ -178,6 +191,32 @@ function lists() {
       const { text } = await fetchDoc(more.href, { 'HX-Request': 'true' });
       setRows(tbody, text, true);
     } catch { more.textContent = label; more.removeAttribute('aria-busy'); }
+  });
+}
+
+// ---------- the timeline: "Show earlier" adds the next 20 events in place (the plain link still opens them) ----------
+
+function timeline() {
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest?.('[data-show-earlier]');
+    if (!button) return;
+    event.preventDefault();
+    const holder = button.closest('[data-timeline-more]');
+    const label = button.textContent;
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = button.dataset.workingText || 'Loading';
+    try {
+      const { text } = await fetchDoc(button.href, { 'HX-Request': 'true' });
+      const chunk = parse(text).querySelector('[data-timeline-chunk]');
+      if (!chunk) throw new Error('no chunk');
+      const last = [...document.querySelectorAll('[data-timeline-day]')].pop();
+      const first = chunk.querySelector('[data-timeline-day]');
+      if (last && first && last.textContent === first.textContent) first.remove();   // the same day continues: one heading
+      const fresh = document.importNode(chunk, true);
+      if (!reduced()) fresh.classList.add('o-fade-in');
+      holder.replaceWith(fresh);
+      fresh.querySelector('[data-timeline-item]')?.closest('li')?.setAttribute('tabindex', '-1');
+    } catch { button.textContent = label; button.removeAttribute('aria-busy'); }
   });
 }
 
@@ -218,5 +257,6 @@ export function initSwap() {
   document.addEventListener('click', (event) => { if (event.target.closest?.('[data-retry]')) go(failedUrl || location.href, false); });
   window.addEventListener('popstate', () => { if (forms().length) go(location.pathname + location.search, false); });
   lists();
+  timeline();
   actions();
 }

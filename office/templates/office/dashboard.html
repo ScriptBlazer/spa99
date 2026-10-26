@@ -83,44 +83,82 @@
     </div>
   </section>
 
-  {# What people want: stored facts. Closed: six tiles. Open (the plus): every option of every question. <details> is the base, JS only animates the height. #}
+  {# Leads: stored figures (snapshot). New leads, and how many of them went on to register. #}
+  <section class="o-card o-leads" data-reveal data-office-leads aria-labelledby="leads-h">
+    <h2 id="leads-h" class="o-h3"><span class="o-lead-dot" aria-hidden="true"></span>Leads</h2>
+    <div class="o-leads-body" data-region="leads-card" data-fade>
+      <div class="o-leads-new">
+        <p class="o-leads-num" data-leads-new>{{ data.leads_new|num }}</p>
+        {% if data.leads_new %}
+        <p class="o-leads-label">gave their email</p>
+        {% change_line data.leads_new data.leads_new_previous data.range as change %}
+        {% if change %}<p class="o-delta" data-leads-delta>{{ change }}</p>{% endif %}
+        {% else %}<p class="o-leads-label o-leads-label--muted">No new leads in this range.</p>{% endif %}
+      </div>
+      {% if data.leads_new %}
+      {% ratio data.leads_registered data.leads_new as reg_share %}
+      <div class="o-leads-reg" data-leads-registered>
+        <p class="o-leads-num o-leads-num--sm">{{ data.leads_registered|num }}</p>
+        <p class="o-delta">of {{ data.leads_new|num }} lead{{ data.leads_new|pluralize }} {{ data.leads_new|pluralize:"has,have" }} registered</p>
+        <span class="o-lbar" role="presentation"><span class="o-lbar-fill" data-morph="leads-bar" style="--share: {{ reg_share }}"></span></span>
+      </div>
+      {% endif %}
+      <a class="o-quiet o-more" href="{% url 'office_leads' %}?range={{ data.range }}">See all leads</a>
+    </div>
+  </section>
+
+  {# Hot leads: a short list, newest first. No action buttons: Office level only looks. #}
+  <section class="o-card o-hot" data-reveal data-office-hot aria-labelledby="hot-h">
+    <header class="o-card-head">
+      <h2 id="hot-h">Hot leads</h2>
+      <span class="o-count" data-region="hot-count" data-hot-count>{{ data.hot_leads|num }}</span>
+    </header>
+    <div class="o-rowlist" data-region="hot-list">
+      {% for l in data.hot_lead_rows %}
+      <a class="o-latest-row o-hot-row" href="{{ l.href }}" data-hot-item>
+        <span class="o-latest-name">{{ l.email }}</span>
+        <span class="o-latest-plan">{% if l.tier %}Suggested {{ l.tier }}{% else %}No suggestion yet{% endif %}</span>
+        <span class="o-hot-badge">{% include "office/_badge.html" with potential=l.potential %}</span>
+        <span class="o-latest-when">{{ l.last_seen|relative }}</span>
+      </a>
+      {% empty %}<p class="o-empty-line">No hot leads right now. They appear when someone with a strong Gold profile leaves his email.</p>{% endfor %}
+      {% if data.hot_leads > 5 %}<a class="o-quiet o-more" href="{% url 'office_leads' %}?potential=high&amp;show=lead">See all hot leads</a>{% endif %}
+    </div>
+  </section>
+
+  {# Recent activity: the latest ten events, not tied to the range. #}
+  <section class="o-card o-activity" data-reveal data-office-activity aria-labelledby="activity-h">
+    <h2 id="activity-h" class="o-h3">Recent activity</h2>
+    <div class="o-rowlist" data-region="activity">
+      {% for e in data.activity %}
+      <a class="o-feed-row" {% if e.href %}href="{{ e.href }}"{% endif %} data-activity-item data-kind="{{ e.kind }}">
+        <span class="o-feed-dot" aria-hidden="true">{% if e.kind == "lead" %}{% include "office/_icon.html" with name="envelope" %}{% elif e.kind == "registered" %}{% include "office/_icon.html" with name="person-plus" %}{% elif e.kind == "verified" %}{% include "office/_icon.html" with name="check" %}{% elif e.kind == "journey_finished" %}{% include "office/_icon.html" with name="flag" %}{% else %}{% include "office/_icon.html" with name="gold" %}{% endif %}</span>
+        <span class="o-feed-text"><span class="o-feed-who">{{ e.who }}</span> {{ e.label }}{% if e.detail %}<span class="o-feed-detail"> &middot; {{ e.detail }}</span>{% endif %}</span>
+        <span class="o-latest-when">{{ e.at|relative }}</span>
+      </a>
+      {% empty %}<p class="o-empty-line">Nothing has happened yet.</p>{% endfor %}
+    </div>
+  </section>
+
+  {% comment %}What people want: stored facts. Closed: six tiles. Open (the plus): every option of every question. Everyone or Leads (a stored second set). <details> is the base, JS only animates the height and fades the scope switch.{% endcomment %}
   <section class="o-card o-wants" data-reveal data-office-wants aria-labelledby="wants-h">
     <h2 id="wants-h" class="o-h3">What people want</h2>
+    <fieldset class="o-seg o-seg--sm o-wants-scope" style="--n: 2; --i: 0" data-wants-scope>
+      <legend class="sr-only">Who answered</legend>
+      <span class="o-seg-thumb" aria-hidden="true"></span>
+      <label class="o-seg-item"><input type="radio" name="wants-scope" value="everyone" checked><span>Everyone</span></label>
+      <label class="o-seg-item"><input type="radio" name="wants-scope" value="leads"><span>Leads</span></label>
+    </fieldset>
     <div class="o-wants-stage" data-wants-stage>
       <details class="o-wants-details" data-wants-details>
         <summary class="o-plus" aria-label="Show all answers" aria-expanded="false" data-wants-toggle>
           <svg class="o-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>
         </summary>
-        <div class="o-wants-all" data-region="insights-all" data-fade>
-          {% if data.insights %}
-          <div class="o-cats">
-            {% for ins in data.insights %}
-            <section class="o-cat o-cat--{% if ins.key == 'tier_picked' or ins.key == 'tier_suggested' %}clay{% elif ins.key == 'source' %}slate{% else %}teal{% endif %}" data-insight-all="{{ ins.key }}" aria-labelledby="cat-{{ ins.key }}">
-              <h3 id="cat-{{ ins.key }}" class="o-cat-title">{{ ins.key|insight_name }}</h3>
-              <ul class="o-opts">
-                {% for o in ins.options %}<li style="--share: {{ o.share_bp|bp_ratio }}"><span class="o-opt-name">{{ o.label }}</span><span class="o-opt-count">{{ o.value|num }} of {{ o.of_total|num }}</span></li>{% endfor %}
-              </ul>
-            </section>
-            {% endfor %}
-          </div>
-          {% else %}<p class="o-empty-line">Facts appear once people finish the journey.</p>{% endif %}
-        </div>
+        <div class="o-wants-all" data-region="insights-all" data-scope="everyone" data-fade>{% include "office/_wants_all.html" with items=data.insights empty="Facts appear once people finish the journey." prefix="" %}</div>
+        <div class="o-wants-all" data-region="insights-all-leads" data-scope="leads" data-fade>{% include "office/_wants_all.html" with items=data.insights_leads empty="Facts appear once leads finish the journey." prefix="leads-" %}</div>
       </details>
-      <div data-region="insights" data-fade>
-        {% if data.insights %}
-        <ul class="o-facts">
-          {% for ins in data.insights %}{% if ins.key != 'source' %}
-          <li class="o-fact o-fact--{% if ins.key == 'tier_picked' or ins.key == 'tier_suggested' %}clay{% else %}teal{% endif %}" role="group" aria-label="{{ ins.sentence|default:ins.title }}" data-insight="{{ ins.key }}">
-            <p class="o-fact-title">{{ ins.title }}</p>
-            <p class="o-fact-top">{{ ins.top.label }}</p>
-            <p class="o-fact-count">{{ ins.top.value|num }} of {{ ins.top.of_total|num }}</p>
-            <span class="o-fact-bar" role="presentation"><span class="o-fact-fill" data-morph="fact-{{ ins.key }}" style="--share: {{ ins.top.share_bp|bp_ratio }}"></span></span>
-            {% if ins.runner_up %}<p class="o-fact-next">Next: {{ ins.runner_up.label }} ({{ ins.runner_up.value|num }})</p>{% endif %}
-          </li>
-          {% endif %}{% endfor %}
-        </ul>
-        {% else %}<p class="o-empty-line">Facts appear once people finish the journey.</p>{% endif %}
-      </div>
+      <div data-region="insights" data-tiles data-scope="everyone" data-fade>{% include "office/_wants_tiles.html" with items=data.insights empty="Facts appear once people finish the journey." prefix="" %}</div>
+      <div data-region="insights-leads" data-tiles data-scope="leads" data-fade>{% include "office/_wants_tiles.html" with items=data.insights_leads empty="Facts appear once leads finish the journey." prefix="leads-" %}</div>
     </div>
   </section>
 

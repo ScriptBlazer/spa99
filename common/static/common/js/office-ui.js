@@ -10,6 +10,7 @@ export function initOfficeUi() {
   segmented();
   filterSheet();
   wants();
+  wantsScope();
 }
 
 function header() {
@@ -139,4 +140,19 @@ function goldDialogs() {
     if (box) box.hidden = !toggle.checked;
   });
   show(dialogs.find((dialog) => dialog.hasAttribute('data-open')), null);
+}
+
+/** "What people want": Everyone or Leads. The radios hide one set with CSS (works without JS); this fades the set that appears. */
+function wantsScope() {
+  const card = document.querySelector('[data-office-wants]');
+  if (!card) return;
+  card.addEventListener('change', (event) => {
+    if (event.target.name !== 'wants-scope') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    card.querySelectorAll(`[data-scope="${event.target.value}"]`).forEach((el) => {
+      el.classList.remove('o-fade-in');
+      void el.offsetWidth;   // restart the fade
+      el.classList.add('o-fade-in');
+    });
+  });
 }

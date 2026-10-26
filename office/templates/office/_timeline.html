@@ -1,6 +1,12 @@
 {% load office_tags %}<div data-timeline-chunk>
-{% for d in timeline_days %}<h3 class="o-subhead" data-timeline-day>{{ d.day|dmy }}</h3>
-{% for e in d.items %}<div class="o-tl" data-timeline-item data-kind="{{ e.kind }}"><strong>{% if e.href %}<a href="{{ e.href }}">{{ e.label }}</a>{% else %}{{ e.label }}{% endif %}</strong>{% if e.detail %}<br>{{ e.detail }}{% endif %}<br><small>{{ e.at|dt }}</small></div>{% endfor %}
-{% endfor %}
-{% if timeline_more %}<a class="btn btn-secondary btn-sm" href="?tl={{ timeline_next }}" hx-get="?tl={{ timeline_next }}" hx-target="closest [data-timeline-chunk]" hx-swap="outerHTML" data-show-earlier>Show earlier</a>{% endif %}
+{% for d in timeline_days %}<h3 class="o-subhead" data-timeline-day>{{ d.day|day_label }}</h3>
+<ol class="o-timeline">{% for e in d.items %}
+  <li class="o-tl" data-timeline-item data-kind="{{ e.kind }}">
+    <p class="o-tl-line"><span class="o-tl-what">{% if e.href %}<a href="{{ e.href }}">{{ e.label }}</a>{% else %}{{ e.label }}{% endif %}</span></p>
+    {% if e.detail %}<p class="o-tl-meta{% if e.kind == 'email' and e.detail != 'Sent' %} o-danger{% endif %}">{% if e.kind == 'email' and e.detail != 'Sent' %}{% include "office/_icon.html" with name="warning" %}{% endif %}{{ e.detail }}</p>{% endif %}
+    <p class="o-tl-meta">{{ e.time }}</p>
+  </li>{% endfor %}
+</ol>
+{% empty %}<p class="o-empty-line">History starts on 26 Oct 2026.</p>{% endfor %}
+{% if timeline_more %}<div class="o-more-line" data-timeline-more><a class="btn btn-secondary btn-sm" href="?tl={{ timeline_next }}" data-show-earlier data-working-text="Loading">Show earlier</a></div>{% endif %}
 </div>

@@ -130,7 +130,7 @@ def consent_block(emails, sessions, user=None, applications=()):
                    "marketing_at": _iso(user.marketing_consent_at)}
     opt_out = EmailOptOut.objects.filter(email__in=[e.lower() for e in emails if e]).exists()
     return {"lead": gate, "account": account, "unsubscribed": opt_out,
-            "gold": [{"reference": a.reference, "marketing": a.marketing_consent, "privacy_version": a.privacy_version, "at": _iso(a.privacy_accepted_at)}
+            "gold": [{"reference": a.reference, "marketing": a.marketing_consent, "privacy_version": a.privacy_accepted_version, "at": _iso(a.privacy_accepted_at)}
                      for a in applications]}
 
 

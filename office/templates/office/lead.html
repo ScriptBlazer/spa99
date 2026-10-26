@@ -1,23 +1,2 @@
-{% extends "office/base.html" %}
-{% load office_tags %}
-{% block title %}{{ person.email }} | Spa 99 Office{% endblock %}
-{% block body_attrs %}data-office-detail{% endblock %}
-{% block header_left %}<a class="o-back" href="{% url 'office_leads' %}">{% include "office/_icon.html" with name="chevron-left" %}<span>Leads</span></a>{% endblock %}
-{% block main %}
-<header class="o-detail-head"><h1>{{ person.email }}</h1>
-  <p class="o-lead">Lead since {{ person.first_seen|dmy }}, last seen {{ person.last_seen|dt }}</p></header>
-<div class="o-detail">
-  <div class="o-detail-main">{% include "office/_profile.html" %}</div>
-  <aside class="o-detail-rail">
-    {% include "office/_profile_rail.html" %}
-    {% if office_can.can_export or office_can.can_delete %}
-    <section class="o-card" data-person-data><h2 class="o-h3">Data</h2>
-      {% if office_can.can_export %}<a class="btn btn-secondary btn-block" href="{% url 'office_lead_export' person.id %}" data-export-person>Export his data</a>{% endif %}
-      {% if office_can.can_delete %}<form method="post" action="{% url 'office_lead_delete' person.id %}" data-delete-person>{% csrf_token %}
-        <button type="submit" class="o-danger-link" data-confirm data-confirm-danger data-confirm-title="Remove {{ person.email }}?"
-                data-confirm-body="This clears his email from his journeys. The answers stay, without his email. It cannot be undone." data-confirm-label="Remove for good" data-confirm-cancel="Keep">Remove this lead</button>
-      </form>{% endif %}
-    </section>{% endif %}
-  </aside>
-</div>
-{% endblock %}
+{% extends "office/person.html" %}
+{# A lead is the same page as an account (person.html): the route and the data decide what shows. #}

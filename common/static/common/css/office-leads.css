@@ -1,0 +1,159 @@
+/* Office Leads, the person page and the lead figures on the Dashboard (docs/design/OFFICE-LEADS.md).
+   Brand colours on the light shell; tone and soft shadow, never a border, rule or side stripe (the Lead pill's ring is a full inset ring).
+   Two layout values only (6, proposed), scoped to .office. */
+.office { --office-feed-dot: 1.75rem; --office-row-h-2: 4.25rem; }
+
+.o-muted, .o-unrated { color: var(--office-muted); }
+.o-unrated { font-size: var(--text-sm); }
+.o-cell-sub { display: block; font-size: var(--text-sm); font-weight: 400; color: var(--office-muted); }
+
+/* ---------- status pills (1.1): text first, colour second ---------- */
+.o-badge--st-lead { background: var(--office-surface); color: var(--office-text); box-shadow: inset 0 0 0 1px var(--color-control-line); }   /* 12.19 */
+.o-badge--st-registered { background: var(--office-sunken); color: var(--office-text); }                                                  /* 10.13 */
+.o-badge--st-applied { background: var(--office-text); color: var(--color-gold); }                                                        /* 6.17 */
+.o-badge--st-gold { background: var(--color-gold); color: var(--office-text); }                                                           /* 6.17 */
+.o-badge--type { padding-inline: var(--space-1); color: var(--office-muted); }
+@media (forced-colors: active) { .o-badge--st-lead, .o-badge--st-registered { border: 1px solid CanvasText; } }
+
+/* ---------- the summary strip: three tonal tiles, no shadow ---------- */
+.o-leadsum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin-bottom: var(--space-3); }
+.o-leadsum-tile { display: grid; align-content: start; gap: 2px; min-width: 0; padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-sunken); color: var(--office-text); text-decoration: none; transition: background-color var(--office-dur-lift) var(--ease-soft); }
+.o-leadsum-tile > * { margin: 0; max-width: none; }
+.o-leadsum-label { font-size: var(--text-sm); font-weight: 500; color: var(--office-muted); }
+.o-leadsum-num { font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; }
+.o-leadsum-line { display: none; font-size: var(--text-sm); color: var(--office-muted); }
+@media (hover: hover) and (pointer: fine) { .o-leadsum-tile--link:hover { background: var(--office-taupe-track); } }
+@media (min-width: 64em) {
+  .o-leadsum { gap: var(--space-3); margin-bottom: var(--space-4); }
+  .o-leadsum-tile { padding: var(--space-3) var(--space-4); }
+  .o-leadsum-line { display: block; }
+}
+
+/* ---------- filters on Leads: more controls, same bar ---------- */
+.o-filters-body .o-select { min-width: 9rem; }
+.o-filters .o-seg-item { padding: 0 var(--space-2); }
+.o-totalline .o-export { margin-left: auto; }
+.o-export--sheet { display: none; }
+@media (max-width: 63.99em) { .o-export--bar { display: none; } .o-export--sheet { display: inline-flex; } }
+.o-filter-group--chip { align-self: flex-end; }
+.o-filter-group--chip .o-chip { min-height: var(--control-h-compact); }
+@media (min-width: 64em) { .o-filters-slot > .o-filters-body { display: contents; } }   /* the controls wrap in one bar with the search */
+.o-filters-bar .o-search { flex: 1 1 14rem; max-width: 20rem; }
+.o-filter-group .o-seg[style*="--n: 4"] { min-width: 16rem; }
+.o-filter-group .o-seg[style*="--n: 3"] { min-width: 17rem; }
+.o-sheet .o-filter-group .o-seg, .o-sheet .o-select { min-width: 0; }
+.o-sheet .o-filters-body .o-export--sheet { margin-left: 0; align-self: stretch; width: 100%; }
+.o-sheet .o-filter-group--chip { align-self: start; }
+.o-empty-row .o-quiet { justify-content: center; }
+
+/* ---------- the Leads table: two-line cells, widths from the brief (3.4) ---------- */
+.o-list--leads .c-name a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.o-line { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.o-line--2 { color: var(--office-muted); }
+.o-wide-xl { display: none; }
+.o-mid-only { display: inline; }
+@media (min-width: 80em) { .o-wide-xl { display: table-cell; } .o-mid-only { display: none; } }
+@media (min-width: 64em) {
+  .o-list--leads { table-layout: fixed; }
+  .o-list--leads td { height: var(--office-row-h-2); padding-inline: var(--space-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .o-list--leads th { padding-inline: var(--space-2); overflow: hidden; text-overflow: ellipsis; }
+  .o-list--leads td:first-child, .o-list--leads th:first-child { padding-left: var(--space-3); }
+  .o-list--leads td:last-child, .o-list--leads th:last-child { padding-right: var(--space-3); }
+  .o-list--leads .c-name { max-width: none; }
+  .o-list--leads .c-source .o-cell-sub, .o-list--leads .c-industry .o-cell-sub, .o-list--leads .c-name .o-cell-sub { overflow: hidden; text-overflow: ellipsis; }
+  .o-list--leads th:nth-child(1) { width: 19%; }   /* Lead */
+  .o-list--leads th:nth-child(2) { width: 18%; }   /* Wants */
+  .o-list--leads th:nth-child(3) { width: 12%; }   /* Suggested */
+  .o-list--leads th:nth-child(4) { width: 12%; }   /* Potential */
+  .o-list--leads th:nth-child(6) { width: 11%; }   /* Source */
+  .o-list--leads th:nth-child(8) { width: 14%; }   /* Status */
+  .o-list--leads th:nth-child(9) { width: 14%; }   /* Last seen */
+}
+@media (min-width: 80em) {
+  .o-list--leads th:nth-child(1) { width: 16%; }
+  .o-list--leads th:nth-child(2) { width: 17%; }
+  .o-list--leads th:nth-child(3) { width: 10%; }
+  .o-list--leads th:nth-child(4) { width: 11%; }
+  .o-list--leads th:nth-child(5) { width: 9%; }    /* Industry */
+  .o-list--leads th:nth-child(6) { width: 9%; }
+  .o-list--leads th:nth-child(7) { width: 7%; }    /* Visits */
+  .o-list--leads th:nth-child(8) { width: 10%; }
+  .o-list--leads th:nth-child(9) { width: 11%; }
+}
+.o-list--leads th { letter-spacing: 0.04em; }
+.o-list--leads .c-source .o-cell-sub { display: block; }
+
+/* phone: one surface card per lead (3.5): email and pill, potential and tier, the two answer lines, seen and source */
+@media (max-width: 63.99em) {
+  .o-list--leads .o-row { gap: var(--space-1) var(--space-2); }
+  .o-list--leads .o-row::after { content: ""; order: 2; flex: 0 0 100%; height: 0; }   /* a line break after the pill */
+  .o-list--leads .o-row td.c-name { order: 1; flex: 1 1 0; }
+  .o-list--leads .o-row td.c-name .o-cell-sub { display: none; }
+  .o-list--leads .o-row td.c-status { order: 2; flex: none; }
+  .o-list--leads .o-row td.c-potential { order: 3; flex: none; }
+  .o-list--leads .o-row td.c-tier { order: 4; flex: none; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-list--leads .o-row td.c-wants { order: 5; flex: 0 0 100%; font-size: var(--text-sm); }
+  .o-list--leads .o-row td.c-wants .o-line { white-space: normal; color: var(--office-muted); }
+  .o-list--leads .o-row td.c-date { order: 6; flex: none; }
+  .o-list--leads .o-row td.c-source { order: 7; flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-list--leads .o-row td.c-source .o-cell-sub { display: none; }
+  .o-list--leads .o-row td.c-industry, .o-list--leads .o-row td.c-visits { display: none; }
+  .o-list--leads .o-empty-row::after, .o-list--leads .o-more-row::after { display: none; }
+}
+@media (min-width: 64em) { .o-list--leads .c-tier .o-only-narrow, .o-list--leads .c-source .o-only-narrow { display: none; } }
+
+/* ---------- the person page ---------- */
+.o-detail-head--person .o-badges { display: flex; }
+.o-person-name { overflow-wrap: anywhere; }
+.o-count-muted { margin-left: var(--space-1); font-family: var(--font-body); font-size: var(--text-sm); font-weight: 500; color: var(--office-muted); letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.o-card-sub { margin: calc(var(--space-2) * -1) 0 var(--space-3); max-width: none; }
+.o-panels { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); margin-bottom: var(--space-4); }
+@media (min-width: 48em) { .o-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.o-panel { display: grid; align-content: start; gap: var(--space-1); padding: var(--space-3) var(--space-4); border-radius: var(--office-radius); background: var(--office-sunken); }
+.o-panel > * { margin: 0; max-width: none; }
+.o-panel-label { font-size: var(--text-sm); color: var(--office-muted); }
+.o-panel-name { font-family: var(--font-display); font-weight: 500; font-size: var(--text-lg); letter-spacing: var(--tracking-display); line-height: var(--leading-tight); }
+.o-panel-list, .o-panel-note { font-size: var(--text-sm); color: var(--office-muted); }
+.o-panel-list, .o-plain-list { display: grid; gap: 2px; list-style: none; padding: 0; }
+.o-plain-list { font-size: var(--text-base); }
+.o-potential-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); max-width: none; }
+.o-card > .o-subhead { margin-top: var(--space-4); }
+.o-tile-link { margin-top: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--office-radius); background: var(--office-sunken); transition: background-color var(--office-dur-lift) var(--ease-soft); }
+.o-tile-link > span:first-child { margin-right: auto; }
+.o-tile-link .o-wait-go { margin-left: 0; }
+@media (hover: hover) and (pointer: fine) { .o-tile-link:hover { background: var(--office-taupe-track); } }
+.o-tl a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.25em; }
+.o-timeline + .o-subhead, .o-timeline + .o-more-line { margin-top: var(--space-4); }
+.o-more-line { margin-top: var(--space-4); }
+.o-tl-meta.o-danger { display: flex; align-items: center; gap: var(--space-1); }
+
+/* all journeys: one <details> per journey, tone only */
+.o-jlist { display: grid; gap: 4px; }
+.o-jrny { border-radius: var(--office-radius); transition: background-color var(--office-dur-lift) var(--ease-soft); }
+.o-jrny summary { display: flex; align-items: center; gap: var(--space-3); min-height: 3.5rem; padding: var(--space-2) var(--space-3); border-radius: var(--office-radius); cursor: pointer; list-style: none; }
+.o-jrny summary::-webkit-details-marker { display: none; }
+.o-jrny[open] { background: var(--office-sunken); }
+.o-jrny-main { display: grid; flex: 1; min-width: 0; }
+.o-jrny-when { font-weight: 600; }
+.o-jrny-line { font-size: var(--text-sm); color: var(--office-muted); }
+.o-jrny-go { display: grid; place-items: center; color: var(--office-muted); }
+.o-jrny-open, .o-jrny[open] .o-jrny-closed { display: none; }
+.o-jrny[open] .o-jrny-open { display: grid; }
+.o-jrny-body { display: grid; gap: var(--space-3); padding: var(--space-2) var(--space-3) var(--space-3); }
+.o-jrny[open] .o-jrny-body { animation: o-fade var(--office-dur-swap) var(--ease-soft) both; }
+@media (hover: hover) and (pointer: fine) { .o-jrny:not([open]):hover { background: var(--office-sunken); } }
+
+/* phone order: header, answers, Gold, timeline, details, source, consent, all journeys, data (the two columns dissolve) */
+@media (max-width: 63.99em) {
+  .o-detail--person .o-detail-main, .o-detail--person .o-detail-rail { display: contents; }
+  .o-detail--person [data-person-answers] { order: 1; }
+  .o-detail--person [data-person-gold-potential] { order: 2; }
+  .o-detail--person [data-person-timeline] { order: 3; }
+  .o-detail--person [data-person-details] { order: 4; }
+  .o-detail--person [data-person-source] { order: 5; }
+  .o-detail--person [data-person-consent] { order: 6; }
+  .o-detail--person [data-person-journeys] { order: 7; }
+  .o-detail--person [data-person-unlinked] { order: 8; }
+  .o-detail--person [data-person-data] { order: 9; }
+}
+@media (prefers-reduced-motion: reduce) { .o-leadsum-tile, .o-tile-link, .o-jrny { transition: none; } .o-jrny[open] .o-jrny-body { animation: none; } }

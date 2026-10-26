@@ -9,11 +9,14 @@
   .o-greeting h1 { font-size: var(--text-2xl); }
   .o-rings { grid-column: 1 / span 8; grid-row: 2; }
   .o-gold-tile { grid-column: 9 / span 4; grid-row: 2; }
-  .o-wants { grid-column: 1 / -1; grid-row: 3; }
-  .o-stat[data-stat="visitors"] { grid-column: 1 / span 6; grid-row: 4; }
-  .o-stat[data-stat="page_views"] { grid-column: 7 / span 6; grid-row: 4; }
+  .o-leads { grid-column: 1 / span 4; grid-row: 3; }
+  .o-hot { grid-column: 5 / span 8; grid-row: 3; }
+  .o-wants { grid-column: 1 / -1; grid-row: 4; }
   .o-waiting { grid-column: 1 / span 7; grid-row: 5; }
   .o-latest { grid-column: 8 / span 5; grid-row: 5; }
+  .o-activity { grid-column: 1 / span 7; grid-row: 6 / span 2; }
+  .o-stat[data-stat="visitors"] { grid-column: 8 / span 5; grid-row: 6; }
+  .o-stat[data-stat="page_views"] { grid-column: 8 / span 5; grid-row: 7; }
 }
 
 /* ---------- the journey: three single rings, the count in the middle ---------- */
@@ -87,7 +90,7 @@
 .o-wants-details[open] .o-plus-icon { transform: rotate(45deg); }
 @media (hover: hover) and (pointer: fine) { .o-plus:hover { background: var(--office-taupe-track); } }
 /* open: the six tiles give way to every option (no JS needed) */
-.o-wants:has(.o-wants-details[open]) [data-region="insights"] { display: none; }
+.o-wants:has(.o-wants-details[open]) [data-tiles] { display: none; }
 .o-wants-details[open] .o-wants-all { animation: o-fade var(--office-dur-swap) var(--ease-soft) both; }
 .o-cats { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
 @media (min-width: 48em) { .o-cats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -160,3 +163,53 @@
   .o-ring-arc, .o-ring-cap, .o-ring-track, .o-ring-open, .o-funnel-fill, .o-fact-fill, .o-plus, .o-plus-icon, .o-wait-row, .o-latest-row { transition: none; animation: none !important; }
   .o-spark svg, .o-spark-area, .o-spark-dot { animation: none !important; }
 }
+
+/* ---------- Leads, Hot leads, Recent activity (OFFICE-LEADS 2): stored figures and two short lists ---------- */
+.o-leads-body { display: grid; gap: var(--space-4); }
+.o-leads .o-h3 { display: flex; align-items: center; gap: var(--space-2); }
+.o-lead-dot { width: 0.625rem; height: 0.625rem; flex: none; border-radius: 50%; background: var(--office-teal); }
+.o-leads-new, .o-leads-reg { display: grid; gap: var(--space-1); }
+.o-leads-new > *, .o-leads-reg > * { margin: 0; max-width: none; }
+.o-leads-num { font-family: var(--font-display); font-weight: 500; font-size: var(--office-stat); line-height: var(--leading-display); letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; color: var(--office-text); }
+.o-leads-num--sm { font-size: var(--text-xl); line-height: var(--leading-tight); }
+.o-leads-label { font-size: var(--text-sm); font-weight: 500; color: var(--office-text); }
+.o-leads-label--muted { font-weight: 400; color: var(--office-muted); }
+.o-lbar { display: block; height: 0.625rem; margin-top: var(--space-2); border-radius: var(--office-pill); background: var(--office-clay-track); overflow: hidden; }
+.o-lbar-fill { display: block; height: 100%; width: max(calc(var(--share, 0) * 100%), 0.375rem); border-radius: var(--office-pill); background: var(--office-clay); transition: width var(--office-dur-morph) var(--ease-soft); }
+.o-leads-body .o-more { margin-top: 0; padding-inline: 0; }
+.js .o-leads.is-visible:not(.is-settled) .o-lbar-fill { animation: o-lbar-grow var(--office-dur-spark) var(--ease-soft) backwards; }
+@keyframes o-lbar-grow { from { width: 0.375rem; } }
+
+.o-hot-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name when" "badge when" "plan when"; row-gap: 2px; }
+.o-hot-badge { grid-area: badge; justify-self: start; margin-block: 2px; }
+.o-hot-row .o-latest-when { align-self: start; padding-top: var(--space-1); }
+@media (min-width: 48em) {
+  .o-hot-row { grid-template-areas: "name badge" "plan when"; align-items: center; }
+  .o-hot-badge { justify-self: end; margin: 0; }
+  .o-hot-row .o-latest-when { align-self: center; padding-top: 0; justify-self: end; }
+}
+.o-hot .o-count { background: var(--color-gold); }
+
+.o-feed-row { min-width: 0; display: flex; align-items: center; gap: var(--space-3); min-height: 3.25rem; padding: var(--space-2) var(--space-3); border-radius: var(--office-radius); color: inherit; text-decoration: none; transition: background-color var(--office-dur-lift) var(--ease-soft); }
+.o-feed-dot { display: grid; place-items: center; flex: none; width: var(--office-feed-dot); height: var(--office-feed-dot); border-radius: 50%; background: var(--office-sunken); color: var(--office-text); }
+.o-feed-dot .o-icon { width: 1rem; height: 1rem; }
+.o-feed-text { flex: 1; min-width: 0; font-size: var(--text-sm); line-height: var(--leading-snug); overflow-wrap: anywhere; }
+.o-feed-who { font-weight: 600; }
+.o-feed-detail { color: var(--office-muted); }
+.o-feed-row .o-latest-when { flex: none; text-align: right; }
+@media (min-width: 64em) { .o-feed-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; } }
+@media (hover: hover) and (pointer: fine) { .o-feed-row[href]:hover { background: var(--office-sunken); } }
+.o-feed-row:focus-visible { outline-offset: -2px; }
+.o-feed-row:not([href]) { cursor: default; }
+
+/* What people want: Everyone or Leads */
+.o-wants-scope { width: 100%; max-width: 15rem; margin-bottom: var(--space-3); }
+.o-wants-scope .o-seg-item { min-height: calc(2.5rem - 6px); }
+@media (min-width: 64em) {
+  .o-wants .o-wants-scope { position: absolute; top: var(--space-4); right: calc(var(--space-4) + 2.75rem + var(--space-2)); width: 12rem; margin: 0; z-index: 1; }
+  .o-wants .o-h3 { padding-right: 17rem; }
+}
+.o-wants:has(input[name="wants-scope"][value="leads"]:checked) [data-scope="everyone"],
+.o-wants:not(:has(input[name="wants-scope"][value="leads"]:checked)) [data-scope="leads"] { display: none; }
+
+@media (prefers-reduced-motion: reduce) { .o-lbar-fill, .o-feed-row { transition: none; animation: none !important; } }

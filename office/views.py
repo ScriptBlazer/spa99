@@ -1,8 +1,12 @@
 """Office views. Short: data comes from office.selectors (stored figures) and office.lists (source lists); actions call
 the existing services. Permissions are decorators on every view (see office.permissions)."""
+from datetime import datetime
+from urllib.parse import urlparse
+
 from django.contrib import messages
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.cache import patch_vary_headers
@@ -118,7 +122,27 @@ def _timeline_context(request, person):
     except ValueError:
         number = 1
     days, more = lead_lists.timeline_page(person["timeline"], number)
+    for day in days:
+        for item in day["items"]:
+            item["time"] = f"{timezone.localtime(datetime.fromisoformat(item['at'])):%H:%M}" if item["at"] else ""  # the day is the heading above
     return {"timeline_days": days, "timeline_more": more, "timeline_next": number + 1}
+
+
+def _person_extras(request, person):
+    """Values the person page draws that no list holds: the furthest status, the journey his answers come from (the latest
+    finished one, else the latest), where the back link goes, and the score that makes a Gold potential High."""
+    from gold import rating
+
+    journeys = person["journeys"]
+    finished = [j for j in journeys if j["completed"]]
+    latest = max(finished, key=lambda j: j["completed_at"] or j["started"]) if finished else (journeys[-1] if journeys else None)
+    status = lead_lists.status_of(person["kind"] == "account", [a["status"] for a in person["gold"]["applications"]])
+    referer = urlparse(request.META.get("HTTP_REFERER", ""))
+    came = {"/leads/": ("Leads", "office_leads"), "/people/": ("People", "office_people")}.get(referer.path)
+    label, name = came or (("Leads", "office_leads") if person["kind"] == "lead" else ("People", "office_people"))
+    back = reverse(name) + (f"?{referer.query}" if came and referer.query and referer.netloc == request.get_host() else "")
+    return {"person_status": status, "latest_journey": latest, "latest_finished": bool(finished), "back": {"label": label, "url": back},
+            "gold_high_at": rating.thresholds()[rating.HIGH]}
 
 
 @reader
@@ -126,7 +150,7 @@ def _timeline_context(request, person):
 def person(request, pk):
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
     person = lists.person_detail(user)
-    context = {"person": person, "section": "people", **_timeline_context(request, person)}
+    context = {"person": person, "section": "people", **_timeline_context(request, person), **_person_extras(request, person)}
     return render(request, "office/_timeline.html" if request.headers.get("HX-Request") and "tl" in request.GET else "office/person.html", context)
 
 
@@ -192,7 +216,7 @@ def lead(request, pk):
     session, (kind, data) = _lead_session(pk)
     if kind == "account":
         return redirect("office_person", pk=data.pk)
-    context = {"person": data, "section": "leads", **_timeline_context(request, data)}
+    context = {"person": data, "section": "leads", **_timeline_context(request, data), **_person_extras(request, data)}
     return render(request, "office/_timeline.html" if request.headers.get("HX-Request") and "tl" in request.GET else "office/lead.html", context)
 
 

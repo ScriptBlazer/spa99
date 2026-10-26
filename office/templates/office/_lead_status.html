@@ -1,0 +1,2 @@
+{% comment %}One status pill, the furthest a person has gone (OFFICE-LEADS 1.1). Usage: include with status="lead|registered|applied|gold".{% endcomment %}
+<span class="o-badge o-badge--st-{{ status }}">{% if status == "applied" %}Applied Gold{% elif status == "gold" %}Gold member{% else %}{{ status|capfirst }}{% endif %}</span>

@@ -1,48 +1,42 @@
 {% extends "office/base.html" %}
 {% load office_tags %}
-{% block title %}{{ person.name }} | Spa 99 Office{% endblock %}
+{% block title %}{{ person.name|default:person.email }} | Spa 99 Office{% endblock %}
 {% block body_attrs %}data-office-detail{% endblock %}
-{% block header_left %}<a class="o-back" href="{% url 'office_people' %}">{% include "office/_icon.html" with name="chevron-left" %}<span>People</span></a>{% endblock %}
+{% block header_left %}<a class="o-back" href="{{ back.url }}">{% include "office/_icon.html" with name="chevron-left" %}<span>{{ back.label }}</span></a>{% endblock %}
 {% block main %}
-<header class="o-detail-head">
-  <h1>{{ person.name }}</h1>
-  {% if person.interest %}<p class="o-lead">Registered {{ person.interest.registered|dmy }}</p>{% endif %}
-  <p class="o-badges">{% if person.verified_at %}<span class="o-badge o-badge--s-approved">Verified</span>{% else %}<span class="o-badge o-badge--s-waiting">Not verified</span>{% endif %}
-    {% if person.gold_applications %}<span class="o-badge o-badge--p-medium">Gold applicant</span>{% endif %}</p>
+{# One page for an account and for a lead. Phone order: header, answers, Gold, timeline, details, source, consent, journeys, data (css order on the cards). #}
+<header class="o-detail-head o-detail-head--person">
+  <h1 class="o-person-name">{{ person.name|default:person.email }}</h1>
+  <p class="o-lead" data-person-line>{% if person.kind == "lead" %}Lead since {{ person.first_seen|dmy }} &middot; last seen {{ person.last_seen|relative:True }}{% else %}{% if person.interest %}Registered {{ person.interest.registered|dmy }}{% endif %}{% with c=person.consent.lead.0 %}{% if c and person.interest %} &middot; lead since {{ c.at|dm }}{% endif %}{% endwith %}{% endif %}</p>
+  <p class="o-badges" data-person-badges>
+    {% include "office/_lead_status.html" with status=person_status %}
+    <span class="o-badge o-badge--type">{% if person.is_staff %}Team{% elif person.kind == "lead" %}No account{% elif person_status == "gold" %}Gold member{% elif person.interest.plan %}Member, {{ person.interest.plan }}{% else %}Member{% endif %}</span>
+    {% if person.kind == "account" %}{% if person.verified_at %}<span class="o-badge o-badge--s-approved">Verified</span>{% else %}<span class="o-badge o-badge--s-waiting">Not verified</span>{% endif %}{% endif %}
+    {% if person.gold.potential %}{% include "office/_badge.html" with potential=person.gold.potential %}{% endif %}
+  </p>
 </header>
-<div class="o-detail">
-  <div class="o-detail-main">
-    <section class="o-card" data-person-details aria-labelledby="p-details"><h2 id="p-details" class="o-h3">Details</h2>
-      <dl class="o-rows">
-        <div><dt>Email</dt><dd>{{ person.email }}</dd></div>
-        <div><dt>Mobile</dt><dd>{{ person.mobile|default:"None given" }}</dd></div>
-        <div><dt>Account ID</dt><dd class="num">{{ person.public_id }}</dd></div>
-        <div><dt>Verified</dt><dd>{% if person.verified_at %}{{ person.verified_at|dt }}{% else %}Not yet{% endif %}</dd></div>
-        <div><dt>Marketing</dt><dd>{% if person.marketing %}Yes{% else %}No{% endif %}</dd></div>
-        {% if person.last_login %}<div><dt>Last signed in</dt><dd>{{ person.last_login|dt }}</dd></div>{% endif %}
-      </dl>
-    </section>
-    {% if person.interest %}
-    <section class="o-card" data-person-interest aria-labelledby="p-plan"><h2 id="p-plan" class="o-h3">Membership</h2>
-      <dl class="o-rows">
-        <div><dt>Plan</dt><dd>{{ person.interest.plan|default:"None chosen" }}</dd></div>
-        <div><dt>Came from</dt><dd>{{ person.interest.source|default:"Not recorded"|capfirst }}</dd></div>
-        <div><dt>Registered</dt><dd>{{ person.interest.registered|dt }}</dd></div>
-      </dl>
-    </section>{% endif %}
-    {% include "office/_profile.html" %}
-    {% if person.unlinked_journeys %}<section class="o-card" data-person-unlinked><h2 class="o-h3">Left this email without signing in</h2><p class="o-sub">{{ person.unlinked_journeys|length }} journey(s) not linked to this account.</p></section>{% endif %}
+<div class="o-detail o-detail--person">
+  <div class="o-detail-main">{% include "office/_profile.html" %}
+    {% if person.unlinked_journeys %}<section class="o-card" data-person-unlinked><h2 class="o-h3">Left this email without signing in</h2><p class="o-sub">{{ person.unlinked_journeys|length }} journey{{ person.unlinked_journeys|length|pluralize }} left this address but {{ person.unlinked_journeys|length|pluralize:"is,are" }} not linked to this account.</p></section>{% endif %}
   </div>
   <aside class="o-detail-rail">
     {% include "office/_profile_rail.html" %}
     {% if office_can.can_export or office_can.can_delete %}
     <section class="o-card" data-person-data aria-labelledby="p-data"><h2 id="p-data" class="o-h3">Data</h2>
+      {% if person.kind == "lead" %}
+      {% if office_can.can_export %}<a class="btn btn-secondary btn-block" href="{% url 'office_lead_export' person.id %}" data-export-person>Export his data</a>{% endif %}
+      {% if office_can.can_delete %}<form method="post" action="{% url 'office_lead_delete' person.id %}" data-delete-person>{% csrf_token %}
+        <button type="submit" class="o-danger-link" data-working-text="Removing" data-confirm data-confirm-danger data-confirm-title="Remove {{ person.email }}?"
+                data-confirm-body="This clears his email from {{ person.journeys|length }} journey{{ person.journeys|length|pluralize }}. The answers stay, without his email. It cannot be undone." data-confirm-label="Remove for good" data-confirm-cancel="Keep">Remove this lead</button>
+      </form>{% endif %}
+      {% else %}
       {% if office_can.can_export %}<a class="btn btn-secondary btn-block" href="{% url 'office_person_export' person.id %}" data-export-person>Export his data</a>{% endif %}
       {% if office_can.can_delete and not person.is_staff %}
       <form method="post" action="{% url 'office_person_delete' person.id %}" data-delete-person>{% csrf_token %}
         <button type="submit" class="o-danger-link" data-working-text="Deleting" data-confirm data-confirm-danger data-confirm-title="Delete {{ person.name }}?"
                 data-confirm-body="This removes his registration, journey answers and Gold application. It cannot be undone." data-confirm-label="Delete for good" data-confirm-cancel="Keep">Delete this person</button>
       </form>{% endif %}
+      {% endif %}
     </section>{% endif %}
   </aside>
 </div>
