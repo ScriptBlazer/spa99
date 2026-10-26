@@ -242,6 +242,8 @@ def _industry_gold_points():
 
     changed = Counter()
     for value, points in INDUSTRY_GOLD_POINTS.items():
+        if not points:
+            continue
         updated = Option.objects.filter(question__key="industry", value=value, gold_points=0).update(gold_points=points)
         if updated:
             changed[f"journey.Option (industry {value}: {points} Gold points)"] += updated

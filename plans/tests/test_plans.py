@@ -112,11 +112,13 @@ class MembershipsPageDataTests(TestCase):
         self.assertIn("Leil Shishi", [r["label"] for r in pages.compare_table(pages.purchasable_plans())])
         self.assertIn("Leil Shishi when offered", dict(pages.gold_groups())["Beyond the spa"])
 
-    def test_gold_column_says_by_application_until_an_annual_fee_is_set(self):
+    def test_gold_column_shows_the_annual_fee_and_says_by_application_when_empty(self):
         def gold_cells():
             table = pages.compare_table(pages.purchasable_plans())
             return [next(r for r in table if r["label"] == label)["cells"][-1]["text"] for label in ("Price, ex VAT", "Price, inc VAT")]
 
+        self.assertEqual(gold_cells(), ["£199 a year", "£238.80 a year"])  # default £199 ex VAT (2026-10-26)
+        Plan.objects.filter(slug="gold").update(annual_fee=None)
         self.assertEqual(gold_cells(), ["By application", "By application"])  # no "TBC" text
         Plan.objects.filter(slug="gold").update(annual_fee=Decimal("150.00"))
         self.assertEqual(gold_cells(), ["£150 a year", "£180 a year"])

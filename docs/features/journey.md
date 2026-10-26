@@ -94,6 +94,15 @@ Which answers count as property, and the thresholds, are editable in Control.
   - `POST /journey/restart/` "Start again": returns the state of a new empty session (same shape as `GET /journey/state/`, `current_step` 1, `last_suggestion` null); the cookie is replaced; the old session is kept for the statistics.
 - Questions or options retired in Control are hidden, never deleted, so old answers stay readable.
 - **Gold points from a multi-select (2026-10-26):** for one question the journey takes the **highest** `gold_points` among the options chosen, never the sum (ticking Finance, Business owner and Law is worth 3, not 9). Points from different questions still add. Plan points are unchanged (every chosen option adds its plan points, as `time` and `facilities` always did).
+- **Who sees Gold in the journey (2026-10-26, pushed to more people; journey only, the application rating and thresholds are unchanged; High is 6 or more, Medium is 3 or more):**
+
+| Industry (highest chosen wins) | `gold_points` | Result |
+|---|---|---|
+| Property, Finance, Business owner, Law, Tech | 6 | Full Gold panel |
+| Medical, Creative | 3 | The Gold line |
+| Other | 0 | Nothing, unless other signals add up |
+
+  Property follow-ups (link, size) and "property law" only add on top. Points are editable per option in System > Journey.
 - **Counting:** each option a person chose is one vote for him (Office rule C3 "Answers"), as for `facilities`; `counted_answers` lists `industry:finance`, `industry:law`.
 - **Memberships page switch (2026-10-26):** `SiteSettings.memberships_public` (System > Settings, off by default). While off, the Memberships link is removed from the nav, mobile menu and footer, `/memberships/` redirects (302) to the journey, the sale bar points at the journey, and the sitemap leaves it out. Signed-in team members (`is_staff`) can still open the page to check it. People reach Register only through the journey, so prices appear after the email gate. Rule: `pages/access.py` `memberships_visible(request)`; templates use `{% memberships_url %}` / `{% memberships_shown %}` (`common/templatetags/membership_tags.py`).
 - On sign-up the session is linked to the new `User`; on a Gold application the application points at the session.

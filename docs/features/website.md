@@ -98,7 +98,11 @@ Decisions are in docs/PROJECT.md (row dated 2026-10-26) and docs/SPA99_RULES.md 
 - **Off-peak and Peak.** Labels only (the stored keys `daytime` and `evening` and `Plan.hours` values are unchanged). Pills, facts, compare "When" row, Gold figure and journey copy say Off-peak / Peak.
 - **Facility facts.** Dry sauna 110-120°C, wet sauna 60-80°C, cold plunge 9-11°C (seed; edit in Control). The gym has display `compact` (one smaller picture, shorter section, no bottle inset); the massage room is a full `feature` section.
 - **Leil Shishi switch.** Site settings "show Leil Shishi" (`SiteSettings.show_leil_shishi`, default off). `plans.services.shown_perks()` filters the perk out of plan cards, pills, the compare table, Register and the Gold Card page. The perks stay on the plans.
-- **Gold in the compare table.** `pages.services.compare_cards(cards)` adds the Gold Card as the last column (the template reads it with `{% compare_columns cards as columns %}`). `Plan.annual_fee` (ex VAT, empty = not decided) is edited in System > Plans (More row of the Gold Card). Empty shows "By application" in both price rows; set shows "£X a year" (inc VAT in the second row).
+- **Gold in the compare table.** `pages.services.compare_cards(cards)` adds the Gold Card as the last column (the template reads it with `{% compare_columns cards as columns %}`). `Plan.annual_fee` (ex VAT, empty = not decided) is edited in System > Plans (More row of the Gold Card). Default £199 a year (2026-10-26, ex VAT). Empty shows "By application" in both price rows; set shows "£X a year" (inc VAT in the second row).
 - **Tier 3** card says "Unlimited" (smaller numeral, `.tier-num--word`).
 - **Address.** `SiteSettings.address_street` default "BML House, 99c Vale Road". Existing installs: edit it in the admin (no backfill written; a new live database gets it from the model default).
 - **Every visit.** The kit row is Towels, Robe, Slippers, Ice bucket, Toiletries (the ice bucket has no picture yet, so it shows on the swan tile). Free drinks and free ice lollies are pills on the Arrive step and in the Memberships "Every visit" line.
+
+## To do for the booking build
+
+- **Shabbos and Yom Tov cut-off (decided 2026-10-26, not built):** bookings are allowed up to 1 hour before closing (see the CAL-07 override in `docs/SPA99_RULES.md`). Apply it in the booking rules when the booking system is built.

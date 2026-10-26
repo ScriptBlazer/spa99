@@ -103,28 +103,37 @@ class GoldPotentialTests(TestCase):
 
     def test_thresholds_from_the_journey(self):
         self.assertEqual(self.level().level, "low")
-        self.assertEqual(self.level(industry="finance").level, "medium")  # Finance, Business owner, Law: 3 points (2026-10-23)
-        self.assertEqual(self.level(industry="business_owner").level, "medium")
-        self.assertEqual(self.level(industry="tech").level, "low")
-        self.assertEqual(self.level(industry="medical").level, "low")
         owner = self.level(industry="property", property_link="owner_investor")
-        self.assertEqual((owner.level, owner.score), ("medium", 5))  # a property link without scale
+        self.assertEqual((owner.level, owner.score), ("high", 11))  # property 6 + a property link 5
         scaled = self.level(industry="property", property_link="owner_investor", property_size="50_199")
-        self.assertEqual((scaled.level, scaled.score), ("high", 7))
-        self.assertEqual(self.level(industry="property", property_link="firm").level, "medium")
-        self.assertEqual(self.level(industry="law", property_law="yes").level, "high")  # law 3 + property lawyer 3
-        self.assertEqual(self.level(industry="law", property_law="no").level, "medium")
+        self.assertEqual((scaled.level, scaled.score), ("high", 13))
+        self.assertEqual(self.level(industry="law", property_law="yes").level, "high")  # law 6 + property lawyer 3
+        self.assertEqual(self.level(industry="law", property_law="no").level, "high")
+
+    def test_who_sees_the_gold_panel_line_or_nothing(self):
+        """2026-10-26 table (journey only): 6 points = panel (high), 3 = line (medium), 0 = nothing (low)."""
+        table = [
+            (dict(industry="finance"), "high"), (dict(industry="tech"), "high"), (dict(industry="business_owner"), "high"),
+            (dict(industry="law"), "high"), (dict(industry="property"), "high"),
+            (dict(industry="medical"), "medium"), (dict(industry="creative"), "medium"),
+            (dict(industry="other"), "low"), (dict(industry=["medical", "tech"]), "high"),
+        ]
+        for answers, level in table:
+            self.assertEqual(self.level(**answers).level, level, answers)
+        for size in ("1_9", "10_49", "50_199", "200_plus"):
+            self.assertEqual(self.level(industry="property", property_link="owner_investor", property_size=size).level, "high")
 
     def test_weights_and_thresholds_are_editable(self):
         GoldRule.objects.filter(group="threshold", match_value="high").update(points=5)
         self.assertEqual(self.level(industry="property", property_link="owner_investor").level, "high")
         GoldRule.objects.filter(group="property_link", match_value="owner_investor").update(points=0)
+        Option.objects.filter(question__key="industry", value="property").update(gold_points=0)
         self.assertEqual(self.level(industry="property", property_link="owner_investor").level, "low")
 
     def test_hidden_answers_do_not_count(self):
         session = make_session(industry="property", property_link="owner_investor", property_size="200_plus")
         self.assertEqual(engine.compute_gold(session).level, "high")
-        services.save_answer(session, "industry", options=["tech"])  # property questions disappear
+        services.save_answer(session, "industry", options=["other"])  # property questions disappear
         self.assertEqual(engine.compute_gold(session).level, "low")
 
 
@@ -225,9 +234,9 @@ class MultiIndustryTests(TestCase):
     def test_gold_extra_points_use_the_highest_industry_not_the_sum(self):
         one = engine.compute_gold(make_session(industry="finance"))
         many = engine.compute_gold(make_session(industry=["finance", "business_owner", "law", "tech"]))
-        self.assertEqual((one.score, many.score), (3, 3))  # three occupations worth 3 each still give 3
-        Option.objects.filter(question__key="industry", value="tech").update(gold_points=4)
-        self.assertEqual(engine.compute_gold(make_session(industry=["finance", "tech"])).score, 4)
+        self.assertEqual((one.score, many.score), (6, 6))  # four occupations worth 6 each still give 6
+        Option.objects.filter(question__key="industry", value="tech").update(gold_points=8)
+        self.assertEqual(engine.compute_gold(make_session(industry=["finance", "tech"])).score, 8)
 
     def test_every_chosen_industry_counts_as_a_vote(self):
         session = make_session(industry=["finance", "law"])
@@ -327,7 +336,7 @@ class EndpointTests(TestCase):
         self.assertEqual(saved.status_code, 200)
         self.post(client, "/journey/answer/", {"question": "time", "options": ["daytime"]}, token)
         self.post(client, "/journey/answer/", {"question": "facilities", "options": ["gym"]}, token)
-        self.post(client, "/journey/answer/", {"question": "industry", "options": ["tech", "creative"]}, token)
+        self.post(client, "/journey/answer/", {"question": "industry", "options": ["other"]}, token)
         self.assertEqual(self.post(client, "/journey/answer/", {"question": "frequency", "options": ["bogus"]}, token).status_code, 400)
         self.post(client, "/journey/step/", {"step": 2}, token)
 

@@ -33,8 +33,9 @@ INDUSTRY = [
     ("property", "Property"), ("finance", "Finance"), ("business_owner", "Business owner"), ("law", "Law"),
     ("medical", "Medical"), ("tech", "Tech"), ("creative", "Creative"), ("other", "Other"),
 ]
-# Gold points per occupation (Moishe 2026-10-23): these reach the "Gold might suit you" level, like a property owner.
-INDUSTRY_GOLD_POINTS = {"finance": 3, "business_owner": 3, "law": 3}
+# Gold points per occupation (Moishe 2026-10-26, pushes Gold to more people; journey only, the application rating is
+# unchanged): 6 = full Gold panel (High, threshold 6), 3 = the Gold line (Medium, threshold 3), 0 = nothing.
+INDUSTRY_GOLD_POINTS = {"property": 6, "finance": 6, "business_owner": 6, "law": 6, "tech": 6, "medical": 3, "creative": 3, "other": 0}
 PROPERTY_LINK = [
     ("owner_investor", "Owner or investor"), ("developer", "Developer"), ("manager", "Manager (block, estate, portfolio)"),
     ("firm", "At a property or management firm"), ("agent", "Agent or broker"), ("property_lawyer", "Property lawyer"),
