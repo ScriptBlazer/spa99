@@ -290,3 +290,161 @@ None. Everything is existing `--sys-*`.
 6. Tier cards, single visit, continue bar, register plan card and My Spa 99 show the sale lines of section 2 with the regular price unchanged; no strike-through, no red, no badges; register line follows the chosen chip.
 7. System Sales: list grouped Live / Upcoming / Past with the badges and empty state of 3.1; form fields, preview panel, locked fields with written reasons, overlap error, save confirm, End now and Delete modals, toasts with Undo, all in existing `sys-*` classes; no one-sided borders anywhere.
 8. AA everywhere (pairs in 1.3 and 2); 44px targets on the public phone bar, 36px in System on phone; screenshots at 375 and 1440 of Home with the bar (top and scrolled 20px), Memberships with a selected sale card, Register with a sale plan, System list (all three groups and empty) and the edit form of a live sale with locked fields, sent for design review.
+
+---
+
+## Round 2 — sale band
+
+Moishe (2026-10-26): the strip is too small and too high up. On **Home** and **Memberships** the sale becomes a big band right after the first screen; **every other full-header page keeps the slim strip** (section 1) exactly as today. A page shows one or the other, never both. Section 1 still applies to the strip; this section overrides it only where it says so.
+
+### R2.1 Placement
+
+| Page | Where | Background |
+|---|---|---|
+| Home (`pages/home.html`) | A new full-bleed `<section>` between the hero (`.hero-scene`, after its closing `</section>`) and the ritual scene. It sits after the pin, so the pinned hero is untouched. | `--color-espresso-raised` (one tone step up from the espresso scenes on both sides: the step is the only separation, no lines) |
+| Memberships (`pages/memberships.html`) | Full bleed, right after `</form>` (the intro and tier cards) and before the `.container` holding `#compare`. | `--color-espresso` (a dark band across the cream page) |
+
+- Both pages override `{% block sale_bar %}{% endblock %}{% block sale_html %}{% endblock %}` (the `tour.html` pattern). So: no strip, no `has-sale` on `<html>`, no header dock and no first-screen subtraction on these two pages.
+- One include, `common/_sale_band.html`, called as `{% include "common/_sale_band.html" with tone="raised" %}` (Home) or `tone="deep"` (Memberships). It renders nothing unless `sale_bar` is set (live, or preview). Loads `common/css/sale-band.css` and `sale-bar.js` itself.
+- **Not dismissible.** No close button. The strip's sessionStorage dismissal never hides the band.
+
+### R2.2 Anatomy
+
+```
+1440 (container, 12-col grid, padding-block --space-7)
++------------------------------------------------------------------------------+
+|                                                                              |
+|  [Preview]                                                                   |
+|  Christmas sale                                 3        04        12        |
+|                                                 DAYS     HOURS     MINUTES   |
+|  20% off Tier 2 and Tier 3.                                                  |
+|  Keep it for your first 3 months.               Ends Thursday 24 December,   |
+|                                                 23:59                        |
+|  [ See the memberships  -> ]   End preview                                   |
+|                                                                              |
++------------------------------------------------------------------------------+
+   text: columns 1-7                              countdown: columns 8-12, align-self: end
+
+375 (stacked, padding-block --space-6)
++---------------------------------+
+| [Preview]                       |
+| Christmas sale                  |
+| 20% off Tier 2 and Tier 3.      |
+| Keep it for your first 3 months.|
+|                                 |
+| 3      04      12               |
+| DAYS   HOURS   MINUTES          |
+| Ends Thursday 24 December, 23:59|
+|                                 |
+| [ See the memberships       -> ]|  full width
+| End preview                     |
++---------------------------------+
+```
+
+```html
+<section class="sale-band on-dark sale-band--{{ tone }}" aria-labelledby="sale-band-title" data-sale-band data-ends="…" data-now="…"{% if upcoming %} data-upcoming{% endif %} {# Home: data-scene="sale"  Memberships: data-reveal="stagger" on .sale-band-grid #}>
+  <div class="container grid sale-band-grid">
+    <div class="sale-band-text">
+      {% if sale_bar.preview %}<p class="sale-band-preview">Preview</p>{% endif %}
+      <h2 class="sale-band-name" id="sale-band-title">Christmas sale</h2>
+      <p class="sale-band-offer">20% off Tier 2 and Tier 3.<br>Keep it for your first 3 months.</p>
+      <div class="sale-band-actions">…button… {% if preview %}<a class="sale-band-end-preview" href="?sale_preview=end">End preview</a>{% endif %}</div>
+    </div>
+    <div class="sale-band-time">
+      <div class="sale-band-count" aria-hidden="true" data-sale-count>
+        <span class="sale-band-unit"><span class="sale-band-num">3</span><span class="sale-band-label">days</span></span>
+        <span class="sale-band-unit"><span class="sale-band-num">04</span><span class="sale-band-label">hours</span></span>
+        <span class="sale-band-unit"><span class="sale-band-num">12</span><span class="sale-band-label">minutes</span></span>
+      </div>
+      <p class="sale-band-ends">Ends Thursday 24 December, 23:59</p>
+    </div>
+  </div>
+</section>
+```
+
+DOM order is text, then time, then the button lives inside the text block; at 1440 the grid puts time in columns 8-12 (`align-self: end`, so the countdown baseline sits level with the button row). Below 64em everything stacks in one column, in this visual order: preview, name, offer, countdown, ends, actions (use `display: contents` on `.sale-band-text` below 64em with `order`, or simply move actions after time in the markup and place them with grid areas at 1440; either is fine, keep tab order = visual order).
+
+### R2.3 Look (tokens only, no new tokens)
+
+| Part | Token / value |
+|---|---|
+| Band | `padding-block: var(--space-6)` phone, `var(--space-7)` from 64em. Full bleed background; content in `.container` (`--container-max`, `--page-margin`). No border, no radius, no shadow, no texture. |
+| Preview marker | As the strip: `--text-sm`, `--color-text-muted-inverse`, 1px full `--color-hairline-inverse` border, `--radius-sm`, `padding: 0 var(--space-2)`, `display: inline-block`, `margin-bottom: var(--space-3)`. |
+| Name | Signika (`--font-display`), `--text-2xl`, `--leading-tight`, `--tracking-display`, weight 500, `--color-gold` (6.17 on espresso, 5.32 on espresso-raised; large text). `max-width: var(--measure-display)`. The only gold on the band. |
+| Offer | Figtree `--text-lg`, `--leading-snug`, `--color-text-inverse`, `margin-top: var(--space-4)`, `max-width: var(--measure)`. Second sentence ("Keep it…") in `--color-text-muted-inverse`. |
+| Countdown numerals | Figtree, `--text-2xl`, weight 300, `--leading-display`, `font-variant-numeric: tabular-nums`, `--color-text-inverse`. No colons, no boxes, no dividers. |
+| Unit labels | `--text-sm`, uppercase, `--tracking-label`, `--color-text-muted-inverse`, `margin-top: var(--space-2)`. Singular at 1 ("1 day", "1 hour", "1 minute"). |
+| Units | `.sale-band-count { display: flex; gap: var(--space-4) }` phone, `var(--space-5)` from 64em; each unit a 1-col grid, left aligned. Phone: `margin-top: var(--space-5)`. |
+| Ends line | `--text-sm`, `--color-text-muted-inverse`, `margin-top: var(--space-3)`. Real text (this is what screen readers get). |
+| Button | Existing `.btn.btn-primary` in its on-dark look, `btn-block-phone` (full width below 48em), `margin-top: var(--space-5)`. Arrow-right icon on Home and journey links; no icon on Memberships (it scrolls up). |
+| End preview | Text link, `--text-sm`, `--color-text-muted-inverse`, hover `--color-text-inverse`; beside the button from 48em (`margin-left: var(--space-4)`), under it on phone (`margin-top: var(--space-3)`, 44px tall target). |
+| Focus | `--color-focus-inverse` 2px outline, as everywhere on dark. |
+| `prefers-contrast: more` | both tones become `--color-espresso`; second offer sentence and labels go `--color-text-inverse`. |
+
+Colour rule recap: espresso / espresso-raised ground, cream for the offer and numbers, gold only for the name. No red, no caramel, no badge, no strike-through.
+
+### R2.4 Countdown rules
+
+Same maths and format rules as the strip (1.5): minutes rounded **up** (never 0 while live), skew-corrected from `data-now`, ticks once a minute on the end time's minute boundary (`setTimeout`, never `setInterval`, no seconds anywhere), `visibilitychange` recomputes. Leading unit unpadded, later units two digits.
+
+| Time left | Units shown | Example |
+|---|---|---|
+| 1 day or more | days, hours, minutes | `3` days `04` hours `12` minutes |
+| Under 1 day | hours, minutes | `4` hours `07` minutes |
+| Under 1 hour | minutes | `12` minutes |
+| Under 1 minute | minutes | `1` minute |
+
+The band shows all three units on phone too (it has the room; the strip's phone rule of dropping minutes does not apply). When a unit drops off, it is removed instantly, no fade. Digits swap instantly; tabular numerals keep widths still.
+
+- The numerals are `aria-hidden`; the visible "Ends …" line carries the meaning. No `aria-live`.
+- **At zero**: the band does **not** leave (it is content mid-page; removing it would jump the page). `.sale-band-count` is replaced in place by one line "This sale has now ended." (`--text-lg`, `--color-text-muted-inverse`) inside the same box with its height locked (`min-block-size` set from its current height first), the "Ends …" line is hidden, offer and button stay. A crossfade of `--duration-base` `--ease-soft` if the band is in view, instant otherwise or under reduced motion. The next request renders no band.
+- **JS**: extend `sale-bar.js` rather than add a file: share `format()` (return `{ d, h, m }`), drive the strip if present and every `[data-sale-band]` if present. The band has no dismiss and no header logic.
+
+### R2.5 Motion
+
+A single gentle reveal when the band enters, matching each page's existing system. The numbers never count up or roll (prices and numbers do not animate).
+
+- **Home** (scenes.js): `data-scene="sale"` and a new `SCENES.sale(el)`: `lineRise(name)` (give the name `data-rise` and the others `data-fade` so the existing pre-hide CSS covers them), then `fadeUp([offer, count, ends, actions], { trigger: name, start: 'top 80%', stagger: 0.12 })`. Once only, defaults (`soft`, 0.9s fade, 16px rise). No pin, no scrub, no frame. After the band appears or changes height, nothing to refresh: it is below the hero pin.
+- **Memberships** (reveal.js): `data-reveal="stagger"` on `.sale-band-grid` (children rise `--rise` 8px over `--duration-reveal` with `--stagger`), same as the cards above it.
+- **Reduced motion**: none. The band is fully visible on first paint (scenes.js does nothing without `motion`; reveal.js already shows `[data-reveal]` under reduced motion). No-JS: visible (the `.js` hide rules never apply).
+
+### R2.6 Links and copy
+
+| Where | Button label | Target |
+|---|---|---|
+| Home, Memberships shown | See the memberships | `{% memberships_url %}#plans` |
+| Home, Memberships hidden | Find your membership | `{% memberships_url %}` (the journey) |
+| Memberships page | Choose your membership | `#plans` (scrolls up to the cards; smooth via Lenis/`scroll-behavior` when motion is on, instant under reduced motion; focus moves to the `.tiers` fieldset legend) |
+
+| Part | Text |
+|---|---|
+| Name | `{sale.name}` as written in System (e.g. "Christmas sale") |
+| Offer | `{pct}% off {plans_text}.` then `Keep it for your first {n} months.` (`1 month` when 1; plans wording from 1.4, sentence case: "20% off all memberships.") |
+| Labels | days / hours / minutes (day / hour / minute at 1) |
+| Ends | Ends Thursday 24 December, 23:59 |
+| Ended | This sale has now ended. |
+| Preview | Preview / End preview |
+| Preview, upcoming | the countdown is replaced by `Starts Tuesday 1 December, 09:00` in `--text-lg` cream; no "Ends" line |
+
+Never: "Hurry", "Don't miss out", "Limited time", "Ends soon", "Last chance", exclamation marks, em dashes.
+
+### R2.7 Preview
+
+The signed preview link (1.9) shows the band on Home and Memberships, with the "Preview" marker above the name and "End preview" by the button; other pages show the strip in preview as today. Live sales count to the end; upcoming sales show the start line (R2.6). Memberships prices show the sale lines (section 2) as before.
+
+### R2.8 Large screens (wide.css)
+
+Nothing new in `wide.css`. Every band size is a `rem` token or a `clamp()` token, so above 1920 the whole band grows with the root (`font-size: max(100%, min(100vw / 120, 100vh / 60))`) and keeps its 1920 proportions; the container cap (`--container-max`) grows with it. Do not write any `px` in `sale-band.css` except the 1px preview hairline and the 2px focus ring. Check at 2560x1440 and 3840x2160 that the band keeps the 1440 composition (text left, countdown right) and that the name stays one or two lines.
+
+### R2.9 Strip on other pages
+
+Unchanged (section 1), still dismissible, still at the top of every other full-header page. Remove Home and Memberships from the list in 1.1 and from the first-screen subtraction in 1.6 (`.hero-first` and `.mem-stage` rules become dead; delete them).
+
+### R2.10 Acceptance
+
+1. Home: band between hero and ritual, espresso-raised; Memberships: band right after the tier form, espresso. Neither page shows the strip or sets `has-sale`; every other full-header page shows the strip as before.
+2. Layout as R2.2 at 375 and 1440 (text left, countdown right at 1440; stacked, full-width button at 375); tokens as R2.3; gold on the name only; no borders, no red, no seconds.
+3. Countdown units and drop rules as R2.4, rounded up, ticking on the minute; at zero the band stays and swaps to "This sale has now ended." without a page jump.
+4. Reveal as R2.5 (lineRise + staggered fade on Home, data-reveal on Memberships); nothing moves under reduced motion; numbers never animate.
+5. Preview marker and End preview on both bands; upcoming preview shows the start line.
+6. Screenshots for design review: Home and Memberships at 375 and 1440 with the band in view (live, under 1 day, under 1 hour, preview upcoming), one other page with the strip, and Home at 2560.
