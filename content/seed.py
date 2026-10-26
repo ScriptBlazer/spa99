@@ -127,9 +127,9 @@ PAGES = {
         ("result_cta", "", "", "Register for {plan}", "/register/"),
         ("change_answers", "", "", "Start again", ""),  # same wording as start_again; the page reads start_again
         ("gold_panel", "The Gold Card.",
-         "With your property background, you may be invited to hold the Gold Card. It's free, by application, and your answers come with you.",
+         "With your line of work, you may be invited to hold the Gold Card. It's free, by application, and your answers come with you.",
          "Apply for the Gold Card", "/gold-card/apply/"),
-        ("gold_line", "", "In property? You may be eligible for the Gold Card.", "Apply", "/gold-card/apply/"),
+        ("gold_line", "", "You may be eligible for the Gold Card.", "Apply", "/gold-card/apply/"),
         ("others", "Or choose another", "", "Choose {plan}", ""),
         ("explore_memberships", "", "", "Explore all memberships", "/memberships/"),
         ("continue", "", "", "Continue", ""),
