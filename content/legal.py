@@ -1,4 +1,4 @@
-"""Starting text of the Privacy notice and the Terms of use (2026-10-23). Sources for every statement and the open
+"""Starting text of the Privacy notice and the Terms of use (updated 2026-10-26). Sources for every statement and the open
 proposals are in docs/features/legal.md. Written into content rows by `seed_phase1` (new installs) and
 `backfill_site_data` (existing ones); after that the rows are edited in Control, never here.
 
@@ -14,8 +14,8 @@ How a legal body is written (one line per block, rendered by `content.legal_rend
 
 Keys: `body` (title and intro), `updated` (the date shown), `part_N` (the numbered parts, in order), `contact`."""
 
-UPDATED = "23 October 2026"
-PRIVACY_VERSION = "2026-10-23"  # SiteSettings.privacy_version; recorded on everyone who accepts this notice
+UPDATED = "26 October 2026"
+PRIVACY_VERSION = "2026-10-26"  # SiteSettings.privacy_version; recorded on everyone who accepts this notice
 
 COMPANY_LINE = ("Spa 99 is run by BML SPA 99 LIMITED, a company registered in England (company number 16930909). "
                 "Our registered office is 40 Wellington Avenue, London N15 6AS.")
@@ -24,7 +24,7 @@ POSTAL = "BML SPA 99 LIMITED, 40 Wellington Avenue, London N15 6AS"
 PRIVACY_PARTS = [
     ("part_1", "Who we are", "\n".join([
         COMPANY_LINE,
-        "The spa is at 99 Vale Road, London N4. We are part of BML Group.",
+        "The spa is at BML House, 99c Vale Road, London N4 1PR. We are part of BML Group.",
         "We are the data controller for the information in this notice. That means we decide how it is used, and we "
         "are responsible for looking after it.",
         "We are registered with the Information Commissioner's Office. Our registration number is {ico}.",
@@ -44,6 +44,10 @@ PRIVACY_PARTS = [
         "- About the visit: the page that linked to us (if any), campaign tags in the link, the kind of device (phone, "
         "tablet or computer), and when you started and finished.",
         "Answers are saved as you go, even if you stop part way. They carry no name unless you register.",
+        "- Your email address, if you give it. Before the journey shows your suggested membership and price, it asks for "
+        "your email, with a tick to say Spa 99 may email you about opening. We keep the address with your answers, the "
+        "date you gave it and the version of this notice in force. If you are signed in, we use your account email "
+        "instead and do not ask.",
         "### When you register",
         "- Your name, email address, UK mobile number, date of birth and password. The password is stored scrambled "
         "(hashed), so nobody can read it, including us.",
@@ -59,6 +63,7 @@ PRIVACY_PARTS = [
         "- A potential rating (High, Medium or Low) worked out from your answers, with its reasons.",
         "- Whether you would like news from us by email, and which version of this notice you accepted.",
         "- Our decision and, if we approve, the date and the invitation we send you.",
+        "- If our team writes to you about your application (for example to ask a question), a record of that email.",
         "### Change history",
         "- Earlier versions of your details (a change history): when your account, registration or Gold Card "
         "application changes, we keep the previous version, so we can see what changed and put mistakes right. "
@@ -82,11 +87,16 @@ PRIVACY_PARTS = [
         "Your journey answers give you a suggestion. Added together with everyone else's, they show us which times and "
         "rooms matter most. Those figures are totals, never decisions about you. Basis: legitimate interests.",
         "### To consider a Gold Card application",
-        "We read your application, and the potential rating helps us. The rating never decides on its own: a person "
+        "We read your application, and the potential rating helps us. Our team may email you with questions about it. The rating never decides on its own: a person "
         "does. Basis: steps before a contract, and legitimate interests.",
         "### To send news, only if you ask",
         "We send news by email only if you said yes. You can stop it at any time in My Spa 99, or by writing to "
         "{contact}. Basis: your consent.",
+        "### To email you about opening after the journey",
+        "If you gave your email in the guided journey and ticked the box, we use it to send news about the opening and "
+        "to understand which membership suits people (your answers, linked to your address, show us what people "
+        "choose). Basis: your consent. You can withdraw it at any time by following the unsubscribe link in any email "
+        "or by writing to {contact}; we then stop emailing you and delete the address.",
         "### To keep the site and your account safe",
         "Sign-in records, limits on repeated attempts, error reports and our team's activity records. Basis: "
         "legitimate interests.",
@@ -148,6 +158,9 @@ PRIVACY_PARTS = [
         "write to you, then delete it.",
         "- Accounts whose email is never confirmed: 90 days.",
         "- Journey answers with no account: two years, then deleted.",
+        "- Your email address from the journey: two years after you gave it, or until you unsubscribe, withdraw "
+        "consent or register (then it is kept as part of your account), whichever comes first. The answers then stay "
+        "only as anonymous figures.",
         "- Gold Card applications we do not approve: one year after our decision.",
         "- Sign-in records: one year.",
         "- Records of emails we send: two years.",
@@ -171,8 +184,8 @@ PRIVACY_PARTS = [
         "Where we rely on your consent, you can withdraw it at any time.",
         "### Do it yourself in My Spa 99",
         "Under You, Download my data gives you a file of everything we hold about your account. Delete my account erases "
-        "your account, your registration, any Gold Card applications made with your email, our records of emails about "
-        "you, your sign-in records, and the change history of all of these. Your journey answers stay only as anonymous figures, no longer linked to you.",
+        "your account, your registration, any Gold Card applications made with your email, the email you gave in the journey, our records of "
+        "emails about you, your sign-in records, and the change history of all of these. Your journey answers stay only as anonymous figures, no longer linked to you.",
         "For anything else, write to {contact}. We reply within one month, and there is no charge.",
     ])),
     ("part_10", "Complaints", "\n".join([
@@ -189,7 +202,7 @@ PRIVACY_PARTS = [
 TERMS_PARTS = [
     ("part_1", "About us", "\n".join([
         COMPANY_LINE,
-        "Spa 99 is a private spa for men at 99 Vale Road, London N4, opening {opening}. We are part of BML Group.",
+        "Spa 99 is a private spa for men at BML House, 99c Vale Road, London N4 1PR, opening {opening}. We are part of BML Group.",
         "These terms cover your use of the Spa 99 website and your account. By using the site, you accept them.",
     ])),
     ("part_2", "Men only, 18 and over", "\n".join([

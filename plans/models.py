@@ -151,7 +151,7 @@ class SiteSettings(BaseModel):
         help_text="Shown on the site and used as Reply-To. Empty = the address inside DEFAULT_FROM_EMAIL.")
 
     privacy_version = models.CharField(
-        max_length=20, default="2026-10-23",
+        max_length=20, default="2026-10-26",
         help_text="Recorded on each person who accepts the privacy notice. Change it (and the notice's Last updated row) "
                   "whenever the notice changes in a way people should accept again."
     )
