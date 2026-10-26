@@ -49,3 +49,24 @@ class MembershipsSwitchTests(TestCase):
 
     def test_register_still_works_for_someone_who_came_through_the_journey(self):
         self.assertEqual(self.client.get("/register/?plan=tier-2").status_code, 200)
+
+
+class NoPricesBeforeTheGateTests(TestCase):
+    """Barry, 2026-10-26: no prices on pages reachable without leaving an email, while Memberships is hidden."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_spa_and_home_show_no_price_while_hidden(self):
+        spa = self.client.get("/the-spa/").content.decode()
+        self.assertNotIn("£", spa)
+        self.assertIn("Tailor your membership", spa)
+        home = self.client.get("/").content.decode()
+        self.assertNotIn("&pound;", home)
+        self.assertNotIn("£", home)
+
+    def test_spa_and_home_show_the_prices_once_public(self):
+        open_memberships()
+        self.assertIn("Memberships from £299 a month, £358.80 inc VAT.", self.client.get("/the-spa/").content.decode())
+        self.assertIn("&pound;299", self.client.get("/").content.decode())
