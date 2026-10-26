@@ -17,17 +17,34 @@ class SalePageTests(TestCase):
         self.assertNotIn("data-sale-bar", html)
         self.assertNotIn("has-sale", html)
 
-    def test_bar_and_lines_while_live(self):
+    def test_strip_on_other_pages_band_on_home_and_memberships(self):
+        make_sale(start=-1, end=80)
+        html = self.client.get("/the-spa/").content.decode()
+        self.assertIn("data-sale-bar", html)
+        self.assertNotIn("data-sale-band", html)
+        self.assertLess(html.index("skip-link"), html.index("data-sale-bar"))
+        self.assertLess(html.index("data-sale-bar"), html.index("site-header"))
+        for path in ("/", "/memberships/"):
+            html = self.client.get(path).content.decode()
+            self.assertIn("data-sale-band", html, path)
+            self.assertNotIn("data-sale-bar", html, path)
+            self.assertNotIn("has-sale", html, path)
+            self.assertNotIn("data-sale-close", html, path)
+
+    def test_band_text_and_lines_while_live(self):
         make_sale(start=-1, end=80)
         html = self.client.get("/memberships/").content.decode()
-        self.assertIn("data-sale-bar", html)
-        self.assertIn("20% off", html)
-        self.assertIn("Tier 2 and Tier 3", html)
+        self.assertIn("20% off Tier 2 and Tier 3.", html)
+        self.assertIn("Keep it for your first 3 months.", html)
+        self.assertIn("Choose your membership", html)
         self.assertIn("Christmas sale: £", html)
         self.assertIn("for your first 3 months", html)
         self.assertEqual(html.count('class="tier-sale"'), 2)
-        self.assertLess(html.index("skip-link"), html.index("data-sale-bar"))
-        self.assertLess(html.index("data-sale-bar"), html.index("site-header"))
+        self.assertLess(html.index('id="plans"'), html.index("data-sale-band"))
+        self.assertLess(html.index("data-sale-band"), html.index('id="compare"'))
+        home = self.client.get("/").content.decode()
+        self.assertLess(home.index('data-scene="hero"'), home.index("data-sale-band"))
+        self.assertLess(home.index("data-sale-band"), home.index('data-scene="ritual"'))
 
     def test_reduced_pages_and_the_tour_have_no_bar(self):
         make_sale(start=-1, end=80)
@@ -38,6 +55,8 @@ class SalePageTests(TestCase):
     def test_end_preview_link_clears_the_session_preview(self):
         sale = make_sale(start=48, end=72)
         self.client.get(f"/?sale_preview={sales.preview_token(sale)}")
-        self.assertIn("End preview", self.client.get("/").content.decode())
+        page = self.client.get("/").content.decode()
+        self.assertIn("End preview", page)
+        self.assertIn("Starts ", page)
         self.client.get("/?sale_preview=end")
-        self.assertNotIn("data-sale-bar", self.client.get("/").content.decode())
+        self.assertNotIn("data-sale-band", self.client.get("/").content.decode())

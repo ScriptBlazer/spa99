@@ -24,13 +24,16 @@ class MembershipsSwitchTests(TestCase):
         self.assertIn('href="/gold-card/"', html)  # the rest of the nav is still there
         self.assertNotIn("/memberships/", self.client.get("/sitemap.xml").content.decode())
 
-    def test_the_sale_bar_points_at_the_journey_while_hidden(self):
+    def test_the_sale_band_and_strip_point_at_the_journey_while_hidden(self):
         make_sale(start=-1, end=80)
         html = self.client.get("/").content.decode()
-        self.assertIn("data-sale-bar", html)
-        self.assertIn('class="sale-bar-link" href="/journey/"', html)
+        self.assertIn("data-sale-band", html)
+        self.assertIn('href="/journey/">Find your membership', html)
+        strip = self.client.get("/visit/").content.decode()
+        self.assertIn('class="sale-bar-link" href="/journey/"', strip)
         open_memberships()
-        self.assertIn('class="sale-bar-link" href="/memberships/#plans"', self.client.get("/").content.decode())
+        self.assertIn('href="/memberships/#plans">See the memberships', self.client.get("/").content.decode())
+        self.assertIn('class="sale-bar-link" href="/memberships/#plans"', self.client.get("/visit/").content.decode())
 
     def test_team_members_can_still_look_and_see_the_link(self):
         self.client.force_login(make_team_member("office@example.com"))

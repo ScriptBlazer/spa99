@@ -1,0 +1,25 @@
+{% load static sale_tags membership_tags %}{% if sale_bar %}{% sale_bar_view sale_bar as sb %}{% memberships_shown as show_memberships %}{% memberships_url as mem_url %}
+{# The sale band (docs/design/SYSTEM-SALES.md Round 2). Used on Home (tone="raised") and Memberships (tone="deep"); every other page keeps the slim strip. Not dismissible. #}
+<link rel="stylesheet" href="{% static 'common/css/sale-band.css' %}">
+<section class="sale-band on-dark sale-band--{{ tone|default:'raised' }}" aria-labelledby="sale-band-title" data-sale-band data-ends="{{ sale_bar.ends_at }}" data-now="{{ sb.now }}"{% if sb.upcoming %} data-upcoming{% endif %}{% if tone == "raised" %} data-scene="sale"{% endif %}>
+  <div class="container grid sale-band-grid"{% if tone != "raised" %} data-reveal="stagger"{% endif %}>
+    <div class="sale-band-text">
+      {% if sale_bar.preview %}<p class="sale-band-preview"{% if tone == "raised" %} data-fade{% endif %}>Preview</p>{% endif %}
+      <h2 class="sale-band-name" id="sale-band-title"{% if tone == "raised" %} data-rise{% endif %}>{{ sale_bar.name }}</h2>
+      <p class="sale-band-offer"{% if tone == "raised" %} data-fade{% endif %}>{{ sale_bar.percent }}% off {{ sale_bar.plans_text }}.<br><span class="sale-band-keep">Keep it for your first {{ sale_bar.months }} month{{ sale_bar.months|pluralize }}.</span></p>
+    </div>
+    <div class="sale-band-time"{% if tone == "raised" %} data-fade{% endif %}>
+      {% if sb.upcoming %}<p class="sale-band-starts">Starts {{ sb.starts_long }}</p>
+      {% else %}<div class="sale-band-count" aria-hidden="true" data-sale-count>{% for num, label in sb.units %}<span class="sale-band-unit"><span class="sale-band-num">{{ num }}</span><span class="sale-band-label">{{ label }}</span></span>{% endfor %}</div>
+      <p class="sale-band-ends" data-sale-ends>Ends {{ sb.ends_sr }}</p>{% endif %}
+    </div>
+    <div class="sale-band-actions"{% if tone == "raised" %} data-fade{% endif %}>
+      {% if tone == "deep" %}<a class="btn btn-primary btn-block-phone" href="#plans" data-sale-jump>Choose your membership</a>
+      {% elif show_memberships %}<a class="btn btn-primary btn-block-phone" href="{{ mem_url }}#plans">See the memberships {% include "common/_icon.html" with name="arrow-right" %}</a>
+      {% else %}<a class="btn btn-primary btn-block-phone" href="{{ mem_url }}">Find your membership {% include "common/_icon.html" with name="arrow-right" %}</a>{% endif %}
+      {% if sale_bar.preview %}<a class="sale-band-end-preview" href="?sale_preview=end">End preview</a>{% endif %}
+    </div>
+  </div>
+</section>
+<script type="module" src="{% static 'common/js/sale-bar.js' %}"></script>
+{% endif %}

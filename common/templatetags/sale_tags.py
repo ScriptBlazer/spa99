@@ -40,8 +40,16 @@ def sale_bar_view(sale_bar):
     starts, ends = parse_datetime(sale_bar["starts_at"]), parse_datetime(sale_bar["ends_at"])
     upcoming = starts > now
     lead, tail, has_days = count_text((ends - now).total_seconds())
-    return {"upcoming": upcoming, "starts_label": when(starts), "ends_sr": when(ends, True), "now": now.isoformat(), "lead": lead, "tail": tail,
-            "has_days": has_days}
+    days, hours, minutes = count_parts((ends - now).total_seconds())
+    units = []   # the band's numerals: leading unit unpadded, later ones two digits, a unit that is not needed is left out
+    if days:
+        units = [(str(days), "day" if days == 1 else "days"), (f"{hours:02d}", "hour" if hours == 1 else "hours"), (f"{minutes:02d}", "minute" if minutes == 1 else "minutes")]
+    elif hours:
+        units = [(str(hours), "hour" if hours == 1 else "hours"), (f"{minutes:02d}", "minute" if minutes == 1 else "minutes")]
+    else:
+        units = [(str(minutes), "minute" if minutes == 1 else "minutes")]
+    return {"upcoming": upcoming, "starts_label": when(starts), "starts_long": when(starts, True), "ends_sr": when(ends, True), "now": now.isoformat(),
+            "lead": lead, "tail": tail, "has_days": has_days, "units": units}
 
 
 def _money(value):

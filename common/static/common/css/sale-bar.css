@@ -40,11 +40,9 @@ html.sale-off .sale-bar, .sale-bar[hidden] { display: none; }
 @media (min-width: 64em) {
   html.has-sale:not(.sale-off) .signin, html.has-sale:not(.sale-off) .register--solo .register-grid { min-height: calc(100svh - var(--header-h) - var(--sale-h)); }
 }
-html.has-sale:not(.sale-off) .hero-first { min-height: calc(100svh - var(--sale-h)); }
 html.has-sale:not(.sale-off) .gold-hero { min-height: calc(var(--scene-h) - var(--sale-h)); }
 html.has-sale:not(.sale-off) .book-hero { min-height: calc(100svh - var(--header-h) - var(--sale-h)); }
 html.motion.has-sale:not(.sale-off) .door-scene:not(.scene-failed) { min-height: calc(100svh - var(--sale-h)); }
-@media (min-width: 80em) { html.has-sale:not(.sale-off) .mem-stage { min-height: calc(100svh - var(--header-h) - var(--sale-h)); } }
 
 /* Marketing pages: the fixed header starts under the bar and docks at 0 as the bar scrolls off (transform only). */
 html.has-sale:not(.sale-off)[data-page="marketing"] .site-header { transform: translateY(var(--sale-shift, var(--sale-h))); }

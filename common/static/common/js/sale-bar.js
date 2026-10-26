@@ -1,5 +1,65 @@
-/* Sale bar: quiet countdown on the minute, dismiss for the session, removal at the end. No scroll listeners, no setInterval. */
+/* Sale bar and sale band: quiet countdown on the minute, dismiss for the session (strip), removal at the end (strip) or an in-place "ended" line (band). No scroll listeners, no setInterval. */
 const bar = document.querySelector('[data-sale-bar]');
+const bands = [...document.querySelectorAll('[data-sale-band]')];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+const two = (n) => String(n).padStart(2, '0');
+
+/** Minutes rounded up so a live sale never says 0. Returns { d, h, m }. */
+function format(ms) {
+  const total = Math.max(1, Math.ceil(ms / 60000));
+  return { d: Math.floor(total / 1440), h: Math.floor((total % 1440) / 60), m: total % 60 };
+}
+/** Run `fn` now and then on each minute boundary of the end time, and again when the tab comes back. `fn` returns false to stop. */
+function clock(ends, offset, fn) {
+  let timer = 0;
+  const tick = () => {
+    clearTimeout(timer);
+    const left = ends - (Date.now() + offset);
+    if (fn(left) === false) return;
+    timer = setTimeout(tick, (left % 60000) || 60000);
+  };
+  tick();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+}
+
+for (const band of bands) {
+  if ('upcoming' in band.dataset) continue;
+  const count = band.querySelector('[data-sale-count]');
+  const ends = Date.parse(band.dataset.ends);
+  const offset = Date.parse(band.dataset.now) - Date.now();
+  let inView = true;
+  if ('IntersectionObserver' in window) new IntersectionObserver(([e]) => { inView = e.isIntersecting; }).observe(band);
+  const unit = (n, one, many) => `<span class="sale-band-unit"><span class="sale-band-num">${n}</span><span class="sale-band-label">${n === '1' || n === '01' ? one : many}</span></span>`;
+  let last = '';
+  clock(ends, offset, (left) => {
+    if (left <= 0) { finish(); return false; }
+    const { d, h, m } = format(left);
+    const html = (d ? unit(String(d), 'day', 'days') : '') + (d || h ? unit(d ? two(h) : String(h), 'hour', 'hours') : '') + unit(d || h ? two(m) : String(m), 'minute', 'minutes');
+    if (html !== last) { count.innerHTML = html; last = html; }
+  });
+  function finish() {
+    count.style.minBlockSize = `${count.offsetHeight}px`;
+    const swap = () => {
+      count.innerHTML = '<p class="sale-band-over">This sale has now ended.</p>';
+      count.removeAttribute('aria-hidden');
+      band.querySelector('[data-sale-ends]')?.setAttribute('hidden', '');
+      count.classList.remove('is-leaving');
+    };
+    if (reduce.matches || !inView) swap();
+    else { count.classList.add('is-leaving'); setTimeout(swap, 400); }
+  }
+}
+
+// The Memberships band button scrolls up to the tier cards and moves focus to their group.
+document.querySelector('[data-sale-jump]')?.addEventListener('click', (event) => {
+  const target = document.getElementById('plans');
+  if (!target) return;
+  event.preventDefault();
+  target.scrollIntoView({ behavior: reduce.matches ? 'auto' : 'smooth', block: 'start' });
+  const legend = target.querySelector('.tiers legend');
+  if (legend) { legend.tabIndex = -1; legend.focus({ preventScroll: true }); }
+});
+
 if (bar) {
   const root = document.documentElement;
   const KEY = 'spa99.sale.dismissed';
@@ -8,22 +68,14 @@ if (bar) {
   const ends = Date.parse(bar.dataset.ends);
   const offset = Date.parse(bar.dataset.now) - Date.now();
   const now = () => Date.now() + offset;
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
   let timer = 0;
   let visible = true;
 
-  const two = (n) => String(n).padStart(2, '0');
-  function format(ms) {
-    const total = Math.max(1, Math.ceil(ms / 60000));
-    const d = Math.floor(total / 1440), h = Math.floor((total % 1440) / 60), m = total % 60;
-    if (d) return [`${d}d ${two(h)}h`, ` ${two(m)}m`, true];
-    if (h) return [`${h}h ${two(m)}m`, '', false];
-    return [`${m}m`, '', false];
-  }
   function render() {
-    const [lead, tail, days] = format(ends - now());
-    count.textContent = lead;
-    if (days) { const s = document.createElement('span'); s.className = 'sale-bar-m'; s.textContent = tail; count.append(s); }
+    const { d, h, m } = format(ends - now());
+    const days = d > 0;
+    count.textContent = days ? `${d}d ${two(h)}h` : h ? `${h}h ${two(m)}m` : `${m}m`;
+    if (days) { const s = document.createElement('span'); s.className = 'sale-bar-m'; s.textContent = ` ${two(m)}m`; count.append(s); }
   }
   function refreshPins() { window.dispatchEvent(new Event('resize')); }
   function remove(fade) {

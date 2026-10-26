@@ -330,6 +330,13 @@ SCENES.opening = (el) => {
   fadeUp(el.querySelectorAll('[data-fade]'), { trigger: h, start: 'top 90%', delay: 0.4, stagger: 0.12 });
 };
 
+/** Sale band (docs/design/SYSTEM-SALES.md R2.5): the name rises, then offer, countdown, ends line and button fade up once. Numbers never animate. */
+SCENES.sale = (el) => {
+  const name = el.querySelector('[data-rise]');
+  lineRise(name);
+  fadeUp(el.querySelectorAll('[data-fade]'), { trigger: name, start: 'top 80%', stagger: 0.12 });
+};
+
 /* ---------- setup (8.2) ---------- */
 
 function boot() {
