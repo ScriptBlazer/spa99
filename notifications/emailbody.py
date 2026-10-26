@@ -115,6 +115,20 @@ SPECS = {spec.key: spec for spec in [
         "Registering is free and there is nothing to pay. Use your personal link to start: your name and email are already filled in."
         "\n\n{button}\n\nIf you were not expecting this, you can ignore this email.",
         button_label="Register for Spa 99", button_required=True, subject_placeholders=_FIRST),
+    # Sent by an approver from the Office (docs/features/gold-actions.md). Respond: the typed {message} sits in this wording.
+    # Declined: this wording only PREFILLS the decline form; the approver can edit it, and what is sent is exactly that text.
+    EmailSpec(
+        "gold_respond", "Gold application: a message from the team", {**_FIRST, "message": "What the approver wrote (line breaks kept)"},
+        {"first_name": "James", "message": "Thank you for applying. Could you tell us a little more about the properties you own?"},
+        "Hello {first_name},\n\n{message}\n\nYou can reply to this email and it will reach the team.",
+        subject_placeholders=_FIRST),
+    EmailSpec(
+        "gold_declined", "Gold declined (only sent if the approver ticks Email the applicant)",
+        {**_FIRST, "name": "The applicant's full name", "reference": "The application reference"},
+        {"first_name": "James", "name": "James Smith", "reference": "GC-7K2M9Q"},
+        "Hello {first_name},\n\nThank you for applying for the Spa 99 Gold Card. We have looked at your application carefully and we are "
+        "not able to offer you a Gold Card at this time.\n\nThank you for your interest in Spa 99.",
+        subject_placeholders={**_FIRST, "name": "The applicant's full name"}),
     # The structured emails to the approvers: layout and wording stay in the template files, only the subject is editable.
     EmailSpec("gold_approver", "Gold application (to approvers)", {}, {}, editable=False,
               subject_placeholders={"name": "The applicant's name", "potential": "High, Medium or Low"}),
@@ -272,6 +286,13 @@ def render(spec, body, values, button_url="", button_label=None):
         html.extend(pieces_html)
         text.extend(pieces_text)
     return mark_safe("\n".join(html)), "\n\n".join(text)
+
+
+def render_plain(text):
+    """(html, text) for words typed by a person, shown exactly as typed: no placeholders, paragraphs on blank lines, line breaks kept."""
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", (text or "").replace("\r\n", "\n").replace("\r", "\n")) if p.strip()]
+    html = "\n".join(f'<p style="{P_STYLE}">{str(escape(p)).replace(chr(10), "<br>")}</p>' for p in paragraphs)
+    return mark_safe(html), "\n\n".join(paragraphs)
 
 
 def _button_html(url, label, fallback):

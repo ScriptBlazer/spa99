@@ -7,7 +7,8 @@ Note from the final approver:
 {{ note }}
 {% endif %}
 Approve: {{ approve_url }}
-Decline: {{ decline_url }}
+Decline (asks for a reason in the Office): {{ decline_url }}
+Respond (write to the applicant in the Office): {{ respond_url }}
 View the whole application: {{ view_url }}
 (Approve opens a confirm page in the Office. Nothing is sent until you tap the button there.)
 {% for section in sections %}

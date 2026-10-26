@@ -1,8 +1,7 @@
 {% load office_tags %}{% comment %}Decision buttons for one application. Owner and Manager only (never rendered for a Viewer). bar=True is the phone's sticky bar variant.{% endcomment %}
 {% if office_can.can_act %}
-{% if a.can_decline %}<form method="post" action="{% url 'office_gold_decline' a.id %}" data-office-action data-decline class="o-act o-act--decline">{% csrf_token %}
-  <button type="submit" class="btn btn-secondary{% if bar %}{% else %} btn-block{% endif %}" data-working-text="Declining" data-confirm data-confirm-danger
-          data-confirm-title="Decline {{ a.name }}?" data-confirm-body="He will not be invited. This cannot be changed here." data-confirm-label="Decline application" data-confirm-cancel="Keep waiting">Decline</button></form>{% endif %}
+{% if a.can_decline %}<div data-decline class="o-act o-act--decline">
+  <button type="button" class="btn btn-secondary{% if bar %}{% else %} btn-block{% endif %}" data-gold-open="decline" aria-haspopup="dialog">Decline</button></div>{% endif %}
 {% if a.can_approve %}<form method="post" action="{% url 'office_gold_approve' a.id %}" data-office-action data-approve class="o-act o-act--approve">{% csrf_token %}
   <button type="submit" class="btn btn-primary{% if not bar %} btn-block{% endif %}" data-working-text="Approving" data-confirm
           data-confirm-title="Approve {{ a.name }} for Gold?" data-confirm-body="He gets an invite to set up his account. His Gold month starts today, {% now 'j F' %}."

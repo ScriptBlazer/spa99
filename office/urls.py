@@ -23,4 +23,6 @@ urlpatterns = [
     path("gold/<uuid:pk>/final/<str:token>/", views.gold_final_page, name="office_gold_final"),
     path("gold/<uuid:pk>/resend/", views.gold_resend, name="office_gold_resend"),
     path("gold/<uuid:pk>/decline/", views.gold_decline, name="office_gold_decline"),
+    path("gold/<uuid:pk>/respond/", views.gold_respond, name="office_gold_respond"),
+    path("gold/<uuid:pk>/note/", views.gold_note, name="office_gold_note"),
 ]

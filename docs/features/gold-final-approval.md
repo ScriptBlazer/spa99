@@ -49,3 +49,7 @@ Tests: `gold/tests/test_final_approval.py`, `system/tests/test_approval.py`, plu
 - The Office "no final approver" warning also shows on an `awaiting_final` detail.
 - "N waiting" (nav badge, Gold list, dashboard, summaries, dashboard rows) counts `new`, `contacted` and `awaiting_final`, matching the Waiting list; still read from the stored counters.
 - `add()` refuses the whole request when a picked id no longer exists, and returns False (toast "Nobody new to add.") when nobody was new. Team `set_access` drops an unused `ApproverDelivery` row. New field `final_previous_status` (migration `gold.0007`, schema only).
+
+### Audit trail (2026-10-26)
+
+Every step above is also a `gold.ApplicationEvent` (see `gold-actions.md`): `sent_for_final` (who approved, from which status), `final_confirmed` and `sent_back` (with the note as the message) record the actor, the channel (`office`, or `email_link` when the signed one-tap page was used, `admin` for the Django action) and the status change. Final approvers still cannot decline, respond or add notes (those need the Approver permission); the "sent back" email now also has a **Respond** link, and its Decline link opens the Office decline form (reason required).

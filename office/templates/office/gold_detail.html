@@ -16,6 +16,7 @@
       <dl class="o-rows">{% for row in section.rows %}<div><dt>{{ row.label }}</dt><dd>{{ row.value|linebreaksbr }}</dd></div>{% endfor %}</dl>
     </section>
     {% endfor %}
+    {% include "office/_gold_history.html" %}
   </div>
   <aside class="o-detail-rail o-detail-rail--sticky" data-gold-decision data-invite-state="{{ a.invite.state }}">
     <section class="o-card" aria-labelledby="decision-h" data-region="decision" data-fade>
@@ -42,8 +43,10 @@
       <div class="o-actions-rail">{% include "office/_gold_actions.html" %}</div>
       {% if office_can.can_act and a.can_approve %}<p class="o-sub">He gets an email to set up his account. The link lasts 14 days.{% if a.potential == "low" and not final_approver_missing and not a.sent_back %} The potential is Low, so a final approver confirms first.{% endif %}</p>{% endif %}
       {% if a.person_id and office_can.can_see_all %}<a class="o-quiet" href="{% url 'office_person' a.person_id %}">Open his account</a>{% endif %}
-      <h3 class="o-h4">History</h3>
-      <ul class="o-history" data-gold-history>{% for h in a.history %}<li>{{ h.at|dt }} &middot; {{ h.text }}</li>{% endfor %}</ul>
+      {% if office_can.can_act %}<div class="o-actions-more" data-gold-more>
+        {% if a.can_respond %}<button type="button" class="btn btn-secondary" data-gold-open="respond" aria-haspopup="dialog">Respond</button>{% endif %}
+        <button type="button" class="btn btn-secondary" data-gold-open="note" aria-haspopup="dialog">Add note</button>
+      </div>{% endif %}
     </section>
   </aside>
 </div>
@@ -55,5 +58,6 @@
   <div class="o-bar-actions">{% include "office/_gold_actions.html" with bar=True %}</div>
 </div>
 {% endif %}
+{% if office_can.can_act %}{% include "office/_gold_dialogs.html" %}{% endif %}
 {% endwith %}
 {% endblock %}

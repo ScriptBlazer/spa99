@@ -9,10 +9,14 @@ from django.utils.cache import patch_vary_headers
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
-from gold import approval, invites
+from gold import actions as gold_actions
+from gold import approval, audit, invites
+from gold import services as gold_services
+from gold.forms import DeclineForm, NoteForm, RespondForm
 from gold.models import GoldApplication
 from insights.metrics import K
 from plans.models import Plan
+from common import levels
 from users import services as user_services
 from users import views as user_views
 from users.models import User
@@ -151,13 +155,38 @@ def gold(request):
     return _varied(render(request, _fragment(request, "office/gold.html", "office/_gold_rows.html"), context))
 
 
+GOLD_FORMS = ("decline", "respond", "note")  # ?do= on the application page opens that form (the approver email's Decline and Respond links)
+
+
+def _can_open(application, name):
+    """The forms offered right now: Decline while waiting, Respond while open, a note any time."""
+    return {"decline": application.status in GoldApplication.WAITING, "respond": application.status in gold_actions.OPEN, "note": True}.get(name, False)
+
+
+def _gold_page(request, application, status=200, open_form="", form=None):
+    """The application page. `form` (a bound, invalid Django form) re-opens its dialog with the typed text and the errors, so a
+    mistake never loses what was written. `open_form` opens a dialog on load (an email link)."""
+    acts = levels.is_approver(request.user)
+    opened = ""
+    if form is not None:
+        opened = open_form
+    elif open_form in GOLD_FORMS and acts:
+        opened = open_form if _can_open(application, open_form) else ""
+        if not opened:
+            messages.info(request, "This application has already been decided, so that is not available now.")
+    context = {"application": lists.gold_detail(application), "section": "gold", "final_approver_missing": not approval.final_approver_exists(),
+               "open_form": opened, "decline_prefill": gold_services.declined_prefill(application) if acts else "",
+               "form_errors": {field: [str(m) for m in found] for field, found in form.errors.items()} if form is not None else {},
+               "form_values": form.data if form is not None else {}}
+    return render(request, "office/gold_detail.html", context, status=status)
+
+
 @reader
 @require_GET
 @never_cache
 def gold_application(request, pk):
     application = get_object_or_404(GoldApplication, pk=pk)
-    context = {"application": lists.gold_detail(application), "section": "gold", "final_approver_missing": not approval.final_approver_exists()}
-    return render(request, "office/gold_detail.html", context)
+    return _gold_page(request, application, open_form=request.GET.get("do", ""))
 
 
 @approver
@@ -177,11 +206,16 @@ def _act(request, pk, action):
     return redirect("office_gold_application", pk=application.pk)
 
 
+def _approve_channel(request):
+    """The confirm page opened from the approver email posts channel=email_link; anything else is the Office."""
+    return audit.EMAIL_LINK if request.POST.get("channel") == audit.EMAIL_LINK else audit.OFFICE
+
+
 @approver
 @require_POST
 def gold_approve(request, pk):
     def run(request, application):
-        result = approval.approve(application, request.user)
+        result = approval.approve(application, request.user, channel=_approve_channel(request))
         first = application.first_name or "He"
         text = {approval.AWAITING: "Sent for final approval.",
                 invites.INVITED: f"{first} is approved. His invite is on its way.",
@@ -219,15 +253,15 @@ def _final_act(request, pk, run):
     token = request.POST.get("token", "")
     if token and not approval.token_is_valid(token, application):
         return render(request, "office/gold_final.html", {"state": "invalid", "section": "gold", "application": None}, status=410)
-    run(application)
+    run(application, audit.EMAIL_LINK if token else audit.OFFICE)  # a valid token means the email's one-tap page
     return redirect("office_gold_application", pk=application.pk)
 
 
 @final_approver
 @require_POST
 def gold_final_confirm(request, pk):
-    def run(application):
-        result = approval.final_confirm(application, request.user)
+    def run(application, channel):
+        result = approval.final_confirm(application, request.user, channel=channel)
         first = application.first_name or "He"
         if result == invites.INVITED:
             messages.success(request, f"{first} is approved. His invite is on its way.")
@@ -241,9 +275,9 @@ def gold_final_confirm(request, pk):
 @final_approver
 @require_POST
 def gold_final_send_back(request, pk):
-    def run(application):
+    def run(application, channel):
         try:
-            sent = approval.send_back(application, request.user, request.POST.get("note", ""))
+            sent = approval.send_back(application, request.user, request.POST.get("note", ""), channel=channel)
         except approval.NoteTooLong as error:
             messages.error(request, str(error))
             return
@@ -258,22 +292,56 @@ def gold_final_send_back(request, pk):
 @require_POST
 def gold_resend(request, pk):
     def run(request, application):
-        if invites.resend_invite(application) == invites.INVITED:
+        if invites.resend_invite(application, request.user, channel=audit.OFFICE) == invites.INVITED:
             messages.success(request, "A new invite is on its way. The old link no longer works.")
         else:
             messages.warning(request, "No invite was sent: only approved applicants without an account get one.")
     return _act(request, pk, run)
 
 
+def _form_act(request, pk, name, form_class, run):
+    """Decline, Respond and Add note: validate, then act. A mistake re-opens the form with its errors and the typed text (400)."""
+    application = get_object_or_404(GoldApplication, pk=pk)
+    form = form_class(request.POST)
+    if not form.is_valid():
+        return _gold_page(request, application, status=400, open_form=name, form=form)
+    run(application, form.cleaned_data)
+    return redirect("office_gold_application", pk=application.pk)
+
+
 @approver
 @require_POST
 def gold_decline(request, pk):
-    def run(request, application):
-        if invites.decline_application(application):
-            messages.success(request, "Declined. He will not be invited.")
+    def run(application, data):
+        emailing = data["email_applicant"]
+        if invites.decline_application(application, request.user, data["reason"], channel=audit.OFFICE, email_message=data["email_message"] if emailing else None):
+            messages.success(request, "Declined. He will not be invited." + (" He has been emailed." if emailing else ""))
         else:
             messages.warning(request, "Nothing changed: this application was already decided.")
-    return _act(request, pk, run)
+    return _form_act(request, pk, "decline", DeclineForm, run)
+
+
+@approver
+@require_POST
+def gold_respond(request, pk):
+    def run(application, data):
+        result, _ = gold_actions.respond(application, request.user, data["message"], channel=audit.OFFICE)
+        if result == gold_actions.DONE:
+            messages.success(request, f"Your message is on its way to {application.first_name or 'him'}. It is in the history.")
+        elif result == gold_actions.DUPLICATE:
+            messages.info(request, "That message was already sent.")
+        else:
+            messages.warning(request, "Nothing sent: this application was already decided.")
+    return _form_act(request, pk, "respond", RespondForm, run)
+
+
+@approver
+@require_POST
+def gold_note(request, pk):
+    def run(application, data):
+        result, _ = gold_actions.add_note(application, request.user, data["note"], channel=audit.OFFICE)
+        messages.success(request, "Note added to the history.") if result == gold_actions.DONE else messages.info(request, "That note was already added.")
+    return _form_act(request, pk, "note", NoteForm, run)
 
 
 # ---------- change password (team members; the member area is for members only) ----------

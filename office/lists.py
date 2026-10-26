@@ -197,6 +197,41 @@ def _name(user):
     return (user.get_full_name() or user.email) if user is not None else ""
 
 
+STATUS_NAMES = dict(GoldApplication.STATUS_CHOICES)
+EMAIL_NAMES = {"gold_approver": "Approver email", "gold_invite": "Invite email", "gold_active": "Gold-added email",
+               "gold_respond": "Response email", "gold_declined": "Decline email"}
+
+
+def _event_detail(event):
+    """One short plain line under an event, from its meta (who was emailed, the result)."""
+    meta = event.meta or {}
+    if event.action in ("email_sent", "email_failed"):
+        name = EMAIL_NAMES.get(meta.get("template"), "Email")
+        if event.action == "email_sent":
+            return f"{name} sent to {meta.get('recipient', '')}".strip()
+        return f"{name} to {meta.get('recipient', '')} failed: {meta.get('error', 'unknown reason')}".replace("  ", " ")
+    if event.action == "declined":
+        return "The applicant was emailed." if meta.get("email_applicant") else "The applicant was not emailed."
+    if event.action in ("approved", "final_confirmed"):
+        return {"invited": "An invite to set up his account was queued.", "activated": "Gold was added to his existing account."}.get(meta.get("result"), "")
+    if event.action == "responded":
+        return "Emailed to the applicant."
+    return ""
+
+
+def gold_events(application):
+    """The audit trail, newest first, as plain rows for the History card."""
+    rows = []
+    for event in application.events.select_related("actor"):
+        rows.append({
+            "id": str(event.pk), "at": event.at.isoformat(), "action": event.action, "label": event.get_action_display(),
+            "who": event.actor_label, "channel": event.channel, "channel_label": event.get_channel_display(),
+            "from": STATUS_NAMES.get(event.from_status, ""), "to": STATUS_NAMES.get(event.to_status, ""), "message": event.message,
+            "detail": _event_detail(event),
+        })
+    return rows
+
+
 def gold_detail(application):
     sections = [{"title": s["title"], "rows": [{"label": label, "value": value} for label, value in s["rows"]]}
                 for s in gold_services.application_sections(application)]
@@ -213,6 +248,8 @@ def gold_detail(application):
         "person_id": str(application.user_id) if application.user_id else "",
         "can_approve": application.status in WAITING,
         "can_decline": application.status in WAITING,
+        "can_respond": application.status in (*WAITING, GoldApplication.AWAITING_FINAL),
+        "events": gold_events(application),
         "awaiting_final": application.status == GoldApplication.AWAITING_FINAL,
         "can_final": application.status == GoldApplication.AWAITING_FINAL,
         "final_requested_at": application.final_requested_at.isoformat() if application.final_requested_at else "",

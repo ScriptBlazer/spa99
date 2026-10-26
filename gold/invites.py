@@ -20,7 +20,8 @@ from plans import sales as sale_services
 from plans.models import Plan, SiteSettings
 from users.models import InterestRegistration
 
-from .models import GoldApplication, GoldInvite
+from . import audit
+from .models import ApplicationEvent, GoldApplication, GoldInvite
 
 logger = logging.getLogger("spa99.gold")
 
@@ -121,7 +122,7 @@ class _Rollback(Exception):
     pass
 
 
-def approve_and_invite(application, approved_by, from_final=False):
+def approve_and_invite(application, approved_by, from_final=False, channel=audit.SYSTEM):
     """Approve one application. Returns INVITED, ACTIVATED (existing account) or SKIPPED (declined, already approved,
     or Gold could not be activated: nothing is changed or sent then). Safe against two people approving at once.
     An application awaiting final approval is only approved by `from_final=True` (a final approver's Confirm), and
@@ -134,6 +135,7 @@ def approve_and_invite(application, approved_by, from_final=False):
                 return SKIPPED
             if (fresh.status == GoldApplication.AWAITING_FINAL) != from_final:
                 return SKIPPED
+            before = fresh.status
             fresh.status = GoldApplication.APPROVED
             fresh.approved_at = timezone.now()
             fresh.approved_by = approved_by
@@ -142,6 +144,8 @@ def approve_and_invite(application, approved_by, from_final=False):
                     raise _Rollback
                 fresh.user = existing
             fresh.save()
+            audit.record(fresh, ApplicationEvent.FINAL_CONFIRMED if from_final else ApplicationEvent.APPROVED, actor=approved_by, channel=channel,
+                         from_status=before, to_status=GoldApplication.APPROVED, meta={"result": ACTIVATED if existing is not None else INVITED})
             if existing is None:
                 _new_invite(fresh)
     except _Rollback:
@@ -153,26 +157,34 @@ def approve_and_invite(application, approved_by, from_final=False):
     return INVITED
 
 
-def decline_application(application):
+def decline_application(application, actor=None, reason="", channel=audit.SYSTEM, email_message=None):
     """Decline a waiting application (new or contacted). Declined applicants never get an invite or an account.
-    Returns True if declined, False if it was not waiting (nothing changed). Safe against two people acting at once."""
+    Returns True if declined, False if it was not waiting (nothing changed, nothing recorded). Safe against two people acting
+    at once. The reason goes in the trail. `email_message` (text) emails the applicant that message; None = no email."""
     with transaction.atomic():
         fresh = GoldApplication.objects.select_for_update().get(pk=application.pk)
         if fresh.status not in (GoldApplication.NEW, GoldApplication.CONTACTED):
             return False
+        before = fresh.status
         fresh.status = GoldApplication.DECLINED
         fresh.save()
+        meta = {"email_applicant": True, "email_message": audit.clean_text(email_message)} if email_message else {"email_applicant": False}
+        event = audit.record(fresh, ApplicationEvent.DECLINED, actor=actor, channel=channel, from_status=before,
+                             to_status=GoldApplication.DECLINED, message=reason, meta=meta)
     application.refresh_from_db()
+    if email_message:
+        _queue("gold.tasks.send_gold_applicant_email", str(application.pk), str(event.pk))
     return True
 
 
-def resend_invite(application):
+def resend_invite(application, actor=None, channel=audit.SYSTEM):
     """A new link; the old one stops working. Only for approved applicants with no account yet. Returns INVITED or SKIPPED."""
     if application.status != GoldApplication.APPROVED or application.user_id is not None:
         return SKIPPED
     if get_user_model().objects.filter(email__iexact=application.email).exists():
         return SKIPPED
     with transaction.atomic():
+        audit.record(application, ApplicationEvent.INVITE_RESENT, actor=actor, channel=channel)
         _new_invite(application)
     return INVITED
 

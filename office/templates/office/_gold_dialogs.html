@@ -1,0 +1,52 @@
+{% comment %}The three forms an approver fills in (Decline, Respond, Add note), each in a dialog in the shared modal look. They are posted as ordinary forms; the server checks everything. A mistake comes back as this page with the dialog open, the typed text kept and the errors listed by the shared form-problems dialog. ?do= (the approver email) opens one on load.{% endcomment %}
+{% with posted=form_values errors=form_errors %}
+{% if a.can_decline %}
+<dialog class="fb-modal o-dialog" data-gold-dialog="decline" {% if open_form == "decline" %}data-open {% endif %}aria-labelledby="gd-decline-h">
+  <form method="post" action="{% url 'office_gold_decline' a.id %}" class="fb-modal-wrap" data-problems data-gold-form="decline">{% csrf_token %}
+    <h2 class="fb-modal-title" id="gd-decline-h">Decline {{ a.name }}?</h2>
+    <p class="fb-modal-body">He will not be invited. This cannot be changed here. The reason is kept in the history and only the team sees it.</p>
+    <label class="fb-modal-field"><span>Reason</span>
+      <textarea class="fb-modal-textarea" name="reason" rows="3" required minlength="10" maxlength="1000" data-label="Reason">{{ posted.reason }}</textarea></label>
+    {% for m in errors.reason %}<p class="o-field-error" data-problem data-problem-field="reason" data-problem-label="Reason">{{ m }}</p>{% endfor %}
+    <label class="o-check"><input type="checkbox" name="email_applicant" value="1" data-gold-email-toggle{% if posted.email_applicant %} checked{% endif %}><span>Email the applicant</span></label>
+    <div class="o-email-box" data-gold-email-box{% if not posted.email_applicant %} hidden{% endif %}>
+      <label class="fb-modal-field"><span>Message to the applicant (you can change it)</span>
+        <textarea class="fb-modal-textarea" name="email_message" rows="7" maxlength="2000" data-label="Message">{% if open_form == "decline" and posted %}{{ posted.email_message }}{% else %}{{ decline_prefill }}{% endif %}</textarea></label>
+      {% for m in errors.email_message %}<p class="o-field-error" data-problem data-problem-field="email_message" data-problem-label="Message">{{ m }}</p>{% endfor %}
+    </div>
+    <div class="fb-modal-actions">
+      <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Keep waiting</button>
+      <button type="submit" class="fb-btn fb-btn--danger" data-working-text="Declining">Decline application</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% if a.can_respond %}
+<dialog class="fb-modal o-dialog" data-gold-dialog="respond" {% if open_form == "respond" %}data-open {% endif %}aria-labelledby="gd-respond-h">
+  <form method="post" action="{% url 'office_gold_respond' a.id %}" class="fb-modal-wrap" data-problems data-gold-form="respond">{% csrf_token %}
+    <h2 class="fb-modal-title" id="gd-respond-h">Respond to {{ a.name }}</h2>
+    <p class="fb-modal-body">He gets this by email, and his reply comes to the team. The application stays open and is marked Contacted. The full message is kept in the history.</p>
+    <label class="fb-modal-field"><span>Message</span>
+      <textarea class="fb-modal-textarea" name="message" rows="6" required minlength="5" maxlength="2000" data-label="Message">{{ posted.message }}</textarea></label>
+    {% for m in errors.message %}<p class="o-field-error" data-problem data-problem-field="message" data-problem-label="Message">{{ m }}</p>{% endfor %}
+    <div class="fb-modal-actions">
+      <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
+      <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Sending">Send message</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+<dialog class="fb-modal o-dialog" data-gold-dialog="note" {% if open_form == "note" %}data-open {% endif %}aria-labelledby="gd-note-h">
+  <form method="post" action="{% url 'office_gold_note' a.id %}" class="fb-modal-wrap" data-problems data-gold-form="note">{% csrf_token %}
+    <h2 class="fb-modal-title" id="gd-note-h">Add a note</h2>
+    <p class="fb-modal-body">Only the team sees it. Use it to record anything, for example that he replied by phone. It goes in the history and cannot be changed.</p>
+    <label class="fb-modal-field"><span>Note</span>
+      <textarea class="fb-modal-textarea" name="note" rows="4" required maxlength="2000" data-label="Note">{{ posted.note }}</textarea></label>
+    {% for m in errors.note %}<p class="o-field-error" data-problem data-problem-field="note" data-problem-label="Note">{{ m }}</p>{% endfor %}
+    <div class="fb-modal-actions">
+      <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
+      <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Saving">Add note</button>
+    </div>
+  </form>
+</dialog>
+{% endwith %}

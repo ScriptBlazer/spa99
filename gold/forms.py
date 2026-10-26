@@ -151,3 +151,37 @@ class GoldSetupForm(forms.Form):
         if problems:
             raise ValidationError(problems)
         return self.cleaned_data["password"]
+
+
+# ---------- the Office actions (docs/features/gold-actions.md) ----------
+
+REASON_MIN, REASON_MAX, MESSAGE_MAX = 10, 1000, 2000
+
+
+def _text(label, minimum, maximum, required_message):
+    return forms.CharField(strip=True, max_length=maximum, min_length=minimum or None,
+                           error_messages={"required": required_message, "min_length": f"{label}: write at least {minimum} characters.",
+                                           "max_length": f"{label}: keep it to {maximum} characters."})
+
+
+class DeclineForm(forms.Form):
+    """Declining needs an internal reason (shown in the trail). The applicant is emailed only when the box is ticked."""
+
+    reason = _text("Reason", REASON_MIN, REASON_MAX, "Write the reason for declining (only the team sees it).")
+    email_applicant = forms.BooleanField(required=False)
+    email_message = forms.CharField(strip=True, required=False, max_length=MESSAGE_MAX,
+                                    error_messages={"max_length": f"Message: keep it to {MESSAGE_MAX} characters."})
+
+    def clean(self):
+        data = super().clean()
+        if data.get("email_applicant") and not data.get("email_message"):
+            self.add_error("email_message", "Write the message to send, or untick Email the applicant.")
+        return data
+
+
+class RespondForm(forms.Form):
+    message = _text("Message", 5, MESSAGE_MAX, "Write the message for the applicant.")
+
+
+class NoteForm(forms.Form):
+    note = _text("Note", 0, MESSAGE_MAX, "Write the note.")

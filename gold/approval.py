@@ -19,8 +19,8 @@ from django.utils import timezone
 from common import levels
 from common.tasks import enqueue
 
-from . import invites, rating
-from .models import GoldApplication
+from . import audit, invites, rating
+from .models import ApplicationEvent, GoldApplication
 
 logger = logging.getLogger("spa99.gold")
 
@@ -109,7 +109,7 @@ def sent_back_email_context(application):
     from . import services
 
     context = services.approver_email_context(application)
-    return {**context, "decline_url": f"{context['view_url']}#decision-h", "note": application.sent_back_note,
+    return {**context, "note": application.sent_back_note,
             "sent_back_by": (application.sent_back_by.get_full_name() or application.sent_back_by.email) if application.sent_back_by_id else ""}
 
 
@@ -126,7 +126,7 @@ def needs_final_review(application):
     return (application.potential_level == rating.LOW and not application.final_review_done and final_approver_exists())
 
 
-def approve(application, actor):
+def approve(application, actor, channel=audit.SYSTEM):
     """An approver's Approve. Returns AWAITING (sent for final approval) or what invites.approve_and_invite returns
     (INVITED, ACTIVATED, SKIPPED)."""
     if needs_final_review(application):
@@ -137,18 +137,20 @@ def approve(application, actor):
                 fresh.final_previous_status = fresh.status
                 fresh.status, fresh.final_requested_at, fresh.final_requested_by = GoldApplication.AWAITING_FINAL, timezone.now(), actor
                 fresh.save()
+                audit.record(fresh, ApplicationEvent.SENT_FOR_FINAL, actor=actor, channel=channel, from_status=fresh.final_previous_status,
+                             to_status=GoldApplication.AWAITING_FINAL, meta={"potential": rating.LOW})
         if sent:
             logger.info("Gold %s sent for final approval by %s", application.reference, actor.pk)
             _queue("gold.tasks.send_gold_final_email", str(application.pk))
             application.refresh_from_db()
             return AWAITING
-    return invites.approve_and_invite(application, actor)
+    return invites.approve_and_invite(application, actor, channel=channel)
 
 
-def final_confirm(application, actor):
+def final_confirm(application, actor, channel=audit.SYSTEM):
     """A final approver's Confirm: the normal approval runs (invite, or Gold on the existing account). SKIPPED when it is not
     awaiting final approval any more (nothing changes)."""
-    result = invites.approve_and_invite(application, actor, from_final=True)
+    result = invites.approve_and_invite(application, actor, from_final=True, channel=channel)
     if result != invites.SKIPPED:
         logger.info("Gold %s confirmed by final approver %s", application.reference, actor.pk)
     return result
@@ -161,7 +163,7 @@ def clean_note(note):
     return note
 
 
-def send_back(application, actor, note=""):
+def send_back(application, actor, note="", channel=audit.SYSTEM):
     """A final approver's Send back: the application returns to the approvers' queue (status new), with who, when and the
     optional note, and every approver is emailed. Returns False when it was not awaiting final approval."""
     note = clean_note(note)
@@ -172,6 +174,8 @@ def send_back(application, actor, note=""):
         restore = fresh.final_previous_status if fresh.final_previous_status in GoldApplication.WAITING else GoldApplication.NEW
         fresh.status, fresh.sent_back_at, fresh.sent_back_by, fresh.sent_back_note = restore, timezone.now(), actor, note
         fresh.save()
+        audit.record(fresh, ApplicationEvent.SENT_BACK, actor=actor, channel=channel, from_status=GoldApplication.AWAITING_FINAL,
+                     to_status=restore, message=note, meta={"reason": "Low potential, are you sure?"})
     logger.info("Gold %s sent back by final approver %s", application.reference, actor.pk)
     _queue("gold.tasks.send_gold_sent_back_email", str(application.pk))
     application.refresh_from_db()

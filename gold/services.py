@@ -13,8 +13,8 @@ from journey import services as journey_services
 from notifications.services import subject_for
 from plans.models import SiteSettings
 
-from . import rating
-from .models import BML, PROPERTY_LINK, SIZE, WHERE, GoldApplication, GoldInvite
+from . import audit, rating
+from .models import BML, PROPERTY_LINK, SIZE, WHERE, ApplicationEvent, GoldApplication, GoldInvite
 
 logger = logging.getLogger("spa99.gold")
 
@@ -185,6 +185,8 @@ def submit_application(data, session=None):
         )
         rate_application(application)
         application.save()
+        audit.record(application, ApplicationEvent.SUBMITTED, channel=audit.SYSTEM, to_status=GoldApplication.NEW,
+                     meta={"repeat": application.is_repeat, "potential": application.potential_level})
     queue_emails(application)
     return application, True
 
@@ -215,12 +217,22 @@ def approver_email_context(application):
     return {
         "approve_url": f"{office}/gold/{application.pk}/approve/confirm/",
         "view_url": f"{office}/gold/{application.pk}/",
+        "decline_url": f"{office}/gold/{application.pk}/?do=decline",  # Decline and Respond need typed text, so they open the Office form
+        "respond_url": f"{office}/gold/{application.pk}/?do=respond",
         "name": application.full_name,
         "potential_label": POTENTIAL_LABELS.get(application.potential_level, ""),
         "sections": application_sections(application),
         "is_repeat": application.is_repeat,
         "repeat_reference": application.repeat_of.reference if application.repeat_of_id else "",
     }
+
+
+def declined_prefill(application):
+    """The decline form's message, from the editable email `gold_declined`, with this person's details filled in."""
+    from notifications.services import render_editable
+
+    context = {"first_name": application.first_name, "name": application.full_name, "reference": application.reference}
+    return render_editable("gold_declined", context)[1]
 
 
 def approver_subject(application):
@@ -251,8 +263,12 @@ def export_applications(email):
                  "replaced_at": i.revoked_at.isoformat() if i.revoked_at else None}
                 for i in a.invites.all().order_by("created_at")
             ],
+            "history": [  # the audit trail: what happened and the text of each step (not which team member did it)
+                {"at": e.at.isoformat(), "action": e.action, "from_status": e.from_status, "to_status": e.to_status, "message": e.message}
+                for e in sorted(a.events.all(), key=lambda e: e.at)
+            ],
         }
-        for a in GoldApplication.objects.filter(email__iexact=email).prefetch_related("invites").order_by("created_at")
+        for a in GoldApplication.objects.filter(email__iexact=email).prefetch_related("invites", "events").order_by("created_at")
     ]
 
 
@@ -263,7 +279,7 @@ def delete_applications(email):
     applications = GoldApplication.objects.filter(email__iexact=email)
     ids = list(applications.values_list("pk", flat=True))
     invite_ids = list(GoldInvite.objects.filter(application_id__in=ids).values_list("pk", flat=True))  # invite emails are queued by invite id
-    removed = applications.delete()[0]
+    removed = applications.delete()[1].get("gold.GoldApplication", 0)  # applications only: their invites and events go with them
     from mailings.erasure import erase_address  # group-send rows and invites for an applicant who never had an account
 
     erase_address(email)
