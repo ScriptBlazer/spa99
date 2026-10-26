@@ -136,7 +136,7 @@ def _confirm_tier(request, slug):
     site = SiteSettings.load()
     card = pages_services.plan_card(plan, site.vat_rate, plan_services.hours_ranges())
     return render(request, "users/choose_confirm.html", {**member.base_context(request.user), "plan": plan, "card": card,
-                                                         "register_sale": sale_services.register_offer()})
+                                                         "register_sale": sale_services.register_offer(request=request)})
 
 
 REGISTER_LABELS = {
@@ -215,7 +215,7 @@ def register(request):
 
         form, status = SignUpForm(initial={"plan": plan_slug, **invites.prefill(request.session.get(invites.SESSION_KEY))}), 200
     context = {"form": form, "plans": plans, "selected_plan": plan_slug, "suggested_plan": suggested, "from_journey": bool(session and session.completed),
-               "register_sale": sale_services.register_offer()}
+               "register_sale": sale_services.register_offer(request=request)}
     return render(request, "users/register.html", context, status=status)
 
 

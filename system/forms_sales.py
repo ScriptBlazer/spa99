@@ -1,6 +1,7 @@
 """System > Sales: the sale form. Times are typed in London time (datetime-local boxes). A live sale locks % off, months and the start
 (people already hold them); an ended sale is read-only. The version token also covers the plans and an End now."""
 import hashlib
+from datetime import timedelta
 
 from django import forms
 from django.utils import timezone
@@ -13,8 +14,20 @@ WHEN = ["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S"]
 LIVE_LOCKED = ("percent_off", "months_at_price", "starts_at")
 
 
+class WhenField(forms.DateTimeField):
+    """A London time typed in a datetime-local box. A time that does not exist or happens twice (the clocks change) gets a plain message."""
+
+    def to_python(self, value):
+        try:
+            return super().to_python(value)
+        except forms.ValidationError as error:
+            if error.code == "ambiguous_timezone":
+                raise forms.ValidationError("The clocks change at that time. Pick another minute.", code="ambiguous_timezone") from None
+            raise
+
+
 def _when():
-    return forms.DateTimeField(input_formats=WHEN, widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"))
+    return WhenField(input_formats=WHEN, widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"))
 
 
 class SaleForm(VersionedForm):
@@ -28,8 +41,12 @@ class SaleForm(VersionedForm):
         widgets = {"percent_off": forms.NumberInput(attrs={"min": 1, "max": Sale.MAX_PERCENT}),
                    "months_at_price": forms.NumberInput(attrs={"min": 1, "max": Sale.MAX_MONTHS})}
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, data=None, *args, **kwargs):
+        instance = kwargs.get("instance")
+        if data is not None and data.get("ss_starts_mode") == "now" and (instance is None or instance.status() == "upcoming"):
+            data = data.copy()  # "Starts now" is the server's now, not the time the page was opened (it goes stale)
+            data["starts_at"] = timezone.localtime().strftime("%Y-%m-%dT%H:%M:%S")
+        super().__init__(data, *args, **kwargs)
         self.fields["plans"].queryset = Plan.objects.exclude(kind=Plan.FREE_BY_APPLICATION)
         self.fields["plans"].label_from_instance = lambda plan: plan.name
         status = "upcoming" if self.instance._state.adding else self.instance.status()
@@ -61,6 +78,6 @@ class SaleForm(VersionedForm):
         data = super().clean()
         if self.status == "ended":
             raise forms.ValidationError("An ended sale cannot be edited.")
-        if self.status == "upcoming" and data.get("starts_at") and data["starts_at"] < timezone.now() and self.instance._state.adding:
+        if self.status == "upcoming" and data.get("starts_at") and data["starts_at"] < timezone.now() - timedelta(minutes=2) and self.instance._state.adding:
             self.add_error("starts_at", "The start cannot be in the past.")
         return data

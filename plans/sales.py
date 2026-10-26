@@ -4,18 +4,20 @@ Everything about "which sale is on" is one indexed query (`live_sale`); a reques
 saving or ending a sale takes a row lock on the SiteSettings singleton (`lock`), so two saves cannot both pass the overlap check.
 SQLite ignores select_for_update (it serialises writers anyway); nothing here is Postgres-only."""
 import time
+import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.core import signing
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Sale, SiteSettings
+from .models import Plan, Sale, SiteSettings
 
 PENNY = Decimal("0.01")
 PREVIEW_SALT = "plans.sale-preview"
-PREVIEW_SECONDS = 3600  # the link works for an hour; once opened, that browser sees the bar for an hour
+PREVIEW_SECONDS = 3600  # the link works once, within an hour; the browser that opens it sees the bar for an hour
 PREVIEW_KEY = "sale_preview"
 PREVIEW_PARAM = "sale_preview"
 EMPTY_SNAPSHOT = {"sale": None, "sale_name": "", "sale_percent_off": None, "sale_months": None, "sale_locked_at": None}
@@ -24,10 +26,17 @@ EMPTY_SNAPSHOT = {"sale": None, "sale_name": "", "sale_percent_off": None, "sale
 # ---------- which sale is on ----------
 
 def live_sale(now=None):
-    """The sale live at `now` (starts_at inclusive, end exclusive; End now counts), or None. One query."""
+    """The sale live at `now` (starts_at inclusive, end exclusive; End now counts), or None, with its plans loaded (two queries)."""
     now = now or timezone.now()
     queryset = Sale.objects.filter(starts_at__lte=now, ends_at__gt=now).exclude(ended_early_at__lte=now)
-    return queryset.order_by("-starts_at").first()
+    return queryset.prefetch_related("plans").order_by("-starts_at").first()
+
+
+def live_sale_for_request(request):
+    """The live sale, asked once per request (the bar and the register offer share it)."""
+    if not hasattr(request, "_live_sale"):
+        request._live_sale = live_sale()
+    return request._live_sale
 
 
 def plans_in(sale):
@@ -39,9 +48,25 @@ def covers(sale, plan):
 
 
 def plans_text(sale):
-    """'Tier 2', 'Tier 2 and Tier 3', 'Tier 1, Tier 2 and Tier 3'."""
-    names = [p.name for p in sale.plans.all()]
-    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1] if names else ""
+    """'Tier 2', 'Tier 2 and Tier 3'; every membership: 'all memberships' (plus the single visit: 'all memberships and single visits');
+    the single visit alone: 'single visits'. A single visit inside a longer list is lower case ('Tier 2 and single visit')."""
+    if hasattr(sale, "_plans_text"):
+        return sale._plans_text
+    chosen = list(sale.plans.all())
+    monthly = set(Plan.objects.filter(kind=Plan.MONTHLY).values_list("pk", flat=True))
+    one_off = {p.pk for p in chosen if p.kind == Plan.ONE_OFF}
+    picked = {p.pk for p in chosen}
+    if monthly and picked == monthly:
+        text = "all memberships"
+    elif monthly and one_off and picked == monthly | one_off:
+        text = "all memberships and single visits"
+    elif picked and picked == one_off:
+        text = "single visits"
+    else:
+        names = [p.name.lower() if p.kind == Plan.ONE_OFF and i else p.name for i, p in enumerate(chosen)]
+        text = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1] if names else ""
+    sale._plans_text = text
+    return text
 
 
 # ---------- prices ----------
@@ -93,7 +118,8 @@ def kept_price(interest, vat_rate=None):
     unit = "month" if months == 1 else "months"
     return {
         "name": interest.sale_name, "percent": percent, "months": months, "plan_name": plan.name,
-        "plan_slugs": [p.slug for p in interest.sale.plans.all()] if interest.sale_id else [plan.slug],  # plans that keep the price "locked_at": interest.sale_locked_at,
+        "plan_slugs": [p.slug for p in interest.sale.plans.all()] if interest.sale_id else [plan.slug],  # plans that keep the price
+        "locked_at": interest.sale_locked_at,
         **price_lines(plan, percent, vat),
         "text": f"You keep {percent}% off {plan.name} for {months} {unit} from your first payment.",
     }
@@ -154,10 +180,10 @@ def end_now(sale, user):
     return sale
 
 
-def register_offer(vat_rate=None):
+def register_offer(vat_rate=None, request=None):
     """For the register and choose-a-tier screens: the live sale (never a preview: nothing is promised for a sale that is not on) with
     each covered plan's price lines, or None. `text` is the factual sentence; `prices` is keyed by plan slug."""
-    sale = live_sale()
+    sale = live_sale_for_request(request) if request is not None else live_sale()
     if sale is None:
         return None
     vat = SiteSettings.load().vat_rate if vat_rate is None else vat_rate
@@ -178,7 +204,8 @@ def bar(sale, preview=False):
 
 
 def preview_token(sale):
-    return signing.dumps({"sale": str(sale.pk)}, salt=PREVIEW_SALT)
+    """Signed and single-use: it carries a random nonce, spent by the first browser that opens the link (start_preview)."""
+    return signing.dumps({"sale": str(sale.pk), "n": uuid.uuid4().hex}, salt=PREVIEW_SALT)
 
 
 def preview_url(sale):
@@ -187,14 +214,19 @@ def preview_url(sale):
     return f"{settings.SITE_URL}/?{PREVIEW_PARAM}={preview_token(sale)}"
 
 
-def sale_from_token(token, max_age=PREVIEW_SECONDS):
-    """The sale a preview link is for, or None (bad signature, expired, sale gone or already ended)."""
+def sale_from_token(token, max_age=PREVIEW_SECONDS, spend=False):
+    """The sale a preview link is for, or None (bad signature, expired, sale gone or already ended). With `spend=True` the link's
+    nonce is used up (an atomic cache add: DatabaseCache, same on SQLite and Postgres): a second open gets None."""
     try:
         data = signing.loads(token, salt=PREVIEW_SALT, max_age=max_age)
-        sale = Sale.objects.filter(pk=data["sale"]).first()
+        sale = Sale.objects.filter(pk=data["sale"]).prefetch_related("plans").first()
     except (signing.BadSignature, KeyError, ValueError, TypeError, ValidationError):
         return None
-    return sale if sale is not None and sale.status() != "ended" else None
+    if sale is None or sale.status() == "ended":
+        return None
+    if spend and not cache.add(f"sale-preview-used:{data.get('n', '')}", 1, timeout=max_age + 60):
+        return None
+    return sale
 
 
 def start_preview(request):
@@ -204,8 +236,10 @@ def start_preview(request):
         if getattr(request, "session", None) is not None:
             request.session.pop(PREVIEW_KEY, None)
         return
-    sale = sale_from_token(request.GET.get(PREVIEW_PARAM, ""))
-    if sale is not None and getattr(request, "session", None) is not None:
+    if getattr(request, "session", None) is None:
+        return
+    sale = sale_from_token(request.GET.get(PREVIEW_PARAM, ""), spend=True)  # single use: the first browser to open it gets the hour
+    if sale is not None:
         request.session[PREVIEW_KEY] = {"sale": str(sale.pk), "until": time.time() + PREVIEW_SECONDS}
 
 
@@ -216,7 +250,7 @@ def _preview_sale(request):
         return None
     held = session.get(PREVIEW_KEY)
     if held and held.get("until", 0) > time.time():
-        sale = Sale.objects.filter(pk=held["sale"]).first()
+        sale = Sale.objects.filter(pk=held["sale"]).prefetch_related("plans").first()
         if sale is not None and sale.status() != "ended":
             return sale
     return None
@@ -234,7 +268,7 @@ def sale_bar_for_request(request):
     result = None
     if is_public_host(request):
         previewed = _preview_sale(request)
-        sale = previewed or live_sale()
+        sale = previewed or live_sale_for_request(request)
         result = bar(sale, preview=previewed is not None) if sale is not None else None
     request._sale_bar = result
     return result

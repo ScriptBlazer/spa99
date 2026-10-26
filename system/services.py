@@ -184,6 +184,10 @@ def undo_change(change, user):
     if not changes.is_undoable_field(field):
         raise ChangeRefused("This entry cannot be undone.")
     with transaction.atomic():
+        if change.model_label == "plans.sale":  # the same lock a normal sale save takes, first, so two sales are never live at once
+            from plans import sales
+
+            sales.lock()
         change = SystemChange.objects.select_for_update().get(pk=change.pk)  # no select_related: Postgres cannot lock nullable joins
         if change.undone_by.exists():
             raise ChangeRefused("This change has already been undone.")

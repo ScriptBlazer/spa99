@@ -1,6 +1,6 @@
 # Feature: Sales
 
-Decided 2026-10-25 (PROJECT.md). Backend built on `feature/sales` (see Built below); frontend and design brief follow.
+Decided 2026-10-25 (PROJECT.md). Built on `feature/sales` (see Built below).
 
 ## Setting a sale (System only)
 - New System section **Sales** (Developer level, behind the unlock, logged with undo).
@@ -23,3 +23,11 @@ Decided 2026-10-25 (PROJECT.md). Backend built on `feature/sales` (see Built bel
 - **System > Sales** (`/sales/` on the System host, Developer + unlock, 404 for everyone else): list (live, upcoming, past), new, edit (row token: 409 "Changed since you opened it"), **End now** (POST; an upcoming sale is cancelled instead), **preview link** (POST, signed, valid an hour; opening `/?sale_preview=<token>` on the public site shows that sale's bar in that browser's session for an hour). All saves go through the change log (section "Sales"). Undo of End now uses the normal change-log undo: refused if the freed time was taken or the original end has passed.
 - **Public bar:** `sale_bar` template variable (lazy), public host only. **Member screens:** `kept_price` in the member context, `register_sale` on the register and choose-a-tier screens (the live sale only, never a preview).
 - Money: `plans.sales.sale_price(plan, sale_or_percent, vat_rate=None)`, whole pence, half up.
+
+## Built (frontend)
+- **Bar:** slim bar above the header on every public page while a sale is live (`common/_sale_bar.html`, `sale-bar.css/js`): name, % off, plans, a quiet countdown (hours and minutes on the last day), dismissible for the visit, removed at the end time on its own. The tour page has no bar (deviation).
+- **Price lines:** Memberships and Register show a calm sale line under the full price for covered plans (no strike-through). Choosing a plan the sale does not cover, or leaving a covered one, asks for a confirm only when it would lose the kept price (deviation: no confirm otherwise).
+- **Kept price:** My Spa 99 membership page says what they keep ("You keep 20% off Tier 2 for 3 months from your first payment").
+- **System > Sales:** list, new/edit with live preview of the bar and prices, locked fields on a live sale, End now with confirm, "Start now" (the server uses its own now, so a stale page never gives a past-start error).
+- **Preview link:** signed, single-use, valid an hour; the first browser that opens it sees the bar for an hour ("End preview" link in the bar). Later opens of the same link do nothing.
+- Wording for plan lists: "all memberships", "all memberships and single visits", "single visits".

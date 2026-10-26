@@ -16,6 +16,7 @@ from django.utils import timezone
 from common.tasks import enqueue
 from insights import metrics
 from common.validators import normalise_uk_mobile
+from plans import sales as sale_services
 from plans.models import Plan, SiteSettings
 from users.models import InterestRegistration
 
@@ -84,6 +85,8 @@ def activate_gold(user):
         metrics.registered(plan.slug, interest.source, interest.created_at, marketing=user.marketing_consent)
     elif interest.plan_id != plan.pk:
         interest.plan = plan
+        for name, value in sale_services.snapshot_fields(plan, held=interest).items():
+            setattr(interest, name, value)  # Gold is free: no sale price is kept
         interest.save()  # the plan split follows this save (insights.signals)
     return True
 

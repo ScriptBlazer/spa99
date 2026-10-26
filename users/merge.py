@@ -59,7 +59,9 @@ def preview(actor, keep, remove):
     mine, theirs = _interest(keep), _interest(remove)
     fill = [name for name in PROFILE_FIELDS if not getattr(keep, name) and getattr(remove, name)]
     return {
-        "membership": "Moves the membership" if theirs and not mine else "The same membership is on both: one copy is kept" if theirs else "None",
+        "membership": "Moves the membership" if theirs and not mine else (
+            "The same membership is on both: one copy is kept" + (", with the sale price they keep" if theirs.sale_percent_off and not mine.sale_percent_off and mine.plan_id == theirs.plan_id else "")
+        ) if theirs else "None",
         "sessions": JourneySession.objects.filter(user=remove).count(),
         "gold": GoldApplication.objects.filter(user=remove).count(),
         "sign_ins": LoginEvent.objects.filter(user=remove).count(),
@@ -79,6 +81,10 @@ def merge(actor, keep, remove):
     elif theirs is not None:  # the same plan on both: one copy stays, and the stored figures forget the extra one
         metrics.registered(theirs.plan.slug if theirs.plan_id else None, theirs.source, theirs.created_at,
                            marketing=remove.marketing_consent, amount=-1)
+        if not mine.sale_percent_off and theirs.sale_percent_off and mine.plan_id == theirs.plan_id:
+            for name in ("sale", "sale_name", "sale_percent_off", "sale_months", "sale_locked_at"):
+                setattr(mine, name, getattr(theirs, name))  # the kept sale price is not lost with the extra copy
+            mine.save()
         theirs.delete()
     removed_email = remove.email
     sessions = list(JourneySession.objects.filter(user=remove).values_list("pk", flat=True))

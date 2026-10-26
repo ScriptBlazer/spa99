@@ -130,7 +130,7 @@ The bar is **in normal flow and scrolls away**. It never overlays the header or 
 
 ### 1.9 Preview (developer only)
 
-From System "Preview on site" the site renders as if the sale were live for that browser session only (signed session flag, never a public URL parameter). The bar gets one extra item before the name: `Preview` in `--color-text-muted-inverse`, 1px full `--color-hairline-inverse` border, `--radius-sm`, `0 var(--space-2)`, and a text link "End preview" just left of the close button. Countdown counts to the sale's end. Prices on Memberships and Register show the sale lines (section 2). Upcoming sales show "Preview · starts 1 Dec, 09:00" on desktop, "Preview" on phone.
+From System "Preview on site" the site renders as if the sale were live for that browser session only (the link is signed and single-use: the first browser that opens it gets a one-hour session flag, later opens of the same link do nothing, and it is no use to anyone else). The bar gets one extra item before the name: `Preview` in `--color-text-muted-inverse`, 1px full `--color-hairline-inverse` border, `--radius-sm`, `0 var(--space-2)`, and a text link "End preview" just left of the close button. Countdown counts to the sale's end. Prices on Memberships and Register show the sale lines (section 2). Upcoming sales show "Preview · starts 1 Dec, 09:00" on desktop, "Preview" on phone.
 
 ---
 

@@ -6,7 +6,8 @@ from decimal import Decimal
 from unittest import mock
 
 from django.core.exceptions import ValidationError
-from django.test import RequestFactory, TestCase
+from django.core.cache import cache
+from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 
 from plans import sales
@@ -77,7 +78,7 @@ class SaleRuleTests(TestCase):
         self.assertEqual(sales.sale_price(tier2, make_sale(percent=20)), Decimal("319.20"))
         self.assertEqual(sales.sale_price(tier2, 33), Decimal("267.33"))
         self.assertEqual(sales.sale_price(tier2, 20, vat_rate=Decimal("20")), Decimal("383.04"))
-        self.assertEqual(sales.plans_text(make_sale(plans=("tier-1", "tier-2", "tier-3"), start=100, end=101)), "Tier 1, Tier 2 and Tier 3")
+        self.assertEqual(sales.plans_text(make_sale(plans=("tier-1", "tier-2", "tier-3"), start=100, end=101)), "all memberships")
 
 
 class SnapshotTests(TestCase):
@@ -200,3 +201,60 @@ class MemberContextTests(TestCase):
 
         kept = member.membership_context(user)["kept_price"]
         self.assertEqual((kept["text"], kept["sale_price_inc_vat"]), ("You keep 20% off Tier 3 for 3 months from your first payment.", "479.04"))
+
+
+class ReviewFixTests(TestCase):
+    def setUp(self):
+        seed_all()
+
+    def test_plans_text_wording(self):
+        self.assertEqual(sales.plans_text(make_sale(plans=("tier-1", "tier-2", "tier-3"), start=100, end=101)), "all memberships")
+        self.assertEqual(sales.plans_text(make_sale(plans=("tier-1", "tier-2", "tier-3", "single-visit"), start=102, end=103)), "all memberships and single visits")
+        self.assertEqual(sales.plans_text(make_sale(plans=("single-visit",), start=104, end=105)), "single visits")
+        self.assertEqual(sales.plans_text(make_sale(plans=("tier-2", "single-visit"), start=106, end=107)), "Tier 2 and single visit")
+
+    @override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "sales-tests"}})
+    def test_preview_link_is_single_use(self):
+        cache.clear()
+        sale = make_sale(start=48, end=72)
+        token = sales.preview_token(sale)
+        self.assertEqual(sales.sale_from_token(token, spend=True), sale)
+        self.assertIsNone(sales.sale_from_token(token, spend=True))  # a second browser gets nothing
+        self.assertNotEqual(sales.preview_token(sale), token)
+
+    def test_gold_activation_clears_the_kept_price(self):
+        from gold import invites
+
+        make_sale()
+        user = services.register_interest(cleaned(plan="tier-2")).user
+        self.assertTrue(invites.activate_gold(user))
+        self.assertIsNone(InterestRegistration.objects.get(user=user).sale_percent_off)
+
+    def test_merge_keeps_the_sale_price_when_the_same_plan_is_on_both(self):
+        from users import merge
+
+        keep = services.register_interest(cleaned(email="keep@example.com", mobile="07912345601", plan="tier-2")).user
+        make_sale()
+        gone = services.register_interest(cleaned(email="gone@example.com", mobile="07912345602", plan="tier-2")).user
+        actor = User.objects.create_user("boss@example.com", "x-Pass-123456", is_superuser=True, is_staff=True)
+        merge.merge(actor, keep, gone)
+        self.assertEqual(InterestRegistration.objects.get(user=keep).sale_percent_off, 20)
+
+    def test_start_now_uses_the_servers_clock_and_clock_change_times_get_a_friendly_error(self):
+        from system.forms_sales import SaleForm
+
+        data = {"name": "Now", "percent_off": 10, "months_at_price": 1, "ends_at": (timezone.localtime() + 3 * HOUR).strftime("%Y-%m-%dT%H:%M"),
+                "starts_at": "2020-01-01T00:00", "ss_starts_mode": "now", "plans": [Plan.objects.get(slug="tier-1").pk]}
+        form = SaleForm(data)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertLess(abs(form.cleaned_data["starts_at"] - timezone.now()), timedelta(minutes=1))
+        data.update(ss_starts_mode="at", starts_at="2027-03-28T01:30")  # does not exist in London
+        self.assertIn("The clocks change at that time. Pick another minute.", SaleForm(data).errors["starts_at"])
+
+    def test_live_sale_and_register_offer_share_one_lookup_per_request(self):
+        make_sale()
+        request = RequestFactory().get("/register/")
+        with self.assertNumQueries(2):  # the sale and its plans
+            first = sales.live_sale_for_request(request)
+            self.assertEqual(sales.live_sale_for_request(request), first)
+            self.assertEqual([p.name for p in first.plans.all()], ["Tier 2", "Tier 3"])
