@@ -12,7 +12,7 @@
 .site-header { position: sticky; top: 0; z-index: 10; height: var(--header-h); border-bottom: 1px solid var(--s-hair); }
 .header-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); height: 100%; }
 .brand { display: inline-flex; align-items: center; color: var(--color-text-inverse); text-decoration: none; }
-.brand .logo { height: calc(var(--header-h) * 0.58); width: auto; }
+.brand .logo { height: calc(var(--header-h) * 0.65); width: auto; }
 .logo-swan { fill: var(--color-gold); }
 .logo-text { fill: currentColor; }
 .nav-desktop, .header-actions { display: none; }
