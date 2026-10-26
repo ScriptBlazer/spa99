@@ -4,6 +4,7 @@ from io import StringIO
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.test import TestCase
+from django.urls import reverse
 
 from content import services as content
 from content.models import Section
@@ -28,27 +29,38 @@ class SpaSectionsTests(TestCase):
 
     def test_seed_gives_the_compositions_with_alternating_sides(self):
         self.assertEqual(layout(self.sections()), [
-            ("dry-sauna", None, "left"), ["wet-sauna", "cold-plunge", "showers", "kitchenette"],
+            ("dry-sauna", None, "left"), ["wet-sauna", "cold-plunge", "showers"], ["ice-bucket", "kitchenette"],
             ("relaxing-zone", None, "right"), ("massage-room", None, "left"), ("gym", None, "right")])
 
     def test_hiding_rooms_never_breaks_the_layout(self):
         Facility.objects.filter(slug__in=["dry-sauna", "gym", "wet-sauna"]).update(visible=False)
         self.assertEqual(layout(self.sections()), [
-            ["cold-plunge", "showers", "kitchenette"], ("relaxing-zone", None, "left"), ("massage-room", None, "right")])
+            ["cold-plunge", "showers", "ice-bucket", "kitchenette"], ("relaxing-zone", None, "left"), ("massage-room", None, "right")])
 
     def test_extra_and_lonely_companions_become_tiles_and_long_runs_split(self):
         Facility.objects.update(display="tile")
         Facility.objects.filter(slug="gym").update(display="feature")
         Facility.objects.filter(slug__in=["massage-room", "kitchenette", "cold-plunge"]).update(display="companion")
-        # order: dry-sauna wet-sauna cold-plunge showers kitchenette relaxing-zone massage-room gym
+        # order: dry-sauna wet-sauna cold-plunge showers ice-bucket kitchenette relaxing-zone massage-room gym
         self.assertEqual(layout(self.sections()), [
-            ["dry-sauna", "wet-sauna", "cold-plunge", "showers"], ["kitchenette", "relaxing-zone", "massage-room"],
+            ["dry-sauna", "wet-sauna", "cold-plunge", "showers"], ["ice-bucket", "kitchenette", "relaxing-zone", "massage-room"],
             ("gym", None, "left")])
 
+    def test_ice_bucket_follows_showers_on_home_and_the_spa_page(self):
+        self.assertEqual(list(Facility.objects.order_by("order").values_list("slug", flat=True)), [
+            "dry-sauna", "wet-sauna", "cold-plunge", "showers", "ice-bucket", "kitchenette", "relaxing-zone", "massage-room", "gym"])
+        home = self.client.get(reverse("home")).context["room_groups"]
+        self.assertEqual([r["slug"] for r in home[0]], ["dry-sauna", "wet-sauna", "cold-plunge", "showers", "ice-bucket"])
+        cards = [c["slug"] for c in self.client.get(reverse("spa")).context["facilities"]]
+        self.assertEqual(cards[3:5], ["showers", "ice-bucket"])
+        self.assertEqual([c["tour_url"] for c in self.client.get(reverse("spa")).context["facilities"] if c["slug"] == "ice-bucket"], [""])
+        from pages import services
+        self.assertEqual(services.journey_facility_images()["ice_bucket"]["src"].count("ice-bucket"), 1)
+
     def test_room_count_word_follows_visible_rooms(self):
-        self.assertEqual(content.page_content("spa")["intro"].body, "Eight spaces, one quiet visit.")
+        self.assertEqual(content.page_content("spa")["intro"].body, "Nine spaces, one quiet visit.")
         Facility.objects.filter(slug="gym").update(visible=False)
-        self.assertEqual(content.page_content("spa")["intro"].body, "Seven spaces, one quiet visit.")
+        self.assertEqual(content.page_content("spa")["intro"].body, "Eight spaces, one quiet visit.")
 
 
 class FacilityValidationTests(TestCase):
@@ -155,13 +167,29 @@ class BackfillTests(TestCase):
 
     def test_backfill_moves_the_kitchenette_only_in_an_untouched_order(self):
         seed_all()
+        Facility.objects.filter(slug="ice-bucket").delete()
         for slug, order in OLD_FACILITY_ORDER.items():
             Facility.objects.filter(slug=slug).update(order=order)
         call_command("backfill_site_data", stdout=StringIO())
-        self.assertEqual([f.slug for f in Facility.objects.all()][3:5], ["showers", "kitchenette"])
+        self.assertEqual([f.slug for f in Facility.objects.all()][3:6], ["showers", "ice-bucket", "kitchenette"])
+        Facility.objects.filter(slug="ice-bucket").delete()
         Facility.objects.filter(slug="gym").update(order=1)  # someone rearranged by hand
         for slug, order in OLD_FACILITY_ORDER.items():
             if slug != "gym":
                 Facility.objects.filter(slug=slug).update(order=order)
         call_command("backfill_site_data", stdout=StringIO())
         self.assertEqual(Facility.objects.get(slug="kitchenette").order, 8)
+
+    def test_backfill_adds_the_ice_bucket_after_the_showers_and_moves_the_rest_down(self):
+        seed_all()
+        Facility.objects.filter(slug="ice-bucket").delete()
+        for slug, order in {"dry-sauna": 1, "wet-sauna": 2, "cold-plunge": 3, "showers": 4, "kitchenette": 5, "relaxing-zone": 6,
+                            "massage-room": 7, "gym": 8}.items():
+            Facility.objects.filter(slug=slug).update(order=order)
+        call_command("backfill_site_data", "--dry-run", stdout=StringIO())
+        self.assertFalse(Facility.objects.filter(slug="ice-bucket").exists())
+        call_command("backfill_site_data", stdout=StringIO())
+        self.assertEqual([f.slug for f in Facility.objects.order_by("order")][3:6], ["showers", "ice-bucket", "kitchenette"])
+        self.assertEqual(Facility.objects.get(slug="gym").order, 9)
+        call_command("backfill_site_data", stdout=StringIO())  # twice is safe
+        self.assertEqual(Facility.objects.get(slug="gym").order, 9)

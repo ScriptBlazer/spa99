@@ -141,6 +141,7 @@ def backfill():
         changed["content.Section (memberships: Not sure?)"] += 1
 
     changed.update(_spa_page())
+    changed.update(_ice_bucket_2026_10_26())
     changed.update(_home_opening_label())
     changed.update(_round_3())
     changed.update(_journey_and_gold_2026_10_23())
@@ -517,6 +518,31 @@ def _reorder_facilities():
             facility.order = new[facility.slug]
             facility.save()
     return 1
+
+
+PRE_ICE_BUCKET_ORDER = {"dry-sauna": 1, "wet-sauna": 2, "cold-plunge": 3, "showers": 4, "kitchenette": 5, "relaxing-zone": 6,
+                        "massage-room": 7, "gym": 8}
+
+
+def _ice_bucket_2026_10_26():
+    """The Ice bucket room: created when missing, after the showers. The rooms after it move down one place only while
+    the orders are still exactly the seeded ones from before (a rearranged set is left alone)."""
+    changed = Counter()
+    if Facility.objects.filter(slug="ice-bucket").exists():
+        return changed
+    facilities = list(Facility.objects.all())
+    if {f.slug: f.order for f in facilities} == PRE_ICE_BUCKET_ORDER:
+        for facility in facilities:
+            if facility.order >= 5:
+                facility.order += 1
+                facility.save()
+    row = next(r for r in plans_seed.FACILITIES if r[0] == "ice-bucket")
+    order = next(i for i, r in enumerate(plans_seed.FACILITIES, start=1) if r[0] == "ice-bucket")
+    slug, name, line, description, alt = row
+    Facility.objects.create(slug=slug, name=name, short_line=line, description=description, image_alt=alt, order=order,
+                            **plans_seed.FACILITY_SPA_PAGE[slug])
+    changed["plans.Facility (Ice bucket added)"] += 1
+    return changed
 
 
 def _spa_page():

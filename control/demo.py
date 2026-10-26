@@ -76,7 +76,7 @@ SCREENS = [
 # DEMO value: music zones (section 7.1). A room belongs to one zone; the saunas have no speakers.
 ZONES = [
     {"id": "lounge", "name": "Lounge", "rooms": ["reception-lounge", "kitchenette", "hallway"]},
-    {"id": "wet-area", "name": "Wet area", "rooms": ["cold-plunge", "showers", "changing-room"]},
+    {"id": "wet-area", "name": "Wet area", "rooms": ["cold-plunge", "showers", "ice-bucket", "changing-room"]},
     {"id": "relaxing-zone", "name": "Relaxing zone", "rooms": ["relaxing-zone"]},
     {"id": "massage-room", "name": "Massage room", "rooms": ["massage-room"]},
     {"id": "gym", "name": "Gym", "rooms": ["gym"]},

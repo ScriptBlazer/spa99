@@ -482,10 +482,6 @@ def room_index():
     ]
 
 
-# Journey facility options that have no Facility row: option value -> (built image name, alt). 2026-10-26: Showers became Ice bucket.
-JOURNEY_EXTRA_IMAGES = {"ice_bucket": ("ice-bucket", "A wooden ice bucket on a bronze bracket beside the rain showers")}
-
-
 def journey_facility_images():
     """Option value (wet_sauna) -> {src, alt} for the journey tiles. src '' means the calm placeholder."""
     mapping = {}
@@ -498,9 +494,6 @@ def journey_facility_images():
         if not url and card["image_name"] and images.has_image(card["image_name"]):
             url = images.src(card["image_name"], 480)
         mapping[card["slug"].replace("-", "_")] = {"src": url, "alt": card["alt"]}
-    for value, (name, alt) in JOURNEY_EXTRA_IMAGES.items():  # options with no Facility row
-        if value not in mapping and images.has_image(name):
-            mapping[value] = {"src": images.src(name, 480), "alt": alt}
     return mapping
 
 

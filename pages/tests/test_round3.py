@@ -79,7 +79,7 @@ class OpenerTests(TestCase):
 
     def test_full_set_fills_hours_closure_and_room_count(self):
         lines = pages.opener_lines(count=pages.OPENER_MAX_LINES)
-        self.assertEqual(lines[2]["note"], "Eight rooms, all part of the same visit.")
+        self.assertEqual(lines[2]["note"], "Nine rooms, all part of the same visit.")
         self.assertEqual(len(lines), 4)
 
     def test_hiding_a_room_or_changing_hours_changes_the_lines(self):
@@ -87,7 +87,7 @@ class OpenerTests(TestCase):
         OpeningRule.objects.filter(key="evening").update(end_time="02:00")
         lines = pages.opener_lines(count=pages.OPENER_MAX_LINES)
         self.assertEqual(lines[0]["statement"], "Open 5am to 2am.")
-        self.assertEqual(lines[2]["note"], "Seven rooms, all part of the same visit.")
+        self.assertEqual(lines[2]["note"], "Eight rooms, all part of the same visit.")
 
     def test_missing_values_never_leave_a_gap(self):
         OpeningRule.objects.filter(kind=OpeningRule.CLOSE_BEFORE_CANDLES).update(public_title="")
