@@ -49,31 +49,28 @@ jobs:
         run: python manage.py test
 
   build:
-    # Only for version tags (1.2.3) and only after the tests pass.
+    # Version tags only (1.2.3), after the tests pass. Pushes to GitHub's own registry (ghcr.io) with the built-in
+    # GITHUB_TOKEN: no secrets or variables to set (Moishe, 2026-10-26).
     needs: test
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    env:
-      # Registry is not decided yet. Set repo variables REGISTRY (e.g. 123456789.dkr.ecr.eu-west-2.amazonaws.com)
-      # and IMAGE_NAME (e.g. spa99) plus secrets REGISTRY_USERNAME / REGISTRY_PASSWORD to turn pushing on.
-      PUSH_ENABLED: ${{ vars.REGISTRY != '' && vars.IMAGE_NAME != '' }}
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Log in to registry
-        if: env.PUSH_ENABLED == 'true'
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ vars.REGISTRY }}
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
-      - name: Build (and push when a registry is configured)
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image name (lower case, as ghcr.io needs)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ env.PUSH_ENABLED == 'true' }}
-          tags: ${{ env.PUSH_ENABLED == 'true' && format('{0}/{1}:{2}', vars.REGISTRY, vars.IMAGE_NAME, github.ref_name) || format('spa99:{0}', github.ref_name) }}
-      - name: Note when nothing was pushed
-        if: env.PUSH_ENABLED != 'true'
-        run: |
-          echo "Image built but not pushed, no registry configured (set REGISTRY and IMAGE_NAME repo variables)."
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.ref_name }}

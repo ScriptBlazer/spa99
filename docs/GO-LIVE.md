@@ -5,13 +5,10 @@ Run these in order. Live starts with an empty database, so it needs no backfills
 ## A. Day before (code)
 
 1. Merge every open branch into `main` (now: `feature/compare-order`). Wait for the green tick on GitHub.
-2. Image registry (Amazon ECR): create a private repository called `spa99`. In GitHub, go to Settings > Secrets and variables > Actions and add:
-   - variable `REGISTRY` (for example `137808120968.dkr.ecr.eu-west-2.amazonaws.com`)
-   - variable `IMAGE_NAME` = `spa99`
-   - secrets `REGISTRY_USERNAME` = `AWS` and `REGISTRY_PASSWORD`
-
-   An ECR password expires after 12 hours, so the CI build job should switch to `aws-actions/amazon-ecr-login` with an AWS access key. Ask me and I'll change it.
-3. Tag the release: `git tag 1.0.0 && git push origin 1.0.0`. GitHub Actions tests it and pushes the image.
+2. Nothing to set up for the image: GitHub builds it and pushes it to its own registry (`ghcr.io/scriptblazer/spa99`).
+3. Tag the release: `git tag 1.0.0 && git push origin 1.0.0`. GitHub Actions tests it and pushes the image `ghcr.io/scriptblazer/spa99:1.0.0`.
+   - Check it worked: GitHub, the repo, Packages. The image stays private.
+   - Make a GitHub token for the server: Settings > Developer settings > Personal access tokens (classic), scope `read:packages` only, no expiry (or a long one).
 
 ## B. AWS
 
@@ -26,8 +23,7 @@ Run these in order. Live starts with an empty database, so it needs no backfills
 
 ## C. Server
 
-8. **Log the server in to the registry** (repeat before each deploy):
-   `aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin <REGISTRY>`
+8. **Log the server in to GitHub's registry** (once; it stays logged in): `docker login ghcr.io -u ScriptBlazer`, and paste the token from step 3 as the password.
 9. Copy `docker-compose.yml` and `Caddyfile` to the server.
 10. Create the server's `.env` from `.env.example`. Wrap `SECRET_KEY` in single quotes (it may contain `$`).
 
@@ -44,7 +40,7 @@ Run these in order. Live starts with an empty database, so it needs no backfills
     - `AWS_SES_REGION_NAME=eu-west-2`
     - `SES_SNS_TOPIC_ARN=arn:aws:sns:eu-west-2:137808120968:spa99-ses-feedback`
     - `SENTRY_DSN`
-    - `IMAGE=<REGISTRY>/spa99` and `APP_TAG=1.0.0`
+    - `IMAGE=ghcr.io/scriptblazer/spa99` and `APP_TAG=1.0.0`
 
     Live always uses the prod settings and SES email, whatever the `.env` says. No AWS keys: the server uses its role.
 11. **DNS, grey cloud first (DNS only):** point `spa99.uk`, `www.spa99.uk`, `office.spa99.uk`, `system.spa99.uk` and `control.spa99.uk` at the server.
@@ -79,7 +75,7 @@ Run these in order. Live starts with an empty database, so it needs no backfills
 
 - Take an RDS snapshot first.
 - Never edit or delete a migration that is already live.
-- Tag the new version (for example `1.0.1`), log in to ECR (step 8), set `APP_TAG` in `.env`, run `docker compose up -d`, then check `/health/`.
+- Tag the new version (for example `1.0.1`), wait for the green tick, set `APP_TAG` in `.env`, run `docker compose up -d`, then check `/health/`.
 - If something breaks, set `APP_TAG` back to the previous version and run `docker compose up -d` again. If a migration damaged data, restore the snapshot.
 
 ## Suggestions (not blockers)
