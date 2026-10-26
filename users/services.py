@@ -306,6 +306,9 @@ def _export_sessions(user):
     sessions = JourneySession.objects.filter(Q(user=user) | Q(lead_email__iexact=user.email)).select_related("suggested_plan").order_by("created_at")
     result = []
     for session in sessions:
+        if session.user_id != user.pk:  # matched only by the address he gave: his lead details, nothing more about that visit
+            result.append({"started_at": session.created_at.isoformat(), "lead_email": session.lead_email, "lead_at": _plain(session.lead_at)})
+            continue
         answers = [
             {
                 "question": a.question.text, "options": [o.label for o in a.options.all()],

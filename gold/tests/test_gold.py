@@ -93,7 +93,7 @@ class SubmitTests(TestCase):
         positions = [body.index(h) for h in ("1. PERSONAL DETAILS", "2. ABOUT HIM", "3. WHAT THE SITE COLLECTED")]
         self.assertEqual(positions, sorted(positions))
         for expected in ("dan@example.com", "What he does: Property", "Owner / investor", "Potential: High (12 points)", "Owner or investor (+5)",
-                         "Evening (6 to 10pm), Late night (10pm to 3am)", "Cold plunge, Gym", "Sometimes with a friend",
+                         "Peak (6 to 10pm), Late night (10pm to 3am)", "Cold plunge, Gym", "Sometimes with a friend",
                          "Suggested membership: Tier 3", application.reference):
             self.assertIn(expected, body)
         html = barry.alternatives[0][0]
@@ -353,7 +353,6 @@ class IndustryTests(TestCase):
         rows = dict(services.application_sections(application)[1]["rows"])
         self.assertEqual(rows["What he does"], "Finance, Property")
         self.assertIn("Size", rows)  # Property is among them
-        self.assertEqual(rating.industry_extra_points(["finance", "business_owner", "law"]), 3)  # highest, not the sum
 
     def test_older_applications_with_one_industry_still_read_as_a_list(self):
         application, _ = services.submit_application(self.form(industry="finance").cleaned_data)

@@ -26,6 +26,8 @@ Source: `Spa 99 - Rules and System Spec.pdf` v1.0, 16 Oct 2026 (255 rules, 53 sc
 | MEM-02 | Gold targets property people. Everyone can apply; property people are nudged. | 2026-10-22 |
 | CAL-02 | Moishe + Barry: the spa is open 24 hours a day. 3am to 5am is shown on the site as "Cleaning hours", never "Closed". Still closed for Shabbos and Yom Tov (CAL-07 offsets unchanged). The public line is "Open 24 hours a day", then the cleaning hours, then "Closed Shabbos and Yom Tov". Booking and entry rules still treat the cleaning window as no bookings and no visits. | 2026-10-26 |
 | CAL-03 | Moishe: Daytime is called Off-peak (5am to 6pm) and Evening is called Peak (6pm to 3am) on the site and in System. The times and the plans they apply to are unchanged. | 2026-10-26 |
+| CAL-08 | Moishe + Barry: the Saturday night rule is now "the normal 3am to 5am cleaning hours still apply" (the spa is open 24 hours, see CAL-02 override). Behaviour unchanged. | 2026-10-26 |
+| CAL-12 | Moishe: "Daytime products" are called Off-peak products (see CAL-03 override). Latest start 4pm, ending by 6pm, unchanged. | 2026-10-26 |
 | EXT-06 | Moishe: Leil Shishi is hidden everywhere on the public site for now (cards, compare table, Register, Gold Card page). Data kept; Site settings "show Leil Shishi" (default off) brings it back. Status stays OPTIONAL: nothing is built. | 2026-10-26 |
 | MEM-02a | Moishe: the Gold Card has a yearly fee, amount not decided (£99 to £200 discussed). Stored as `Plan.annual_fee` (ex VAT), empty until decided. The compare table says "By application" while empty and "£X a year" once set. Gold is shown in the compare table as its own column. | 2026-10-26 |
 
@@ -101,16 +103,16 @@ Table of values: see `PRICING.md`.
 | ID | Rule | Status | Phase |
 |---|---|---|---|
 | CAL-01 | A spa day runs 5am to 3am the next calendar morning. | CONFIRMED | 1 |
-| CAL-02 | Cleaning hours 3am to 5am every day, for cleaning and set-up. The spa is otherwise open 24 hours a day (Moishe, 2026-10-26). No bookings, no visits. | CONFIRMED | 1 |
-| CAL-03 | Off-peak (was Daytime) is 5am to 6pm. Peak (was Evening) is 6pm to 3am. | CONFIRMED | 1 |
+| CAL-02 | Closed 3am to 5am every day for cleaning and set-up. No bookings, no visits. | CONFIRMED | 1 |
+| CAL-03 | Daytime is 5am to 6pm. Evening is 6pm to 3am. | CONFIRMED | 1 |
 | CAL-04 | Times 00:00–02:59 belong to the previous spa day. | CONFIRMED | 3 |
 | CAL-05 | Times 03:00–04:59 belong to the spa day about to open. At 4am Tuesday, "today" is Tuesday. | CONFIRMED | 3 |
 | CAL-06 | The one-per-day rule, booking windows and grace periods all use spa days. | CONFIRMED | 3 |
 | CAL-07 | Close Friday 2 hours before candle lighting. Open Saturday night 1 hour after Shabbos ends. Same for Yom Tov. | BASELINE | 1 |
-| CAL-08 | The normal 3am–5am cleaning hours still apply on Saturday night. | BASELINE | 3 |
+| CAL-08 | The normal 3am–5am closure still applies on Saturday night. | BASELINE | 3 |
 | CAL-09 | Source times from Hebcal for London. Load 12 months ahead, show in admin, admin can override any single day. | CONFIRMED | 3 |
 | CAL-11 | A two-hour slot must start and end inside one open period. It may not run into any closure. | CONFIRMED | 3 |
-| CAL-12 | Off-peak products (Tier 1, single visit) must end by 6pm: latest start 4pm. | CONFIRMED | 3 |
+| CAL-12 | Daytime products (Tier 1, single visit) must end by 6pm: latest start 4pm. | CONFIRMED | 3 |
 | CAL-13 | With a 3am close the latest start is 1am. | CONFIRMED | 3 |
 | CAL-14 | Starts stay on the half-hour grid even when closing is at an odd minute. Friday close 1:33pm → latest start 11:30am. | CONFIRMED | 3 |
 | CAL-15 | Saturday-night opening at an odd minute (5:50pm): first start is the next half hour (6pm). Entry from 5:50pm via early entry (BK-09). | PROPOSED | 3 |

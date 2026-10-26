@@ -10,8 +10,8 @@ PROPERTY_LINK_VALUES = ["owner_investor", "developer", "manager", "firm", "agent
 # (value, label, plan points, weight, reason)
 TIME = [
     ("early_morning", "Early morning (5 to 9am)", {T1: 2, T2: 1}, None, "Early mornings suit you"),
-    ("daytime", "Daytime (9am to 6pm)", {T1: 3, T2: 1}, None, "Daytime visits fit"),
-    ("evening", "Evening (6 to 10pm)", {T2: 3, T3: 2}, None, "Evenings suit you"),
+    ("daytime", "Off-peak (9am to 6pm)", {T1: 3, T2: 1}, None, "Off-peak visits fit"),
+    ("evening", "Peak (6 to 10pm)", {T2: 3, T3: 2}, None, "Peak times suit you"),
     ("late_night", "Late night (10pm to 3am)", {T2: 3, T3: 2}, None, "Late nights suit you"),
 ]
 FREQUENCY = [

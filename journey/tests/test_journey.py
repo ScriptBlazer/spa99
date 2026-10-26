@@ -70,7 +70,7 @@ class SuggestionTests(TestCase):
 
     def test_three_reasons_from_answers_and_plan_facts(self):
         suggestion = engine.compute_suggestion(make_session(time=["evening"], frequency="two_three", company="alone"))
-        self.assertEqual(suggestion.reasons, ["Two to three visits a week", "Evenings suit you", "Book up to 3 days ahead"])
+        self.assertEqual(suggestion.reasons, ["Two to three visits a week", "Peak times suit you", "Book up to 3 days ahead"])
 
     def test_changing_points_or_a_plan_changes_the_suggestion_without_code(self):
         session = make_session(time=["daytime"], frequency="two_three")
@@ -258,6 +258,25 @@ class LeadGateTests(TestCase):
         self.assertEqual(session.lead_email, "a@example.com")
         member = User.objects.create_user(email="m@example.com", password="x-Strong-pass-1")
         self.assertFalse(services.lead_required(make_session(), member))  # his account is his address
+
+    def test_lead_data_command_exports_then_erases_by_email(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+        session = make_session(time="evening", facilities="gym", industry="tech")
+        services.save_lead(session, "lead@example.com", True)
+        out, err = StringIO(), StringIO()
+        call_command("lead_data", email="LEAD@example.com", stdout=out, stderr=err)
+        data = json.loads(out.getvalue())
+        self.assertEqual(len(data["sessions"]), 1)
+        self.assertTrue(data["sessions"][0]["answers"])
+        call_command("lead_data", email="lead@example.com", erase=True, dry_run=True, stdout=StringIO(), stderr=err)
+        session.refresh_from_db()
+        self.assertEqual(session.lead_email, "lead@example.com")  # dry run changed nothing
+        call_command("lead_data", email="lead@example.com", erase=True, stdout=StringIO(), stderr=err)
+        session.refresh_from_db()
+        self.assertEqual(session.lead_email, "")
+        self.assertEqual(services.export_lead("lead@example.com"), [])
 
     def test_a_restart_in_the_same_browser_keeps_the_address(self):
         old = make_session()

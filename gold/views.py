@@ -38,7 +38,7 @@ def _payload(request):
         except (ValueError, UnicodeDecodeError):
             return None
         return data if isinstance(data, dict) else None
-    return request.POST.dict()
+    return {key: (values if key == rating.INDUSTRY_QUESTION else values[-1]) for key, values in request.POST.lists()}  # industry is multi-select
 
 
 def _question_text(key, default):

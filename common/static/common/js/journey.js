@@ -289,7 +289,7 @@ function goldMark() { return el('span', { class: 'mark-glyph', 'aria-hidden': 't
 function renderResult(data) {
   const s = data.suggested;
   if (!s) {
-    const empty = data.copy?.empty || {};
+    const empty = config.membershipsHidden ? { ...copyOf('result_empty'), url: config.urls.memberships } : (data.copy?.empty || {});
     return el('section', { class: 'result', tabindex: '-1', 'data-reveal': 'hero' },
       el('h1', { class: 'screen-title', tabindex: '-1', text: empty.heading || '' }),
       el('p', { class: 'lead', text: empty.body || '' }),
@@ -358,7 +358,7 @@ function renderGate() {
     if (primary.disabled) return;
     primary.disabled = true;
     primary.setAttribute('aria-busy', 'true');
-    const reply = await postJson('/journey/lead/', { email: input.value, consent: consent.checked, website: form.querySelector('[name=website]').value }).catch(() => null);
+    const reply = await postJson(config.urls.lead, { email: input.value, consent: consent.checked, website: form.querySelector('[name=website]').value }).catch(() => null);
     primary.disabled = false;
     primary.removeAttribute('aria-busy');
     if (reply?.ok) {

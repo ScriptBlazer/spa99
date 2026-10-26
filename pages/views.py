@@ -155,16 +155,24 @@ def journey(request, slug=""):
     _check_slug(slug, {*JOURNEY_SLUGS.values(), JOURNEY_RESULT_SLUG})
     keys = ["screen_1", "screen_2", "screen_3", "screen_4", "result_label", "why", "result_cta", "change_answers",
             "gold_panel", "gold_line", "others", "continue", "skip", "last", "back", "prefer_not", "start_again",
-            "save_error", "result_loading", "result_error", "unavailable", "not_a_fit", "optional", "last_suggestion", "need_one"]
+            "save_error", "result_loading", "result_error", "unavailable", "not_a_fit", "optional", "last_suggestion", "need_one", "result_empty"]
     session = journey_services.session_from_cookies(request.COOKIES, request.user)
+    shown = memberships_visible(request)
     config = {
         "slugs": JOURNEY_SLUGS, "resultSlug": JOURNEY_RESULT_SLUG, "base": reverse("journey"),
         "copy": _copy("journey", keys), "gate": JOURNEY_GATE, "facilityImages": services.journey_facility_images(),
         "iconSprite": static("common/img/icons.svg"),
         "lastSuggestion": journey_services.last_suggestion(session) if session is not None else None,
         "urls": {"restart": reverse("journey:restart"), "lead": reverse("journey:lead"), "privacy": reverse("privacy"), "register": reverse("register"), "goldApply": reverse("gold_apply"), "home": reverse("home"),
-                 "memberships": reverse("memberships") if memberships_visible(request) else reverse("home")},
+                 "memberships": reverse("memberships") if shown else reverse("journey")},
+        "membershipsHidden": not shown,
     }
+    if not shown:  # Memberships is hidden: fallbacks send him back into the journey, not to a page that is not there
+        again = config["copy"]["start_again"]["cta"] or "Start again"
+        config["copy"]["result_empty"] = {"heading": config["copy"]["result_empty"]["heading"],
+                                          "body": "Answer a few questions and we will suggest the membership that suits you.", "cta": again}
+        for key in ("result_error", "unavailable"):
+            config["copy"][key]["cta"] = again
     return _page(request, "pages/journey.html", "journey", journey_config=config)
 
 

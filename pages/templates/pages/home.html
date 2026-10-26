@@ -187,7 +187,7 @@
     <div class="container grid">
       <div class="plans-head">
         <h2 id="teaser-title" class="statement" data-rise>{{ home.memberships_teaser.heading }}</h2>
-        <div class="actions" data-fade><a class="btn-quiet" href="{% memberships_url %}">{{ home.memberships_teaser.cta_label }}</a></div>
+        <div class="actions" data-fade><a class="btn-quiet" href="{% memberships_url %}">{% memberships_shown as shown %}{% if shown %}{{ home.memberships_teaser.cta_label }}{% else %}{{ home.journey_entry.cta_label }}{% endif %}</a></div>
       </div>
       {% memberships_shown as prices_shown %}{% if prices_shown %}{# no prices before the visitor has left an email (Barry, 2026-10-26) #}
       <div class="plans-list">

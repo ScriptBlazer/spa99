@@ -424,3 +424,27 @@ def build_state(session, user=None):
         "last_suggestion": last_suggestion(session),
         "screens": [{"number": n, "questions": screens[n]} for n in sorted(screens)],
     }
+
+
+def export_lead(email):
+    """Everything held for an address given at the gate: its sessions and answers, as plain data (for UK GDPR requests
+    from people who never registered)."""
+    email = (email or "").strip()
+    if not email:
+        return []
+    sessions = JourneySession.objects.filter(lead_email__iexact=email).select_related("suggested_plan").order_by("created_at")
+    rows = []
+    for session in sessions:
+        answers = [
+            {"question": a.question.text, "options": [o.label for o in a.options.all()], "text": a.text_value,
+             "skipped": a.skipped, "answered_at": a.answered_at.isoformat()}
+            for a in session.answers.select_related("question").prefetch_related("options").order_by("answered_at")
+        ]
+        rows.append({
+            "started_at": session.created_at.isoformat(), "device": session.device_type, "referrer": session.referrer,
+            "utm_source": session.utm_source, "utm_medium": session.utm_medium, "utm_campaign": session.utm_campaign,
+            "lead_email": session.lead_email, "lead_at": session.lead_at.isoformat() if session.lead_at else None,
+            "completed": session.completed,
+            "suggested_plan": session.suggested_plan.name if session.suggested_plan else None, "answers": answers,
+        })
+    return rows
