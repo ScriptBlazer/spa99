@@ -13,6 +13,12 @@
       <h1 id="m-title" class="mem-title line-mask"><span class="mem-title-line">{{ m.intro.heading }}</span></h1>
       <p class="lead mem-fade">{{ m.intro.body }}</p>
       <p class="mem-fade mem-notsure"><span class="mem-notsure-q">{{ m.not_sure.heading }}</span> <a class="btn-quiet mem-notsure-link" href="{% url 'journey' %}">{{ m.not_sure.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a></p>
+      {% if gold_cta and m.gold_cta.cta_label %}{% url 'gold_apply' as gold_apply_url %}
+      <div class="mem-gold mem-fade">
+        <p class="mem-gold-hook">{% include "common/_mark.html" %}<span>{{ m.gold_cta.body }}</span></p>
+        <a class="btn btn-secondary mem-gold-btn" href="{{ m.gold_cta.cta_url|default:gold_apply_url }}">{{ m.gold_cta.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
+      </div>
+      {% endif %}
     </div>
 
     <fieldset class="tiers" data-reveal>
@@ -58,15 +64,6 @@
       <p class="continue-note">{{ m.continue.body }}</p>
     </div>
 
-    {% if gold_cta and m.gold_cta.cta_label %}{% url 'gold_apply' as gold_apply_url %}
-    <div class="mem-gold mem-fade">
-      {% include "common/_mark.html" %}
-      <div class="mem-gold-text">
-        <p class="mem-gold-hook">{{ m.gold_cta.body }}</p>
-        <a class="btn btn-secondary mem-gold-btn" href="{{ m.gold_cta.cta_url|default:gold_apply_url }}">{{ m.gold_cta.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
-      </div>
-    </div>
-    {% endif %}
   </div>
 </form>
 
