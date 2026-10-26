@@ -210,10 +210,12 @@ def beta_gold_links(w):
         assert "/login/" in signed_out.url, f"Landed on {signed_out.url}"
         assert dbtool("gold", email)["status"] == "new"
     olive = w.page()
-    with w.step("Office level without Approver opens the link: refused (403), nothing approved", olive):
+    with w.step("Office level without Approver opens the link: view only, no Approve, nothing approved", olive):
         sign_in(olive, OFFICE, OLIVE["email"], PASSWORD)
-        status = olive.goto(url).status
-        assert status == 403, f"The approve link answered {status} to someone who is not an Approver (expected 403)"
+        status = olive.goto(url).status  # the link opens the application page, which Office level may view (2026-10-26)
+        assert status == 200, f"The link answered {status} to an Office-level person"
+        assert olive.locator("[data-approve], [data-decline]").count() == 0, "Office level without Approver sees decision buttons"
+        assert post_direct(olive, OFFICE, f"/gold/{application_id(url)}/approve/").status == 403, "Office level could approve directly"
         assert dbtool("gold", email)["status"] == "new"
     barry = barry_page(w)
     with w.step("The approver taps the link: approved, one invite email", barry):

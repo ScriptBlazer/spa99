@@ -571,7 +571,7 @@ def phone(w):
 WALKS = [
     ("visitor", "1. Visitor: pages and the journey to a suggested tier", visitor, ()),
     ("tier", "2. Tier membership: register, verify, sign in, dashboard, Book a visit", tier, ()),
-    ("gold_approved", "3. Gold approved: apply, approver email, one-tap approve, member is Gold", gold_approved, ()),
+    ("gold_approved", "3. Gold approved: apply, approver email, approve on the application page, member is Gold", gold_approved, ()),
     ("gold_declined", "4. Gold declined: decline in the Office, not Gold", gold_declined, ()),
     ("account", "5. Account: change password, reset by email, delete, cannot sign in", account, ()),
     ("office_levels", "6. Office levels, then the figures", office_levels, (r"status of 40[34]",)),
