@@ -185,7 +185,7 @@ class RollupAndRebuildTests(TestCase):
 class CleanLabelTests(TestCase):
     def test_hint_is_dropped_but_a_real_parenthesis_stays(self):
         from insights.facts import clean_label
-        self.assertEqual(clean_label("Often with someone (Most visits.)"), "Often with someone")
+        self.assertEqual(clean_label("Often with a friend (Most visits.)"), "Often with a friend")
         self.assertEqual(clean_label("Early morning (5 to 9am)"), "Early morning (5 to 9am)")
         self.assertEqual(clean_label("Manager (block, estate, portfolio)"), "Manager (block, estate, portfolio)")
 

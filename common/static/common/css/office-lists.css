@@ -174,3 +174,19 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 @media (pointer: coarse) { .o-chip { min-height: 2.75rem; } }
 .o-seg:not(:has(input:checked)) .o-seg-thumb { opacity: 0; }
 .o-badge { gap: 0.25em; }
+
+/* ---------- Gold actions (2026-10-26): Decline / Respond / Add note dialogs and the History timeline. Tint and full hairlines only. ---------- */
+.o-actions-more { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.o-actions-more .btn { flex: 1 1 8rem; }
+.o-dialog { --modal-w: 32rem; }
+.o-check { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); min-height: 2.75rem; font-size: var(--text-base); color: var(--fb-text); cursor: pointer; }
+.o-check input { width: 1.25rem; height: 1.25rem; margin: 0; accent-color: var(--office-text); }
+.o-email-box[hidden] { display: none; }
+.o-field-error { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--office-danger); }
+.o-timeline { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.o-tl { display: grid; gap: 2px; padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-sunken); }
+.o-tl > * { margin: 0; max-width: none; }
+.o-tl-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); font-weight: 600; }
+.o-tl-change { font-weight: 400; font-size: var(--text-sm); color: var(--office-muted); }
+.o-tl-meta { font-size: var(--text-sm); color: var(--office-muted); }
+.o-tl-msg { margin-top: var(--space-1); padding: var(--space-2) var(--space-3); border-radius: var(--office-radius); background: var(--office-surface); overflow-wrap: anywhere; }

@@ -208,11 +208,24 @@ def gold_declined(w):
         sign_in(office, OFFICE, barry["email"], PASSWORD)
         application_id = office_gold_detail(office, f"{first} {last}")
         assert "Waiting" in office.locator("[data-gold-decision]").inner_text() or office.locator("[data-decline]").count() > 0
-    with w.step("Decline the application", office):
+    with w.step("Decline needs a reason: an empty form lists the problem and stays open", office):
         office.locator("[data-decline] button:visible").first.click()
-        confirm_office_modal(office)
+        dialog = office.locator('dialog[data-gold-dialog="decline"]')
+        dialog.wait_for(state="visible")
+        dialog.locator('button[type="submit"]').click()
+        office.locator("dialog[data-fb-modal][open] .fb-problems").wait_for()
+        assert "Reason" in office.locator("dialog[data-fb-modal][open] .fb-problems").inner_text()
+        office.locator("dialog[data-fb-modal][open] button", has_text="OK").click()
+        assert dbtool("gold", email)["status"] == "new", "A decline without a reason went through"
+    with w.step("Decline with a reason (the applicant is not emailed by default)", office):
+        dialog.locator('textarea[name="reason"]').fill("E2E: not a fit for Gold at this time")
+        assert not dialog.locator('input[name="email_applicant"]').is_checked(), "Email the applicant must be off by default"
+        dialog.locator('button[type="submit"]').click()
         office.wait_for_selector("[data-gold-decision] .o-state")
         assert "Declined" in office.locator("[data-gold-decision]").inner_text()
+    with w.step("The History shows the decline with the reason, who and how", office):
+        trail = office.locator("[data-gold-timeline]").inner_text()
+        assert "Declined" in trail and "E2E: not a fit for Gold at this time" in trail and "Office" in trail, f"History says: {trail}"
     with w.step("The application is declined and the person is not Gold", office):
         status = dbtool("gold", email)
         assert status["status"] == "declined" and not status["has_user"], f"Database says {status}"

@@ -27,6 +27,11 @@ if (panel) {
     fill('[data-plan-character]', chosen.dataset.character);
     fill('[data-plan-price]', `£${chosen.dataset.price}`);
     fill('[data-plan-vat]', `ex VAT (£${chosen.dataset.inc} inc VAT)`);
+    const sale = chosen.dataset.saleLine || '';
+    const saleEl = body.querySelector('[data-plan-sale]');
+    if (saleEl) { saleEl.querySelector('[data-plan-sale-text]').textContent = sale; saleEl.hidden = !sale; }
+    const note = document.querySelector('[data-sale-note]');
+    if (note) note.hidden = !sale;
     eyebrow.textContent = chosen.value === eyebrow.dataset.suggested ? eyebrow.dataset.suggestedText : plainEyebrow;
     // One 240ms fade of the text block (opacity only). Reduced motion: none.
     if (animate && !reduceMotion.matches && text.animate) {

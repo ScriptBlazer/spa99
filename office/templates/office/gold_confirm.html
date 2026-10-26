@@ -12,7 +12,7 @@
   <p class="o-sub">Applied {{ a.applied|dmy }}</p>
   {% if final_approver_missing and a.potential == "low" and a.can_approve %}<p class="o-warn" data-final-approver-missing>No final approver is set, so a Low potential approval goes through at once. Set one in System, Approval.</p>{% endif %}
   {% if a.can_approve %}
-  <form method="post" action="{% url 'office_gold_approve' a.id %}" class="o-confirm-form" data-confirm-form>{% csrf_token %}
+  <form method="post" action="{% url 'office_gold_approve' a.id %}" class="o-confirm-form" data-confirm-form>{% csrf_token %}{% if approve_token %}<input type="hidden" name="token" value="{{ approve_token }}">{% endif %}
     <button type="submit" class="btn btn-primary btn-block o-confirm-go">Approve and send invite</button>
     <p class="o-sub">He gets an email to set up his account. The link lasts 14 days.</p>
   </form>
@@ -21,7 +21,7 @@
   {% endif %}
   <p class="o-confirm-links">
     <a class="o-quiet" href="{% url 'office_gold_application' a.id %}">Open full application</a>
-    {% if a.can_approve %}<a class="o-quiet" href="{% url 'office_gold_application' a.id %}#decision-h">Decline</a>{% endif %}
+    {% if a.can_approve %}<a class="o-quiet" href="{% url 'office_gold_application' a.id %}?do=decline" data-confirm-decline>Decline</a><a class="o-quiet" href="{% url 'office_gold_application' a.id %}?do=respond" data-confirm-respond>Respond</a>{% endif %}
   </p>
 </section>
 {% endwith %}

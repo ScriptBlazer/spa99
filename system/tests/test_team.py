@@ -200,8 +200,10 @@ class ReviewFixTests(TestCase):
         from notifications.models import EmailLog
         from users import services as user_services
 
-        keep = User.objects.create_user("keep@example.com", "x", first_name="Kay")
-        gone = User.objects.create_user("gone@example.com", "x", first_name="Gil")
+        from django.utils import timezone
+
+        keep = User.objects.create_user("keep@example.com", "x", first_name="Kay", email_verified_at=timezone.now())
+        gone = User.objects.create_user("gone@example.com", "x", first_name="Gil", email_verified_at=timezone.now())
         application = gold_services.submit_application(application_data(email="gone@example.com"))[0]
         EmailLog.objects.create(to="gone@example.com", subject="Hello", template="welcome", subject_email="gone@example.com")
         LoginEvent.objects.create(attempted_email="gone@example.com", event="failed")

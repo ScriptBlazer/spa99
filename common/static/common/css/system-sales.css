@@ -1,0 +1,70 @@
+/* System > Sales (docs/design/SYSTEM-SALES.md 3). Classes prefixed ss-; sys-* is reused. No one-sided borders. */
+.system .ss-back { display: inline-block; margin-bottom: var(--sys-1); color: var(--sys-text-2); font-size: var(--sys-fs-sm); }
+.system .ss-hint, .ss-sub, .ss-lock, .ss-count, .ss-left { font-size: var(--sys-fs-sm); color: var(--sys-text-3); }
+.ss-hint { margin: calc(var(--sys-2) * -1) 0 var(--sys-3); }
+.sys-head .sys-actions { display: flex; flex-wrap: wrap; gap: var(--sys-2); align-items: center; }
+.sys-head .sys-actions form { margin: 0; }
+.sys-head h1 .sys-badge { margin-left: var(--sys-2); vertical-align: middle; }
+
+/* ---------- list ---------- */
+.ss-count { font-family: var(--sys-mono); }
+.ss-list td.ss-name a { color: var(--sys-text); font-weight: 500; text-decoration: none; }
+.ss-list td.ss-name a:hover { text-decoration: underline; }
+.ss-sub { display: block; }
+.ss-list .ss-sub { display: none; }
+.ss-left { margin-left: var(--sys-1); }
+.ss-actions { text-align: right; white-space: nowrap; }
+.ss-actions form { display: inline; margin: 0; }
+.ss-actions .sys-btn + form, .ss-actions form + form { margin-left: var(--sys-1); }
+.ss-actions form .sys-btn, .ss-actions .sys-btn { margin-left: var(--sys-1); }
+.js .ss-extra:not([data-open]) { display: none; }
+.ss-empty { display: grid; gap: var(--sys-2); justify-items: center; padding: var(--sys-5) var(--sys-4); text-align: center; color: var(--sys-text-2); }
+.ss-empty-note { font-size: var(--sys-fs-sm); color: var(--sys-text-3); }
+
+/* ---------- preview link ---------- */
+.ss-link { margin-bottom: var(--sys-4); }
+.ss-link[hidden] { display: none; }
+.ss-link-head { font-weight: 600; margin-bottom: var(--sys-2); }
+.ss-link-row { display: flex; gap: var(--sys-2); align-items: center; flex-wrap: wrap; }
+.ss-link-row input { flex: 1 1 22rem; min-width: 0; font-family: var(--sys-mono); font-size: var(--sys-fs-sm); }
+.ss-link-note { margin-top: var(--sys-2); font-size: var(--sys-fs-sm); }
+
+/* ---------- form ---------- */
+.ss-form { margin: 0; }
+.ss-rows { padding: var(--sys-2) var(--sys-4) var(--sys-4); }
+.ss-locked { display: inline-block; padding-top: 5px; font-size: var(--sys-fs); }
+.ss-locked.mono { font-family: var(--sys-mono); }
+.ss-lock { display: flex; align-items: center; gap: var(--sys-1); margin-top: var(--sys-1); }
+.ss-plans { display: flex; flex-wrap: wrap; gap: var(--sys-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.ss-start-mode { margin-bottom: var(--sys-2); }
+.ss-start-mode[hidden], [data-ss-start-now][hidden], [data-ss-start-fields][hidden] { display: none; }
+.ss-nojs { padding: 0 var(--sys-4) var(--sys-4); }
+.js .ss-nojs { display: none; }
+.sys-row input[type=datetime-local] { width: 200px; }
+
+/* ---------- what people see ---------- */
+.ss-preview > summary { list-style: none; cursor: pointer; padding: var(--sys-3) var(--sys-4); display: flex; justify-content: space-between; align-items: center; }
+.ss-preview > summary::-webkit-details-marker { display: none; }
+.ss-preview > summary h2 { font-size: var(--sys-fs-md); font-weight: 600; }
+.ss-preview > summary::after { content: "Show"; font-size: var(--sys-fs-sm); color: var(--sys-text-3); }
+.ss-preview[open] > summary::after { content: "Hide"; }
+.ss-preview > summary:focus-visible { outline: 2px solid var(--sys-accent); outline-offset: -2px; }
+.ss-preview-body { display: grid; gap: var(--sys-2); padding: 0 var(--sys-4) var(--sys-4); }
+.ss-label { font-size: var(--sys-fs-sm); color: var(--sys-text-2); margin-top: var(--sys-2); }
+.ss-bar-copy { padding: var(--sys-2) var(--sys-3); background: var(--sys-subtle); border-radius: var(--sys-radius); overflow-wrap: anywhere; min-height: 2.2em; }
+.ss-prices td, .ss-prices th { height: 32px; }
+@media (min-width: 64em) {
+  .ss-preview > summary { pointer-events: none; }
+  .ss-preview > summary::after { content: none; }
+}
+
+/* ---------- phone ---------- */
+@media (max-width: 47.99em) {
+  .ss-list .ss-col-plans, .ss-list .ss-col-runs, .ss-list .ss-col-months, .ss-list .ss-col-held, .ss-list .ss-col-off { display: none; }
+  .ss-list .ss-sub { display: block; color: var(--sys-text-2); }
+  .ss-list td { padding-block: var(--sys-2); height: auto; white-space: normal; }
+  .ss-actions .sys-btn { min-height: 36px; }
+  .sys-row input[type=datetime-local] { width: 100%; max-width: 220px; }
+}
+
+.system .sys-note[data-system-sale-readonly] { margin-bottom: var(--sys-4); }

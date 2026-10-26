@@ -15,7 +15,7 @@ Every answer is saved the moment it's given, from the first tap, even if the vis
 - **Mixed inputs:** tap tiles (single or multi), a slider or segmented control for frequency, at most one or two short typed answers.
 - **Calm feedback:** a choice is acknowledged instantly (soft highlight), saved in the background, and the next part reveals gently.
 - **Never lost:** refresh, back button, closing and returning (same device) all resume where he was.
-- **Skippable, except two:** every question has a quiet "skip" or "prefer not to say" (skips are saved too), except "When would you come?" and "What would you use?", which need at least one choice ("Choose at least one.", Continue stays disabled until one is chosen; more are allowed). The rule is `Question.min_choices` (0 = optional), set to 1 on `time` and `facilities`, editable in Control. The server enforces it: a required question cannot be skipped or saved empty, `POST /journey/step/` will not move forward past a screen with a required question unanswered, and `POST /journey/result/` computes and stores nothing until they are answered (400 `{"error", "missing": [question keys]}`). The state carries `min_choices`, `required` and `skippable` per question.
+- **Skippable, except three (2026-10-26):** every question has a quiet "skip" or "prefer not to say" (skips are saved too), except "When would you come?", "What would you use?" and "What do you do?", which need at least one choice ("Choose at least one.", Continue stays disabled until one is chosen; more are allowed). The rule is `Question.min_choices` (0 = optional), set to 1 on `time`, `facilities` and `industry`, editable in Control. The server enforces it: a required question cannot be skipped or saved empty, `POST /journey/step/` will not move forward past a screen with a required question unanswered, and `POST /journey/result/` computes and stores nothing until they are answered (400 `{"error", "missing": [question keys]}`). The state carries `min_choices`, `required` and `skippable` per question.
 - **Progress shown subtly** (thin line or dots), not "Question 3 of 12".
 
 ## Draft flow (questions are data, editable in Control)
@@ -25,16 +25,22 @@ Every answer is saved the moment it's given, from the first tap, even if the vis
 - How often? (segmented): Once a week · 2–3 times a week · Most days · Now and then
 
 **Screen 2 — What draws you** (multi tiles, from the real facilities)
-- Wet sauna · Dry sauna · Cold plunge · Showers · Relaxing zone · Gym · Massage room · Kitchenette / time to unwind
+- Wet sauna · Dry sauna · Cold plunge · Ice bucket · Relaxing zone · Gym · Massage room · Kitchenette / time to unwind. (2026-10-26: Showers became **Ice bucket**, value `ice_bucket`. The old `showers` option is retired, never deleted, so old answers keep their label. It has no spa picture yet, so its tile shows the calm placeholder.)
 
 **Screen 3 — Company**
-- Alone, or sometimes with a friend? Alone · Sometimes with someone (two answers only: guest visits are Tier 3 and Gold only, GST-01; "Often with someone" was retired 2026-10-23, kept inactive so old answers keep their label)
+- Alone, or sometimes with a friend? Alone · Sometimes with a friend (two answers only: guest visits are Tier 3 and Gold only, GST-01; "Often with a friend" was retired 2026-10-23, kept inactive so old answers keep their label)
 
 **Screen 4 — You**
-- What do you do? (tiles): Property · Finance · Business owner · Law · Medical · Tech · Creative · Other
+- What do you do? (**multi tiles, choose at least one**, 2026-10-26): Property · Finance · Business owner · Law · Medical · Tech · Creative · Other. Follow-ups follow the choices: the Property questions show when Property is among them, "Is it property law?" when Law is among them, the "In a few words" text when Other is. No "prefer not to say" on this one.
 - If Property: your link to property (tiles): Owner / investor · Developer · Manager (block, estate, portfolio) · Work at a property or management firm · Agent / broker · Property lawyer
 - If Law: is it property law? Yes · No
 - How did you hear about us? (small select, tap again to clear): A friend · BML member · Social media · Other ("Instagram" and "Walking past" retired 2026-10-23, kept inactive)
+
+**Email gate (2026-10-26)** — between screen 4 and the result, for anyone not signed in
+- "One last thing." One field (Email) and one required tick: "Yes, Spa 99 may email me about opening. I can unsubscribe at any time." with a privacy link. Button "See my tailored membership". Until the address is saved there is no suggested membership, no price and the journey is not marked finished (`POST` and `GET /journey/result/` answer 403 `{"needs_email": true}`; the state carries `session.lead_required`). Signed-in visitors skip it (his account is his address). A restart in the same browser carries the address over, so he is not asked twice. Words live in `journey/copy.py`.
+- Stored on the session: `JourneySession.lead_email`, `lead_at`, `lead_privacy_version` (privacy version in force). Personal data, never shown publicly; visible in the Django admin (list, search, CSV export) and, for a registered person whose address differs from his account email, on his Office person page. Leads who never register are not listed in Office yet (they are in the admin). In the UK GDPR export (sessions by user or by that address) and erased with the person (`journey.services.erase_lead`, also from a Gold applicant's erasure); the answers stay anonymously. For a lead who never registers, export and erase by hand with `manage.py lead_data --email X [--erase] [--dry-run]` (prints the sessions and answers as JSON; `--erase` clears the address, `--dry-run` only reports what it would clear). An Office/System screen for this is a follow-up.
+- **Passing the gate unlocks Memberships (2026-10-26):** `memberships_visible(request)` (`pages/access.py`) is also True when this browser's journey session (the `spa99_journey` cookie) holds a `lead_email`, and for any signed-in person. So after the gate the nav/footer link, price lines, sale bar and `/memberships/` work for him while the switch is off; everyone else is still sent to the journey. One small query, cached on the request. The result shows a quiet link "Explore all memberships" (copy row `journey` / `explore_memberships`) under "Or choose another", to `/memberships/` (`config.urls.membershipsPage`).
+- Bots: the hidden `website` field flags the session as a bot and stores nothing. Endpoint `POST /journey/lead/` `{"email", "consent": true}` (rate limited, CSRF): 200, or 400 `{"errors": {"email", "consent"}}`.
 
 **Result**
 - "Your membership: Tier 2" with three short reasons drawn from his answers (e.g. "Evenings suit you", "Two to three visits a week", "Book up to 3 days ahead").
@@ -52,7 +58,7 @@ Each option carries points per plan, stored in data. The plan with the most poin
 | "Most days" | Strong towards Tier 3 |
 | "2–3 times a week" | Towards Tier 2; Tier 3 if also evenings + guests |
 | "Once a week" / "Now and then" | Towards Tier 1 (daytime) or Tier 2 (evenings) |
-| "Sometimes with someone" | Towards Tier 3 (guest visits, Tier 3 and Gold only) |
+| "Sometimes with a friend" | Towards Tier 3 (guest visits, Tier 3 and Gold only) |
 | Ties | Prefer Tier 2 (MEM-03) |
 
 Points, constraints and tie-break are editable in Control. Plans and their features (visits, hours, guests) come from `plans`, so the reasons text updates when plans change.
@@ -88,8 +94,20 @@ Which answers count as property, and the thresholds, are editable in Control.
   - `POST /journey/step/` cannot go further than the screen after the furthest one reached (a posted `99` cannot inflate the funnel).
   - `POST /journey/restart/` "Start again": returns the state of a new empty session (same shape as `GET /journey/state/`, `current_step` 1, `last_suggestion` null); the cookie is replaced; the old session is kept for the statistics.
 - Questions or options retired in Control are hidden, never deleted, so old answers stay readable.
+- **Gold points from a multi-select (2026-10-26):** for one question the journey takes the **highest** `gold_points` among the options chosen, never the sum (ticking Finance, Business owner and Law is worth 3, not 9). Points from different questions still add. Plan points are unchanged (every chosen option adds its plan points, as `time` and `facilities` always did).
+- **Who sees Gold in the journey (2026-10-26, pushed to more people; journey only, the application rating and thresholds are unchanged; High is 6 or more, Medium is 3 or more):**
+
+| Industry (highest chosen wins) | `gold_points` | Result |
+|---|---|---|
+| Property, Finance, Business owner, Law, Tech | 6 | Full Gold panel |
+| Medical, Creative | 3 | The Gold line |
+| Other | 0 | Nothing, unless other signals add up |
+
+  Property follow-ups (link, size) and "property law" only add on top. Points are editable per option in System > Journey.
+- **Counting:** each option a person chose is one vote for him (Office rule C3 "Answers"), as for `facilities`; `counted_answers` lists `industry:finance`, `industry:law`.
+- **Memberships page switch (2026-10-26):** `SiteSettings.memberships_public` (System > Settings, off by default). While off, the Memberships link is removed from the nav, mobile menu and footer, `/memberships/` redirects (302) to the journey, the sale bar points at the journey, and the sitemap leaves it out. Signed-in team members (`is_staff`) can still open the page to check it. People reach Register only through the journey, so prices appear after the email gate. Rule: `pages/access.py` `memberships_visible(request)`; templates use `{% memberships_url %}` / `{% memberships_shown %}` (`common/templatetags/membership_tags.py`).
 - On sign-up the session is linked to the new `User`; on a Gold application the application points at the session.
-- No personal data is asked before sign-up except optional industry/role.
+- No personal data is asked before the email gate except optional industry/role (the gate asks for an email, with consent, before the result).
 - Added to the draft flow: a conditional `property_size` question on screen 4 (1-9, 10-49, 50-199, 200+) so a property person can reach High potential from the journey ("property link with scale"). Hide it in Control if not wanted.
 - Seed: `python manage.py seed_phase1` loads these questions, options, points and rules (create-only, never overwrites edits).
 

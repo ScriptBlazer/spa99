@@ -1,6 +1,6 @@
 {% load content_tags %}{# A feature room (S2a, S2c, S2d): an edge-bleed frame on one side, the words on the other, an optional detail inset and one companion. Needs s (the section) and ratio (a|b|c). #}
 {% with f=s.feature c=s.companion %}
-<article class="scene sp-sec sp-feature sp-feature--{{ s.side }} sp-ratio-{{ ratio }} on-dark" id="{{ f.slug }}" data-scene="feature" data-glow>
+<article class="scene sp-sec sp-feature{% if s.compact %} sp-feature--compact{% endif %} sp-feature--{{ s.side }} sp-ratio-{{ ratio }} on-dark" id="{{ f.slug }}" data-scene="feature" data-glow>
   <div class="glow" aria-hidden="true"></div>
   <div class="container grid sp-grid">
     <div class="sp-pic">
@@ -9,7 +9,7 @@
         <div class="frame-media">{% include "pages/_spa_media.html" with f=f sizes="(min-width: 64em) 62vw, 100vw" %}</div>
         <div class="frame-tint" aria-hidden="true"></div>
       </figure>
-      {% if f.detail_image or f.detail_image_name %}
+      {% if not s.compact and f.detail_image or not s.compact and f.detail_image_name %}
       {# the detail inset (the steel bottle on the gym): a mount, no caption (docs/design/AMENITIES.md M4) #}
       {% include "pages/_spa_mount.html" with name=f.detail_image_name alt=f.detail_alt sizes="(min-width: 64em) 14vw, 40vw" focus="50% 50%" upload=f.detail_image depth="12" cls="sp-detail" %}
       {% endif %}
@@ -24,18 +24,7 @@
         {% if f.facts %}<ul class="pills sp-pills" aria-label="{{ f.name }}, at a glance">{% for p in f.facts %}<li class="pill" data-pill>{{ p }}</li>{% endfor %}</ul>{% endif %}
       </div>
       {% if c %}
-      <article class="sp-companion" id="{{ c.slug }}">
-        <figure class="frame frame--inset sp-thumb" data-frame data-depth="12" style="--focus: {{ c.focus }}">
-          <div class="frame-media">{% include "pages/_spa_media.html" with f=c sizes="(min-width: 64em) 10vw, 96px" %}</div>
-          <div class="frame-tint" aria-hidden="true"></div>
-        </figure>
-        <div class="sp-companion-copy">
-          <h2 class="sp-cname" data-rise>{{ c.name }}</h2>
-          {% if c.line %}<p class="small muted" data-fade>{{ c.line }}</p>{% endif %}
-          {% if c.tour_url %}<a class="sp-tour small" href="{{ c.tour_url }}">{{ spa.tour_link.cta_label|default:"Take the tour" }}</a>{% endif %}
-          {% if c.facts %}<ul class="pills sp-pills sp-pills--small" aria-label="{{ c.name }}, at a glance">{% for p in c.facts %}<li class="pill" data-pill>{{ p }}</li>{% endfor %}</ul>{% endif %}
-        </div>
-      </article>
+      {% include "pages/_spa_companion.html" with c=c %}
       {% endif %}
     </div>
   </div>

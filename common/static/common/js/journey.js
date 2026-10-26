@@ -18,7 +18,7 @@ const progress = document.querySelector('[data-progress]');
 const fill = document.querySelector('[data-progress-fill]');
 
 // Layout choices per question (everything else follows its type).
-const PREFER_NOT_SAY = new Set(['industry', 'property_link', 'property_size', 'heard_via']);
+const PREFER_NOT_SAY = new Set(['property_link', 'property_size', 'heard_via']);
 const LAYOUT = {
   time: 'tiles-2', frequency: 'segmented', facilities: 'image', company: 'large', industry: 'tiles-4',
   property_link: 'tiles-stack', property_size: 'segmented', property_law: 'segmented', heard_via: 'small',
@@ -289,7 +289,7 @@ function goldMark() { return el('span', { class: 'mark-glyph', 'aria-hidden': 't
 function renderResult(data) {
   const s = data.suggested;
   if (!s) {
-    const empty = data.copy?.empty || {};
+    const empty = config.membershipsHidden ? { ...copyOf('result_empty'), url: config.urls.memberships } : (data.copy?.empty || {});
     return el('section', { class: 'result', tabindex: '-1', 'data-reveal': 'hero' },
       el('h1', { class: 'screen-title', tabindex: '-1', text: empty.heading || '' }),
       el('p', { class: 'lead', text: empty.body || '' }),
@@ -318,17 +318,67 @@ function renderResult(data) {
       data.others.map((plan) => el('div', { class: 'other-plan' },
         el('div', {}, el('strong', { text: plan.name }), ' ', el('span', { class: 'muted', text: plan.character_line }), plan.not_a_fit ? el('p', { class: 'not-fit', text: copyOf('not_a_fit').body }) : null),
         el('span', { class: 'num', text: `£${plan.price_whole}` }),
-        el('a', { class: 'btn-quiet', href: registerUrl(plan.slug), text: copyOf('others').cta.replace('{plan}', plan.name) }))))
+        el('a', { class: 'btn-quiet', href: registerUrl(plan.slug), text: copyOf('others').cta.replace('{plan}', plan.name) }))),
+      // he has given his email to get here, so the Memberships page is open to him
+      el('p', { class: 'explore-memberships' }, el('a', { class: 'btn-quiet', href: config.urls.membershipsPage, text: copyOf('explore_memberships').cta })))
     : null;
 
   const grid = el('div', { class: `result-grid${presentation === 'panel' ? ' has-gold' : ''}` }, main);
   if (presentation === 'panel') {
     grid.append(el('div', { class: 'result-gold', 'data-reveal': '' }, el('div', { class: 'gold-panel' },
       goldMark(), el('h2', { text: goldPanelCopy.heading }), el('p', { text: goldPanelCopy.body }),
+      config.goldFeeNote ? el('p', { class: 'fee-note', text: config.goldFeeNote }) : null,
       el('a', { class: 'btn btn-primary', href: config.urls.goldApply }, goldPanelCopy.cta, ' ', arrowIcon()))));
   }
   if (others) grid.append(others);
   return el('section', { class: 'result', 'aria-label': copyOf('result_label').body }, grid);
+}
+
+/* ---------- the email gate (before the result) ---------- */
+
+/** One field and one consent. Posts to /journey/lead/; the server checks the address and says why when it is wrong. */
+function renderGate() {
+  const g = config.gate || {};
+  const input = el('input', { id: 'lead-email', name: 'email', type: 'email', class: 'input', autocomplete: 'email', inputmode: 'email', 'aria-describedby': 'lead-email-msg' });
+  const emailMsg = el('p', { class: 'feedback', id: 'lead-email-msg', 'aria-live': 'polite', 'data-state': 'hint' });
+  const consent = el('input', { type: 'checkbox', id: 'lead-consent', name: 'consent', 'aria-describedby': 'lead-consent-msg' });
+  const consentMsg = el('p', { class: 'feedback', id: 'lead-consent-msg', 'aria-live': 'polite', 'data-state': 'hint' });
+  const primary = el('button', { type: 'submit', class: 'btn btn-primary', 'data-gate-primary': '' }, g.cta || '', ' ', arrowIcon());
+  const back = el('button', { type: 'button', class: 'btn-quiet', 'data-back': '', text: copyOf('back').cta });
+  const form = el('form', { class: 'screen lead-gate', novalidate: '', 'aria-label': g.heading || '', 'data-reveal': 'hero' },
+    el('div', { class: 'screen-head' }, el('h1', { class: 'screen-title', tabindex: '-1', text: g.heading || '' }), g.body ? el('p', { class: 'lead muted', text: g.body }) : null),
+    el('div', { class: 'screen-body' },
+      el('div', { class: 'question' }, el('div', { class: 'field' }, el('label', { for: 'lead-email' }, g.email_label || 'Email'), input, emailMsg)),
+      el('div', { class: 'question' }, el('div', { class: 'field' },
+        el('label', { class: 'check' }, consent, el('span', {}, `${g.consent || ''} `, el('a', { href: config.urls.privacy, text: g.privacy_label || 'Privacy' }))), consentMsg)),
+      el('div', { class: 'hp', 'aria-hidden': 'true' }, el('label', {}, 'Website ', el('input', { name: 'website', tabindex: '-1', autocomplete: 'off' })))),
+    el('div', { class: 'action-bar' }, back, primary));
+  const mark = (slot, message) => { slot.textContent = message || ''; slot.dataset.state = message ? 'error' : 'hint'; };
+  input.addEventListener('input', () => { mark(emailMsg, ''); input.removeAttribute('aria-invalid'); });
+  consent.addEventListener('change', () => mark(consentMsg, ''));
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (primary.disabled) return;
+    primary.disabled = true;
+    primary.setAttribute('aria-busy', 'true');
+    const reply = await postJson(config.urls.lead, { email: input.value, consent: consent.checked, website: form.querySelector('[name=website]').value }).catch(() => null);
+    primary.disabled = false;
+    primary.removeAttribute('aria-busy');
+    if (reply?.ok) {
+      state.session.lead_required = false;
+      show(resultStep); // same URL: now the result itself
+      return;
+    }
+    const errors = reply?.status === 400 ? reply.data?.errors || {} : null;
+    if (errors) {
+      mark(emailMsg, errors.email);
+      mark(consentMsg, errors.consent);
+      if (errors.email) { input.setAttribute('aria-invalid', 'true'); input.focus(); } else consent.focus();
+    } else {
+      mark(emailMsg, g.error || '');
+    }
+  });
+  return form;
 }
 
 /* ---------- navigation ---------- */
@@ -367,15 +417,20 @@ async function show(step) {
   computeResultStep();
   if (step > resultStep) current = step = resultStep;
   const onResult = step === resultStep;
-  setSurface(onResult);
+  const gated = onResult && Boolean(state.session.lead_required);
+  setSurface(onResult && !gated);
   let node;
-  if (onResult) {
+  if (gated) {
+    node = renderGate();
+    updateProgress();
+  } else if (onResult) {
     root.replaceChildren(el('p', { class: 'muted flow-loading', text: copyOf('result_loading').body }));
     updateProgress();
     try {
       // POST: arriving at the result is what stores the suggestion and marks the journey finished (a GET changes nothing).
       const reply = await postWithRetry('/journey/result/', {});
       if (reply.status === 400 && reply.data?.missing?.length) { bounce(reply.data.missing); return; }
+      if (reply.status === 403 && reply.data?.needs_email) { state.session.lead_required = true; show(step); return; }  // gate first
       if (!reply.ok) throw new Error('result');
       if (reply.data?.suggested) lastSuggestion = { plan_name: reply.data.suggested.name, plan_slug: reply.data.suggested.slug, url: urlFor(resultStep) };
       node = renderResult(reply.data);
@@ -416,7 +471,7 @@ function go(step, { replace = false } = {}) {
 function goBack() {
   const numbers = screenNumbers();
   const index = numbers.indexOf(current);
-  const target = index > 0 ? numbers[index - 1] : numbers[0];
+  const target = index > 0 ? numbers[index - 1] : (current === resultStep ? numbers[numbers.length - 1] : numbers[0]);
   if ((history.state?.idx || 0) > 0) history.back();
   else go(target, { replace: true });
 }

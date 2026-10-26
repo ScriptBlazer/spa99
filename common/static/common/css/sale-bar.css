@@ -1,0 +1,53 @@
+/* Sale bar (docs/design/SYSTEM-SALES.md 1). Tokens only. In normal flow, scrolls away, no borders. */
+.sale-bar { height: var(--sale-h); background: var(--color-espresso-raised); color: var(--color-text-inverse); font-size: var(--text-sm); line-height: var(--leading-snug); font-variant-numeric: tabular-nums; view-transition-name: sale-bar; transition: opacity var(--duration-base) var(--ease-soft); }
+.sale-bar.is-leaving { opacity: 0; }
+html.sale-off .sale-bar, .sale-bar[hidden] { display: none; }
+.sale-bar-inner { position: relative; height: 100%; display: flex; align-items: center; }
+.sale-bar-link { display: flex; align-items: center; min-width: 0; white-space: nowrap; color: inherit; text-decoration: none; height: 100%; }
+.sale-bar-name { color: var(--color-gold); font-weight: 500; overflow: hidden; text-overflow: ellipsis; max-width: 12rem; }
+.sale-bar-sep { margin-inline: var(--space-2); color: var(--color-text-muted-inverse); }
+.sale-bar-ends { color: var(--color-text-muted-inverse); }
+.sale-bar-time [data-sale-count] { font-weight: 500; }
+.sale-bar-starts { color: var(--color-text-muted-inverse); }
+.sale-bar-plans, .sale-bar-ends, .sale-bar-link .icon, .sale-bar-end-preview, .sale-bar-starts { display: none; }
+.sale-bar-link .icon { width: 1rem; height: 1rem; margin-left: var(--space-2); color: var(--color-text-muted-inverse); }
+.sale-bar-preview { margin-right: var(--space-2); padding: 0 var(--space-2); border: 1px solid var(--color-hairline-inverse); border-radius: var(--radius-sm); color: var(--color-text-muted-inverse); }
+.sale-bar-close { margin-left: auto; margin-right: calc(var(--space-3) * -1); width: var(--chip-h, 2.75rem); height: 100%; display: grid; place-items: center; background: none; border: 0; padding: 0; color: var(--color-text-muted-inverse); cursor: pointer; }
+.sale-bar-close .icon { width: 1rem; height: 1rem; }
+.sale-bar-link:focus-visible, .sale-bar-close:focus-visible, .sale-bar-end-preview:focus-visible { outline: 2px solid var(--color-focus-inverse); outline-offset: -2px; }
+.sale-bar-end-preview { color: var(--color-text-muted-inverse); margin-left: var(--space-3); white-space: nowrap; }
+@media (hover: hover) and (pointer: fine) {
+  .sale-bar-link:hover .sale-bar-offer { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+  .sale-bar-close:hover, .sale-bar-end-preview:hover { color: var(--color-text-inverse); }
+}
+@media (max-width: 47.99em) {
+  .sale-bar-preview ~ .sale-bar-name { max-width: 7rem; }
+  .sale-bar-m { display: none; }
+  .sale-bar-end-preview { display: none; }
+}
+@media (min-width: 48em) {
+  .sale-bar-inner { justify-content: center; }
+  .sale-bar-plans, .sale-bar-ends, .sale-bar-link .icon, .sale-bar-starts, .sale-bar-end-preview { display: inline; }
+  .sale-bar-link .icon { display: inline-block; }
+  .sale-bar-close { position: absolute; right: calc(var(--page-margin) - var(--space-3)); top: 0; margin: 0; }
+  .sale-bar-end-preview { position: absolute; right: var(--space-5); }
+  .sale-bar-name { max-width: none; }
+}
+@media (min-width: 64em) { .sale-bar-close { width: var(--sale-h); } }
+@media (prefers-contrast: more) { .sale-bar { background: var(--color-espresso); } .sale-bar-sep { color: var(--color-text-inverse); } }
+
+/* First screens still fit one screen: subtract the bar once. */
+@media (min-width: 64em) {
+  html.has-sale:not(.sale-off) .signin, html.has-sale:not(.sale-off) .register--solo .register-grid { min-height: calc(100svh - var(--header-h) - var(--sale-h)); }
+}
+html.has-sale:not(.sale-off) .gold-hero { min-height: calc(var(--scene-h) - var(--sale-h)); }
+html.has-sale:not(.sale-off) .book-hero { min-height: calc(100svh - var(--header-h) - var(--sale-h)); }
+html.motion.has-sale:not(.sale-off) .door-scene:not(.scene-failed) { min-height: calc(100svh - var(--sale-h)); }
+
+/* Marketing pages: the fixed header starts under the bar and docks at 0 as the bar scrolls off (transform only). */
+html.has-sale:not(.sale-off)[data-page="marketing"] .site-header { transform: translateY(var(--sale-shift, var(--sale-h))); }
+html.has-sale:not(.sale-off):not(.js)[data-page="marketing"] .site-header { transform: none; position: absolute; top: var(--sale-h); }
+@keyframes sale-dock { from { transform: translateY(var(--sale-h)); } to { transform: none; } }
+@supports (animation-timeline: scroll()) {
+  html.has-sale:not(.sale-off)[data-page="marketing"] .site-header { animation: sale-dock linear both; animation-timeline: scroll(root); animation-range: 0 var(--sale-h); }
+}

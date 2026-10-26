@@ -59,7 +59,10 @@ def render_email(template, ctx, body=None, values=None, button_url=None):
     the context is given the rendered body as `body_html` / `body_text`."""
     layout = template
     spec = emailbody.spec_for(template)
-    if spec is not None and spec.editable:
+    if ctx.get("plain_body") is not None:  # words typed by a person, sent as typed (the Gold decline message)
+        ctx["body_html"], ctx["body_text"] = emailbody.render_plain(ctx["plain_body"])
+        layout = "_body"
+    elif spec is not None and spec.editable:
         ctx["body_html"], ctx["body_text"] = render_editable(template, ctx, body=body, values=values, button_url=button_url)
         layout = "_body"
     return render_to_string(f"notifications/emails/{layout}.html", ctx), render_to_string(f"notifications/emails/{layout}.txt", ctx)
@@ -83,12 +86,13 @@ def fill_subject(text, values):
     return text
 
 
-def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None):
+def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None, plain_body=None):
     """Render the email, send, and log. Returns the EmailLog. Editable emails (notifications/emailbody.py) use the shared
     layout `_body` and the stored or default wording; the Gold approver emails render their own template files.
     `to` and `cc` are lists of addresses. `subject_email` is the person the message is about when it goes to
     someone else (Barry's Gold email), so deleting that person's data finds the log row.
-    `headers` are extra mail headers (List-Unsubscribe); `body` replaces the stored wording (a group mailing)."""
+    `headers` are extra mail headers (List-Unsubscribe); `body` replaces the stored wording (a group mailing); `plain_body` is
+    text a person typed, sent as typed in the shared layout."""
     to, cc = list(to or []), list(cc or [])
     try:
         blocked = suppression.suppressed_set(to + cc)  # THE guard: every email goes through here
@@ -111,6 +115,8 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
                 subject_email=(subject_email or "").strip().lower(), error="Address is on the suppression list (bounce or complaint).")
             return log
     ctx = {**base_context(), "subject": subject, **(context or {})}
+    if plain_body is not None:
+        ctx["plain_body"] = plain_body
     log = EmailLog(
         to=", ".join(to), cc=", ".join(cc), subject=subject[:300], template=template,
         subject_email=(subject_email or "").strip().lower(),

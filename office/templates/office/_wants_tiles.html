@@ -1,0 +1,14 @@
+{% load office_tags %}{% comment %}The six closed tiles of "What people want". Params: items (stored insights), empty (the empty line).{% endcomment %}
+{% if items %}
+<ul class="o-facts">
+  {% for ins in items %}{% if ins.key != 'source' %}
+  <li class="o-fact o-fact--{% if ins.key == 'tier_picked' or ins.key == 'tier_suggested' %}clay{% else %}teal{% endif %}" role="group" aria-label="{{ ins.sentence|default:ins.title }}" data-insight="{{ ins.key }}">
+    <p class="o-fact-title">{{ ins.title }}</p>
+    <p class="o-fact-top">{{ ins.top.label }}</p>
+    <p class="o-fact-count">{{ ins.top.value|num }} of {{ ins.top.of_total|num }}</p>
+    <span class="o-fact-bar" role="presentation"><span class="o-fact-fill" data-morph="fact-{{ prefix }}{{ ins.key }}" style="--share: {{ ins.top.share_bp|bp_ratio }}"></span></span>
+    {% if ins.runner_up %}<p class="o-fact-next">Next: {{ ins.runner_up.label }} ({{ ins.runner_up.value|num }})</p>{% endif %}
+  </li>
+  {% endif %}{% endfor %}
+</ul>
+{% else %}<p class="o-empty-line">{{ empty }}</p>{% endif %}

@@ -73,6 +73,7 @@
   --measure-display: 14ch;
   --section-y: clamp(6rem, 11vw, 10rem);
   --header-h: 4rem;
+  --sale-h: 2.75rem;                       /* height of the sale bar */
   --control-h: 3.25rem;                    /* 52px buttons and fields */
   --control-h-compact: 2.5rem;             /* 40px, Control only */
   --tile-min-h: 4.5rem;
@@ -177,7 +178,7 @@ html[data-page="marketing"] {
 }
 
 @media (min-width: 64em) {
-  :root { --header-h: 4.5rem; --gc-w: min(40rem, 44vw); --tier-num-size: 4.5rem; --tier-lift: -8px; }
+  :root { --header-h: 4.5rem; --sale-h: 2.5rem; --gc-w: min(40rem, 44vw); --tier-num-size: 4.5rem; --tier-lift: -8px; }
 }
 
 /* Round 3, The spa (derived, 2026-10-23) */

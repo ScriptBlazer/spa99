@@ -75,6 +75,7 @@ class RegisterInterestTests(TestCase):
         journey.save_answer(session, "time", options=["evening"])
         journey.save_answer(session, "frequency", options=["two_three"])
         journey.save_answer(session, "facilities", options=["gym"])
+        journey.save_answer(session, "industry", options=["tech"])
         engine.complete(session)
 
         result = services.register_interest(cleaned(marketing_opt_in="on"), journey_session=session)
@@ -136,6 +137,9 @@ class RegisterInterestTests(TestCase):
             "property_link": "developer",
         })
         user = services.register_interest(cleaned()).user
+        application.refresh_from_db()
+        self.assertIsNone(application.user)  # registering proves nothing about the address
+        services.verify_email(tokens.make_verify_token(user))
         application.refresh_from_db()
         self.assertEqual(application.user, user)
 
@@ -268,6 +272,8 @@ class PersonDataTests(TestCase):
         session = journey.create_session("Mozilla/5.0 Safari", referrer="https://example.org/x")
         journey.save_answer(session, "frequency", options=["weekly"])
         user = services.register_interest(cleaned(), journey_session=session).user
+        services.verify_email(tokens.make_verify_token(user))
+        user.refresh_from_db()
         gold_services.submit_application({
             "first_name": "Hugo", "last_name": "B", "email": "hugo@example.com", "mobile": "+447912345678",
             "property_link": "developer",
@@ -393,3 +399,22 @@ class NoPaymentAndDiscountLineTests(TestCase):
         SiteSettings.objects.update(discount_contact_url="")
         send_welcome_email(user.pk)
         self.assertNotIn("WhatsApp", mail.outbox[-1].body)
+
+
+class RegisterPrefillTests(TestCase):
+    """2026-10-26: the email given at the journey gate pre-fills Register (still editable)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_journey_email_prefills_the_register_form(self):
+        from journey.models import JourneySession
+
+        session = JourneySession.objects.create(lead_email="daniel@example.com", lead_at=timezone.now())
+        self.client.cookies[journey.COOKIE_NAME] = session.key
+        html = self.client.get("/register/").content.decode()
+        self.assertIn('value="daniel@example.com"', html)
+
+    def test_no_journey_email_leaves_it_empty(self):
+        self.assertNotIn("daniel@example.com", self.client.get("/register/").content.decode())

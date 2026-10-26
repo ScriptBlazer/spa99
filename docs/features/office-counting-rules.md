@@ -39,3 +39,9 @@ Started ≥ Finished always (same people). Registered can exceed Finished (someo
 - A background job (the hourly roll-up, plus a debounced refresh queued after each counted event) works out every figure from the source tables using C1-C4 and saves one **snapshot per page and range**. All figures on a page come from the same snapshot, so they always agree.
 - Pages read one stored row (plus the two short "waiting" and "latest" lists). No sums, no counts at request time. Tests prove the query count does not grow with data.
 - `rebuild_metrics` rewrites every snapshot from the source tables (visitors and referrers excepted).
+
+## Leads (2026-10-26)
+
+A lead is an email given at the journey gate; "new leads" counts addresses by the day of their first `lead_at`, "went on to register" counts those whose address has an account now. Journeys with that email join the account when the email is verified (see `office-leads.md`); counts merge from the next snapshot.
+
+**Open question (Moishe has not answered):** should the same email left in two different browsers count as one person before he registers? Today it does not (C1: one browser = one person), so such a lead is counted twice in "Started the journey" but once in the Leads list. Counting rules are unchanged until he decides.

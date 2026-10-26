@@ -39,7 +39,7 @@ class VersionedForm(forms.ModelForm):
                 field.to_python = self._ascii_only(field.to_python)
         if not self.instance._state.adding:
             self.fields[TOKEN] = TokenField()
-            self.initial[TOKEN] = services.row_fingerprint(self.instance, self.version_fields())
+            self.initial[TOKEN] = self.fingerprint(self.instance)
 
     @staticmethod
     def _ascii_only(original):
@@ -53,13 +53,17 @@ class VersionedForm(forms.ModelForm):
         names = {f.name for f in self.instance._meta.concrete_fields}
         return [name for name in self.fields if name in names]
 
+    def fingerprint(self, row):
+        """The row's version (a form with extra parts, like a many-to-many, adds them here)."""
+        return services.row_fingerprint(row, self.version_fields())
+
     def ensure_current(self, lock=False):
         """Raise ValidationError(STALE_MESSAGE) unless the row still has the version this form was made from."""
         token = self.cleaned_data.get(TOKEN) if TOKEN in self.fields else ""
         if not token:
             return
         row = services.current_row(self.instance, lock=lock)
-        if row is None or services.row_fingerprint(row, self.version_fields()) != token:
+        if row is None or self.fingerprint(row) != token:
             self.stale = True
             raise ValidationError(services.STALE_MESSAGE, code="stale")
 
@@ -92,6 +96,7 @@ class SettingsForm(VersionedForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["register_interest_open"].label = "Registration open"
+        self.fields["memberships_public"].label = "Memberships page public"
         self.fields["discount_contact_url"].assume_scheme = "https"
         self.fields["discount_contact_url"].widget.attrs.update({"placeholder": "https://wa.me/..."})
         self.fields["code_theme_default"].required = False  # a post without it (older forms, scripts) keeps the saved theme
@@ -117,6 +122,6 @@ class SettingsForm(VersionedForm):
 
     class Meta:
         model = SiteSettings
-        fields = ["opening_date", "opening_text", "register_interest_open", "subscribe_open", "booking_open",
-                  "join_wording", "vat_rate", "discount_contact_url", "lock_idle_minutes", "max_sign_in_hours", "code_theme_default"]
+        fields = ["opening_date", "opening_text", "register_interest_open", "memberships_public", "subscribe_open", "booking_open",
+                  "join_wording", "show_leil_shishi", "vat_rate", "discount_contact_url", "lock_idle_minutes", "max_sign_in_hours", "code_theme_default"]
         widgets = {"opening_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}

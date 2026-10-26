@@ -24,6 +24,15 @@ Source: `Spa 99 - Rules and System Spec.pdf` v1.0, 16 Oct 2026 (255 rules, 53 sc
 | ACC-07 | Phase 1: mobile collected but not SMS-verified. Email verification only. | 2026-10-22 |
 | LC-28 | Approvers are the team members picked in System > Approval (not typed addresses); Low potential approvals need a final approver first (see LC-28a below). | 2026-10-25 |
 | MEM-02 | Gold targets property people. Everyone can apply; property people are nudged. | 2026-10-22 |
+| CAL-02 | Moishe + Barry: the spa is open 24 hours a day. 3am to 5am is shown on the site as "Cleaning hours", never "Closed". Still closed for Shabbos and Yom Tov (CAL-07 offsets unchanged). The public line is "Open 24 hours a day", then the cleaning hours, then "Closed Shabbos and Yom Tov". Booking and entry rules still treat the cleaning window as no bookings and no visits. | 2026-10-26 |
+| CAL-03 | Moishe: Daytime is called Off-peak (5am to 6pm) and Evening is called Peak (6pm to 3am) on the site and in System. The times and the plans they apply to are unchanged. | 2026-10-26 |
+| CAL-08 | Moishe + Barry: the Saturday night rule is now "the normal 3am to 5am cleaning hours still apply" (the spa is open 24 hours, see CAL-02 override). Behaviour unchanged. | 2026-10-26 |
+| CAL-12 | Moishe: "Daytime products" are called Off-peak products (see CAL-03 override). Latest start 4pm, ending by 6pm, unchanged. | 2026-10-26 |
+| EXT-06 | Moishe: Leil Shishi is hidden everywhere on the public site for now (cards, compare table, Register, Gold Card page). Data kept; Site settings "show Leil Shishi" (default off) brings it back. Status stays OPTIONAL: nothing is built. | 2026-10-26 |
+| MEM-02a | Moishe: the Gold Card has a yearly fee, amount not decided (£99 to £200 discussed). Stored as `Plan.annual_fee` (ex VAT), empty until decided. The compare table says "By application" while empty and "£X a year" once set. Gold is shown in the compare table as its own column. | 2026-10-26 |
+| MEM-02a | Moishe: the Gold Card annual fee is £199 a year by default (ex VAT, as stored in `Plan.annual_fee`; compare shows "£199 a year", inc VAT in the second row), editable in System > Plans. | 2026-10-26 |
+| MEM-02a | Moishe (update): the Gold Card annual admin fee default is £199 + VAT a year (a same-day change to £299 was a mistake, corrected); compare shows "£199 a year" (£238.80 inc VAT). Wherever the site says the Gold Card is free it reads "free*" with the note "*An annual admin fee of £199 + VAT applies.", the amount taken from `Plan.annual_fee`; with no fee set it says plain "free" and no note. | 2026-10-26 |
+| CAL-07 | Moishe: bookings are allowed up to 1 hour before closing for Shabbos and Yom Tov. Applies when the booking system is built (status: decided, not built). | 2026-10-26 |
 
 ## Glossary
 

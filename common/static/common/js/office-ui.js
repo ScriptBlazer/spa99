@@ -4,11 +4,13 @@ import { noteModal } from './feedback.js';
 
 export function initOfficeUi() {
   sendBack();
+  goldDialogs();
   header();
   personMenu();
   segmented();
   filterSheet();
   wants();
+  wantsScope();
 }
 
 function header() {
@@ -103,5 +105,54 @@ function sendBack() {
     if (!field) { field = document.createElement('input'); field.type = 'hidden'; field.name = 'note'; form.append(field); }
     field.value = text;
     form.requestSubmit(button);
+  });
+}
+
+/** The Gold application's Decline, Respond and Add note forms: each is a <dialog> in the page (shared modal look). A button with
+ *  data-gold-open="decline|respond|note" opens it; one with data-gold-close closes it; the server opens one on load after a
+ *  mistake (data-open, text kept) or from the approver email (?do=). The decline form shows its email message only while
+ *  "Email the applicant" is ticked. */
+function goldDialogs() {
+  const dialogs = [...document.querySelectorAll('dialog[data-gold-dialog]')];
+  if (!dialogs.length) return;
+  const find = (name) => dialogs.find((dialog) => dialog.dataset.goldDialog === name);
+  const show = (dialog, opener) => {
+    if (!dialog || dialog.open) return;
+    dialog.goldOpener = opener || null;
+    if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
+    (dialog.querySelector('textarea[aria-invalid="true"]') || dialog.querySelector('textarea'))?.focus({ preventScroll: true });
+  };
+  document.addEventListener('click', (event) => {
+    const opener = event.target.closest?.('[data-gold-open]');
+    if (opener) { event.preventDefault(); show(find(opener.dataset.goldOpen), opener); return; }
+    const closer = event.target.closest?.('[data-gold-close]');
+    if (closer) { event.preventDefault(); closer.closest('dialog')?.close(); }
+  });
+  dialogs.forEach((dialog) => {
+    let downOnBackdrop = false;
+    dialog.addEventListener('pointerdown', (event) => { downOnBackdrop = event.target === dialog; });
+    dialog.addEventListener('click', (event) => { if (event.target === dialog && downOnBackdrop) dialog.close(); });
+    dialog.addEventListener('close', () => dialog.goldOpener?.focus?.({ preventScroll: true }));
+  });
+  document.addEventListener('change', (event) => {
+    const toggle = event.target.closest?.('[data-gold-email-toggle]');
+    const box = toggle?.form?.querySelector('[data-gold-email-box]');
+    if (box) box.hidden = !toggle.checked;
+  });
+  show(dialogs.find((dialog) => dialog.hasAttribute('data-open')), null);
+}
+
+/** "What people want": Everyone or Leads. The radios hide one set with CSS (works without JS); this fades the set that appears. */
+function wantsScope() {
+  const card = document.querySelector('[data-office-wants]');
+  if (!card) return;
+  card.addEventListener('change', (event) => {
+    if (event.target.name !== 'wants-scope') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    card.querySelectorAll(`[data-scope="${event.target.value}"]`).forEach((el) => {
+      el.classList.remove('o-fade-in');
+      void el.offsetWidth;   // restart the fade
+      el.classList.add('o-fade-in');
+    });
   });
 }

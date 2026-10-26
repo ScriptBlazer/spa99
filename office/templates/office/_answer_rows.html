@@ -1,0 +1,5 @@
+{% comment %}One journey's answers as label and value rows (plain labels, OFFICE-LEADS 4.3). Param: journey. Skipped answers read "Skipped" in muted text; typed words are quoted.{% endcomment %}
+{% if journey.answers %}<dl class="o-rows" data-answers>{% for a in journey.answers %}
+  <div><dt>{% if a.key == "time" %}When he'd come{% elif a.key == "frequency" %}How often{% elif a.key == "facilities" %}What he'd use{% elif a.key == "company" %}Company{% elif a.key == "industry" %}Work{% elif a.key == "property_link" %}Link to property{% elif a.key == "property_size" %}Properties or units{% elif a.key == "property_law" %}Property law{% elif a.key == "industry_other" %}In his words{% elif a.key == "heard_via" %}Heard about us{% elif a.key == "heard_via_other" %}Heard about us, in his words{% else %}{{ a.question }}{% endif %}</dt>
+  <dd{% if a.skipped %} class="o-muted"{% endif %}>{% if a.skipped %}Skipped{% elif a.text and not a.options %}&ldquo;{{ a.text }}&rdquo;{% else %}{{ a.display }}{% endif %}</dd></div>{% endfor %}
+</dl>{% else %}<p class="o-empty-line">He has not answered any questions yet.</p>{% endif %}

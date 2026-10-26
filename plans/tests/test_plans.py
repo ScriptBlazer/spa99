@@ -74,13 +74,13 @@ class MembershipsPageDataTests(TestCase):
 
     def test_plan_pills_come_from_the_row_and_the_opening_rules(self):
         self.assertEqual(services.plan_pills(Plan.objects.get(slug="tier-1")),
-                         ["Daytime, 5am to 6pm", "Book up to 1 day ahead", "1 booking at a time"])
+                         ["Off-peak, 5am to 6pm", "Book up to 1 day ahead", "1 booking at a time"])
         self.assertEqual(services.plan_pills(Plan.objects.get(slug="tier-3")), [
-            "Day and evening, 5am to 3am", "Book up to 7 days ahead", "3 bookings at a time", "1 guest a month", "Leil Shishi option"])
+            "Off-peak and peak, 24 hours a day", "Book up to 7 days ahead", "3 bookings at a time", "1 guest a month"])
         plan = Plan.objects.get(slug="tier-2")  # a changed row or hours rule changes the words
         plan.upcoming_limit = 4
         OpeningRule.objects.filter(key="evening").update(end_time=time(2, 0))
-        self.assertEqual(services.plan_pills(plan)[0::2], ["Day and evening, 5am to 2am", "4 bookings at a time"])
+        self.assertEqual(services.plan_pills(plan)[0::2], ["Off-peak and peak, 5am to 2am", "4 bookings at a time"])
 
     def test_card_has_tagline_fallback_and_pills(self):
         Plan.objects.filter(slug="tier-3").update(tagline="")
@@ -88,15 +88,69 @@ class MembershipsPageDataTests(TestCase):
         self.assertEqual(cards["tier-2"]["tagline"], "Your evenings, too.")
         self.assertEqual(cards["tier-3"]["tagline"], "Unlimited")
         self.assertEqual(cards["tier-2"]["render"], "dry-sauna")
-        self.assertEqual(cards["tier-2"]["pills"][-1], "Leil Shishi option")
+        self.assertEqual(cards["tier-2"]["pills"][-1], "2 bookings at a time")  # Leil Shishi is hidden for now
 
-    def test_compare_table_has_single_visit_column_and_perk_rows(self):
+    def test_compare_table_has_single_visit_gold_and_perk_rows(self):
         table = pages.compare_table(pages.purchasable_plans())
         labels = [r["label"] for r in table]
-        self.assertEqual(labels[-2:], ["Merch", "Leil Shishi"])
-        leil = table[-1]["cells"]
-        self.assertEqual([c["slug"] for c in leil], ["tier-1", "tier-2", "tier-3", "single-visit"])
-        self.assertEqual([c["text"] for c in leil], ["No", "Option, £45 + VAT a place", "Option, £45 + VAT a place", "No"])
+        self.assertEqual(labels[-2:], ["Waitlist", "BML members' events"])  # Leil Shishi is hidden for now (2026-10-26)
+        self.assertNotIn("Leil Shishi", labels)
+        merch = next(r for r in table if r["label"] == "Merch")["cells"]
+        self.assertEqual([c["slug"] for c in merch], ["tier-1", "tier-2", "tier-3", "single-visit", "gold"])
+        visits = next(r for r in table if r["label"] == "Visits a month")["cells"]
+        self.assertEqual([c["text"] for c in visits], ["6", "8", "Unlimited", "1", "Unlimited"])  # Tier 3 says Unlimited, not All
+        self.assertEqual([c["text"] for c in next(r for r in table if r["label"] == "When")["cells"]][:3], ["Off-peak", "Off-peak and peak", "Off-peak and peak"])
+
+    def test_leil_shishi_switch_hides_it_everywhere_and_shows_it_again(self):
+        self.assertFalse(SiteSettings.load().show_leil_shishi)  # default off
+        tier2 = Plan.objects.get(slug="tier-2")
+        self.assertNotIn("Leil Shishi option", services.plan_pills(tier2))
+        self.assertNotIn("leil_shishi", [p["key"] for p in services.plan_display(tier2)["perks"]])
+        self.assertNotIn("Leil Shishi when offered", dict(pages.gold_groups())["Beyond the spa"])
+        SiteSettings.objects.update(show_leil_shishi=True)  # the data was never deleted
+        self.assertIn("Leil Shishi option", services.plan_pills(tier2))
+        self.assertIn("Leil Shishi", [r["label"] for r in pages.compare_table(pages.purchasable_plans())])
+        self.assertIn("Leil Shishi when offered", dict(pages.gold_groups())["Beyond the spa"])
+
+    def test_gold_column_shows_the_annual_fee_and_says_by_application_when_empty(self):
+        def gold_cells():
+            table = pages.compare_table(pages.purchasable_plans())
+            return [next(r for r in table if r["label"] == label)["cells"][-1]["text"] for label in ("Price, ex VAT", "Price, inc VAT")]
+
+        self.assertEqual(gold_cells(), ["£199 a year", "£238.80 a year"])  # default £199 ex VAT (2026-10-26)
+        Plan.objects.filter(slug="gold").update(annual_fee=None)
+        self.assertEqual(gold_cells(), ["By application", "By application"])  # no "TBC" text
+        Plan.objects.filter(slug="gold").update(annual_fee=Decimal("150.00"))
+        self.assertEqual(gold_cells(), ["£150 a year", "£180 a year"])
+        Plan.objects.filter(slug="gold").update(visible=False)  # a hidden Gold Card leaves the table
+        self.assertEqual(len(pages.compare_table(pages.purchasable_plans())[0]["cells"]), 4)
+
+    def test_free_star_and_note_follow_the_gold_annual_fee(self):
+        from django.template import Context, Template
+
+        def render():
+            return Template("{% load content_tags %}{% gold_fee_note %}").render(Context()).strip()
+
+        gold_cta = page_content("memberships")["gold_cta"].body
+        self.assertIn("free*, by application", gold_cta)
+        self.assertIn("*An annual admin fee of £199 + VAT applies.", render())
+        Plan.objects.filter(slug="gold").update(annual_fee=Decimal("150.50"))
+        self.assertIn("£150.50 + VAT", render())
+        Plan.objects.filter(slug="gold").update(annual_fee=None)  # no fee: plain "free", no note
+        self.assertEqual(render(), "")
+        self.assertIn("free, by application", page_content("memberships")["gold_cta"].body)
+        self.assertNotIn("*", services.gold_star() + page_content("home")["gold_teaser"].body)
+        self.assertEqual(services.gold_fee_note(), "")
+
+    def test_open_24_hours_with_cleaning_hours_and_shabbos(self):
+        self.assertEqual(pages.hours_summary(), "Open 24 hours a day")
+        self.assertEqual(pages.hours_note(), "Open 24 hours a day. Cleaning hours 3am to 5am. Closed Shabbos and Yom Tov.")
+        rows = pages.opening_hours()
+        self.assertEqual(rows[0], ("Open", "24 hours a day"))
+        self.assertIn(("Cleaning hours", "3am to 5am, every day"), rows)
+        self.assertNotIn("Closed", [label for label, _ in rows])
+        OpeningRule.objects.filter(key="evening").update(end_time=time(1, 0))  # the rules no longer fill the day: honest words
+        self.assertEqual(pages.hours_summary(), "Open 5am to 1am")
 
     def test_preselect_order(self):
         cards = pages.purchasable_plans()

@@ -65,3 +65,12 @@ Decided 2026-10-25 (PROJECT.md). Backend built 2026-10-25 (see "Built" below; sc
 - **Opened is marked when Register renders** with the invite in the session (`invites.prefill`), not on the `/invite/<token>/` redirect.
 - **Throttling.** A send that fails with Throttling, MaxSendingRateExceeded, 5xx or a network timeout goes back to `queued` with `retry_at` (30 s, 60 s, 120 s ...) and `attempts` (fails after 5); the slice eases off for a second. One worker per mailing or invite batch (a cache lock shared through the database cache, freed after 2 minutes if a worker dies), so two workers cannot double the rate; a second one answers "busy".
 - Blank first name falls back to "there" in subjects too. Gold account set-up now marks invites registered (and clears an old unsubscribe when news is ticked), through the same hook as Register. Team accounts are not members and are left alone.
+
+## Two new automatic emails (2026-10-26, Gold actions)
+
+Both are listed in System > Emails > Automatic emails (editable subject and wording, preview, test send, reset) and both go through `send_templated`, so they use the shared layout, the suppression guard, the email log, and Reply-To = the site contact address.
+
+- **`gold_respond`** ("A message about your Spa 99 Gold Card application"). Sent when an approver clicks Respond on a Gold application. Placeholders `{first_name}` and `{message}` (what the approver typed; line breaks kept; escaped). Default body: "Hello {first_name}, {message}, You can reply to this email and it will reach the team." Sent from `gold.tasks.send_gold_applicant_email(application_id, event_id)` (ids only; the text is read from the audit event, so no applicant text sits in the queue).
+- **`gold_declined`** ("Your Spa 99 Gold Card application"). Only sent when the approver ticks **Email the applicant** while declining (default off; whether declines get an email is still Moishe's decision). Placeholders `{first_name}`, `{name}`, `{reference}`. The editable wording **prefills** the decline form's message box (placeholders filled in); the approver can change it, and what is sent is exactly the text in the box (shown as typed in the shared layout, `send_templated(..., plain_body=...)`). The sent result is a line in the application's History.
+
+The Gold approver email and the "sent back" email gained **Decline** and **Respond** links (Office form, `?do=decline|respond`); their wording stays in the template files (subject only is editable).

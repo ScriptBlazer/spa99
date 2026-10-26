@@ -34,7 +34,7 @@ _HINT = re.compile(r"\s*\([^()]*\.\)\s*$")
 
 
 def clean_label(label):
-    """An option's name without its hint: 'Often with someone (Most visits.)' is 'Often with someone'. A parenthesis that is part of the
+    """An option's name without its hint: 'Often with a friend (Most visits.)' is 'Often with a friend'. A parenthesis that is part of the
     name ('Early morning (5 to 9am)') has no full stop inside, so it stays."""
     return _HINT.sub("", label or "").strip()
 

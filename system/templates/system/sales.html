@@ -1,0 +1,17 @@
+{% extends "system/base.html" %}{% load static %}
+{# Context: live, upcoming, past (lists of Sale; each has .state, .plans_label, .holders). docs/design/SYSTEM-SALES.md 3.1. #}
+{% block head_extra %}<link rel="stylesheet" href="{% static 'common/css/system-sales.css' %}">
+<script type="module" src="{% static 'common/js/system-sales.js' %}"></script>
+{% endblock %}
+{% block main %}
+<div class="sys-head"><div><h1>Sales</h1><p>A sale shows a bar on the site and keeps its price for people who register during it. London time.</p></div>
+  <div class="sys-actions"><a class="sys-btn primary" href="{% url 'system_sale_new' %}" data-system-sale-new>New sale</a></div></div>
+{% include "system/_sale_link.html" %}
+{% if live or upcoming or past %}
+{% if live %}{% include "system/_sales_table.html" with rows=live title="Live" key="live" %}{% endif %}
+{% if upcoming %}{% include "system/_sales_table.html" with rows=upcoming title="Upcoming" key="upcoming" %}{% endif %}
+{% if past %}{% include "system/_sales_table.html" with rows=past title="Past" key="past" %}{% endif %}
+{% else %}
+<section class="sys-panel" aria-label="Sales"><p class="sys-empty ss-empty">No sales yet.<br><a class="sys-btn sm primary" href="{% url 'system_sale_new' %}">New sale</a><span class="ss-empty-note">Only one sale can run at a time.</span></p></section>
+{% endif %}
+{% endblock %}

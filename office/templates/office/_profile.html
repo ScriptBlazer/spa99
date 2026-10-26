@@ -1,0 +1,47 @@
+{% load office_tags %}{% comment %}The main column of a person or lead page (OFFICE-LEADS 4.3 to 4.6). Context: person, latest_journey, latest_finished, gold_high_at, timeline_*.{% endcomment %}
+<section class="o-card" data-person-answers aria-labelledby="p-answers"><h2 id="p-answers" class="o-h3">Their answers</h2>
+  {% if latest_journey %}<p class="o-sub o-card-sub">{% if latest_finished %}From his latest finished journey, {{ latest_journey.completed_at|dt }}{% else %}From his latest journey, not finished.{% with last=latest_journey.answers|last %}{% if last %} The last question he answered was &ldquo;{{ last.question }}&rdquo;.{% endif %}{% endwith %}{% endif %}</p>{% endif %}
+  <div class="o-panels" data-tier>
+    <div class="o-panel" data-tier-suggested>
+      <p class="o-panel-label">Suggested</p>
+      {% if person.tier.suggested %}<p class="o-panel-name">{{ person.tier.suggested }}</p>
+      {% if latest_journey.tier_reasons %}<ul class="o-panel-list">{% for r in latest_journey.tier_reasons|slice:":3" %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+      {% else %}<p class="o-panel-note">Nothing suggested yet.</p>{% endif %}
+    </div>
+    <div class="o-panel" data-tier-picked>
+      <p class="o-panel-label">Picked</p>
+      {% if person.tier.picked %}<p class="o-panel-name">{{ person.tier.picked }}</p>
+        <p class="o-panel-note">{% if person.tier.match is True %}Took the suggestion{% elif person.tier.match is False %}Chose differently{% else %}No suggestion to compare{% endif %}</p>
+      {% else %}<p class="o-panel-note">Not yet</p>{% endif %}
+    </div>
+  </div>
+  {% include "office/_answer_rows.html" with journey=latest_journey %}
+</section>
+
+<section class="o-card" data-person-gold-potential aria-labelledby="p-gold"><h2 id="p-gold" class="o-h3">Gold</h2>
+  {% if person.gold.potential %}
+  <p class="o-potential-line" data-gold-potential>{% include "office/_badge.html" with potential=person.gold.potential %}{% if person.gold.score is not None %}<span class="o-sub">Score {{ person.gold.score }}. High is {{ gold_high_at }} or more.</span>{% endif %}</p>
+  {% if person.gold.reasons %}<h3 class="o-subhead">Why</h3><ul class="o-plain-list">{% for r in person.gold.reasons %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+  {% else %}<p class="o-empty-line" data-gold-potential>Not rated yet.</p>{% endif %}
+  {% for g in person.gold.applications %}
+  <a class="o-linkrow o-tile-link" href="{% url 'office_gold_application' g.id %}" data-gold-application><span>{{ g.reference }}</span>{% include "office/_badge.html" with potential=g.potential %}{% include "office/_badge.html" with status=g.status %}<span class="o-wait-go" aria-hidden="true">{% include "office/_icon.html" with name="chevron-right" %}</span></a>
+  {% empty %}<p class="o-empty-line">He has not applied for Gold.{% if person.gold.potential == "high" and person.kind == "lead" %} A strong profile for Gold.{% endif %}</p>{% endfor %}
+</section>
+
+<section class="o-card" data-person-timeline aria-labelledby="p-timeline"><h2 id="p-timeline" class="o-h3">Timeline</h2>{% include "office/_timeline.html" %}</section>
+
+<section class="o-card" data-person-journeys id="journeys" aria-labelledby="p-journeys"><h2 id="p-journeys" class="o-h3">All journeys <span class="o-count-muted">{{ person.journeys|length }}</span></h2>
+  <div class="o-jlist">
+  {% for j in person.journeys reversed %}
+  <details class="o-jrny" id="journey-{{ j.id }}" data-journey data-completed="{{ j.completed }}">
+    <summary><span class="o-jrny-main"><span class="o-jrny-when">{{ j.started|dt }}</span>
+      <span class="o-jrny-line">{% if j.completed %}Finished{% if j.suggested_plan %} &middot; Suggested {{ j.suggested_plan }}{% endif %}{% else %}{% with last=j.answers|last %}{% if last %}Stopped after {{ last.question }}{% else %}Stopped before the first question{% endif %}{% endwith %}{% endif %}{% if j.device %} &middot; {{ j.device|capfirst }}{% endif %}</span></span>
+      <span class="o-jrny-go" aria-hidden="true"><span class="o-jrny-closed">{% include "office/_icon.html" with name="chevron-right" %}</span><span class="o-jrny-open">{% include "office/_icon.html" with name="chevron-down" %}</span></span></summary>
+    <div class="o-jrny-body">
+      {% include "office/_answer_rows.html" with journey=j %}
+      <p class="o-sub">Visits on this journey {{ j.visits }} &middot; From {{ j.source.label }}{% if j.source.utm_campaign %} &middot; utm {{ j.source.utm_campaign }}{% endif %}{% if j.lead_email %} &middot; Email given {{ j.lead_at|dt }}, privacy version {{ j.lead_privacy_version }}{% endif %}</p>
+    </div>
+  </details>
+  {% empty %}<p class="o-empty-line">He has not started the journey.</p>{% endfor %}
+  </div>
+</section>

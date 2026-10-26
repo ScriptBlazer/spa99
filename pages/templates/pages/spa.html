@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static content_tags pages_tags pages_media %}
+{% load static content_tags pages_tags pages_media membership_tags %}
 {# The spa (docs/design/SPA-PAGE.md, round 3 house style, with the 2026-10-22 decisions: the door shrinks onto its frame inside a short pin like Home's arrival, the 3D room walk gets the other pin). One espresso walk through the building. Every room section comes from the data (`sections`), nothing about a room is typed here. #}
 {% block html_attrs %} data-page="marketing"{% endblock %}
 {% block body_class %}page-spa{% endblock %}
@@ -55,9 +55,15 @@
 {% for s in sections %}
   {% if s.kind == "moment" %}
     {# the amenity moments, placed by the data (AMENITIES.md): a moment without a built picture never reaches here #}
-    {% if s.moment.key == "shower" %}{% include "pages/_spa_moment_shower.html" with m=s.moment %}
+    {% if s.moment.key == "shower" %}{% include "pages/_spa_moment_shower.html" with m=s.moment companion=s.companion %}
     {% elif s.moment.key == "slippers" %}{% include "pages/_spa_moment_inset.html" with m=s.moment %}
     {% else %}{% include "pages/_spa_moment_band.html" with m=s.moment over=False %}{% endif %}
+  {% elif s.kind == "aside" %}
+    {# a small companion room with no moment to sit beside (the shower moment is not built): its own quiet strip #}
+    <section class="scene sp-sec sp-aside on-dark" data-scene="moment" data-glow aria-label="{{ s.companion.name }}">
+      <div class="glow" aria-hidden="true"></div>
+      <div class="container grid sp-aside-grid">{% include "pages/_spa_companion.html" with c=s.companion plain=True %}</div>
+    </section>
   {% elif s.kind == "feature" %}
     {% cycle "a" "b" "c" as ratio silent %}
     {% include "pages/_spa_feature.html" with s=s ratio=ratio %}
@@ -89,6 +95,7 @@
       <div class="frame-tint" aria-hidden="true"></div>
     </figure>
   </div>
+  {% if spa.images_note.body %}<div class="container"><p class="images-note small muted">{{ spa.images_note.body }}</p></div>{% endif %}
 </section>
 
 {# S4. Next: a compact closing band, with the tote on the way out when its picture exists. #}
@@ -97,7 +104,7 @@
   <div class="container grid sp-band-grid">
     <div class="sp-band-main">
       <h2 class="statement" id="next-title" data-rise>{{ spa.next.heading }}</h2>
-      {% if next_from %}<p class="small muted" data-fade>{{ next_from }}</p>{% endif %}
+      {% memberships_shown as prices_shown %}{% if next_from and prices_shown %}<p class="small muted" data-fade>{{ next_from }}</p>{% endif %}
     </div>
     <div class="sp-band-actions actions" data-fade>
       <a class="btn btn-primary btn-block-phone" href="{% url 'journey' %}">{{ spa.next.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>

@@ -20,11 +20,14 @@ def _in(day, start, end):
 
 
 class Figures:
-    def __init__(self, started, finished, registrations, votes):
+    def __init__(self, started, finished, registrations, votes, leads=None, lead_votes=None, registered_emails=None):
         self.started_days = started          # {day: {person}} (includes people who finished that day)
         self.finished_days = finished        # {day: {person}}
         self.registrations = registrations   # [(day, plan slug or "none", source)]
         self.votes = votes                   # [(person, day, completed_at, [answers], suggested slug or "")]
+        self.leads = leads or {}             # {lower email: day the address was first given}  (bots and staff left out)
+        self.lead_votes = lead_votes or []   # [(lower email, day, completed_at, [answers])] finished journeys that left an email
+        self.registered_emails = registered_emails or set()  # lower emails that have an account (not staff)
 
     # ----- people -----
     @staticmethod
@@ -61,6 +64,32 @@ class Figures:
             if _in(row[0], start, end):
                 out[row[index]] += 1
         return dict(out)
+
+    # ----- leads (an email given at the journey gate; one lead = one lower-cased address) -----
+    def new_leads(self, start, end):
+        return {email for email, day in self.leads.items() if _in(day, start, end)}
+
+    def new_lead_count(self, start, end):
+        return len(self.new_leads(start, end))
+
+    def converted_leads(self, start, end):
+        """New leads in the range whose address has an account now (when they registered does not matter)."""
+        return len(self.new_leads(start, end) & self.registered_emails)
+
+    def new_leads_series(self, buckets):
+        return [self.new_lead_count(a, b) for a, b in buckets]
+
+    def lead_answer_counts(self, start, end):
+        """(number of leads voting, {"question:option": n}): one vote per lead address that has not registered, from its latest
+        finished journey in the range."""
+        latest = {}
+        for email, day, completed_at, answers in self.lead_votes:
+            if email not in self.registered_emails and _in(day, start, end) and (email not in latest or completed_at > latest[email][0]):
+                latest[email] = (completed_at, answers)
+        counts = Counter()
+        for _, answers in latest.values():
+            counts.update(set(answers))
+        return len(latest), dict(counts)
 
     # ----- votes: each person's latest finished journey in the range -----
     def latest_votes(self, start, end):
@@ -106,12 +135,19 @@ def load():
         account_of[person_key or key] = user_id
 
     started, finished, votes, uncounted = defaultdict(set), defaultdict(set), [], 0
-    fields = ("key", "person_key", "user_id", "created_at", "completed", "completed_at", "updated_at", "suggested_plan__slug", "suggestion_detail")
-    for key, person_key, user_id, created_at, completed, completed_at, updated_at, plan, detail in real.values_list(*fields).iterator(chunk_size=2000):
+    staff_emails = {e.lower() for e in User.objects.filter(is_staff=True).values_list("email", flat=True)}
+    leads, lead_votes = {}, []
+    fields = ("key", "person_key", "user_id", "created_at", "completed", "completed_at", "updated_at", "suggested_plan__slug", "suggestion_detail",
+              "lead_email", "lead_at")
+    for key, person_key, user_id, created_at, completed, completed_at, updated_at, plan, detail, lead_email, lead_at in real.values_list(*fields).iterator(chunk_size=2000):
         account = user_id or account_of.get(person_key or key)
         who = ("account", account) if account else ("browser", person_key or key)
         if account in staff:
             continue
+        email = (lead_email or "").strip().lower()
+        if email and email not in staff_emails:
+            given = metrics.day(lead_at or created_at)
+            leads[email] = min(given, leads.get(email, given))
         started[metrics.day(created_at)].add(who)
         if not completed:
             continue
@@ -123,6 +159,8 @@ def load():
         if counted is None:  # finished before answers were recorded on the session: no vote on answers (counted below)
             uncounted += 1
         votes.append((who, day, done, list(counted or []), plan or ""))
+        if email and email not in staff_emails and counted is not None:
+            lead_votes.append((email, day, done, list(counted)))
     if uncounted:
         logger.info("%s finished journeys have no stored answers and give no answer vote", uncounted)
 
@@ -130,4 +168,5 @@ def load():
         (metrics.day(created), slug or "none", source)
         for created, slug, source in InterestRegistration.objects.filter(user__is_staff=False).values_list("created_at", "plan__slug", "source")
     ]
-    return Figures(dict(started), dict(finished), registrations, votes)
+    registered_emails = {e.lower() for e in User.objects.filter(is_staff=False, email_verified_at__isnull=False).values_list("email", flat=True)}  # verified only: the Leads list agrees
+    return Figures(dict(started), dict(finished), registrations, votes, leads, lead_votes, registered_emails)

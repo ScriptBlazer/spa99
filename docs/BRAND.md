@@ -211,6 +211,7 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --measure-display: 14ch;
   --section-y: clamp(6rem, 11vw, 10rem);
   --header-h: 4rem;
+  --sale-h: 2.75rem;                       /* height of the sale bar (2.5rem from 64em) */
   --control-h: 3.25rem;                    /* 52px buttons and fields */
   --control-h-compact: 2.5rem;             /* 40px, Control only */
   --tile-min-h: 4.5rem;

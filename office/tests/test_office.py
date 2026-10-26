@@ -173,7 +173,7 @@ class StoredFigureTests(OfficeTestCase):
         rollup.run()
         for path in paths:
             self.assertEqual(self.queries(path), empty[path], path)
-            self.assertLessEqual(empty[path], 20, path)
+            self.assertLessEqual(empty[path], 30, path)
 
     def test_dashboard_and_analytics_json_shapes(self):
         finished_journey()
@@ -240,7 +240,7 @@ class PeopleAndGoldTests(OfficeTestCase):
         old.refresh_from_db()
         self.assertIsNotNone(old.revoked_at)  # resend replaces the old link
         self.assertEqual(a.invites.count(), 2)
-        post(owner, f"/gold/{b.pk}/decline/")
+        post(owner, f"/gold/{b.pk}/decline/", reason="Not a fit for Gold at this time")
         b.refresh_from_db()
         self.assertEqual(b.status, "declined")
         self.assertEqual(post(owner, f"/gold/{b.pk}/approve/").status_code, 302)  # declined stays declined

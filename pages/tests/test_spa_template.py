@@ -18,7 +18,7 @@ class SpaTemplateTests(TestCase):
     def test_every_chip_has_a_room_to_land_on(self):
         html = self.page()
         chips = re.findall(r'class="chip" href="#([a-z-]+)"', html)
-        self.assertEqual(len(chips), 8)
+        self.assertEqual(len(chips), 9)
         for slug in chips:
             self.assertEqual(html.count(f'id="{slug}"'), 1, slug)
 

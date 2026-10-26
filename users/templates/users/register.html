@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load sale_tags %}
 {% load static content_tags pages_tags validation_tags %}
 {% block head_title %}{% include "common/_head.html" with title=site_settings.wording|add:" | Spa 99" %}{% endblock %}
 {% block main %}
@@ -14,7 +15,7 @@
         <p class="register-lead">{{ r.intro.body }}</p>
         {% if cards %}
         <div class="plan-card" data-plan-panel>
-          <p class="plan-eyebrow" data-plan-eyebrow data-suggested="{{ suggested_plan }}" data-suggested-text="Suggested by your answers">{% if chosen and chosen == suggested_plan %}Suggested by your answers{% else %}Your membership{% endif %}</p>
+          <p class="plan-eyebrow" data-plan-eyebrow data-suggested="{{ suggested_plan }}" data-suggested-text="Based on your answers">{% if chosen and chosen == suggested_plan %}Based on your answers{% else %}Your membership{% endif %}</p>
           <div class="plan-text" data-plan-text aria-live="polite">
             {% for card in cards %}{% if card.slug == chosen %}
             <div data-plan-body>
@@ -24,12 +25,14 @@
               </div>
               <p class="plan-character" data-plan-character>{{ card.character }}</p>
               <p class="plan-vat" data-plan-vat>ex VAT (£{{ card.price_inc }} inc VAT)</p>
+              {% register_sale_line register_sale card.slug as reg_sale %}<p class="plan-sale" data-plan-sale{% if not reg_sale %} hidden{% endif %}><span class="mark-glyph" aria-hidden="true"></span><span data-plan-sale-text>{{ reg_sale }}</span></p>
             </div>
             {% endif %}{% endfor %}
             <div data-plan-body hidden>{# filled by register.js when there was no server-side choice #}
               <div class="plan-row"><p class="plan-name" data-plan-name></p><p class="plan-price num"><span data-plan-price></span><small>a month</small></p></div>
               <p class="plan-character" data-plan-character></p>
               <p class="plan-vat" data-plan-vat></p>
+              <p class="plan-sale" data-plan-sale hidden><span class="mark-glyph" aria-hidden="true"></span><span data-plan-sale-text></span></p>
             </div>
             <p class="plan-empty" data-plan-empty{% if chosen %} hidden{% endif %}>Choose one. You can change it later.</p>
           </div>
@@ -38,7 +41,7 @@
             <div class="plan-chips">
               {% for card in cards %}
               <label class="plan-chip"><input type="radio" name="plan" value="{{ card.slug }}" form="register-form"
-                data-name="{{ card.name }}" data-character="{{ card.character }}" data-price="{{ card.price_whole }}" data-inc="{{ card.price_inc }}"
+                data-name="{{ card.name }}" data-character="{{ card.character }}" data-price="{{ card.price_whole }}" data-inc="{{ card.price_inc }}"{% register_sale_line register_sale card.slug as chip_sale %} data-sale-line="{{ chip_sale }}"
                 {% if card.slug == chosen %}checked{% endif %}><span>{{ card.name }}</span></label>
               {% endfor %}
             </div>
@@ -91,6 +94,7 @@
       <div class="form-submit">
         <button type="submit" class="btn btn-primary btn-block" data-working-text="One moment">{{ site_settings.wording }}</button>
         <p class="no-payment">Registering is free. Payment will be taken before your first booking.</p>
+        {% if register_sale %}<p class="no-payment" data-sale-note hidden>Your sale price is saved with your registration.</p>{% endif %}
         <p class="form-foot small"><span class="muted">Already registered?</span> <a class="btn-quiet small" href="{% url 'login' %}">Sign in</a></p>
       </div>
     </form>

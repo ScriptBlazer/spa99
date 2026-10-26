@@ -1,5 +1,6 @@
 """Read site copy. Templates use the `content_tags` library: {% load content_tags %} {% page_content "home" as home %}."""
 from plans.models import SiteSettings
+from plans.services import GOLD_STAR, gold_star
 
 from .models import Page, Section
 
@@ -27,6 +28,8 @@ def fill(text, opening, rooms=None):
         text = text.replace(ROOMS_PLACEHOLDER, rooms)
         if text.startswith(rooms):
             text = text[0].upper() + text[1:]
+    if text and GOLD_STAR in text:  # "free{gold_star}": the asterisk only while the Gold plan has an annual fee
+        text = text.replace(GOLD_STAR, gold_star())
     return text
 
 

@@ -97,17 +97,13 @@ def people_csv(filters):
 
 
 def person_detail(user):
+    """The account person page. The long picture (journeys with every answer, tier, Gold, source, consent, timeline) comes
+    from office.profile; the keys the page always had are kept."""
+    from . import profile
+
     interest = InterestRegistration.objects.filter(user=user).select_related("plan").first()
-    journeys = []
-    sessions = user.journey_sessions.select_related("suggested_plan").order_by("created_at")
-    for session in sessions:
-        answers = [{"question": a.question.text, "options": [o.label for o in a.options.all()], "text": a.text_value, "skipped": a.skipped}
-                   for a in session.answers.select_related("question").prefetch_related("options").order_by("answered_at")]
-        journeys.append({"started": session.created_at.isoformat(), "completed": session.completed, "device": session.device_type,
-                         "suggested_plan": session.suggested_plan.name if session.suggested_plan_id else "",
-                         "gold_potential": session.gold_potential, "answers": answers})
     return {
-        "id": str(user.pk), "name": user.get_full_name() or user.email, "email": user.email, "mobile": user.mobile or "",
+        "kind": "account", "id": str(user.pk), "name": user.get_full_name() or user.email, "email": user.email, "mobile": user.mobile or "",
         "public_id": user.public_id_display, "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else "",
         "verified_at": user.email_verified_at.isoformat() if user.email_verified_at else "",
         "marketing": user.marketing_consent, "privacy_version": user.privacy_accepted_version,
@@ -115,9 +111,9 @@ def person_detail(user):
         "is_staff": user.is_staff,
         "interest": None if interest is None else {"plan": interest.plan.name if interest.plan_id else "", "source": interest.source,
                                                    "registered": interest.created_at.isoformat()},
-        "journeys": journeys,
         "gold_applications": [{"id": str(a.pk), "reference": a.reference, "status": a.status, "potential": a.potential_level}
                               for a in user.gold_applications.all()],
+        **profile.account_profile(user, interest),
     }
 
 
@@ -197,6 +193,41 @@ def _name(user):
     return (user.get_full_name() or user.email) if user is not None else ""
 
 
+STATUS_NAMES = dict(GoldApplication.STATUS_CHOICES)
+EMAIL_NAMES = {"gold_approver": "Approver email", "gold_invite": "Invite email", "gold_active": "Gold-added email",
+               "gold_respond": "Response email", "gold_ack": "Thank-you email", "gold_final": "Final approval email", "gold_sent_back": "Sent-back email", "gold_declined": "Decline email"}
+
+
+def _event_detail(event):
+    """One short plain line under an event, from its meta (who was emailed, the result)."""
+    meta = event.meta or {}
+    if event.action in ("email_sent", "email_failed"):
+        name = EMAIL_NAMES.get(meta.get("template"), "Email")
+        if event.action == "email_sent":
+            return f"{name} sent to {meta.get('recipient', '')}".strip()
+        return f"{name} to {meta.get('recipient', '')} failed: {meta.get('error', 'unknown reason')}".replace("  ", " ")
+    if event.action == "declined":
+        return "The applicant was emailed." if meta.get("email_applicant") else "The applicant was not emailed."
+    if event.action in ("approved", "final_confirmed"):
+        return {"invited": "An invite to set up his account was queued.", "activated": "Gold was added to his existing account."}.get(meta.get("result"), "")
+    if event.action == "responded":
+        return "Emailed to the applicant."
+    return ""
+
+
+def gold_events(application):
+    """The audit trail, newest first, as plain rows for the History card."""
+    rows = []
+    for event in application.events.select_related("actor"):
+        rows.append({
+            "id": str(event.pk), "at": event.at.isoformat(), "action": event.action, "label": event.get_action_display(),
+            "who": event.actor_label, "channel": event.channel, "channel_label": event.get_channel_display(),
+            "from": STATUS_NAMES.get(event.from_status, ""), "to": STATUS_NAMES.get(event.to_status, ""), "message": event.message,
+            "detail": _event_detail(event),
+        })
+    return rows
+
+
 def gold_detail(application):
     sections = [{"title": s["title"], "rows": [{"label": label, "value": value} for label, value in s["rows"]]}
                 for s in gold_services.application_sections(application)]
@@ -213,6 +244,8 @@ def gold_detail(application):
         "person_id": str(application.user_id) if application.user_id else "",
         "can_approve": application.status in WAITING,
         "can_decline": application.status in WAITING,
+        "can_respond": application.status in (*WAITING, GoldApplication.AWAITING_FINAL),
+        "events": gold_events(application),
         "awaiting_final": application.status == GoldApplication.AWAITING_FINAL,
         "can_final": application.status == GoldApplication.AWAITING_FINAL,
         "final_requested_at": application.final_requested_at.isoformat() if application.final_requested_at else "",

@@ -4,6 +4,8 @@ from simple_history.admin import SimpleHistoryAdmin
 
 from common.admin import ExportCsvMixin
 
+from plans import sales as sale_services
+
 from . import services
 from .forms import UserChangeForm, UserCreationForm
 from .models import InterestRegistration, User
@@ -49,7 +51,14 @@ class InterestRegistrationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
     list_filter = ("plan", "source")
     search_fields = ("user__email", "user__first_name", "user__last_name")
     date_hierarchy = "created_at"
-    readonly_fields = ("user", "source", "journey_session")  # the plan stays editable: its change is counted by a signal
+    readonly_fields = ("user", "source", "journey_session", "sale", "sale_name", "sale_percent_off", "sale_months", "sale_locked_at")  # the plan stays editable: its change is counted by a signal
+
+    def save_model(self, request, obj, form, change):
+        if change and "plan" in form.changed_data:  # same kept-price rule as the site (plans.sales.snapshot_fields)
+            stored = InterestRegistration.objects.select_related("sale").get(pk=obj.pk)
+            for name, value in sale_services.snapshot_fields(obj.plan, held=stored).items():
+                setattr(obj, name, value)
+        super().save_model(request, obj, form, change)
 
     def has_add_permission(self, request):
         return False  # created by sign-up, which counts it

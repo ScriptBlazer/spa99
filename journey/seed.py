@@ -10,8 +10,8 @@ PROPERTY_LINK_VALUES = ["owner_investor", "developer", "manager", "firm", "agent
 # (value, label, plan points, weight, reason)
 TIME = [
     ("early_morning", "Early morning (5 to 9am)", {T1: 2, T2: 1}, None, "Early mornings suit you"),
-    ("daytime", "Daytime (9am to 6pm)", {T1: 3, T2: 1}, None, "Daytime visits fit"),
-    ("evening", "Evening (6 to 10pm)", {T2: 3, T3: 2}, None, "Evenings suit you"),
+    ("daytime", "Off-peak (9am to 6pm)", {T1: 3, T2: 1}, None, "Off-peak visits fit"),
+    ("evening", "Peak (6 to 10pm)", {T2: 3, T3: 2}, None, "Peak times suit you"),
     ("late_night", "Late night (10pm to 3am)", {T2: 3, T3: 2}, None, "Late nights suit you"),
 ]
 FREQUENCY = [
@@ -21,20 +21,21 @@ FREQUENCY = [
     ("most_days", "Most days", {T3: 6, T2: 1}, Decimal("5"), "Most days of the week"),
 ]
 FACILITIES = [
-    ("dry_sauna", "Dry sauna"), ("wet_sauna", "Wet sauna"), ("cold_plunge", "Cold plunge"), ("showers", "Showers"),
+    ("dry_sauna", "Dry sauna"), ("wet_sauna", "Wet sauna"), ("cold_plunge", "Cold plunge"), ("ice_bucket", "Ice bucket"),
     ("relaxing_zone", "Relaxing zone"), ("gym", "Gym"), ("massage_room", "Massage room"), ("kitchenette", "Kitchenette"),
 ]
 COMPANY = [
     ("alone", "Alone (Time to myself.)", {T2: 1}, ""),
     # Guest visits are Tier 3 and Gold only (GST-01), so "sometimes" leans to Tier 3. "Often" was retired (2026-10-23).
-    ("sometimes", "Sometimes with someone (A friend now and then.)", {T3: 3}, "Sometimes with a friend"),
+    ("sometimes", "Sometimes with a friend (Now and then.)", {T3: 3}, "Sometimes with a friend"),
 ]
 INDUSTRY = [
     ("property", "Property"), ("finance", "Finance"), ("business_owner", "Business owner"), ("law", "Law"),
     ("medical", "Medical"), ("tech", "Tech"), ("creative", "Creative"), ("other", "Other"),
 ]
-# Gold points per occupation (Moishe 2026-10-23): these reach the "Gold might suit you" level, like a property owner.
-INDUSTRY_GOLD_POINTS = {"finance": 3, "business_owner": 3, "law": 3}
+# Gold points per occupation (Moishe 2026-10-26, pushes Gold to more people; journey only, the application rating is
+# unchanged): 6 = full Gold panel (High, threshold 6), 3 = the Gold line (Medium, threshold 3), 0 = nothing.
+INDUSTRY_GOLD_POINTS = {"property": 6, "finance": 6, "business_owner": 6, "law": 6, "tech": 6, "medical": 3, "creative": 3, "other": 0}
 PROPERTY_LINK = [
     ("owner_investor", "Owner or investor"), ("developer", "Developer"), ("manager", "Manager (block, estate, portfolio)"),
     ("firm", "At a property or management firm"), ("agent", "Agent or broker"), ("property_lawyer", "Property lawyer"),
@@ -46,17 +47,17 @@ HEARD_VIA = [
 ]
 
 GUEST_COMPANY = ["sometimes", "often"]  # "often" was retired (2026-10-23); old sessions keep their points
-GUEST_RULES = {  # 2026-10-23: "Sometimes with someone" never yields Tier 1 and wins ties for Tier 3
-    "Sometimes with someone: not Tier 1": {
+GUEST_RULES = {  # 2026-10-23: "Sometimes with a friend" never yields Tier 1 and wins ties for Tier 3
+    "Sometimes with a friend: not Tier 1": {
         "kind": SuggestionRule.EXCLUDE, "order": 1, "plan_slugs": [T1],
         "conditions": [{"question": "company", "any_of": GUEST_COMPANY}],
     },
-    "Sometimes with someone: tie goes to Tier 3": {
+    "Sometimes with a friend: tie goes to Tier 3": {
         "kind": SuggestionRule.TIE_BREAK, "order": 3, "plan_slugs": [T3, T2, T1],
         "conditions": [{"question": "company", "any_of": GUEST_COMPANY}],
     },
 }
-MIN_CHOICES = {"time": 1, "facilities": 1}  # 2026-10-23: "Choose at least one."
+MIN_CHOICES = {"time": 1, "facilities": 1, "industry": 1}  # 2026-10-23: "Choose at least one." (industry too, 2026-10-26: it is multi-select)
 
 # key, text, help, type, screen, order, condition, options
 QUESTIONS = [
@@ -64,7 +65,7 @@ QUESTIONS = [
     ("frequency", "How often?", "", Question.SCALE, 1, 2, {}, FREQUENCY),
     ("facilities", "What would you use?", "Choose at least one.", Question.MULTI, 2, 1, {}, FACILITIES),
     ("company", "Do you usually come alone?", "", Question.SINGLE, 3, 1, {}, COMPANY),
-    ("industry", "What do you do?", "", Question.SINGLE, 4, 1, {}, INDUSTRY),
+    ("industry", "What do you do?", "Choose at least one.", Question.MULTI, 4, 1, {}, INDUSTRY),
     ("property_link", "Your link to property", "", Question.SINGLE, 4, 2,
      {"question": "industry", "any_of": ["property"]}, PROPERTY_LINK),
     ("property_size", "How many properties or units?", "An approximate range is fine.", Question.SINGLE, 4, 3,

@@ -12,12 +12,22 @@ from . import rating
 from .models import BML, PROPERTY_LINK, SIZE, WHERE
 
 
+class IndustryField(forms.MultipleChoiceField):
+    """What he does: one or more journey `industry` options. A single value (older posts) counts as a list of one;
+    repeats are dropped, the order he chose is kept."""
+
+    def to_python(self, value):
+        if isinstance(value, str):
+            value = [value] if value else []
+        return list(dict.fromkeys(super().to_python(value)))
+
+
 class GoldApplicationForm(forms.Form):
     first_name = forms.CharField(max_length=200)
     last_name = forms.CharField(max_length=200)
     email = forms.CharField(max_length=254)
     mobile = forms.CharField(max_length=40)
-    industry = forms.ChoiceField(choices=[], error_messages={"required": "Choose what you do."})
+    industry = IndustryField(choices=[], error_messages={"required": "Choose at least one."})
     industry_other = forms.CharField(max_length=100, required=False)
     property_link = forms.ChoiceField(choices=[], required=False)  # only for industry Property (see clean())
     size_range = forms.ChoiceField(choices=[], required=False)
@@ -41,18 +51,19 @@ class GoldApplicationForm(forms.Form):
         return " ".join(self.cleaned_data["industry_other"].split())
 
     def clean(self):
-        """The property questions belong to Property people only: for anyone else they are dropped, never required."""
+        """The property questions belong to people who chose Property (among others): for anyone else they are dropped,
+        never required. The Other text only stays when Other is chosen."""
         data = super().clean()
         industry = data.get("industry")
         if industry is None:  # already reported as invalid
             return data
-        if industry == rating.PROPERTY_INDUSTRY:
+        if rating.PROPERTY_INDUSTRY in industry:
             if not data.get("property_link"):
                 self.add_error("property_link", "Choose your link to property.")
         else:
             data["property_link"] = ""
             data["size_range"] = ""
-        if industry != rating.OTHER_INDUSTRY:
+        if rating.OTHER_INDUSTRY not in industry:
             data["industry_other"] = ""
         return data
 
@@ -140,3 +151,37 @@ class GoldSetupForm(forms.Form):
         if problems:
             raise ValidationError(problems)
         return self.cleaned_data["password"]
+
+
+# ---------- the Office actions (docs/features/gold-actions.md) ----------
+
+REASON_MIN, REASON_MAX, MESSAGE_MAX = 10, 1000, 2000
+
+
+def _text(label, minimum, maximum, required_message):
+    return forms.CharField(strip=True, max_length=maximum, min_length=minimum or None,
+                           error_messages={"required": required_message, "min_length": f"{label}: write at least {minimum} characters.",
+                                           "max_length": f"{label}: keep it to {maximum} characters."})
+
+
+class DeclineForm(forms.Form):
+    """Declining needs an internal reason (shown in the trail). The applicant is emailed only when the box is ticked."""
+
+    reason = _text("Reason", REASON_MIN, REASON_MAX, "Write the reason for declining (only the team sees it).")
+    email_applicant = forms.BooleanField(required=False)
+    email_message = forms.CharField(strip=True, required=False, max_length=MESSAGE_MAX,
+                                    error_messages={"max_length": f"Message: keep it to {MESSAGE_MAX} characters."})
+
+    def clean(self):
+        data = super().clean()
+        if data.get("email_applicant") and not data.get("email_message"):
+            self.add_error("email_message", "Write the message to send, or untick Email the applicant.")
+        return data
+
+
+class RespondForm(forms.Form):
+    message = _text("Message", 5, MESSAGE_MAX, "Write the message for the applicant.")
+
+
+class NoteForm(forms.Form):
+    note = _text("Note", 0, MESSAGE_MAX, "Write the note.")

@@ -1,0 +1,102 @@
+{% extends "system/base.html" %}{% load static sale_tags %}
+{# Context: form (SaleForm), sale (None when new), state (upcoming, live, ended), locked_fields (names), read_only. docs/design/SYSTEM-SALES.md 3.2 #}
+{% block head_extra %}<link rel="stylesheet" href="{% static 'common/css/system-sales.css' %}">
+<script type="module" src="{% static 'common/js/system-sales.js' %}"></script>
+{% endblock %}
+{% block main %}
+{% sale_plan_prices as plan_prices %}{{ plan_prices|json_script:"ss-plan-prices" }}
+<a class="ss-back" href="{% url 'system_sales' %}">Sales</a>
+<div class="sys-head"><div><h1>{{ sale.name|default:"New sale" }}{% if sale %} {% if state == "live" %}<span class="sys-badge ok">Live</span>{% elif state == "upcoming" %}<span class="sys-badge info">Upcoming</span>{% else %}<span class="sys-badge">{% if sale.ended_early_at %}Ended early{% else %}Ended{% endif %}</span>{% endif %}{% endif %}</h1>
+  <p>Times are London time.</p></div>
+  {% if sale %}<div class="sys-actions">
+    {% if state != "ended" %}
+    <form method="post" action="{% url 'system_sale_preview' sale.pk %}" data-ss-preview>{% csrf_token %}<button type="submit" class="sys-btn">Preview on site</button></form>
+    {% if state == "live" %}
+    <form method="post" action="{% url 'system_sale_end' sale.pk %}" data-system-confirm="sale" data-confirm-title="End {{ sale.name }} now?" data-confirm-body="The bar and the sale prices leave the site at once. {% if sale.interests.count == 0 %}Nobody has registered during it yet.{% else %}The {{ sale.interests.count }} {% if sale.interests.count == 1 %}person who registered keeps{% else %}people who registered keep{% endif %} their price.{% endif %}" data-confirm-action="End sale now" data-line="">{% csrf_token %}<button type="submit" class="sys-btn">End now</button></form>
+    {% else %}
+    <form method="post" action="{% url 'system_sale_end' sale.pk %}" data-system-confirm="sale" data-confirm-title="Delete {{ sale.name }}?" data-confirm-body="It has not started, so nobody has this price." data-confirm-action="Delete sale" data-line="">{% csrf_token %}<button type="submit" class="sys-btn">Delete</button></form>
+    {% endif %}
+    {% else %}<a class="sys-btn" href="{% url 'system_sale_new' %}?copy={{ sale.pk }}">Copy</a>{% endif %}
+  </div>{% endif %}</div>
+{% if sale and state != "ended" %}<p class="ss-hint">Only you see the preview, in this browser.</p>{% endif %}
+{% include "system/_sale_link.html" %}
+{% if read_only %}<p class="sys-note" role="status" data-system-sale-readonly>This sale has ended. Copy it to run it again.</p>{% endif %}
+<form method="post" class="ss-form" data-system-form="sale" data-sale-form data-state="{{ state }}"{% if not sale %} data-new{% else %} data-percent="{{ sale.percent_off }}" data-months="{{ sale.months_at_price }}" data-ends-was="{{ form.ends_at.initial|date:"Y-m-d\TH:i" }}"{% endif %} data-problems novalidate>{% csrf_token %}
+  {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+  {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-problem data-problem-label="Sale">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+  <div class="sys-cols">
+    <section class="sys-panel ss-fields" aria-labelledby="ss-sale-h">
+      <header><h2 id="ss-sale-h">Sale</h2></header>
+      <div class="ss-rows">
+        <div class="sys-row{% if form.name.errors %} invalid{% endif %}" data-system-field="name">
+          <label for="{{ form.name.id_for_label }}">Name<small>Shown in the bar, as written.</small></label>
+          <div>{% if read_only %}<span class="ss-locked">{{ sale.name }}</span>{% else %}<input type="text" name="name" id="{{ form.name.id_for_label }}" value="{{ form.name.value|default:'' }}" maxlength="40" required data-ss="name" autocomplete="off">{% endif %}
+            {% if form.name.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="name" data-problem-label="Name">{{ form.name.errors|join:" " }}</p>{% endif %}</div>
+        </div>
+
+        <div class="sys-row{% if form.percent_off.errors %} invalid{% endif %}" data-system-field="percent_off">
+          <label for="{{ form.percent_off.id_for_label }}">Off</label>
+          <div>{% if "percent_off" in locked_fields %}<span class="ss-locked mono">{{ sale.percent_off }}%</span>{% if not read_only %}{% include "system/_sale_locked.html" %}{% endif %}
+            {% else %}<div class="sys-ctl"><input type="number" name="percent_off" id="{{ form.percent_off.id_for_label }}" value="{{ form.percent_off.value|default:'' }}" min="1" max="90" step="1" required data-ss="percent" inputmode="numeric" data-label="Off"><span class="sys-unit">%</span></div>
+            {% if form.percent_off.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="percent_off" data-problem-label="Off">{{ form.percent_off.errors|join:" " }}</p>{% endif %}{% endif %}</div>
+        </div>
+
+        <div class="sys-row{% if form.plans.errors %} invalid{% endif %}" data-system-field="plans">
+          <div class="sys-label" id="ss-plans-l">Plans{% if not read_only %}<small>Tick at least one.</small>{% endif %}</div>
+          <div>
+            {% if read_only %}<span class="ss-locked">{{ sale.plans.all|join:", " }}</span>{% else %}
+            <fieldset class="ss-plans" aria-labelledby="ss-plans-l" data-required-group data-label="Plans" data-required-message="Tick at least one plan.">
+              <legend class="sr">Plans</legend>
+              {% for w in form.plans %}<label class="sys-pill">{{ w.tag }}<span>{{ w.choice_label }}</span></label>{% endfor %}
+            </fieldset>
+            {% if form.plans.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="plans" data-problem-label="Plans">{{ form.plans.errors|join:" " }}</p>{% endif %}{% endif %}</div>
+        </div>
+
+        <div class="sys-row{% if form.starts_at.errors %} invalid{% endif %}" data-system-field="starts_at">
+          <label for="{{ form.starts_at.id_for_label }}">Starts</label>
+          <div>{% if "starts_at" in locked_fields %}<span class="ss-locked mono">{{ sale.starts_at|date:"j M Y, H:i" }}</span>{% if not read_only %}{% include "system/_sale_locked.html" %}{% endif %}
+            {% else %}
+            <div class="sys-seg ss-start-mode" role="radiogroup" aria-label="Starts" data-ss-start-mode hidden>
+              <label><input type="radio" name="ss_starts_mode" value="now"> Now</label>
+              <label><input type="radio" name="ss_starts_mode" value="at" checked> At a time</label>
+            </div>
+            <div class="sys-ctl" data-ss-start-fields><input type="datetime-local" name="starts_at" id="{{ form.starts_at.id_for_label }}" value="{% if form.starts_at.value.year %}{{ form.starts_at.value|date:'Y-m-d\TH:i' }}{% else %}{{ form.starts_at.value|default:'' }}{% endif %}" required data-ss="starts" data-label="Starts"><span class="sys-unit">London time</span></div>
+            <p class="ss-sub" data-ss-start-now hidden>Starts within a minute of saving.</p>
+            {% if form.starts_at.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="starts_at" data-problem-label="Starts">{{ form.starts_at.errors|join:" " }}</p>{% endif %}{% endif %}</div>
+        </div>
+
+        <div class="sys-row{% if form.ends_at.errors %} invalid{% endif %}" data-system-field="ends_at">
+          <label for="{{ form.ends_at.id_for_label }}">Ends</label>
+          <div>{% if read_only %}<span class="ss-locked mono">{{ sale.window_end|date:"j M Y, H:i" }}</span>{% else %}
+            <div class="sys-ctl"><input type="datetime-local" name="ends_at" id="{{ form.ends_at.id_for_label }}" value="{% if form.ends_at.value.year %}{{ form.ends_at.value|date:'Y-m-d\TH:i' }}{% else %}{{ form.ends_at.value|default:'' }}{% endif %}" required data-ss="ends" data-label="Ends"><span class="sys-unit">London time</span></div>
+            <p class="ss-sub" data-ss-runs aria-live="polite"></p>
+            {% if state == "live" %}<p class="ss-sub">Cannot be set earlier than now. Use End now to stop it today.</p>{% endif %}
+            {% if form.ends_at.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="ends_at" data-problem-label="Ends">{{ form.ends_at.errors|join:" " }}</p>{% endif %}{% endif %}</div>
+        </div>
+
+        <div class="sys-row{% if form.months_at_price.errors %} invalid{% endif %}" data-system-field="months_at_price">
+          <label for="{{ form.months_at_price.id_for_label }}">Months at sale price<small>For people who register during the sale.</small></label>
+          <div>{% if "months_at_price" in locked_fields %}<span class="ss-locked mono">{{ sale.months_at_price }} {% if sale.months_at_price == 1 %}month{% else %}months{% endif %}</span>{% if not read_only %}{% include "system/_sale_locked.html" %}{% endif %}
+            {% else %}<div class="sys-ctl"><input type="number" name="months_at_price" id="{{ form.months_at_price.id_for_label }}" value="{{ form.months_at_price.value|default:'' }}" min="1" max="24" step="1" required data-ss="months" inputmode="numeric" data-label="Months at sale price"><span class="sys-unit">months</span></div>
+            {% if form.months_at_price.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="months_at_price" data-problem-label="Months at sale price">{{ form.months_at_price.errors|join:" " }}</p>{% endif %}{% endif %}</div>
+        </div>
+      </div>
+      {% if not read_only %}<div class="ss-nojs"><button type="submit" class="sys-btn primary">Save sale</button></div>{% endif %}
+    </section>
+
+    {% if not read_only %}<details class="sys-panel ss-preview" data-ss-preview-panel>
+      <summary><h2>What people see</h2></summary>
+      <div class="ss-preview-body">
+        <p class="ss-label">Bar</p>
+        <p class="ss-bar-copy" data-ss-bar aria-live="polite"></p>
+        <p class="ss-label">Prices</p>
+        <div class="sys-scroll"><table class="sys-table ss-prices">
+          <thead><tr><th scope="col">Plan</th><th scope="col" class="sys-num">Price</th><th scope="col" class="sys-num">Sale price</th><th scope="col">For</th></tr></thead>
+          <tbody data-ss-prices><tr><td colspan="4" class="sys-muted">Tick a plan to see its sale price.</td></tr></tbody>
+        </table></div>
+        <p class="ss-sub">Prices are ex VAT, as everywhere on the site.</p>
+      </div>
+    </details>{% endif %}
+  </div>
+</form>
+{% endblock %}

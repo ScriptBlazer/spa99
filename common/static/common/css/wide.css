@@ -1,0 +1,21 @@
+/* Large screens (docs/design/LARGE-SCREENS.md). Above 1920 CSS px the root size grows with the screen,
+   so the whole page keeps its 1920 proportions. Nothing here applies at 1920 or below. */
+@media (min-width: 120.0625em) {
+  html {
+    /* 16px at 1920 wide (no jump), 21.3px at 2560, 25.1px at 3008, 32px at 3840.
+       Capped by height (16px at 960 tall) so short, very wide windows (21:9, 32:9) do not overflow.
+       Never smaller than the reader's own default. */
+    font-size: max(100%, min(100vw / 120, 100vh / 60));
+  }
+  :root {
+    /* Proposed, large screens: keep corners in proportion. Same 6px and 12px at 16px root. */
+    --radius-sm: 0.375rem;
+    --radius-md: 0.75rem;
+  }
+  /* Proposed, large screens: the swan texture keeps its density (200 x 240px at 16px root). */
+  .register::before {
+    -webkit-mask-size: 12.5rem 15rem;
+    mask-size: 12.5rem 15rem;
+  }
+  .type-tile { background-size: 12.5rem 15rem; }
+}

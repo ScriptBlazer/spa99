@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import Facility, Plan
+from plans.tests.helpers import open_memberships
 from users.models import InterestRegistration
 
 PUBLIC_PAGES = [
@@ -21,6 +22,7 @@ class PageTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         seed_all()
+        open_memberships()
 
     def test_every_public_page_renders(self):
         for path in PUBLIC_PAGES:
@@ -76,8 +78,8 @@ class PageTests(TestCase):
         from content.models import Section
 
         html = self.client.get("/").content.decode()
-        self.assertIn("5am to 3am", html)
-        self.assertIn(">22<", html)  # hours a day from the open periods
+        self.assertIn("3am to 5am", html)  # the cleaning hours
+        self.assertIn(">24<", html)  # open 24 hours a day (2026-10-26)
         for name in ["Dry sauna", "Kitchenette"]:
             self.assertIn(name, html)
         self.assertIn('href="/the-spa/#showers"', html)
@@ -89,8 +91,8 @@ class PageTests(TestCase):
 
     def test_home_gold_and_opening_bands_use_data(self):
         html = self.client.get("/").content.decode()
-        for needle in ["Unlimited visits", "Bring 2 guests a month", "Leil Shishi when offered", "99 Vale Road, London N4 1PR",
-                       "Open 5am to 3am, every day.", "Closed for Shabbos and Yom Tov.", "cold-plunge-", "hero-poster-landscape"]:
+        for needle in ["Unlimited visits", "Bring 2 guests a month", "BML House, 99c Vale Road, London N4 1PR",
+                       "Open 24 hours a day. Cleaning hours 3am to 5am. Closed Shabbos and Yom Tov.", "cold-plunge-", "hero-poster-landscape"]:
             self.assertIn(needle, html)
 
     def test_home_preloads_the_hero_poster_and_runs_no_smooth_scroll(self):
@@ -108,8 +110,33 @@ class PageTests(TestCase):
     def test_memberships_round_3_details(self):
         html = self.client.get("/memberships/").content.decode()
         self.assertIn('<span class="cur">&pound;</span>299', html)  # the raised pound sign, still one price
-        self.assertIn("Every visit: every room, as long as you like.", html)
+        self.assertIn("Every visit: every room and all areas, as long as you like. Free drinks and free ice lollies.", html)
+        self.assertIn('tier-num tier-num--word">Unlimited', html)  # Tier 3 (2026-10-26)
         self.assertIn('href="/the-spa/">See the spa', html)
+
+    def test_memberships_round_4_gold_invitation_and_compare_section(self):
+        from content.models import Section
+        from gold.models import GoldApplication
+        html = self.client.get("/memberships/").content.decode()
+        self.assertIn('class="mem-gold', html)
+        self.assertIn("Apply for the Gold Card", html)
+        self.assertIn('href="/gold-card/apply/"', html)
+        self.assertIn('id="compare"', html)
+        self.assertNotIn("<details", html)
+        self.assertNotIn("gold-aside", html)
+        self.assertLess(html.index('id="compare"'), html.index("every-visit"))
+        # off switch: clearing the button label in Control hides it
+        Section.objects.filter(page__key="memberships", key="gold_cta").update(cta_label="")
+        self.assertNotIn('class="mem-gold', self.client.get("/memberships/").content.decode())
+        Section.objects.filter(page__key="memberships", key="gold_cta").update(cta_label="Apply for the Gold Card")
+        # any application on the signed-in account hides it; a signed-in user without one still sees it
+        user = get_user_model().objects.create_user(email="gold-r4@example.com", password="x-Strong-pass-1")
+        self.client.force_login(user)
+        self.assertTrue(self.client.get("/memberships/").context["gold_cta"])
+        GoldApplication.objects.create(first_name="A", last_name="B", email="gold-r4@example.com", user=user, status=GoldApplication.DECLINED)
+        resp = self.client.get("/memberships/")
+        self.assertFalse(resp.context["gold_cta"])
+        self.assertNotIn('class="mem-gold', resp.content.decode())
 
     def test_spa_page_lists_every_facility_with_a_finished_image_or_placeholder(self):
         Facility.objects.filter(slug="wet-sauna").update(image_name="")

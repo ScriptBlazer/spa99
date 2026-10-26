@@ -6,6 +6,7 @@
       <span class="sp-rule" data-rule aria-hidden="true"></span>
       <h2 class="sp-moment-title" id="moment-shower" data-rise>{{ m.heading }}</h2>
       {% if m.body %}<p class="muted sp-moment-line" data-fade>{{ m.body }}</p>{% endif %}
+      {% if companion %}{% include "pages/_spa_companion.html" with c=companion plain=True %}{% endif %}
     </div>
     <div class="sp-pair">
       {% for p in m.pictures %}{% if p.has_image %}

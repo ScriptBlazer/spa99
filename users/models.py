@@ -95,6 +95,13 @@ class InterestRegistration(BaseModel):
     journey_session = models.ForeignKey(
         "journey.JourneySession", null=True, blank=True, on_delete=models.SET_NULL, related_name="registrations"
     )
+    # The sale price this person keeps (docs/features/sales.md). A snapshot: name, percent and months are copied, so editing or
+    # deleting the sale never changes it. `sale` is only a link back (SET_NULL). Set by plans.sales.snapshot_fields, never backfilled.
+    sale = models.ForeignKey("plans.Sale", null=True, blank=True, on_delete=models.SET_NULL, related_name="interests")
+    sale_name = models.CharField(max_length=80, blank=True)
+    sale_percent_off = models.PositiveSmallIntegerField(null=True, blank=True)
+    sale_months = models.PositiveSmallIntegerField(null=True, blank=True)
+    sale_locked_at = models.DateTimeField(null=True, blank=True, help_text="When the sale price was locked in.")
 
     history = HistoricalRecords()
 

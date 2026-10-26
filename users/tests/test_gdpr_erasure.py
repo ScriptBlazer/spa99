@@ -11,7 +11,7 @@ from gold.models import GoldApplication
 from notifications.models import EmailLog
 from plans.management.commands.seed_phase1 import seed_all
 from plans.tests.helpers import set_recipients
-from users import services
+from users import services, tokens
 from users.forms import SignUpForm
 from users.models import User
 
@@ -25,7 +25,10 @@ def sign_up():
         "privacy_accepted": "on", "plan": "tier-2",
     })
     assert form.is_valid(), form.errors
-    return services.register_interest(form.cleaned_data).user
+    user = services.register_interest(form.cleaned_data).user
+    services.verify_email(tokens.make_verify_token(user))  # rows found by email are his only once the address is proven
+    user.refresh_from_db()
+    return user
 
 
 def apply_for_gold():
@@ -70,9 +73,9 @@ class ErasureTests(TestCase):
         self.assertFalse(GoldApplication.objects.filter(pk=application.pk).exists())
         self.assertFalse(Task.objects.filter(func__startswith="gold.tasks.").exists())
         self.assertFalse(Task.objects.filter(func__startswith="users.tasks.").exclude(pk=keep_task.pk).exists())
-        self.assertEqual(result["queue_records"], 2)  # the sign-up email task and the Gold email task
+        self.assertEqual(result["queue_records"], 3)  # the sign-up, welcome and Gold email tasks
         self.assertTrue(EmailLog.objects.filter(subject="Keep me").exists())  # someone else's rows are untouched
-        self.assertEqual(len(mail.outbox), 3)  # (nothing was sent again by deleting)
+        self.assertEqual(len(mail.outbox), 4)  # (the welcome email came with verifying; nothing was sent again by deleting)
 
     def test_erase_task_records_also_clears_waiting_jobs_and_ignores_other_functions(self):
         waiting = SignedPackage.dumps({"id": "w", "func": "users.tasks.send_verification_email", "args": ("abc-123",), "kwargs": {}})

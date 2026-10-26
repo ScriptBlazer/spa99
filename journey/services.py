@@ -5,7 +5,10 @@ from django.db import IntegrityError, transaction
 from django.db.models import F, Prefetch
 from django.utils import timezone
 
+from django.core.exceptions import ValidationError
+
 from common.useragent import device_type
+from common.validators import normalise_email
 from insights import metrics
 
 from .conditions import matches
@@ -41,6 +44,9 @@ def create_session(user_agent="", referrer="", utm=None, user=None, previous=Non
             is_bot=kind == "bot",
             referrer=(referrer or "")[:500],
             user=user if user is not None and user.is_authenticated else None,
+            # a restart in the same browser is the same person: he is not asked for his email again
+            **({"lead_email": previous.lead_email, "lead_at": previous.lead_at, "lead_privacy_version": previous.lead_privacy_version}
+               if previous is not None else {}),
             **{name: (utm.get(name) or "")[:100] for name in UTM_FIELDS},
         )
         if not session.is_bot:  # bots are never counted
@@ -96,6 +102,105 @@ def link_user(session, user):
         session.user = user
         session.save(update_fields=["user", "updated_at"])
     return session
+
+
+def link_leads(user):
+    """Tie every journey that left this account's email at the gate (any browser, any case) to the account, when it
+    belongs to nobody yet. Called once the address is proven (email verified). Sessions already linked to someone are
+    never taken; running it again changes nothing. A save per session, so history records the link. Returns the number
+    linked. (If an account later changes its email, old leads are not re-linked: see docs/features/office-leads.md.)"""
+    email = (user.email or "").strip()
+    if not email:
+        return 0
+    linked = 0
+    with transaction.atomic():
+        for session in JourneySession.objects.filter(lead_email__iexact=email, user__isnull=True):
+            session.user = user
+            session.save(update_fields=["user", "updated_at"])
+            linked += 1
+    return linked
+
+
+# ---------- the email gate (before the result) ----------
+
+CONSENT_MESSAGE = "Please tick the box so we may email you about Spa 99 opening."
+
+
+class LeadError(ValueError):
+    """The email or the consent is not acceptable. `errors` is {field: message}, safe to show."""
+
+    def __init__(self, errors):
+        super().__init__("; ".join(errors.values()))
+        self.errors = errors
+
+
+def lead_required(session, user=None):
+    """Does this visitor still have to leave an email before the result? Not when signed in (his account is his
+    address), and not once an address was given on this session."""
+    if user is not None and user.is_authenticated:
+        return False
+    return session.user_id is None and not session.lead_email
+
+
+def save_lead(session, email, consent):
+    """Store the visitor's email on his journey session (one field, one consent). Returns the clean address.
+    Raises LeadError. Safe to repeat: a second address replaces the first."""
+    errors = {}
+    try:
+        clean = normalise_email(email)
+    except ValidationError as error:
+        errors["email"] = error.messages[0]
+        clean = ""
+    if consent is not True:
+        errors["consent"] = CONSENT_MESSAGE
+    if errors:
+        raise LeadError(errors)
+    from plans.models import SiteSettings  # local: plans imports journey services indirectly
+
+    session.lead_email = clean
+    session.lead_at = timezone.now()
+    session.lead_privacy_version = SiteSettings.load().privacy_version
+    session.save(update_fields=["lead_email", "lead_at", "lead_privacy_version", "updated_at"])
+    touch(session)
+    from office import snapshots  # local: the Office job reads the journey tables
+
+    snapshots.request_refresh()  # a new lead moves the Office figures (debounced, after commit)
+    return clean
+
+
+def erase_lead(email):
+    """Remove an address given at the gate (sessions and their history rows). Used when a person's data is erased.
+    The answers stay (anonymous statistics). Returns the number of sessions cleared."""
+    email = (email or "").strip()
+    if not email:
+        return 0
+    ids = list(JourneySession.objects.filter(lead_email__iexact=email).values_list("pk", flat=True))
+    JourneySession.objects.filter(pk__in=ids).update(lead_email="", lead_at=None, lead_privacy_version="")
+    JourneySession.history.model.objects.filter(lead_email__iexact=email).update(lead_email="", lead_at=None, lead_privacy_version="")
+    return len(ids)
+
+
+def erase_lead_data(email):
+    """The Office "remove this lead" path: everything held for an address given at the gate, except the Gold applications.
+    Sessions lose the address, consent, cookie value, person key and referrer, typed answer text goes (also in history),
+    emails sent to the address and group-send rows, invites and the unsubscribe key go. The choices stay as anonymous
+    statistics. Returns the number of sessions cleared."""
+    email = (email or "").strip()
+    if not email:
+        return 0
+    from mailings.erasure import erase_address
+    from notifications.models import EmailLog
+
+    ids = list(JourneySession.objects.filter(lead_email__iexact=email).values_list("pk", flat=True))
+    for pk in ids:
+        JourneySession.objects.filter(pk=pk).update(key=new_session_key(), person_key="", referrer="", lead_email="", lead_at=None, lead_privacy_version="")
+    Answer.objects.filter(session_id__in=ids).update(text_value="")
+    History = JourneySession.history.model
+    History.objects.filter(id__in=ids).update(key="", person_key="", referrer="", lead_email="", lead_at=None, lead_privacy_version="")
+    Answer.history.model.objects.filter(session_id__in=ids).update(text_value="")
+    EmailLog.objects.filter(to__iexact=email).delete()
+    erase_address(email)
+    return len(ids)
 
 
 # ---------- questions, visibility, screens ----------
@@ -338,7 +443,7 @@ def result_url():
     return reverse("journey_page", args=[JOURNEY_RESULT_SLUG])
 
 
-def build_state(session):
+def build_state(session, user=None):
     """Everything the journey page needs to draw itself and resume. JSON friendly."""
     answers = answers_by_key(session)
     visible, _ = visible_questions(session, answers)
@@ -354,6 +459,7 @@ def build_state(session):
             "current_step": session.current_step,
             "furthest_step": session.furthest_step,
             "completed": session.completed,
+            "lead_required": lead_required(session, user),
             "result_step": result_step(session, visible),
             "total_screens": len(numbers),
             "resume_step": numbers[0] if numbers else 1,  # reopening always starts at screen 1, answers ticked
@@ -361,3 +467,38 @@ def build_state(session):
         "last_suggestion": last_suggestion(session),
         "screens": [{"number": n, "questions": screens[n]} for n in sorted(screens)],
     }
+
+
+def export_lead(email):
+    """Everything held for an address given at the gate: its sessions and answers, as plain data (for UK GDPR requests
+    from people who never registered)."""
+    email = (email or "").strip()
+    if not email:
+        return []
+    sessions = JourneySession.objects.filter(lead_email__iexact=email).select_related("suggested_plan").order_by("created_at")
+    rows = []
+    for session in sessions:
+        answers = [
+            {"question": a.question.text, "options": [o.label for o in a.options.all()], "text": a.text_value,
+             "skipped": a.skipped, "answered_at": a.answered_at.isoformat()}
+            for a in session.answers.select_related("question").prefetch_related("options").order_by("answered_at")
+        ]
+        rows.append({
+            "started_at": session.created_at.isoformat(), "device": session.device_type, "referrer": session.referrer,
+            "utm_source": session.utm_source, "utm_medium": session.utm_medium, "utm_campaign": session.utm_campaign,
+            "lead_email": session.lead_email, "lead_at": session.lead_at.isoformat() if session.lead_at else None,
+            "utm_term": session.utm_term, "utm_content": session.utm_content, "lead_privacy_version": session.lead_privacy_version,
+            "completed": session.completed,
+            "suggested_plan": session.suggested_plan.name if session.suggested_plan else None,
+            "gold_potential": session.gold_potential, "gold_score": session.gold_score,
+            "gold_reasons": (session.suggestion_detail or {}).get("gold_reasons", []), "answers": answers,
+        })
+    return rows
+
+
+def export_lead_emails(email):
+    """Emails we sent to an address given at the gate (no bodies are stored): template, subject, status, time."""
+    from notifications.models import EmailLog
+
+    return [{"template": e.template, "subject": e.subject, "status": e.status, "sent_at": e.sent_at.isoformat() if e.sent_at else None}
+            for e in EmailLog.objects.filter(to__iexact=(email or "").strip()).order_by("created_at")]

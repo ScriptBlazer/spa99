@@ -1,0 +1,32 @@
+{% load office_tags %}{% comment %}The rail of a person or lead page: Details (accounts), Source, Consent (OFFICE-LEADS 4.7). The Data card is in the page, it depends on who looks.{% endcomment %}
+{% if person.kind == "account" %}
+<section class="o-card" data-person-details aria-labelledby="p-details"><h2 id="p-details" class="o-h3">Details</h2>
+  <dl class="o-rows">
+    <div><dt>Email</dt><dd>{{ person.email }}</dd></div>
+    <div><dt>Mobile</dt><dd>{{ person.mobile|default:"None given" }}</dd></div>
+    <div><dt>Account ID</dt><dd class="num">{{ person.public_id }}</dd></div>
+    <div><dt>Verified</dt><dd>{% if person.verified_at %}{{ person.verified_at|dt }}{% else %}Not yet{% endif %}</dd></div>
+    {% if person.last_login %}<div><dt>Last signed in</dt><dd>{{ person.last_login|dt }}</dd></div>{% endif %}
+    {% for c in person.consent.lead %}{% if c.email|lower != person.email|lower %}<div><dt>Also gave</dt><dd class="o-muted">{{ c.email }}</dd></div>{% endif %}{% endfor %}
+  </dl>
+</section>
+{% endif %}
+<section class="o-card" data-person-source aria-labelledby="p-source"><h2 id="p-source" class="o-h3">Source</h2>
+  {% with first=person.journeys.0 latest=latest_journey %}
+  {% if person.source %}<dl class="o-rows">
+    {% if person.first_seen %}<div><dt>First seen</dt><dd>{{ person.first_seen|dmy }}</dd></div>{% elif first %}<div><dt>First seen</dt><dd>{{ first.started|dmy }}</dd></div>{% endif %}
+    <div><dt>Came from</dt><dd>{{ person.source.host|default:"Direct" }}</dd></div>
+    {% if person.source.utm_source %}<div><dt>Campaign source</dt><dd>{{ person.source.utm_source }}</dd></div>{% endif %}
+    {% if person.source.utm_medium %}<div><dt>Campaign medium</dt><dd>{{ person.source.utm_medium }}</dd></div>{% endif %}
+    {% if person.source.utm_campaign %}<div><dt>Campaign</dt><dd>{{ person.source.utm_campaign }}</dd></div>{% endif %}
+    {% if person.source.device %}<div><dt>Device</dt><dd>{{ person.source.device|capfirst }}</dd></div>{% endif %}
+    {% for a in latest.answers %}{% if a.key == "heard_via" and not a.skipped %}<div><dt>Heard about us</dt><dd>{{ a.display }}</dd></div>{% endif %}{% endfor %}
+  </dl>{% else %}<p class="o-empty-line">Not recorded.</p>{% endif %}
+  {% endwith %}
+</section>
+<section class="o-card" data-person-consent aria-labelledby="p-consent"><h2 id="p-consent" class="o-h3">Consent</h2>
+  <dl class="o-rows">
+    <div><dt>Journey email</dt><dd>{% with c=person.consent.lead.0 %}{% if c %}Given {{ c.at|dt }}<span class="o-cell-sub">Privacy version {{ c.privacy_version }}</span>{% else %}<span class="o-muted">Not asked (signed in)</span>{% endif %}{% endwith %}</dd></div>
+    <div><dt>Marketing emails</dt><dd data-marketing>{% if person.consent.unsubscribed %}<span data-unsubscribed>Unsubscribed</span>{% elif person.consent.account %}{% if person.consent.account.marketing %}Yes{% if person.consent.account.marketing_at %}, since {{ person.consent.account.marketing_at|dm }}{% endif %}{% else %}No{% endif %}{% else %}<span class="o-muted">Opening emails only (journey consent)</span>{% endif %}</dd></div>
+  </dl>
+</section>

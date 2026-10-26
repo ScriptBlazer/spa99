@@ -1,17 +1,19 @@
 {% extends "users/member_base.html" %}
+{% load membership_tags %}
 {% block head_title %}{% include "common/_head.html" with title="Choose "|add:plan.name|add:" | My Spa 99" %}{% endblock %}
-{% load content_tags %}
+{% load content_tags sale_tags %}
 {% block main %}
 <section class="m-screen" data-screen="choose">
   <div class="m-title" data-reveal="hero">
     <h1>Choose {{ plan.name }}</h1>
     <p class="lead num">&pound;{{ card.price_whole }} a month, ex VAT (&pound;{{ card.price_inc }} inc VAT)</p>
+    {% register_sale_line register_sale plan.slug as cc_sale %}{% if cc_sale %}<p class="m-sale"><span class="mark-glyph" aria-hidden="true"></span>{{ cc_sale }}</p>{% endif %}
     <p class="muted">Nothing to pay now. No card details needed.</p>
   </div>
   <form method="post" action="{% url 'account_interest' %}" data-choose-confirm>{% csrf_token %}
     <input type="hidden" name="plan" value="{{ plan.slug }}">
     <button type="submit" class="btn btn-primary" data-working-text="Saving">Choose {{ plan.name }}</button>
   </form>
-  <a class="btn-quiet" href="{% url 'memberships' %}">Back</a>
+  <a class="btn-quiet" href="{% memberships_url %}">Back</a>
 </section>
 {% endblock %}

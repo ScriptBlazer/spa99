@@ -104,7 +104,7 @@ class SnapshotTests(OfficeTestCase):
         snapshots.build_everything()
         for path in paths:
             self.assertEqual(self.queries(path), empty[path], path)
-            self.assertLessEqual(empty[path], 20, path)
+            self.assertLessEqual(empty[path], 30, path)
 
     def test_snapshots_are_idempotent_all_ranges_exist_and_the_all_range_has_no_previous_period(self):
         finished_journey()
@@ -112,7 +112,7 @@ class SnapshotTests(OfficeTestCase):
         first = sorted(OfficeSnapshot.objects.values_list("page", "range", "payload"), key=str)
         snapshots.build_everything()
         self.assertEqual(first, sorted(OfficeSnapshot.objects.values_list("page", "range", "payload"), key=str))
-        self.assertEqual(OfficeSnapshot.objects.count(), 4 + 4 + 4)
+        self.assertEqual(OfficeSnapshot.objects.count(), 4 + 4 + 4 + 4)
         everything = selectors.dashboard("all")
         self.assertEqual(everything["range"], "all")
         self.assertTrue(all(r["previous"] is None and r["change"] is None for r in everything["rings"]))

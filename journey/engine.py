@@ -102,10 +102,12 @@ def _reasons(plan, supports):
 
 def gold_signals(session):
     """Gold rating inputs from the journey answers (shared with the Gold application). Which question feeds which
-    signal is data (gold.GoldSignalSource). Returns ({signal: value}, extra points from options)."""
+    signal is data (gold.GoldSignalSource). Returns ({signal: value}, extra points from options: per question the
+    highest chosen option's points, summed over questions)."""
     answers = services.effective_answers(session)
     values = {key: [o.value for o in a.options.all()] for key, a in answers.items()}
-    extra = sum(o.gold_points for a in answers.values() for o in a.options.all())
+    # One question gives its highest option's points, never the sum (ticking every industry must not inflate the rating).
+    extra = sum(max((o.gold_points for o in a.options.all()), default=0) for a in answers.values())
     return gold_rating.signals_from_answers(values), extra
 
 

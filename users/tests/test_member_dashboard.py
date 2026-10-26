@@ -171,7 +171,10 @@ class WebsiteMenuTests(TestCase):
     def test_sitemap_excludes_book(self):
         body = self.client.get("/sitemap.xml").content.decode()
         self.assertNotIn("/book/", body)
-        self.assertIn("/memberships/", body)
+        self.assertNotIn("/memberships/", body)  # hidden until opening
+        from plans.tests.helpers import open_memberships
+        open_memberships()
+        self.assertIn("/memberships/", self.client.get("/sitemap.xml").content.decode())
 
 
 class PasswordScreenShellTests(TestCase):

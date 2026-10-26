@@ -122,7 +122,7 @@ Copy check: the reassurance promises one service email to registered people when
 **Registered or none**
 - Heading Signika `--text-2xl`: "Tier 2" (or "Choose your membership").
 - Price line `num`: "£X a month, ex VAT (£Y inc VAT)". Under it: "Nothing to pay now. Billing opens in {opening}."
-- Journey line, when a finished journey is linked: "Your journey suggested Tier 2." If it differs from the interest, add quiet link "Switch to Tier 2" (same POST).
+- Journey line, when a finished journey is linked: "Based on your answers: Tier 2." If it differs from the interest, add quiet link "Switch to Tier 2" (same POST).
 - **Change**: always visible choice tiles, not a hidden form. One tile per `interest_cards` card: name (Signika `--text-lg`), tagline, price ex VAT. `--tile-min-h`, cream-raised, `--color-control-line` 1px, `--radius-md`. Current: espresso fill, cream text, gold `check`. Tapping another tile marks it chosen instantly (radio inside a `role="radiogroup"`, label "Membership you're interested in") and reveals one button under the group: "Keep Tier 3" (primary). Success message "Your interest is updated." Phone: tiles full width, stacked. Desktop: 2 x 2 grid.
 - Quiet link "Compare memberships" to `/memberships/`.
 

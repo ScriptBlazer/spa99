@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
 from django.db import models
+from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from common.models import BaseModel
@@ -28,7 +29,7 @@ class Plan(BaseModel):
     ]
     DAYTIME_ONLY = "daytime"
     ANY_TIME = "any"
-    HOURS_CHOICES = [(DAYTIME_ONLY, "Daytime only"), (ANY_TIME, "Any time")]
+    HOURS_CHOICES = [(DAYTIME_ONLY, "Off-peak only"), (ANY_TIME, "Any time")]
 
     slug = models.SlugField(unique=True, help_text="Stable key used by the journey and rules, e.g. tier-2. Do not rename.")
     name = models.CharField(max_length=60)
@@ -50,9 +51,12 @@ class Plan(BaseModel):
                   'Flexible: add any perk. "phrase" is the short line on the Gold Card page (empty = the label). '
                   '"pill" is the short chip on the memberships page (empty = no chip).',
     )
+    annual_fee = models.DecimalField(
+        "annual fee ex VAT", max_digits=8, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal("0"))],
+        help_text="Gold Card only, per year. Empty = not decided: the compare table says 'By application'. Set it and it shows 'a year'.")
     short_description = models.CharField(max_length=200, blank=True)
     tagline = models.CharField(
-        max_length=80, blank=True, help_text="One calm line under the name. Empty = Daytime / Any time / Unlimited.")
+        max_length=80, blank=True, help_text="One calm line under the name. Empty = Off-peak / Any time / Unlimited.")
     image = models.FileField(
         upload_to=plan_image_path, blank=True, help_text="Picture on the memberships page. Wins over the render.")  # default storage: S3 on live
     render = models.CharField(
@@ -113,11 +117,19 @@ class SiteSettings(BaseModel):
         max_length=60, default="January 2027", blank=True,
         help_text='Shown as the opening time while the opening date is empty, e.g. "January 2027". Used by the {opening} placeholder in site copy.',
     )
-    address_street = models.CharField(max_length=120, default="99 Vale Road")
+    address_street = models.CharField(max_length=120, default="BML House, 99c Vale Road")
     address_town = models.CharField(max_length=80, default="London")
     address_postcode = models.CharField(max_length=12, default="N4 1PR")
 
+    show_leil_shishi = models.BooleanField(
+        "show Leil Shishi", default=False,
+        help_text="Off for now (Moishe, 2026-10-26): Leil Shishi is hidden on the cards, the compare table, Register and the Gold Card page. Nothing is deleted; turn on to show it again.")
+
     register_interest_open = models.BooleanField(default=True, help_text="Stage A: accounts and Gold applications.")
+    memberships_public = models.BooleanField(
+        default=False,
+        help_text="Off until opening: the Memberships page and its links are hidden and the journey is the way in (the journey asks for an email "
+                  "first). Team members can still open the page to check it.")
     subscribe_open = models.BooleanField(default=False, help_text="Stage B: checkout (Phase 2).")
     booking_open = models.BooleanField(default=False, help_text="Stage C: bookings (Phase 3).")
     notify_booking_open = models.BooleanField(
@@ -139,7 +151,7 @@ class SiteSettings(BaseModel):
         help_text="Shown on the site and used as Reply-To. Empty = the address inside DEFAULT_FROM_EMAIL.")
 
     privacy_version = models.CharField(
-        max_length=20, default="2026-10-23",
+        max_length=20, default="2026-10-26",
         help_text="Recorded on each person who accepts the privacy notice. Change it (and the notice's Last updated row) "
                   "whenever the notice changes in a way people should accept again."
     )
@@ -199,7 +211,7 @@ class SiteSettings(BaseModel):
 
     @property
     def address_one_line(self):
-        """'99 Vale Road, London N4 1PR'."""
+        """'BML House, 99c Vale Road, London N4 1PR'."""
         town_line = " ".join(part for part in (self.address_town, self.address_postcode) if part)
         return ", ".join(part for part in (self.address_street, town_line) if part)
 
@@ -221,8 +233,8 @@ class OpeningRule(BaseModel):
     CLOSE_BEFORE_CANDLES = "close_before_candles"
     OPEN_AFTER_NIGHTFALL = "open_after_end"
     KIND_CHOICES = [
-        (PERIOD, "Open period (daytime, evening)"),
-        (DAILY_CLOSURE, "Closed every day"),
+        (PERIOD, "Open period (off-peak, peak)"),
+        (DAILY_CLOSURE, "Cleaning hours (every day)"),
         (CLOSE_BEFORE_CANDLES, "Close before candle lighting (Friday, Yom Tov)"),
         (OPEN_AFTER_NIGHTFALL, "Open after Shabbos / Yom Tov ends"),
     ]
@@ -302,10 +314,12 @@ class Facility(BaseModel):
     FEATURE = "feature"
     TILE = "tile"
     COMPANION = "companion"
+    COMPACT = "compact"
     DISPLAY_CHOICES = [
         (FEATURE, "Feature (large picture, own section)"),
         (TILE, "Tile (small portrait, in a row)"),
         (COMPANION, "Companion (small, beside the feature before it)"),
+        (COMPACT, "Compact (one smaller picture, own short section)"),
     ]
     FACTS_MAX = 4
     FACT_MAX_LENGTH = 32
@@ -358,3 +372,95 @@ class Facility(BaseModel):
 
     def __str__(self):
         return self.name
+
+
+class Sale(BaseModel):
+    """A limited-time sale (System > Sales): a percentage off some plans, for the people who register while it is live.
+    Only one sale is live at a time. The window is starts_at to `window_end` (ended_early_at when End now was used, else ends_at).
+    A person's kept price is a snapshot on their InterestRegistration (users app), so editing or deleting a sale never changes it.
+    Lives in the plans app because it is pricing data for Plan rows."""
+
+    MAX_PERCENT = 90
+    MAX_MONTHS = 36
+
+    name = models.CharField(max_length=80, help_text='Shown on the site bar, e.g. "Christmas sale".')
+    percent_off = models.PositiveSmallIntegerField(
+        "% off", validators=[MinValueValidator(1), MaxValueValidator(MAX_PERCENT)], help_text="1 to 90. Locked once the sale is live.")
+    plans = models.ManyToManyField(Plan, related_name="sales")
+    starts_at = models.DateTimeField(db_index=True, help_text="London time.")
+    ends_at = models.DateTimeField(db_index=True, help_text="London time.")
+    months_at_price = models.PositiveSmallIntegerField(
+        "months at the sale price", validators=[MinValueValidator(1), MaxValueValidator(MAX_MONTHS)],
+        help_text="How long a person who registers during the sale keeps the sale price once billing starts. Locked once live.")
+    ended_early_at = models.DateTimeField(null=True, blank=True, help_text="Set by End now.")
+    created_by = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["-starts_at"]
+        indexes = [models.Index(fields=["starts_at", "ends_at"])]
+
+    def __str__(self):
+        return self.name
+
+    # ---- the window ----
+
+    @property
+    def window_end(self):
+        return self.ended_early_at or self.ends_at
+
+    def status(self, now=None):
+        """"upcoming", "live" or "ended" (ended early, or its end time has passed)."""
+        now = now or timezone.now()
+        if self.ended_early_at is not None and (self.ended_early_at <= now or self.ended_early_at <= self.starts_at):
+            return "ended"  # ended early (an upcoming sale ended early never runs)
+        if now >= self.ends_at:
+            return "ended"
+        return "upcoming" if now < self.starts_at else "live"
+
+    @classmethod
+    def overlapping(cls, starts_at, ends_at, exclude_pk=None):
+        """Other sales whose live window shares time with [starts_at, ends_at). A sale ended early frees the rest of its time; one
+        that was ended before it started has no window at all."""
+        queryset = cls.objects.filter(starts_at__lt=ends_at).filter(
+            models.Q(ended_early_at__isnull=True, ends_at__gt=starts_at) | models.Q(ended_early_at__gt=starts_at)
+        ).exclude(ended_early_at__lte=models.F("starts_at"))
+        return queryset.exclude(pk=exclude_pk) if exclude_pk else queryset
+
+    # ---- rules ----
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
+            errors["ends_at"] = "The sale must end after it starts."
+        if self.ended_early_at and self.ends_at and self.ended_early_at > self.ends_at:
+            errors["ended_early_at"] = "A sale cannot be ended after its end time."
+        if not errors and self.starts_at and self.ends_at:
+            other = self.overlapping(self.starts_at, self.window_end, self.pk if not self._state.adding else None).first()
+            if other is not None and self.window_end > self.starts_at:
+                errors["starts_at"] = f"This overlaps {other.name}. Only one sale can be live at a time."
+        if not self._state.adding:
+            stored = type(self).objects.filter(pk=self.pk).first()
+            if stored is not None:
+                self._clean_against_stored(stored, errors)
+                if not self.plans.exists():
+                    errors["plans"] = "Choose at least one plan."
+        if errors:
+            raise ValidationError(errors)
+
+    def _clean_against_stored(self, stored, errors):
+        """A live sale's % off, months and start are locked (people already hold them). An ended-early sale can only be put back
+        while its original end is still in the future."""
+        if stored.status() == "live":
+            for name in ("percent_off", "months_at_price", "starts_at"):
+                now_value, was = getattr(self, name), getattr(stored, name)
+                if name == "starts_at":  # forms drop microseconds
+                    now_value, was = now_value.replace(microsecond=0), was.replace(microsecond=0)
+                if now_value != was:
+                    errors[name] = "This cannot change once the sale is live: people already hold it."
+            if self.ends_at <= timezone.now() and self.ended_early_at is None:
+                errors["ends_at"] = "Use End now to end a live sale."
+        if stored.ended_early_at and self.ended_early_at is None and self.ends_at <= timezone.now():
+            errors["ended_early_at"] = "The original end time has passed, so this sale cannot be put back."

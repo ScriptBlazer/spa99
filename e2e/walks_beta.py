@@ -159,7 +159,7 @@ def beta_gold_declined(w):
         apply_gold(visitor, first, last, email, mob)
         link = approve_link(first, last)
         barry = barry_page(w)
-        assert post_direct(barry, OFFICE, f"/gold/{application_id(link)}/decline/").status == 302
+        assert post_direct(barry, OFFICE, f"/gold/{application_id(link)}/decline/", form={"reason": "Beta run: not a fit for Gold"}).status == 302
         assert dbtool("gold", email)["status"] == "declined"
     other = w.page()
     with w.step("Signing in with that email gets nothing: no account", other):
@@ -251,7 +251,7 @@ def beta_gold_links(w):
         apply_gold(other, first2, last2, email2, mobile(202))
         url2 = approve_link(first2, last2)
         pk2 = application_id(url2)
-        assert post_direct(barry, OFFICE, f"/gold/{pk2}/decline/").status == 302
+        assert post_direct(barry, OFFICE, f"/gold/{pk2}/decline/", form={"reason": "Beta run: not a fit for Gold"}).status == 302
         assert dbtool("gold", email2)["status"] == "declined"
     with w.step("The approve link after a decline is refused and the application stays declined, with no invite", barry):
         barry.goto(url2)

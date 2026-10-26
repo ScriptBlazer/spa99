@@ -21,6 +21,8 @@ from common.ratelimit import hit, rate_limited_json
 from common.validators import normalise_email
 from journey import services as journey_services
 from pages import services as pages_services
+from pages.access import memberships_visible
+from plans import sales as sale_services
 from plans import services as plan_services
 from plans.models import SiteSettings
 
@@ -134,7 +136,8 @@ def _confirm_tier(request, slug):
         return redirect("account")
     site = SiteSettings.load()
     card = pages_services.plan_card(plan, site.vat_rate, plan_services.hours_ranges())
-    return render(request, "users/choose_confirm.html", {**member.base_context(request.user), "plan": plan, "card": card})
+    return render(request, "users/choose_confirm.html", {**member.base_context(request.user), "plan": plan, "card": card,
+                                                         "register_sale": sale_services.register_offer(request=request)})
 
 
 REGISTER_LABELS = {
@@ -211,8 +214,13 @@ def register(request):
     else:
         from mailings import invites  # the personal invite link left the invite in the session: it only pre-fills name and email
 
-        form, status = SignUpForm(initial={"plan": plan_slug, **invites.prefill(request.session.get(invites.SESSION_KEY))}), 200
-    context = {"form": form, "plans": plans, "selected_plan": plan_slug, "suggested_plan": suggested, "from_journey": bool(session and session.completed)}
+        initial = {"plan": plan_slug}
+        if session and session.lead_email:  # he gave his email at the journey in this browser: pre-fill it, still editable
+            initial["email"] = session.lead_email
+        initial.update(invites.prefill(request.session.get(invites.SESSION_KEY)))  # a personal invite wins
+        form, status = SignUpForm(initial=initial), 200
+    context = {"form": form, "plans": plans, "selected_plan": plan_slug, "suggested_plan": suggested, "from_journey": bool(session and session.completed),
+               "register_sale": sale_services.register_offer(request=request)}
     return render(request, "users/register.html", context, status=status)
 
 
@@ -412,7 +420,7 @@ def _tier_message(request, outcome, plan):
 def account_interest(request):
     outcome = _tier_message(request, *services.choose_tier(request.user, request.POST.get("plan", "")))
     if outcome == "invalid":
-        return redirect("account_membership" if member.can_open(request.user) else "memberships")
+        return redirect("account_membership" if member.can_open(request.user) else ("memberships" if memberships_visible(request) else "journey"))
     return redirect("account")
 
 

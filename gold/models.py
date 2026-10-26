@@ -4,10 +4,11 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from common.ids import generate_public_code
-from common.models import BaseModel
+from common.models import BaseModel, UUIDModel
 
 # The answer choices (link to property, size, where, BML) are GoldChoice rows, the points are GoldRule rows and the
 # journey questions that feed them are GoldSignalSource rows: all edited in Control.
@@ -140,7 +141,8 @@ class GoldApplication(BaseModel):
     email = models.EmailField(db_index=True)
     mobile = models.CharField(max_length=16, blank=True, help_text="E.164")
 
-    industry = models.CharField(max_length=20, blank=True, help_text="What he does: a journey `industry` option value.")
+    industry = models.CharField(max_length=20, blank=True, help_text="First of the industries chosen (older applications: the only one). Use `industry_values` to read them all.")
+    industries = models.JSONField(default=list, blank=True, help_text="Everything he does: journey `industry` option values (multi-select). Empty on older applications: they have `industry` only.")
     industry_other = models.CharField(max_length=100, blank=True, help_text="Typed when the industry is Other.")
     property_link = models.CharField(max_length=20, blank=True, help_text="Only asked when the industry is Property.")
     size_range = models.CharField(max_length=10, blank=True)
@@ -205,6 +207,11 @@ class GoldApplication(BaseModel):
         return self.sent_back_at is not None
 
     @property
+    def industry_values(self):
+        """Every industry chosen, in order. Older applications (before multi-select) only have `industry`."""
+        return list(self.industries or ([self.industry] if self.industry else []))
+
+    @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
 
@@ -258,3 +265,70 @@ class ApproverDelivery(BaseModel):
     @property
     def address(self):
         return self.user.email if self.use_account_email or not self.other_email else self.other_email
+
+
+class AppendOnlyError(Exception):
+    """An audit row was asked to change or go."""
+
+
+class EventQuerySet(models.QuerySet):
+    """Bulk edits and deletes are refused too. (An application being erased still removes its events: Django's cascade
+    does not go through these methods.)"""
+
+    def update(self, **kwargs):
+        raise AppendOnlyError("The Gold audit trail cannot be edited.")
+
+    def delete(self):
+        raise AppendOnlyError("The Gold audit trail cannot be deleted.")
+
+    def bulk_update(self, *args, **kwargs):
+        raise AppendOnlyError("The Gold audit trail cannot be edited.")
+
+
+class ApplicationEvent(UUIDModel):
+    """One step in the life of a Gold application: who did what, when, through which door, the status change and the text
+    (reason, message or note). Append-only (docs/features/gold-actions.md). Written only by gold.audit.record, inside the
+    same transaction as the change. Erased with the application (UK GDPR): the text can hold personal details."""
+
+    SUBMITTED, APPROVED, SENT_FOR_FINAL, FINAL_CONFIRMED, SENT_BACK = "submitted", "approved", "sent_for_final", "final_confirmed", "sent_back"
+    DECLINED, RESPONDED, NOTE_ADDED = "declined", "responded", "note_added"
+    INVITE_SENT, INVITE_RESENT, EMAIL_SENT, EMAIL_FAILED, STATUS_CHANGED_ADMIN = "invite_sent", "invite_resent", "email_sent", "email_failed", "status_changed_admin"
+    ACTION_CHOICES = [
+        (SUBMITTED, "Applied"), (APPROVED, "Approved"), (SENT_FOR_FINAL, "Sent for final approval"),
+        (FINAL_CONFIRMED, "Final approval confirmed"), (SENT_BACK, "Sent back for review"), (DECLINED, "Declined"),
+        (RESPONDED, "Responded to the applicant"), (NOTE_ADDED, "Note added"), (INVITE_SENT, "Invite emailed"),
+        (INVITE_RESENT, "New invite requested"), (EMAIL_SENT, "Email sent"), (EMAIL_FAILED, "Email failed"),
+        (STATUS_CHANGED_ADMIN, "Status changed in the admin"),
+    ]
+    OFFICE, EMAIL_LINK, ADMIN, SYSTEM, SHELL = "office", "email_link", "admin", "system", "shell"
+    CHANNEL_CHOICES = [(OFFICE, "Office"), (EMAIL_LINK, "Email link"), (ADMIN, "Django admin"), (SYSTEM, "System"), (SHELL, "Command line")]
+
+    application = models.ForeignKey(GoldApplication, on_delete=models.CASCADE, related_name="events")
+    at = models.DateTimeField(default=timezone.now, db_index=True)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                              help_text="Empty = the system or the applicant.")
+    actor_label = models.CharField(max_length=254, blank=True, help_text="Name and email when it happened (kept if the account goes).")
+    action = models.CharField(max_length=24, choices=ACTION_CHOICES, db_index=True)
+    channel = models.CharField(max_length=12, choices=CHANNEL_CHOICES, default=SYSTEM)
+    from_status = models.CharField(max_length=20, blank=True)
+    to_status = models.CharField(max_length=20, blank=True)
+    message = models.TextField(blank=True, help_text="The reason, message or note.")
+    meta = models.JSONField(default=dict, blank=True, help_text="Recipient, template, error, result.")
+
+    objects = EventQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-at", "-id"]
+        indexes = [models.Index(fields=["application", "-at"])]
+
+    def __str__(self):
+        return f"{self.action} on {self.application_id} at {self.at:%Y-%m-%d %H:%M}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise AppendOnlyError("The Gold audit trail cannot be edited.")
+        kwargs["force_insert"] = True
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise AppendOnlyError("The Gold audit trail cannot be deleted.")

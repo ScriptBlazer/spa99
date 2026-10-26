@@ -7,8 +7,8 @@ from django.utils import timezone
 from plans.models import SiteSettings
 from notifications.services import send_templated, subject_for
 
-from . import approval, services
-from .models import GoldApplication
+from . import approval, audit, services
+from .models import ApplicationEvent, GoldApplication
 
 
 logger = logging.getLogger("spa99.email")
@@ -19,6 +19,16 @@ def _warn_no_approver_once():
     if not _warned:
         _warned.append(True)
         logger.warning("There are no Gold approvers (System > Approval): Gold application emails are not sent to anyone.")
+
+
+def _log_email(application, log, template, **meta):
+    """The send's result in the audit trail: 'Email sent' or 'Email failed' (with the reason), who it went to. Never raises."""
+    try:
+        ok = log.status == log.SENT
+        audit.record(application, ApplicationEvent.EMAIL_SENT if ok else ApplicationEvent.EMAIL_FAILED, channel=audit.SYSTEM,
+                     meta={"template": template, "recipient": log.to, **({} if ok else {"error": (log.error or log.get_status_display())[:300]}), **meta})
+    except Exception:  # noqa: BLE001 - the email is done; a broken log line must not fail the task
+        logger.exception("Could not write the Gold audit line for %s", template)
 
 
 def send_gold_emails(application_id, acknowledge=True):
@@ -35,6 +45,7 @@ def send_gold_emails(application_id, acknowledge=True):
             services.approver_email_context(application), cc=cc, subject_email=application.email,
         )
         status = log.status
+        _log_email(application, log, "gold_approver")
         if log.status == log.SENT:
             application.email_sent_at, application.email_error = timezone.now(), ""
         else:
@@ -45,11 +56,12 @@ def send_gold_emails(application_id, acknowledge=True):
         application.email_error = "There are no approvers (System > Approval)."
     application.save(update_fields=["email_sent_at", "email_error", "updated_at"])
     if acknowledge and application.email:
-        send_templated(
+        ack = send_templated(
             "gold_ack", [application.email], subject_for("gold_ack", first_name=application.first_name),
             {"first_name": application.first_name, "reference": application.reference},
             subject_email=application.email,
         )
+        _log_email(application, ack, "gold_ack")
     return status
 
 
@@ -64,6 +76,7 @@ def _send_to_group(template, application_id, people_addresses, context_builder, 
     subject = subject_for(template, name=application.full_name)
     log = send_templated(template, recipients, subject, context_builder(application),
                          cc=SiteSettings.load().approver_cc_list, subject_email=application.email)
+    _log_email(application, log, template)
     return log.status
 
 
@@ -106,6 +119,7 @@ def send_gold_invite_email(invite_id):
     if log.status == log.SENT:
         invite.sent_at = timezone.now()
         invite.save(update_fields=["sent_at", "updated_at"])
+    _log_email(application, log, "gold_invite")
     return log.status
 
 
@@ -120,4 +134,27 @@ def send_gold_active_email(application_id):
         {"first_name": application.first_name, "url": f"{settings.SITE_URL}/account/"},
         subject_email=application.email,
     )
+    _log_email(application, log, "gold_active")
+    return log.status
+
+
+def send_gold_applicant_email(application_id, event_id):
+    """The applicant's email for an approver's Respond (the message is the event's text, template `gold_respond`) or a Decline
+    with Email the applicant ticked (the typed message is in the event's meta, sent as typed, template `gold_declined`). Takes ids
+    only, so no applicant text sits in the queue. The result is a new trail line. Returns a status string."""
+    event = ApplicationEvent.objects.select_related("application").filter(pk=event_id, application_id=application_id).first()
+    if event is None or event.action not in (ApplicationEvent.RESPONDED, ApplicationEvent.DECLINED):
+        return None
+    application = event.application
+    if event.action == ApplicationEvent.RESPONDED:
+        template, plain = "gold_respond", None
+        context = {"first_name": application.first_name, "name": application.full_name, "message": event.message}
+    else:
+        template, plain = "gold_declined", event.meta.get("email_message", "")
+        if not plain:
+            return None
+        context = {"first_name": application.first_name, "name": application.full_name, "reference": application.reference}
+    log = send_templated(template, [application.email], subject_for(template, first_name=application.first_name, name=application.full_name),
+                         context, subject_email=application.email, plain_body=plain)
+    _log_email(application, log, template, event=str(event.pk))
     return log.status

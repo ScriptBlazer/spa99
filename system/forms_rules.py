@@ -14,9 +14,9 @@ from .forms import DIGITS_MESSAGE, VersionedForm
 POINTS_LIMIT = 1000  # plan points and Gold points: -1000 to 1000
 
 RISKY = {
-    "settings": ["vat_rate", "opening_date", "register_interest_open", "subscribe_open", "booking_open", "lock_idle_minutes", "max_sign_in_hours"],
+    "settings": ["vat_rate", "opening_date", "register_interest_open", "memberships_public", "subscribe_open", "booking_open", "lock_idle_minutes", "max_sign_in_hours"],
     "emails": ["gold_approver_cc", "contact_email"],
-    "plans": ["price_ex_vat", "visits_per_month", "hours", "booking_window_days", "upcoming_limit", "cancel_hours", "guests_per_month", "visible"],
+    "plans": ["price_ex_vat", "visits_per_month", "hours", "booking_window_days", "upcoming_limit", "cancel_hours", "guests_per_month", "annual_fee", "visible"],
     "hours": ["start_time", "end_time", "offset_minutes", "active", "starts_at", "ends_at", "capacity", "slot_length_minutes", "slot_step_minutes"],
     "gold": ["points", "active", "is_property"],
     "journey": ["plan_points", "gold_points", "active", "min_choices", "screen", "plan_slugs", "conditions", "points", "kind"],
@@ -79,9 +79,10 @@ class PlanForm(VersionedForm):
     class Meta:
         model = Plan
         fields = ["name", "price_ex_vat", "visits_per_month", "hours", "booking_window_days", "upcoming_limit", "cancel_hours",
-                  "guests_per_month", "perks", "short_description", "highlight", "visible", "order"]
+                  "guests_per_month", "annual_fee", "perks", "short_description", "highlight", "visible", "order"]
         # money: a plain text box (no 1p arrows), shown as 299.00; the DecimalField still validates on the server
-        widgets = {"price_ex_vat": forms.TextInput(attrs={"inputmode": "decimal", "autocomplete": "off", "data-money": ""})}
+        widgets = {"price_ex_vat": forms.TextInput(attrs={"inputmode": "decimal", "autocomplete": "off", "data-money": ""}),
+                   "annual_fee": forms.TextInput(attrs={"inputmode": "decimal", "autocomplete": "off", "data-money": ""})}
 
     def clean_perks(self):
         perks = shape.no_nul(self.cleaned_data.get("perks") or [])

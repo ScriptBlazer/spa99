@@ -1,8 +1,10 @@
 import json
+from io import StringIO
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 
 from gold import rating, services
@@ -50,7 +52,7 @@ class RatingTests(TestCase):
     def test_reasons_and_editable_weights(self):
         result = rating.rate_potential({"property_link": "owner_investor", "size": "50_199", "bml": "yes"})
         self.assertEqual(result.score, 10)
-        self.assertEqual(result.reasons, ["Owner or investor (+5)", "50 to 199 properties (+2)", "Works with BML (+3)"])
+        self.assertEqual(result.reasons, ["Owner or investor (+5)", "50 to 199 properties (+2)", "BML staff (+3)"])
         GoldRule.objects.filter(group="bml").update(points=0)
         self.assertEqual(rating.rate_potential({"property_link": "owner_investor", "bml": "yes"}).score, 5)
 
@@ -66,6 +68,7 @@ class SubmitTests(TestCase):
         journey.save_answer(session, "time", options=["evening", "late_night"])
         journey.save_answer(session, "frequency", options=["two_three"])
         journey.save_answer(session, "facilities", options=["gym", "cold_plunge"])
+        journey.save_answer(session, "industry", options=["finance"])
         journey.save_answer(session, "company", options=["sometimes"])
         journey.save_answer(session, "heard_via", options=["bml"])
         engine.complete(session)
@@ -78,6 +81,7 @@ class SubmitTests(TestCase):
         self.assertEqual(User.objects.filter(is_staff=False).count(), 0)  # applying never creates an account (the approver is a team account)
         self.assertEqual((application.potential_level, application.potential_score), ("high", 12))
         self.assertEqual(application.journey_session, session)
+        self.assertEqual((application.industry, application.industry_values), ("property", ["property"]))
         self.assertEqual(session.gold_applications.count(), 1)
 
         barry, thanks = mail.outbox
@@ -89,7 +93,7 @@ class SubmitTests(TestCase):
         positions = [body.index(h) for h in ("1. PERSONAL DETAILS", "2. ABOUT HIM", "3. WHAT THE SITE COLLECTED")]
         self.assertEqual(positions, sorted(positions))
         for expected in ("dan@example.com", "What he does: Property", "Owner / investor", "Potential: High (12 points)", "Owner or investor (+5)",
-                         "Evening (6 to 10pm), Late night (10pm to 3am)", "Cold plunge, Gym", "Sometimes with someone",
+                         "Peak (6 to 10pm), Late night (10pm to 3am)", "Cold plunge, Gym", "Sometimes with a friend",
                          "Suggested membership: Tier 3", application.reference):
             self.assertIn(expected, body)
         html = barry.alternatives[0][0]
@@ -217,7 +221,7 @@ class EndpointTests(TestCase):
         journey.save_answer(session, "property_link", options=["developer"])
         journey.save_answer(session, "property_size", options=["200_plus"])
         data = client.get("/gold/options/").json()
-        self.assertEqual(data["prefill"], {"industry": "property", "property_link": "developer", "size_range": "200_plus"})
+        self.assertEqual(data["prefill"], {"industry": ["property"], "property_link": "developer", "size_range": "200_plus"})
         self.assertIn({"value": "none", "label": "None of these"}, data["property_link"])
 
 
@@ -308,6 +312,7 @@ class IndustryTests(TestCase):
 
     def test_property_questions_are_asked_only_of_property_people(self):
         self.assertIn("industry", self.form(industry="").errors)
+        self.assertIn("industry", self.form(industry=[]).errors)
         self.assertIn("industry", self.form(industry="nonsense").errors)
         self.assertIn("property_link", self.form(property_link="").errors)  # Property: the link is needed
         finance = self.form(industry="finance", industry_other="ignored")  # the property answers are dropped
@@ -333,6 +338,39 @@ class IndustryTests(TestCase):
         self.assertEqual((property_app.potential_level, property_app.potential_score), ("high", 12))  # weights unchanged
         self.assertIn("Link to property", dict(services.application_sections(property_app)[1]["rows"]))
 
+    def test_several_industries_keep_every_follow_up_that_applies(self):
+        form = self.form(industry=["finance", "other"], industry_other="Sculptor")
+        self.assertTrue(form.is_valid(), form.errors)  # Property not chosen: the property answers are dropped
+        self.assertEqual((form.cleaned_data["industry"], form.cleaned_data["property_link"], form.cleaned_data["industry_other"]),
+                         (["finance", "other"], "", "Sculptor"))
+        mixed = self.form(industry=["finance", "property"], property_link="")  # Property among the choices: the link is needed
+        self.assertIn("property_link", mixed.errors)
+        mixed = self.form(industry=["finance", "property", "finance"])
+        self.assertEqual(mixed.cleaned_data["industry"], ["finance", "property"])  # repeats dropped, order kept
+        self.assertIn("industry", self.form(industry=["finance", "nonsense"]).errors)
+        application, _ = services.submit_application(mixed.cleaned_data)
+        self.assertEqual((application.industry, application.industries), ("finance", ["finance", "property"]))
+        rows = dict(services.application_sections(application)[1]["rows"])
+        self.assertEqual(rows["What he does"], "Finance, Property")
+        self.assertIn("Size", rows)  # Property is among them
+
+    def test_older_applications_with_one_industry_still_read_as_a_list(self):
+        application, _ = services.submit_application(self.form(industry="finance").cleaned_data)
+        GoldApplication.objects.filter(pk=application.pk).update(industries=[])  # made before the multi-select
+        old = GoldApplication.objects.get(pk=application.pk)
+        self.assertEqual(old.industry_values, ["finance"])
+        self.assertEqual(dict(services.application_sections(old)[1]["rows"])["What he does"], "Finance")
+        call_command("backfill_gold_industries", "--dry-run", stdout=StringIO())
+        self.assertEqual(GoldApplication.objects.get(pk=application.pk).industries, [])  # a dry run changes nothing
+        call_command("backfill_gold_industries", stdout=StringIO())
+        self.assertEqual(GoldApplication.objects.get(pk=application.pk).industries, ["finance"])
+
+    def test_nationwide_and_bml_staff_wording(self):
+        self.assertEqual(rating.label_for("where", "rest_of_uk"), "Nationwide")
+        self.assertEqual(rating.label_for("bml", "yes"), "Yes")
+        rows = dict(services.application_sections(services.submit_application(self.form().cleaned_data)[0])[1]["rows"])
+        self.assertIn("BML staff", rows)
+
     def test_a_property_lawyer_from_the_journey_still_counts(self):
         session = journey.create_session()
         journey.save_answer(session, "industry", options=["law"])
@@ -351,4 +389,4 @@ class IndustryTests(TestCase):
         self.assertEqual([o["value"] for o in data["industry"]["options"]][:2], ["property", "finance"])
         self.assertEqual(data["industry"]["other_value"], "other")
         self.assertEqual(data["property_when"], {"question": "industry", "any_of": ["property"]})
-        self.assertEqual(data["prefill"], {"industry": "finance"})  # no property prefill for a non-property person
+        self.assertEqual(data["prefill"], {"industry": ["finance"]})  # no property prefill for a non-property person

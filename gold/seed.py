@@ -23,7 +23,7 @@ RULES = [
     (S, "50_199", "50 to 199 properties", 2, False),
     (S, "200_plus", "200 or more properties", 3, False),
     (W, "north_london", "Based in North London", 1, False),
-    (B, "yes", "Works with BML", 3, False),
+    (B, "yes", "BML staff", 3, False),
     (R, "yes", "Referred by someone", 1, False),
     (T, "high", "Points needed for High", 6, False),
     (T, "medium", "Points needed for Medium", 3, False),
@@ -45,10 +45,10 @@ CHOICES = [
     (S, "200_plus", "200 or more"),
     (W, "north_london", "North London"),
     (W, "rest_of_london", "Rest of London"),
-    (W, "rest_of_uk", "Rest of the UK"),
+    (W, "rest_of_uk", "Nationwide"),  # the value stays rest_of_uk (stored on applications); only the wording changed 2026-10-26
     (W, "abroad", "Abroad"),
     (B, "yes", "Yes"),
-    (B, "not_yet", "Not yet"),
+    (B, "not_yet", "No"),  # value stays not_yet; the question is "Are you BML staff?"
 ]
 
 # signal, journey question key, answer value ("" = pass the option through), value it gives ("" = the option's own)

@@ -40,6 +40,10 @@ written by hand:
   (review round, same day) privacy parts still exactly as first written get the corrected text (Sentry wording, change
   history, Gold consents, optional details, tour storage, team sign-ins)
 
+- (2026-10-26) "with someone" becomes "with a friend" (journey Company options and their reasons, the two guest suggestion
+  rule names); the journey result label "Your membership" becomes "Based on your answers". Exact old wording only, so
+  hand edits are kept; saved one by one so the change is in the history
+
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 from collections import Counter
 
@@ -137,6 +141,7 @@ def backfill():
         changed["content.Section (memberships: Not sure?)"] += 1
 
     changed.update(_spa_page())
+    changed.update(_ice_bucket_2026_10_26())
     changed.update(_home_opening_label())
     changed.update(_round_3())
     changed.update(_journey_and_gold_2026_10_23())
@@ -238,6 +243,8 @@ def _industry_gold_points():
 
     changed = Counter()
     for value, points in INDUSTRY_GOLD_POINTS.items():
+        if not points:
+            continue
         updated = Option.objects.filter(question__key="industry", value=value, gold_points=0).update(gold_points=points)
         if updated:
             changed[f"journey.Option (industry {value}: {points} Gold points)"] += updated
@@ -316,6 +323,7 @@ OLD_SECTION_TEXT = [  # page key, section key, field, old value, new value
     ("journey", "result_cta", "cta_label", "Register interest in {plan}", "Register for {plan}"),
     ("book", "placeholder", "cta_label", "Register interest", "Register"),
     ("register", "intro", "heading", "Register interest", "Register"),
+    ("journey", "result_label", "body", "Your membership", "Based on your answers"),  # 2026-10-26
 ]
 # (page key, field, old value, new value) for the Page row itself
 OLD_PAGE_TEXT = [
@@ -325,6 +333,16 @@ OLD_PAGE_TEXT = [
 # Retired, never deleted: hidden from new journeys, old answers keep their label. (question, value, old label)
 OLD_RETIRED_OPTIONS = [("company", "often", "Often with someone (Most visits.)"), ("heard_via", "instagram", "Instagram"),
                        ("heard_via", "walking_past", "Walking past")]
+# 2026-10-26: "with someone" becomes "with a friend". (question, value, field, old, new); exact old wording only.
+OLD_FRIEND_WORDING = [
+    ("company", "sometimes", "label", "Sometimes with someone (A friend now and then.)", "Sometimes with a friend (Now and then.)"),
+    ("company", "sometimes", "reason", "Sometimes with someone", "Sometimes with a friend"),
+    ("company", "often", "label", "Often with someone (Most visits.)", "Often with a friend (Most visits.)"),
+    ("company", "often", "reason", "Often with someone", "Often with a friend"),
+]
+OLD_TO_NEW_LABEL = {old: new for _, _, field, old, new in OLD_FRIEND_WORDING if field == "label"}
+OLD_FRIEND_RULES = {"Sometimes with someone: not Tier 1": "Sometimes with a friend: not Tier 1",
+                    "Sometimes with someone: tie goes to Tier 3": "Sometimes with a friend: tie goes to Tier 3"}
 OLD_SOMETIMES_POINTS = {"tier-2": 1, "tier-3": 1}
 
 
@@ -333,7 +351,7 @@ def _journey_options_2026_10_23():
     changed = Counter()
     for key, value, label in OLD_RETIRED_OPTIONS:
         changed["journey.Option (retired)"] += Option.objects.filter(
-            question__key=key, value=value, label=label, active=True).update(active=False)
+            question__key=key, value=value, label__in=[label, OLD_TO_NEW_LABEL.get(label, label)], active=True).update(active=False)
     for option in Option.objects.filter(question__key="company", value="sometimes", plan_points=OLD_SOMETIMES_POINTS):
         option.plan_points = {"tier-3": 3}
         option.save()
@@ -358,6 +376,22 @@ def _journey_options_2026_10_23():
     return +changed  # drop zero counts
 
 
+def _with_a_friend_2026_10_26():
+    """Journey options and guest rules: "with someone" becomes "with a friend" (saved via the model, so history records it)."""
+    changed = Counter()
+    for question, value, field, old, new in OLD_FRIEND_WORDING:
+        for option in Option.objects.filter(question__key=question, value=value, **{field: old}):
+            setattr(option, field, new)
+            option.save()
+            changed["journey.Option (with a friend wording)"] += 1
+    for old, new in OLD_FRIEND_RULES.items():
+        for rule in SuggestionRule.objects.filter(name=old):
+            rule.name = new
+            rule.save()
+            changed["journey.SuggestionRule (with a friend wording)"] += 1
+    return changed
+
+
 def _journey_and_gold_2026_10_23():
     """'Choose at least one.' on Your time / What draws you (and the rule behind it), Start again, Gold 'About you.'"""
     changed = Counter()
@@ -379,6 +413,7 @@ def _journey_and_gold_2026_10_23():
             setattr(page, field, new)
             page.save()
             changed["content.Page (Register wording)"] += 1
+    changed.update(_with_a_friend_2026_10_26())  # before the options step, so renamed rules are found, not re-created
     changed.update(_journey_options_2026_10_23())
     return changed
 
@@ -483,6 +518,50 @@ def _reorder_facilities():
             facility.order = new[facility.slug]
             facility.save()
     return 1
+
+
+PRE_ICE_BUCKET_ORDER = {"dry-sauna": 1, "wet-sauna": 2, "cold-plunge": 3, "showers": 4, "kitchenette": 5, "relaxing-zone": 6,
+                        "massage-room": 7, "gym": 8}
+
+
+def _small_kitchenette(changed):
+    """2026-10-26: the kitchenette is the small companion beside the "After the heat." moment, the ice bucket a tile in the
+    first group. Changed only while each still has its seeded picture and facts and its old seeded display."""
+    seed = plans_seed.FACILITY_SPA_PAGE["kitchenette"]
+    kitchenette = Facility.objects.filter(slug="kitchenette").first()
+    if (kitchenette and kitchenette.display == Facility.TILE and kitchenette.image_name == seed["image_name"]
+            and kitchenette.facts == seed["facts"]):
+        kitchenette.display = Facility.COMPANION
+        kitchenette.save()
+        changed["plans.Facility (kitchenette is a small companion)"] += 1
+    ice = Facility.objects.filter(slug="ice-bucket").first()
+    ice_seed = plans_seed.FACILITY_SPA_PAGE["ice-bucket"]
+    if ice and ice.display == Facility.COMPANION and ice.image_name == ice_seed["image_name"] and ice.facts == ice_seed["facts"]:
+        ice.display = Facility.TILE
+        ice.save()
+        changed["plans.Facility (ice bucket is a tile)"] += 1
+
+
+def _ice_bucket_2026_10_26():
+    """The Ice bucket room: created when missing, after the showers. The rooms after it move down one place only while
+    the orders are still exactly the seeded ones from before (a rearranged set is left alone)."""
+    changed = Counter()
+    _small_kitchenette(changed)
+    if Facility.objects.filter(slug="ice-bucket").exists():
+        return changed
+    facilities = list(Facility.objects.all())
+    if {f.slug: f.order for f in facilities} == PRE_ICE_BUCKET_ORDER:
+        for facility in facilities:
+            if facility.order >= 5:
+                facility.order += 1
+                facility.save()
+    row = next(r for r in plans_seed.FACILITIES if r[0] == "ice-bucket")
+    order = next(i for i, r in enumerate(plans_seed.FACILITIES, start=1) if r[0] == "ice-bucket")
+    slug, name, line, description, alt = row
+    Facility.objects.create(slug=slug, name=name, short_line=line, description=description, image_alt=alt, order=order,
+                            **plans_seed.FACILITY_SPA_PAGE[slug])
+    changed["plans.Facility (Ice bucket added)"] += 1
+    return changed
 
 
 def _spa_page():

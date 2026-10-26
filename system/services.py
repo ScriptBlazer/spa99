@@ -174,6 +174,11 @@ def delete_logged(obj, user):
     obj.delete()
 
 
+def made_by_script(change):
+    """Recorded with no person at all (manage.py shell, commands, seed, backfill). A deleted account keeps its email text, so is not a script."""
+    return not change.user_id and not change.user_label
+
+
 def undo_change(change, user):
     """Put the old value back as a new logged change. Refused unless the field still holds the value this change set
     (otherwise undo the newer change first), and for created, deleted or file entries."""
@@ -184,6 +189,10 @@ def undo_change(change, user):
     if not changes.is_undoable_field(field):
         raise ChangeRefused("This entry cannot be undone.")
     with transaction.atomic():
+        if change.model_label == "plans.sale":  # the same lock a normal sale save takes, first, so two sales are never live at once
+            from plans import sales
+
+            sales.lock()
         change = SystemChange.objects.select_for_update().get(pk=change.pk)  # no select_related: Postgres cannot lock nullable joins
         if change.undone_by.exists():
             raise ChangeRefused("This change has already been undone.")

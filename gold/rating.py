@@ -87,6 +87,11 @@ def industry_label(value):
     return row.label if row else (value or "")
 
 
+def industry_labels(values):
+    """Labels for several stored industry values, in the order given."""
+    return [industry_label(v) for v in values or []]
+
+
 # ---------- choices and journey signals (rows, edited in Control) ----------
 
 def choices(group, include_inactive=False):

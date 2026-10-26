@@ -32,6 +32,7 @@ def payloads(today, figures):
     for name in selectors.ANALYTICS_RANGES:
         out[(OfficeSnapshot.ANALYTICS, name)] = selectors.build_analytics(name, today, figures)
         out[(OfficeSnapshot.PAGES, name)] = selectors.build_pages(name, today)
+        out[(OfficeSnapshot.LEADS, name)] = selectors.build_leads(name, today, figures)
     return out
 
 

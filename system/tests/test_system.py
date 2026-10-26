@@ -107,6 +107,14 @@ class ChangeLogTests(TestCase):
         self.user = make_user()
         self.client = unlocked_client(self.user)
 
+    def test_the_memberships_switch_is_on_the_settings_page_and_saves(self):
+        self.assertFalse(SiteSettings.load().memberships_public)
+        self.assertContains(self.client.get("/settings/"), 'name="memberships_public"')
+        response = self.client.post("/settings/", {"opening_text": "January 2027", "register_interest_open": "on", "memberships_public": "on", "join_wording": "register_interest", "vat_rate": "20.00", "lock_idle_minutes": "15", "max_sign_in_hours": "12"})
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(SiteSettings.load().memberships_public)
+        self.assertTrue(SystemChange.objects.filter(field="memberships_public").exists())
+
     def test_a_settings_change_logs_who_when_old_and_new_and_undo_restores_it(self):
         site = SiteSettings.load()
         self.assertEqual(site.vat_rate, Decimal("20.00"))

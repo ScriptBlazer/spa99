@@ -3,7 +3,7 @@
    - choosing a membership tile marks it at once and offers "Switch to ..." (or "Choose ..." with no tier yet)
    - the marketing switch saves as it is flipped */
 import { csrfToken } from './api.js';
-import { toast } from './feedback.js';
+import { toast, confirmModal } from './feedback.js';
 
 const FIELD = 'input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]), textarea, select';
 
@@ -32,6 +32,21 @@ function initInterest() {
   };
   form.addEventListener('change', update);
   update();
+  // A kept sale price is for one plan: switching to another means the full price, so ask first (shared modal).
+  let confirmed = false;
+  form.addEventListener('submit', async (event) => {
+    const chosen = form.querySelector('input[name="plan"]:checked');
+    if (confirmed || !form.dataset.keptPlan || !chosen || (form.dataset.keptCovers || form.dataset.keptPlan).split(' ').includes(chosen.value)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const name = chosen.closest('[data-plan-name]').dataset.planName;
+    const ok = await confirmModal({
+      title: `Switch to ${name}?`,
+      body: `Your ${form.dataset.keptName} price is for ${form.dataset.keptPlanName}. Switching to ${name} means paying the full price.`,
+      confirmLabel: `Switch to ${name}`, opener: button,
+    });
+    if (ok) { confirmed = true; form.requestSubmit(); }
+  }, true);
 }
 
 function initEmails() {

@@ -34,6 +34,8 @@ SOURCES = {
         "relaxing-zone", "gym", "dry-sauna", "door-gold", "door-white", "lockers", "arrival", "lounge",
         "relax-loungers", "showers", "reception", "corridor", "showers-mosaic", "cold-plunge",
         "wet-sauna", "massage-room", "kitchenette",
+        # 2026-10-26: the ice bucket (journey tile and The spa kit) and the tour's small gym (the tour photo only; The spa keeps `gym`).
+        "ice-bucket", "gym-tour",
         # Moishe's own mock-ups, used as they are (2026-10-23), cropped to the page shapes:
         "towel-bench", "towel-bench-portrait", "slippers", "slippers-portrait", "toiletries", "towel-rail",
         "tote", "bottle-gym", "robe", "robe-portrait"]},

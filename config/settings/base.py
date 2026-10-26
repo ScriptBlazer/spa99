@@ -64,6 +64,7 @@ MIDDLEWARE = [
     "common.middleware.HostRoutingMiddleware",
     "system.middleware.SystemHeadersMiddleware",  # System host: never cached, never framed (wraps the gate's 404 too)
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "plans.middleware.SalePreviewMiddleware",  # public site: ?sale_preview=<signed token> shows an upcoming sale's bar in this browser
     "system.middleware.SystemGateMiddleware",  # System host: 404 for non-developers before CSRF can tell routes apart
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -92,6 +93,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "plans.context_processors.site",
+                "plans.context_processors.sale",
                 "users.context.member_area",
                 "office.context.office",
                 "system.context.system",

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load membership_tags %}
 {% load pages_tags %}
 {% block head_title %}{% include "common/_head.html" with title="No membership on this account | Spa 99" %}{% endblock %}
 {% block main %}
@@ -6,7 +7,7 @@
 {% include "users/_shell_top.html" %}
       <h1>No membership on this account</h1>
       <p class="signin-lead">{{ email }} is signed in, but it does not hold a Spa 99 membership, so there is no member area to show. If you would like to be a member, you can look at the memberships on the website.</p>
-      <div class="signin-actions"><a class="btn btn-primary btn-block" href="{% url 'memberships' %}" data-no-membership>See the memberships</a>
+      <div class="signin-actions"><a class="btn btn-primary btn-block" href="{% memberships_url %}" data-no-membership>{% memberships_shown as shown %}{% if shown %}See the memberships{% else %}Tailor your membership{% endif %}</a>
       <a class="btn-quiet" href="{% url 'home' %}">Go to the website</a>
       <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit" class="btn-quiet small">Sign out</button></form></div>
 {% include "users/_shell_bottom.html" %}

@@ -6,10 +6,10 @@ Not legal advice: a solicitor must review both texts before launch (see Launch b
 ## How it is built
 
 - **Copy is data.** Both pages are `content` rows (pages `privacy` and `terms`). The first version lives in `content/legal.py`; `seed_phase1` creates the rows on a new install and `backfill_site_data` (`--dry-run` first) writes them on an existing one. After that, edit the rows in Control, never the file. Run `backfill_site_data` on live after deploy.
-- **Rows:** `body` (title + intro), `updated` (the date shown, "23 October 2026"), `part_1` ... `part_N` (numbered parts, in order; each becomes a Contents entry and an anchor from its heading), `contact`. Privacy also has `ico` and `hosting` (empty until known).
+- **Rows:** `body` (title + intro), `updated` (the date shown, "26 October 2026"), `part_1` ... `part_N` (numbered parts, in order; each becomes a Contents entry and an anchor from its heading), `contact`. Privacy also has `ico` and `hosting` (empty until known).
 - **Body format** (`content/legal.py` docstring, rendered by `content/legal_render.py`, tag `{% legal_text %}`): a line is a paragraph; `- ` a list item; `### ` a small heading; `[words](/path/)` a link (only `/`, `https://`, `mailto:`); `{contact}` the contact email from Site settings (`SiteSettings.contact_address`, never typed in the text); `{opening}` the opening time; `{version}` the privacy version; `{ico}` / `{hosting}` the fill-later rows. Everything typed is escaped.
 - **Fill-later values:** while `ico` or `hosting` is empty, dev (`DEBUG`) shows a dashed red marker, e.g. "[ICO registration number — to add before launch]". Live never shows a marker: a line with `({hosting})` loses the brackets, a line where the token stands alone (the ICO sentence) is left out.
-- **Privacy version:** `SiteSettings.privacy_version` is now `2026-10-23` (model default and backfill, which changes it only while it is still `draft-1`). It is stored on each person who accepts the notice (`User.privacy_accepted_version`, `GoldApplication.privacy_accepted_version`) and shown on the page ("Version 2026-10-23"). Existing records keep `draft-1`, which is correct: that is what they accepted. When the notice changes in a way people should accept again, change both the `updated` row and the version (hidden admin, Site settings).
+- **Privacy version:** `SiteSettings.privacy_version` is now `2026-10-26` (model default and backfill, which changes it only while it is still `draft-1`). It is stored on each person who accepts the notice (`User.privacy_accepted_version`, `GoldApplication.privacy_accepted_version`) and shown on the page ("Version 2026-10-26"). Existing records keep `draft-1`, which is correct: that is what they accepted. When the notice changes in a way people should accept again, change both the `updated` row and the version (hidden admin, Site settings).
 - **Design:** one reading column at `--measure`; title group reveals (7B hero), long text never animates. Phone: an open, collapsible Contents list, then the parts. Desktop (64em): article centred, Contents a sticky left rail; `legal.js` marks the part being read (`aria-current`, one IntersectionObserver). Print: header, footer and Contents hidden, link addresses printed. Existing tokens only, no new ones.
 - **Tests:** `pages/tests/test_legal.py`.
 
@@ -64,6 +64,7 @@ Retention periods in the notice are **proposals**. Nothing deletes on these sche
 | Sentry error reports | 90 days | Sentry plan default; set it in Sentry |
 | Change history (simple-history rows) | 2 years, or until the account is deleted | Kept forever; erased with the account. Needs a pruning job (e.g. `django-simple-history`'s `clean_old_history --days 730`) |
 | Team activity (`SystemChange`, `SystemEvent`) | 2 years | `SYSTEM_AUDIT_RETENTION_DAYS=0` keeps forever; set `730` and schedule `prune_audit_log` |
+| Journey email (`JourneySession.lead_email`, the gate before the suggestion) | 2 years after given, or until unsubscribe / withdrawn consent / registration | Not enforced yet: needs a clean-up job; export and erase by hand with `manage.py lead_data` |
 | Backups | Replaced within 35 days | Live backups not set up yet (local script keeps 30) |
 
 Other proposals:
@@ -73,9 +74,16 @@ Other proposals:
 - **Re-acceptance:** the notice promises an email when a change matters. There is no "accept the new version" step on sign-in; build one if the solicitor wants it.
 - **Profile edits:** members cannot edit their name or mobile themselves yet; the notice routes correction requests to the contact email.
 
+## Update 2026-10-26 (version `2026-10-26`)
+
+- Address in both texts is now "BML House, 99c Vale Road, London N4 1PR".
+- Privacy: the journey email gate (email + answers linked to it, consent tick, basis consent, withdraw by unsubscribe link or contact address, two-year retention row, erased with the account or by `lead_data`), and one line that the team may email Gold applicants with questions (the Respond emails, also in the Gold data list and logged as emails).
+- Text and version are new in `content/legal.py` and the model default (migration `plans/0019`). New installs get them from the seed; the local DB was updated once through the models in a shell. Existing live rows would need the same one-off (live starts clean). Older acceptances keep `2026-10-23`.
+- The solicitor still has to review the text (open item 3 below), including the two-year journey-email period. The unsubscribe link in emails is not built yet (the notice describes it, so build it before the first marketing email).
+
 ## Launch blockers
 
-1. **ICO registration number:** register with the ICO (data protection fee) and put the number in the privacy `ico` row in Control. Until then dev shows the marker and live leaves the sentence out.
+1. **ICO registration number:** done 2026-10-26: BML Spa 99 Limited, ZC284282 (in the seed and the privacy `ico` row). Hosting: "Amazon Web Services, London region" (2026-10-26).
 2. **Hosting provider name:** fill the privacy `hosting` row once chosen.
 3. **Solicitor review** of both texts, the lawful bases and the retention periods.
 4. **Retention:** build the clean-up jobs for the proposed periods (including the change history), or change the text to what is true.

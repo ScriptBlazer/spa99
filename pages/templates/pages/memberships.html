@@ -1,26 +1,36 @@
 {% extends "base.html" %}
-{% load static content_tags pages_tags %}
+{% load static content_tags pages_tags sale_tags %}
 {# Memberships round 2 (docs/design/MEMBERSHIPS-R2.md): slim key cards, tag column with the choice and Continue. Cream page (Moishe, 2026-10-22), selected card is espresso with a gold hairline. Sheen = the .tier-sheen span (delete it, or `.tier-sheen{display:none}`, to remove). SWITCHES: preselect = the `highlight` plan in plans/services (selected_plan_slug), or clear it by passing selected_slug="" from the view. #}
 {% block html_attrs %} data-page="marketing"{% endblock %}
 {% block body_class %}page-mem on-light{% endblock %}
 {% block header_mode %}solid{% endblock %}
+{# The sale shows as a band after the tier cards, not the slim strip (docs/design/SYSTEM-SALES.md Round 2). #}
+{% block sale_bar %}{% endblock %}{% block sale_html %}{% endblock %}
 {% block main %}
 {% page_content "memberships" as m %}
 
-<form class="mem-stage" method="get" action="{% url 'register' %}" data-mem-form data-empty-text="Choose a membership">
+<form id="plans" class="mem-stage" method="get" action="{% url 'register' %}" data-mem-form data-empty-text="Choose a membership">
   <div class="container mem-grid">
     <div class="mem-top">
       <h1 id="m-title" class="mem-title line-mask"><span class="mem-title-line">{{ m.intro.heading }}</span></h1>
       <p class="lead mem-fade">{{ m.intro.body }}</p>
       <p class="mem-fade mem-notsure"><span class="mem-notsure-q">{{ m.not_sure.heading }}</span> <a class="btn-quiet mem-notsure-link" href="{% url 'journey' %}">{{ m.not_sure.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a></p>
+      {% if gold_cta and m.gold_cta.cta_label %}{% url 'gold_apply' as gold_apply_url %}
+      <div class="mem-gold mem-fade">
+        <p class="mem-gold-hook">{% include "common/_mark.html" %}<span>{{ m.gold_cta.body }}</span></p>
+        {% gold_fee_note %}
+        <a class="btn btn-secondary mem-gold-btn" href="{{ m.gold_cta.cta_url|default:gold_apply_url }}">{{ m.gold_cta.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
+      </div>
+      {% endif %}
     </div>
 
     <fieldset class="tiers" data-reveal>
       <legend class="sr-only">Choose your membership</legend>
       {% for t in tiers %}
+      {% sale_line t.slug as tier_sale %}{% sale_line t.slug 'short' as tier_sale_short %}
       <label class="tier">
         <span class="tier-shadow" aria-hidden="true"></span>
-        <input type="radio" name="plan" value="{{ t.slug }}"{% if t.slug == selected_slug %} checked{% endif %} aria-labelledby="tn-{{ t.slug }}" aria-describedby="tf-{{ t.slug }} tp-{{ t.slug }}" data-name="{{ t.name }}" data-price="&pound;{{ t.price_whole }} {{ t.period }}, ex VAT" data-inc="&pound;{{ t.price_inc }} inc VAT">
+        <input type="radio" name="plan" value="{{ t.slug }}"{% if t.slug == selected_slug %} checked{% endif %} aria-labelledby="tn-{{ t.slug }}" aria-describedby="tf-{{ t.slug }} tp-{{ t.slug }}" data-name="{{ t.name }}" data-price="&pound;{{ t.price_whole }} {{ t.period }}, ex VAT" data-inc="&pound;{{ t.price_inc }} inc VAT" data-sale="{{ tier_sale_short }}">
         <span class="tier-media">{% photo t.render alt=t.image_alt sizes="(min-width: 64em) 22vw, (min-width: 48em) 30rem, 92vw" override=t.image %}</span>
         <span class="tier-head">
           <span class="tier-name" id="tn-{{ t.slug }}">{{ t.name }}</span>
@@ -28,19 +38,22 @@
           <span class="tier-tagline">{{ t.tagline }}</span>
         </span>
         <span class="tier-num-row" id="tf-{{ t.slug }}">
-          {# Signika has no infinity glyph (checked 2026-10-22), so Tier 3 says "All" in the numeral style. #}
-          <span class="tier-num">{% if t.visits_count %}<span class="num" data-count>{{ t.visits_count }}</span>{% else %}All{% endif %}</span>
-          <span class="tier-num-side">{% if t.visits_count %}visit{{ t.visits_count|pluralize }}<br>a month{% else %}visits<br>you like{% endif %}</span>
+          {# Signika has no infinity glyph (checked 2026-10-22), so Tier 3 says "Unlimited" (Moishe, 2026-10-26), a little smaller. #}
+          <span class="tier-num{% if not t.visits_count %} tier-num--word{% endif %}">{% if t.visits_count %}<span class="num" data-count>{{ t.visits_count }}</span>{% else %}Unlimited{% endif %}</span>
+          <span class="tier-num-side">{% if t.visits_count %}visit{{ t.visits_count|pluralize }}<br>a month{% else %}visits<br>a month{% endif %}</span>
         </span>
         <ul class="tier-list" role="list">{% for p in t.pills %}<li>{{ p }}</li>{% endfor %}</ul>
         <span class="tier-price-group" id="tp-{{ t.slug }}">
           <span class="tier-price num"><span class="cur">&pound;</span>{{ t.price_whole }}</span> <span class="tier-per">{{ t.period }}, ex VAT</span>
           <span class="tier-inc num">&pound;{{ t.price_inc }} inc VAT</span>
+          {% if tier_sale %}<span class="tier-sale"><span class="mark-glyph" aria-hidden="true"></span>{{ tier_sale }}</span>{% endif %}
         </span>
         <span class="tier-sheen" aria-hidden="true"></span>
       </label>
       {% endfor %}
     </fieldset>
+
+    <p class="mem-more"><a class="btn-quiet mem-more-link" href="#compare">{{ m.compare.cta_label|default:"Compare memberships" }} {% include "common/_icon.html" with name="caret-down" %}</a></p>
 
     <div class="mem-choice">
       <div class="continue-summary">
@@ -48,14 +61,38 @@
         <p class="continue-name" data-summary-name></p>
         <p class="continue-price num" data-summary-price></p>
         <p class="continue-inc num" data-summary-inc></p>
+        <p class="continue-sale" data-summary-sale hidden></p>
       </div>
       <button type="submit" class="btn btn-primary" data-continue>{{ m.continue.cta_label|default:"Continue" }}</button>
       <p class="continue-note">{{ m.continue.body }}</p>
     </div>
+
   </div>
 </form>
 
+{% include "common/_sale_band.html" with tone="deep" %}
+
 <div class="container">
+  <section class="compare" id="compare" aria-labelledby="compare-title" data-reveal>
+    <div class="compare-head">
+      <h2 id="compare-title">{{ m.compare.heading }}</h2>
+      <p class="compare-lead">{{ m.compare.body }}</p>
+    </div>
+    <div class="compare-body" data-compare>
+      {% compare_columns cards as columns %}
+      <div class="segmented segmented--wrap compare-picker" role="radiogroup" aria-label="Choose a membership to compare">
+        {% for card in columns %}<label class="seg"><input type="radio" name="compare" value="{{ forloop.counter0 }}" data-slug="{{ card.slug }}"{% if card.slug == selected_slug %} checked{% elif forloop.first and not selected_slug %} checked{% endif %}><span>{{ card.name }}</span></label>{% endfor %}
+      </div>
+      <table class="compare-table" data-active="{% for card in columns %}{% if card.slug == selected_slug %}{{ forloop.counter0 }}{% endif %}{% endfor %}">
+        <caption class="sr-only">Compare memberships</caption>
+        <thead><tr><th scope="col"><span class="sr-only">Feature</span></th>{% for card in columns %}<th scope="col" data-col="{{ forloop.counter0 }}" data-slug="{{ card.slug }}"{% if card.slug == selected_slug %} class="is-selected"{% endif %}><span class="cmp-head">{{ card.name }}<svg class="icon cmp-check" aria-hidden="true" focusable="false"><use href="{% static 'common/img/icons.svg' %}#check"/></svg></span></th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for row in table %}<tr{% if forloop.counter0 == 2 or forloop.counter0 == 4 or forloop.counter0 == 8 %} class="grp-start"{% endif %}><th scope="row">{{ row.label }}</th>{% for cell in row.cells %}<td data-col="{{ forloop.counter0 }}" data-slug="{{ cell.slug }}" class="num{% if cell.slug == selected_slug %} is-selected{% endif %}">{{ cell.text }}</td>{% endfor %}</tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <div class="mem-also">
     {% if every_visit %}{% url 'spa' as spa_url %}
     <div class="every-visit" data-reveal>
@@ -73,31 +110,13 @@
         <h2>{{ single.name }}</h2>
         <p class="small num"><span class="cur">&pound;</span>{{ single.price_whole }} {{ single.period }}, ex VAT </p>
         <p class="small muted num">&pound;{{ single.price_inc }} inc VAT</p>
+        {% sale_line single.slug "single" as single_sale %}{% if single_sale %}<p class="small plan-aside-sale"><span class="mark-glyph" aria-hidden="true"></span>{{ single_sale }}</p>{% endif %}
         <p class="plan-aside-meta">{% if single.pills %}<span class="small">{{ single.pills.0 }}</span>{% endif %}<span class="small muted">{{ m.single_note.body }}</span></p>
       </div>
     </div>
     {% endif %}
-    <div class="gold-aside" data-reveal>
-      {% include "common/_mark.html" %}
-      <p class="small">{{ m.gold_line.body }} <a class="btn-quiet small" href="{% url 'gold_card' %}">{{ m.gold_line.cta_label }}</a></p>
-    </div>
   </div>
 
-  <details class="compare" data-reveal>
-    <summary><span class="compare-summary">{{ m.compare.heading }}</span></summary>
-    <div class="compare-body" data-compare>
-      <div class="segmented segmented--wrap compare-picker" role="radiogroup" aria-label="Choose a membership to compare">
-        {% for card in cards %}<label class="seg"><input type="radio" name="compare" value="{{ forloop.counter0 }}" data-slug="{{ card.slug }}"{% if card.slug == selected_slug %} checked{% elif forloop.first and not selected_slug %} checked{% endif %}><span>{{ card.name }}</span></label>{% endfor %}
-      </div>
-      <table class="compare-table" data-active="{% for card in cards %}{% if card.slug == selected_slug %}{{ forloop.counter0 }}{% endif %}{% endfor %}">
-        <caption class="sr-only">Compare memberships</caption>
-        <thead><tr><th scope="col"><span class="sr-only">Feature</span></th>{% for card in cards %}<th scope="col" data-col="{{ forloop.counter0 }}" data-slug="{{ card.slug }}"{% if card.slug == selected_slug %} class="is-selected"{% endif %}><span class="cmp-head">{{ card.name }}<svg class="icon cmp-check" aria-hidden="true" focusable="false"><use href="{% static 'common/img/icons.svg' %}#check"/></svg></span></th>{% endfor %}</tr></thead>
-        <tbody>
-          {% for row in table %}<tr{% if forloop.counter0 == 2 or forloop.counter0 == 4 or forloop.counter0 == 8 %} class="grp-start"{% endif %}><th scope="row">{{ row.label }}</th>{% for cell in row.cells %}<td data-col="{{ forloop.counter0 }}" data-slug="{{ cell.slug }}" class="num{% if cell.slug == selected_slug %} is-selected{% endif %}">{{ cell.text }}</td>{% endfor %}</tr>{% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </details>
 
   <p class="small muted vat-note">Prices exclude VAT at {{ vat_rate }}%. {{ m.price_note.body }}</p>
 </div>

@@ -1,0 +1,2 @@
+{% comment %}Gold potential for a lead row or header. The word "potential" is always readable on the phone; the desktop table's column head names it. Not rated reads as a muted dash.{% endcomment %}
+{% if potential %}{% include "office/_badge.html" with potential=potential %}{% else %}<span class="o-unrated">Not rated</span>{% endif %}

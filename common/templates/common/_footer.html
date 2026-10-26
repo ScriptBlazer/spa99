@@ -1,4 +1,4 @@
-{% load pages_tags %}<footer class="site-footer on-dark">
+{% load pages_tags membership_tags content_tags %}<footer class="site-footer on-dark">
   <div class="container footer-grid">
     <div class="footer-brand">
       <a class="brand" href="{% url 'home' %}" aria-label="Spa 99, home">{% include "common/_logo.html" %}</a>
@@ -8,17 +8,19 @@
       <a href="{% url 'home' %}">Home</a>
       <a href="{% url 'spa' %}">The spa</a>
       <a href="{% url 'tour' %}">Virtual tour</a>
-      <a href="{% url 'memberships' %}">Memberships</a>
+      {% memberships_shown as show_memberships %}{% if show_memberships %}<a href="{% url 'memberships' %}">Memberships</a>{% endif %}
       <a href="{% url 'gold_card' %}">Gold Card</a>
       <a href="{% url 'visit' %}">Visit us</a>
       {% if user.is_authenticated %}<a href="{% url 'account' %}">My Spa 99</a>{% else %}<a href="{% url 'login' %}">Sign in</a>{% endif %}
     </nav>
     <address class="footer-contact">
-      {{ site_settings.address_one_line|default:"99 Vale Road, London N4 1PR" }}<br>
+      {{ site_settings.address_one_line|default:"BML House, 99c Vale Road, London N4 1PR" }}<br>
       <a href="mailto:{{ site_settings.contact_address }}">{{ site_settings.contact_address }}</a><br>
-      {% hours_summary as hours_line %}{% if hours_line %}<span class="muted">{{ hours_line }}</span>{% endif %}
+      {% hours_note as hours_line %}{% if hours_line %}<span class="muted">{{ hours_line }}</span>{% endif %}
     </address>
   </div>
+  {% page_content "site" as site_copy %}
+  {% if site_copy.images_note.body %}<div class="container"><p class="images-note small muted">{{ site_copy.images_note.body }}</p></div>{% endif %}
   <div class="container footer-legal small muted">
     <span>Men only. 18 and over.</span>
     <a href="{% url 'privacy' %}">Privacy</a>

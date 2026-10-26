@@ -12,10 +12,14 @@ from django.views.decorators.http import require_GET
 
 from content import services as content
 from journey import services as journey_services
+from journey.copy import GATE as JOURNEY_GATE
 from journey.models import Option, Question
+from gold.models import GoldApplication
+from plans import services as plan_services
 from plans.models import SiteSettings
 
 from . import services
+from .access import memberships_visible
 
 JOURNEY_SLUGS = {1: "your-time", 2: "what-draws-you", 3: "company", 4: "about-you"}
 JOURNEY_RESULT_SLUG = "your-membership"
@@ -69,8 +73,11 @@ def spa(request):
 @login_not_required  # PUBLIC marketing page
 @require_GET
 def memberships(request):
+    if not memberships_visible(request):  # hidden until opening: the journey is the way in (team members can still look)
+        return redirect("journey")
     cards = services.purchasable_plans()
-    return _page(request, "pages/memberships.html", "memberships", cards=cards, table=services.compare_table(cards),
+    gold_cta = not (request.user.is_authenticated and GoldApplication.objects.filter(user=request.user).exists())
+    return _page(request, "pages/memberships.html", "memberships", cards=cards, gold_cta=gold_cta, table=services.compare_table(cards),
                  tiers=[c for c in cards if c["interest_allowed"]], single=next((c for c in cards if c["is_single"]), None),
                  selected_slug=services.selected_plan_slug(request, cards), every_visit=services.every_visit(),
                  vat_rate=SiteSettings.load().vat_rate.normalize())
@@ -148,17 +155,27 @@ def _copy(page_key, keys):
 def journey(request, slug=""):
     _check_slug(slug, {*JOURNEY_SLUGS.values(), JOURNEY_RESULT_SLUG})
     keys = ["screen_1", "screen_2", "screen_3", "screen_4", "result_label", "why", "result_cta", "change_answers",
-            "gold_panel", "gold_line", "others", "continue", "skip", "last", "back", "prefer_not", "start_again",
-            "save_error", "result_loading", "result_error", "unavailable", "not_a_fit", "optional", "last_suggestion", "need_one"]
+            "gold_panel", "gold_line", "others", "explore_memberships", "continue", "skip", "last", "back", "prefer_not", "start_again",
+            "save_error", "result_loading", "result_error", "unavailable", "not_a_fit", "optional", "last_suggestion", "need_one", "result_empty"]
     session = journey_services.session_from_cookies(request.COOKIES, request.user)
+    shown = memberships_visible(request)
     config = {
         "slugs": JOURNEY_SLUGS, "resultSlug": JOURNEY_RESULT_SLUG, "base": reverse("journey"),
-        "copy": _copy("journey", keys), "facilityImages": services.journey_facility_images(),
+        "copy": _copy("journey", keys), "gate": JOURNEY_GATE, "facilityImages": services.journey_facility_images(),
         "iconSprite": static("common/img/icons.svg"),
         "lastSuggestion": journey_services.last_suggestion(session) if session is not None else None,
-        "urls": {"restart": reverse("journey:restart"), "register": reverse("register"), "goldApply": reverse("gold_apply"), "home": reverse("home"),
-                 "memberships": reverse("memberships")},
+        "urls": {"restart": reverse("journey:restart"), "lead": reverse("journey:lead"), "privacy": reverse("privacy"), "register": reverse("register"), "goldApply": reverse("gold_apply"), "home": reverse("home"),
+                 "memberships": reverse("memberships") if shown else reverse("journey"),
+                 "membershipsPage": reverse("memberships")},  # the result link: he has passed the gate by then
+        "membershipsHidden": not shown,
+        "goldFeeNote": plan_services.gold_fee_note(),  # shown under the Gold panel; '' while the fee is empty
     }
+    if not shown:  # Memberships is hidden: fallbacks send him back into the journey, not to a page that is not there
+        again = config["copy"]["start_again"]["cta"] or "Start again"
+        config["copy"]["result_empty"] = {"heading": config["copy"]["result_empty"]["heading"],
+                                          "body": "Answer a few questions and we will suggest the membership that suits you.", "cta": again}
+        for key in ("result_error", "unavailable"):
+            config["copy"][key]["cta"] = again
     return _page(request, "pages/journey.html", "journey", journey_config=config)
 
 
@@ -195,6 +212,7 @@ SITEMAP_NAMES = ["home", "spa", "tour", "memberships", "gold_card", "visit", "pr
 @login_not_required  # PUBLIC
 @require_GET
 def sitemap(request):
-    urls = "".join(f"<url><loc>{request.build_absolute_uri(reverse(name))}</loc></url>" for name in SITEMAP_NAMES)
+    names = SITEMAP_NAMES if SiteSettings.load().memberships_public else [n for n in SITEMAP_NAMES if n != "memberships"]
+    urls = "".join(f"<url><loc>{request.build_absolute_uri(reverse(name))}</loc></url>" for name in names)
     xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>'
     return HttpResponse(xml, content_type="application/xml")

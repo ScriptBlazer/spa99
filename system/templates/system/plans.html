@@ -28,6 +28,7 @@
           <label>Upcoming limit {% cell f.upcoming_limit pk "Upcoming limit" %}</label>
           <label>Cancel (hours) {% cell f.cancel_hours pk "Cancel hours" %}</label>
           <label>Guests per month {% cell f.guests_per_month pk "Guests per month" %}</label>
+          {% if row.obj.kind == "free_by_application" %}<label>Annual fee ex VAT, £ (empty = By application) {% cell f.annual_fee pk "Annual fee" %}</label>{% endif %}
           <label class="grow">Short description {% cell f.short_description pk "Short description" %}</label>
           <label class="grow">Perks (JSON) {% cell f.perks pk "Perks" %}</label>
         </div></td>

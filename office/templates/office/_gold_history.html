@@ -1,0 +1,18 @@
+{% load office_tags %}{% comment %}The audit trail of one application, newest first (docs/features/gold-actions.md). Everything a person typed is escaped, line breaks kept. Applications from before the trail existed fall back to the old status list.{% endcomment %}
+<section class="o-card" data-gold-history-card aria-labelledby="history-h">
+  <h2 id="history-h" class="o-h3">History</h2>
+  {% if a.events %}
+  <ol class="o-timeline" data-gold-timeline>
+    {% for e in a.events %}
+    <li class="o-tl" data-event="{{ e.action }}" data-channel="{{ e.channel }}">
+      <p class="o-tl-line"><span class="o-tl-what">{{ e.label }}</span>{% if e.from or e.to %}<span class="o-tl-change">{% if e.from %}{{ e.from }} to {% endif %}{{ e.to }}</span>{% endif %}</p>
+      <p class="o-tl-meta">{{ e.at|dt }} &middot; {% if e.who %}{{ e.who }} &middot; {% endif %}{{ e.channel_label }}</p>
+      {% if e.detail %}<p class="o-tl-meta" data-event-detail>{{ e.detail }}</p>{% endif %}
+      {% if e.message %}<p class="o-tl-msg" data-event-message>{{ e.message|linebreaksbr }}</p>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <ul class="o-history" data-gold-history>{% for h in a.history %}<li>{{ h.at|dt }} &middot; {{ h.text }}</li>{% endfor %}</ul>
+  {% endif %}
+</section>

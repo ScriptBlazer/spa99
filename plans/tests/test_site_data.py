@@ -22,7 +22,7 @@ class SiteSettingsTests(TestCase):
 
     def test_address_and_opening_label_have_defaults_and_follow_the_date(self):
         site = SiteSettings.load()
-        self.assertEqual(site.address_one_line, "99 Vale Road, London N4 1PR")
+        self.assertEqual(site.address_one_line, "BML House, 99c Vale Road, London N4 1PR")
         self.assertEqual(site.opening_label, "January 2027")
         SiteSettings.objects.update(opening_date=date(2027, 2, 14), address_street="1 New Street", address_postcode="N4 9ZZ")
         site = SiteSettings.load()
@@ -59,7 +59,7 @@ class HoursAndLabelsTests(TestCase):
                       pages.opening_hours())
         OpeningRule.objects.filter(key__startswith="shabbos").update(offset_minutes=None, public_note="")
         self.assertFalse([row for row in pages.opening_hours() if "Shabbos" in row[0]])
-        self.assertEqual(pages.hours_summary(), "Open 5am to 3am")
+        self.assertEqual(pages.hours_summary(), "Open 24 hours a day")
 
     def test_facility_alt_and_gold_perk_phrases_come_from_rows(self):
         Facility.objects.filter(slug="gym").update(image_alt="A bright gym")
@@ -67,7 +67,7 @@ class HoursAndLabelsTests(TestCase):
         alts = {card["slug"]: card["alt"] for card in pages.facility_cards()}
         self.assertEqual((alts["gym"], alts["showers"]), ("A bright gym", "Showers"))
         beyond = dict(pages.gold_groups())["Beyond the spa"]
-        self.assertEqual(beyond, ["Each merch release", "Leil Shishi when offered", "BML members' events"])
+        self.assertEqual(beyond, ["Each merch release", "BML members' events"])  # Leil Shishi hidden (2026-10-26)
 
     def test_one_label_splitter(self):
         self.assertEqual(pages.split_label("Early morning (5 to 9am)"), ("Early morning", "5 to 9am"))
@@ -195,3 +195,29 @@ class RegisterWordingBackfillTests(TestCase):
         self.assertEqual(Section.objects.get(page__key="journey", key="result_cta").cta_label, "Register for {plan}")
         self.assertEqual(Section.objects.get(page__key="home", key="opening").cta_label, "Register")
         self.assertEqual(Section.objects.get(page__key="book", key="placeholder").cta_label, "Join the list")
+
+
+class WithAFriendBackfillTests(TestCase):
+    """2026-10-26: 'with someone' becomes 'with a friend' and 'Your membership' becomes 'Based on your answers'; edits stay."""
+
+    def test_exact_old_wording_is_swapped_and_edited_wording_is_left_alone(self):
+        from journey.models import Option, Question, SuggestionRule
+        seed_all()
+        sometimes = Option.objects.get(question__key="company", value="sometimes")
+        Option.objects.filter(pk=sometimes.pk).update(label="Sometimes with someone (A friend now and then.)", reason="Sometimes with someone")
+        Option.objects.create(question=Question.objects.get(key="company"), value="often", active=False, order=9,
+                              label="Often with someone (Most visits.)", reason="Often with someone")
+        SuggestionRule.objects.filter(name="Sometimes with a friend: not Tier 1").update(name="Sometimes with someone: not Tier 1")
+        SuggestionRule.objects.filter(name="Sometimes with a friend: tie goes to Tier 3").update(name="Our own tie rule")  # edited by hand
+        Section.objects.filter(page__key="journey", key="result_label").update(body="Your membership")
+        call_command("backfill_site_data", "--dry-run", stdout=StringIO())
+        self.assertEqual(Option.objects.get(pk=sometimes.pk).reason, "Sometimes with someone")  # dry run saves nothing
+        call_command("backfill_site_data", stdout=StringIO())
+        sometimes.refresh_from_db()
+        self.assertEqual((sometimes.label, sometimes.reason), ("Sometimes with a friend (Now and then.)", "Sometimes with a friend"))
+        often = Option.objects.get(question__key="company", value="often")
+        self.assertEqual((often.label, often.reason, often.active), ("Often with a friend (Most visits.)", "Often with a friend", False))
+        self.assertTrue(sometimes.history.filter(label="Sometimes with a friend (Now and then.)").exists())
+        self.assertTrue(SuggestionRule.objects.filter(name="Sometimes with a friend: not Tier 1").exists())
+        self.assertTrue(SuggestionRule.objects.filter(name="Our own tie rule").exists())
+        self.assertEqual(Section.objects.get(page__key="journey", key="result_label").body, "Based on your answers")

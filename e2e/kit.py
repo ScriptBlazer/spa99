@@ -288,13 +288,21 @@ def verify_email_link(page, url):
     page.wait_for_url(re.compile(r"/account/"))
 
 
-def answer_journey(page, stop_before_result=False):
+def answer_journey(page, stop_before_result=False, email="journey-walker@example.test"):
     """Walk the guided journey: pick the first choice of every question on every screen until the suggested tier shows.
     Returns the suggested tier text (for example 'Tier 2.')."""
     page.goto(f"{SITE}/journey/")
     for _ in range(10):
         page.wait_for_selector("[data-flow-root] .screen, [data-flow-root] .result")
         if page.locator("[data-flow-root] .result").count():
+            break
+        if page.locator("[data-flow-root] .lead-gate").count():  # the email gate before the result (2026-10-26)
+            page.locator("#lead-email").fill(email)
+            tick(page, "consent")
+            page.locator("[data-gate-primary]").click()
+            # The gate stays in the page until the server has taken the address: wait for the result itself, or the next
+            # pass would fill and click the old gate while it is being replaced (a click on a detached button times out).
+            page.wait_for_selector("[data-flow-root] .result")
             break
         heading = page.locator("[data-flow-root] h1").first.inner_text()
         for _ in range(5):  # follow-up questions appear after an answer, so look again
@@ -313,7 +321,11 @@ def gold_to_last_screen(page):
     """Open the Gold application, choose Finance, pass 'your visits', and wait on the last screen ('you')."""
     page.goto(f"{SITE}/gold-card/apply/")
     page.wait_for_selector("[data-flow-root] .screen")
-    page.locator("label.tile:has(input[name=industry][value=finance])").click()
+    # Industry is multi-select: a tile is a checkbox, and answers from an earlier journey or application can already be ticked
+    # (clicking a ticked one would untick it and block Continue), so tick it only when it is not.
+    page.locator("input[name=industry][value=finance]").wait_for(state="attached")
+    if not page.locator("input[name=industry][value=finance]").is_checked():
+        page.locator("label.tile:has(input[name=industry][value=finance])").click()
     page.locator("[data-primary]").click()           # screen 2: your visits (from the journey, or asked now)
     page.wait_for_selector("[data-flow-root] .screen-title")
     page.locator("[data-primary]").click()           # screen 3: you

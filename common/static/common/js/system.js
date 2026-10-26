@@ -1,7 +1,7 @@
 /* Spa 99 System behaviour (docs/design/SYSTEM.md). Everything here is an enhancement: every page works as plain forms.
    Sections: helpers, dirty state and save bar, confirm dialog, submit interception, lock countdown, keyboard, audit log, menu.
    Toasts and the confirm modal are the shared ones (feedback.js, docs/design/FEEDBACK.md). */
-import { toast, confirmModal, initFeedback } from './feedback.js';
+import { toast, confirmModal, formModal, initFeedback } from './feedback.js';
 import { initFormProblems, collectProblems, showProblems } from './form-problems.js';
 import { initApproval } from './system-combobox.js';
 
@@ -183,6 +183,7 @@ function riskSpec(changes) {
 /* ---------- submit interception (confirm before risky saves, Team, undo, delete) ---------- */
 
 function specFor(form) {
+  if (form.matches('[data-sale-form]')) return saleSpec(form);
   if (form.matches('form[data-system-form]') && initial.has(form)) return riskSpec(changesOf(form));
   if (form.matches('[data-system-access-form]')) {
     const select = $('select[name=level]', form);
@@ -202,6 +203,10 @@ function specFor(form) {
   if (form.matches('[data-approval-remove]')) { // Approval: "Remove X as approver?" with the consequence, no diff
     return { title: form.dataset.confirmTitle, rows: [], line: form.dataset.confirmBody, action: 'Remove', danger: true };
   }
+  if (form.matches('[data-system-confirm][data-confirm-title]')) { // End now / Delete on Sales: the page words the whole question
+    const d = form.dataset;
+    return { title: d.confirmTitle, rows: [], line: d.confirmBody, action: d.confirmAction, danger: true };
+  }
   if (form.matches('[data-system-confirm]')) {
     const d = form.dataset;
     return { title: `Remove ${d.systemConfirm} on ${ENV}?`, rows: [{ label: d.systemConfirmWhat || d.systemConfirm, old: 'Present', now: 'Removed' }], line: d.line, action: d.systemConfirmLabel || 'Remove' };
@@ -209,10 +214,75 @@ function specFor(form) {
   return null;
 }
 
+/* Sales: saving a new sale, or moving the end of a live one, asks first (docs/design/SYSTEM-SALES.md 3.2). */
+const SALE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function saleWhen(value) { const m = /^\d{4}-(\d{2})-(\d{2})T(\d{2}:\d{2})/.exec(value || ''); return m ? { date: `${+m[2]} ${SALE_MONTHS[+m[1] - 1]}`, time: m[3], text: `${+m[2]} ${SALE_MONTHS[+m[1] - 1]}, ${m[3]}` } : null; }
+function saleSpec(form) {
+  const name = $('[name=name]', form)?.value.trim() || 'this sale';
+  const ends = $('[name=ends_at]', form);
+  if (form.hasAttribute('data-new')) {
+    const names = $$('input[name=plans]:checked', form).map((p) => p.closest('label').textContent.trim());
+    const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0] || 'the chosen plans';
+    const now = $('input[name=ss_starts_mode][value=now]', form)?.checked;
+    const start = saleWhen($('[name=starts_at]', form)?.value);
+    return { title: `Save ${name} on ${ENV}?`, rows: [], line: `${now || !start ? 'It starts now' : `It starts on ${start.date} at ${start.time}`} for ${list}. The bar appears on every page then.`, action: 'Save sale' };
+  }
+  if (form.dataset.state === 'live' && ends && form.dataset.endsWas && ends.value !== form.dataset.endsWas) {
+    return { title: `Change when ${name} ends?`, rows: [{ label: 'Ends', old: saleWhen(form.dataset.endsWas)?.text || '', now: saleWhen(ends.value)?.text || '' }], line: 'The countdown on the site changes at once.', action: 'Change end' };
+  }
+  return null;
+}
+
+/* Undo on a change a script made asks for the System code again, in the shared modal. The code goes to the same undo URL;
+ * a wrong one comes back as 403 JSON {needs_code, message} and the message stays in the modal (nothing is undone). */
+async function askCodeAndUndo(form, opener) {
+  const next = $('[name=next]', form)?.value || location.href;
+  const done = await formModal((dialog, close) => {
+    const heading = document.createElement('h2');
+    heading.className = 'fb-modal-title'; heading.id = 'sys-undo-code-title';
+    heading.textContent = 'Enter the System code to undo a script change.';
+    const field = document.createElement('label');
+    field.className = 'fb-modal-field';
+    const name = document.createElement('span'); name.textContent = 'System code';
+    const input = document.createElement('input');
+    Object.assign(input, { type: 'password', name: 'code', autocomplete: 'off', maxLength: 64, className: 'fb-modal-input' });
+    input.setAttribute('inputmode', 'numeric'); input.setAttribute('pattern', '[0-9]*'); input.setAttribute('autofocus', '');
+    const error = document.createElement('p');
+    error.className = 'fb-modal-error'; error.setAttribute('role', 'alert'); error.hidden = true;
+    field.append(name, input);
+    const actions = document.createElement('div');
+    actions.className = 'fb-modal-actions';
+    const cancel = document.createElement('button');
+    Object.assign(cancel, { type: 'button', className: 'fb-btn fb-btn--secondary', textContent: 'Cancel' });
+    cancel.addEventListener('click', () => close(null));
+    const ok = document.createElement('button');
+    Object.assign(ok, { type: 'submit', className: 'fb-btn fb-btn--primary', textContent: 'Undo' });
+    actions.append(cancel, ok);
+    dialog.append(heading, field, error, actions);
+    dialog.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!input.value.trim()) { error.textContent = 'Enter the System code.'; error.hidden = false; input.focus(); return; }
+      ok.disabled = true;
+      try {
+        const data = new FormData(form); data.set('code', input.value);
+        const response = await fetch(form.action, { method: 'POST', body: data, credentials: 'same-origin', redirect: 'manual', headers: { 'X-Requested-With': 'fetch' } });
+        if (response.type === 'opaqueredirect' || response.ok) { close(true); return; }
+        let message = 'Could not undo. Try again.';
+        try { message = (await response.json()).message || message; } catch (e) { /* not JSON: keep the plain line */ }
+        error.textContent = message; error.hidden = false; input.value = ''; input.focus();
+      } catch (e) {
+        error.textContent = 'Could not reach the server. Try again.'; error.hidden = false;
+      } finally { ok.disabled = false; }
+    });
+  }, { opener });
+  if (done) { submitting = true; location.assign(next); }
+}
+
 function initSubmit() {
   document.addEventListener('submit', async (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || form.method !== 'post') return;
+    if (form.matches('[data-system-needs-code]')) { event.preventDefault(); askCodeAndUndo(form, event.submitter || document.activeElement); return; }
     if (form._confirmed) { form._confirmed = false; begin(form); return; }
     const spec = specFor(form);
     if (spec) {

@@ -59,7 +59,9 @@ def preview(actor, keep, remove):
     mine, theirs = _interest(keep), _interest(remove)
     fill = [name for name in PROFILE_FIELDS if not getattr(keep, name) and getattr(remove, name)]
     return {
-        "membership": "Moves the membership" if theirs and not mine else "The same membership is on both: one copy is kept" if theirs else "None",
+        "membership": "Moves the membership" if theirs and not mine else (
+            "The same membership is on both: one copy is kept" + (", with the sale price they keep" if theirs.sale_percent_off and not mine.sale_percent_off and mine.plan_id == theirs.plan_id else "")
+        ) if theirs else "None",
         "sessions": JourneySession.objects.filter(user=remove).count(),
         "gold": GoldApplication.objects.filter(user=remove).count(),
         "sign_ins": LoginEvent.objects.filter(user=remove).count(),
@@ -79,11 +81,23 @@ def merge(actor, keep, remove):
     elif theirs is not None:  # the same plan on both: one copy stays, and the stored figures forget the extra one
         metrics.registered(theirs.plan.slug if theirs.plan_id else None, theirs.source, theirs.created_at,
                            marketing=remove.marketing_consent, amount=-1)
+        if not mine.sale_percent_off and theirs.sale_percent_off and mine.plan_id == theirs.plan_id:
+            for name in ("sale", "sale_name", "sale_percent_off", "sale_months", "sale_locked_at"):
+                setattr(mine, name, getattr(theirs, name))  # the kept sale price is not lost with the extra copy
+            mine.save()
         theirs.delete()
     removed_email = remove.email
     sessions = list(JourneySession.objects.filter(user=remove).values_list("pk", flat=True))
     JourneySession.objects.filter(pk__in=sessions).update(user=keep)
     JourneySession.history.model.objects.filter(id__in=sessions).update(user=keep)
+    if remove.email_verified_at:  # the removed address was proven his: journeys that left it become keep's and carry keep's address,
+        # because export and erasure find them by email (an unverified address proves nothing, so its rows are left alone)
+        leads = list(JourneySession.objects.filter(lead_email__iexact=removed_email, user__isnull=True).values_list("pk", flat=True))
+        JourneySession.objects.filter(pk__in=leads).update(user=keep)
+        JourneySession.history.model.objects.filter(id__in=leads).update(user=keep)
+        both = [*sessions, *leads]
+        JourneySession.objects.filter(pk__in=both, lead_email__iexact=removed_email).update(lead_email=keep.email)
+        JourneySession.history.model.objects.filter(id__in=both, lead_email__iexact=removed_email).update(lead_email=keep.email)
     # Gold applications (linked to the removed account or made with its email) now belong to keep and carry keep's email,
     # because export and erasure find them by email; their history rows follow.
     apps = list(GoldApplication.objects.filter(Q(user=remove) | Q(email__iexact=removed_email)).values_list("pk", flat=True))

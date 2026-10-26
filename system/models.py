@@ -174,6 +174,7 @@ class SystemEvent(AuditRow):
     UNDO, UNDO_ALL, EXPORT, AUDIT_PRUNED, AUDIT_CHECK, JOB_RUN = "undo", "undo_all", "export", "audit_pruned", "audit_check", "job_run"
     SUPPRESSION_REMOVED = "suppress_removed"
     PASSWORD_CHANGED = "password_changed"
+    UNDO_CODE_FAILED, UNDO_RATE_LIMITED = "undo_code_failed", "undo_rate_limited"  # the System code asked to undo a script's change
     CODE_EDIT = "code_edit"
     MAILING_SCHEDULED, MAILING_SENT, MAILING_CANCELLED = "mailing_scheduled", "mailing_sent", "mailing_cancelled"
     INVITES_SENT, EMAIL_TEST = "invites_sent", "email_test"
@@ -184,6 +185,7 @@ class SystemEvent(AuditRow):
         (ROLE_CHANGED, "Roles changed"), (USER_DEACTIVATED, "Account deactivated"), (USER_REACTIVATED, "Account reactivated"),
         (UNDO, "Undo"), (UNDO_ALL, "Undo all"), (EXPORT, "Export"), (AUDIT_PRUNED, "Old log removed"), (AUDIT_CHECK, "Chain checked"), (JOB_RUN, "Job run now"),
         (SUPPRESSION_REMOVED, "Email suppression removed"), (PASSWORD_CHANGED, "Password changed"),
+        (UNDO_CODE_FAILED, "Undo code wrong"), (UNDO_RATE_LIMITED, "Undo blocked (too many tries)"),
         (CODE_EDIT, "Edited as code"), (MAILING_SCHEDULED, "Mailing scheduled"), (MAILING_SENT, "Mailing sent"),
         (MAILING_CANCELLED, "Mailing cancelled"), (INVITES_SENT, "Invites sent"), (EMAIL_TEST, "Test email sent"),
     ]

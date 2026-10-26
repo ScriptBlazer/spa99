@@ -13,8 +13,8 @@ from journey import services as journey_services
 from notifications.services import subject_for
 from plans.models import SiteSettings
 
-from . import rating
-from .models import BML, PROPERTY_LINK, SIZE, WHERE, GoldApplication, GoldInvite
+from . import audit, rating
+from .models import BML, PROPERTY_LINK, SIZE, WHERE, ApplicationEvent, GoldApplication, GoldInvite
 
 logger = logging.getLogger("spa99.gold")
 
@@ -47,7 +47,7 @@ JOURNEY_SUMMARY = [
     ("time", "When he would come"),
     ("frequency", "How often"),
     ("facilities", "Facilities he wants"),
-    ("company", "Alone or with someone"),
+    ("company", "Alone or with a friend"),
     ("industry", "What he does"),
     ("heard_via", "How he heard about us"),
 ]
@@ -91,7 +91,7 @@ def application_sections(application):
         ("Date applied", created),
         ("Reference", application.reference),
     ]
-    what = rating.industry_label(application.industry) or "Not given"
+    what = ", ".join(rating.industry_labels(application.industry_values)) or "Not given"
     if application.industry_other:
         what += f" ({application.industry_other})"
     prop = [("What he does", what)]
@@ -101,11 +101,11 @@ def application_sections(application):
         ("Company and role", " / ".join(p for p in (application.company, application.role) if p) or "Not given"),
     ]
     # Size is only asked in Property (older applications have no industry: keep showing it for them).
-    if application.industry == rating.PROPERTY_INDUSTRY or (not application.industry and application.property_link):
+    if rating.PROPERTY_INDUSTRY in application.industry_values or (not application.industry_values and application.property_link):
         prop.append(("Size", rating.label_for(SIZE, application.size_range) or "Not given"))
     prop += [
         ("Where", rating.label_for(WHERE, application.location) or "Not given"),
-        ("Works with BML", rating.label_for(BML, application.bml_relationship) or "Not given"),
+        ("BML staff", rating.label_for(BML, application.bml_relationship) or "Not given"),
         ("Referred by", application.referred_by or "Nobody named"),
         ("Potential", f"{POTENTIAL_LABELS.get(application.potential_level, '')} ({application.potential_score} points)"),
         ("Why", "\n".join(application.potential_reasons) or "No scoring signals"),
@@ -143,6 +143,13 @@ def _serialise_submissions(site):
     SiteSettings.objects.filter(pk=site.pk).update(updated_at=timezone.now())
 
 
+def _as_list(value):
+    """The industry from validated form data (a list) or from an older caller (one value)."""
+    if isinstance(value, str):
+        return [value] if value else []
+    return list(value or [])
+
+
 def submit_application(data, session=None):
     """Save an application from validated form data. Creates no account. Returns (application, created).
     A second identical submit within two minutes (double click) returns the first one and sends nothing new."""
@@ -156,7 +163,8 @@ def submit_application(data, session=None):
         if duplicate is not None:
             return duplicate, False
 
-        if data.get("industry") == rating.LAW_INDUSTRY and not data.get("property_link") and session is not None:
+        industries = _as_list(data.get("industry"))
+        if rating.LAW_INDUSTRY in industries and not data.get("property_link") and session is not None:
             # A lawyer who told the journey it is property law still counts as a property lawyer (as the journey rates him).
             if journey_engine.gold_signals(session)[0].get("property_link") == rating.PROPERTY_LAWYER:
                 data = {**data, "property_link": rating.PROPERTY_LAWYER}
@@ -166,7 +174,7 @@ def submit_application(data, session=None):
         now = timezone.now()
         application = GoldApplication(
             first_name=data["first_name"], last_name=data["last_name"], email=email, mobile=data.get("mobile", ""),
-            industry=data.get("industry", ""), industry_other=data.get("industry_other", ""),
+            industry=industries[0] if industries else "", industries=industries, industry_other=data.get("industry_other", ""),
             property_link=data.get("property_link", ""), size_range=data.get("size_range", ""), location=data.get("location", ""),
             company=data.get("company", ""), role=data.get("role", ""), bml_relationship=data.get("bml_relationship", ""),
             referred_by=data.get("referred_by", ""), note=data.get("note", ""),
@@ -177,6 +185,8 @@ def submit_application(data, session=None):
         )
         rate_application(application)
         application.save()
+        audit.record(application, ApplicationEvent.SUBMITTED, channel=audit.SYSTEM, to_status=GoldApplication.NEW,
+                     meta={"repeat": application.is_repeat, "potential": application.potential_level})
     queue_emails(application)
     return application, True
 
@@ -202,17 +212,33 @@ def link_user_applications(user):
     return GoldApplication.objects.filter(email__iexact=user.email, user__isnull=True).update(user=user)
 
 
+def approval_token(application):
+    from . import approval
+
+    return approval.make_approve_token(application)
+
+
 def approver_email_context(application):
     office = settings.OFFICE_URL  # links hold only the application id: the Office asks for sign-in and checks the role
     return {
-        "approve_url": f"{office}/gold/{application.pk}/approve/confirm/",
+        "approve_url": f"{office}/gold/{application.pk}/approve/confirm/?t={approval_token(application)}",
         "view_url": f"{office}/gold/{application.pk}/",
+        "decline_url": f"{office}/gold/{application.pk}/?do=decline",  # Decline and Respond need typed text, so they open the Office form
+        "respond_url": f"{office}/gold/{application.pk}/?do=respond",
         "name": application.full_name,
         "potential_label": POTENTIAL_LABELS.get(application.potential_level, ""),
         "sections": application_sections(application),
         "is_repeat": application.is_repeat,
         "repeat_reference": application.repeat_of.reference if application.repeat_of_id else "",
     }
+
+
+def declined_prefill(application):
+    """The decline form's message, from the editable email `gold_declined`, with this person's details filled in."""
+    from notifications.services import render_editable
+
+    context = {"first_name": application.first_name, "name": application.full_name, "reference": application.reference}
+    return render_editable("gold_declined", context)[1]
 
 
 def approver_subject(application):
@@ -226,7 +252,7 @@ def export_applications(email):
     return [
         {
             "reference": a.reference, "created_at": a.created_at.isoformat(), "name": a.full_name, "email": a.email,
-            "mobile": a.mobile, "industry": a.industry, "industry_other": a.industry_other, "property_link": a.property_link, "size_range": a.size_range, "where": a.location,
+            "mobile": a.mobile, "industry": a.industry_values, "industry_other": a.industry_other, "property_link": a.property_link, "size_range": a.size_range, "where": a.location,
             "company": a.company, "role": a.role, "bml_relationship": a.bml_relationship,
             "referred_by": a.referred_by, "note": a.note, "potential": a.potential_level, "status": a.status,
             "potential_score": a.potential_score, "potential_reasons": a.potential_reasons,
@@ -243,8 +269,13 @@ def export_applications(email):
                  "replaced_at": i.revoked_at.isoformat() if i.revoked_at else None}
                 for i in a.invites.all().order_by("created_at")
             ],
+            "history": [  # the audit trail: what happened and the text of each step (not which team member did it)
+                {"at": e.at.isoformat(), "action": e.action, "from_status": e.from_status, "to_status": e.to_status, "message": e.message,
+                 **({"email_message": e.meta["email_message"]} if e.meta.get("email_message") else {})}  # the text emailed on a decline
+                for e in sorted(a.events.all(), key=lambda e: e.at)
+            ],
         }
-        for a in GoldApplication.objects.filter(email__iexact=email).prefetch_related("invites").order_by("created_at")
+        for a in GoldApplication.objects.filter(email__iexact=email).prefetch_related("invites", "events").order_by("created_at")
     ]
 
 
@@ -255,10 +286,11 @@ def delete_applications(email):
     applications = GoldApplication.objects.filter(email__iexact=email)
     ids = list(applications.values_list("pk", flat=True))
     invite_ids = list(GoldInvite.objects.filter(application_id__in=ids).values_list("pk", flat=True))  # invite emails are queued by invite id
-    removed = applications.delete()[0]
+    removed = applications.delete()[1].get("gold.GoldApplication", 0)  # applications only: their invites and events go with them
     from mailings.erasure import erase_address  # group-send rows and invites for an applicant who never had an account
 
     erase_address(email)
+    journey_services.erase_lead(email)  # an address given at the journey gate (the answers stay, anonymously)
     history = GoldApplication.history.model.objects.filter(id__in=ids).delete()[0]
     queue = erase_task_records([*ids, *invite_ids], ["gold.tasks."])
     return {"gold_applications": removed, "gold_history_rows": history, "queue_records": queue}

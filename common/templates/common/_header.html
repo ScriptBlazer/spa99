@@ -1,11 +1,11 @@
-{% load pages_tags %}{% with current=request.resolver_match.url_name %}
+{% load pages_tags membership_tags %}{% with current=request.resolver_match.url_name %}
 <header class="site-header on-dark">
   <div class="container header-bar">
     <a class="brand" href="{% url 'home' %}" aria-label="Spa 99, home">{% include "common/_logo.html" %}</a>
     <nav class="nav-desktop" aria-label="Main">
       <a href="{% url 'spa' %}"{% if current == 'spa' %} aria-current="page"{% endif %}>The spa</a>
       <a href="{% url 'tour' %}"{% if current == 'tour' or current == 'tour_room' %} aria-current="page"{% endif %}>Virtual tour</a>
-      <a href="{% url 'memberships' %}"{% if current == 'memberships' %} aria-current="page"{% endif %}>Memberships</a>
+      {% memberships_shown as show_memberships %}{% if show_memberships %}<a href="{% url 'memberships' %}"{% if current == 'memberships' %} aria-current="page"{% endif %}>Memberships</a>{% endif %}
       <a href="{% url 'gold_card' %}"{% if current == 'gold_card' %} aria-current="page"{% endif %}>Gold Card</a>
       <a href="{% url 'visit' %}"{% if current == 'visit' %} aria-current="page"{% endif %}>Visit us</a>
     </nav>
@@ -24,14 +24,14 @@
     <nav aria-label="Main">
       <a href="{% url 'spa' %}"{% if current == 'spa' %} aria-current="page"{% endif %}>The spa</a>
       <a href="{% url 'tour' %}"{% if current == 'tour' or current == 'tour_room' %} aria-current="page"{% endif %}>Virtual tour</a>
-      <a href="{% url 'memberships' %}"{% if current == 'memberships' %} aria-current="page"{% endif %}>Memberships</a>
+      {% memberships_shown as show_memberships %}{% if show_memberships %}<a href="{% url 'memberships' %}"{% if current == 'memberships' %} aria-current="page"{% endif %}>Memberships</a>{% endif %}
       <a href="{% url 'gold_card' %}"{% if current == 'gold_card' %} aria-current="page"{% endif %}>Gold Card</a>
       <a href="{% url 'visit' %}"{% if current == 'visit' %} aria-current="page"{% endif %}>Visit us</a>
     </nav>
     <div class="menu-actions">
       {% if user.is_authenticated %}<a class="btn-quiet" href="{% url 'account' %}">My Spa 99</a>{% else %}<a class="btn-quiet" href="{% url 'login' %}">Sign in</a>{% endif %}
     </div>
-    <p class="menu-meta small muted">{{ site_settings.address_one_line|default:"99 Vale Road, London N4 1PR" }}<br>{{ site_settings.contact_address }}</p>
+    <p class="menu-meta small muted">{{ site_settings.address_one_line|default:"BML House, 99c Vale Road, London N4 1PR" }}<br>{{ site_settings.contact_address }}</p>
   </div>
 </dialog>
 {% endwith %}

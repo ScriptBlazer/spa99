@@ -21,6 +21,8 @@ DEFAULT_SUBJECTS = {
     "gold_invite": ("Your Spa 99 Gold Card is approved", "To the applicant when Barry approves: the link to set up the account."),
     "gold_active": ("Your Spa 99 Gold Card is active", "To an existing member when Barry approves their Gold application."),
     "gold_ack": ("Your Spa 99 Gold Card application", "To the applicant after they apply."),
+    "gold_respond": ("A message about your Spa 99 Gold Card application", "To the applicant when an approver clicks Respond on a Gold application."),
+    "gold_declined": ("Your Spa 99 Gold Card application", "To the applicant when an approver declines AND ticks Email the applicant (off by default)."),
     "invite": ("You are invited to register for Spa 99", "To a person on an invite list (System > Emails > Invites): the personal register link."),
 }
 

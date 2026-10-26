@@ -19,6 +19,8 @@ from notifications.models import EmailLog
 from plans.models import Plan, SiteSettings
 
 from . import tokens
+from plans import sales as sale_services
+
 from .models import InterestRegistration, User
 
 logger = logging.getLogger("spa99.users")
@@ -121,11 +123,10 @@ def register_interest(data, journey_session=None):
             interest = InterestRegistration.objects.create(
                 user=user, plan=plan,
                 source=InterestRegistration.JOURNEY if journey_session else InterestRegistration.DIRECT,
-                journey_session=journey_session,
+                journey_session=journey_session, **sale_services.snapshot_fields(plan),
             )
             metrics.registered(plan.slug if plan else None, interest.source, interest.created_at, marketing=user.marketing_consent)
-            journey_services.link_user(journey_session, user)
-            gold_services.link_user_applications(user)
+            journey_services.link_user(journey_session, user)  # this browser's own session; Gold applications and other leads wait for the verify
     except IntegrityError:  # two people (or two clicks) raced for the same email or mobile
         raise SignUpError({"email": ["That email or mobile number is already registered."]}) from None
     _after_registration(user, bool(data.get("marketing_opt_in")))
@@ -145,13 +146,29 @@ def _after_registration(user, opted_in):
             logger.exception("Could not clear the unsubscribe for a new account")
 
 
+def link_earlier_data(user):
+    """The account's email is now its owner's: attach the journeys that left this email at the gate and the Gold
+    applications made with it (only those nobody owns). Idempotent; logs counts only. When something moved, the Office
+    figures are refreshed in the background so the person counts once (counting rule C1/C5). Returns (sessions, applications)."""
+    sessions = journey_services.link_leads(user)
+    applications = gold_services.link_user_applications(user)
+    if sessions or applications:
+        from office import snapshots
+
+        snapshots.request_refresh()
+        logger.info("Linked %s journey(s) and %s Gold application(s) to account %s", sessions, applications, user.pk)
+    return sessions, applications
+
+
 def set_interest(user, plan):
     """Change the plan a person is interested in (account page). History keeps the old one."""
     with transaction.atomic():
-        interest, created = InterestRegistration.objects.get_or_create(user=user, defaults={"plan": plan})
+        interest, created = InterestRegistration.objects.get_or_create(user=user, defaults={"plan": plan, **sale_services.snapshot_fields(plan)})
         if created:
             metrics.registered(plan.slug if plan else None, interest.source, interest.created_at, marketing=user.marketing_consent)
         elif interest.plan_id != (plan.pk if plan else None):
+            for name, value in sale_services.snapshot_fields(plan, held=interest).items():
+                setattr(interest, name, value)  # the kept sale price follows the plan rules (plans.sales.snapshot_fields)
             interest.plan = plan
             interest.save()  # the plan split follows this save (insights.signals), so the admin path counts too
     return interest
@@ -186,6 +203,7 @@ def verify_email(token):
         user.email_verified_at = timezone.now()
         user.save(update_fields=["email_verified_at", "updated_at"])
         metrics.email_verified(user.email_verified_at)
+        link_earlier_data(user)  # the address is proven: earlier leads and applications with it become his
     try:
         enqueue("users.tasks.send_welcome_email", str(user.pk))
     except Exception:  # noqa: BLE001
@@ -243,10 +261,10 @@ def export_user_data(user):
         **({"approval_emails": {"use_account_email": delivery.use_account_email, "other_email": delivery.other_email}} if delivery else {}),
         "interest": _export_interest(user),
         "journey_sessions": _export_sessions(user),
-        "gold_applications": gold_services.export_applications(user.email),
+        "gold_applications": gold_services.export_applications(user.email) if user.email_verified_at else [],  # by email only once the address is proven his
         "emails": [
             {"template": e.template, "subject": e.subject, "status": e.status, "sent_at": _plain(e.sent_at)}
-            for e in _email_logs(user.email).order_by("created_at")
+            for e in _email_logs(user.email).order_by("created_at") if user.email_verified_at
         ],
         "group_emails": [
             {"mailing": r.mailing.subject, "status": r.status, "sent_at": _plain(r.sent_at)}
@@ -290,6 +308,8 @@ def _export_interest(user):
     return {
         "plan": interest.plan.name if interest.plan else None, "source": interest.source,
         "registered_at": interest.created_at.isoformat(),
+        "sale_price": {"sale": interest.sale_name, "percent_off": interest.sale_percent_off, "months": interest.sale_months,
+                       "locked_at": _plain(interest.sale_locked_at)} if interest.sale_percent_off else None,
         "changes": [
             {"at": row.history_date.isoformat(), "plan_id": row.plan_id} for row in interest.history.order_by("history_date")
         ],
@@ -297,9 +317,13 @@ def _export_interest(user):
 
 
 def _export_sessions(user):
-    sessions = JourneySession.objects.filter(user=user).select_related("suggested_plan").order_by("created_at")
+    by_email = Q(lead_email__iexact=user.email) if user.email_verified_at else Q(pk__in=[])  # an unproven address is not his
+    sessions = JourneySession.objects.filter(Q(user=user) | by_email).select_related("suggested_plan").order_by("created_at")
     result = []
     for session in sessions:
+        if session.user_id != user.pk:  # matched only by the address he gave: his lead details, nothing more about that visit
+            result.append({"started_at": session.created_at.isoformat(), "lead_email": session.lead_email, "lead_at": _plain(session.lead_at)})
+            continue
         answers = [
             {
                 "question": a.question.text, "options": [o.label for o in a.options.all()],
@@ -311,6 +335,7 @@ def _export_sessions(user):
             "started_at": session.created_at.isoformat(), "device": session.device_type, "referrer": session.referrer,
             "utm_source": session.utm_source, "utm_medium": session.utm_medium, "utm_campaign": session.utm_campaign,
             "utm_term": session.utm_term, "utm_content": session.utm_content,
+            "lead_email": session.lead_email, "lead_at": _plain(session.lead_at),  # the address given before the result
             "completed": session.completed, "completed_at": _plain(session.completed_at),
             "suggested_plan": session.suggested_plan.name if session.suggested_plan else None,
             "suggestion_detail": session.suggestion_detail,
@@ -329,9 +354,11 @@ def _anonymise_sessions(user):
     replaced, person key cleared, referrer and any typed text removed (also in the history rows)."""
     ids = list(JourneySession.objects.filter(user=user).values_list("pk", flat=True))
     for session_id in ids:
-        JourneySession.objects.filter(pk=session_id).update(user=None, key=new_session_key(), person_key="", referrer="")
+        JourneySession.objects.filter(pk=session_id).update(user=None, key=new_session_key(), person_key="", referrer="",
+                                                            lead_email="", lead_at=None, lead_privacy_version="")
     Answer.objects.filter(session_id__in=ids).update(text_value="")
-    JourneySession.history.model.objects.filter(id__in=ids).update(user=None, key="", person_key="", referrer="")
+    JourneySession.history.model.objects.filter(id__in=ids).update(user=None, key="", person_key="", referrer="",
+                                                                   lead_email="", lead_at=None, lead_privacy_version="")
     Answer.history.model.objects.filter(session_id__in=ids).update(text_value="")
     return len(ids)
 
@@ -343,12 +370,21 @@ def delete_user_data(user):
     Erasure overrides the "history is never deleted" rule because history holds personal data."""
     pk, email = user.pk, user.email
     anonymised = _anonymise_sessions(user)
+    proven = bool(user.email_verified_at)  # rows found only by email are his only once the address is proven (an unverified account may carry someone else's address)
+    if proven:
+        journey_services.erase_lead(email)  # an address given at the journey gate before he had an account
     removed_logins = _login_events(user).delete()[0]
-    removed_emails = _email_logs(email).delete()[0]
+    removed_emails = _email_logs(email).delete()[0] if proven else 0  # EmailLog has no account link: an unproven address deletes none
     from mailings.erasure import erase_address
 
-    removed_emails += erase_address(email, user)  # group sends, invites and the unsubscribe key hold the address too
-    gold = gold_services.delete_applications(email)
+    if proven:
+        removed_emails += erase_address(email, user)  # group sends, invites and the unsubscribe key hold the address too
+        gold = gold_services.delete_applications(email)
+    else:
+        from mailings.models import MailingRecipient
+
+        removed_emails += MailingRecipient.objects.filter(user=user).delete()[0]
+        gold = {"gold_applications": 0, "gold_history_rows": 0, "queue_records": 0}
     queue = erase_task_records([pk], ["users.tasks."])
     interest = InterestRegistration.objects.filter(user=user).select_related("plan").first()
     interest_ids = [interest.pk] if interest else []

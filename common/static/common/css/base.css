@@ -148,3 +148,7 @@ figcaption { margin-top: var(--space-3); font-size: var(--text-sm); color: var(-
 @media (prefers-reduced-motion: reduce) {
   .js [data-reveal], .js [data-reveal="stagger"] > * { opacity: 1; transform: none; transition: none; }
 }
+
+/* The Gold Card annual-fee footnote ("*An annual admin fee of £299 + VAT applies."): small and muted under the copy. */
+.images-note { max-width: none; margin-top: var(--space-4); }
+.fee-note { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--s-muted); }
