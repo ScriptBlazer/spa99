@@ -21,3 +21,8 @@ STARTUP_REPORT = build_startup_report("config.settings.dev")
 # Background jobs run inline on Moishe's Mac (no worker to start): emails print straight to the runserver terminal.
 # Set Q_SYNC=0 in .env to test the real queue with `manage.py qcluster`.
 Q_CLUSTER = {**Q_CLUSTER, "sync": ENV.get("Q_SYNC", "1") != "0"}  # noqa: F405
+
+# scripts/tunnel.sh (a temporary public https link to this Mac): trust Cloudflare's https header and the tunnel origins.
+CSRF_TRUSTED_ORIGINS = ENV.list("CSRF_TRUSTED_ORIGINS", [])
+if ENV.get("DEV_BEHIND_TUNNEL") == "1":
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
