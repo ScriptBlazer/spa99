@@ -17,7 +17,7 @@ def send_verification_email(user_id):
         return None
     url = f"{settings.SITE_URL}/verify/{tokens.make_verify_token(user)}/"
     log = send_templated(
-        "verify", [user.email], subject_for("verify"), {"first_name": user.first_name, "url": url},
+        "verify", [user.email], subject_for("verify", first_name=user.first_name), {"first_name": user.first_name, "url": url},
         subject_email=user.email,
     )
     return log.status
@@ -30,7 +30,7 @@ def send_password_reset_email(user_id):
     uid, token = tokens.make_reset_link_parts(user)
     url = f"{settings.SITE_URL}/reset/{uid}/{token}/"
     log = send_templated(
-        "password_reset", [user.email], subject_for("password_reset"), {"first_name": user.first_name, "url": url},
+        "password_reset", [user.email], subject_for("password_reset", first_name=user.first_name), {"first_name": user.first_name, "url": url},
         subject_email=user.email,
     )
     return log.status
@@ -46,7 +46,7 @@ def send_team_invite_email(user_id):
     uid, token = tokens.make_reset_link_parts(user)
     level = levels.LABELS[levels.held_level(user)]
     log = send_templated(
-        "team_invite", [user.email], subject_for("team_invite"),
+        "team_invite", [user.email], subject_for("team_invite", first_name=user.first_name),
         {"first_name": user.first_name, "url": f"{settings.SITE_URL}/reset/{uid}/{token}/", "level": level, "office_url": settings.OFFICE_URL},
         subject_email=user.email,
     )
@@ -60,7 +60,7 @@ def send_welcome_email(user_id):
     interest = getattr(user, "interest", None)
     opening = SiteSettings.load().opening_label
     log = send_templated(
-        "welcome", [user.email], subject_for("welcome"),
+        "welcome", [user.email], subject_for("welcome", first_name=user.first_name),
         {
             "first_name": user.first_name,
             "plan_name": interest.plan.name if interest and interest.plan else "",

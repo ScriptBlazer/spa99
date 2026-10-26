@@ -26,7 +26,20 @@ def is_suppressed(email):
 
 
 def add(email, reason, feedback_id="", detail=""):
-    """Suppress an address. A repeat of the same feedback id changes nothing. Returns True when something was recorded."""
+    """Suppress an address. A repeat of the same feedback id changes nothing. Returns True when something was recorded.
+    Invites and group-mailing rows sent to the address are then shown as bounced."""
+    recorded = _add(email, reason, feedback_id, detail)
+    if recorded:
+        try:
+            from mailings.invites import mark_bounced
+
+            mark_bounced(email)
+        except Exception:  # noqa: BLE001 - the suppression itself is what matters
+            logger.exception("Could not mark invites as bounced")
+    return recorded
+
+
+def _add(email, reason, feedback_id="", detail=""):
     email = clean(email)
     if not email or "@" not in email:
         return False

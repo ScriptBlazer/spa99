@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load static %}{% comment %}
+The unsubscribe page (docs/design/SYSTEM-EMAILS.md section 6): website look, cream page. A GET only asks (a link scanner opening the
+address changes nothing); the one button POSTs. The mail-client one-click is a POST straight to the same address (List-Unsubscribe-Post).
+{% endcomment %}
+{% block head_title %}{% include "common/_head.html" with title="Unsubscribe | Spa 99" %}{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="{% static 'common/css/mailings.css' %}">{% endblock %}
+{% block main %}
+<section class="section on-light unsub">
+  <div class="container unsub-wrap">
+    <div class="unsub-group" data-reveal>
+      {% if done %}
+      <h1 data-unsubscribe-done>You're unsubscribed from Spa 99 news.</h1>
+      <p class="unsub-lead">You'll still get emails about your account and bookings.</p>
+      {% if has_account %}<p class="unsub-aside">{% if user.is_authenticated %}<a class="btn btn-secondary" href="{% url 'account' %}">Subscribe again in My Spa 99</a>{% else %}<a class="btn-quiet" href="{% url 'login' %}?next={% url 'account' %}">Sign in to subscribe again</a>{% endif %}</p>{% endif %}
+      {% else %}
+      <h1 data-unsubscribe-confirm>Unsubscribe from Spa 99 news?</h1>
+      <p class="unsub-lead">We'll stop news emails to {{ email }}. You'll still get emails about your account and bookings.</p>
+      <form method="post" action="{% url 'unsubscribe' token %}" class="unsub-form">{% csrf_token %}
+        <button type="submit" class="btn btn-primary" data-working-text="Unsubscribing">Unsubscribe</button>
+      </form>
+      {% endif %}
+      <p class="unsub-aside"><a class="btn-quiet small" href="{% url 'home' %}">Back to home</a></p>
+    </div>
+  </div>
+</section>
+{% endblock %}

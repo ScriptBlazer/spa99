@@ -1,0 +1,74 @@
+{% extends "system/emails_base.html" %}
+{% block main %}
+<div class="sys-head se-head"><div><a class="se-back" href="{% url 'system_email_list' %}">Automatic emails</a><h1>{{ spec.title }}</h1>{% if row.note %}<p>{{ row.note }}</p>{% endif %}</div>
+  <div class="sys-actions se-actions">
+    {% if spec.editable %}<span class="se-testnote" data-se-test-note aria-live="polite"></span><button type="button" class="sys-btn" data-se-test>Send me a test</button>{% endif %}
+    {% if not is_default %}<form method="post" action="{% url 'system_email_reset' spec.key %}" data-se-reset>{% csrf_token %}<button type="submit" class="sys-btn" data-confirm data-confirm-title="Reset {{ spec.title }} to the default wording?" data-confirm-body="Your subject and wording are replaced. Undo is in the audit log." data-confirm-label="Reset">Reset to default</button></form>{% endif %}
+  </div>
+</div>
+{% include "system/_emails_tabs.html" with tab="automatic" %}
+{% if form.stale %}<div class="se-stale" role="alert" data-se-stale><p><b>Changed since you opened it.</b> Someone saved this email after you opened it. Nothing of yours was saved.</p>
+  <span class="se-stale-actions"><button type="button" class="sys-btn sm" data-se-copy-mine>Copy my version</button><button type="button" class="sys-btn sm" data-se-load-latest="{% url 'system_email_edit' spec.key %}">Load the latest</button></span></div>{% endif %}
+{{ spec|json_script:"se-spec" }}
+<form method="post" action="{% url 'system_email_save' spec.key %}" data-problems data-system-form="emails" data-se-editor="{{ spec.key }}" class="se-form" data-view="write"
+      data-preview-url="{% url 'system_email_preview' spec.key %}" data-test-url="{% url 'system_email_test' spec.key %}" data-dev="{% if ses.mode == 'dev' %}1{% endif %}" novalidate>{% csrf_token %}
+  <div class="se-switch sys-seg" role="group" aria-label="Show">
+    <button type="button" aria-pressed="true" data-se-show="write">Write</button><button type="button" aria-pressed="false" data-se-show="preview">Preview</button>
+  </div>
+  <div class="se-compose">
+    <section class="sys-panel se-wording" aria-label="Wording" data-se-pane="write">
+      <header><h2>Wording</h2></header>
+      <div class="se-body">
+        {% if form.non_field_errors and not form.stale %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
+        <div class="sys-row se-field{% if form.subject.errors %} invalid{% endif %}" data-system-field="subject">
+          <label for="{{ form.subject.id_for_label }}">Subject</label>
+          <div>
+            <input type="text" name="subject" id="{{ form.subject.id_for_label }}" value="{{ form.subject.value|default:'' }}" maxlength="300" autocomplete="off" data-se-subject aria-describedby="se-subject-live">
+            <p class="se-live-error" id="se-subject-live" data-se-live="subject" hidden></p>
+            {% if form.subject.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="subject" data-problem-label="Subject">{{ form.subject.errors|join:" " }}</p>{% endif %}
+          </div>
+        </div>
+        {% if spec.has_button %}<div class="sys-row se-field" data-se-button-row>
+          <span class="sys-label">Button text</span>
+          <div><p class="se-fixed">{{ spec.button_label }}</p><p class="sys-muted se-help">The button appears where <code>{{ "{button}" }}</code> is. Its text is fixed.</p></div>
+        </div>{% endif %}
+        {% if spec.editable %}<div class="sys-row se-field{% if form.body.errors %} invalid{% endif %}" data-system-field="body">
+          <label for="{{ form.body.id_for_label }}">Body</label>
+          <div>
+            <div class="se-editor" data-se-body-editor>
+              <pre class="se-pre" aria-hidden="true"></pre>
+              <textarea name="body" id="{{ form.body.id_for_label }}" rows="14" spellcheck="true" aria-describedby="se-body-live se-body-help" data-se-body>{{ form.body.value|default:'' }}</textarea>
+            </div>
+            <p class="se-live-error" id="se-body-live" data-se-live="body" hidden></p>
+            {% if form.body.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="body" data-problem-label="Body">{{ form.body.errors|join:" " }}</p>{% endif %}
+            <p class="sys-muted se-help" id="se-body-help">A blank line starts a new paragraph.{% if spec.has_button %} Put <code>{{ "{button}" }}</code> on a line of its own.{% endif %}</p>
+          </div>
+        </div>{% else %}<p class="sys-muted se-help">The wording of this email cannot be changed here: its layout is a real application. Only the subject can be changed.</p>{% endif %}
+        {{ form.row_token }}
+        <div class="se-palette" data-se-palette aria-label="Placeholders">
+          <span class="se-palette-label" data-se-palette-label>Placeholders</span>
+          {% for p in spec.placeholders %}<button type="button" class="se-token" data-insert="{{ '{' }}{{ p.name }}{{ '}' }}" data-scope="body" title="{{ p.description }}"><code>{{ "{" }}{{ p.name }}{{ "}" }}</code><span class="sr">, {{ p.description }}</span></button>{% endfor %}
+          {% if spec.has_button %}<button type="button" class="se-token" data-insert="{{ '{button}' }}" data-scope="body" title="The main link, drawn as the button"><code>{{ "{button}" }}</code><span class="sr">, the main link, drawn as the button</span></button>{% endif %}
+          {% for p in spec.subject_placeholders %}<button type="button" class="se-token" data-insert="{{ '{' }}{{ p.name }}{{ '}' }}" data-scope="subject" title="{{ p.description }}"><code>{{ "{" }}{{ p.name }}{{ "}" }}</code><span class="sr">, {{ p.description }}</span></button>{% endfor %}
+          <span class="sys-muted se-palette-none" data-se-palette-none hidden>No placeholders here.</span>
+        </div>
+      </div>
+    </section>
+    <section class="sys-panel se-preview" aria-label="Preview" data-se-pane="preview">
+      <header><h2>Preview</h2>
+        <div class="sys-seg se-width" role="group" aria-label="Preview width"><button type="button" aria-pressed="true" data-se-width="desktop">Desktop</button><button type="button" aria-pressed="false" data-se-width="phone">Phone</button></div>
+      </header>
+      <div class="se-stage">
+        <p class="se-meta"><span data-se-subject-line>Subject: {{ form.subject.value|default:'' }}</span><br><span data-se-sample></span></p>
+        <p class="se-preview-error" data-se-preview-error hidden>Could not draw the preview. Your wording is safe. <button type="button" class="sys-btn sm" data-se-retry>Retry</button></p>
+        <p class="se-preview-note" data-se-preview-note hidden></p>
+        <div class="se-frame-wrap" data-se-frame-wrap data-width="desktop">
+          <div class="se-frame-first" data-se-frame-first aria-hidden="true"></div>
+          <iframe class="se-frame" title="Email preview, desktop width" sandbox="allow-same-origin" hidden data-se-frame></iframe>
+        </div>
+      </div>
+    </section>
+  </div>
+</form>
+<noscript><form method="post" action="{% url 'system_email_test' spec.key %}">{% csrf_token %}<button type="submit" class="sys-btn">Send me a test</button></form></noscript>
+{% endblock %}

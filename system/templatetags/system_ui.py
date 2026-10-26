@@ -255,3 +255,21 @@ def short_hash(value):
     value = value or ""
     return f"{value[:6]}…{value[-6:]}" if len(value) > 14 else value
 
+
+
+@register.filter
+def group_label(key):
+    """The name of a group-send audience ("opted_in" -> "Opted in to news"), for the Group sends list."""
+    from mailings.segments import GROUPS
+
+    group = GROUPS.get(key)
+    return group.label if group else (key or "")
+
+
+@register.filter
+def minus(value, other):
+    """value - other for counts in templates (invited = everyone in an import minus the skipped)."""
+    try:
+        return int(value) - int(other)
+    except (TypeError, ValueError):
+        return value

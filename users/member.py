@@ -93,6 +93,10 @@ def set_marketing_consent(user, on):
     from django.utils import timezone
 
     on = bool(on)
+    if on:  # choosing news again also lifts an earlier no-account unsubscribe of this address
+        from mailings import optout
+
+        optout.clear(user.email)
     if user.marketing_consent == on:
         return False
     user.marketing_consent = on

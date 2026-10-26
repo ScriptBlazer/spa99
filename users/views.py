@@ -209,7 +209,9 @@ def register(request):
             return JsonResponse({"ok": False, "errors": _register_errors(form)}, status=400)
         status = 400
     else:
-        form, status = SignUpForm(initial={"plan": plan_slug}), 200
+        from mailings import invites  # the personal invite link left the invite in the session: it only pre-fills name and email
+
+        form, status = SignUpForm(initial={"plan": plan_slug, **invites.prefill(request.session.get(invites.SESSION_KEY))}), 200
     context = {"form": form, "plans": plans, "selected_plan": plan_slug, "suggested_plan": suggested, "from_journey": bool(session and session.completed)}
     return render(request, "users/register.html", context, status=status)
 

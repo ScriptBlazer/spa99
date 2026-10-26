@@ -1,0 +1,27 @@
+{% extends "system/emails_base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Emails" description="What the site sends, and what you send." %}
+{% include "system/_emails_tabs.html" with tab="invites" %}
+<div class="se-title"><a class="se-back" href="{% url 'system_invites' %}">Invites</a><h2>Import a list</h2></div>
+{% include "system/_ses_state.html" %}
+<form method="post" action="{% url 'system_invites_review' %}" enctype="multipart/form-data" data-system-invites-import data-se-import data-problems novalidate>{% csrf_token %}
+  <section class="sys-panel se-add">
+    <header><h2>Add people</h2>
+      <div class="sys-seg se-mode" role="radiogroup" aria-label="How to add them"><label><input type="radio" name="mode" value="paste" checked> Paste</label><label><input type="radio" name="mode" value="upload"> Upload CSV</label></div>
+    </header>
+    <div class="se-body">
+      <div data-se-mode="paste">
+        <label for="invites-text" class="se-label">The list</label>
+        <textarea id="invites-text" name="text" rows="8" data-invites-text placeholder="Name, email" spellcheck="false" autocomplete="off"></textarea>
+        <p class="sys-muted se-help">One person per line: name, email. A header row is fine. Up to {{ max_rows }} rows or 1 MB.</p>
+      </div>
+      <div data-se-mode="upload" hidden>
+        <label class="se-drop" data-se-drop for="invites-file"><span data-se-drop-text>Drop a CSV here or choose a file</span><input id="invites-file" type="file" name="file" accept=".csv,.txt,text/csv,text/plain"></label>
+        <p class="sys-muted se-help">Name and email columns, either order. Up to {{ max_rows }} rows or 1 MB.</p>
+      </div>
+      <p class="se-live-error" data-se-live="list" role="alert" hidden></p>
+    </div>
+  </section>
+  <div class="se-formbar"><button type="submit" class="sys-btn primary" data-se-check>Check list</button></div>
+</form>
+{% endblock %}

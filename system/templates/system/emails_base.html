@@ -1,0 +1,6 @@
+{% extends "system/base.html" %}{% load static %}{% comment %}
+Every System > Emails page extends this: it loads the section's own stylesheet and script (docs/design/SYSTEM-EMAILS.md). Pages fill `main`.
+{% endcomment %}
+{% block head_extra %}<link rel="stylesheet" href="{% static 'common/css/system-emails.css' %}">
+<script type="module" src="{% static 'common/js/system-emails.js' %}"></script>
+{% endblock %}

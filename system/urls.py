@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_code as c, views_rules as r
+from . import views, views_code as c, views_emails as e, views_rules as r
 from .permissions import unlocked
 
 urlpatterns = [
@@ -21,6 +21,33 @@ urlpatterns = [
     path("approval/final/<uuid:pk>/remove/", views.approval_remove, {"role": "final"}, name="system_approval_final_remove"),
     path("approval/delivery/<uuid:pk>/", views.approval_delivery, name="system_approval_delivery"),
     path("emails/", views.emails, name="system_emails"),
+    path("emails/ses/refresh/", e.ses_refresh, name="system_ses_refresh"),
+    path("emails/automatic/", e.automatic, name="system_email_list"),
+    path("emails/automatic/<slug:key>/", e.automatic_edit, name="system_email_edit"),
+    path("emails/automatic/<slug:key>/save/", e.automatic_save, name="system_email_save"),
+    path("emails/automatic/<slug:key>/preview/", e.automatic_preview, name="system_email_preview"),
+    path("emails/automatic/<slug:key>/test/", e.automatic_test, name="system_email_test"),
+    path("emails/automatic/<slug:key>/reset/", e.automatic_reset, name="system_email_reset"),
+    path("emails/mailings/", e.mailings, name="system_mailings"),
+    path("emails/mailings/new/", e.mailing_edit, name="system_mailing_new"),
+    path("emails/mailings/count/", e.mailing_count, name="system_mailing_count"),
+    path("emails/mailings/preview/", e.mailing_preview, name="system_mailing_preview"),
+    path("emails/mailings/<uuid:pk>/", e.mailing_detail, name="system_mailing"),
+    path("emails/mailings/<uuid:pk>/edit/", e.mailing_edit, name="system_mailing_edit"),
+    path("emails/mailings/<uuid:pk>/progress/", e.mailing_progress, name="system_mailing_progress"),
+    path("emails/mailings/<uuid:pk>/test/", e.mailing_test, name="system_mailing_test"),
+    path("emails/mailings/<uuid:pk>/send/", e.mailing_send, name="system_mailing_send"),
+    path("emails/mailings/<uuid:pk>/schedule/", e.mailing_schedule, name="system_mailing_schedule"),
+    path("emails/mailings/<uuid:pk>/cancel/", e.mailing_cancel, name="system_mailing_cancel"),
+    path("emails/mailings/<uuid:pk>/resume/", e.mailing_resume, name="system_mailing_resume"),
+    path("emails/mailings/<uuid:pk>/delete/", e.mailing_delete, name="system_mailing_delete"),
+    path("emails/invites/", e.invites_list, name="system_invites"),
+    path("emails/invites/new/", e.invites_new, name="system_invites_new"),
+    path("emails/invites/review/", e.invites_review, name="system_invites_review"),
+    path("emails/invites/send/", e.invites_send, name="system_invites_send"),
+    path("emails/invites/<uuid:batch>/", e.invite_batch, name="system_invite_batch"),
+    path("emails/invites/<uuid:batch>/progress/", e.invite_progress, name="system_invite_progress"),
+    path("emails/invites/<uuid:batch>/resume/", e.invite_resume, name="system_invite_resume"),
     path("suppressions/", views.suppressions, name="system_suppressions"),
     path("suppressions/<uuid:pk>/remove/", views.suppression_remove, name="system_suppression_remove"),
     path("settings/", views.site_settings, name="system_settings"),

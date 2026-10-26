@@ -1,0 +1,7 @@
+{% extends "notifications/emails/_base.html" %}
+{% comment %}Layout for every email whose wording is editable (notifications/emailbody.py). body_html is already escaped and safe.
+notice is the "why you receive this" line; unsubscribe_url (news and invites) adds the one-click unsubscribe link.{% endcomment %}
+{% block title %}{{ subject }}{% endblock %}
+{% block content %}{{ body_html }}{% endblock %}
+{% block footer_extra %}{% if notice %}<br><br>{{ notice }}{% endif %}{% if unsubscribe_url %}<br>
+        <a href="{{ unsubscribe_url }}" style="color:#492E21;">Unsubscribe</a> from these emails.{% endif %}{% endblock %}

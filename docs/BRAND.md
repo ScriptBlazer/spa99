@@ -383,3 +383,6 @@ In `system.css` under `body.system` (System only, never in `tokens.css`). Spec: 
 - `--band-h` min(62svh, 36rem): height of a full-bleed amenity band.
 - `--opener-measure` 26rem: widest the opener words go.
 - `--opener-pin` 0.35 (0.5 from 64em): opener pin length in screens (shortened 2026-10-23: one line in the hero).
+
+### System Emails tokens (2026-10-25, derived)
+In `system-emails.css` under `body.system` (System only). No new hues, marked **derived (System Emails)**: `--se-token` = `--sys-info` and `--se-token-bg` = `--sys-info-bg` (placeholder chips, 6.06:1 on the fill, 7.08:1 on white), `--se-preview-w: 640px` (desktop email frame), `--se-preview-phone: 375px`. Spec: `docs/design/SYSTEM-EMAILS.md` section 7.

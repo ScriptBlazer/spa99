@@ -256,6 +256,9 @@ def delete_applications(email):
     ids = list(applications.values_list("pk", flat=True))
     invite_ids = list(GoldInvite.objects.filter(application_id__in=ids).values_list("pk", flat=True))  # invite emails are queued by invite id
     removed = applications.delete()[0]
+    from mailings.erasure import erase_address  # group-send rows and invites for an applicant who never had an account
+
+    erase_address(email)
     history = GoldApplication.history.model.objects.filter(id__in=ids).delete()[0]
     queue = erase_task_records([*ids, *invite_ids], ["gold.tasks."])
     return {"gold_applications": removed, "gold_history_rows": history, "queue_records": queue}

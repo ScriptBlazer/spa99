@@ -1,9 +1,0 @@
-{% autoescape off %}Hello {{ first_name }},
-
-Your Spa 99 Gold Card is active on your account, from today.
-
-You can see it when you sign in: {{ url }}
-
-{{ site_name }}, {{ address }}
-Questions? Reply to this email or write to {{ contact_email }}.
-{% endautoescape %}

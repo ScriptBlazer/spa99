@@ -29,3 +29,11 @@ Until the site is live the subscription cannot be confirmed (SNS cannot reach th
 ## Tests
 
 `notifications/tests/test_ses_feedback.py`: signature accept and reject (throwaway key and certificate, download patched), wrong topic, evil certificate and subscribe hosts, subscription confirmation, permanent and transient bounce, complaint, repeats, the guard for every account email, the same reset answer, and the System remove (audit logged, 404 below Developer). The signature tests skip themselves if `cryptography` is not installed.
+
+## Unsubscribe, List-Unsubscribe and rate (2026-10-25, feature/emails)
+
+- News mailings and invites carry a one-click unsubscribe link `/unsubscribe/<signed token>/` (no login, no expiry) in the footer and the headers `List-Unsubscribe: <url>` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058; the SES backend sends the raw message, so the headers go through). GET shows a confirm page, POST (and the one-click POST from the mail client, CSRF exempt) sets `marketing_consent` off through `member.set_marketing_consent` (history logged) or, for an address with no account, adds it to `mailings.EmailOptOut`. Service messages have no unsubscribe and say why the person receives them.
+- Suppression stays the guard: group sends and invites go through `send_templated`, so a suppressed address is skipped (`suppressed` in the EmailLog, `skipped` on the recipient). A hard bounce or complaint also marks that address's invites and recent group-send rows `bounced`.
+- Send rate: group sends and invites go out at `MAILING_RATE_PER_SECOND` (settings, default 10, never above SES `MaxSendRate`) from a background task in slices; none when the queue runs inline in dev.
+- `send_templated(..., headers=None, body=None)`; `EmailLog.message_id` keeps the SES message id. The wording of the automatic emails is editable (`NotificationTemplate.body`, `notifications/emailbody.py`): see `docs/features/system-emails.md`.
+- The SES production gate (`notifications.ses_status()`): group sends and invites only start when SES reports production access (or in development). Full detail in `docs/features/system-emails.md`.

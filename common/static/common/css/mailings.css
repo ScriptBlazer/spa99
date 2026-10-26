@@ -1,0 +1,8 @@
+/* The unsubscribe page (docs/design/SYSTEM-EMAILS.md section 6). Website tokens only; the group rises and fades in through data-reveal (BRAND 7B). */
+.unsub { background: var(--color-cream); color: var(--color-espresso); }
+.unsub-wrap { display: grid; justify-items: center; text-align: center; padding-top: var(--space-6); padding-bottom: var(--space-6); min-height: 50dvh; align-content: start; }
+.unsub-group { display: grid; justify-items: center; gap: var(--space-3); max-width: 100%; }
+.unsub h1 { max-width: var(--measure-display); font-size: var(--text-2xl); letter-spacing: var(--tracking-display); color: var(--color-espresso); }
+.unsub-lead { max-width: var(--measure); font-size: var(--text-body); color: var(--color-text-muted); }
+.unsub-form { margin-top: var(--space-2); }
+.unsub-aside { margin-top: var(--space-2); }

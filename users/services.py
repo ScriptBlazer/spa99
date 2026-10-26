@@ -128,8 +128,21 @@ def register_interest(data, journey_session=None):
             gold_services.link_user_applications(user)
     except IntegrityError:  # two people (or two clicks) raced for the same email or mobile
         raise SignUpError({"email": ["That email or mobile number is already registered."]}) from None
+    _after_registration(user, bool(data.get("marketing_opt_in")))
     queue_verification_email(user)
     return SignUpResult(user, created=True)
+
+
+def _after_registration(user, opted_in):
+    """Invites for this address become 'registered'; ticking the news box lifts an earlier unsubscribe. Never raises."""
+    from mailings import invites, optout
+
+    invites.on_registered(user)
+    if opted_in:
+        try:
+            optout.clear(user.email)
+        except Exception:  # noqa: BLE001
+            logger.exception("Could not clear the unsubscribe for a new account")
 
 
 def set_interest(user, plan):
@@ -235,6 +248,14 @@ def export_user_data(user):
             {"template": e.template, "subject": e.subject, "status": e.status, "sent_at": _plain(e.sent_at)}
             for e in _email_logs(user.email).order_by("created_at")
         ],
+        "group_emails": [
+            {"mailing": r.mailing.subject, "status": r.status, "sent_at": _plain(r.sent_at)}
+            for r in _mailing_rows(user).select_related("mailing").order_by("created_at")
+        ],
+        "invites": [
+            {"name": i.name, "status": i.status, "sent_at": _plain(i.sent_at), "opened_at": _plain(i.opened_at), "registered_at": _plain(i.registered_at)}
+            for i in _invites(user.email).order_by("created_at")
+        ],
         "login_events": logins,
         "history": history,
     }
@@ -243,6 +264,19 @@ def export_user_data(user):
 def _email_logs(email):
     """Emails sent to the person, plus emails about them sent to someone else (Barry's Gold email)."""
     return EmailLog.objects.filter(Q(to__iexact=email) | Q(subject_email__iexact=email))
+
+
+def _mailing_rows(user):
+    """Group-send rows for the person (by account or address)."""
+    from mailings.models import MailingRecipient
+
+    return MailingRecipient.objects.filter(Q(user=user) | Q(email__iexact=user.email))
+
+
+def _invites(email):
+    from mailings.models import Invite
+
+    return Invite.objects.filter(email__iexact=email)
 
 
 def _plain(value):
@@ -311,6 +345,9 @@ def delete_user_data(user):
     anonymised = _anonymise_sessions(user)
     removed_logins = _login_events(user).delete()[0]
     removed_emails = _email_logs(email).delete()[0]
+    from mailings.erasure import erase_address
+
+    removed_emails += erase_address(email, user)  # group sends, invites and the unsubscribe key hold the address too
     gold = gold_services.delete_applications(email)
     queue = erase_task_records([pk], ["users.tasks."])
     interest = InterestRegistration.objects.filter(user=user).select_related("plan").first()
