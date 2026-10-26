@@ -142,6 +142,15 @@ class RoutingAndRoleTests(OfficeTestCase):
         post(admin, f"/people/{admin.pk}/delete/")  # never a staff account, never yourself
         self.assertTrue(User.objects.filter(pk=admin.pk).exists())
 
+    def test_no_quick_approve_on_lists_only_on_the_application_page(self):
+        approver = staff("Owner")  # may approve
+        application = gold_services.submit_application(application_data())[0]
+        for path in ("/", "/gold/"):
+            page = get(approver, path).content.decode()
+            self.assertNotIn("data-approve", page, path)
+            self.assertIn(f"/gold/{application.pk}/", page, path)
+        self.assertIn("data-approve", get(approver, f"/gold/{application.pk}/").content.decode())
+
     def test_the_hidden_django_admin_is_for_superusers_only(self):
         from django.conf import settings
 

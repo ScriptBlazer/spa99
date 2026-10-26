@@ -450,3 +450,4 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-26 | Moishe: Register pre-fills the email the visitor gave at the journey (same browser); it stays editable. A personal invite still wins. |
 | 2026-10-26 | Moishe: the sale is too small at the very top. New: a big sale band right under the hero on Home and Memberships (name, offer, clear countdown, button); other pages keep a slim strip at the top. |
 | 2026-10-26 | Moishe: Compare memberships table order is Tier 1, Tier 2, Tier 3, Gold Card, then Single visit last on the right. The cards above are unchanged. |
+| 2026-10-26 | Moishe: no quick "Approve and invite" from the Office dashboard or Gold list (too easy). Both now show "View application", which opens the application page where approve, decline and respond live. |
