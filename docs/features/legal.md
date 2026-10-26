@@ -83,7 +83,7 @@ Other proposals:
 
 ## Launch blockers
 
-1. **ICO registration number:** done 2026-10-26: BML Spa 99 Limited, ZC284282 (in the seed and the privacy `ico` row).
+1. **ICO registration number:** done 2026-10-26: BML Spa 99 Limited, ZC284282 (in the seed and the privacy `ico` row). Hosting: "Amazon Web Services, London region" (2026-10-26).
 2. **Hosting provider name:** fill the privacy `hosting` row once chosen.
 3. **Solicitor review** of both texts, the lawful bases and the retention periods.
 4. **Retention:** build the clean-up jobs for the proposed periods (including the change history), or change the text to what is true.

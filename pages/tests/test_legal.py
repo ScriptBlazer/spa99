@@ -54,13 +54,13 @@ class LegalPageTests(TestCase):
 
     @override_settings(DEBUG=True)
     def test_dev_marks_the_missing_ico_number_and_hosting_provider(self):
-        Section.objects.filter(page__key="privacy", key="ico").update(body="")
+        Section.objects.filter(page__key="privacy", key__in=["ico", "hosting"]).update(body="")
         response = self.client.get("/privacy/")
         self.assertContains(response, ICO_TODO)
         self.assertContains(response, 'data-legal-todo="hosting"')
 
     def test_live_never_shows_a_placeholder(self):
-        Section.objects.filter(page__key="privacy", key="ico").update(body="")
+        Section.objects.filter(page__key="privacy", key__in=["ico", "hosting"]).update(body="")
         html = self.client.get("/privacy/").content.decode()
         self.assertNotIn("to add before launch", html)
         self.assertNotIn("Our registration number is", html)  # the line is dropped until the number exists
