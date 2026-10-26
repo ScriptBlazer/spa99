@@ -30,8 +30,10 @@ export function lineRise(el, { trigger = true, delay = 0 } = {}) {
     type: 'lines', mask: 'lines', linesClass: 'line', autoSplit: true,
     onSplit: (self) => {
       gsap.set(el, { opacity: 1 });
-      return gsap.from(self.lines, {
-        yPercent: 105, stagger: 0.08, delay,
+      // Hide the lines under their masks right now. A from() with a delay leaves them in place until the delay has run, so the heading flashed, dropped, then rose.
+      gsap.set(self.lines, { yPercent: 105 });
+      return gsap.fromTo(self.lines, { yPercent: 105 }, {
+        yPercent: 0, stagger: 0.08, delay, immediateRender: true,
         scrollTrigger: trigger ? { trigger: el, start: 'top 80%', once: true } : undefined,
       });
     },
