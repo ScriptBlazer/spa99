@@ -25,7 +25,8 @@ const NETWORK = 'Could not reach System. Your work is still here.';
 const isLocked = (url, type, redirected) => /\/unlock\//.test(url || '') || (redirected && !/json/.test(type || ''));
 const unlockHref = () => document.body.dataset.systemUnlockUrl || '/unlock/';
 function showLocked(message) {
-  const form = $('[data-se-composer]') || $('form');
+  const form = $('[data-se-composer]') || $('main form') || $('[data-se-detail]') || $('main, #system-main');
+  if (!form) { toast(message, { kind: 'error' }); return; }
   let note = $('[data-se-locknote]');
   if (!note) {
     note = document.createElement('p');
@@ -311,6 +312,7 @@ function initEditor(form) {
     testButton.setAttribute('aria-disabled', 'true');
     const result = await call(form.dataset.testUrl, { body: params() });
     refreshTest();
+    if (result.locked) return showLocked('System locked. Unlock it in another tab, then send the test again.');
     if (result.status === 0) return toast(NETWORK, { kind: 'error' });
     const message = result.data?.message || 'The test could not be sent.';
     if (result.data?.ok) {
@@ -409,6 +411,7 @@ function initComposer(form) {
     const query = new URLSearchParams({ group: key, kind: kind(), ...optionsOf(key) });
     const result = await call(`${form.dataset.countUrl}?${query}`, { method: 'GET' });
     if (mine !== cardSeq[key] || result.aborted) return;
+    if (result.locked) showLocked('System locked. Unlock it in another tab to see how many people get this.');
     if (!result.ok || !result.data) {
       cardCount.textContent = '-';
       if (asChosen) { counting = false; count = null; countError = 'Could not count. Try again in a moment.'; paintCount(); refreshBar(); }
@@ -661,6 +664,7 @@ function initComposer(form) {
     send.setAttribute('aria-disabled', 'true');
     const body = scheduled ? { scheduled_at: whenIso() } : { expected_count: String(n) };
     const result = await call(`${base}${id}/${scheduled ? 'schedule' : 'send'}/`, { body });
+    if (result.locked) { refreshBar(); return showLocked(`System locked. Unlock it in another tab, then ${scheduled ? 'schedule' : 'send'} again. Your draft is saved.`); }
     if (result.status === 0) { refreshBar(); return toast(NETWORK, { kind: 'error' }); }
     if (result.data?.ok) {
       dirty = false;
@@ -692,6 +696,8 @@ function poll(url, paint, { every = 2000 } = {}) {
   const tick = async () => {
     if (document.hidden) return schedule();
     const result = await call(url, { method: 'GET' });
+    if (result.locked) { showLocked('System locked. Unlock it in another tab; progress will carry on here.'); return schedule(); }
+    clearLocked();
     if (result.ok && result.data) { failures = 0; if (await paint(result.data, false)) return; } else failures += 1;
     if (failures >= 3) paint(null, true);
     schedule();
@@ -816,6 +822,7 @@ function initReview(root) {
       const kept = $$('[data-filter][aria-pressed="true"]', root)[0]?.dataset.filter || 'all';
       input.disabled = true;
       const result = await call(root.dataset.reviewUrl, { body: new URLSearchParams({ text: lines.join('\n') }), json: false });
+      if (result.locked) { input.disabled = false; return showLocked('System locked. Unlock it in another tab, then check the list again.'); }
       if (result.status === 0) { input.disabled = false; return toast(NETWORK, { kind: 'error' }); }
       const doc = new DOMParser().parseFromString(await result.response.text(), 'text/html');
       const fresh = $('[data-se-review-root]', doc);
