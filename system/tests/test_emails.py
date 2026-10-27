@@ -206,3 +206,45 @@ class MailingViewTests(TestCase):
         detail = self.client.get(f"/emails/invites/{batch}/").context
         self.assertEqual((detail["summary"]["sent"], detail["summary"]["skipped"]), (1, 1))
         self.assertEqual(self.client.get(f"/emails/invites/{batch}/progress/").json()["sent"], 1)
+
+
+class MailingEditorPageTests(TestCase):
+    """The parts editor's page (docs/design/EMAIL-BUILDER-UI.md): what the template hands the script, and the Start from choice."""
+
+    def setUp(self):
+        seed_all()
+        self.client = unlocked_client(make_user())
+
+    def test_a_new_page_has_the_start_choice_and_the_editor_data_without_inline_script(self):
+        page = self.client.get("/emails/mailings/new/")
+        html = page.content.decode()
+        self.assertContains(page, "Start from")
+        self.assertContains(page, 'value="booking_open"')
+        self.assertContains(page, 'name="blocks"')
+        self.assertContains(page, 'id="se-blocks"')
+        self.assertContains(page, 'id="se-block-types"')
+        self.assertNotIn('name="body"', html)  # the old Body box is gone
+        self.assertEqual(page.context["blocks"], [])
+        self.assertContains(page, f'data-max-parts="{page.context["block_max_parts"]}"')
+        self.assertContains(page, "system-icons.svg")
+
+    def test_the_booking_starter_fills_the_parts_and_ticks_its_card(self):
+        page = self.client.get("/emails/mailings/new/?start=booking_open")
+        self.assertEqual([part["type"] for part in page.context["blocks"]], ["heading", "paragraph", "button", "small_print"])
+        self.assertContains(page, 'data-start="booking_open"')
+        self.assertContains(page, 'value="booking_open" checked')
+        self.assertContains(page, "Booking is open at Spa 99")  # the subject, from the starter
+
+    def test_an_old_draft_opens_as_paragraphs_with_the_split_note_and_no_start_choice(self):
+        mailing = Mailing.objects.create(name="Old", subject="Hi", body="One\n\nTwo", kind="news", group="everyone")
+        page = self.client.get(f"/emails/mailings/{mailing.pk}/edit/")
+        self.assertEqual(page.context["blocks"], [{"type": "paragraph", "text": "One"}, {"type": "paragraph", "text": "Two"}])
+        self.assertContains(page, "This draft was one block of text.")
+        self.assertNotContains(page, "Start from")
+
+    def test_a_draft_with_parts_has_no_split_note(self):
+        mailing = Mailing.objects.create(name="New", subject="Hi", body="", blocks=[{"type": "heading", "text": "Hello"}], kind="news", group="everyone")
+        page = self.client.get(f"/emails/mailings/{mailing.pk}/edit/")
+        self.assertNotContains(page, "This draft was one block of text.")
+        self.assertEqual(page.context["blocks"], [{"type": "heading", "text": "Hello"}])
+        self.assertTrue(page.context["image_view_base"].endswith("/email-image/"))

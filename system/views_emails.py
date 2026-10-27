@@ -191,7 +191,7 @@ def _mailing_page(request, form, mailing, status=200, start=""):
                "block_types": {kind: {name: {"max": limit, "required": required} for name, (limit, required) in fields.items()}
                                for kind, fields in mailing_blocks.TYPES.items()},
                "block_max_parts": mailing_blocks.MAX_PARTS, "image_upload_url": reverse("system_mailing_image_upload"),
-               "image_max_bytes": images.MAX_BYTES, "starters": mailing_blocks.starter_choices(), "start": start}
+               "image_max_bytes": images.MAX_BYTES, "image_view_base": f"{settings.SITE_URL}/email-image/", "starters": mailing_blocks.starter_choices(), "start": start}
     return page(request, "system/emails_mailing_form.html", "emails", context, status=status)
 
 

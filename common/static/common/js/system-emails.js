@@ -1,9 +1,10 @@
 /* System > Emails behaviour (docs/design/SYSTEM-EMAILS.md). Loaded on the Emails pages only. Every page still works as plain forms where it can;
    this adds the live parts: the token editor and the real-email preview, group counts, sending progress, the invite list check.
    Toasts, the confirm modal and the problems modal are the shared ones (feedback.js, form-problems.js).
-   Sections: helpers, token editor, preview, automatic email, group composer, sending progress, invites, overview, start. */
+   Sections: helpers, token editor, preview, automatic email, group composer (the parts editor is system-email-builder.js), sending progress, invites, overview, start. */
 import { toast, confirmModal } from './feedback.js';
 import { collectProblems, showProblems } from './form-problems.js';
+import { initBuilder } from './system-email-builder.js';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -97,7 +98,7 @@ function insertAt(field, text, { block = false } = {}) {
 
 /** The placeholder fields shared by the automatic email editor and the group composer.
  *  known: { subject: Set, body: Set }; needButton: the body must hold {button}. Returns hooks the page uses. */
-function wordingFields(form, { known, needButton = false, onChange = () => {} }) {
+function wordingFields(form, { known, needButton = false, ownPalette = false, onChange = () => {} }) {
   const subject = $('[data-se-subject]', form);
   const body = $('[data-se-body]', form);
   const pre = $('.se-pre', form);
@@ -142,7 +143,7 @@ function wordingFields(form, { known, needButton = false, onChange = () => {} })
     field.addEventListener('focus', () => { focused = field; syncPalette(); });
     field.addEventListener('input', () => { field.closest('.sys-row')?.classList.remove('invalid'); check(); onChange(field); });
   });
-  palette?.addEventListener('click', (event) => {
+  if (!ownPalette) palette?.addEventListener('click', (event) => { // the parts editor (ownPalette) inserts into the part that has focus
     const button = event.target.closest('[data-insert]');
     if (!button) return;
     const text = button.dataset.insert;
@@ -165,7 +166,7 @@ function wordingFields(form, { known, needButton = false, onChange = () => {} })
 
 /* ---------- preview: the real email in a sandboxed frame ---------- */
 
-function previewPane(root, { url, params, onResult = () => {}, sample }) {
+function previewPane(root, { url, params, onResult = () => {}, sample, nothing = () => '' }) {
   const wrap = $('[data-se-frame-wrap]', root);
   const frame = $('[data-se-frame]', root);
   const errorBox = $('[data-se-preview-error]', root);
@@ -196,6 +197,8 @@ function previewPane(root, { url, params, onResult = () => {}, sample }) {
   async function refresh() {
     const mine = ++seq;
     controller?.abort();
+    const none = nothing();
+    if (none) { delete wrap.dataset.busy; errorBox.hidden = true; note.textContent = none; note.hidden = false; onResult({}); return; }
     controller = new AbortController();
     wrap.dataset.busy = '';
     const result = await call(url, { body: params(), signal: controller.signal });
@@ -329,6 +332,7 @@ function initComposer(form) {
   let countError = '';
   let counting = false;
   let dirty = false;
+  let typed = false; // something was written (not just a group or kind chosen): switching the starting template then asks first
   let saving = false;
 
   const radio = (name) => form.querySelector(`input[name="${name}"]:checked`);
@@ -342,21 +346,30 @@ function initComposer(form) {
     return out;
   };
   // only the chosen group's options are live: the others are neither checked nor sent
-  const syncOptions = () => $$('.se-group', form).forEach((card) => $$('.se-group-opts select, .se-group-opts input', card).forEach((el) => { el.disabled = card.dataset.group !== group(); }));
+  const syncOptions = () => $$('.se-group[data-group]', form).forEach((card) => $$('.se-group-opts select, .se-group-opts input', card).forEach((el) => { el.disabled = card.dataset.group !== group(); }));
   const needs = (key) => $$('select[required]', $(`.se-group[data-group="${key}"]`, form)).some((s) => !s.value);
 
   const fields = wordingFields(form, {
-    known, onChange: (field) => {
-      dirty = true; refreshBar();
+    known, ownPalette: true, onChange: (field) => {
+      dirty = true; typed = true; refreshBar();
       if (field === fields.subject && nameField && !nameField.dataset.touched) nameField.value = fields.subject.value.slice(0, 60);
       preview.soon();
     },
   });
-  const params = () => new URLSearchParams({ subject: fields.subject.value, body: fields.body.value, kind: kind(), group: group() });
-  const preview = previewPane(form, { url: form.dataset.previewUrl, params, onResult: (errors) => { fields.setServer(errors); refreshBar(); } });
+  // The parts of the email (system-email-builder.js): kept as JSON in the hidden `blocks` input, previewed and saved as such.
+  const builder = initBuilder(form, {
+    known: known.body, drawTokens, insertAt, csrf,
+    onChange: () => { dirty = true; typed = true; refreshBar(); preview.soon(); },
+  });
+  const params = () => new URLSearchParams({ subject: fields.subject.value, blocks: builder.json(), kind: kind(), group: group() });
+  const preview = previewPane(form, {
+    url: form.dataset.previewUrl, params,
+    nothing: () => (builder.count ? '' : 'Add a part to see the preview.'),
+    onResult: (errors) => { const { blocks, ...rest } = errors; fields.setServer(rest); builder.applyErrors(blocks || {}); refreshBar(); },
+  });
   widthToggle(form);
   paneSwitch(form, () => preview.refresh());
-  nameField?.addEventListener('input', () => { nameField.dataset.touched = '1'; dirty = true; });
+  nameField?.addEventListener('input', () => { nameField.dataset.touched = '1'; dirty = true; typed = true; });
   if (nameField && nameField.value) nameField.dataset.touched = '1';
 
   /* ----- counts ----- */
@@ -387,7 +400,7 @@ function initComposer(form) {
     }
   }
   const countAll = debounce(() => {
-    $$('.se-group', form).forEach((card) => countCard(card.dataset.group, card.dataset.group === group()));
+    $$('.se-group[data-group]', form).forEach((card) => countCard(card.dataset.group, card.dataset.group === group()));
   }, 250);
   const countChosen = debounce(() => { if (group()) countCard(group(), true); }, 250);
 
@@ -418,6 +431,8 @@ function initComposer(form) {
     else if (count === null) reason = 'Choose an option for the group.';
     else if (count === 0) reason = 'Nobody to send to.';
     else if (later() && !whenIso()) reason = 'Choose a date and time.';
+    else if (builder.uploading) reason = 'Wait for the image to finish uploading.';
+    else if (!builder.count) reason = 'Add a part to the email.';
     else if (!fields.valid) reason = 'Fix the placeholders first.';
     if (gate) reason = 'Off until Amazon approves production sending.';
     const label = later() ? (whenIso() ? `Schedule for ${whenText(date.value, time.value)}` : 'Schedule') : (count ? `Send to ${fmt(count)}` : 'Send');
@@ -425,11 +440,19 @@ function initComposer(form) {
     send.setAttribute('aria-disabled', String(!!reason));
     send.dataset.reason = reason;
     note.textContent = reason;
-    testButton.setAttribute('aria-disabled', String(!fields.valid));
+    testButton.setAttribute('aria-disabled', String(!!testReason()));
+  }
+
+  /** Why Send me a test is off right now ('' when it is on). */
+  function testReason() {
+    if (builder.uploading) return 'Wait for the image to finish uploading.';
+    if (!builder.count) return 'Add a part to the email.';
+    if (!fields.valid) return 'Fix the placeholders first.';
+    return '';
   }
 
   $$('input[name="group"]', form).forEach((r) => r.addEventListener('change', () => { syncOptions(); dirty = true; count = null; countError = ''; countChosen(); paintCount(); refreshBar(); preview.soon(); }));
-  $$('.se-group-opts select, .se-group-opts input', form).forEach((el) => el.addEventListener('change', () => { dirty = true; const key = el.closest('.se-group').dataset.group; if (key === group()) countChosen(); else countCard(key, false); }));
+  $$('.se-group-opts select, .se-group-opts input', form).forEach((el) => el.addEventListener('change', () => { dirty = true; const key = el.closest('.se-group[data-group]').dataset.group; if (key === group()) countChosen(); else countCard(key, false); }));
   $$('input[name="kind"]', form).forEach((r) => r.addEventListener('change', () => { dirty = true; help(); countAll(); refreshBar(); preview.soon(); }));
   $$('input[name="when"]', form).forEach((r) => r.addEventListener('change', () => {
     if (later() && !date.value) { const d = new Date(); d.setDate(d.getDate() + 1); date.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -442,34 +465,45 @@ function initComposer(form) {
   paintCount();
   countAll();
   refreshBar();
+  preview.refresh();
 
   /* ----- save, test, send ----- */
 
-  const problemList = async () => {
-    const found = await collectProblems(form);
-    return found;
-  };
+  const problemList = async () => [...await collectProblems(form), ...builder.problems()];
 
-  /** Save the draft (a normal POST to the form's own address, followed). Resolves the draft id, or '' when something is wrong. */
+  const FIELD_LABELS = { name: 'Name', subject: 'Subject', group: 'Who', kind: 'Kind', _: 'Email' };
+  /** The server's { field: [messages], blocks: {...}, _: [...] } as dialog rows; the parts' errors also land on their cards. */
+  function problemsFrom(errors) {
+    const items = [];
+    Object.entries(errors).forEach(([key, value]) => {
+      if (key === 'blocks') return;
+      items.push({ field: key, label: FIELD_LABELS[key] || '', message: [value].flat().join(' '), control: $(`[name="${key}"]`, form) });
+    });
+    builder.applyErrors(errors.blocks || {});
+    return [...items, ...builder.problems()];
+  }
+
+  /** Save the draft (a script POST to the form's own address, answered as JSON). Resolves the draft id, or '' when something is wrong. */
   async function saveDraft({ quiet = false } = {}) {
     if (saving) return '';
+    if (builder.uploading) { toast('Wait for the image to finish uploading.', { kind: 'error' }); return ''; }
     const found = await problemList();
     if (found.length) { await showProblems(form, found, { opener: saveButton }); return ''; }
     saving = true;
     saveButton.setAttribute('aria-disabled', 'true');
     const data = new FormData(form);
-    ['when'].forEach((name) => data.delete(name));
+    ['when', 'start'].forEach((name) => data.delete(name));
     let id = '';
     try {
-      const response = await fetch(form.action || location.href, { method: 'POST', body: data, credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } });
-      const match = response.redirected ? response.url.match(/mailings\/([0-9a-f-]{36})\/?(?:\?.*)?$/) : null;
-      if (match) id = match[1];
-      else {
-        const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
-        const issues = $$('[data-problem]', doc).map((el) => ({ field: el.dataset.problemField || '', label: el.dataset.problemLabel || '', message: el.textContent.trim() })).filter((i) => i.message);
-        if (issues.length) await showProblems(form, issues.map((i) => ({ ...i, control: form.elements[i.field] || null })), { opener: saveButton });
+      const response = await fetch(form.action || location.href, { method: 'POST', body: data, credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch', Accept: 'application/json', 'X-CSRFToken': csrf() } });
+      let answer = null;
+      try { answer = await response.json(); } catch { answer = null; }
+      if (answer?.ok && answer.id) id = answer.id;
+      else if (answer?.errors) {
+        const issues = problemsFrom(answer.errors);
+        if (issues.length) await showProblems(form, issues, { opener: saveButton });
         else toast('We could not save the draft. Please try again.', { kind: 'error' });
-      }
+      } else toast('We could not save the draft. Please try again.', { kind: 'error' });
     } catch { toast(NETWORK, { kind: 'error' }); }
     saving = false;
     saveButton.setAttribute('aria-disabled', 'false');
@@ -477,9 +511,32 @@ function initComposer(form) {
     form.dataset.draftId = id;
     form.action = `${base}${id}/edit/`;
     history.replaceState(null, '', form.action);
+    if (startBlock) startBlock.hidden = true; // an Edit draft has no Start from
     dirty = false;
     if (!quiet) toast('Saved as a draft.');
     return id;
+  }
+
+  /* ----- Start from (a new send only): the server draws the chosen template, so changing it reloads the page ----- */
+
+  const startBlock = $('[data-se-start-block]', form);
+  if (startBlock) {
+    const startNote = $('[data-se-start-note]', startBlock);
+    const startRadios = $$('input[name="start"]', startBlock);
+    const current = form.dataset.start || '';
+    let wanted = '';
+    const go = (key) => { dirty = false; location.href = key ? `${location.pathname}?start=${encodeURIComponent(key)}` : location.pathname; };
+    startRadios.forEach((r) => r.addEventListener('change', () => {
+      if (!typed) { go(r.value); return; }
+      wanted = r.value;
+      startNote.hidden = false;
+    }));
+    $('[data-se-start-replace]', startBlock).addEventListener('click', () => go(wanted));
+    $('[data-se-start-keep]', startBlock).addEventListener('click', () => {
+      startRadios.forEach((r) => { r.checked = r.value === current; });
+      startNote.hidden = true;
+      startRadios.find((r) => r.checked)?.focus();
+    });
   }
 
   saveButton.addEventListener('click', () => saveDraft());
@@ -488,7 +545,7 @@ function initComposer(form) {
   window.addEventListener('beforeunload', (event) => { if (dirty && !saving) { event.preventDefault(); event.returnValue = ''; } });
 
   testButton.addEventListener('click', async () => {
-    if (testButton.getAttribute('aria-disabled') === 'true') { note.textContent = 'Fix the placeholders first.'; return; }
+    if (testButton.getAttribute('aria-disabled') === 'true') { note.textContent = testReason(); return; }
     const id = await saveDraft({ quiet: true });
     if (!id) return;
     testButton.setAttribute('aria-disabled', 'true');

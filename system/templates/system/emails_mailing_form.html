@@ -1,11 +1,15 @@
-{% extends "system/emails_base.html" %}
+{% extends "system/emails_base.html" %}{% load static %}
 {% block main %}
 {% include "system/_page_header.html" with title="Emails" description="What the site sends, and what you send." %}
 {% include "system/_emails_tabs.html" with tab="mailings" %}
 <div class="se-title"><a class="se-back" href="{% if mailing %}{% url 'system_mailing' mailing.pk %}{% else %}{% url 'system_mailings' %}{% endif %}">{% if mailing %}Back to this send{% else %}Group sends{% endif %}</a><h2>{% if mailing %}Edit draft{% else %}New group send{% endif %}</h2></div>
 {% include "system/_ses_state.html" %}
 {{ placeholders|json_script:"se-placeholders" }}
+{{ blocks|json_script:"se-blocks" }}
+{{ block_errors|json_script:"se-block-errors" }}
+{{ block_types|json_script:"se-block-types" }}
 <form method="post" class="se-form" data-problems data-se-composer data-view="write" data-count-url="{{ count_url }}" data-preview-url="{{ preview_url }}" data-draft-id="{{ mailing.pk|default:'' }}"
+      data-start="{{ start }}" data-max-parts="{{ block_max_parts }}" data-image-url="{{ image_upload_url }}" data-image-max="{{ image_max_bytes }}" data-image-base="{{ image_view_base }}" data-icons="{% static 'common/img/system-icons.svg' %}"
       data-send-base="{% url 'system_mailings' %}" data-allowed="{{ ses.allowed|yesno:'1,0' }}" data-gate="{{ ses.message }}" data-dev="{% if ses.mode == 'dev' %}1{% endif %}" novalidate>{% csrf_token %}
   <div class="se-switch sys-seg" role="group" aria-label="Show">
     <button type="button" aria-pressed="true" data-se-show="write">Write</button><button type="button" aria-pressed="false" data-se-show="preview">Preview</button>
@@ -15,7 +19,21 @@
       <div class="se-body">
         {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
 
-        <fieldset class="se-block se-groups{% if form.group.errors %} invalid{% endif %}" data-required-group data-label="Who" data-required-message="Choose who gets it.">
+        {% if not mailing %}<fieldset class="se-block se-start" data-se-start-block>
+          <legend>Start from</legend>
+          <div class="se-groups-grid">
+            {% for key, label in starters %}<div class="se-group">
+              <label class="se-group-card"><input type="radio" name="start" value="{{ key }}"{% if key == start %} checked{% endif %}>
+                <span class="se-group-top"><span class="se-group-name">{{ label }}</span></span>
+                <span class="se-group-desc">{% if key %}Service message to everyone registered: a heading, a short paragraph, a Book button and small print.{% else %}An empty email with one paragraph.{% endif %}</span>
+                <svg class="se-check" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </label>
+            </div>{% endfor %}
+          </div>
+          <div class="sys-note warn se-start-note" data-se-start-note role="status" hidden>This replaces what you have written. <button type="button" class="sys-btn sm" data-se-start-replace>Replace</button> <button type="button" class="sys-btn sm link" data-se-start-keep>Keep mine</button></div>
+        </fieldset>
+
+        {% endif %}<fieldset class="se-block se-groups{% if form.group.errors %} invalid{% endif %}" data-required-group data-label="Who" data-required-message="Choose who gets it.">
           <legend>Who</legend>
           <div class="se-groups-grid">
             {% for g in groups %}<div class="se-group" data-group="{{ g.key }}">
@@ -57,21 +75,34 @@
               <p class="se-live-error" id="se-subject-live" data-se-live="subject" hidden></p>
               {% if form.subject.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="subject" data-problem-label="Subject">{{ form.subject.errors|join:" " }}</p>{% endif %}</div>
           </div>
-          <div class="sys-row se-field{% if form.body.errors %} invalid{% endif %}" data-system-field="body">
-            <label for="{{ form.body.id_for_label }}">Body</label>
-            <div>
-              <div class="se-editor" data-se-body-editor>
-                <pre class="se-pre" aria-hidden="true"></pre>
-                <textarea name="body" id="{{ form.body.id_for_label }}" rows="12" required spellcheck="true" aria-describedby="se-body-live se-body-help" data-se-body>{{ form.body.value|default:'' }}</textarea>
-              </div>
-              <p class="se-live-error" id="se-body-live" data-se-live="body" hidden></p>
-              {% if form.body.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="body" data-problem-label="Body">{{ form.body.errors|join:" " }}</p>{% endif %}
-              <p class="sys-muted se-help" id="se-body-help">A blank line starts a new paragraph. News also gets an unsubscribe link in the footer, added for you.</p>
+
+          <div class="se-parts" data-se-builder>
+          <div class="se-parts-head"><h3 class="se-label" id="se-parts-title">Parts</h3><span class="sys-muted mono" data-se-parts-count hidden></span></div>
+          {% if mailing and mailing.body and not mailing.blocks %}<p class="sys-note se-oldnote">This draft was one block of text. It is now split into paragraphs. Check the preview.</p>{% endif %}
+          {% if form.body.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="body" data-problem-label="Parts">{{ form.body.errors|join:" " }}</p>{% endif %}
+          <div data-se-summary></div>
+          <p class="sys-error" data-se-list-error hidden></p>
+          <ol class="se-parts-list" data-se-list aria-labelledby="se-parts-title"></ol>
+          <div class="se-empty" data-se-empty hidden><p class="sys-muted">No parts yet. Add a heading, paragraph or button to begin.</p></div>
+          <p class="sys-muted se-help" data-se-full hidden>{{ block_max_parts }} parts is the most one email can hold. Remove one to add another.</p>
+          <div class="se-add" data-se-add-wrap>
+            <button type="button" class="sys-btn" data-se-add aria-haspopup="menu" aria-expanded="false"><svg class="se-icon" width="14" height="14" aria-hidden="true" focusable="false"><use href="{% static 'common/img/system-icons.svg' %}#plus"></use></svg><span>Add part</span></button>
+            <div class="sys-pop se-menu" role="menu" aria-label="Add a part" data-se-menu hidden>
+              <button type="button" role="menuitem" tabindex="-1" data-type="heading"><span>Heading</span><span class="sys-muted">A section title</span></button>
+              <button type="button" role="menuitem" tabindex="-1" data-type="paragraph"><span>Paragraph</span><span class="sys-muted">Body text</span></button>
+              <button type="button" role="menuitem" tabindex="-1" data-type="button"><span>Button</span><span class="sys-muted">A link people tap</span></button>
+              <button type="button" role="menuitem" tabindex="-1" data-type="image"><span>Image</span><span class="sys-muted">JPEG, PNG or GIF</span></button>
+              <button type="button" role="menuitem" tabindex="-1" data-type="divider"><span>Divider</span><span class="sys-muted">A thin line</span></button>
+              <button type="button" role="menuitem" tabindex="-1" data-type="small_print"><span>Small print</span><span class="sys-muted">Terms or details</span></button>
             </div>
           </div>
+          <input type="hidden" name="blocks" value="" data-se-blocks>
+          <div class="sr" role="status" aria-live="polite" data-se-parts-live></div>
           <div class="se-palette" data-se-palette aria-label="Placeholders">
             <span class="se-palette-label">Placeholders</span>
             {% for p in placeholders %}<button type="button" class="se-token" data-insert="{{ '{' }}{{ p.name }}{{ '}' }}" data-scope="both" title="{{ p.description }}"><code>{{ "{" }}{{ p.name }}{{ "}" }}</code><span class="sr">, {{ p.description }}</span></button>{% endfor %}
+          </div>
+          <p class="sys-muted se-help">The footer is added for you. News gets an unsubscribe link; Service messages say why it was sent.</p>
           </div>
         </div>
 
@@ -106,6 +137,7 @@
     </section>
   </div>
   <div class="sys-savebar se-bar" data-se-bar>
+    <span class="se-bar-undo" data-se-undo hidden><span></span> <button type="button" class="sys-btn sm link">Undo</button></span>
     <span class="sys-msg se-bar-note" data-se-bar-note aria-live="polite"></span>
     <button type="button" class="sys-btn" data-se-save-draft>Save draft</button>
     <button type="button" class="sys-btn" data-se-test>Send me a test</button>
