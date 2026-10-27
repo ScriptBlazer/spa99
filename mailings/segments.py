@@ -3,15 +3,19 @@
 also needs consent (`User.marketing_consent`; for Gold applicants the application's tick) and leaves out people who
 unsubscribed without an account.
 
+The "Journey leads" group is different: people who left an address at the journey gate and have no account. News only (they
+never registered, so a service message has no reason to reach them); the gate tick is their consent.
+
 "Registered" means a person with a registered interest (the early list), not a team account. Tier = the plan they
 registered interest in. Plain ORM only, so it behaves the same on SQLite and Postgres."""
 import datetime
 from dataclasses import dataclass, field
 
-from django.db.models import Exists, F, OuterRef
+from django.db.models import CharField, Exists, F, OuterRef, UUIDField, Value
 from django.db.models.functions import Lower
 
 from gold.models import GoldApplication
+from journey.models import JourneySession
 from notifications.models import EmailSuppression
 from plans.models import Plan
 from users.models import User
@@ -20,6 +24,7 @@ from .models import EmailOptOut, Mailing
 
 REASON_ACCOUNT = "because you registered with Spa 99"
 REASON_GOLD = "because you applied for a Spa 99 Gold Card"
+REASON_LEAD = "because you asked to hear about Spa 99 opening"
 
 
 @dataclass(frozen=True)
@@ -29,7 +34,8 @@ class Group:
     description: str
     reason: str  # "You are receiving this ..." for service messages
     params: tuple = field(default_factory=tuple)  # ({"name", "type": choice|date, "label", "required"}, ...)
-    people: str = "users"  # "users" or "applicants"
+    people: str = "users"  # "users", "applicants" or "leads"
+    news_only: bool = False
 
 
 def _users():
@@ -70,6 +76,16 @@ def _applicants(params):
     return GoldApplication.objects.filter(status=params["status"])
 
 
+def _leads(params):
+    """One row per journey session that left an address; people with an account, bots and linked sessions are out."""
+    qs = JourneySession.objects.filter(is_bot=False, user__isnull=True).exclude(lead_email="")
+    if params.get("date_from"):
+        qs = qs.filter(lead_at__date__gte=params["date_from"])
+    if params.get("date_to"):
+        qs = qs.filter(lead_at__date__lte=params["date_to"])
+    return qs
+
+
 GROUPS = {g.key: g for g in [
     Group("everyone", "Everyone registered", "Every active person who has registered.", REASON_ACCOUNT),
     Group("tier", "By tier", "People who registered for one membership.", REASON_ACCOUNT,
@@ -82,9 +98,12 @@ GROUPS = {g.key: g for g in [
            {"name": "date_to", "type": "date", "label": "To", "required": False})),
     Group("applicants", "Gold applicants by status", "People who applied for a Gold Card, by where the application stands.", REASON_GOLD,
           ({"name": "status", "type": "choice", "label": "Status", "required": True},), people="applicants"),
+    Group("leads", "Journey leads", "People who left their email at the journey and have no account. News only.", REASON_LEAD,
+          ({"name": "date_from", "type": "date", "label": "Given from", "required": False},
+           {"name": "date_to", "type": "date", "label": "Given to", "required": False}), people="leads", news_only=True),
 ]}
 BUILDERS = {"everyone": _everyone, "tier": _tier, "gold": _gold, "opted_in": _opted_in, "unconfirmed": _unconfirmed,
-            "between": _between, "applicants": _applicants}
+            "between": _between, "applicants": _applicants, "leads": _leads}
 
 
 def param_choices(name):
@@ -97,7 +116,7 @@ def param_choices(name):
 
 def catalog():
     """For the frontend: every group with its parameters (choices filled in from the database)."""
-    return [{"key": g.key, "label": g.label, "description": g.description, "reason": g.reason,
+    return [{"key": g.key, "label": g.label, "description": g.description, "reason": g.reason, "news_only": g.news_only,
              "params": [{**p, **({"choices": param_choices(p["name"])} if p["type"] == "choice" else {})} for p in g.params]}
             for g in GROUPS.values()]
 
@@ -132,11 +151,21 @@ def queryset(group_key, params, kind):
     """People in the group who may be emailed for this kind of mailing: suppressed and inactive people are out; News also
     needs consent and leaves out people who unsubscribed without an account."""
     group = GROUPS[group_key]
+    if group.people == "leads":
+        return _lead_queryset(params or {}, kind == Mailing.NEWS)
     qs = BUILDERS[group_key](params or {}).annotate(r_email=Lower("email"), r_user_id=F("user_id") if group.people == "applicants" else F("pk"))
     qs = qs.exclude(Exists(EmailSuppression.objects.filter(email=OuterRef("r_email"))))
     if kind == Mailing.NEWS:
         qs = qs.filter(marketing_consent=True).exclude(Exists(EmailOptOut.objects.filter(email=OuterRef("r_email"))))
     return qs
+
+
+def _lead_queryset(params, allowed):
+    qs = (_leads(params) if allowed else JourneySession.objects.none()).annotate(r_email=Lower("lead_email"), first_name=Value("", output_field=CharField()),
+                                 r_user_id=Value(None, output_field=UUIDField()))
+    qs = qs.exclude(Exists(User.objects.annotate(u_email=Lower("email")).filter(u_email=OuterRef("r_email"))))  # any account, staff included
+    qs = qs.exclude(Exists(EmailSuppression.objects.filter(email=OuterRef("r_email"))))
+    return qs.exclude(Exists(EmailOptOut.objects.filter(email=OuterRef("r_email"))))
 
 
 def count(group_key, params, kind):

@@ -15,6 +15,7 @@ from django.utils import timezone
 from gold.models import ApplicationEvent, GoldApplication
 from insights import reader
 from journey.models import JourneySession, Option
+from mailings.models import EmailOptOut
 from users.models import InterestRegistration, User
 
 from . import lists, profile
@@ -153,6 +154,8 @@ def build_rows(page_sessions):
     for key, status in GoldApplication.objects.annotate(k=Lower("email")).filter(k__in=emails).values_list("k", "status"):
         statuses.setdefault(key, []).append(status)
     accounts = dict(User.objects.filter(email_verified_at__isnull=False).annotate(k=Lower("email")).filter(k__in=emails).values_list("k", "pk"))
+    unsubscribed = set(EmailOptOut.objects.filter(email__in=emails).values_list("email", flat=True))
+    unsubscribed |= set(User.objects.filter(marketing_consent=False).annotate(k=Lower("email")).filter(k__in=emails).values_list("k", flat=True))  # an account that turned news off
     firsts = {}
     for key, referrer, utm, medium, campaign, device in (_gate_sessions().filter(email_key__in=emails).order_by("-created_at")
                                                          .values_list("email_key", "referrer", "utm_source", "utm_medium", "utm_campaign", "device_type")):
@@ -173,7 +176,7 @@ def build_rows(page_sessions):
                        "label": utm or host or "Direct", "campaign": campaign},
             "registered": page_row.has_account, "account_id": str(accounts[page_row.email_key]) if page_row.email_key in accounts else "",
             "gold_applied": page_row.has_application, "status": status_of(page_row.has_account, statuses.get(page_row.email_key, [])),
-            "href": _url("office_lead", session.pk),
+            "href": _url("office_lead", session.pk), "unsubscribed": page_row.email_key in unsubscribed,
         })
     return out
 

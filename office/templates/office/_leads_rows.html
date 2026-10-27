@@ -1,7 +1,7 @@
 {% load office_tags %}{% for l in rows %}
 <tr class="o-row" data-lead-row data-status="{{ l.status }}">
   <td class="c-name" data-col="email"><a class="o-rowlink" href="{{ l.href }}">{{ l.email }}</a>
-    <span class="o-cell-sub">First seen {{ l.first_seen|dm }}<span class="o-mid-only"> &middot; {{ l.journeys }} visit{{ l.journeys|pluralize }}</span></span></td>
+    <span class="o-cell-sub">First seen {{ l.first_seen|dm }}{% if l.unsubscribed %} &middot; <span data-unsubscribed>Unsubscribed</span>{% endif %}<span class="o-mid-only"> &middot; {{ l.journeys }} visit{{ l.journeys|pluralize }}</span></span></td>
   <td class="c-wants" data-col="wants">{% for line in l.summary %}<span class="o-line o-line--{{ forloop.counter }}">{{ line }}</span>{% endfor %}</td>
   <td class="c-tier" data-col="tier">{% if l.tier %}<span class="o-only-narrow">Suggested </span>{{ l.tier }}{% else %}<span class="o-unrated">None yet</span>{% endif %}</td>
   <td class="c-potential" data-col="potential">{% include "office/_lead_potential.html" with potential=l.potential %}</td>

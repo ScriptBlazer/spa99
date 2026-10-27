@@ -64,6 +64,26 @@ class LinkingTests(OfficeTestCase):
         self.assertFalse(JourneySession.objects.filter(lead_email__iexact="hugo@example.com").exists())
 
 
+class LeadUnsubscribedTests(OfficeTestCase):
+    def test_lead_page_and_list_show_unsubscribed(self):
+        from mailings import optout
+
+        session = lead("hugo@example.com")
+        office = staff("Office", "o@example.com")
+        self.assertNotContains(get(office, f"/leads/{session.pk}/"), "data-unsubscribed")
+        optout.unsubscribe("Hugo@example.com")
+        self.assertContains(get(office, f"/leads/{session.pk}/"), "data-unsubscribed")
+        self.assertContains(get(office, "/leads/"), "data-unsubscribed")
+
+    def test_list_labels_an_account_that_turned_news_off(self):
+        lead("sam@example.com")
+        user = User.objects.create_user("sam@example.com", "x", email_verified_at=timezone.now(), marketing_consent=False)
+        office = staff("Office", "o@example.com")
+        self.assertContains(get(office, "/leads/?show=registered"), "data-unsubscribed")
+        User.objects.filter(pk=user.pk).update(marketing_consent=True)
+        self.assertNotContains(get(office, "/leads/?show=registered"), "data-unsubscribed")
+
+
 class LeadsListTests(OfficeTestCase):
     def setUp(self):
         self.office = staff("Office", "o@example.com")
