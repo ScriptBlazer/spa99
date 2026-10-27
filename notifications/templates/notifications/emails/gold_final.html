@@ -1,28 +1,12 @@
 {% extends "notifications/emails/_base.html" %}
 {% block title %}Final approval{% endblock %}
+{% block preheader %}Approved by an approver, potential Low. Your final approval is needed.{% endblock %}
+{% block h1 %}{% include "notifications/emails/_heading.html" with heading="Final approval: "|add:name %}{% endblock %}
 {% block content %}
-<h2 style="margin:0 0 4px;font-family:Signika,Helvetica,Arial,sans-serif;font-size:20px;">Final approval: {{ name }}</h2>
-<p style="margin:0 0 16px;">{{ potential_label }} potential</p>
-<p style="margin:0 0 20px;">An approver has approved this Gold Card application, but the potential is Low, so it needs your final approval. The applicant has not been told anything yet.</p>
-
-<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">
-  <tr>
-    <td bgcolor="#492E21" style="background:#492E21;border-radius:6px;"><a href="{{ confirm_url }}" style="display:inline-block;padding:14px 28px;font-family:Figtree,Helvetica,Arial,sans-serif;font-size:16px;font-weight:bold;color:#F5F2D8;text-decoration:none;">Confirm approval</a></td>
-    <td width="12" style="font-size:0;line-height:0;">&nbsp;</td>
-    <td style="border:2px solid #492E21;border-radius:6px;"><a href="{{ send_back_url }}" style="display:inline-block;padding:12px 24px;font-family:Figtree,Helvetica,Arial,sans-serif;font-size:16px;font-weight:bold;color:#492E21;text-decoration:none;">Send back</a></td>
-  </tr>
-</table>
-<p style="margin:0 0 8px;font-size:13px;">Both open a page in the Office (you may need to sign in). Nothing happens until you tap the button there. Sending it back asks the approvers whether they are sure, and you can add a note. <a href="{{ view_url }}" style="color:#492E21;">View the whole application</a>.</p>
-
-{% for section in sections %}
-<h3 style="margin:24px 0 8px;font-family:Signika,Helvetica,Arial,sans-serif;font-size:16px;border-bottom:1px solid #BB8855;padding-bottom:4px;">{{ forloop.counter }}. {{ section.title }}</h3>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;">
-  {% for label, value in section.rows %}
-  <tr>
-    <td valign="top" style="padding:3px 12px 3px 0;width:38%;color:#492E21;opacity:0.8;">{{ label }}</td>
-    <td valign="top" style="padding:3px 0;">{{ value|linebreaksbr }}</td>
-  </tr>
-  {% endfor %}
-</table>
-{% endfor %}
+<p class="e-muted" style="margin:0 0 16px;font-size:13px;line-height:20px;color:#7B675A;">{{ potential_label }} potential</p>
+<p style="margin:0 0 16px;font-size:16px;line-height:26px;color:#492E21;">An approver has approved this Gold Card application, but the potential is Low, so it needs your final approval. The applicant has not been told anything yet.</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 16px;"><tr><td class="e-btn" bgcolor="#492E21" align="center" style="background:#492E21;background-image:linear-gradient(#492E21,#492E21);border-radius:6px;mso-padding-alt:15px 32px;"><a href="{{ confirm_url }}" target="_blank" style="display:inline-block;padding:15px 32px;font-family:'Figtree','Segoe UI',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:16px;line-height:20px;font-weight:600;color:#F5F2D8;text-decoration:none;border-radius:6px;">Confirm approval</a></td></tr></table>
+<p style="margin:0 0 16px;font-size:15px;line-height:28px;color:#492E21;"><a href="{{ send_back_url }}" style="color:#492E21;text-decoration:underline;padding-right:20px;">Send back</a> <a href="{{ view_url }}" style="color:#492E21;text-decoration:underline;padding-right:20px;">View application</a> </p>
+<p class="e-muted" style="margin:0 0 16px;font-size:13px;line-height:20px;color:#7B675A;">Both open a page in the Office (you may need to sign in). Nothing happens until you tap the button there. Sending it back asks the approvers whether they are sure, and you can add a note.</p>
+{% include "notifications/emails/_gold_summary.html" %}
 {% endblock %}

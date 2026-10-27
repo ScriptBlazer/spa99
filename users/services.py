@@ -229,9 +229,21 @@ def reset_password(uidb64, token, new_password):
     if user is None:
         return None
     validate_password(new_password, user=user)
+    had_password = user.has_usable_password()  # a team member choosing a first password from an invite had none
     user.set_password(new_password)
     user.save(update_fields=["password", "updated_at"])
+    if had_password:
+        password_changed(user)
     return user
+
+
+def password_changed(user):
+    """Queue the "your password was changed" email. Called after a signed-in change and a completed reset (never after a
+    first password from an invite, never for an admin or command setting one). Never raises."""
+    try:
+        enqueue("users.tasks.send_password_changed_email", str(user.pk), timezone.now().isoformat())
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not queue the password-changed email for %s", user.pk)
 
 
 # ---------- GDPR ----------

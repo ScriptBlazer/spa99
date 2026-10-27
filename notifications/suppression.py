@@ -1,6 +1,8 @@
 """The email suppression list: addresses SES told us bounce for good or complained. One place decides who may be emailed."""
 import logging
 
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
@@ -41,7 +43,11 @@ def add(email, reason, feedback_id="", detail=""):
 
 def _add(email, reason, feedback_id="", detail=""):
     email = clean(email)
-    if not email or "@" not in email:
+    if not email or "\x00" in email:
+        return False
+    try:
+        validate_email(email)  # junk such as "@" or "a b@c d" is never stored (SES and Postmark both come through here)
+    except ValidationError:
         return False
     if len(email) > 254:  # cannot be a real address (and would not fit the column)
         logger.warning("Suppression skipped: address longer than 254 characters")

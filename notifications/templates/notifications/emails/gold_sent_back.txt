@@ -1,7 +1,9 @@
-{% autoescape off %}{{ name }} was approved, but the potential is Low. Are you sure?
+{% autoescape off %}SPA 99
+
+{{ name }}: sent back for review
 {{ potential_label }} potential
 
-A final approver{% if sent_back_by %} ({{ sent_back_by }}){% endif %} has sent this Gold Card application back to you. The applicant has not been told anything. You can approve it again, which goes through at once, or decline it.
+{{ name }} was approved, but the potential is Low. Are you sure? A final approver{% if sent_back_by %} ({{ sent_back_by }}){% endif %} has sent this Gold Card application back to you. The applicant has not been told anything. You can approve it again, which goes through at once, or decline it.
 {% if note %}
 Note from the final approver:
 {{ note }}
@@ -14,4 +16,8 @@ View the whole application: {{ view_url }}
 {{ forloop.counter }}. {{ section.title|upper }}
 {% for label, value in section.rows %}{{ label }}: {{ value }}
 {% endfor %}{% endfor %}
+-- 
+{{ site_name }}, {{ address }}
+Questions? Reply to this email or write to {{ contact_email }}.
+Beyond Luxury
 {% endautoescape %}

@@ -387,3 +387,21 @@ In `system.css` under `body.system` (System only, never in `tokens.css`). Spec: 
 
 ### System Emails tokens (2026-10-25, derived)
 In `system-emails.css` under `body.system` (System only). No new hues, marked **derived (System Emails)**: `--se-token` = `--sys-info` and `--se-token-bg` = `--sys-info-bg` (placeholder chips, 6.06:1 on the fill, 7.08:1 on white), `--se-preview-w: 640px` (desktop email frame), `--se-preview-phone: 375px`. Spec: `docs/design/SYSTEM-EMAILS.md` section 7.
+
+### Email layout tokens (2026-10-27, derived)
+Used only inline in `notifications/templates/notifications/emails/` and `notifications/emailbody.py` (mail clients have no CSS variables). No new hues, marked **derived (email)**. Spec: `docs/design/EMAIL-LAYOUT.md` section 2.
+
+| Role | Light | Dark (`prefers-color-scheme`) |
+|---|---|---|
+| Page | `#F5F2D8` Spa Cream | `#2B1B13` deep espresso (derived) |
+| Header band | `#492E21` Espresso | `#492E21` (unchanged) |
+| Card | `#FBF9EC` lighter cream (derived, replaces white) | `#3A261C` espresso one step darker (derived) |
+| Text, headings | `#492E21` | `#F5F2D8` |
+| Links | `#492E21` | `#E5AC6E` Gold |
+| Muted text | `#7B675A` espresso 72% over card as a solid hex (derived, 5.05:1 on card) | `#C1B9A3` cream 72% over dark card (derived, 7.28:1) |
+| Hairline | `#E2DDD0` espresso 14% over card (derived, decoration) | `#58473A` cream 16% over dark card (derived) |
+| Heading rule | `#BB8855` Caramel (decoration only) | same |
+| Button | `#492E21` fill, `#F5F2D8` text | `#E5AC6E` fill, `#492E21` text |
+| Panel | `#F5F2D8` | `#492E21` |
+
+No pure white or black in email. Radii: 12px header/card outer corners (`--radius-md`), 6px button and panel (`--radius-sm`).

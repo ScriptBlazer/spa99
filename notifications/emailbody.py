@@ -19,8 +19,26 @@ BODY_MAX = 5000
 SUBJECT_MAX = 300
 BUTTON = "button"
 
-BUTTON_STYLE = "display:inline-block;background:#492E21;color:#F5F2D8;padding:12px 24px;text-decoration:none;"
-P_STYLE = "margin:0 0 12px;"
+FONT_BODY = "'Figtree','Segoe UI',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Helvetica,Arial,sans-serif"
+P_STYLE = "margin:0 0 16px;font-size:16px;line-height:26px;color:#492E21;"
+LINK_STYLE = "color:#492E21;text-decoration:underline;word-break:break-word;"
+GREETING_RE = re.compile(r"(hello|hi|dear)\b", re.I)
+PREVIEW_MAX = 100
+
+
+def preview_text(text):
+    """The inbox preview line for an email body: the first paragraph that is not a short greeting, cut at 100 characters
+    on a word boundary with an ellipsis. A paragraph with a link (the button, a {..._url} value) is never used. Plain text in, plain text out (the layout escapes it)."""
+    for paragraph in re.split(r"\n\s*\n", (text or "").replace("\r\n", "\n")):
+        paragraph = " ".join(paragraph.split())
+        if not paragraph or "http://" in paragraph or "https://" in paragraph or (GREETING_RE.match(paragraph) and len(paragraph) < 40):
+            continue
+        if len(paragraph) <= PREVIEW_MAX:
+            return paragraph
+        cut = paragraph[:PREVIEW_MAX + 1]
+        cut = cut[:cut.rfind(" ")] if " " in cut else cut[:PREVIEW_MAX]
+        return cut.rstrip(" ,;:.-") + "\u2026"
+    return ""
 
 
 class Rich:
@@ -52,7 +70,7 @@ def _welcome_values(ctx):
     return {
         "registration_line": f"We have noted your registration for {plan}." if plan else "We have noted your registration.",
         "booking_line": f"We will write to you before booking opens{', ' + opening if opening else ''}.",
-        "discount_line": (Rich(f'Looking for a better rate? Message us on WhatsApp: <a href="{escape(discount)}">{escape(discount)}</a>',
+        "discount_line": (Rich(f'Looking for a better rate? Message us on WhatsApp: <a href="{escape(discount)}" style="{LINK_STYLE}">{escape(discount)}</a>',
                                f"Looking for a better rate? Message us on WhatsApp: {discount}") if discount else ""),
     }
 
@@ -73,7 +91,7 @@ SPECS = {spec.key: spec for spec in [
                                "discount_line": "The WhatsApp discount line (empty when no link is set)"},
         {"first_name": "James", "account_id": "AB12-CD34", "registration_line": "We have noted your registration for Tier 2.",
          "booking_line": "We will write to you before booking opens, and we plan to open in December.",
-         "discount_line": Rich(f'Looking for a better rate? Message us on WhatsApp: <a href="{_SAMPLE_URL}">{_SAMPLE_URL}</a>',
+         "discount_line": Rich(f'Looking for a better rate? Message us on WhatsApp: <a href="{_SAMPLE_URL}" style="{LINK_STYLE}">{_SAMPLE_URL}</a>',
                                f"Looking for a better rate? Message us on WhatsApp: {_SAMPLE_URL}")},
         "Hello {first_name},\n\nThank you for confirming your email. {registration_line}\n\n"
         "There is nothing to pay and nothing more to do right now. {booking_line}\n\n{discount_line}\n\nYour account ID is {account_id}.",
@@ -85,6 +103,13 @@ SPECS = {spec.key: spec for spec in [
         "Hello {first_name},\n\nUse the link below to choose a new password. It works for one hour and only once.\n\n{button}\n\n"
         "If you did not ask for this, you can ignore this email. Your password has not changed.",
         button_label="Choose a new password", button_required=True, subject_placeholders=_FIRST),
+    EmailSpec(
+        "password_changed", "Password changed",
+        {**_FIRST, "when": "When it was changed (London time)", "reset_url": "The forgot-password page, to reset it again"},
+        {"first_name": "James", "when": "27 October 2026 at 14:05 (London time)", "reset_url": _SAMPLE_URL},
+        "Hello {first_name},\n\nYour Spa 99 password was changed on {when}.\n\nIf this wasn't you, reset your password now: "
+        "{reset_url}\n\nQuestions? Reply to this email and it will reach the team.",
+        subject_placeholders=_FIRST),
     EmailSpec(
         "team_invite", "Added to the team",
         {**_FIRST, "level": "Their level: Office, Admin, Developer or Superuser", "office_url": "The address of the Office"},
@@ -242,7 +267,7 @@ def _html_value(name, value):
         return value.html
     value = "" if value is None else str(value)
     if name.endswith("_url") and value.startswith(("http://", "https://")):
-        return mark_safe(f'<a href="{escape(value)}" style="color:#492E21;">{escape(value)}</a>')
+        return mark_safe(f'<a href="{escape(value)}" style="{LINK_STYLE}">{escape(value)}</a>')
     return conditional_escape(value)
 
 
@@ -277,7 +302,7 @@ def render(spec, body, values, button_url="", button_label=None):
                 flush()
                 if button_url:
                     pieces_html.append(_button_html(button_url, label, spec.button_fallback))
-                    pieces_text.append(button_url)
+                    pieces_text.append(f"{label}:\n{button_url}")
             else:
                 value = values.get(part, "")
                 current_html.append(str(_html_value(part, value)))
@@ -297,8 +322,14 @@ def render_plain(text):
 
 def _button_html(url, label, fallback):
     url_html, label_html = escape(url), escape(label)
-    button = f'<p style="margin:0 0 20px;"><a href="{url_html}" style="{BUTTON_STYLE}">{label_html}</a></p>'
+    button = (
+        '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 16px;"><tr>'
+        '<td class="e-btn" bgcolor="#492E21" align="center" style="background:#492E21;background-image:linear-gradient(#492E21,#492E21);'
+        'border-radius:6px;mso-padding-alt:15px 32px;">'
+        f'<a href="{url_html}" target="_blank" style="display:inline-block;padding:15px 32px;font-family:{FONT_BODY};font-size:16px;'
+        f'line-height:20px;font-weight:600;color:#F5F2D8;text-decoration:none;border-radius:6px;">{label_html}</a></td></tr></table>')
     if fallback:
-        button += (f'<p style="margin:0 0 12px;font-size:14px;">If the button does not work, copy this address into your '
-                   f"browser:<br>{url_html}</p>")
+        button += (f'<p class="e-muted" style="margin:0 0 16px;font-size:13px;line-height:20px;color:#7B675A;">'
+                   f'If the button does not work, paste this link into your browser:<br>'
+                   f'<a href="{url_html}" style="color:#7B675A;text-decoration:underline;word-break:break-all;">{url_html}</a></p>')
     return button

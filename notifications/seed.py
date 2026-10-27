@@ -6,6 +6,7 @@ from .models import NotificationTemplate
 DEFAULT_SUBJECTS = {
     "verify": ("Confirm your email for Spa 99", "Sign-up: confirm the email address."),
     "password_reset": ("Reset your Spa 99 password", "Forgot password."),
+    "password_changed": ("Your Spa 99 password was changed", "After any password change (signed in or reset), team accounts too."),
     "team_invite": ("You've been added to the Spa 99 team", "To a new team member: the link to choose their own password."),
     "welcome": ("Welcome to Spa 99", "After the email address is confirmed."),
     "gold_approver": ("Gold Card application: {name} ({potential} potential)", "To the approver for each Gold application."),
