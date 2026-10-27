@@ -1,6 +1,6 @@
 {% extends "system/base.html" %}
 {% block main %}
-{% include "system/_page_header.html" with title="Email suppressions" description="Addresses Amazon SES reported as a permanent bounce or a spam complaint. We never email them. Removing one is logged in the audit log." %}
+{% include "system/_page_header.html" with title="Email suppressions" description="Addresses our email provider (Postmark, or Amazon SES) reported as a permanent bounce or a spam complaint. We also add anyone who asked the provider to stop emailing them. We never email them. Removing one is logged in the audit log." %}
 <section class="sys-panel" aria-label="Email suppressions">
   <div class="sys-scroll"><table class="sys-table" data-system-suppressions>
     <thead><tr><th scope="col">Email</th><th scope="col">Reason</th><th scope="col">Last seen</th><th scope="col">Count</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
