@@ -287,3 +287,17 @@ body.system {
   .se-touch { display: inline; }
   .se-bar-undo { flex-basis: 100%; }
 }
+
+/* ---------- saved templates: the Save as template panel, and the Templates tab ---------- */
+.se-tpl { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-2) var(--sys-3); margin-top: var(--sys-4); padding: var(--sys-3) var(--sys-4); border: 1px solid var(--sys-line); border-radius: var(--sys-radius-lg); background: var(--sys-surface); }
+.se-tpl > label { font-weight: 500; }
+.system .se-tpl input[type=text] { flex: 1 1 220px; min-width: 0; max-width: 360px; }
+.se-tpl .se-tpl-error, .se-tpl .se-tpl-exists { flex-basis: 100%; margin: 0; }
+.se-tpl .se-tpl-exists { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-2); }
+.se-tpl + .se-bar { margin-top: var(--sys-2); }
+.se-locknote { margin-bottom: var(--sys-3); }
+.se-templates td:last-child { white-space: nowrap; }
+.se-templates td:last-child form { display: inline-flex; align-items: center; gap: var(--sys-2); margin: 0 var(--sys-2) 0 0; }
+.system .se-templates input[type=text] { width: 180px; }
+.se-templates .sys-num { text-align: right; }
+@media (max-width: 48em) { .system .se-templates input[type=text] { width: 140px; } .se-tpl { padding: var(--sys-3); } }

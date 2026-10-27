@@ -274,3 +274,26 @@ class ProviderModeTests(TestCase):
             self.assertNotContains(page, "tok-secret")
             self.assertNotContains(page, "Check now")
         self.assertEqual(client.get("/emails/").context["ses"]["mode"], "provider")
+
+
+class MailingFormTemplateUiTests(TestCase):
+    """Markup the editor script relies on: the Save as template panel, the test address, and the Templates tab."""
+
+    def setUp(self):
+        seed_all()
+        self.client = unlocked_client(make_user())
+
+    def test_the_form_has_the_save_as_template_panel_and_the_addresses_the_script_posts_to(self):
+        page = self.client.get("/emails/mailings/new/")
+        self.assertContains(page, "data-se-save-template")
+        self.assertContains(page, 'data-se-tpl-name')
+        self.assertContains(page, 'data-test-url="/emails/mailings/test/"')
+        self.assertContains(page, 'data-template-url="/emails/mailings/templates/save/"')
+        booking = MailingTemplate.objects.get(key="booking_open")
+        self.assertContains(page, f'name="start" value="{booking.pk}"')
+
+    def test_the_templates_tab_lists_them_with_rename_and_delete(self):
+        page = self.client.get("/emails/templates/")
+        self.assertContains(page, 'data-tab="templates" aria-current="page"')
+        self.assertContains(page, "Booking is open")
+        self.assertContains(page, "data-system-template-rename")

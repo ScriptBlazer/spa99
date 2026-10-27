@@ -451,7 +451,7 @@ function initComposer(form) {
   function refreshBar() {
     const gate = !allowed;
     let reason = '';
-    if (!group()) reason = 'Choose who gets it.';
+    if (!group()) reason = testReason() ? 'Choose who gets it.' : 'Choose who gets it to send. You can test now.';
     else if (counting) reason = 'Counting.';
     else if (countError) reason = countError;
     else if (count === null) reason = 'Choose an option for the group.';
@@ -472,8 +472,9 @@ function initComposer(form) {
   /** Why Send me a test is off right now ('' when it is on). */
   function testReason() {
     if (builder.uploading) return 'Wait for the image to finish uploading.';
+    if (!fields.subject.value.trim()) return 'Add a subject to send a test.';
     if (!builder.count) return 'Add a part to the email.';
-    if (!fields.valid) return 'Fix the placeholders first.';
+    if (!fields.valid || builder.hasErrors()) return 'Fix the wording first.';
     return '';
   }
 
@@ -574,15 +575,70 @@ function initComposer(form) {
 
   testButton.addEventListener('click', async () => {
     if (testButton.getAttribute('aria-disabled') === 'true') { note.textContent = testReason(); return; }
-    const id = await saveDraft({ quiet: true });
-    if (!id) return;
-    testButton.setAttribute('aria-disabled', 'true');
-    const result = await call(`${base}${id}/test/`);
+    // A saved draft with a Who is saved again first and tested as saved; anything else is tested as typed, with no Who and nothing saved.
+    let result;
+    if (form.dataset.draftId && group()) {
+      const id = await saveDraft({ quiet: true });
+      if (!id) return;
+      testButton.setAttribute('aria-disabled', 'true');
+      result = await call(`${base}${id}/test/`);
+    } else {
+      testButton.setAttribute('aria-disabled', 'true');
+      result = await call(form.dataset.testUrl, { body: { subject: fields.subject.value, blocks: builder.json(), kind: kind(), name: nameField?.value || '' } });
+    }
     refreshBar();
+    if (result.locked) return showLocked('System locked. Unlock it in another tab, then send the test again.');
     if (result.status === 0) return toast(NETWORK, { kind: 'error' });
     if (result.data?.ok) toast(form.dataset.dev ? 'Test printed in the server log.' : `Test sent to ${$('[data-system-user]')?.textContent.trim() || 'you'}.`);
-    else toast(result.data?.message || 'The test could not be sent.', { kind: 'error' });
+    else {
+      if (result.data?.errors?.blocks) { builder.applyErrors(result.data.errors.blocks); await showProblems(form, builder.problems(), { opener: testButton }); }
+      toast(result.data?.message || 'The test could not be sent.', { kind: 'error' });
+    }
   });
+
+  /* ----- Save as template: a small panel above the bar asks for the name ----- */
+
+  const tpl = $('[data-se-tpl]', form);
+  const tplName = $('[data-se-tpl-name]', form);
+  const tplError = $('[data-se-tpl-error]', form);
+  const tplExists = $('[data-se-tpl-exists]', form);
+  const tplButton = $('[data-se-save-template]', form);
+  let tplBusy = false;
+  const tplClose = (refocus = true) => { tpl.hidden = true; tplExists.hidden = true; tplError.hidden = true; if (refocus) tplButton.focus(); };
+  tplButton.addEventListener('click', () => {
+    if (!tpl.hidden) { tplName.focus(); return; }
+    tplName.value = (nameField?.value || fields.subject.value || '').slice(0, 120);
+    tplError.hidden = true; tplExists.hidden = true; tpl.hidden = false;
+    tplName.focus(); tplName.select();
+    tpl.scrollIntoView({ block: 'nearest' });
+  });
+  async function saveTemplate(overwrite) {
+    if (tplBusy) return;
+    const name = tplName.value.trim();
+    tplError.hidden = true; tplExists.hidden = true;
+    if (!name) { tplError.textContent = 'Give the template a name.'; tplError.hidden = false; tplName.setAttribute('aria-invalid', 'true'); tplName.focus(); return; }
+    if (builder.uploading) { tplError.textContent = 'Wait for the image to finish uploading.'; tplError.hidden = false; return; }
+    tplBusy = true;
+    const body = { name, subject: fields.subject.value, kind: kind(), group: group(), blocks: builder.json() };
+    if (overwrite) body.overwrite = '1';
+    const result = await call(form.dataset.templateUrl, { body });
+    tplBusy = false;
+    if (result.locked) { showLocked('System locked. Unlock it in another tab, then save the template again.'); return; }
+    if (result.status === 0) { toast(NETWORK, { kind: 'error' }); return; }
+    const data = result.data || {};
+    if (result.ok && data.ok) { clearLocked(); tplClose(); toast(`Saved as template ${data.name || name}.`); return; }
+    if (data.exists) { tplExists.firstElementChild.textContent = `A template called ${name} exists. Replace it?`; tplExists.hidden = false; $('[data-se-tpl-replace]', tplExists).focus(); return; }
+    const errors = data.errors || {};
+    if (errors.name?.length) { tplError.textContent = errors.name.join(' '); tplError.hidden = false; tplName.setAttribute('aria-invalid', 'true'); tplName.focus(); }
+    const { name: _n, ...rest } = errors;
+    if (Object.keys(rest).length) { const issues = problemsFrom(rest); if (issues.length) await showProblems(form, issues, { opener: tplButton }); } else if (!errors.name?.length) toast('The template could not be saved. Please try again.', { kind: 'error' });
+  }
+  $('[data-se-tpl-save]', form).addEventListener('click', () => saveTemplate(false));
+  $('[data-se-tpl-replace]', form).addEventListener('click', () => saveTemplate(true));
+  $('[data-se-tpl-keep]', form).addEventListener('click', () => { tplExists.hidden = true; tplName.focus(); });
+  $('[data-se-tpl-cancel]', form).addEventListener('click', () => tplClose());
+  tplName.addEventListener('input', () => { tplName.removeAttribute('aria-invalid'); tplError.hidden = true; tplExists.hidden = true; });
+  tplName.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); saveTemplate(false); } else if (event.key === 'Escape') { event.preventDefault(); tplClose(); } });
 
   send.addEventListener('click', async () => {
     if (send.getAttribute('aria-disabled') === 'true') { note.textContent = send.dataset.reason; return; }

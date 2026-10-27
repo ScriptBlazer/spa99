@@ -8,7 +8,7 @@
 {{ blocks|json_script:"se-blocks" }}
 {{ block_errors|json_script:"se-block-errors" }}
 {{ block_types|json_script:"se-block-types" }}
-<form method="post" class="se-form" data-problems data-se-composer data-view="write" data-count-url="{{ count_url }}" data-preview-url="{{ preview_url }}" data-draft-id="{{ mailing.pk|default:'' }}"
+<form method="post" class="se-form" data-problems data-se-composer data-view="write" data-count-url="{{ count_url }}" data-preview-url="{{ preview_url }}" data-test-url="{% url 'system_mailing_test_posted' %}" data-template-url="{{ template_save_url }}" data-draft-id="{{ mailing.pk|default:'' }}"
       data-start="{{ start }}" data-max-parts="{{ block_max_parts }}" data-image-url="{{ image_upload_url }}" data-image-max="{{ image_max_bytes }}" data-image-base="{{ image_view_base }}" data-icons="{% static 'common/img/system-icons.svg' %}"
       data-send-base="{% url 'system_mailings' %}" data-allowed="{{ ses.allowed|yesno:'1,0' }}" data-gate="{{ ses.message }}" data-dev="{% if ses.mode == 'dev' %}1{% endif %}" novalidate>{% csrf_token %}
   <div class="se-switch sys-seg" role="group" aria-label="Show">
@@ -136,10 +136,19 @@
       </div>
     </section>
   </div>
+  <div class="se-tpl" data-se-tpl role="group" aria-label="Save as template" hidden>
+    <label for="se-tpl-name">Template name</label>
+    <input type="text" id="se-tpl-name" maxlength="120" autocomplete="off" data-se-tpl-name>
+    <button type="button" class="sys-btn sm primary" data-se-tpl-save>Save template</button>
+    <button type="button" class="sys-btn sm link" data-se-tpl-cancel>Cancel</button>
+    <p class="sys-error se-tpl-error" role="alert" data-se-tpl-error hidden></p>
+    <p class="sys-note warn se-tpl-exists" role="alert" data-se-tpl-exists hidden><span></span> <button type="button" class="sys-btn sm" data-se-tpl-replace>Replace</button> <button type="button" class="sys-btn sm link" data-se-tpl-keep>Cancel</button></p>
+  </div>
   <div class="sys-savebar se-bar" data-se-bar>
     <span class="se-bar-undo" data-se-undo hidden><span></span> <button type="button" class="sys-btn sm link">Undo</button></span>
     <span class="sys-msg se-bar-note" data-se-bar-note aria-live="polite"></span>
     <button type="button" class="sys-btn" data-se-save-draft>Save draft</button>
+    <button type="button" class="sys-btn" data-se-save-template>Save as template</button>
     <button type="button" class="sys-btn" data-se-test>Send me a test</button>
     <button type="button" class="sys-btn primary" data-se-send aria-disabled="true">Send</button>
   </div>
