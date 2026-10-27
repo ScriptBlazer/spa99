@@ -6,7 +6,9 @@ from django.http import Http404, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from . import sns
+from common.ratelimit import rate_limited_json
+
+from . import postmark, sns
 
 logger = logging.getLogger("spa99.email")
 
@@ -29,4 +31,27 @@ def ses_notifications(request):
     except sns.Rejected as error:
         logger.warning("SES feedback refused: %s", error)
         return HttpResponse(status=403)
+    return HttpResponse(status=200)
+
+
+@login_not_required  # PUBLIC on purpose: Postmark calls it. HTTP Basic credentials from the webhook URL are the proof.
+@csrf_exempt  # a server-to-server call has no CSRF token
+@require_POST
+@rate_limited_json("postmark-webhook", 300, 60)
+def postmark_webhook(request):
+    """Postmark bounce and spam-complaint feedback. 404 unless POSTMARK_WEBHOOK_USER and _PASSWORD are both set.
+    Valid records we ignore (soft bounces, other types) still answer 200, because Postmark retries anything else."""
+    if not postmark.configured():
+        raise Http404
+    if not postmark.authorised(request.META.get("HTTP_AUTHORIZATION")):
+        logger.warning("Postmark feedback refused: bad credentials")
+        return HttpResponse(status=401, headers={"WWW-Authenticate": 'Basic realm="postmark"'})
+    length = request.META.get("CONTENT_LENGTH") or "0"
+    if not length.isdigit() or int(length) > postmark.MAX_BODY_BYTES:
+        return HttpResponse(status=413)
+    try:
+        postmark.handle(request.body)
+    except ValueError as error:
+        logger.warning("Postmark feedback refused: %s", error)
+        return HttpResponse(status=400)
     return HttpResponse(status=200)

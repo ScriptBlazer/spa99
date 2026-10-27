@@ -21,6 +21,7 @@ Run these in order. Live starts with an empty database, so it needs no backfills
 7. **Email: Postmark for launch** (2026-10-27; SES is still in sandbox).
    - In Postmark, add the sending domain `spa99.uk` and put its DKIM and Return-Path records in Cloudflare. They sit alongside the SES records without clashing.
    - Copy the server token.
+   - **Bounces:** make up a long random user and password (letters and digits only) and put them in the server `.env` as `POSTMARK_WEBHOOK_USER` and `POSTMARK_WEBHOOK_PASSWORD`, then `docker compose up -d`. In Postmark: Server, Webhooks, Add webhook. URL `https://<user>:<password>@spa99.uk/postmark/webhook/`. Tick **Bounce** and **Spam complaint** only. Press **Send test** next to each: it must show 200 (a 404 means the two env values are not set, 401 means they differ from the URL). Cloudflare Bot Fight Mode must stay off (see below) or it blocks Postmark.
    - Ask Postmark to approve the account. Until it does, mail only reaches addresses at spa99.uk.
    - **Switching to SES later** is a `.env` change only (and change the Postmark lines in the privacy notice, parts 6 and 7, back to Amazon SES in Control). Delete the five `EMAIL_*` lines, so the default (SES) applies again, then run `docker compose up -d`. Then do step 19 for the bounce subscription.
 

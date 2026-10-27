@@ -75,3 +75,7 @@ Both are listed in System > Emails > Automatic emails (editable subject and word
 - **`gold_declined`** ("Your Spa 99 Gold Card application"). Only sent when the approver ticks **Email the applicant** while declining (default off; whether declines get an email is still Moishe's decision). Placeholders `{first_name}`, `{name}`, `{reference}`. The editable wording **prefills** the decline form's message box (placeholders filled in); the approver can change it, and what is sent is exactly the text in the box (shown as typed in the shared layout, `send_templated(..., plain_body=...)`). The sent result is a line in the application's History.
 
 The Gold approver email and the "sent back" email gained **Decline** and **Respond** links (Office form, `?do=decline|respond`); their wording stays in the template files (subject only is editable).
+
+## Postmark bounces (2026-10-27)
+
+With Postmark sending, permanent bounces and spam complaints arrive at `POST /postmark/webhook/` and land in the same suppression list as SES feedback, so group sends, invites and account emails skip those addresses and the System > Emails stats count them. Details and setup: `docs/features/email.md`.

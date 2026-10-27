@@ -11,6 +11,20 @@ Built 2026-10-25 (branch feature/email-signup). It is what we told AWS: bounce a
 - **The guard:** `notifications.services.send_templated` is the only way the site sends email. It drops suppressed addresses from To and CC (case-insensitive), logs a warning (no address), and if nobody is left writes an `EmailLog` row with status `suppressed` and returns it. It never raises, so a password reset for a suppressed address gives the same page as any other.
 - The address stays suppressed even if the person deletes their account (it holds only the address; sending again would harm our reputation).
 
+## Postmark bounces and complaints (2026-10-27, feature/postmark-bounces)
+
+Launch mail goes through Postmark, so its bounces reach the same `notifications.EmailSuppression` list as SES feedback does.
+
+- Endpoint `POST /postmark/webhook/` (public, CSRF exempt, JSON, marked PUBLIC in `config/urls.py`, rate limited 300 a minute per IP). Code: `notifications/postmark.py`, view `postmark_webhook`.
+- **Off (404) unless both `POSTMARK_WEBHOOK_USER` and `POSTMARK_WEBHOOK_PASSWORD` are set.** Then HTTP Basic is required (`hmac.compare_digest`); wrong or missing credentials: 401. Prod starts fine without them.
+- `RecordType` `SpamComplaint` (or a Bounce of Type `SpamComplaint`) is stored as `complaint`. A `Bounce` of Type `HardBounce`, `BadEmailAddress` or `ManuallyDeactivated`, or any bounce with `Inactive: true` (Postmark itself stopped sending), is stored as `hard_bounce`. SoftBounce, Transient, AutoResponder and the rest are ignored.
+- A bounce of Type `Unsubscribe` (the recipient asked to be removed) is stored as `complaint`. Non-string `Email`/`Type`/`RecordType` and addresses that fail `validate_email` (shared with SES, in `suppression.py`) are ignored with 200.
+- Staff: if a member says they get no reset or other email, check System > Email suppressions and remove the address (a bounce or complaint blocks every email to it, resets included).
+- Valid records we ignore answer 200 (Postmark retries anything else). A body that is not a JSON object: 400.
+- Same upsert as SES (`suppression.add`: lower case, first_seen / last_seen, count, invites and mailing rows marked bounced). The feedback id is the Postmark record `ID`, so a retry of the same record changes nothing; a new bounce for the same address updates `last_seen`. `EmailLog` is not touched: it stores no Postmark message id (SES does not update it either).
+- Logs hold the record type and a count, never the address or the credentials.
+- Setup: see `docs/GO-LIVE.md` step 7. Tests: `notifications/tests/test_postmark_feedback.py`.
+
 ## Seeing and removing (System, Developer level, behind the unlock)
 
 `/suppressions/` ("Email suppressions"): email, reason, last seen, count, and **Remove**. Remove writes a `suppress_removed` event to the System audit log first (nothing is removed if that cannot be written). The Django admin has a read-only list with CSV export. `manage.py ses_suppressions --list` / `--remove EMAIL` also exist (not audit logged: prefer System).
