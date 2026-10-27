@@ -2,7 +2,7 @@
 
 Decided 2026-10-27: every default visible in System on one tidy **Defaults** page, grouped by area. This is the inventory (170 defaults found). Not built yet. Moishe marks what should be editable before the build.
 
-Key: **E** editable · **RO** shown read-only (security, infra, abuse protection) · **Code** too technical, stays in code (not shown).
+Only editable defaults are shown (Moishe, 2026-10-27). A range default is the choice pre-selected when a page opens; the list of choices stays fixed.
 28 defaults are already editable on other System pages (Settings, Hours, Plans, Gold rules, Journey, Emails, Approval). The Defaults page links to them instead of copying them.
 
 ## Proposed editable (new) — 33
@@ -68,8 +68,8 @@ Key: **E** editable · **RO** shown read-only (security, infra, abuse protection
 |---|---|
 | Picture time on screen | 8 seconds |
 
-## Proposed read-only (shown, not editable) — 73
-Grouped on the page with a one-line reason each. Main ones:
+## Not shown (Moishe, 2026-10-27: no read-only section) — 73
+These stay in code and are not on the page:
 - **Abuse protection:** every rate limit (sign-in 10 per 5 min, registrations 20 an hour, Gold 10 an hour, journey and email limits, System code tries).
 - **Security:** password rules (min 10), reset link 1 hour, public sign-in 2 weeks, HTTPS/CSRF/HSTS, secret key, System code, hidden admin path (values never shown, only "set" / "not set").
 - **Legal and rules:** minimum age 18, UK mobiles only, journey cookie 1 year, privacy notice version, hot-lead definition, spa day 5am to 3am, audit retention.
