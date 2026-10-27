@@ -82,8 +82,8 @@ def hot_leads_queryset():
 
 def filters_from(request):
     get = request.GET
-    show, sort, range_name = get.get("show", "lead"), get.get("sort", "last_seen"), get.get("range", "30d")
-    return {"q": get.get("q", "").strip(), "range": range_name if range_name in RANGES else "30d", "show": show if show in SHOWS else "lead",
+    show, sort, range_name = get.get("show", "all"), get.get("sort", "last_seen"), get.get("range", "30d")
+    return {"q": get.get("q", "").strip(), "range": range_name if range_name in RANGES else "30d", "show": show if show in SHOWS else "all",
             "tier": get.get("tier", ""), "potential": get.get("potential", "") if get.get("potential") in POTENTIALS else "",
             "industry": get.get("industry", ""), "gold": "yes" if get.get("gold") in ("yes", "1", "on") else "", "hot": "1" if get.get("hot") == "1" else "",
             "sort": sort if sort in SORTS else "last_seen"}
@@ -92,7 +92,7 @@ def filters_from(request):
 def is_filtered(filters):
     """True when anything narrows the list beyond the defaults. The page shows no count then (counting rule C5)."""
     return bool(filters["q"] or filters["tier"] or filters["potential"] or filters["industry"] or filters["gold"] or filters["hot"]
-                or filters["show"] != "lead" or filters["range"] != "30d")
+                or filters["show"] != "all" or filters["range"] != "30d")
 
 
 def filtered_queryset(filters):

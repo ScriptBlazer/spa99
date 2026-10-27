@@ -133,7 +133,7 @@ def build_leads(range_name="30d", today=None, figures=None):
     new, converted = figures.new_lead_count(*window), figures.converted_leads(*window)
     return {"range": range_name, "ranges": list(ANALYTICS_RANGES), "today": today.isoformat(), "leads_new": new, "leads_registered": converted,
             "registered_share_bp": basis_points(converted, new), "hot_leads": leads.hot_leads_queryset().count(),
-            "leads_total": leads.lead_queryset(show="lead", range_name=range_name, today=today).count()}  # same range as the list
+            "leads_total": leads.lead_queryset(show="all", range_name=range_name, today=today).count()}  # same range as the list
 
 
 # ---------- dashboard ----------

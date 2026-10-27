@@ -39,7 +39,7 @@
             {% for r in summary.ranges %}<label class="o-seg-item"><input type="radio" name="range" value="{{ r }}"{% if filters.range == r %} checked{% endif %}><span>{% if r == "all" %}All{% else %}{{ r|range_label }}{% endif %}</span></label>{% endfor %}
           </fieldset></div>
         <div class="o-filter-group"><span class="o-filter-label" id="l-show">Show</span>
-          <fieldset class="o-seg" aria-labelledby="l-show" style="--n: 3; --i: {% if filters.show == 'registered' %}1{% elif filters.show == 'all' %}2{% else %}0{% endif %}" data-default="lead">
+          <fieldset class="o-seg" aria-labelledby="l-show" style="--n: 3; --i: {% if filters.show == "lead" %}0{% elif filters.show == "registered" %}1{% else %}2{% endif %}" data-default="all">
             <span class="o-seg-thumb" aria-hidden="true"></span>
             <label class="o-seg-item"><input type="radio" name="show" value="lead"{% if filters.show == "lead" %} checked{% endif %}><span>Not registered</span></label>
             <label class="o-seg-item"><input type="radio" name="show" value="registered"{% if filters.show == "registered" %} checked{% endif %}><span>Registered</span></label>
