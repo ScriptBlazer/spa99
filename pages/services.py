@@ -11,6 +11,7 @@ from content import services as content
 from content import images
 from plans import services as plan_services
 from plans.models import Facility, OpeningRule, Plan, SiteSettings
+from system import defaults
 
 # Home "What's inside" preview: the photo shown for a room (IMMERSIVE-R2 section 3, R3). Rooms not listed keep the current picture.
 # No photo here may appear elsewhere on Home: dry-sauna (Heat, slowly), cold-plunge, relax-loungers (the ritual) and lounge
@@ -507,7 +508,6 @@ def journey_facility_images():
 # ---------- the spa opener (SPA-OPENER.md section 2) ----------
 
 OPENER_MAX_LINES = 5
-OPENER_HERO_LINES = 1  # Moishe 2026-10-23: only "Open 5am to 3am." in the hero; rows 2 to 5 stay in the database, unrendered
 OPENER_PICTURES = ["robe", "door-gold"]  # the design picture, then the picture that exists today (until the robe is built)
 
 
@@ -536,11 +536,12 @@ def _fill_note(text, values):
     return _PLACEHOLDER.sub(lambda m: values[m.group(1)], "".join(kept)).strip()
 
 
-def opener_lines(copy=None, count=OPENER_HERO_LINES):
+def opener_lines(copy=None, count=None, request=None):
     """The opener words: [{statement, note}] from the first `count` `opener_n` rows of the `spa` page (the hero shows
     row 1 only; `count` up to 5 for the full set), placeholders {hours} {closure} {rooms} {Rooms} filled from the
     opening rules and the visible rooms. Rows with an empty heading (or a statement that needs a value we do not have)
     are skipped, never replaced by a later row."""
+    count = defaults.get(request).opener_lines if count is None else count  # System > Defaults (1 since 2026-10-23: only "Open 5am to 3am.")
     copy = copy if copy is not None else content.page_content("spa")
     values, lines = _opener_values(), []
     for n in range(1, min(count, OPENER_MAX_LINES) + 1):

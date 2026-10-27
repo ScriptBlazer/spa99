@@ -536,7 +536,8 @@ def _send_invite(invite):
             return
         unsub = tokens.unsubscribe_url(invite.email)
         context = {"first_name": invite.name.split(" ")[0] if invite.name else "", "url": f"{settings.SITE_URL}/invite/{invite.token}/",
-                   "unsubscribe_url": unsub, "notice": INVITE_NOTICE}
+                   "unsubscribe_url": unsub, "notice": INVITE_NOTICE,
+                   "valid_days": max(1, round((invite.expires_at - invite.created_at).total_seconds() / 86400))}
         log = send_templated("invite", [invite.email], subject_for("invite", first_name=context["first_name"] or "there"), context,
                              headers=tokens.list_unsubscribe_headers(unsub), subject_email=invite.email)
     except Exception as error:  # noqa: BLE001

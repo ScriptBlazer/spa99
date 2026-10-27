@@ -21,7 +21,7 @@ from users.views import LoginView, TeamPasswordView
 
 
 from . import approval as approval_service
-from . import audit, changes, codeview, feed, services
+from . import audit, changes, codeview, defaults, feed, services
 from . import team as team_service
 from .forms import EmailsForm, SettingsForm
 from .forms_rules import RISKY
@@ -30,7 +30,7 @@ from .permissions import signed_in, unlocked
 
 NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", "system_plans"), ("hours", "Hours and closures", "system_hours"),
        ("gold", "Gold rules", "system_gold"), ("approval", "Approval", "system_approval"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("sales", "Sales", "system_sales"), ("suppressions", "Email suppressions", "system_suppressions"),
-       ("settings", "Settings", "system_settings"), ("team", "Team", "system_team"), ("changes", "Audit log", "system_changes")]
+       ("settings", "Settings", "system_settings"), ("defaults", "Defaults", "system_defaults"), ("team", "Team", "system_team"), ("changes", "Audit log", "system_changes")]
 
 
 def saved(request, text="Saved."):
@@ -160,7 +160,7 @@ def sign_out(request):
 @require_GET
 def dashboard(request):
     site = SiteSettings.load()
-    context = {"health": services.health_report(), "recent": services.recent_changes(10), "site": site,
+    context = {"health": services.health_report(), "recent": services.recent_changes(defaults.get(request).dashboard_recent_changes), "site": site,
                "stages": [("Registration", site.register_interest_open), ("Subscribe", site.subscribe_open), ("Book", site.booking_open)]}
     return page(request, "system/dashboard.html", "dashboard", context)
 
@@ -173,8 +173,8 @@ def change_log(request):
     entry = request.GET.get("entry", "").strip()
     page_number = request.GET.get("page")
     if not page_number and (entry or request.GET.get("focus")):
-        page_number = feed.page_of(params, entry or request.GET["focus"])
-    result = feed.audit_feed(params, page_number)
+        page_number = feed.page_of(params, entry or request.GET["focus"], defaults.get(request).audit_page_size)
+    result = feed.audit_feed(params, page_number, defaults.get(request).audit_page_size)
     filters = feed.query_string(params)
     number = result["page"]["number"]
     context = {"feed": result, "params": params, "people": feed.people(), "section_choices": feed.section_choices(),
@@ -306,7 +306,7 @@ def _edit_site(request, form_class, template, section, extra=None):
 def emails(request):
     from . import emails as emails_logic
 
-    return _edit_site(request, EmailsForm, "system/emails.html", "emails", extra=emails_logic.overview)
+    return _edit_site(request, EmailsForm, "system/emails.html", "emails", extra=lambda: emails_logic.overview(request))
 
 
 @unlocked

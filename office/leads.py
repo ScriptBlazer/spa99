@@ -18,11 +18,12 @@ from journey.models import JourneySession, Option
 from mailings.models import EmailOptOut
 from users.models import InterestRegistration, User
 
+from system import defaults
+
 from . import lists, profile
 
 logger = logging.getLogger("spa99.office")
 
-PAGE_SIZE = 25
 SHOWS = ("lead", "registered", "all")
 SORTS = ("last_seen", "first_seen", "potential", "visits")
 RANGES = ("7d", "30d", "90d", "all")
@@ -81,18 +82,20 @@ def hot_leads_queryset():
 
 
 def filters_from(request):
-    get = request.GET
-    show, sort, range_name = get.get("show", "all"), get.get("sort", "last_seen"), get.get("range", "30d")
-    return {"q": get.get("q", "").strip(), "range": range_name if range_name in RANGES else "30d", "show": show if show in SHOWS else "all",
+    get, d = request.GET, defaults.get(request)
+    show, sort, range_name = get.get("show", d.leads_show), get.get("sort", d.leads_sort), get.get("range", d.leads_range)
+    return {"q": get.get("q", "").strip(), "range": range_name if range_name in RANGES else d.leads_range, "show": show if show in SHOWS else d.leads_show,
             "tier": get.get("tier", ""), "potential": get.get("potential", "") if get.get("potential") in POTENTIALS else "",
             "industry": get.get("industry", ""), "gold": "yes" if get.get("gold") in ("yes", "1", "on") else "", "hot": "1" if get.get("hot") == "1" else "",
-            "sort": sort if sort in SORTS else "last_seen"}
+            "sort": sort if sort in SORTS else d.leads_sort}
 
 
-def is_filtered(filters):
-    """True when anything narrows the list beyond the defaults. The page shows no count then (counting rule C5)."""
+def is_filtered(filters, request=None):
+    """True when anything narrows the list beyond the defaults (System > Defaults). The page shows no count then (counting rule C5).
+    Reads the same values as filters_from."""
+    d = defaults.get(request)
     return bool(filters["q"] or filters["tier"] or filters["potential"] or filters["industry"] or filters["gold"] or filters["hot"]
-                or filters["show"] != "all" or filters["range"] != "30d")
+                or filters["show"] != d.leads_show or filters["range"] != d.leads_range)
 
 
 def filtered_queryset(filters):
@@ -185,15 +188,17 @@ def lists_iso(value):
     return value.isoformat() if value else ""
 
 
-def page(filters, number):
-    """(rows, has_next) for one page, DB-side."""
-    start = (number - 1) * PAGE_SIZE
-    found = list(filtered_queryset(filters)[start:start + PAGE_SIZE + 1])
-    return build_rows(found[:PAGE_SIZE]), len(found) > PAGE_SIZE
+def page(filters, number, size=None):
+    """(rows, has_next) for one page, DB-side. `size` defaults to System > Defaults > Leads rows per page."""
+    size = size or defaults.get().leads_page_size
+    start = (number - 1) * size
+    found = list(filtered_queryset(filters)[start:start + size + 1])
+    return build_rows(found[:size]), len(found) > size
 
 
-def hot_leads(limit=5):
-    """The short Hot leads list (newest first): LIMIT read, one query."""
+def hot_leads(limit=None):
+    """The short Hot leads list (newest first): LIMIT read, one query. Default length: System > Defaults."""
+    limit = limit or defaults.get().dashboard_hot_leads
     found = hot_leads_queryset().select_related("suggested_plan").order_by("-lead_at", "-id")[:limit]
     return [{"id": str(s.pk), "email": s.email_key, "tier": s.suggested_plan.name if s.suggested_plan_id else "", "potential": s.gold_potential,
              "score": s.gold_score, "last_seen": lists_iso(s.last_seen_at), "first_seen": lists_iso(s.lead_at or s.created_at),
@@ -239,9 +244,10 @@ def _who(user=None, email=""):
     return email or "A visitor"
 
 
-def activity(limit=10):
+def activity(limit=None):
     """The latest `limit` events: email given, registered, verified, journey finished, Gold applied, Gold decided. Six LIMIT
     reads over the existing timestamps, merged: [{kind, at, who, label, detail, href}] newest first."""
+    limit = limit or defaults.get().dashboard_activity
     out = []
 
     def add(at, kind, who, label, detail="", href=""):
@@ -293,17 +299,15 @@ def lead_for(session):
     return "lead", profile.lead_profile(email, session.pk)
 
 
-TIMELINE_PAGE = 20
-
-
-def timeline_page(timeline, number):
-    """A page of the timeline (newest first, 20 events), grouped by day: ([{day, items}], has_more)."""
-    start = (number - 1) * TIMELINE_PAGE
-    chunk = timeline[start:start + TIMELINE_PAGE]
+def timeline_page(timeline, number, size=None):
+    """A page of the timeline (newest first; System > Defaults > events per page), grouped by day: ([{day, items}], has_more)."""
+    size = size or defaults.get().timeline_page_size
+    start = (number - 1) * size
+    chunk = timeline[start:start + size]
     days = []
     for item in chunk:
         day = timezone.localtime(datetime.fromisoformat(item["at"])).date().isoformat() if item["at"] else ""
         if not days or days[-1]["day"] != day:
             days.append({"day": day, "items": []})
         days[-1]["items"].append(item)
-    return days, len(timeline) > start + TIMELINE_PAGE
+    return days, len(timeline) > start + size

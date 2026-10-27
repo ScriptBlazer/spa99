@@ -25,6 +25,7 @@ from pages.access import memberships_visible
 from plans import sales as sale_services
 from plans import services as plan_services
 from plans.models import SiteSettings
+from system import defaults
 
 from . import member, services, tokens
 from .forms import ChangePasswordForm, ForgotPasswordForm, ResetPasswordForm, SignInForm, SignUpForm
@@ -92,7 +93,7 @@ class LoginView(auth_views.LoginView):
         mine = None if foreign else journey_services.session_from_cookies(self.request.COOKIES, user)
         response = super().form_valid(form)
         if getattr(self.request, "urlconf", "") == "config.urls_office":  # Office only: set on this session, not site-wide
-            self.request.session.set_expiry(settings.OFFICE_SESSION_AGE)
+            self.request.session.set_expiry(defaults.get(self.request).office_session_days * 86400)
         journey_services.link_user(mine, user)
         return _forget_journey_cookie(response) if foreign else response
 

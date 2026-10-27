@@ -34,12 +34,12 @@
     <div class="o-filters-slot" data-filters-slot>
       <div class="o-filters-body" data-filter-body>
         <div class="o-filter-group"><span class="o-filter-label" id="l-range">Last seen</span>
-          <fieldset class="o-seg" aria-labelledby="l-range" style="--n: 4; --i: {% index_of summary.ranges filters.range %}" data-default="30d">
+          <fieldset class="o-seg" aria-labelledby="l-range" style="--n: 4; --i: {% index_of summary.ranges filters.range %}" data-default="{{ site_defaults.leads_range }}">
             <span class="o-seg-thumb" aria-hidden="true"></span>
             {% for r in summary.ranges %}<label class="o-seg-item"><input type="radio" name="range" value="{{ r }}"{% if filters.range == r %} checked{% endif %}><span>{% if r == "all" %}All{% else %}{{ r|range_label }}{% endif %}</span></label>{% endfor %}
           </fieldset></div>
         <div class="o-filter-group"><span class="o-filter-label" id="l-show">Show</span>
-          <fieldset class="o-seg" aria-labelledby="l-show" style="--n: 3; --i: {% if filters.show == "lead" %}0{% elif filters.show == "registered" %}1{% else %}2{% endif %}" data-default="all">
+          <fieldset class="o-seg" aria-labelledby="l-show" style="--n: 3; --i: {% if filters.show == "lead" %}0{% elif filters.show == "registered" %}1{% else %}2{% endif %}" data-default="{{ site_defaults.leads_show }}">
             <span class="o-seg-thumb" aria-hidden="true"></span>
             <label class="o-seg-item"><input type="radio" name="show" value="lead"{% if filters.show == "lead" %} checked{% endif %}><span>Not registered</span></label>
             <label class="o-seg-item"><input type="radio" name="show" value="registered"{% if filters.show == "registered" %} checked{% endif %}><span>Registered</span></label>
@@ -58,7 +58,7 @@
         <div class="o-filter-group"><label class="o-filter-label" for="f-industry">Industry</label>
           <select id="f-industry" name="industry" class="o-select"><option value="">All industries</option>{% for i in choices.industries %}<option value="{{ i.value }}"{% if filters.industry == i.value %} selected{% endif %}>{{ i.label }}</option>{% endfor %}</select></div>
         <div class="o-filter-group"><label class="o-filter-label" for="f-sort">Sort by</label>
-          <select id="f-sort" name="sort" class="o-select" data-default="last_seen">
+          <select id="f-sort" name="sort" class="o-select" data-default="{{ site_defaults.leads_sort }}">
             <option value="last_seen"{% if filters.sort == "last_seen" %} selected{% endif %}>Last seen</option>
             <option value="first_seen"{% if filters.sort == "first_seen" %} selected{% endif %}>First seen</option>
             <option value="potential"{% if filters.sort == "potential" %} selected{% endif %}>Highest potential</option>

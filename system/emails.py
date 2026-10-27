@@ -13,6 +13,7 @@ from notifications import emailbody, ses
 from notifications.models import EmailLog, EmailSuppression, NotificationTemplate
 from notifications.seed import DEFAULT_SUBJECTS
 
+from . import defaults
 from .forms import VersionedForm
 from .models import SystemChange
 
@@ -23,12 +24,13 @@ SCHEDULE_FORMATS = ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S")
 
 # ---------- overview ----------
 
-def overview():
+def overview(request=None):
     """Context for /emails/: the SES state and cheap counts."""
     now = timezone.now()
     today = timezone.localtime(now).replace(hour=0, minute=0, second=0, microsecond=0)
     week = now - datetime.timedelta(days=7)
     sent = EmailLog.objects.filter(status=EmailLog.SENT)
+    d = defaults.get(request)
     return {
         "ses": ses.ses_status(),
         "stats": {
@@ -40,8 +42,8 @@ def overview():
             "suppressed_total": EmailSuppression.objects.count(),
             "unsubscribed_no_account": EmailOptOut.objects.count(),
         },
-        "recent_mailings": list(Mailing.objects.all()[:5]),
-        "recent_invite_batches": invite_batches()[:5],
+        "recent_mailings": list(Mailing.objects.all()[:d.recent_mailings]),
+        "recent_invite_batches": invite_batches()[:d.recent_batches],
     }
 
 

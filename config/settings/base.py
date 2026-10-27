@@ -111,7 +111,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.db.DatabaseCache", "LOCATION": "spa99_cache", "OPTIONS": {"MAX_ENTRIES": 10000}}}
 
 AUTH_USER_MODEL = "users.User"
-OFFICE_SESSION_AGE = 30 * 24 * 60 * 60  # staff sign-ins on the Office host last 30 days (SESSION_COOKIE_AGE stays Django's default for the public site)
 LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/account/"
 LOGOUT_REDIRECT_URL = "/login/"
@@ -128,7 +127,6 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Sign-up rules. (Prices, hours, journey and Gold rules are database rows, not settings.)
 MINIMUM_AGE = 18  # ACC-08; mirrored in common/static/common/js/validate.js
-EMAIL_VERIFY_MAX_AGE = 24 * 60 * 60  # seconds a verification link works
 PASSWORD_RESET_TIMEOUT = 60 * 60  # seconds a password reset link works
 
 # Email. Dev prints to the console, tests use the in-memory outbox, live sets EMAIL_BACKEND

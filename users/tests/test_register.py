@@ -1,4 +1,5 @@
 import re
+import time
 from datetime import timedelta
 from unittest import mock
 
@@ -196,7 +197,7 @@ class VerificationTests(TestCase):
         self.assertNotIn("_auth_user_id", replay.session)
 
     def test_expired_tampered_and_changed_email_links_are_refused(self):
-        with override_settings(EMAIL_VERIFY_MAX_AGE=-1):
+        with mock.patch("django.core.signing.time.time", return_value=time.time() + 25 * 3600):  # past the 24 hours default
             self.assertEqual(services.verify_email(self.token)[0], tokens.EXPIRED)
         self.assertEqual(services.verify_email(self.token[:-3] + "xyz")[0], tokens.INVALID)
         old_token = tokens.make_verify_token(self.user)

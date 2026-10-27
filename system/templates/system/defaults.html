@@ -1,0 +1,15 @@
+{% extends "system/base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Defaults" description="What each page starts with and how many rows it shows. Changes apply at once." %}
+<form id="defaults-reset" method="post" action="{% url 'system_defaults_reset' %}">{% csrf_token %}</form>
+<form method="post" data-problems data-system-form="defaults" data-system-risky="{{ risky_fields|join:',' }}">{% csrf_token %}
+  <section class="sys-panel">
+    {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
+    {{ form.row_token }}
+    {% for group in groups %}<div class="sys-group"><h3>{{ group.title }}</h3>
+      {% for row in group.rows %}{% include "system/_defaults_row.html" %}{% endfor %}
+    </div>{% endfor %}
+  </section>
+  <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>
+</form>
+{% endblock %}

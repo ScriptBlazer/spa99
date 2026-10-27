@@ -17,7 +17,9 @@ from common.validators import normalise_email
 from notifications.models import EmailSuppression
 from users.models import User
 
-from .models import INVITE_DAYS, EmailOptOut, Invite
+from system import defaults
+
+from .models import EmailOptOut, Invite
 
 MAX_ROWS = 2000
 MAX_BYTES = 1024 * 1024
@@ -142,13 +144,14 @@ def create_batch(raw, user):
     Returns (batch_id, report). Nothing is sent here."""
     report = check(raw)
     batch_id = uuid.uuid4()
+    expires_at = timezone.now() + timedelta(days=defaults.get().register_invite_days)  # read once for the whole batch
     if report["errors"] or not report["rows"]:
         return batch_id, report
     for item in report["rows"]:
         if item["status"] in ("invalid", "duplicate"):
             continue
         Invite.objects.create(
-            name=item["name"], email=item["email"], batch_id=batch_id, created_by=user if getattr(user, "pk", None) else None,
+            name=item["name"], email=item["email"], batch_id=batch_id, expires_at=expires_at, created_by=user if getattr(user, "pk", None) else None,
             status=Invite.QUEUED if item["status"] == "ok" else Invite.SKIPPED, reason="" if item["status"] == "ok" else item["message"])
     return batch_id, report
 
@@ -212,5 +215,3 @@ def mark_bounced(email):
     MailingRecipient.objects.filter(email=email, status=MailingRecipient.SENT, sent_at__gte=now - timedelta(days=7)).update(
         status=MailingRecipient.BOUNCED, updated_at=now)
 
-
-EXPIRY_DAYS = INVITE_DAYS

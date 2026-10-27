@@ -15,7 +15,7 @@ from .models import Insight
 logger = logging.getLogger("spa99.insights")
 
 RANGES = ("today", "7d", "30d", "90d", "all")
-MAX_RANK = 12  # every option of the biggest question (facilities has 8); Analytics shows the first ANALYTICS_RANK
+MAX_RANK = 12  # every option of the biggest question (facilities has 8); Analytics shows the first N (System > Defaults)
 # (key, title, source, noun for the sentence); source is ("answer", question key), ("plan", metric key) or ("referrer",)
 INSIGHTS = (
     ("facility", "Most wanted facility", ("answer", "facilities"), "people"),

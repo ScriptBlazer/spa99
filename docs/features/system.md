@@ -24,6 +24,7 @@ Branch `feature/system`. Decisions: PROJECT.md rows 2026-10-23 (three staff fron
 | **Emails** | Gold approver CC and contact email; template wording for each notification. Transport and secrets stay in env |
 | **Approval** (2026-10-25) | Who approves Gold (Approver, Office+) and who gives the final approval to Low potential ones (Final approver, Admin+), and where each person's emails go. See `docs/features/gold-final-approval.md` |
 | **Settings** | Opening date, stage switches (registration / subscribe / book), the journey email switch, wording |
+| **Defaults** (2026-10-27) | What Office pages open on, how many rows lists show, link and sign-in lengths, how long toasts stay; per-row Reset to default. See `docs/features/defaults.md` |
 | **Team** | Team members with level (Office, Admin, Developer, Superuser) and read-only Approver / Final approver labels (set in Approval); add, change level, deactivate, remove from team, merge duplicate accounts |
 
 Later (own phases): stay periods, RFID and Face ID rules, access windows, sales and offers (need the access hardware), content and images.

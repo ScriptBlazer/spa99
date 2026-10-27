@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_code as c, views_emails as e, views_rules as r, views_sales as sl
+from . import views, views_code as c, views_defaults as d, views_emails as e, views_rules as r, views_sales as sl
 from .permissions import unlocked
 
 urlpatterns = [
@@ -56,6 +56,8 @@ urlpatterns = [
     path("suppressions/", views.suppressions, name="system_suppressions"),
     path("suppressions/<uuid:pk>/remove/", views.suppression_remove, name="system_suppression_remove"),
     path("settings/", views.site_settings, name="system_settings"),
+    path("defaults/", d.defaults_page, name="system_defaults"),
+    path("defaults/reset/", d.defaults_reset, name="system_defaults_reset"),
     path("password/", unlocked(views.SystemPasswordView.as_view()), name="system_password"),
     path("team/", views.team, name="system_team"),
     path("team/add/", views.team_add, name="system_team_add"),

@@ -64,7 +64,7 @@ def spa(request):
     moments = services.spa_moments(copy)
     return _page(request, "pages/spa.html", "spa", facilities=cards,
                  sections=services.place_moments(services.spa_sections(cards), moments), tote=moments.get("tote"),
-                 opener_lines=services.opener_lines(copy), opener=services.opener_picture(copy),
+                 opener_lines=services.opener_lines(copy, request=request), opener=services.opener_picture(copy),
                  arrive_kit=services.arrive_kit(copy),
                  room_count=len(cards), visit_pills=services.visit_pills(copy), next_from=services.next_from_line(copy),
                  hours=services.opening_hours(), hours_facts=services.hours_facts())

@@ -1,6 +1,6 @@
 """Email verification and password reset tokens.
 
-Verification: a signed token (24h, settings.EMAIL_VERIFY_MAX_AGE). Single use because the person's
+Verification: a signed token (System > Defaults hours, read when checked). Single use because the person's
 `email_verified_at` is checked: a replayed link never signs anyone in again.
 Password reset: Django's token generator (1h, settings.PASSWORD_RESET_TIMEOUT). Single use because the
 token is built from the current password hash, which changes when the password is reset.
@@ -12,6 +12,8 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core import signing
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+
+from system import defaults
 
 from .models import User
 
@@ -27,7 +29,7 @@ def make_verify_token(user):
 def read_verify_token(token):
     """(status, user). status is EXPIRED / INVALID with user None, or 'ok' with the user."""
     try:
-        payload = signing.loads(token, salt=VERIFY_SALT, max_age=settings.EMAIL_VERIFY_MAX_AGE)
+        payload = signing.loads(token, salt=VERIFY_SALT, max_age=defaults.get().email_confirm_hours * 3600)
     except signing.SignatureExpired:
         return EXPIRED, None
     except signing.BadSignature:

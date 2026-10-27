@@ -75,15 +75,47 @@ def _welcome_values(ctx):
     }
 
 
+def _plural(number, unit):
+    return f"{number} {unit}" if number == 1 else f"{number} {unit}s"
+
+
+def _row_days(ctx, fallback):
+    """Days the link works: the row's own stamped length when the sender gave it (`valid_days`), else the Defaults value."""
+    try:
+        return max(1, int(ctx.get("valid_days")))
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _verify_values(ctx):
+    from system import defaults
+
+    return {"valid_for": _plural(defaults.get().email_confirm_hours, "hour")}
+
+
+def _gold_invite_values(ctx):
+    from system import defaults
+
+    days = _row_days(ctx, defaults.get().gold_invite_days)
+    return {"valid_for": _plural(days, "day"), "valid_days": days}
+
+
+def _invite_values(ctx):
+    from system import defaults
+
+    return {"valid_for": _plural(_row_days(ctx, defaults.get().register_invite_days), "day")}
+
+
+VALID_FOR = {"valid_for": "How long the link works, in words (e.g. '24 hours', '14 days'). Set in System > Defaults"}
 _FIRST = {"first_name": "The person's first name"}
 _SAMPLE_URL = "https://spa99.uk/example-link/"
 
 SPECS = {spec.key: spec for spec in [
     EmailSpec(
-        "verify", "Confirm your email", {**_FIRST}, {"first_name": "James"},
-        "Hello {first_name},\n\nPlease confirm your email address to finish setting up your Spa 99 account. The link works for 24 hours."
+        "verify", "Confirm your email", {**_FIRST, **VALID_FOR}, {"first_name": "James"},
+        "Hello {first_name},\n\nPlease confirm your email address to finish setting up your Spa 99 account. The link works for {valid_for}."
         "\n\n{button}\n\nIf you did not ask for this, you can ignore this email.",
-        button_label="Confirm my email", button_required=True, subject_placeholders=_FIRST),
+        button_label="Confirm my email", button_required=True, subject_placeholders=_FIRST, values=_verify_values),
     EmailSpec(
         "welcome", "Welcome", {**_FIRST, "account_id": "The account ID, e.g. AB12-CD34",
                                "registration_line": "'We have noted your registration for <plan>.'",
@@ -124,22 +156,22 @@ SPECS = {spec.key: spec for spec in [
         "Hello {first_name},\n\nThank you. We have your Gold Card application and we will be in touch.\n\nYour reference is {reference}.",
         subject_placeholders=_FIRST),
     EmailSpec(
-        "gold_invite", "Gold approved: set up the account", {**_FIRST, "valid_days": "How many days the link works"},
-        {"first_name": "James", "valid_days": 14},
+        "gold_invite", "Gold approved: set up the account", {**_FIRST, **VALID_FOR, "valid_days": "The number of days only (older wording; use valid_for)"},
+        {"first_name": "James"},
         "Hello {first_name},\n\nGood news: your Spa 99 Gold Card application has been approved.\n\n"
-        "Set up your account below. Your details are already filled in, you only choose a password. The link works for {valid_days} "
-        "days and can be used once.\n\n{button}\n\nIf the link has expired, reply to this email and we will send a new one.",
-        button_label="Set up your account", button_required=True, subject_placeholders=_FIRST),
+        "Set up your account below. Your details are already filled in, you only choose a password. The link works for {valid_for} "
+        "and can be used once.\n\n{button}\n\nIf the link has expired, reply to this email and we will send a new one.",
+        button_label="Set up your account", button_required=True, subject_placeholders=_FIRST, values=_gold_invite_values),
     EmailSpec(
         "gold_active", "Gold active", {**_FIRST}, {"first_name": "James"},
         "Hello {first_name},\n\nYour Spa 99 Gold Card is active on your account, from today.\n\nYou can see it when you sign in.\n\n{button}",
         button_label="Go to my account", button_required=True, button_fallback=False, subject_placeholders=_FIRST),
     EmailSpec(
-        "invite", "Invitation to register", {**_FIRST}, {"first_name": "James"},
+        "invite", "Invitation to register", {**_FIRST, **VALID_FOR}, {"first_name": "James"},
         "Hello {first_name},\n\nYou are invited to register for Spa 99, a men-only luxury spa at 99 Vale Road, London N4.\n\n"
-        "Registering is free and there is nothing to pay. Use your personal link to start: your name and email are already filled in."
+        "Registering is free and there is nothing to pay. Use your personal link to start: your name and email are already filled in. The link works for {valid_for}."
         "\n\n{button}\n\nIf you were not expecting this, you can ignore this email.",
-        button_label="Register for Spa 99", button_required=True, subject_placeholders=_FIRST),
+        button_label="Register for Spa 99", button_required=True, subject_placeholders=_FIRST, values=_invite_values),
     # Sent by an approver from the Office (docs/features/gold-actions.md). Respond: the typed {message} sits in this wording.
     # Declined: this wording only PREFILLS the decline form; the approver can edit it, and what is sent is exactly that text.
     EmailSpec(
@@ -254,12 +286,16 @@ def values_for(spec, context):
 
 
 def sample_values(spec):
-    return dict(spec.samples)
+    """The preview values: the samples, plus anything the spec computes from the live Defaults (e.g. how long a link works)."""
+    values = dict(spec.samples)
+    if spec.values and "valid_for" in spec.placeholders:
+        values.update(spec.values({}))
+    return values
 
 
 def test_context_for(spec, url):
     """The context for a test send: raw values as a real sender gives them, plus the sample link."""
-    return {**(spec.test_context if spec.test_context is not None else spec.samples), "url": url}
+    return {**(spec.test_context if spec.test_context is not None else spec.samples), "url": url}  # computed values (valid_for) are filled at send
 
 
 def _html_value(name, value):

@@ -25,6 +25,11 @@ RISKY = {
     "contact_email": ("contact address", "contact addresses", "The site shows and replies from the new address at once."),
     "lock_idle_minutes": ("lock setting", "lock settings", "System locks after the new idle time at once."),
     "max_sign_in_hours": ("lock setting", "lock settings", "Every System sign-in ends after the new limit."),
+    "gold_invite_days": ("link validity", "link validities", "Gold invites made from now on work for the new number of days."),
+    "gold_approval_days": ("link validity", "link validities", "Approval email links, including ones already sent, work for the new number of days."),
+    "register_invite_days": ("link validity", "link validities", "Register invites made from now on work for the new number of days."),
+    "office_session_days": ("sign-in length", "sign-in lengths", "Office sign-ins from now on last the new number of days."),
+    "email_confirm_hours": ("link validity", "link validities", "Confirmation links, including ones already sent, work for the new number of hours."),
     "roles": ("role", "roles", "Access changes at once."),
     "is_active": ("account", "accounts", "Access changes at once."),
 }

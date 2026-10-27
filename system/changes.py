@@ -15,6 +15,7 @@ from . import sentences
 # model (app_label.model) -> System section. Fields can override (FIELD_SECTIONS) because SiteSettings serves three sections.
 MODEL_SECTIONS = {
     "plans.sitesettings": "settings",
+    "system.sitedefaults": "defaults",
     "plans.plan": "plans",
     "plans.sale": "sales",
     "plans.openingrule": "hours",
@@ -39,7 +40,7 @@ FIELD_SECTIONS = {
 }
 SECTION_LABELS = {
     "plans": "Plans and pricing", "hours": "Hours and closures", "gold": "Gold rules", "journey": "Journey",
-    "emails": "Emails", "settings": "Settings", "team": "Team", "approval": "Approval", "sales": "Sales",
+    "emails": "Emails", "settings": "Settings", "defaults": "Defaults", "team": "Team", "approval": "Approval", "sales": "Sales",
 }
 SKIP_FIELDS = {"id", "created_at", "updated_at", "singleton_key"}
 
@@ -119,7 +120,7 @@ def record(history_instance, instance, history_user, **_):
         "history_id": history_instance.pk, "undo_of_id": undo_of,
     }
     if kind_code in ("+", "-"):
-        if kind_code == "+" and (history_user is None or model_label == "plans.sitesettings"):  # seeds, and the singleton's first load
+        if kind_code == "+" and (history_user is None or model_label in ("plans.sitesettings", "system.sitedefaults")):  # seeds, and the singleton's first load
             return
         kind = SystemChange.CREATED if kind_code == "+" else SystemChange.DELETED
         SystemChange.objects.create(section=section_for(model_label), kind=kind, **base,

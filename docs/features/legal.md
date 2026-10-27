@@ -23,7 +23,7 @@ Not legal advice: a solicitor must review both texts before launch (see Launch b
 | Journey context: referrer (up to 500 chars), UTM tags, device type, timings | `journey/models.py` `JourneySession`, `journey/services.py` `create_session` (user agent only turned into a device type, not stored) |
 | Account fields, hashed password, men-only, privacy version, marketing consent, account ID, verification | `users/models.py`, `users/forms.py` (mobile required), `register-interest.md` |
 | Sign-in records with IP and browser | `common/models.py` `LoginEvent` |
-| Gold application fields, rating, decision, invite (14 days, single use) | `gold/models.py`, `gold/invites.py` `INVITE_DAYS`, `gold-application.md` |
+| Gold application fields, rating, decision, invite (14 days, single use) | `gold/models.py`, System > Defaults (Gold invite link valid), `gold-application.md` |
 | Email records | `notifications/models.py` `EmailLog` |
 | Team activity with IP and UA | `system/models.py` `SystemChange`, `SystemEvent`; `system.md` |
 | Lawful bases | Proposed by us from the purposes above (solicitor to confirm) |
@@ -39,7 +39,7 @@ Not legal advice: a solicitor must review both texts before launch (see Launch b
 | Erasure removes the change history: User, InterestRegistration and GoldApplication history rows are deleted; JourneySession and Answer history are anonymised (user, key, person key, referrer, typed text cleared) | `users/services.py` `delete_user_data`, `_anonymise_sessions`; `gold/services.py` `delete_applications` |
 | What happens without the details (Art. 13(2)(e)): journey optional, registration and Gold need the form's fields, news optional | `users/forms.py`, `gold/forms.py` |
 | Tour display choices in sessionStorage (`tour-low`, `tour-tilt-no`, `tour-hint`) | `common/static/common/js/tour/engine.js` |
-| Team sign-ins up to 30 days | `OFFICE_SESSION_AGE` (System: 12 hours) |
+| Team sign-ins up to 30 days | System > Defaults, Office sign-in lasts (System: 12 hours) |
 | Sentry stores in the EU | Brief from Moishe (foundation: EU region). Confirm the Sentry organisation was created in the EU region |
 | Gold applications emailed to the approver list (may work for BML Group) | `SiteSettings.gold_approver_emails`, `gold/tasks.py` |
 | Self-service export (includes Gold score, reasons, consents, internal notes when present; journey suggestion detail, all UTM tags, Gold score, finish time) and delete, what delete removes, journeys anonymised | `users/services.py` `export_user_data`, `delete_user_data`; `account_you.html` |

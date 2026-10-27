@@ -73,10 +73,13 @@ export function dismiss(element) {
   setTimeout(() => element.remove(), 160);
 }
 
+/** How long a toast stays: System > Defaults sets the two times (data-toast-ms / data-toast-long-ms on the toast region, in ms). */
 function defaultTimeout(kind, hasAction) {
   if (kind === 'error') return 0;                  // stays until dismissed, or until the cause clears (dismiss)
-  if (hasAction || kind === 'warning') return 6000;
-  return 4000;
+  const data = document.querySelector('.toasts')?.dataset || {};
+  const long = Number(data.toastLongMs) || 6000;
+  const short = Number(data.toastMs) || 4000;
+  return hasAction || kind === 'warning' ? long : short;
 }
 
 /** Timers pause on hover, on focus inside the toast, and while the tab is hidden. */

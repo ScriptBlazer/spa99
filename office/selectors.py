@@ -2,7 +2,7 @@
 finished payload of a page and range; only `office.snapshots` calls them (the hourly roll-up and the debounced refresh
 after events). The public `dashboard`, `analytics` and `pages` just read the one stored OfficeSnapshot row (nothing is
 summed on page load; a missing row gives an empty state, never an inline computation). The two short source lists on the
-dashboard (waiting applications, latest registrations) are plain `LIMIT 5` reads."""
+dashboard (waiting applications, latest registrations) are plain LIMIT reads."""
 from datetime import timedelta
 
 from insights import metrics, reader
@@ -12,6 +12,7 @@ from insights.models import DailyMetric, Insight, MetricCounter, MetricText, Off
 from insights.rollup import basis_points
 from journey.models import Option, Question
 from plans.models import Plan
+from system import defaults
 
 DASHBOARD_RANGES = ("today", "7d", "30d", "all")
 ANALYTICS_RANGES = ("7d", "30d", "90d", "all")
@@ -63,7 +64,6 @@ def _text(key, scope):
     return MetricText.objects.filter(key=key, scope=scope).values_list("text", flat=True).first() or ""
 
 
-ANALYTICS_RANK = 6  # Analytics shows up to six options per insight
 HIDDEN_INSIGHTS = {"source"}  # still worked out and stored; not shown in the Office (Moishe 2026-10-25: not useful for now)
 
 
@@ -311,7 +311,7 @@ def build_analytics(range_name="30d", today=None, figures=None):
               for i, (k, label, v) in enumerate(funnel_def)]
 
     plans = _plan_order()
-    people = insights_for(range_name, ANALYTICS_RANK)
+    people = insights_for(range_name, defaults.get().analytics_options)  # System > Defaults; stored, so a change shows at the next refresh
 
     def by_plan(found):
         out = [{"dimension": slug, "label": name, "value": found.get(slug, 0)} for slug, name in plans]
@@ -366,14 +366,15 @@ def build_analytics(range_name="30d", today=None, figures=None):
     }
 
 
-def build_pages(range_name="30d", today=None, limit=10):
+def build_pages(range_name="30d", today=None, limit=None):
     """The stored JSON for page views: series, top pages by path group and referring sites (site names only; 'direct' = no referrer)."""
     range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
     today = today or metrics.day()
     granularity, labels = _points(range_name, today)
     rows = _fetch(range_name, granularity, labels, PAGE_KEYS)
+    limit = limit or defaults.get().top_pages  # System > Defaults > Top pages shown (stored: a change shows at the next refresh)
     top = sorted(_by_dimension(rows, K.PAGE_VIEWS, labels).items(), key=lambda i: (-i[1], i[0]))[:limit]
-    refs = sorted(_by_dimension(rows, K.REFERRERS, labels).items(), key=lambda i: (-i[1], i[0]))[:limit]
+    refs = sorted(_by_dimension(rows, K.REFERRERS, labels).items(), key=lambda i: (-i[1], i[0]))[:10]
     texts = {t.key: t.text for t in MetricText.objects.filter(scope=range_name, key__in=("chart_top_pages", "chart_referrers"))}
     return {
         "range": range_name, "granularity": granularity, "today": today.isoformat(), "labels": [d.isoformat() for d in labels],
@@ -444,37 +445,38 @@ def empty_pages(range_name):
             "summaries": {"top_pages": "", "referrers": ""}}
 
 
-def dashboard(range_name="7d"):
-    """The Dashboard payload: one stored snapshot row, plus the two short live lists (LIMIT 5 reads, not counts)."""
+def dashboard(range_name=None, request=None):
+    """The Dashboard payload: one stored snapshot row, plus the short live lists (LIMIT reads, not counts; lengths from System > Defaults)."""
     from gold.models import GoldApplication
     from users.models import InterestRegistration
 
     from . import leads
 
-    range_name = range_name if range_name in DASHBOARD_RANGES else "7d"
+    d = defaults.get(request)
+    range_name = range_name if range_name in DASHBOARD_RANGES else d.dashboard_range
     data = _snapshot(OfficeSnapshot.DASHBOARD, range_name) or {**empty_dashboard(range_name), "what_changed": UPDATING, "updating": True}
     data = {**EMPTY_LEADS, **data}  # a snapshot from before Leads existed has none of these keys
-    waiting_rows = GoldApplication.objects.filter(status__in=[*GoldApplication.WAITING, GoldApplication.AWAITING_FINAL]).order_by("-created_at")[:5]
-    latest = InterestRegistration.objects.select_related("user", "plan").order_by("-created_at")[:5]
+    waiting_rows = GoldApplication.objects.filter(status__in=[*GoldApplication.WAITING, GoldApplication.AWAITING_FINAL]).order_by("-created_at")[:d.dashboard_gold_waiting]
+    latest = InterestRegistration.objects.select_related("user", "plan").order_by("-created_at")[:d.dashboard_latest]
     return {**data,
             "waiting": {"count": data["gold_waiting"],
                         "items": [{"id": str(a.pk), "name": a.full_name, "potential": a.potential_level, "applied": a.created_at.isoformat()} for a in waiting_rows]},
-            "hot_lead_rows": leads.hot_leads(5), "activity": leads.activity(10),
+            "hot_lead_rows": leads.hot_leads(d.dashboard_hot_leads), "activity": leads.activity(d.dashboard_activity),
             "latest": [{"id": str(i.user_id), "name": i.user.get_full_name() or i.user.email, "plan": i.plan.name if i.plan_id else "",
                         "registered": i.created_at.isoformat()} for i in latest]}
 
 
-def analytics(range_name="30d"):
-    range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
+def analytics(range_name=None, request=None):
+    range_name = range_name if range_name in ANALYTICS_RANGES else defaults.get(request).analytics_range
     return _snapshot(OfficeSnapshot.ANALYTICS, range_name) or {**empty_analytics(range_name), "updating": True}
 
 
-def pages(range_name="30d"):
-    range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
+def pages(range_name=None, request=None):
+    range_name = range_name if range_name in ANALYTICS_RANGES else defaults.get(request).analytics_range
     return _snapshot(OfficeSnapshot.PAGES, range_name) or {**empty_pages(range_name), "updating": True}
 
 
-def leads_summary(range_name="30d"):
+def leads_summary(range_name=None, request=None):
     """The Leads page tiles and total: one stored snapshot row."""
-    range_name = range_name if range_name in ANALYTICS_RANGES else "30d"
+    range_name = range_name if range_name in ANALYTICS_RANGES else defaults.get(request).analytics_range
     return _snapshot(OfficeSnapshot.LEADS, range_name) or {**empty_leads(range_name), "updating": True}

@@ -12,12 +12,17 @@ from plans import services as plan_services
 
 from . import services
 from .conditions import matches
+from system import defaults
+
 from .models import SuggestionRule
 
-MAX_REASONS = 3
-MAX_ANSWER_REASONS = 2
-# How the result page presents each Gold potential (journey.md "Gold nudge").
-GOLD_PRESENTATION = {gold_rating.HIGH: "panel", gold_rating.MEDIUM: "line", gold_rating.LOW: "none"}
+MAX_ANSWER_REASONS = 2  # of the reasons shown, at most this many come from his answers (how many in all: System > Defaults)
+
+
+def gold_presentation(level):
+    """How the result page presents a Gold potential (journey.md "Gold nudge"): panel, line or none, from System > Defaults."""
+    d = defaults.get()
+    return {gold_rating.HIGH: d.gold_nudge_high, gold_rating.MEDIUM: d.gold_nudge_medium, gold_rating.LOW: d.gold_nudge_low}[level]
 
 
 @dataclass
@@ -88,12 +93,13 @@ def compute_suggestion(session):
 
 def _reasons(plan, supports):
     """Up to two reasons from his answers (strongest first), then facts about the plan, three in all."""
+    limit = defaults.get().result_reasons
     reasons = []
     for _, text in sorted(supports, key=lambda item: -item[0]):
-        if text not in reasons and len(reasons) < MAX_ANSWER_REASONS:
+        if text not in reasons and len(reasons) < min(MAX_ANSWER_REASONS, limit):
             reasons.append(text)
     for fact in plan_services.plan_facts(plan):
-        if len(reasons) >= MAX_REASONS:
+        if len(reasons) >= limit:
             break
         if fact not in reasons:
             reasons.append(fact)
@@ -199,7 +205,7 @@ def build_result(session, suggestion, rating):
         "gold": {
             "potential": rating.level,
             "score": rating.score,
-            "presentation": GOLD_PRESENTATION[rating.level],
+            "presentation": gold_presentation(rating.level),
         },
         "copy": copy,
     }

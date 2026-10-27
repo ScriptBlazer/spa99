@@ -12,7 +12,6 @@ from django.utils import timezone
 
 from common.models import BaseModel
 
-INVITE_DAYS = 30
 
 
 class Mailing(BaseModel):
@@ -86,6 +85,12 @@ def new_token():
     return secrets.token_urlsafe(24)
 
 
+def _register_invite_days():
+    from system import defaults
+
+    return defaults.get().register_invite_days
+
+
 class Invite(BaseModel):
     """One person invited to register. The personal link /invite/<token>/ only pre-fills the register form and marks the invite
     opened: nothing else is trusted from it."""
@@ -106,7 +111,7 @@ class Invite(BaseModel):
     opened_at = models.DateTimeField(null=True, blank=True)
     registered_at = models.DateTimeField(null=True, blank=True)
     registered_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
-    expires_at = models.DateTimeField(help_text="The personal link stops working then (30 days after it was created).")
+    expires_at = models.DateTimeField(help_text="The personal link stops working then (System > Defaults days after it was created).")
     message_id = models.CharField(max_length=100, blank=True)
     attempts = models.PositiveSmallIntegerField(default=0)
     retry_at = models.DateTimeField(null=True, blank=True)
@@ -122,7 +127,7 @@ class Invite(BaseModel):
     def save(self, *args, **kwargs):
         self.email = (self.email or "").strip().lower()
         if not self.expires_at:
-            self.expires_at = timezone.now() + timedelta(days=INVITE_DAYS)
+            self.expires_at = timezone.now() + timedelta(days=_register_invite_days())
         super().save(*args, **kwargs)
 
     @property

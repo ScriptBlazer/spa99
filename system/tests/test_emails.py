@@ -58,7 +58,7 @@ class AutomaticEmailTests(TestCase):
                                                      "invite", "gold_approver", "gold_approver_repeat", "gold_final", "gold_sent_back", "gold_respond", "gold_declined"})
         self.assertNotIn("mailing", {e["key"] for e in listing})
         page = self.client.get("/emails/automatic/verify/")
-        self.assertEqual([p["name"] for p in page.context["spec"]["placeholders"]], ["first_name"])
+        self.assertEqual([p["name"] for p in page.context["spec"]["placeholders"]], ["first_name", "valid_for"])
         self.assertTrue(page.context["spec"]["button_required"])
         self.assertIn("Please confirm your email address", page.context["form"].initial["body"])  # the editor shows what is sent
         bad = self.client.post("/emails/automatic/verify/save/", {"subject": "Hi {zzz}", "body": "No link {first_name}"})
