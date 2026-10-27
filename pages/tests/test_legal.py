@@ -30,7 +30,7 @@ class LegalPageTests(TestCase):
                 self.assertContains(response, "16930909")
                 self.assertContains(response, "40 Wellington Avenue, London N15 6AS")
                 self.assertContains(response, 'href="mailto:desk@example.com"')
-                self.assertContains(response, "Last updated 26 October 2026")
+                self.assertContains(response, "Last updated 27 October 2026" if path == "/privacy/" else "Last updated 26 October 2026")
                 self.assertNotContains(response, "To be supplied")
                 self.assertNotContains(response, "{contact}")
 

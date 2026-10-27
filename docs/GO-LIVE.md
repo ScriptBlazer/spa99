@@ -22,7 +22,7 @@ Run these in order. Live starts with an empty database, so it needs no backfills
    - In Postmark, add the sending domain `spa99.uk` and put its DKIM and Return-Path records in Cloudflare. They sit alongside the SES records without clashing.
    - Copy the server token.
    - Ask Postmark to approve the account. Until it does, mail only reaches addresses at spa99.uk.
-   - **Switching to SES later** is a `.env` change only. Delete the five `EMAIL_*` lines, so the default (SES) applies again, then run `docker compose up -d`. Then do step 19 for the bounce subscription.
+   - **Switching to SES later** is a `.env` change only (and change the Postmark lines in the privacy notice, parts 6 and 7, back to Amazon SES in Control). Delete the five `EMAIL_*` lines, so the default (SES) applies again, then run `docker compose up -d`. Then do step 19 for the bounce subscription.
 
 ## C. Server
 

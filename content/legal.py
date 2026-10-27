@@ -15,6 +15,7 @@ How a legal body is written (one line per block, rendered by `content.legal_rend
 Keys: `body` (title and intro), `updated` (the date shown), `part_N` (the numbered parts, in order), `contact`."""
 
 UPDATED = "26 October 2026"
+PRIVACY_UPDATED = "27 October 2026"  # Postmark added as the email sender
 PRIVACY_VERSION = "2026-10-26"  # SiteSettings.privacy_version; recorded on everyone who accepts this notice
 
 COMPANY_LINE = ("Spa 99 is run by BML SPA 99 LIMITED, a company registered in England (company number 16930909). "
@@ -137,7 +138,9 @@ PRIVACY_PARTS = [
         "Only with companies that help us run the site. They work under contract, on our instructions, and may not use "
         "your information for anything else.",
         "- Website hosting ({hosting}): the servers and database the site runs on.",
-        "- Amazon Web Services: stores the site's files and images (Amazon S3) and sends our emails (Amazon SES).",
+        "- Amazon Web Services: stores the site's files and images (Amazon S3).",
+        "- Postmark (ActiveCampaign): sends our emails, such as confirming your email, password resets and Gold Card "
+        "updates. It handles your name, email address and the email itself.",
         "- Sentry: receives error reports when something breaks. Reports leave out names, email addresses and IP "
         "addresses, but can include your account's internal number and the type of browser.",
         "- Microsoft 365: our mailbox, where emails you send us are kept.",
@@ -149,6 +152,8 @@ PRIVACY_PARTS = [
     ("part_7", "Where it is kept", "\n".join([
         "Our Amazon services run in London. Sentry keeps error reports in the European Union, which UK law recognises "
         "as protecting personal data properly.",
+        "Postmark is based in the United States, so the emails we send you pass through and are briefly stored there. "
+        "This is covered by the UK-US data bridge or the UK International Data Transfer Agreement.",
         "If a provider handles information outside the UK, for example for support, we make sure the safeguards UK law "
         "requires are in place, such as the UK International Data Transfer Agreement or the UK-US data bridge.",
     ])),
@@ -276,7 +281,7 @@ TERMS_PARTS = [
 PRIVACY = ("Privacy notice", "What Spa 99 collects, why, and the choices you have.", [
     ("body", "Privacy notice.", "What we collect when you use the Spa 99 website, why, and the choices you have. "
      "Plain words, nothing hidden.", "", ""),
-    ("updated", "Last updated", UPDATED, "", ""),
+    ("updated", "Last updated", PRIVACY_UPDATED, "", ""),
     ("ico", "ICO registration number", "ZC284282", "", ""),  # BML Spa 99 Limited, registered 2026-10-26
     ("hosting", "Hosting provider name", "Amazon Web Services, London region", "", ""),  # chosen 2026-10-26
     *[(key, heading, body, "", "") for key, heading, body in PRIVACY_PARTS],
