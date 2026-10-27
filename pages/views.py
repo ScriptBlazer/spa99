@@ -156,7 +156,7 @@ def journey(request, slug=""):
     _check_slug(slug, {*JOURNEY_SLUGS.values(), JOURNEY_RESULT_SLUG})
     keys = ["screen_1", "screen_2", "screen_3", "screen_4", "result_label", "why", "result_cta", "change_answers",
             "gold_panel", "gold_line", "others", "explore_memberships", "continue", "skip", "last", "back", "prefer_not", "start_again",
-            "save_error", "result_loading", "result_error", "unavailable", "not_a_fit", "optional", "last_suggestion", "need_one", "result_empty"]
+            "save_error", "result_loading", "result_error", "unavailable", "not_a_fit", "optional", "last_suggestion", "need_one", "result_empty", "not_you"]
     session = journey_services.session_from_cookies(request.COOKIES, request.user)
     shown = memberships_visible(request)
     config = {
@@ -168,6 +168,8 @@ def journey(request, slug=""):
                  "memberships": reverse("memberships") if shown else reverse("journey"),
                  "membershipsPage": reverse("memberships")},  # the result link: he has passed the gate by then
         "membershipsHidden": not shown,
+        "emailGate": SiteSettings.load().journey_email_gate,
+        "signedIn": request.user.is_authenticated,  # "Not you?" is for shared devices, never for a known person
         "goldFeeNote": plan_services.gold_fee_note(),  # shown under the Gold panel; '' while the fee is empty
     }
     if not shown:  # Memberships is hidden: fallbacks send him back into the journey, not to a page that is not there

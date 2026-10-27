@@ -311,7 +311,9 @@ function renderResult(data) {
       el('button', { type: 'button', class: 'btn-quiet', 'data-restart': '', text: copyOf('start_again').cta })),
     presentation === 'line'
       ? el('p', { class: 'gold-line-note' }, `${goldLineCopy.body} `, el('a', { href: config.urls.goldApply, text: goldLineCopy.cta }))
-      : null);
+      : null,
+    config.signedIn || !config.emailGate || !state.session.has_lead_email ? null : el('p', { class: 'not-you' },
+      el('button', { type: 'button', class: 'btn-quiet', 'data-restart': '', 'data-new-person': '', text: copyOf('not_you').cta || 'Not you? Use another email' })));
 
   const others = (data.others || []).length
     ? el('div', { class: 'others', 'data-reveal': '' }, el('h2', { text: copyOf('others').heading }),
@@ -366,6 +368,7 @@ function renderGate() {
     primary.removeAttribute('aria-busy');
     if (reply?.ok) {
       state.session.lead_required = false;
+      state.session.has_lead_email = true;
       show(resultStep); // same URL: now the result itself
       return;
     }
@@ -540,7 +543,7 @@ root.addEventListener('click', async (event) => {
     setAnswer(key, { options: [], text: '', skipped: true });
   } else if (target.hasAttribute('data-restart')) {
     target.disabled = true;
-    const fresh = await postJson('/journey/restart/', {}).catch(() => null);
+    const fresh = await postJson('/journey/restart/', target.hasAttribute('data-new-person') ? { new_person: true } : {}).catch(() => null);
     if (fresh?.ok) { load(fresh.data, 1); history.replaceState({ journey: true, step: 1, idx: 0 }, '', urlFor(1)); }
     else target.disabled = false;
   }

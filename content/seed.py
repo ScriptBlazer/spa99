@@ -144,6 +144,7 @@ PAGES = {
         ("prefer_not", "", "", "Prefer not to say", ""),
         ("start_again", "", "", "Start again", ""),
         ("last_suggestion", "", "", "See my last suggestion", ""),
+        ("not_you", "", "", "Not you? Use another email", ""),
         ("need_one", "", "Choose at least one to continue.", "", ""),
         ("save_error", "", "We couldn't save that just now. Your answers are safe on this page.", "", ""),
         ("result_empty", "Thank you.", "Have a look at the memberships and choose the one that suits you.", "See memberships", "/memberships/"),

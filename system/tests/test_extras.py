@@ -16,7 +16,7 @@ from system import services
 from system.models import SystemChange
 from system.tests.test_system import PASSWORD, make_user, sign_in, unlocked_client
 
-SETTINGS_POST = {"opening_text": "January 2027", "register_interest_open": "on", "join_wording": "register_interest", "vat_rate": "20.00", "lock_idle_minutes": "15", "max_sign_in_hours": "12"}
+SETTINGS_POST = {"opening_text": "January 2027", "register_interest_open": "on", "journey_email_gate": "on", "join_wording": "register_interest", "vat_rate": "20.00", "lock_idle_minutes": "15", "max_sign_in_hours": "12"}
 
 
 class PingTests(TestCase):

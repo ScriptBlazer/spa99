@@ -176,11 +176,18 @@ def lead(request):
 @rate_limited_json("journey-restart", 20, 60)
 def restart(request):
     """'Start again': a new empty session on the same device (new cookie), so the old answers, suggestion, statistics
-    and any Gold application linked to it stay intact. Returns the fresh state: screen 1, no answers, no last suggestion."""
+    and any Gold application linked to it stay intact. `{"new_person": true}` (the "Not you? Use another email" link, signed-out only) starts a different person: new person_key, no email. Returns the fresh state: screen 1, no answers, no last suggestion."""
+    data = _body(request) if request.content_type == "application/json" else {}  # a bare POST is a plain restart
+    if data is None:
+        return _bad("Send JSON.")
+    new_person = data.get("new_person") is True
+    if new_person and request.user.is_authenticated:  # a signed-in visitor is his account, not "someone else"
+        return _bad("You are signed in.", status=403)
     old, _ = _session_for(request)
     fresh = services.create_session(
         request.META.get("HTTP_USER_AGENT", ""), referrer=old.referrer,
-        utm={name: getattr(old, name) for name in services.UTM_FIELDS}, user=request.user, previous=old,
+        utm={name: getattr(old, name) for name in services.UTM_FIELDS}, user=request.user,
+        previous=None if new_person else old,  # "Not you?": own person_key, no email carried (shared device)
     )
     visitors.record_journey_start(request)
     return _with_cookie(JsonResponse(services.build_state(fresh, request.user)), fresh)
