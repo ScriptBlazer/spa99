@@ -90,3 +90,5 @@ New editable automatic email `password_changed` ("Your Spa 99 password was chang
 ## Email builder (2026-10-27, backend)
 
 Group mailings can be built from parts (`Mailing.blocks`), with uploaded pictures (`MailingImage`, served at `/email-image/<id>/`) and a "Booking is open" starting template. Real sends, the System preview and "Send me a test" all use the parts when there are any; a mailing without parts renders from `body` as before. Spec and the contract for the editor screen: `docs/features/email-builder.md`. Code: `mailings/blocks.py`, `mailings/images.py`.
+
+**Suppressions tab (2026-10-27).** The suppression list moved here from its own System nav item: tab "Suppressions" at `/emails/suppressions/` (same Developer + unlock rule, remove is audited as before). `/suppressions/` redirects permanently to it.

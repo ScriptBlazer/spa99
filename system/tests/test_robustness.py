@@ -189,7 +189,7 @@ class AuditAndAdminTests(RulesTestCase):
                 services.remove_suppression(mock.Mock(user=self.user, META={}, path="/", headers={}), row)
         self.assertFalse(SystemEvent.objects.filter(kind=SystemEvent.SUPPRESSION_REMOVED).exists())
         self.assertTrue(EmailSuppression.objects.filter(pk=row.pk).exists())
-        self.assertContains(self.client.get("/suppressions/"), "data-system-confirm")
+        self.assertContains(self.client.get("/emails/suppressions/"), "data-system-confirm")
 
 
 class UnlockLimitTests(TestCase):

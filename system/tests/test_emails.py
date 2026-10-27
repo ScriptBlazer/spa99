@@ -19,7 +19,7 @@ from plans.models import Plan
 User = get_user_model()
 LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "emails-tests"}}
 UUID = "00000000-0000-0000-0000-000000000000"
-PATHS = ["/emails/", "/emails/automatic/", "/emails/automatic/verify/", "/emails/mailings/", "/emails/mailings/new/",
+PATHS = ["/emails/", "/emails/suppressions/", "/emails/automatic/", "/emails/automatic/verify/", "/emails/mailings/", "/emails/mailings/new/",
          "/emails/invites/", "/emails/invites/new/", f"/emails/mailings/{UUID}/", f"/emails/invites/{UUID}/"]
 POSTS = ["/emails/automatic/verify/save/", "/emails/automatic/verify/preview/", "/emails/automatic/verify/test/", "/emails/automatic/verify/reset/",
          "/emails/mailings/preview/", f"/emails/mailings/{UUID}/send/", f"/emails/mailings/{UUID}/schedule/", f"/emails/mailings/{UUID}/cancel/",
@@ -248,3 +248,13 @@ class MailingEditorPageTests(TestCase):
         self.assertNotContains(page, "This draft was one block of text.")
         self.assertEqual(page.context["blocks"], [{"type": "heading", "text": "Hello"}])
         self.assertTrue(page.context["image_view_base"].endswith("/email-image/"))
+
+
+class SuppressionsMovedTests(TestCase):
+    def test_the_old_address_redirects_permanently_and_the_tab_is_in_emails(self):
+        client = unlocked_client(make_user())
+        old = client.get("/suppressions/")
+        self.assertEqual((old.status_code, old["Location"]), (301, "/emails/suppressions/"))
+        page = client.get("/emails/suppressions/")
+        self.assertContains(page, 'data-tab="suppressions" aria-current="page"')
+        self.assertNotContains(client.get("/emails/"), ">Email suppressions</a>")
