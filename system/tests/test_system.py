@@ -110,15 +110,23 @@ class ChangeLogTests(TestCase):
     def test_the_memberships_switch_is_on_the_settings_page_and_saves(self):
         self.assertFalse(SiteSettings.load().memberships_public)
         self.assertContains(self.client.get("/settings/"), 'name="memberships_public"')
-        response = self.client.post("/settings/", {"opening_text": "January 2027", "register_interest_open": "on", "memberships_public": "on", "join_wording": "register_interest", "vat_rate": "20.00", "lock_idle_minutes": "15", "max_sign_in_hours": "12"})
+        response = self.client.post("/settings/", {"opening_text": "January 2027", "register_interest_open": "on", "journey_email_gate": "on", "memberships_public": "on", "join_wording": "register_interest", "vat_rate": "20.00", "lock_idle_minutes": "15", "max_sign_in_hours": "12"})
         self.assertEqual(response.status_code, 302)
         self.assertTrue(SiteSettings.load().memberships_public)
         self.assertTrue(SystemChange.objects.filter(field="memberships_public").exists())
 
+    def test_the_journey_email_switch_saves_and_is_logged(self):
+        self.assertTrue(SiteSettings.load().journey_email_gate)
+        self.assertContains(self.client.get("/settings/"), 'name="journey_email_gate"')
+        response = self.client.post("/settings/", {"opening_text": "January 2027", "register_interest_open": "on", "join_wording": "register_interest", "vat_rate": "20.00", "lock_idle_minutes": "15", "max_sign_in_hours": "12"})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(SiteSettings.load().journey_email_gate)
+        self.assertTrue(SystemChange.objects.filter(field="journey_email_gate").exists())
+
     def test_a_settings_change_logs_who_when_old_and_new_and_undo_restores_it(self):
         site = SiteSettings.load()
         self.assertEqual(site.vat_rate, Decimal("20.00"))
-        response = self.client.post("/settings/", {"opening_text": "January 2027", "register_interest_open": "on", "join_wording": "register_interest", "vat_rate": "25.00", "lock_idle_minutes": "15", "max_sign_in_hours": "12"})
+        response = self.client.post("/settings/", {"opening_text": "January 2027", "register_interest_open": "on", "journey_email_gate": "on", "join_wording": "register_interest", "vat_rate": "25.00", "lock_idle_minutes": "15", "max_sign_in_hours": "12"})
         self.assertEqual(response.status_code, 302)
         change = SystemChange.objects.get(field="vat_rate")
         self.assertEqual((change.old_value, change.new_value, change.user, change.section, change.model_label),

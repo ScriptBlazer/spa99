@@ -64,6 +64,26 @@ class LinkingTests(OfficeTestCase):
         self.assertFalse(JourneySession.objects.filter(lead_email__iexact="hugo@example.com").exists())
 
 
+class LeadUnsubscribedTests(OfficeTestCase):
+    def test_lead_page_and_list_show_unsubscribed(self):
+        from mailings import optout
+
+        session = lead("hugo@example.com")
+        office = staff("Office", "o@example.com")
+        self.assertNotContains(get(office, f"/leads/{session.pk}/"), "data-unsubscribed")
+        optout.unsubscribe("Hugo@example.com")
+        self.assertContains(get(office, f"/leads/{session.pk}/"), "data-unsubscribed")
+        self.assertContains(get(office, "/leads/"), "data-unsubscribed")
+
+    def test_list_labels_an_account_that_turned_news_off(self):
+        lead("sam@example.com")
+        user = User.objects.create_user("sam@example.com", "x", email_verified_at=timezone.now(), marketing_consent=False)
+        office = staff("Office", "o@example.com")
+        self.assertContains(get(office, "/leads/?show=registered"), "data-unsubscribed")
+        User.objects.filter(pk=user.pk).update(marketing_consent=True)
+        self.assertNotContains(get(office, "/leads/?show=registered"), "data-unsubscribed")
+
+
 class LeadsListTests(OfficeTestCase):
     def setUp(self):
         self.office = staff("Office", "o@example.com")
@@ -86,15 +106,16 @@ class LeadsListTests(OfficeTestCase):
         User.objects.create_user("unverified@example.com", "x")  # an unverified account does not take the lead over
         lead("boss@example.com")
         staff("Office", "BOSS@example.com")
-        self.assertEqual(sorted(self.emails()), ["one@example.com", "three@example.com", "two@example.com", "unverified@example.com"])
+        self.assertEqual(sorted(self.emails()), ["one@example.com", "reg@example.com", "three@example.com", "two@example.com", "unverified@example.com"])  # default All (2026-10-27)
+        self.assertEqual(sorted(self.emails("show=lead")), ["one@example.com", "three@example.com", "two@example.com", "unverified@example.com"])
         self.assertEqual(self.emails("show=registered"), ["reg@example.com"])
-        self.assertEqual(self.emails("potential=high"), ["two@example.com"])
+        self.assertEqual(self.emails("potential=high&show=lead"), ["two@example.com"])
         self.assertEqual(self.emails("q=THREE"), ["three@example.com"])
         self.assertEqual(self.emails("industry=finance").count("three@example.com"), 0)
         gold_services.submit_application(application_data(email="one@example.com"))
         self.assertEqual(self.emails("gold=yes"), ["one@example.com"])
-        self.assertEqual(self.emails("sort=potential")[0], "two@example.com")
-        self.assertEqual(self.emails("sort=visits")[0], "one@example.com")
+        self.assertEqual(self.emails("sort=potential&show=lead")[0], "two@example.com")
+        self.assertEqual(self.emails("sort=visits&show=lead")[0], "one@example.com")
         rows = lead_lists.page(lead_lists.filters_from(type("R", (), {"GET": {}})()), 1)[0]
         self.assertEqual({r["email"]: r["journeys"] for r in rows}["one@example.com"], 2)
         self.assertEqual([r["email"] for r in lead_lists.hot_leads()], ["two@example.com"])

@@ -10,6 +10,7 @@ from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from gold.models import GoldApplication
+from journey.models import JourneySession
 from mailings import invites, optout, segments, sending, tokens
 from mailings.models import EmailOptOut, Invite, Mailing, MailingRecipient
 from notifications import suppression
@@ -86,6 +87,71 @@ class SegmentTests(TestCase):
         self.assertIn("plan", segments.clean_params("tier", {"plan": "nope"})[1])
         self.assertIn("date_to", segments.clean_params("between", {"date_from": "2026-02-01", "date_to": "2026-01-01"})[1])
         self.assertIn("group", segments.clean_params("everybody", {})[1])
+
+
+def lead(email, bot=False, user=None):
+    return JourneySession.objects.create(lead_email=email, lead_at=timezone.now(), is_bot=bot, user=user)
+
+
+class LeadGroupTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def emails(self, kind=Mailing.NEWS):
+        return [e for e, _, _ in segments.rows("leads", {}, kind)]
+
+    def test_only_people_without_an_account_who_can_be_emailed_once_each(self):
+        lead("a@example.com")
+        lead("A@Example.com")  # another browser, another case: one person
+        lead("account@example.com")
+        person("Account@example.com", consent=True)
+        lead("staff@example.com")
+        User.objects.create_user("staff@example.com", "x", is_staff=True)
+        lead("out@example.com")
+        EmailOptOut.objects.create(email="out@example.com")
+        lead("bounced@example.com")
+        suppression.add("bounced@example.com", EmailSuppression.HARD_BOUNCE)
+        lead("bot@example.com", bot=True)
+        lead("")  # no address
+        self.assertEqual(self.emails(), ["a@example.com"])
+        self.assertEqual(segments.count("leads", {}, Mailing.NEWS), 1)  # the count matches the rows
+        self.assertEqual(segments.rows("leads", {}, Mailing.NEWS).__next__(), ("a@example.com", "", None))
+        tomorrow = (timezone.localdate() + datetime.timedelta(days=1)).isoformat()
+        self.assertEqual(segments.count("leads", {"date_from": tomorrow}, Mailing.NEWS), 0)
+
+    def test_service_messages_cannot_use_the_group(self):
+        lead("a@example.com")
+        self.assertEqual(self.emails(Mailing.SERVICE), [])
+        self.assertTrue(segments.GROUPS["leads"].news_only)
+        self.assertIn("group", sending.check_mailing(mailing(kind=Mailing.SERVICE, group="leads")))
+        self.assertNotIn("group", sending.check_mailing(mailing(group="leads")))
+
+    def test_send_has_the_unsubscribe_link_and_the_link_stops_him_without_an_account(self):
+        lead("a@example.com")
+        m = mailing(group="leads")
+        with mock.patch("mailings.sending.enqueue"):
+            sending.start(m, None)
+        row = MailingRecipient.objects.get()
+        self.assertIsNone(row.user_id)
+        sending.run_mailing(m.pk)
+        row.refresh_from_db()
+        self.assertEqual(row.status, MailingRecipient.SENT)
+        self.assertIn("Hello there", mail.outbox[-1].body)
+        self.assertIn("/unsubscribe/", mail.outbox[-1].body)
+        token = tokens.make_unsubscribe_token("a@example.com")
+        self.assertContains(Client().post(f"/unsubscribe/{token}/"), "data-unsubscribe-done")
+        self.assertTrue(EmailOptOut.objects.filter(email="a@example.com").exists())
+        self.assertEqual(self.emails(), [])
+
+    def test_a_lead_who_registers_with_news_ticked_is_back_and_one_who_does_not_is_out(self):
+        lead("a@example.com")
+        EmailOptOut.objects.create(email="a@example.com")
+        user_services.register_interest({
+            "first_name": "Al", "last_name": "B", "email": "a@example.com", "password": "a-long-test-password-1", "mobile": "+447912345678",
+            "date_of_birth": datetime.date(1990, 1, 1), "plan": "tier-2", "marketing_opt_in": True})
+        self.assertFalse(EmailOptOut.objects.exists())
+        self.assertEqual(self.emails(), [])  # he has an account now: the other groups cover him
 
 
 @override_settings(MAILING_RATE_PER_SECOND=2)

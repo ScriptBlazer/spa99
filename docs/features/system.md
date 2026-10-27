@@ -23,7 +23,7 @@ Branch `feature/system`. Decisions: PROJECT.md rows 2026-10-23 (three staff fron
 | **Journey** | Questions and options: labels, order, hidden, plan and Gold points per option |
 | **Emails** | Gold approver CC and contact email; template wording for each notification. Transport and secrets stay in env |
 | **Approval** (2026-10-25) | Who approves Gold (Approver, Office+) and who gives the final approval to Low potential ones (Final approver, Admin+), and where each person's emails go. See `docs/features/gold-final-approval.md` |
-| **Settings** | Opening date, stage switches (registration / subscribe / book), wording |
+| **Settings** | Opening date, stage switches (registration / subscribe / book), the journey email switch, wording |
 | **Team** | Team members with level (Office, Admin, Developer, Superuser) and read-only Approver / Final approver labels (set in Approval); add, change level, deactivate, remove from team, merge duplicate accounts |
 
 Later (own phases): stay periods, RFID and Face ID rules, access windows, sales and offers (need the access hardware), content and images.
@@ -60,7 +60,7 @@ Compact, dense and calm: small boxes, small controls, tables you can edit in pla
 | `/changes/` | Change log, filters `section`, `user` (select of people who made changes), `q` (field, row, person or value), `range` (1, 7, 30 days), `date_from`, `date_to`, 50 a page, fixed query count |
 | `POST /changes/<id>/undo/` | Undo one entry |
 | `/emails/` | Edit the three recipients |
-| `/settings/` | Opening date and text, stage switches, wording, VAT |
+| `/settings/` | Opening date and text, stage switches, the journey email switch (`SiteSettings.journey_email_gate`, default on, logged and undoable like the others), wording, VAT |
 | `/team/`, `POST /team/add/`, `POST /team/<id>/access/`, `/active/`, `/remove/`, `/invite/`, `/team/merge/` | Team (rule book U4). Add: email + level + Approver; a new email gets an account with no password and a "You've been added to the Spa 99 team" email with the password reset link (1 hour; `Send a new invite` repeats it); an existing account just gains the level and keeps its password. Every change is guarded server side by `common.levels.can_manage`: never yourself; strictly below your own level (a Developer changes Office and Admin; only a superuser changes a Developer); a superuser may change another superuser (changing or removing one clears the superuser flag). Approver needs a level. Remove from team removes levels and Approver, keeps the account and any membership. Logged in the change list and the audit log (`role_changed`). Merge (`/team/merge/`, Developer and up): pick two emails, see what moves, confirm; moves the membership, journey sessions, Gold applications and sign-in records, fills blank profile fields, deletes the other account; refused when both hold different memberships, when a superuser is involved and the actor is not one, or for someone at or above your level. Logic in `system/team.py` and `users/merge.py` |
 | `/health/`, `/robots.txt` | Open |
 

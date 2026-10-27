@@ -15,6 +15,7 @@ RISKY = {
     "vat_rate": ("VAT rate", "VAT rates", "Every price shown includes the new rate at once."),
     "register_interest_open": ("stage switch", "stage switches", "The public site changes at once."),
     "memberships_public": ("stage switch", "stage switches", "The Memberships page and its links appear or disappear for the public at once."),
+    "journey_email_gate": ("switch", "switches", "Visitors see the suggested membership with or without giving an email, from now on."),
     "subscribe_open": ("stage switch", "stage switches", "The public site changes at once."),
     "booking_open": ("stage switch", "stage switches", "Booking opens or closes to the public at once."),
     "opening_date": ("opening date", "opening dates", "The date shown to the public changes at once."),

@@ -27,7 +27,7 @@ from users.admin import UserAdmin
 from users.models import User
 
 STALE = services.STALE_MESSAGE
-SETTINGS_POST = {"opening_text": "January 2027", "register_interest_open": "on", "join_wording": "register_interest", "vat_rate": "20.00", "lock_idle_minutes": "15", "max_sign_in_hours": "12"}
+SETTINGS_POST = {"opening_text": "January 2027", "register_interest_open": "on", "journey_email_gate": "on", "join_wording": "register_interest", "vat_rate": "20.00", "lock_idle_minutes": "15", "max_sign_in_hours": "12"}
 
 
 def plan_post(plan, **changes):

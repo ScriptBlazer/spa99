@@ -48,6 +48,49 @@ class PeopleTests(TestCase):
         self.assertEqual(answers.get("time:daytime") or answers.get("time:evening"), 1)  # one vote: the latest journey only
         self.assertNotEqual(answers.get("time:daytime"), answers.get("time:evening"))
 
+    def test_the_same_email_is_one_person_across_browsers_and_after_registering(self):
+        a, b = finished_journey(time="daytime"), finished_journey(time="evening")
+        for session, email in ((a, "Same@Example.com"), (b, "same@example.com")):
+            JourneySession.objects.filter(pk=session.pk).update(lead_email=email)
+        finished_journey()  # a third browser with no email stays its own person
+        figures = people.load()
+        self.assertEqual((figures.started(None, today()), figures.finished(None, today())), (2, 2))
+        self.assertEqual(figures.vote_counts(None, today())[0], 2)
+        user = User.objects.create_user("same@example.com", "a-long-password-1")
+        journey.link_user(a, user)  # one of them registers: the other browser's email follows the account
+        figures = people.load()
+        self.assertEqual((figures.started(None, today()), figures.finished(None, today()), figures.vote_counts(None, today())[0]), (2, 2, 2))
+
+    def test_a_browser_that_gave_an_email_later_belongs_to_that_email_and_emails_in_one_browser_join(self):
+        early = finished_journey(time="daytime")  # same browser, before any email was given
+        again = journey.create_session("Mozilla/5.0 (iPhone) Safari/604.1", previous=early)
+        JourneySession.objects.filter(pk=again.pk).update(lead_email="one@example.com")
+        other = finished_journey()  # another browser, the same email
+        JourneySession.objects.filter(pk=other.pk).update(lead_email="ONE@example.com")
+        self.assertEqual(people.load().started(None, today()), 1)
+        third = journey.create_session("Mozilla/5.0 (iPhone) Safari/604.1", previous=again)
+        JourneySession.objects.filter(pk=third.pk).update(lead_email="two@example.com")
+        self.assertEqual(people.load().started(None, today()), 1)  # two addresses in one browser: still one person
+        JourneySession.objects.filter(pk=finished_journey().pk).update(lead_email="two@example.com")
+        self.assertEqual(people.load().started(None, today()), 1)
+
+    def test_a_link_in_a_second_browser_pulls_in_every_connected_browser_and_email(self):
+        a = finished_journey()
+        JourneySession.objects.filter(pk=a.pk).update(lead_email="x@example.com")  # browser A gave X
+        b = finished_journey()
+        JourneySession.objects.filter(pk=b.pk).update(lead_email="x@example.com")  # browser B gave X ...
+        b2 = journey.create_session("Mozilla/5.0 (iPhone) Safari/604.1", previous=b)
+        JourneySession.objects.filter(pk=b2.pk).update(lead_email="y@example.com")  # ... then Y
+        user = User.objects.create_user("y@example.com", "a-long-password-1")
+        journey.link_user(b2, user)
+        figures = people.load()
+        self.assertEqual((figures.started(None, today()), figures.finished(None, today())), (1, 1))
+
+    def test_a_staff_email_left_in_an_unlinked_journey_is_not_counted(self):
+        User.objects.create_user("boss@example.com", "a-long-password-1", is_staff=True)
+        JourneySession.objects.filter(pk=finished_journey().pk).update(lead_email="Boss@example.com")
+        self.assertEqual(people.load().started(None, today()), 0)
+
     def test_bots_and_staff_are_never_counted(self):
         finished_journey()
         boss = User.objects.create_user("boss@example.com", "a-long-password-1", is_staff=True)

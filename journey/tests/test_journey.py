@@ -293,6 +293,20 @@ class LeadGateTests(TestCase):
         fresh = services.create_session(previous=old)
         self.assertEqual(fresh.lead_email, "a@example.com")
 
+    def test_not_you_starts_a_new_person_without_the_email_and_never_for_signed_in_visitors(self):
+        old = make_session()
+        services.save_lead(old, "a@example.com", True)
+        client = Client()
+        client.cookies["spa99_journey"] = old.key
+        state = client.post("/journey/restart/", json.dumps({"new_person": True}), content_type="application/json").json()
+        fresh = JourneySession.objects.get(pk=state["session"]["id"])
+        self.assertEqual((fresh.lead_email, fresh.lead_at, state["session"]["lead_required"]), ("", None, True))
+        self.assertNotEqual(fresh.person_key, old.person_key)
+        old.refresh_from_db()
+        self.assertEqual(old.lead_email, "a@example.com")  # the first person is untouched
+        client.force_login(get_user_model().objects.create_user("m@example.com", "a-long-password-1"))
+        self.assertEqual(client.post("/journey/restart/", json.dumps({"new_person": True}), content_type="application/json").status_code, 403)
+
     def test_erasing_an_address_clears_it_from_sessions_and_history(self):
         session = make_session()
         services.save_lead(session, "a@example.com", True)

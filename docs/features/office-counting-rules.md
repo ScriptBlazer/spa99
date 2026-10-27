@@ -4,10 +4,15 @@ Decided 2026-10-23 (PROJECT.md). Replaces every earlier counting approach in `of
 
 ## C1. What a "person" is
 
-- **Known person:** once someone registers or signs in, all their journeys belong to their account. One account = one person.
-- **Anonymous person:** one browser. The journey already keeps an essential first-party cookie (needed to save progress). A restart in the same browser keeps the same person: the new journey session stores the first session's `person_key` (carried over on restart). No new cookie, no IP.
-- Different devices or browsers before sign-in count as different people. That is the honest limit without tracking; it is said in the Office help text.
-- When a session gets linked to an account, its person becomes the account (counts merge from then on, also in rebuilds).
+A journey session's person is the first that applies (decided 2026-10-27: the same journey email is always one person, also before he registers):
+
+1. **Account:** the session is linked to a user, or anything connected to it is (see the connection rule below): its browser (`person_key`), its email, another browser that left the same email, another email left in the same browser. One account = one person. Linking happens when the email is verified; counts merge from the next snapshot, also in rebuilds.
+2. **Email:** else, if the session left an email at the gate, the lower-cased address, whatever the browser. A session in the same browser that left none (for example one that started before the email was given) belongs to that email too. An address that belongs to an account but whose sessions are not linked (not verified yet) still counts as the email, not the account: nothing merges without a proven link.
+3. **Browser:** else one browser (`person_key`). The journey keeps an essential first-party cookie (needed to save progress); a restart keeps the same `person_key`; "Not you? Use another email" on the result starts a new person (new `person_key`, no email carried), so a shared laptop counts two. With the journey email switch off nobody gives an email, so people count by browser (rule 3) and finishers do not appear as Leads. No new cookie, no IP.
+
+- **Connection rule:** browsers and emails are joined (union-find in the snapshot job): a browser is joined to every email left in it, an email to every browser that left it. Everything connected is one person, and if any linked journey is in the group the person is that account (the latest link wins if there are several accounts). So two different addresses left in one browser are one person (one browser was always one person).
+- A group whose email is a staff address is not counted.
+- Different devices or browsers that never gave an email count as different people. That is the honest limit without tracking.
 
 ## C2. Who is never counted
 
@@ -44,4 +49,4 @@ Started ≥ Finished always (same people). Registered can exceed Finished (someo
 
 A lead is an email given at the journey gate; "new leads" counts addresses by the day of their first `lead_at`, "went on to register" counts those whose address has an account now. Journeys with that email join the account when the email is verified (see `office-leads.md`); counts merge from the next snapshot.
 
-**Open question (Moishe has not answered):** should the same email left in two different browsers count as one person before he registers? Today it does not (C1: one browser = one person), so such a lead is counted twice in "Started the journey" but once in the Leads list. Counting rules are unchanged until he decides.
+People are worked out in `insights/people.py` by the snapshot job only; run `rebuild_metrics` once to apply the 2026-10-27 rule to existing snapshots.

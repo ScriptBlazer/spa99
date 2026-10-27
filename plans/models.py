@@ -130,6 +130,10 @@ class SiteSettings(BaseModel):
         default=False,
         help_text="Off until opening: the Memberships page and its links are hidden and the journey is the way in (the journey asks for an email "
                   "first). Team members can still open the page to check it.")
+    journey_email_gate = models.BooleanField(
+        default=True,
+        help_text="On: the journey asks for an email before showing the suggested membership. Off: straight to the suggestion and price, "
+                  "and anyone who has reached the result can open the Memberships page.")
     subscribe_open = models.BooleanField(default=False, help_text="Stage B: checkout (Phase 2).")
     booking_open = models.BooleanField(default=False, help_text="Stage C: bookings (Phase 3).")
     notify_booking_open = models.BooleanField(

@@ -97,6 +97,7 @@ class SettingsForm(VersionedForm):
         super().__init__(*args, **kwargs)
         self.fields["register_interest_open"].label = "Registration open"
         self.fields["memberships_public"].label = "Memberships page public"
+        self.fields["journey_email_gate"].label = "Journey asks for an email"
         self.fields["discount_contact_url"].assume_scheme = "https"
         self.fields["discount_contact_url"].widget.attrs.update({"placeholder": "https://wa.me/..."})
         self.fields["code_theme_default"].required = False  # a post without it (older forms, scripts) keeps the saved theme
@@ -122,6 +123,6 @@ class SettingsForm(VersionedForm):
 
     class Meta:
         model = SiteSettings
-        fields = ["opening_date", "opening_text", "register_interest_open", "memberships_public", "subscribe_open", "booking_open",
+        fields = ["opening_date", "opening_text", "register_interest_open", "memberships_public", "journey_email_gate", "subscribe_open", "booking_open",
                   "join_wording", "show_leil_shishi", "vat_rate", "discount_contact_url", "lock_idle_minutes", "max_sign_in_hours", "code_theme_default"]
         widgets = {"opening_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}

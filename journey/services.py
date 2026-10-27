@@ -10,6 +10,7 @@ from django.core.exceptions import ValidationError
 from common.useragent import device_type
 from common.validators import normalise_email
 from insights import metrics
+from plans.models import SiteSettings
 
 from .conditions import matches
 from .models import Answer, JourneySession, Option, Question, new_session_key
@@ -31,8 +32,9 @@ class AnswerError(ValueError):
 # ---------- sessions ----------
 
 def create_session(user_agent="", referrer="", utm=None, user=None, previous=None):
-    """A new journey session. `previous` (a restart in the same browser) hands over its person_key, so the person stays one
-    person; otherwise the session's own key becomes its person_key."""
+    """A new journey session. `previous` (a restart in the same browser) hands over its person_key and email, so the person
+    stays one person; otherwise the session's own key becomes its person_key. A "Not you?" restart passes no `previous`:
+    a new person on a shared device, with a new key and no email."""
     utm = utm or {}
     kind = device_type(user_agent)
     key = new_session_key()
@@ -136,8 +138,10 @@ class LeadError(ValueError):
 
 def lead_required(session, user=None):
     """Does this visitor still have to leave an email before the result? Not when signed in (his account is his
-    address), and not once an address was given on this session."""
+    address), not once an address was given on this session, and not while System has the email screen switched off."""
     if user is not None and user.is_authenticated:
+        return False
+    if not SiteSettings.load().journey_email_gate:
         return False
     return session.user_id is None and not session.lead_email
 
@@ -460,6 +464,7 @@ def build_state(session, user=None):
             "furthest_step": session.furthest_step,
             "completed": session.completed,
             "lead_required": lead_required(session, user),
+            "has_lead_email": bool(session.lead_email),  # "Not you?" only makes sense for a session that gave one
             "result_step": result_step(session, visible),
             "total_screens": len(numbers),
             "resume_step": numbers[0] if numbers else 1,  # reopening always starts at screen 1, answers ticked

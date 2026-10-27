@@ -1,6 +1,6 @@
 """2026-10-26: the Memberships page is hidden until opening (SiteSettings.memberships_public). The journey is the way in."""
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import Client, TestCase
 
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import SiteSettings
@@ -108,3 +108,62 @@ class EmailUnlocksMembershipsTests(TestCase):
         html = self.client.get("/journey/").content.decode()
         self.assertIn('"membershipsPage": "/memberships/"', html)
         self.assertIn("Explore all memberships", html)
+
+    def test_not_you_restart_closes_memberships_until_the_new_person_gives_his_email(self):
+        """Shared device: after "Not you?" the old session's email no longer opens Memberships, and the Office counts two people."""
+        from insights import metrics, people
+
+        post = lambda url, body: self.client.post(url, body, content_type="application/json")  # noqa: E731
+        self.client.get("/journey/state/")
+        post("/journey/lead/", {"email": "x@example.com", "consent": True})
+        self.assertEqual(self.client.get("/memberships/").status_code, 200)  # x passed the gate
+        post("/journey/restart/", {})
+        self.assertEqual(self.client.get("/memberships/").status_code, 200)  # a plain restart still carries the email
+        post("/journey/restart/", {"new_person": True})
+        self.assertEqual(self.client.get("/memberships/").status_code, 302)  # y has not given his email yet
+        post("/journey/lead/", {"email": "y@example.com", "consent": True})
+        self.assertEqual(self.client.get("/memberships/").status_code, 200)
+        self.assertEqual(people.load().started(None, metrics.day()), 2)  # x and y, not one
+
+
+class JourneyEmailGateSwitchTests(TestCase):
+    """System switch `journey_email_gate` (default on): off means no email screen and no dead end to Memberships."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def finish(self, client):
+        from journey import engine, services
+
+        client.get("/journey/state/")
+        session = services.session_from_cookies({"spa99_journey": client.cookies["spa99_journey"].value})
+        for key, value in (("time", ["evening"]), ("facilities", ["gym"]), ("industry", ["tech"])):
+            services.save_answer(session, key, options=value)
+        return session
+
+    def test_on_by_default_and_the_result_waits_for_the_email(self):
+        self.assertTrue(SiteSettings.load().journey_email_gate)
+        self.finish(self.client)
+        self.assertEqual(self.client.get("/journey/result/").status_code, 403)
+        self.assertEqual(self.client.get("/memberships/").status_code, 302)
+
+    def test_off_gives_the_result_and_opens_memberships_only_to_people_who_reached_it(self):
+        site = SiteSettings.load()
+        site.journey_email_gate = False
+        site.save()
+        stranger = Client()
+        stranger.get("/journey/state/")
+        self.assertEqual(stranger.get("/memberships/").status_code, 302)  # started, never finished
+        self.finish(self.client)
+        self.assertFalse(self.client.get("/journey/state/").json()["session"]["lead_required"])
+        self.assertEqual(self.client.post("/journey/result/", {}, content_type="application/json").status_code, 200)
+        self.assertEqual(self.client.get("/memberships/").status_code, 200)  # no loop back to /journey/
+        self.assertEqual(Client().get("/memberships/").status_code, 302)  # never did the journey
+        self.client.post("/journey/restart/", {}, content_type="application/json")
+        self.assertEqual(self.client.get("/memberships/").status_code, 200)  # a plain restart is the same person
+        self.client.post("/journey/restart/", {"new_person": True}, content_type="application/json")
+        self.assertEqual(self.client.get("/memberships/").status_code, 302)  # a new person has not reached a result
+        site.journey_email_gate = True  # switched back on: asked at the next result, nothing breaks
+        site.save()
+        self.assertEqual(self.client.get("/journey/result/").status_code, 403)

@@ -157,6 +157,8 @@ def check_mailing(mailing):
     params, group_errors = segments.clean_params(mailing.group, mailing.params)
     if group_errors:
         errors.update(group_errors)
+    elif mailing.kind == Mailing.SERVICE and segments.GROUPS[mailing.group].news_only:
+        errors["group"] = ["This group can only get News: these people never registered, so a service message has no reason to reach them."]
     elif not segments.count(mailing.group, params, mailing.kind):
         errors["group"] = ["Nobody in this group can be emailed (suppressed, inactive or not opted in)."]
     if mailing.kind not in (Mailing.NEWS, Mailing.SERVICE):
@@ -369,9 +371,15 @@ def _skip_reason(mailing, recipient):
     from mailings.models import EmailOptOut
     from users.models import User
 
+    user = None
     if recipient.user_id:
         user = User.objects.filter(pk=recipient.user_id).only("is_active", "marketing_consent").first()
-        if user is None or not user.is_active:
+        if user is None:
+            return "The account is no longer active"
+    elif mailing.kind == Mailing.NEWS:  # a lead or applicant who registered after the list was made: his account's choice rules now
+        user = User.objects.filter(email__iexact=recipient.email).only("is_active", "marketing_consent").first()
+    if user is not None:
+        if not user.is_active:
             return "The account is no longer active"
         if mailing.kind == Mailing.NEWS and not user.marketing_consent:
             return "Unsubscribed since the list was made"

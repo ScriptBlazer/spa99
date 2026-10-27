@@ -1,8 +1,8 @@
 """People and registrations worked out from the source tables, by the background job only (docs/features/office-counting-rules.md,
 C1 to C4). Never called while a page loads: the job turns this into stored snapshots and insights.
 
-A person is the account if the journey is linked to one (also when the same browser's earlier journeys were not linked
-themselves: the browser's `person_key` maps to the account), otherwise the browser (`person_key`). Bots and staff
+A person is, in this order: the account if the journey is linked to one (also via its browser or its email, see `load`),
+else the lower-cased lead email group (browsers and emails connected through each other), else the browser (`person_key`). Bots and staff
 accounts are never counted. A person who finishes in a range also counts as started in it, so started >= finished."""
 import logging
 from collections import Counter, defaultdict
@@ -126,25 +126,55 @@ def load():
     """Read the source tables once (journey sessions and registrations) into a Figures. Job only. Sessions are streamed in
     chunks with only the fields needed, so memory holds the small result (people per day, votes), not the sessions."""
     from journey.models import JourneySession
+    from django.db.models import Q
     from users.models import InterestRegistration, User
 
     staff = set(User.objects.filter(is_staff=True).values_list("pk", flat=True))
     real = JourneySession.objects.filter(is_bot=False)
-    account_of = {}  # browser person_key -> account; oldest first, so when a browser was linked to two accounts the latest link wins
-    for key, person_key, user_id in real.filter(user__isnull=False).order_by("created_at").values_list("key", "person_key", "user_id").iterator(chunk_size=2000):
-        account_of[person_key or key] = user_id
+    # Identity (C1), one streamed pass, oldest first. Union-find over browsers and emails: a browser that gave an email is
+    # joined to it, so every browser and email connected together is one group. A group linked to an account is that account.
+    parent = {}
 
-    started, finished, votes, uncounted = defaultdict(set), defaultdict(set), [], 0
+    def find(node):
+        parent.setdefault(node, node)
+        while parent[node] != node:
+            parent[node] = parent[parent[node]]
+            node = parent[node]
+        return node
+
+    links = []  # (browser, user_id) of linked journeys, oldest first: the latest link of a group wins
+    for key, person_key, user_id, lead_email in (real.filter(Q(user__isnull=False) | ~Q(lead_email=""))
+                                                 .order_by("created_at", "pk").values_list("key", "person_key", "user_id", "lead_email").iterator(chunk_size=2000)):
+        browser, email = ("b", person_key or key), (lead_email or "").strip().lower()
+        if email:
+            parent[find(browser)] = find(("e", email))
+        if user_id:
+            links.append((browser, user_id))
+    group_account = {find(browser): user_id for browser, user_id in links}
+    group_email = {}  # group -> its smallest email, the stable label of an email person
+    for node in list(parent):
+        if node[0] == "e":
+            root = find(node)
+            group_email[root] = min(node[1], group_email.get(root, node[1]))
+
     staff_emails = {e.lower() for e in User.objects.filter(is_staff=True).values_list("email", flat=True)}
+    started, finished, votes, uncounted = defaultdict(set), defaultdict(set), [], 0
     leads, lead_votes = {}, []
     fields = ("key", "person_key", "user_id", "created_at", "completed", "completed_at", "updated_at", "suggested_plan__slug", "suggestion_detail",
               "lead_email", "lead_at")
     for key, person_key, user_id, created_at, completed, completed_at, updated_at, plan, detail, lead_email, lead_at in real.values_list(*fields).iterator(chunk_size=2000):
-        account = user_id or account_of.get(person_key or key)
-        who = ("account", account) if account else ("browser", person_key or key)
-        if account in staff:
-            continue
+        browser = ("b", person_key or key)
         email = (lead_email or "").strip().lower()
+        root = find(browser)
+        account = user_id or group_account.get(root)
+        if account:
+            who = ("account", account)
+        elif root in group_email:
+            who = ("email", group_email[root])
+        else:
+            who = ("browser", browser[1])
+        if account in staff or (who[0] == "email" and who[1] in staff_emails):
+            continue
         if email and email not in staff_emails:
             given = metrics.day(lead_at or created_at)
             leads[email] = min(given, leads.get(email, given))
