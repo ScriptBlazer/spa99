@@ -32,6 +32,7 @@ urlpatterns = [
     path("emails/mailings/new/", e.mailing_edit, name="system_mailing_new"),
     path("emails/mailings/count/", e.mailing_count, name="system_mailing_count"),
     path("emails/mailings/preview/", e.mailing_preview, name="system_mailing_preview"),
+    path("emails/mailings/images/", e.mailing_image_upload, name="system_mailing_image_upload"),
     path("emails/mailings/<uuid:pk>/", e.mailing_detail, name="system_mailing"),
     path("emails/mailings/<uuid:pk>/edit/", e.mailing_edit, name="system_mailing_edit"),
     path("emails/mailings/<uuid:pk>/progress/", e.mailing_progress, name="system_mailing_progress"),

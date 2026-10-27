@@ -56,12 +56,18 @@ def render_editable(key, context, body=None, values=None, button_url=None):
     return emailbody.render(spec, text, values, button_url=url)
 
 
-def render_email(template, ctx, body=None, values=None, button_url=None):
+def render_email(template, ctx, body=None, values=None, button_url=None, blocks=None):
     """(html, text) of the whole email for a ready context (the layout around the body). `body` and `values` as in render_editable;
     the context is given the rendered body as `body_html` / `body_text`."""
     layout = "gold_approver" if template == "gold_approver_repeat" else template  # one layout, the repeat panel shows on is_repeat
     spec = emailbody.spec_for(template)
-    if ctx.get("plain_body") is not None:  # words typed by a person, sent as typed (the Gold decline message)
+    if blocks and template == "mailing":  # a group mailing built from parts (mailings/blocks.py); no parts = the old body
+        from mailings import blocks as mailing_blocks
+
+        ctx["body_html"], ctx["body_text"], preheader = mailing_blocks.render(blocks, values if values is not None else emailbody.values_for(spec, ctx))
+        ctx.setdefault("preheader", preheader)
+        layout = "_body"
+    elif ctx.get("plain_body") is not None:  # words typed by a person, sent as typed (the Gold decline message)
         ctx["body_html"], ctx["body_text"] = emailbody.render_plain(ctx["plain_body"])
         layout = "_body"
     elif spec is not None and spec.editable:
@@ -88,14 +94,14 @@ def _staff_sample_context(key):
     }
 
 
-def preview_email(key, subject, body, extra=None):
+def preview_email(key, subject, body, extra=None, blocks=None):
     """The email as it would look with the sample values: {"subject", "html", "text"}. `body` blank = the default; `extra` is added to
     the context (the unsubscribe link and notice of a News mailing)."""
     spec = emailbody.spec_for(key)
     values = emailbody.sample_values(spec)
     ctx = {**base_context(), "subject": fill_subject(subject, values), "url": f"{settings.SITE_URL}/example-link/",
            **_staff_sample_context(key), **(extra or {})}
-    html, text = render_email(key, ctx, body=body if body and body.strip() else spec.default_body, values=values)
+    html, text = render_email(key, ctx, body=body if body and body.strip() else spec.default_body, values=values, blocks=blocks)
     return {"subject": ctx["subject"], "html": html, "text": text}
 
 
@@ -107,13 +113,13 @@ def fill_subject(text, values):
     return text
 
 
-def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None, plain_body=None):
+def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None, plain_body=None, blocks=None):
     """Render the email, send, and log. Returns the EmailLog. Editable emails (notifications/emailbody.py) use the shared
     layout `_body` and the stored or default wording; the Gold approver emails render their own template files.
     `to` and `cc` are lists of addresses. `subject_email` is the person the message is about when it goes to
     someone else (Barry's Gold email), so deleting that person's data finds the log row.
     `headers` are extra mail headers (List-Unsubscribe); `body` replaces the stored wording (a group mailing); `plain_body` is
-    text a person typed, sent as typed in the shared layout."""
+    text a person typed, sent as typed in the shared layout; `blocks` are a group mailing's parts (used instead of `body`)."""
     to, cc = list(to or []), list(cc or [])
     try:
         blocked = suppression.suppressed_set(to + cc)  # THE guard: every email goes through here
@@ -143,7 +149,7 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
         subject_email=(subject_email or "").strip().lower(),
     )
     try:
-        html, text = render_email(template, ctx, body=body)
+        html, text = render_email(template, ctx, body=body, blocks=blocks)
         message = EmailMultiAlternatives(
             subject=subject,
             body=text,

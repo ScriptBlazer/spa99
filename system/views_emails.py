@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from common.ratelimit import hit
-from mailings import invites, segments, sending
+from mailings import blocks as mailing_blocks, images, invites, segments, sending
 from mailings.models import Invite, Mailing
 from notifications import emailbody, ses
 from notifications.models import EmailLog
@@ -176,7 +176,7 @@ def mailings(request):
     return page(request, "system/emails_mailings.html", "emails", {"mailings": logic.mailing_list(request.GET.get("page")), "ses": ses.ses_status()})
 
 
-def _mailing_page(request, form, mailing, status=200):
+def _mailing_page(request, form, mailing, status=200, start=""):
     spec = emailbody.SPECS["mailing"]
     saved_params = mailing.params if mailing else {}
     groups = segments.catalog()
@@ -185,7 +185,13 @@ def _mailing_page(request, form, mailing, status=200):
             param["value"] = (form.data.get(param["name"]) if form.is_bound else saved_params.get(param["name"])) or ""
     context = {"form": form, "mailing": mailing, "groups": groups, "kind_choices": Mailing.KIND_CHOICES, "ses": ses.ses_status(),
                "placeholders": logic.spec_info(spec)["placeholders"],
-               "count_url": reverse("system_mailing_count"), "preview_url": reverse("system_mailing_preview")}
+               "count_url": reverse("system_mailing_count"), "preview_url": reverse("system_mailing_preview"),
+               # The parts editor (docs/features/email-builder.md, Contract)
+               "blocks": logic.editor_blocks(form, mailing, start), "block_errors": form.block_errors or {},
+               "block_types": {kind: {name: {"max": limit, "required": required} for name, (limit, required) in fields.items()}
+                               for kind, fields in mailing_blocks.TYPES.items()},
+               "block_max_parts": mailing_blocks.MAX_PARTS, "image_upload_url": reverse("system_mailing_image_upload"),
+               "image_max_bytes": images.MAX_BYTES, "starters": mailing_blocks.starter_choices(), "start": start}
     return page(request, "system/emails_mailing_form.html", "emails", context, status=status)
 
 
@@ -197,16 +203,28 @@ def mailing_edit(request, pk=None):
     if mailing is not None and not mailing.editable:
         messages.error(request, "Only a draft can be edited.")
         return redirect("system_mailing", pk=mailing.pk)
-    form = logic.MailingForm(request.POST or None, instance=mailing)
+    start = request.GET.get("start", "") if mailing is None and request.method == "GET" else ""
+    start = start if start in mailing_blocks.STARTERS else ""
+    form = logic.MailingForm(request.POST or None, instance=mailing, initial=_starter_fields(start))
     if request.method == "POST" and form.is_valid():
         row = form.save(commit=False)
         row.params = form.params
         if row.created_by_id is None:
             row.created_by = request.user
         row.save()
+        if _wants_json(request):
+            return JsonResponse({"ok": True, "id": str(row.pk), "redirect": reverse("system_mailing", args=[row.pk])})
         messages.success(request, "Saved as a draft.")
         return redirect("system_mailing", pk=row.pk)
-    return _mailing_page(request, form, mailing, status=400 if request.method == "POST" else 200)
+    if request.method == "POST" and _wants_json(request):
+        return JsonResponse({"ok": False, "errors": form.errors_json()}, status=400)
+    return _mailing_page(request, form, mailing, status=400 if request.method == "POST" else 200, start=start)
+
+
+def _starter_fields(start):
+    """Form values for the chosen starting template (New mailing, ?start=booking_open)."""
+    starter = mailing_blocks.STARTERS.get(start)
+    return {key: starter[key] for key in ("name", "subject", "kind", "group")} if starter else {}
 
 
 @unlocked
@@ -223,7 +241,7 @@ def mailing_detail(request, pk):
         "group": segments.GROUPS.get(mailing.group), "can_send": draft and mailing.status == Mailing.DRAFT and state["allowed"] and not blockers,
         "recipients": logic.mailing_recipients(mailing, status, request.GET.get("page")), "status_filter": status,
         "progress_url": reverse("system_mailing_progress", args=[mailing.pk]),
-        "preview": preview_email("mailing", mailing.subject, mailing.body, logic.mailing_extra(mailing.kind, mailing.group)),
+        "preview": preview_email("mailing", mailing.subject, mailing.body, logic.mailing_extra(mailing.kind, mailing.group), blocks=mailing.blocks),
     }
     return page(request, "system/emails_mailing.html", "emails", context)
 
@@ -254,13 +272,35 @@ def mailing_count(request):
 @unlocked
 @require_POST
 def mailing_preview(request):
-    """Preview of what is typed on the mailing form with the sample name: {"ok", "subject", "html", "text", "errors"}."""
+    """Preview of what is typed on the mailing form with the sample name: {"ok", "subject", "html", "text", "errors"}. With a `blocks`
+    field (JSON) the parts are previewed and part problems come back as errors.blocks = {"_": [...], "<index>": {field: [...]}}."""
     subject, body = request.POST.get("subject", ""), request.POST.get("body", "")
-    errors = emailbody.validate(emailbody.SPECS["mailing"], subject=subject, body=body)
+    parts = None
+    if "blocks" in request.POST:
+        parts, block_errors = mailing_blocks.clean(request.POST["blocks"])
+        errors = emailbody.validate(emailbody.SPECS["mailing"], subject=subject)
+        if block_errors:
+            errors["blocks"] = block_errors
+    else:
+        errors = emailbody.validate(emailbody.SPECS["mailing"], subject=subject, body=body)
     if errors:
         return JsonResponse({"ok": False, "errors": errors, "subject": "", "html": "", "text": ""})
     extra = logic.mailing_extra(request.POST.get("kind", Mailing.NEWS), request.POST.get("group", ""))
-    return JsonResponse({"ok": True, "errors": {}, **preview_email("mailing", subject, body, extra)})
+    return JsonResponse({"ok": True, "errors": {}, **preview_email("mailing", subject, body, extra, blocks=parts)})
+
+
+@unlocked
+@require_POST
+def mailing_image_upload(request):
+    """Upload one picture for an email (multipart, field `file`): JPEG, PNG or GIF up to 2 MB, checked from the file content.
+    Answers {"ok", "id", "url", "width", "height"} (width and height are null when the header could not be read) or {"ok": false, "message"}."""
+    if _limited(request, "system-email-image", 30, 600):
+        return JsonResponse({"ok": False, "message": "Too many uploads. Please wait a few minutes."}, status=429)
+    try:
+        image = images.save_upload(request.FILES.get("file"), request.user)
+    except images.ImageError as error:
+        return JsonResponse({"ok": False, "message": str(error)}, status=400)
+    return JsonResponse({"ok": True, "id": str(image.pk), "url": image.url, "width": image.width, "height": image.height})
 
 
 @unlocked
@@ -282,7 +322,7 @@ def mailing_test(request, pk):
         context["unsubscribe_url"] = tokens.unsubscribe_url(request.user.email)
         headers = tokens.list_unsubscribe_headers(context["unsubscribe_url"])
     log = send_templated("mailing", [request.user.email], "[Test] " + sending.subject_line(mailing.subject, request.user.first_name),
-                         context, headers=headers, body=mailing.body, subject_email=request.user.email)
+                         context, headers=headers, body=mailing.body, blocks=mailing.blocks, subject_email=request.user.email)
     ok = log.status == EmailLog.SENT
     audit.log_event(SystemEvent.EMAIL_TEST, request, user=request.user, outcome=SystemEvent.OK if ok else SystemEvent.FAILED,
                     detail={"mailing": str(mailing.pk), "status": log.status},

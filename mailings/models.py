@@ -23,7 +23,8 @@ class Mailing(BaseModel):
 
     name = models.CharField(max_length=120, help_text="Only shown in System.")
     subject = models.CharField(max_length=200)
-    body = models.TextField(help_text="Paragraphs separated by a blank line; {first_name} is filled in for each person.")
+    body = models.TextField(blank=True, help_text="Older mailings: paragraphs separated by a blank line; {first_name} is filled in for each person. Used only when there are no blocks.")
+    blocks = models.JSONField(default=list, blank=True, help_text="The email as parts (mailings.blocks): a list of {type, ...}. When set, it is used instead of the body.")
     kind = models.CharField(max_length=8, choices=KIND_CHOICES, default=NEWS)
     group = models.CharField(max_length=40, help_text="A key of mailings.segments.GROUPS.")
     params = models.JSONField(default=dict, blank=True, help_text="The group's options (plan, dates, status).")
@@ -53,6 +54,40 @@ class Mailing(BaseModel):
     @property
     def schedule_name(self):
         return f"mailing-{self.pk}"
+
+
+IMAGE_EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png", "image/gif": "gif"}
+
+
+def image_path(instance, filename):
+    """A random name under mailings/images/ (the uploaded name is never kept)."""
+    return f"mailings/images/{secrets.token_hex(16)}.{IMAGE_EXTENSIONS[instance.content_type]}"
+
+
+class MailingImage(BaseModel):
+    """A picture uploaded for an email. The bucket is private, so emails link to /email-image/<id>/ (served by the app); the random
+    id is the primary key. Never deleted while a mailing that was sent uses it (there is no delete yet)."""
+
+    file = models.FileField(upload_to=image_path, max_length=200)
+    content_type = models.CharField(max_length=20, choices=[(k, k) for k in IMAGE_EXTENSIONS])
+    size = models.PositiveIntegerField(help_text="Bytes.")
+    width = models.PositiveIntegerField(null=True, blank=True, help_text="Pixels, read from the file header; blank when it could not be read.")
+    height = models.PositiveIntegerField(null=True, blank=True)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.file.name} ({self.width}x{self.height})"
+
+    @property
+    def path(self):
+        return f"/email-image/{self.pk}/"
+
+    @property
+    def url(self):
+        return f"{settings.SITE_URL}{self.path}"
 
 
 class MailingRecipient(BaseModel):

@@ -86,3 +86,7 @@ New editable automatic email `password_changed` ("Your Spa 99 password was chang
 - Hooks: `_PasswordChange.form_valid` (member area and the Office, System and Control change-password pages, so team accounts too) and `users.services.reset_password` (reset completion).
 - No email for a first password: if the account had no usable password before (a team invite or Gold set-up), nothing is sent. Nothing for admin or command password sets (they do not call the helper).
 - `{reset_url}` is always the public `SITE_URL/forgot-password/` page (every account can use it). No device or IP is included.
+
+## Email builder (2026-10-27, backend)
+
+Group mailings can be built from parts (`Mailing.blocks`), with uploaded pictures (`MailingImage`, served at `/email-image/<id>/`) and a "Booking is open" starting template. Real sends, the System preview and "Send me a test" all use the parts when there are any; a mailing without parts renders from `body` as before. Spec and the contract for the editor screen: `docs/features/email-builder.md`. Code: `mailings/blocks.py`, `mailings/images.py`.

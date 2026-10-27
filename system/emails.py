@@ -7,7 +7,7 @@ from django import forms
 from django.core.paginator import Paginator
 from django.utils import timezone
 
-from mailings import segments
+from mailings import blocks as mailing_blocks, segments
 from mailings.models import EmailOptOut, Invite, Mailing
 from notifications import emailbody, ses
 from notifications.models import EmailLog, EmailSuppression, NotificationTemplate
@@ -139,9 +139,25 @@ class MailingForm(forms.ModelForm):
         model = Mailing
         fields = ["name", "subject", "body", "kind", "group"]
 
+    block_errors = None  # {"_": [...], "<index>": {field: [...]}} for the parts, when parts were posted
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["body"].required = False
+
     def clean(self):
         data = super().clean()
-        errors = emailbody.validate(emailbody.SPECS["mailing"], subject=data.get("subject"), body=data.get("body"))
+        # Parts (the `blocks` field, JSON) win over the old body. A form without the field is the old plain-body form.
+        if "blocks" in self.data:
+            cleaned, self.block_errors = mailing_blocks.clean(self.data.get("blocks"))
+            if self.block_errors:
+                self.add_error(None, "Check the parts of the email: " + " ".join(mailing_blocks.flat_errors(self.block_errors)))
+            self.cleaned_blocks = cleaned
+            errors = emailbody.validate(emailbody.SPECS["mailing"], subject=data.get("subject"))
+        else:
+            errors = emailbody.validate(emailbody.SPECS["mailing"], subject=data.get("subject"), body=data.get("body"))
+            if not (data.get("body") or "").strip():
+                errors.setdefault("body", []).append("Write the message.")
         for name, messages in errors.items():
             for message in messages:
                 self.add_error(name, message)
@@ -154,7 +170,29 @@ class MailingForm(forms.ModelForm):
 
     def save(self, commit=True):
         self.instance.params = getattr(self, "params", {})
+        if "blocks" in self.data:
+            self.instance.blocks, self.instance.body = self.cleaned_blocks, ""  # the parts replace the old body
         return super().save(commit)
+
+    def errors_json(self):
+        """{field: [messages]} for the script, with `blocks` as {"_": [...], "<index>": {field: [...]}}."""
+        errors = {name: [str(m) for m in messages] for name, messages in self.errors.items() if name != "__all__"}
+        if self.block_errors:
+            errors["blocks"] = self.block_errors
+        if "__all__" in self.errors and not self.block_errors:
+            errors["_"] = [str(m) for m in self.errors["__all__"]]
+        return errors
+
+
+def editor_blocks(form, mailing, start=None):
+    """The parts the editor starts with: what was posted (after a failed save), else the saved parts, else an old body turned into
+    paragraphs, else the chosen starting template, else nothing."""
+    if form is not None and form.is_bound and "blocks" in form.data:
+        parts, _ = mailing_blocks._parse(form.data.get("blocks"))
+        return parts or []
+    if mailing is not None:
+        return mailing.blocks or mailing_blocks.from_body(mailing.body)
+    return list(mailing_blocks.STARTERS[start]["blocks"]) if start in mailing_blocks.STARTERS else []
 
 
 def mailing_extra(kind, group_key):

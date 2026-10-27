@@ -24,7 +24,7 @@ from notifications.models import EmailLog
 from notifications.services import send_templated, subject_for
 from system.models import SystemEvent
 
-from . import segments, tokens
+from . import blocks, segments, tokens
 from .models import Invite, Mailing, MailingRecipient
 
 logger = logging.getLogger("spa99.email")
@@ -149,11 +149,23 @@ def _count_rows(model, **filters):
 
 # ---------- mailings: checks ----------
 
-def check_mailing(mailing):
-    """Plain-words problems that stop a mailing being sent or scheduled: {field: [messages]}. Empty = fine."""
-    errors = emailbody.validate(emailbody.SPECS["mailing"], subject=mailing.subject, body=mailing.body)
+def _wording_errors(mailing):
+    """Subject and message problems: {field: [messages]}. A mailing with parts is checked part by part (messages say which part)."""
+    errors = emailbody.validate(emailbody.SPECS["mailing"], subject=mailing.subject)
+    if mailing.blocks:
+        problems = blocks.check_stored(mailing.blocks)
+        if problems:
+            errors["blocks"] = problems
+        return errors
+    errors.update(emailbody.validate(emailbody.SPECS["mailing"], body=mailing.body))
     if not mailing.body.strip():
         errors.setdefault("body", []).append("Write the message.")
+    return errors
+
+
+def check_mailing(mailing):
+    """Plain-words problems that stop a mailing being sent or scheduled: {field: [messages]}. Empty = fine."""
+    errors = _wording_errors(mailing)
     params, group_errors = segments.clean_params(mailing.group, mailing.params)
     if group_errors:
         errors.update(group_errors)
@@ -314,7 +326,7 @@ def run_mailing(mailing_id, budget=SLICE_SECONDS):
         return "missing"
     if mailing.status != Mailing.SENDING:
         return mailing.status
-    errors = emailbody.validate(emailbody.SPECS["mailing"], subject=mailing.subject, body=mailing.body)
+    errors = _wording_errors(mailing)
     if errors or mailing.group not in segments.GROUPS:
         Mailing.objects.filter(pk=mailing.pk, status=Mailing.SENDING).update(status=Mailing.FAILED, finished_at=timezone.now(), error="The text or the group is no longer valid.")
         return "failed"
@@ -406,7 +418,7 @@ def _send_one(mailing, group, recipient):
         else:
             context["notice"] = f"You are receiving this message {group.reason}."
         log = send_templated("mailing", [recipient.email], subject_line(mailing.subject, recipient.first_name), context,
-                             headers=headers, body=mailing.body, subject_email=recipient.email)
+                             headers=headers, body=mailing.body, blocks=mailing.blocks, subject_email=recipient.email)
     except Exception as error:  # noqa: BLE001 - one bad address must not stop the others
         logger.error("Mailing %s: a send failed (%s)", mailing.pk, type(error).__name__)
         _mark(recipient, MailingRecipient.FAILED, type(error).__name__)

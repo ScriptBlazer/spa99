@@ -51,3 +51,47 @@ Parts can be added, removed and moved up or down:
 
 - No "send a test to anyone" (Moishe, 2026-10-27). Tests go to the signed-in person.
 - The automatic emails (confirm, reset, Gold) keep their current single-body editor.
+
+## Status
+
+Backend built on `feature/defaults` (2026-10-27): parts model and validation, rendering (HTML and text), picture upload and public image view, the Booking is open starter, and the endpoints below. The editor screen (frontend) is next.
+
+## Contract (for the editor screen)
+
+Code: `mailings/blocks.py` (parts), `mailings/images.py` (pictures), `system/views_emails.py` and `system/emails.py` (endpoints and form).
+
+### Parts (`blocks`: JSON list)
+
+| type | fields | limits |
+|---|---|---|
+| `heading` | `text` | 120, one line |
+| `paragraph` | `text` | 2000, blank line = new paragraph |
+| `button` | `label`, `url` | label 40, one line; url max 500: `http(s)://...` or a site path starting with a single `/` (made absolute on SITE_URL when rendered). Anything else (`javascript:`, `data:`, `mailto:`, `//host`) is refused |
+| `image` | `image` (the uploaded id), `alt` (required, 200), `url` (optional, same rules as a button link) | |
+| `divider` | none | |
+| `small_print` | `text` | 500 |
+
+- `{first_name}` works in `heading`, `paragraph` and `small_print` (and the subject); no other placeholder. Not in labels, alt text or links.
+- At most 30 parts, at least one that is not a divider. Unknown fields are dropped; an unknown `type` is an error.
+- The limits above are also given to the page as `block_types` (`{type: {field: {max, required}}}`) and `block_max_parts`.
+
+### Endpoints (System host, Developer, unlocked, CSRF)
+
+- **Save: `POST /emails/mailings/new/` and `/emails/mailings/<id>/edit/`.** Form fields `name`, `subject`, `kind`, `group` (+ the group's options) and `blocks` (a JSON string, e.g. a hidden input). If `blocks` is present it is used and the old `body` is cleared; if absent the old plain-body form still works. Send `Accept: application/json` (or `X-Requested-With: fetch`) to get JSON:
+  - saved: `200 {"ok": true, "id", "redirect"}`
+  - refused: `400 {"ok": false, "errors": {...}}` where field errors are `{"subject": ["..."], "name": [...], "group": [...]}` and parts are `{"blocks": {"_": ["whole-email problem"], "2": {"url": ["..."]}}}`. The key under `blocks` is the part's position, counting from 0 (so `"2"` is the third part), then the field name. `"_"` is for problems with the email as a whole (too many parts, only dividers, unreadable JSON). Without the JSON header the page is rendered again with status 400 and `block_errors` in the context (same shape).
+- **Preview: `POST /emails/mailings/preview/`** with `subject`, `kind`, `group` and `blocks` (JSON). Answers `200 {"ok", "subject", "html", "text", "errors"}`; when something is wrong `ok` is false, `html` is empty and `errors` has the same shape as above (`errors.blocks`). Without a `blocks` field it previews `body` as before. Previews use the sample name James.
+- **Upload a picture: `POST /emails/mailings/images/`** (multipart, field `file`). JPEG, PNG or GIF by file content, max 2 MB (`image_max_bytes` in the page context). Answers `200 {"ok": true, "id", "url", "width", "height"}` (`width` and `height` are `null` if the header could not be read) or `400 {"ok": false, "message"}` (`429` when too many: 30 per 10 minutes). Put `id` in the part's `image`; `url` is the address to show in the editor.
+- **Public image: `GET /email-image/<id>/`** on the public host, no login, long cache.
+- **Send me a test / Send / Schedule** are unchanged and use the saved parts. Send and Schedule re-check the parts (a missing picture or bad link stops it with a plain message "Part 3: ...").
+
+### Page context for the mailing form (New and Edit)
+
+`blocks` (the parts to show: what was posted after a failed save, else the saved parts, else an old draft's body turned into paragraph parts, else the chosen starter, else `[]`), `block_errors`, `block_types`, `block_max_parts`, `image_upload_url`, `image_max_bytes`, `starters` (`[("", "Blank"), ("booking_open", "Booking is open")]`) and `start` (the chosen key). New mailing with `?start=booking_open` prefills `name`, `subject`, kind Service, group Everyone and the parts (form initial values, so `form.name.value` etc. work as before).
+
+### Rendering notes
+
+- Heading parts are `h2` (Signika 22/28); dividers use the layout hairline; small print is the muted 13/20 paragraph; buttons are the layout's table button plus the "paste this link" line.
+- Images are capped at 504 px wide (the layout's content width, inside the 552 px cap in this spec), with `width`/`height` attributes when known and the alt text; with a link they are wrapped in it. Plain text shows `[Image: alt text]` (and the link).
+- The inbox preview line is the first paragraph part (never one with a link, greeting lines skipped); if there is no paragraph it falls back to headings and small print.
+- A test email sent from a development machine shows pictures as broken in Gmail (it cannot fetch `localhost`); live uses the public address.
