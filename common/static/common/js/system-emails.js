@@ -20,6 +20,28 @@ const esc = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 const debounce = (fn, ms) => { let timer = 0; const run = (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }; run.cancel = () => clearTimeout(timer); return run; };
 const NETWORK = 'Could not reach System. Your work is still here.';
 
+/* The 15 minute unlock ran out: System answers a script call with a redirect to /unlock/, which fetch and XHR follow and get a page back.
+   Say so, keep the work, and offer the unlock page in a new tab. */
+const isLocked = (url, type, redirected) => /\/unlock\//.test(url || '') || (redirected && !/json/.test(type || ''));
+const unlockHref = () => document.body.dataset.systemUnlockUrl || '/unlock/';
+function showLocked(message) {
+  const form = $('[data-se-composer]') || $('form');
+  let note = $('[data-se-locknote]');
+  if (!note) {
+    note = document.createElement('p');
+    note.className = 'sys-note warn se-locknote';
+    note.dataset.seLocknote = '';
+    note.setAttribute('role', 'alert');
+    form.prepend(note);
+  }
+  const link = document.createElement('a');
+  link.href = unlockHref(); link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Unlock System';
+  note.replaceChildren(`${message} `, link);
+  note.hidden = false;
+}
+const clearLocked = () => { const note = $('[data-se-locknote]'); if (note) note.hidden = true; };
+const LOCKED_SAVE = 'System locked. Unlock it in another tab, then save again.';
+
 /** POST (or GET) as a script: JSON back where the endpoint speaks it. Resolves { ok, status, data, response }; a network failure resolves { ok: false, status: 0 }. */
 async function call(url, { method = 'POST', body, signal, json = true } = {}) {
   const headers = { 'X-CSRFToken': csrf(), 'X-Requested-With': 'fetch' };
@@ -28,7 +50,8 @@ async function call(url, { method = 'POST', body, signal, json = true } = {}) {
     const response = await fetch(url, { method, body: body instanceof FormData || body instanceof URLSearchParams ? body : body ? new URLSearchParams(body) : undefined, credentials: 'same-origin', headers, signal });
     let data = null;
     if (json) { try { data = await response.clone().json(); } catch { data = null; } }
-    return { ok: response.ok, status: response.status, data, response };
+    const locked = isLocked(response.url, response.headers?.get?.('content-type'), response.redirected);
+    return { ok: response.ok && !locked, status: response.status, data: locked ? null : data, response, locked };
   } catch (error) {
     if (error.name === 'AbortError') return { ok: false, status: -1, aborted: true };
     return { ok: false, status: 0, data: null };
@@ -204,6 +227,8 @@ function previewPane(root, { url, params, onResult = () => {}, sample, nothing =
     const result = await call(url, { body: params(), signal: controller.signal });
     if (mine !== seq || result.aborted) return;
     delete wrap.dataset.busy;
+    if (result.locked) { errorBox.hidden = true; showLocked('System locked. Unlock it in another tab, then the preview will draw again.'); return; }
+    clearLocked();
     if (!result.data || (!result.ok && result.status !== 200)) { errorBox.hidden = false; note.hidden = true; return; }
     errorBox.hidden = true;
     const data = result.data;
@@ -360,6 +385,7 @@ function initComposer(form) {
   const builder = initBuilder(form, {
     known: known.body, drawTokens, insertAt, csrf,
     onChange: () => { dirty = true; typed = true; refreshBar(); preview.soon(); },
+    locked: () => showLocked('System locked. Unlock it in another tab, then upload the image again.'),
   });
   const params = () => new URLSearchParams({ subject: fields.subject.value, blocks: builder.json(), kind: kind(), group: group() });
   const preview = previewPane(form, {
@@ -497,8 +523,10 @@ function initComposer(form) {
     try {
       const response = await fetch(form.action || location.href, { method: 'POST', body: data, credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch', Accept: 'application/json', 'X-CSRFToken': csrf() } });
       let answer = null;
-      try { answer = await response.json(); } catch { answer = null; }
-      if (answer?.ok && answer.id) id = answer.id;
+      const locked = isLocked(response.url, response.headers.get('content-type'), response.redirected);
+      if (!locked) { try { answer = await response.json(); } catch { answer = null; } }
+      if (locked) showLocked(LOCKED_SAVE);
+      else if (answer?.ok && answer.id) { id = answer.id; clearLocked(); }
       else if (answer?.errors) {
         const issues = problemsFrom(answer.errors);
         if (issues.length) await showProblems(form, issues, { opener: saveButton });

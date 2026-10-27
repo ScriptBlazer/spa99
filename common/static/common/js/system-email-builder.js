@@ -617,6 +617,13 @@ export function initBuilder(form, deps) {
       let data = null;
       try { data = JSON.parse(xhr.responseText); } catch { data = null; }
       finish();
+      if (/\/unlock\//.test(xhr.responseURL || '') || (!data && /html/i.test(xhr.getResponseHeader?.('content-type') || ''))) { // the unlock ran out
+        part.imgError = { message: 'System locked. Unlock it in another tab, then try again.', retry: file };
+        paintImage(part);
+        deps.onChange?.('image');
+        deps.locked?.();
+        return;
+      }
       if (xhr.status === 200 && data?.ok) {
         part.data.image = data.id;
         part.thumb = data.url;
