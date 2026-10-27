@@ -54,7 +54,7 @@ class AutomaticEmailTests(TestCase):
 
     def test_list_edit_context_and_save_through_the_change_log_with_undo(self):
         listing = self.client.get("/emails/automatic/").context["emails"]
-        self.assertEqual({e["key"] for e in listing}, {"verify", "welcome", "password_reset", "team_invite", "gold_ack", "gold_invite", "gold_active",
+        self.assertEqual({e["key"] for e in listing}, {"verify", "welcome", "password_reset", "password_changed", "team_invite", "gold_ack", "gold_invite", "gold_active",
                                                      "invite", "gold_approver", "gold_approver_repeat", "gold_final", "gold_sent_back", "gold_respond", "gold_declined"})
         self.assertNotIn("mailing", {e["key"] for e in listing})
         page = self.client.get("/emails/automatic/verify/")

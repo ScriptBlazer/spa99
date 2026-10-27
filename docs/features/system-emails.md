@@ -79,3 +79,10 @@ The Gold approver email and the "sent back" email gained **Decline** and **Respo
 ## Postmark bounces (2026-10-27)
 
 With Postmark sending, permanent bounces and spam complaints arrive at `POST /postmark/webhook/` and land in the same suppression list as SES feedback, so group sends, invites and account emails skip those addresses and the System > Emails stats count them. Details and setup: `docs/features/email.md`.
+
+## Password changed email (2026-10-27)
+
+New editable automatic email `password_changed` ("Your Spa 99 password was changed"; placeholders `{first_name}`, `{when}` London time, `{reset_url}`; no button, plain link line "If this wasn't you, reset your password now"; Reply-To is the contact address). Seeded by `notifications/seed.py` like the others (`seed_phase1` adds the missing row; no migration, no backfill). Sent by the task `users.tasks.send_password_changed_email(user_id, when_iso)` through `send_templated` (suppression guard, EmailLog, never raises), queued by `users.services.password_changed(user)`.
+- Hooks: `_PasswordChange.form_valid` (member area and the Office, System and Control change-password pages, so team accounts too) and `users.services.reset_password` (reset completion).
+- No email for a first password: if the account had no usable password before (a team invite or Gold set-up), nothing is sent. Nothing for admin or command password sets (they do not call the helper).
+- `{reset_url}` is always the public `SITE_URL/forgot-password/` page (every account can use it). No device or IP is included.

@@ -51,3 +51,4 @@ Until the site is live the subscription cannot be confirmed (SNS cannot reach th
 - Send rate: group sends and invites go out at `MAILING_RATE_PER_SECOND` (settings, default 10, never above SES `MaxSendRate`) from a background task in slices; none when the queue runs inline in dev.
 - `send_templated(..., headers=None, body=None)`; `EmailLog.message_id` keeps the SES message id. The wording of the automatic emails is editable (`NotificationTemplate.body`, `notifications/emailbody.py`): see `docs/features/system-emails.md`.
 - The SES production gate (`notifications.ses_status()`): group sends and invites only start when SES reports production access (or in development). Full detail in `docs/features/system-emails.md`.
+- Password changed: after any signed-in change or completed reset (team accounts too) `users.services.password_changed` queues `password_changed` (editable, see `docs/features/system-emails.md`); a first password from an invite sends nothing.

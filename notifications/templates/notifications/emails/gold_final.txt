@@ -1,4 +1,6 @@
-{% autoescape off %}Final approval: {{ name }}
+{% autoescape off %}SPA 99
+
+Final approval: {{ name }}
 {{ potential_label }} potential
 
 An approver has approved this Gold Card application, but the potential is Low, so it needs your final approval. The applicant has not been told anything yet.
@@ -11,4 +13,8 @@ View the whole application: {{ view_url }}
 {{ forloop.counter }}. {{ section.title|upper }}
 {% for label, value in section.rows %}{{ label }}: {{ value }}
 {% endfor %}{% endfor %}
+-- 
+{{ site_name }}, {{ address }}
+Questions? Reply to this email or write to {{ contact_email }}.
+Beyond Luxury
 {% endautoescape %}

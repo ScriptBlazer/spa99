@@ -379,7 +379,9 @@ class _PasswordChange(auth_views.PasswordChangeView):
 
     def form_valid(self, form):
         messages.success(self.request, "Your password has been changed.")
-        return super().form_valid(form)  # keeps this session signed in
+        response = super().form_valid(form)  # keeps this session signed in
+        services.password_changed(self.request.user)
+        return response
 
 
 class ChangePasswordView(_PasswordChange):

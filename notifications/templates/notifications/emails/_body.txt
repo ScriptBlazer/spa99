@@ -1,8 +1,12 @@
-{% autoescape off %}{{ body_text }}
+{% autoescape off %}SPA 99
 
+{{ body_text }}
+
+-- 
 {{ site_name }}, {{ address }}
 Questions? Reply to this email or write to {{ contact_email }}.
-{% if notice %}
-{{ notice }}
+Beyond Luxury
+{% if notice or unsubscribe_url %}
+{% if notice %}{{ notice }}
 {% endif %}{% if unsubscribe_url %}Unsubscribe from these emails: {{ unsubscribe_url }}
-{% endif %}{% endautoescape %}
+{% endif %}{% endif %}{% endautoescape %}

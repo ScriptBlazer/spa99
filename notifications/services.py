@@ -23,6 +23,8 @@ def base_context():
         "tagline": "Beyond Luxury",
         "contact_email": site.contact_address,
         "site_url": settings.SITE_URL,
+        # Unhashed on purpose: a hashed name changes with every logo edit and would break images in emails already sent.
+        "logo_url": f"{settings.SITE_URL}/static/common/img/email/logo-on-dark-2x.png",
         "address": site.address_one_line,
     }
 
@@ -65,6 +67,9 @@ def render_email(template, ctx, body=None, values=None, button_url=None):
     elif spec is not None and spec.editable:
         ctx["body_html"], ctx["body_text"] = render_editable(template, ctx, body=body, values=values, button_url=button_url)
         layout = "_body"
+    if layout == "_body":
+        ctx.setdefault("heading", ctx.get("subject", "").removeprefix("[Test] "))
+        ctx.setdefault("preheader", emailbody.preview_text(ctx["body_text"]))
     return render_to_string(f"notifications/emails/{layout}.html", ctx), render_to_string(f"notifications/emails/{layout}.txt", ctx)
 
 

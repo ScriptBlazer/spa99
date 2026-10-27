@@ -36,6 +36,24 @@ def send_password_reset_email(user_id):
     return log.status
 
 
+def send_password_changed_email(user_id, when_iso=None):
+    """After any password change. The link goes to the public forgot-password page (every account can use it)."""
+    from django.utils import timezone
+    from django.utils.dateparse import parse_datetime
+
+    user = User.objects.filter(pk=user_id, is_active=True).first()
+    if user is None:
+        return None
+    moment = parse_datetime(when_iso or "") or timezone.now()
+    when = timezone.localtime(moment).strftime("%-d %B %Y at %H:%M") + " (London time)"
+    log = send_templated(
+        "password_changed", [user.email], subject_for("password_changed", first_name=user.first_name),
+        {"first_name": user.first_name, "when": when, "reset_url": f"{settings.SITE_URL}/forgot-password/"},
+        subject_email=user.email,
+    )
+    return log.status
+
+
 def send_team_invite_email(user_id):
     """The 'you've been added to the team' email: the normal password reset link (one hour, single use)."""
     from common import levels
