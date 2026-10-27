@@ -96,9 +96,9 @@ class MembershipsPageDataTests(TestCase):
         self.assertEqual(labels[-2:], ["Waitlist", "BML members' events"])  # Leil Shishi is hidden for now (2026-10-26)
         self.assertNotIn("Leil Shishi", labels)
         merch = next(r for r in table if r["label"] == "Merch")["cells"]
-        self.assertEqual([c["slug"] for c in merch], ["tier-1", "tier-2", "tier-3", "single-visit", "gold"])
+        self.assertEqual([c["slug"] for c in merch], ["tier-1", "tier-2", "tier-3", "gold", "single-visit"])  # Single visit last (2026-10-26)
         visits = next(r for r in table if r["label"] == "Visits a month")["cells"]
-        self.assertEqual([c["text"] for c in visits], ["6", "8", "Unlimited", "1", "Unlimited"])  # Tier 3 says Unlimited, not All
+        self.assertEqual([c["text"] for c in visits], ["6", "8", "Unlimited", "Unlimited", "1"])  # Tier 3 says Unlimited, not All
         self.assertEqual([c["text"] for c in next(r for r in table if r["label"] == "When")["cells"]][:3], ["Off-peak", "Off-peak and peak", "Off-peak and peak"])
 
     def test_leil_shishi_switch_hides_it_everywhere_and_shows_it_again(self):
@@ -115,7 +115,7 @@ class MembershipsPageDataTests(TestCase):
     def test_gold_column_shows_the_annual_fee_and_says_by_application_when_empty(self):
         def gold_cells():
             table = pages.compare_table(pages.purchasable_plans())
-            return [next(r for r in table if r["label"] == label)["cells"][-1]["text"] for label in ("Price, ex VAT", "Price, inc VAT")]
+            return [next(c for c in next(r for r in table if r["label"] == label)["cells"] if c["slug"] == "gold")["text"] for label in ("Price, ex VAT", "Price, inc VAT")]
 
         self.assertEqual(gold_cells(), ["£199 a year", "£238.80 a year"])  # default £199 ex VAT (2026-10-26)
         Plan.objects.filter(slug="gold").update(annual_fee=None)

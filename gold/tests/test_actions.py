@@ -229,9 +229,9 @@ class HardeningTests(ActionsTestCase):
         office(self.approver, f"/gold/{application.pk}/approve/", {"channel": "email_link", "token": "forged"})
         self.assertEqual(events(application, "approved")[0].channel, "office")
         other = self.application(email="o@example.com", mobile="+447911000444")
-        page = office(self.approver, f"/gold/{other.pk}/approve/confirm/?t={approval.make_approve_token(other)}")
+        page = office(self.approver, f"/gold/{other.pk}/?t={approval.make_approve_token(other)}")  # the email link opens the full page
         self.assertContains(page, 'name="token"')
-        self.assertNotContains(office(self.approver, f"/gold/{other.pk}/approve/confirm/?t=junk"), 'name="token"')
+        self.assertNotContains(office(self.approver, f"/gold/{other.pk}/?t=junk"), 'name="token"')
 
     def test_the_database_refuses_edits_but_allows_delete_and_an_account_going(self):
         application = self.application()

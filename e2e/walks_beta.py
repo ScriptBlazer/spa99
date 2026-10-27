@@ -19,6 +19,7 @@ from .kit import (
     NEW_PASSWORD, apply_gold, answer_journey, dbtool, fill_date_of_birth, form_errors, gold_fill_you, gold_to_last_screen, manage,
     close_problems, problems_modal, register_member, sign_in, sign_in_fails, strict_server_up, tick, verify_email_link,
 )
+from .kit import approve_on_application_page
 from .walks import body_text, confirm_office_modal, wav_bytes
 
 BARRY = STAFF["barry"]["email"]
@@ -65,8 +66,8 @@ def application_id(url):
 
 
 def approve_link(first, last):
-    """The one-tap approve link in the approver's email about this applicant."""
-    return mailbox.link(mailbox.wait_for(BARRY, f"Gold Card application: {first} {last}"), "/approve/confirm/")
+    """The Review application link (full application page, ?t=) in the approver's email about this applicant."""
+    return mailbox.link(mailbox.wait_for(BARRY, f"Gold Card application: {first} {last}"), "?t=")
 
 
 def barry_page(w):
@@ -77,13 +78,10 @@ def barry_page(w):
 
 
 def approve_in_office(page, url):
-    """Barry opens the approve link and taps Approve."""
+    """Barry opens the email link (the full application page) and approves there."""
     page.goto(url)
-    page.wait_for_selector("[data-gold-confirm]")
-    with page.expect_navigation():
-        page.locator(".o-confirm-go").click()
     page.wait_for_selector("[data-gold-decision]")
-    assert "Approved" in page.locator("[data-gold-decision]").inner_text()
+    approve_on_application_page(page)
 
 
 def accept_invite(page, url, password=PASSWORD):
@@ -180,7 +178,7 @@ def beta_gold_declined(w):
         barry.goto(f"{OFFICE}/gold/?status=declined")
         assert barry.locator("[data-gold-row]", has_text=f"{first} {last}").count() == 1
         barry.goto(link)
-        assert "declined" in barry.locator("[data-confirm-state]").inner_text().lower(), "The approve page offers to approve a declined application"
+        assert barry.locator("[data-gold-decision] [data-approve]").count() == 0, "The application page offers to approve a declined application"
     again = w.page()
     with w.step("Applying again later: one waiting application, the old one stays declined, no crash", again):
         dbtool("age-gold", email)  # a real re-apply comes days later; this keeps it outside the two-minute double-click window
@@ -212,10 +210,12 @@ def beta_gold_links(w):
         assert "/login/" in signed_out.url, f"Landed on {signed_out.url}"
         assert dbtool("gold", email)["status"] == "new"
     olive = w.page()
-    with w.step("Office level without Approver opens the link: refused (403), nothing approved", olive):
+    with w.step("Office level without Approver opens the link: view only, no Approve, nothing approved", olive):
         sign_in(olive, OFFICE, OLIVE["email"], PASSWORD)
-        status = olive.goto(url).status
-        assert status == 403, f"The approve link answered {status} to someone who is not an Approver (expected 403)"
+        status = olive.goto(url).status  # the link opens the application page, which Office level may view (2026-10-26)
+        assert status == 200, f"The link answered {status} to an Office-level person"
+        assert olive.locator("[data-approve], [data-decline]").count() == 0, "Office level without Approver sees decision buttons"
+        assert post_direct(olive, OFFICE, f"/gold/{application_id(url)}/approve/").status == 403, "Office level could approve directly"
         assert dbtool("gold", email)["status"] == "new"
     barry = barry_page(w)
     with w.step("The approver taps the link: approved, one invite email", barry):
@@ -224,9 +224,9 @@ def beta_gold_links(w):
         mailbox.wait_for(email, "Gold Card is approved")
     with w.step("The same link a second time, and a second approve request: nothing harmful, still one approval, one invite", barry):
         barry.goto(url)
-        barry.wait_for_selector("[data-gold-confirm]")
-        assert barry.locator(".o-confirm-go").count() == 0, "The approve page still offers a button after approval"
-        assert "already approved" in barry.locator("[data-confirm-state]").inner_text().lower()
+        barry.wait_for_selector("[data-gold-decision]")
+        assert barry.locator("[data-gold-decision] [data-approve]").count() == 0, "The application page still offers Approve after approval"
+        assert "approved" in barry.locator("[data-gold-decision]").inner_text().lower()
         again = post_direct(barry, OFFICE, f"/gold/{pk}/approve/")
         assert again.status in (302, 200), f"A second approve request answered {again.status}"
         found = dbtool("gold", email)
@@ -255,9 +255,9 @@ def beta_gold_links(w):
         assert dbtool("gold", email2)["status"] == "declined"
     with w.step("The approve link after a decline is refused and the application stays declined, with no invite", barry):
         barry.goto(url2)
-        barry.wait_for_selector("[data-gold-confirm]")
-        assert barry.locator(".o-confirm-go").count() == 0, "A declined application can still be approved from its link"
-        assert "declined" in barry.locator("[data-confirm-state]").inner_text().lower()
+        barry.wait_for_selector("[data-gold-decision]")
+        assert barry.locator("[data-gold-decision] [data-approve]").count() == 0, "A declined application can still be approved from its link"
+        assert "declined" in barry.locator("[data-gold-decision]").inner_text().lower()
         forced = post_direct(barry, OFFICE, f"/gold/{pk2}/approve/")
         assert forced.status in (302, 200, 403, 400), f"Forced approve answered {forced.status}"
         found = dbtool("gold", email2)
@@ -719,7 +719,7 @@ def beta_bad_input(w):
         assert SCRIPT not in html_part and "<img src=x" not in html_part, "The approver's email carries hostile text as live HTML"
         assert "&lt;script&gt;" in html_part, "The name is not shown (escaped) in the approver's email"
         approver = barry_page(w)
-        link = mailbox.link(message, "/approve/confirm/")
+        link = mailbox.link(message, "?t=")
         for url in (link, f"{OFFICE}/gold/{application_id(link)}/"):
             approver.goto(url)
             assert_text_not_script(approver, f"Office page {url.split('/')[-2]}")
@@ -992,7 +992,7 @@ def beta_emails(w):
     with w.step("The key links (verify, reset, invite, approve) are the same in the text and in the HTML part", page):
         for message in messages:
             hrefs, in_text = _links(message)
-            key = lambda urls: sorted({u for u in urls if any(k in u for k in (*ONE_TIME, "/approve/confirm/"))})  # noqa: E731
+            key = lambda urls: sorted({u for u in urls if any(k in u for k in (*ONE_TIME, "?t="))})  # noqa: E731
             if key(hrefs) != key(in_text) and key(in_text):
                 problems.append(f"'{message['Subject']}': text links {key(in_text)} differ from HTML links {key(hrefs)}")
         assert not problems, "\n".join(dict.fromkeys(problems))

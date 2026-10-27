@@ -97,12 +97,12 @@ class SubmitTests(TestCase):
                          "Suggested membership: Tier 3", application.reference):
             self.assertIn(expected, body)
         html = barry.alternatives[0][0]
-        approve, view = (f"http://office.localhost:8000/gold/{application.pk}/approve/confirm/", f"http://office.localhost:8000/gold/{application.pk}/")
+        approve, view = (f"http://office.localhost:8000/gold/{application.pk}/?t=", f"http://office.localhost:8000/gold/{application.pk}/")
         for text in (body, html):  # both buttons point at the Office host and carry only the application id
             self.assertNotIn("Open in Control", text)
             self.assertIn(approve, text)
             self.assertIn(view, text)
-        self.assertIn("Approve", html)
+        self.assertIn("Review application", html)
         self.assertIn("View application", html)
         self.assertEqual(thanks.to, ["dan@example.com"])
         self.assertIn("We have your Gold Card application", thanks.body)

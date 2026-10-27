@@ -221,7 +221,7 @@ def approval_token(application):
 def approver_email_context(application):
     office = settings.OFFICE_URL  # links hold only the application id: the Office asks for sign-in and checks the role
     return {
-        "approve_url": f"{office}/gold/{application.pk}/approve/confirm/?t={approval_token(application)}",
+        "approve_url": f"{office}/gold/{application.pk}/?t={approval_token(application)}",  # opens the full application page (2026-10-26)
         "view_url": f"{office}/gold/{application.pk}/",
         "decline_url": f"{office}/gold/{application.pk}/?do=decline",  # Decline and Respond need typed text, so they open the Office form
         "respond_url": f"{office}/gold/{application.pk}/?do=respond",

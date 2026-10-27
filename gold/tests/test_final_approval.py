@@ -92,7 +92,7 @@ class FinalApprovalTests(TestCase):
         self.assertEqual(to(message), ["approver@example.test", "elsewhere@example.test"])  # approver2 chose another address
         self.assertEqual(message.subject, "Dan Cohen was approved, but the potential is Low. Are you sure?")
         self.assertIn("Not convinced about this one.", message.body)
-        self.assertIn(f"/gold/{application.pk}/approve/confirm/", message.body)
+        self.assertIn(f"/gold/{application.pk}/?t=", message.body)
         self.assertFalse(approval.send_back(application, self.final))  # no longer awaiting final approval
         with self.assertRaises(approval.NoteTooLong):
             approval.clean_note("x" * 1001)

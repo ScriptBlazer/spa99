@@ -358,6 +358,12 @@ def confirm_office_modal(page):
     page.locator("dialog.fb-modal[open] [data-fb-ok]").click()
 
 
+def approve_on_application_page(page):
+    """On the Office application page: tap Approve and invite, confirm, wait for the rail to say Approved."""
+    page.locator("[data-gold-decision] [data-approve] button").first.click()
+    confirm_office_modal(page)
+    page.wait_for_selector("[data-gold-decision]:has-text('Approved')")
+
 def no_horizontal_overflow(page):
     """(ok, scrollWidth, innerWidth): nothing sticks out sideways."""
     width = page.evaluate("() => [document.documentElement.scrollWidth, document.body ? document.body.scrollWidth : 0, window.innerWidth]")

@@ -114,6 +114,7 @@ class ProdSettingsTests(SimpleTestCase):
         "ADMIN_PATH": "my-own-hidden-door-91x/",
         "DEFAULT_FROM_EMAIL": "Spa 99 <noreply@example.com>",
         "SYSTEM_UNLOCK_CODE": "493021",
+        "AWS_STORAGE_BUCKET_NAME": "spa99-media-test",
     }
 
     def import_prod(self, environ):
@@ -203,8 +204,14 @@ class ProdSettingsTests(SimpleTestCase):
         for host in ("spa99.uk", "control.spa99.uk", "localhost", "127.0.0.1", "extra.example.com"):
             self.assertIn(host, settings.ALLOWED_HOSTS)
 
-    def test_local_media_in_prod_is_flagged(self):
-        self.assertTrue(self.import_prod(self.GOOD).STARTUP_REPORT["media_is_local"])
+    def test_prod_refuses_local_media_and_defaults_to_ses(self):
+        environ = {**self.GOOD}
+        environ.pop("AWS_STORAGE_BUCKET_NAME")
+        with self.assertRaises(ImproperlyConfigured):  # uploads would be lost on the next deploy
+            self.import_prod(environ)
+        settings = self.import_prod(self.GOOD)
+        self.assertFalse(settings.STARTUP_REPORT["media_is_local"])
+        self.assertEqual(settings.EMAIL_BACKEND, "notifications.backends.SesBackend")
 
 
 class CorruptEnvFileTests(SimpleTestCase):

@@ -2,7 +2,7 @@
 {% if office_can.can_act %}
 {% if a.can_decline %}<div data-decline class="o-act o-act--decline">
   <button type="button" class="btn btn-secondary{% if bar %}{% else %} btn-block{% endif %}" data-gold-open="decline" aria-haspopup="dialog">Decline</button></div>{% endif %}
-{% if a.can_approve %}<form method="post" action="{% url 'office_gold_approve' a.id %}" data-office-action data-approve class="o-act o-act--approve">{% csrf_token %}
+{% if a.can_approve %}<form method="post" action="{% url 'office_gold_approve' a.id %}" data-office-action data-approve class="o-act o-act--approve">{% csrf_token %}{% if approve_token %}<input type="hidden" name="token" value="{{ approve_token }}">{% endif %}
   <button type="submit" class="btn btn-primary{% if not bar %} btn-block{% endif %}" data-working-text="Approving" data-confirm
           data-confirm-title="Approve {{ a.name }} for Gold?" data-confirm-body="He gets an invite to set up his account. His Gold month starts today, {% now 'j F' %}."
           data-confirm-label="Approve and invite" data-confirm-cancel="Not now">Approve and invite</button></form>{% endif %}

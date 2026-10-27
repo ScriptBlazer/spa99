@@ -26,8 +26,9 @@ SYSTEM_ENV_LABEL = ENV.get("SYSTEM_ENV_LABEL", "LIVE").upper()
 # ALLOWED_HOSTS in the environment ADDS to these. localhost / 127.0.0.1: the container health check.
 ALLOWED_HOSTS = [DOMAIN, CONTROL_HOST, OFFICE_HOST, SYSTEM_HOST, "localhost", "127.0.0.1"] + ENV.list("ALLOWED_HOSTS", [])
 
-# Email: SMTP unless EMAIL_BACKEND says otherwise (notifications.backends.SesBackend for SES via the IAM role).
-EMAIL_BACKEND = ENV.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+# Email: Amazon SES via the IAM role unless EMAIL_BACKEND says otherwise (go-live audit 2026-10-26: the old SMTP default
+# pointed at localhost and every email failed silently).
+EMAIL_BACKEND = ENV.get("EMAIL_BACKEND", "notifications.backends.SesBackend")
 SITE_URL = ENV.get("SITE_URL", f"https://{DOMAIN}").rstrip("/")
 CONTROL_URL = ENV.get("CONTROL_URL", f"https://{CONTROL_HOST}").rstrip("/")
 OFFICE_URL = ENV.get("OFFICE_URL", f"https://{OFFICE_HOST}").rstrip("/")
@@ -41,8 +42,8 @@ MEDIA_STORAGE, MEDIA_DESCRIPTION = build_media_storage(
 )
 STORAGES = {**STORAGES, "default": MEDIA_STORAGE}  # noqa: F405
 MEDIA_DESCRIPTION, MEDIA_IS_LOCAL = finish_media_description(MEDIA_STORAGE, MEDIA_DESCRIPTION)
-if MEDIA_IS_LOCAL:
-    MEDIA_DESCRIPTION += " (WARNING: S3 not configured, files are lost when the container is replaced)"
+if MEDIA_IS_LOCAL:  # go-live audit 2026-10-26: refuse rather than lose uploads on the next deploy
+    raise ImproperlyConfigured("AWS_STORAGE_BUCKET_NAME must be set in production (uploads would be lost when the container is replaced).")
 
 # HTTPS behind Caddy (RULES.md section 9). HSTS stays off until the site has run on HTTPS without problems.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
