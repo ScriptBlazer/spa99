@@ -49,7 +49,7 @@ body.system.live { --sys-stripe: 3px; }
 .sys-pop p { padding: var(--sys-1) var(--sys-2); color: var(--sys-text-2); font-size: var(--sys-fs-sm); }
 .sys-pop a, .sys-pop button { display: flex; align-items: center; width: 100%; height: var(--sys-ctl); padding: 0 var(--sys-2); border: 0; background: none; color: var(--sys-text); font: inherit; text-decoration: none; text-align: left; border-radius: var(--sys-radius); cursor: pointer; }
 .sys-pop a:hover, .sys-pop button:hover { background: var(--sys-subtle); }
-.sys-menu-btn { display: none; }
+.sys-btn.sys-menu-btn { display: none; }  /* .sys-btn sets display later; keep this more specific */
 
 /* layout and left list */
 .sys-app { display: grid; grid-template-columns: var(--sys-nav-w) minmax(0, 1fr); min-height: calc(100vh - var(--sys-top-h) - var(--sys-stripe)); }
@@ -156,7 +156,7 @@ body.system.live { --sys-stripe: 3px; }
 
 @media (max-width: 64em) {
   .sys-app { grid-template-columns: 1fr; }
-  .js .sys-menu-btn { display: inline-flex; }
+  .js .sys-btn.sys-menu-btn { display: inline-flex; }
   .js .sys-nav { position: fixed; inset: calc(var(--sys-top-h) + var(--sys-stripe)) 0 0 0; height: auto; width: min(320px, 86vw); z-index: 35; transform: translateX(-100%); visibility: hidden; border-right: 1px solid var(--sys-line); box-shadow: var(--sys-shadow-pop); }
   .js .sys-nav[data-open] { transform: none; visibility: visible; }
   .sys-nav-meta { display: block; } .sys-top .sys-lock-timer, .sys-top .sys-who { display: none; }
