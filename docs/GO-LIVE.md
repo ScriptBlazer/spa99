@@ -18,7 +18,11 @@ Run these in order. Live starts with an empty database, so it needs no backfills
    - Give the server role a policy with:
      - `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` and `s3:ListBucket` on the bucket
      - `ses:SendRawEmail` and `ses:GetAccount`
-7. **SES:** check that production access is approved. While SES is in the sandbox, confirm and reset emails reach only verified addresses. Check that the bounce and complaint feedback goes to the SNS topic `spa99-ses-feedback`.
+7. **Email: Postmark for launch** (2026-10-27; SES is still in sandbox).
+   - In Postmark, add the sending domain `spa99.uk` and put its DKIM and Return-Path records in Cloudflare. They sit alongside the SES records without clashing.
+   - Copy the server token.
+   - Ask Postmark to approve the account. Until it does, mail only reaches addresses at spa99.uk.
+   - **Switching to SES later** is a `.env` change only. Delete the five `EMAIL_*` lines, so the default (SES) applies again, then run `docker compose up -d`. Then do step 19 for the bounce subscription.
 
 ## C. Server
 
@@ -36,12 +40,19 @@ Run these in order. Live starts with an empty database, so it needs no backfills
 
     Also set:
     - `DOMAIN`, `OFFICE_DOMAIN`, `SYSTEM_DOMAIN`, `CONTROL_DOMAIN`
-    - `AWS_SES_REGION_NAME=eu-west-2`
-    - `SES_SNS_TOPIC_ARN=arn:aws:sns:eu-west-2:137808120968:spa99-ses-feedback`
+    - Email through Postmark (both user and password are the server token):
+      ```
+      EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+      EMAIL_HOST=smtp.postmarkapp.com
+      EMAIL_PORT=587
+      EMAIL_HOST_USER=<postmark server token>
+      EMAIL_HOST_PASSWORD=<postmark server token>
+      ```
+    - `AWS_SES_REGION_NAME=eu-west-2` and `SES_SNS_TOPIC_ARN=arn:aws:sns:eu-west-2:137808120968:spa99-ses-feedback` (harmless now, ready for SES)
     - `SENTRY_DSN`
     - `IMAGE=<username>/spa99` and `APP_TAG=1.0.0`
 
-    Live always uses the prod settings and SES email, whatever the `.env` says. No AWS keys: the server uses its role.
+    Live always uses the prod settings, whatever the `.env` says. Email goes through SES unless `EMAIL_BACKEND` is set (as above for Postmark). No AWS keys: the server uses its role.
 11. **DNS, grey cloud first (DNS only):** point `spa99.uk`, `www.spa99.uk`, `office.spa99.uk`, `system.spa99.uk` and `control.spa99.uk` at the server.
 12. Start it: `docker compose up -d`. Migrations run by themselves.
 13. Check `docker compose logs web | head -30`: the startup line should name the prod settings, Postgres and S3. Check `docker compose logs caddy` too: it should say the certificates were obtained.
@@ -59,7 +70,7 @@ Run these in order. Live starts with an empty database, so it needs no backfills
     - Set SSL/TLS to **Full (strict)**. "Flexible" causes an endless redirect loop.
     - Turn the records to orange (proxied).
     - Leave **Bot Fight Mode off**: it can block Amazon SNS and uptime checks.
-19. Run `curl -X POST -d '{}' https://spa99.uk/ses/notifications/`. It should answer 400 or 403, not 404. Then, in SNS, open the topic and create a subscription: HTTPS, endpoint `https://spa99.uk/ses/notifications/`. Its status should turn to Confirmed.
+19. **(Only once on SES.)** Run `curl -X POST -d '{}' https://spa99.uk/ses/notifications/`. It should answer 400 or 403, not 404. Then, in SNS, open the topic and create a subscription: HTTPS, endpoint `https://spa99.uk/ses/notifications/`. Its status should turn to Confirmed.
 20. **System** (`system.spa99.uk`):
     - Add Barry in Team (Office level).
     - Make him Approver in Approval.
