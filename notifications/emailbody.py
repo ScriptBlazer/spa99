@@ -28,10 +28,10 @@ PREVIEW_MAX = 100
 
 def preview_text(text):
     """The inbox preview line for an email body: the first paragraph that is not a short greeting, cut at 100 characters
-    on a word boundary with an ellipsis. Plain text in, plain text out (the layout escapes it)."""
+    on a word boundary with an ellipsis. A paragraph with a link (the button, a {..._url} value) is never used. Plain text in, plain text out (the layout escapes it)."""
     for paragraph in re.split(r"\n\s*\n", (text or "").replace("\r\n", "\n")):
         paragraph = " ".join(paragraph.split())
-        if not paragraph or (GREETING_RE.match(paragraph) and len(paragraph) < 40):
+        if not paragraph or "http://" in paragraph or "https://" in paragraph or (GREETING_RE.match(paragraph) and len(paragraph) < 40):
             continue
         if len(paragraph) <= PREVIEW_MAX:
             return paragraph

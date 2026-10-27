@@ -1,7 +1,7 @@
 {% extends "notifications/emails/_base.html" %}
 {% block title %}Sent back for review{% endblock %}
 {% block preheader %}The final approver asks whether you are sure. The applicant has not been told.{% endblock %}
-{% block heading %}{{ name }}: sent back for review{% endblock %}
+{% block h1 %}{% include "notifications/emails/_heading.html" with heading=name|add:": sent back for review" %}{% endblock %}
 {% block content %}
 <p class="e-muted" style="margin:0 0 16px;font-size:13px;line-height:20px;color:#7B675A;">{{ potential_label }} potential</p>
 <p style="margin:0 0 16px;font-size:16px;line-height:26px;color:#492E21;">{{ name }} was approved, but the potential is Low. Are you sure? A final approver{% if sent_back_by %} ({{ sent_back_by }}){% endif %} has sent this Gold Card application back to you. The applicant has not been told anything. You can approve it again, which goes through at once, or decline it.</p>

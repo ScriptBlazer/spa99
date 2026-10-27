@@ -89,3 +89,27 @@ class EmailLayoutTests(TestCase):
                              headers={"List-Unsubscribe": f"<{SITE}/unsubscribe/abc/>"}, body="Hello {first_name},\n\nOur spa opens soon.")
         self.assertEqual(log.status, "sent")
         self.assertEqual(mail.outbox[0].extra_headers["List-Unsubscribe"], f"<{SITE}/unsubscribe/abc/>")
+
+    def test_preview_text_never_shows_links(self):
+        text = "Hello James,\n\nChoose a new password:\nhttps://spa99.uk/reset/tok/\n\nIt works for one hour and only once."
+        self.assertEqual(emailbody.preview_text(text), "It works for one hour and only once.")
+        self.assertEqual(emailbody.preview_text("See https://x.example/a now"), "")
+
+    def test_edited_body_with_button_first_has_clean_preheader(self):
+        html = preview_email("password_reset", "Reset", "{button}\n\nUse it within the hour.")["html"]
+        pre = re.search(r'mso-hide:all[^>]*>(.*?)&#847;', html, re.S).group(1)
+        self.assertEqual(pre, "Use it within the hour.")
+
+    def test_every_spec_previews_with_heading_and_no_empty_href(self):
+        for key, spec in emailbody.SPECS.items():
+            with self.subTest(key=key):
+                out = preview_email(key, "Subject for " + key, "")
+                self.assertNotIn('href=""', out["html"])
+                self.assertIn("</h1>", out["html"])
+                self.assertNotRegex(out["html"], r"<h1[^>]*>\s*(Gold Card application|Final approval): \s*</h1>")
+        self.assertIn("Repeat application.", preview_email("gold_approver_repeat", "S", "")["html"])
+        self.assertIn("James Smith", preview_email("gold_final", "S", "")["html"])
+
+    def test_no_h1_when_heading_empty(self):
+        html, _ = render_email("_body", {**base_context(), "subject": "", "body_html": "<p>x</p>", "body_text": "x"})
+        self.assertNotIn("<h1", html)

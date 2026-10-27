@@ -59,7 +59,7 @@ def render_editable(key, context, body=None, values=None, button_url=None):
 def render_email(template, ctx, body=None, values=None, button_url=None):
     """(html, text) of the whole email for a ready context (the layout around the body). `body` and `values` as in render_editable;
     the context is given the rendered body as `body_html` / `body_text`."""
-    layout = template
+    layout = "gold_approver" if template == "gold_approver_repeat" else template  # one layout, the repeat panel shows on is_repeat
     spec = emailbody.spec_for(template)
     if ctx.get("plain_body") is not None:  # words typed by a person, sent as typed (the Gold decline message)
         ctx["body_html"], ctx["body_text"] = emailbody.render_plain(ctx["plain_body"])
@@ -73,12 +73,28 @@ def render_email(template, ctx, body=None, values=None, button_url=None):
     return render_to_string(f"notifications/emails/{layout}.html", ctx), render_to_string(f"notifications/emails/{layout}.txt", ctx)
 
 
+def _staff_sample_context(key):
+    """A realistic context for previewing the structured staff emails (their layout needs an applicant and links)."""
+    if key not in ("gold_approver", "gold_approver_repeat", "gold_final", "gold_sent_back"):
+        return {}
+    site = settings.SITE_URL
+    rows = [("Name", "James Smith"), ("Email", "james.smith@example.com"), ("Mobile", "+44 7700 900123")]
+    return {
+        "name": "James Smith", "potential_label": "High" if key != "gold_final" else "Low", "is_repeat": key == "gold_approver_repeat",
+        "repeat_reference": "GC-7K2M9Q", "sent_back_by": "Barry", "note": "Please check the property count.",
+        "approve_url": f"{site}/example-link/", "decline_url": f"{site}/example-link/", "respond_url": f"{site}/example-link/",
+        "view_url": f"{site}/example-link/", "confirm_url": f"{site}/example-link/", "send_back_url": f"{site}/example-link/",
+        "sections": [{"title": "Contact", "rows": rows}, {"title": "Property", "rows": [("Where", "London"), ("Size", "10 to 50 units")]}],
+    }
+
+
 def preview_email(key, subject, body, extra=None):
     """The email as it would look with the sample values: {"subject", "html", "text"}. `body` blank = the default; `extra` is added to
     the context (the unsubscribe link and notice of a News mailing)."""
     spec = emailbody.spec_for(key)
     values = emailbody.sample_values(spec)
-    ctx = {**base_context(), "subject": fill_subject(subject, values), "url": f"{settings.SITE_URL}/example-link/", **(extra or {})}
+    ctx = {**base_context(), "subject": fill_subject(subject, values), "url": f"{settings.SITE_URL}/example-link/",
+           **_staff_sample_context(key), **(extra or {})}
     html, text = render_email(key, ctx, body=body if body and body.strip() else spec.default_body, values=values)
     return {"subject": ctx["subject"], "html": html, "text": text}
 

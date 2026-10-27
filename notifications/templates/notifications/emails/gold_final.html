@@ -1,7 +1,7 @@
 {% extends "notifications/emails/_base.html" %}
 {% block title %}Final approval{% endblock %}
 {% block preheader %}Approved by an approver, potential Low. Your final approval is needed.{% endblock %}
-{% block heading %}Final approval: {{ name }}{% endblock %}
+{% block h1 %}{% include "notifications/emails/_heading.html" with heading="Final approval: "|add:name %}{% endblock %}
 {% block content %}
 <p class="e-muted" style="margin:0 0 16px;font-size:13px;line-height:20px;color:#7B675A;">{{ potential_label }} potential</p>
 <p style="margin:0 0 16px;font-size:16px;line-height:26px;color:#492E21;">An approver has approved this Gold Card application, but the potential is Low, so it needs your final approval. The applicant has not been told anything yet.</p>

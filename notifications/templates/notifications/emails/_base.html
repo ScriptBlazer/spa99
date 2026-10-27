@@ -50,8 +50,7 @@ a[x-apple-data-detectors]{color:inherit !important;text-decoration:none !importa
 <a href="{{ site_url }}/" style="text-decoration:none;"><img src="{{ logo_url }}" width="120" height="89" alt="Spa 99" style="display:block;width:120px;height:auto;border:0;outline:none;text-decoration:none;font-family:'Signika','Trebuchet MS',Helvetica,Arial,sans-serif;font-size:22px;line-height:89px;color:#E5AC6E;text-align:center;"></a>
 </td></tr>
 <tr><td class="e-card e-body" bgcolor="#FBF9EC" style="background:#FBF9EC;padding:48px 48px 40px;border-radius:0 0 12px 12px;color:#492E21;font-family:'Figtree','Segoe UI',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;letter-spacing:-0.16px;">
-<h1 class="e-h1" style="margin:0 0 16px;font-family:'Signika','Trebuchet MS','Segoe UI',Helvetica,Arial,sans-serif;font-size:28px;line-height:34px;font-weight:500;letter-spacing:-0.7px;color:#492E21;">{% block heading %}{{ heading }}{% endblock %}</h1>
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;"><tr><td width="32" height="1" bgcolor="#BB8855" style="width:32px;height:1px;font-size:0;line-height:0;background:#BB8855;">&nbsp;</td></tr></table>
+{% block h1 %}{% if heading %}{% include "notifications/emails/_heading.html" %}{% endif %}{% endblock %}
 {% block content %}{% endblock %}
 </td></tr>
 <tr><td align="center" class="e-foot" style="padding:32px 24px 0;font-family:'Figtree','Segoe UI',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#7B675A;">
