@@ -10,7 +10,7 @@
   <p class="o-lead" data-person-line>{% if person.kind == "lead" %}Lead since {{ person.first_seen|dmy }} &middot; last seen {{ person.last_seen|relative:True }}{% else %}{% if person.interest %}Registered {{ person.interest.registered|dmy }}{% endif %}{% with c=person.consent.lead.0 %}{% if c and person.interest %} &middot; lead since {{ c.at|dm }}{% endif %}{% endwith %}{% endif %}</p>
   <p class="o-badges" data-person-badges>
     {% include "office/_lead_status.html" with status=person_status %}
-    <span class="o-badge o-badge--type">{% if person.is_staff %}Team{% elif person.kind == "lead" %}No account{% elif person_status == "gold" %}Gold member{% elif person.interest.plan %}Member, {{ person.interest.plan }}{% else %}Member{% endif %}</span>
+    {% if person.is_staff or person_status != "gold" %}<span class="o-badge o-badge--type">{% if person.is_staff %}Team{% elif person.kind == "lead" %}No account{% elif person.interest.plan %}Member, {{ person.interest.plan }}{% else %}Member{% endif %}</span>{% endif %}{# the status pill already says Gold member (Moishe, 2026-10-27) #}
     {% if person.kind == "account" %}{% if person.verified_at %}<span class="o-badge o-badge--s-approved">Verified</span>{% else %}<span class="o-badge o-badge--s-waiting">Not verified</span>{% endif %}{% endif %}
     {% if person.gold.potential %}{% include "office/_badge.html" with potential=person.gold.potential %}{% endif %}
   </p>
