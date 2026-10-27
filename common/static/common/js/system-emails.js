@@ -212,7 +212,10 @@ function previewPane(root, { url, params, onResult = () => {}, sample }) {
       onResult({});
     } else {
       const first = Object.values(data.errors || {}).flat()[0];
-      note.textContent = first ? 'Fix the wording to see the preview.' : 'The preview is not ready.';
+      const empty = root.querySelector('[name=subject]') && !root.querySelector('[name=subject]').value.trim()
+        && !(root.querySelector('[name=body]')?.value || '').trim();
+      note.textContent = empty ? 'Type a subject and message to see the preview.'
+        : first ? 'Fix the wording to see the preview.' : 'The preview is not ready.';
       note.hidden = false;
       onResult(data.errors || {});
     }
@@ -262,7 +265,7 @@ function initEditor(form) {
     onChange: () => { refreshTest(); preview.soon(); },
   });
   const params = () => new URLSearchParams({ subject: fields.subject.value, body: fields.body ? fields.body.value : '' });
-  preview = previewPane(form, { url: form.dataset.previewUrl, params, onResult: (errors) => { fields.setServer(errors); refreshTest(); }, sample: sampleValue ? `Sample: ${sampleValue}` : '' });
+  preview = previewPane(form, { url: form.dataset.previewUrl, params, onResult: (errors) => { fields.setServer(errors); refreshTest(); }, sample: sampleValue ? `Sample name in the preview: ${sampleValue}` : '' });
   widthToggle(form);
   paneSwitch(form, () => preview.refresh());
 
