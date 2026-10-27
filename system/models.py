@@ -184,6 +184,7 @@ class SystemEvent(AuditRow):
     CODE_EDIT = "code_edit"
     MAILING_SCHEDULED, MAILING_SENT, MAILING_CANCELLED = "mailing_scheduled", "mailing_sent", "mailing_cancelled"
     INVITES_SENT, EMAIL_TEST = "invites_sent", "email_test"
+    TEMPLATE_SAVED, TEMPLATE_RENAMED, TEMPLATE_DELETED = "tpl_saved", "tpl_renamed", "tpl_deleted"
     KIND_CHOICES = [
         (SIGN_IN, "Signed in"), (SIGN_IN_FAILED, "Sign-in failed"), (UNLOCK, "Unlocked"), (UNLOCK_FAILED, "Unlock failed"),
         (UNLOCK_RATE_LIMITED, "Unlock blocked (too many tries)"), (LOCK_MANUAL, "Locked"), (LOCK_IDLE, "Locked (idle)"),
@@ -194,6 +195,7 @@ class SystemEvent(AuditRow):
         (UNDO_CODE_FAILED, "Undo code wrong"), (UNDO_RATE_LIMITED, "Undo blocked (too many tries)"),
         (CODE_EDIT, "Edited as code"), (MAILING_SCHEDULED, "Mailing scheduled"), (MAILING_SENT, "Mailing sent"),
         (MAILING_CANCELLED, "Mailing cancelled"), (INVITES_SENT, "Invites sent"), (EMAIL_TEST, "Test email sent"),
+        (TEMPLATE_SAVED, "Email template saved"), (TEMPLATE_RENAMED, "Email template renamed"), (TEMPLATE_DELETED, "Email template deleted"),
     ]
     OK, FAILED, BLOCKED = "ok", "failed", "blocked"
     OUTCOME_CHOICES = [(OK, "OK"), (FAILED, "Failed"), (BLOCKED, "Blocked")]

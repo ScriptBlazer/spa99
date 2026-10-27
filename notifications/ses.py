@@ -1,8 +1,11 @@
 """The SES production gate. Group sends and invites only start when Amazon SES has production access (a sandbox account can
 only write to verified addresses, so a real send would bounce and hurt the sender reputation).
 
-`ses_status()` reads the account once an hour (boto3 sesv2 get_account), caches it and never raises. In development (DEBUG or a
-console/in-memory mail backend) the mode is "dev": allowed, the emails are printed or kept in memory."""
+`ses_status()` reads the account once an hour (boto3 sesv2 get_account), caches it and never raises.
+
+The gate follows EMAIL_BACKEND, not DEBUG: only notifications.backends.SesBackend is gated on SES. A console/in-memory/file backend is
+mode "dev" (allowed; printed or kept). Any other backend (SMTP through Postmark, say) is mode "provider": allowed, emails really go out
+through EMAIL_HOST, and no Amazon numbers are read or shown."""
 import logging
 
 from django.conf import settings
@@ -13,7 +16,8 @@ logger = logging.getLogger("spa99.email")
 CACHE_KEY = "notifications:ses-status"
 CACHE_SECONDS = 3600
 UNKNOWN_CACHE_SECONDS = 120  # a failed read is retried soon, not hammered
-PRODUCTION, SANDBOX, DEV, UNKNOWN = "production", "sandbox", "dev", "unknown"
+PRODUCTION, SANDBOX, DEV, UNKNOWN, PROVIDER = "production", "sandbox", "dev", "unknown", "provider"
+SES_BACKEND = "notifications.backends.SesBackend"
 DEV_BACKENDS = {
     "django.core.mail.backends.console.EmailBackend", "django.core.mail.backends.locmem.EmailBackend",
     "django.core.mail.backends.filebased.EmailBackend", "django.core.mail.backends.dummy.EmailBackend",
@@ -29,7 +33,17 @@ class SendingRefused(Exception):
 
 
 def is_dev():
-    return bool(settings.DEBUG) or settings.EMAIL_BACKEND in DEV_BACKENDS
+    return settings.EMAIL_BACKEND in DEV_BACKENDS
+
+
+def is_ses():
+    return settings.EMAIL_BACKEND == SES_BACKEND
+
+
+def provider_message():
+    """Plain words for the banner when another provider sends (the host only; never the user name or password)."""
+    host = getattr(settings, "EMAIL_HOST", "") or "another provider"
+    return f"Emails are sent for real through {host} (not Amazon SES)."
 
 
 def _blank(mode):
@@ -52,6 +66,8 @@ def ses_status(refresh=False):
     """{mode: production|sandbox|dev|unknown, max_24h, sent_24h, max_rate, allowed, message}. Cached an hour; `refresh=True` reads again."""
     if is_dev():
         status = _blank(DEV)
+    elif not is_ses():
+        status = _blank(PROVIDER)
     else:
         status = None
         if not refresh:
@@ -71,8 +87,9 @@ def ses_status(refresh=False):
             except Exception:  # noqa: BLE001
                 pass
     status = dict(status)
-    status["allowed"] = status["mode"] in (PRODUCTION, DEV)
+    status["allowed"] = status["mode"] in (PRODUCTION, DEV, PROVIDER)
     status["message"] = "" if status["allowed"] else MESSAGES[status["mode"]]
+    status["provider"] = provider_message() if status["mode"] == PROVIDER else ""
     return status
 
 

@@ -1,0 +1,22 @@
+{% extends "system/emails_base.html" %}
+{% block main %}
+<div class="sys-head se-head"><div><h1>Emails</h1><p>What the site sends, and what you send.</p></div>
+  <div class="sys-actions"><a class="sys-btn primary" href="{% url 'system_mailing_new' %}">New group send</a></div></div>
+{% include "system/_emails_tabs.html" with tab="templates" %}
+<section class="sys-panel"><div class="sys-scroll"><table class="sys-table se-templates" data-system-templates>
+  <thead><tr><th scope="col">Name</th><th scope="col">Subject</th><th scope="col">Kind</th><th scope="col" class="sys-num">Parts</th><th scope="col">Saved</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
+  <tbody>{% for t in templates %}
+    <tr data-system-template="{{ t.pk }}">
+      <td class="se-name"><a href="{% url 'system_mailing_new' %}?start={{ t.pk }}">{{ t.name }}</a></td>
+      <td><span class="se-ellipsis">{{ t.subject|default:"-" }}</span></td>
+      <td>{% if t.kind == "news" %}News{% else %}Service{% endif %}</td>
+      <td class="sys-num">{{ t.blocks|length }}</td>
+      <td>{{ t.updated_at|date:"j M Y, H:i" }}</td>
+      <td>
+        <form method="post" action="{% url 'system_template_rename' t.pk %}" data-system-template-rename>{% csrf_token %}<label class="sr" for="tpl-{{ t.pk }}">Name</label><input type="text" id="tpl-{{ t.pk }}" name="name" value="{{ t.name }}" maxlength="120" required><button type="submit" class="sys-btn sm">Rename</button></form>
+        <form method="post" action="{% url 'system_template_delete' t.pk %}">{% csrf_token %}<button type="submit" class="sys-btn sm" data-confirm data-confirm-danger data-confirm-title="Delete this template?" data-confirm-body="Emails already made from it are not changed. This cannot be undone." data-confirm-label="Delete template">Delete</button></form>
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="6" class="sys-empty">No saved templates yet. Open a group send and choose Save as template.</td></tr>{% endfor %}</tbody>
+</table></div></section>
+{% endblock %}

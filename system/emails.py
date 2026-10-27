@@ -184,15 +184,15 @@ class MailingForm(forms.ModelForm):
         return errors
 
 
-def editor_blocks(form, mailing, start=None):
+def editor_blocks(form, mailing, template=None):
     """The parts the editor starts with: what was posted (after a failed save), else the saved parts, else an old body turned into
-    paragraphs, else the chosen starting template, else nothing."""
+    paragraphs, else the chosen saved template's parts, else nothing."""
     if form is not None and form.is_bound and "blocks" in form.data:
         parts, _ = mailing_blocks._parse(form.data.get("blocks"))
         return parts or []
     if mailing is not None:
         return mailing.blocks or mailing_blocks.from_body(mailing.body)
-    return list(mailing_blocks.STARTERS[start]["blocks"]) if start in mailing_blocks.STARTERS else []
+    return list(template.blocks) if template is not None else []
 
 
 def mailing_extra(kind, group_key):

@@ -15,7 +15,14 @@ from django.utils.safestring import mark_safe
 
 from notifications import emailbody
 
+from .models import IMAGE_EXTENSIONS
+
 MAX_PARTS = 30
+# Gmail clips an email over 102 KB and hides the footer (the unsubscribe link). The layout around the parts is about 12 KB, so the parts
+# may use this much HTML.
+HTML_MAX = 88_000
+TOO_LONG = "This email is too long for some inboxes (they cut it off and hide the unsubscribe link). Shorten it."
+LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1", "0.0.0.0")
 URL_MAX = 500
 IMAGE_MAX_WIDTH = 504  # the layout's content width (600 less 2 x 48 padding); inside the spec's 552 cap
 HEADING, PARAGRAPH, BUTTON, IMAGE, DIVIDER, SMALL_PRINT = "heading", "paragraph", "button", "image", "divider", "small_print"
@@ -97,6 +104,8 @@ def clean_url(value):
         return url, URL_HELP
     if parts.scheme.lower() not in ("http", "https") or not host or "." not in host and host != "localhost":
         return url, URL_HELP
+    if host in LOCAL_HOSTS and not settings.DEBUG:
+        return url, "This link points to a computer, not the internet, so it would not work for the people who get the email."
     return url, ""
 
 
@@ -171,18 +180,17 @@ def clean(raw):
     parts, problem = _parse(raw)
     if problem:
         return [], {"_": [problem]}
-    errors, cleaned = {}, []
+    errors, cleaned = {}, []  # `cleaned` keeps a slot (None) for a part with an unknown type, so errors name the part where it sits
     if len(parts) > MAX_PARTS:
         errors["_"] = [f"An email can have at most {MAX_PARTS} parts."]
     for index, part in enumerate(parts):
         done, part_errors = _clean_part(part)
         if part_errors:
             errors[str(index)] = part_errors
-        if done is not None:
-            cleaned.append(done)
+        cleaned.append(done)
     ids = {}
     for index, part in enumerate(cleaned):
-        if part["type"] == IMAGE and part.get("image"):
+        if part is not None and part["type"] == IMAGE and part.get("image"):
             try:
                 ids[index] = str(uuid.UUID(part["image"]))
             except ValueError:
@@ -193,9 +201,12 @@ def clean(raw):
         if image is None:
             errors.setdefault(str(index), {}).setdefault("image", []).append("This image no longer exists. Upload it again.")
         else:
-            cleaned[index].update({"image": image_id, "width": image.width, "height": image.height})
+            cleaned[index].update({"image": image_id, "width": image.width, "height": image.height, "ext": IMAGE_EXTENSIONS[image.content_type]})
+    cleaned = [part for part in cleaned if part is not None]
     if not any(part["type"] != DIVIDER for part in cleaned) and len(parts) <= MAX_PARTS and "_" not in errors:
         errors["_"] = ["Add at least one part that is not a divider."]
+    if not errors and len(render(cleaned, {"first_name": "Christopher"})[0].encode()) > HTML_MAX:
+        errors["_"] = [TOO_LONG]
     return cleaned, errors
 
 
@@ -228,7 +239,8 @@ def _text(kind, part, values):
 
 def _image(part):
     width, height = part.get("width"), part.get("height")
-    src = f"{settings.SITE_URL}/email-image/{part.get('image', '')}/"
+    ext = f".{part['ext']}" if part.get("ext") else ""
+    src = f"{settings.SITE_URL}/email-image/{part.get('image', '')}{ext}" if ext else f"{settings.SITE_URL}/email-image/{part.get('image', '')}/"
     size = f' width="{min(width, IMAGE_MAX_WIDTH)}"' if width else ""
     if width and height:
         size += f' height="{round(height * min(width, IMAGE_MAX_WIDTH) / width)}"'

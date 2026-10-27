@@ -2,13 +2,14 @@
 {% block main %}
 {% include "system/_page_header.html" with title="Emails" description="What the site sends, and what you send." %}
 {% include "system/_emails_tabs.html" with tab="overview" %}
-<section class="sys-panel se-ses" aria-label="Amazon SES" data-system-ses="{{ ses.mode }}" data-allowed="{{ ses.allowed|yesno:'1,0' }}">
-  <strong class="se-ses-name">Amazon SES</strong>
+<section class="sys-panel se-ses" aria-label="{% if ses.mode == "provider" %}Email provider{% else %}Amazon SES{% endif %}" data-system-ses="{{ ses.mode }}" data-allowed="{{ ses.allowed|yesno:'1,0' }}">
+  <strong class="se-ses-name">{% if ses.mode == "provider" %}Email provider{% else %}Amazon SES{% endif %}</strong>
   {% if ses.mode == "production" %}<span class="sys-badge ok">Production</span><span class="se-ses-line">Approved.{% if ses.max_24h %} Up to {{ ses.max_24h|floatformat:"0g" }} a day, {{ ses.max_rate|floatformat:"0g" }} a second.{% endif %}</span>
   {% elif ses.mode == "sandbox" %}<span class="sys-badge warn">Sandbox</span><span class="se-ses-line">Only verified addresses{% if ses.max_24h %}, {{ ses.max_24h|floatformat:"0g" }} a day{% endif %}. Group sends and invites are off.</span>
+  {% elif ses.mode == "provider" %}<span class="sys-badge ok">Sending</span><span class="se-ses-line">{{ ses.provider }}</span>
   {% elif ses.mode == "dev" %}<span class="sys-badge info">Printed only</span><span class="se-ses-line">Development: emails go to the server log.</span>
   {% else %}<span class="sys-badge">Unknown</span><span class="se-ses-line">Could not reach Amazon. Group sends and invites stay off until it can be read.</span>{% endif %}
-  {% if ses.mode != "dev" %}<form class="se-ses-check" method="post" action="{% url 'system_ses_refresh' %}">{% csrf_token %}<button type="submit" class="sys-btn sm">Check now</button></form>{% endif %}
+  {% if ses.mode != "dev" and ses.mode != "provider" %}<form class="se-ses-check" method="post" action="{% url 'system_ses_refresh' %}">{% csrf_token %}<button type="submit" class="sys-btn sm">Check now</button></form>{% endif %}
 </section>
 <div class="sys-tiles se-tiles" data-system-emails-stats aria-label="Sending">
   <div class="sys-tile"><span class="l">Sent today</span><span class="v" data-stat="sent_today">{{ stats.sent_today|floatformat:"0g" }}</span></div>

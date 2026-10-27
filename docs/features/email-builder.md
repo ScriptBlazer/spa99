@@ -54,7 +54,7 @@ Parts can be added, removed and moved up or down:
 
 ## Status
 
-Backend built on `feature/defaults` (2026-10-27): parts model and validation, rendering (HTML and text), picture upload and public image view, the Booking is open starter, and the endpoints below. The editor screen (frontend) is next.
+Backend built on `feature/defaults` (2026-10-27): parts model and validation, rendering (HTML and text), picture upload and public image view, the Booking is open starter, and the endpoints below. The editor screen is built (commit 2356bd0: parts list, upload, Start from, live preview). Second round (same day): saved templates, a test without Who, and the review fixes below.
 
 ## Contract (for the editor screen)
 
@@ -95,3 +95,31 @@ Code: `mailings/blocks.py` (parts), `mailings/images.py` (pictures), `system/vie
 - Images are capped at 504 px wide (the layout's content width, inside the 552 px cap in this spec), with `width`/`height` attributes when known and the alt text; with a link they are wrapped in it. Plain text shows `[Image: alt text]` (and the link).
 - The inbox preview line is the first paragraph part (never one with a link, greeting lines skipped); if there is no paragraph it falls back to headings and small print.
 - A test email sent from a development machine shows pictures as broken in Gmail (it cannot fetch `localhost`); live uses the public address.
+
+## Round 2 (2026-10-27): saved templates, test without Who, review fixes
+
+### Saved templates (`MailingTemplate`)
+
+- **Model:** name (unique, ignoring capitals), subject, kind, group (may be blank), parts (`blocks`, same rules as a mailing), `key` (set only for the built-in ones the seed makes), created_by, history. Code: `mailings/saved.py`.
+- **Booking is open** is now a saved template made by `seed_phase1` (by key `booking_open`; never overwrites an edited one, and renaming keeps the key so seeding does not add a second copy). There is **no code fallback**: Start from lists what is in the database. If someone deletes it, it stays deleted until `seed_phase1` is run again (it is not a migration and is not run on every deploy). This lets Moishe really remove or edit it. The words stay in `blocks.STARTERS` as the seed's source.
+- **Pictures** used by templates are never deleted (there is no image delete at all).
+- **Page context** for the mailing form (changed): `starters` is `[("", "Blank"), (<template id>, <name>), ...]` from the database; `starter_details` is a list of `{id, key, name, subject, kind, group, parts, description}`; `start_cards` is `[(id, name, description)]` with Blank first (the description is built from the data, e.g. "Service message to Everyone registered: a heading, a paragraph, a button and small print."); `start` is the chosen template id (or ""); `template_save_url`. `?start=<template id or key>` prefills name, subject, kind, Who and the parts.
+- **Save as template: `POST /emails/mailings/templates/save/`** with `name` and either `mailing` (a saved mailing's id) or `subject`, `kind`, `group`, `blocks` (JSON). A name that already exists (any capitals) is refused with `409 {"ok": false, "exists": true, "errors": {"name": [...]}}`; resend with `overwrite=1` to replace it (the typed name is kept). Other problems are `400 {"ok": false, "errors": {...}}` in the same shape as saving a mailing (`errors.blocks` per part). Success: `200 {"ok": true, "id", "name", "created"}`. The subject may be empty; the parts must be valid.
+- **Templates page: `GET /emails/templates/`** (tab "Templates"). **Rename: `POST /emails/templates/<id>/rename/`** (`name`; 409 if taken). **Delete: `POST /emails/templates/<id>/delete/`** (the button uses the `data-confirm` pattern). All three answer JSON with `Accept: application/json`, else a toast and redirect. Saving, renaming and deleting are System audit events (`tpl_saved`, `tpl_renamed`, `tpl_deleted`).
+
+### Send me a test without Who
+
+- **`POST /emails/mailings/test/`** (new): `subject`, `blocks` (JSON; or `body` for the old form), optional `kind` (default `news`, which decides the footer: News gets a real unsubscribe link, Service the "why you get this" line) and optional `name`. Nothing is saved and no Who is needed. It sends only to the signed-in person. `200 {"ok": true, "message"}`, or `400 {"ok": false, "message", "errors": {...}}` when the subject or a part is not valid (the UI can enable the button with just a subject and at least one valid part). Rate limit 5 per 10 minutes, shared with the saved-draft test.
+- `POST /emails/mailings/<id>/test/` (a saved draft) now checks the subject and parts even when the draft has no Who.
+
+### Review fixes
+
+- **Size:** `clean()` renders the parts once and refuses over 88 KB of HTML (`blocks.HTML_MAX`; the layout adds about 12 KB, so the email stays under Gmail's 102 KB clip, which would hide the unsubscribe link). Error under `errors.blocks["_"]`: "This email is too long for some inboxes ... Shorten it." Send and Schedule use the same check.
+- **Part numbers:** errors are numbered by the part's original position, even when an earlier part has an unknown type.
+- **Local links** (`localhost`, `127.0.0.1`, ...) are refused unless DEBUG is on.
+- **Picture address:** pictures are now `/email-image/<id>.<ext>` (so Cloudflare, which caches by file extension, will cache them). The old `/email-image/<id>/` still works, and parts saved before the change keep using it. The view is rate limited per IP (600 a minute). The upload response `url` uses the new form.
+- **Preview** is rate limited (120 a minute per person). The Caddyfile System block limits request bodies to 5 MB (Control keeps its own 600 MB block; Caddy 2 `request_body { max_size }` syntax, the same as Control's, not run here because Caddy is not installed on this machine).
+
+## Sending gate follows the mail provider
+
+`notifications/ses.py`: the Amazon SES production gate now applies only when `EMAIL_BACKEND` is `notifications.backends.SesBackend` (DEBUG no longer matters). Console, in-memory, file and dummy backends are mode `dev` (allowed, printed or kept). Any other backend (SMTP through Postmark) is mode `provider`: allowed, no Amazon numbers read or shown, and the banner says "Emails are sent for real through <EMAIL_HOST> (not Amazon SES)." (host only, never credentials). `ses_status()` has a new `provider` text (empty in other modes). The Overview panel is titled "Email provider" with no "Check now" button in this mode.

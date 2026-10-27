@@ -98,9 +98,26 @@ class SesGateTests(SimpleTestCase):
                 ses.require_sending_allowed()
         self.assertEqual((status["mode"], status["allowed"]), ("unknown", False))
 
-    @override_settings(DEBUG=True)
-    def test_development_is_allowed_without_calling_aws(self):
+    @override_settings(DEBUG=True, EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend")
+    def test_a_console_backend_is_dev_and_allowed_without_calling_aws(self):
         with mock.patch("boto3.client") as client:
             status = ses.ses_status()
         self.assertEqual((status["mode"], status["allowed"]), ("dev", True))
         client.assert_not_called()
+
+    @override_settings(DEBUG=True, EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend", EMAIL_HOST="smtp.postmarkapp.com",
+                       EMAIL_HOST_PASSWORD="secret-token")
+    def test_another_provider_is_allowed_whatever_DEBUG_says_and_shows_no_credentials(self):
+        with mock.patch("boto3.client") as client:
+            status = ses.ses_status()
+            ses.require_sending_allowed()
+        client.assert_not_called()
+        self.assertEqual((status["mode"], status["allowed"], status["max_24h"]), ("provider", True, None))
+        self.assertEqual(status["provider"], "Emails are sent for real through smtp.postmarkapp.com (not Amazon SES).")
+        self.assertNotIn("secret-token", str(status))
+
+    @override_settings(DEBUG=True)
+    def test_ses_is_gated_even_when_DEBUG_is_on(self):
+        with mock.patch("boto3.client") as client:
+            client.return_value.get_account.return_value = {"ProductionAccessEnabled": False}
+            self.assertEqual(ses.ses_status()["mode"], "sandbox")

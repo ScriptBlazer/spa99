@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from mailings.models import Invite, Mailing, MailingRecipient
+from mailings.models import Invite, Mailing, MailingRecipient, MailingTemplate
 from notifications.models import EmailLog, NotificationTemplate
 from plans.management.commands.seed_phase1 import seed_all
 from system.models import SystemChange, SystemEvent
@@ -219,7 +219,8 @@ class MailingEditorPageTests(TestCase):
         page = self.client.get("/emails/mailings/new/")
         html = page.content.decode()
         self.assertContains(page, "Start from")
-        self.assertContains(page, 'value="booking_open"')
+        booking = MailingTemplate.objects.get(key="booking_open")
+        self.assertContains(page, f'value="{booking.pk}"')
         self.assertContains(page, 'name="blocks"')
         self.assertContains(page, 'id="se-blocks"')
         self.assertContains(page, 'id="se-block-types"')
@@ -231,8 +232,10 @@ class MailingEditorPageTests(TestCase):
     def test_the_booking_starter_fills_the_parts_and_ticks_its_card(self):
         page = self.client.get("/emails/mailings/new/?start=booking_open")
         self.assertEqual([part["type"] for part in page.context["blocks"]], ["heading", "paragraph", "button", "small_print"])
-        self.assertContains(page, 'data-start="booking_open"')
-        self.assertContains(page, 'value="booking_open" checked')
+        booking = MailingTemplate.objects.get(key="booking_open")
+        self.assertEqual(page.context["start"], str(booking.pk))
+        self.assertContains(page, f'data-start="{booking.pk}"')
+        self.assertContains(page, f'value="{booking.pk}" checked')
         self.assertContains(page, "Booking is open at Spa 99")  # the subject, from the starter
 
     def test_an_old_draft_opens_as_paragraphs_with_the_split_note_and_no_start_choice(self):
@@ -258,3 +261,16 @@ class SuppressionsMovedTests(TestCase):
         page = client.get("/emails/suppressions/")
         self.assertContains(page, 'data-tab="suppressions" aria-current="page"')
         self.assertNotContains(client.get("/emails/"), ">Email suppressions</a>")
+
+
+@override_settings(DEBUG=True, EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend", EMAIL_HOST="smtp.postmarkapp.com", EMAIL_HOST_PASSWORD="tok-secret")
+class ProviderModeTests(TestCase):
+    def test_the_pages_say_who_sends_hide_amazon_numbers_and_never_show_credentials(self):
+        seed_all()
+        client = unlocked_client(make_user())
+        for path in ("/emails/", "/emails/mailings/"):
+            page = client.get(path)
+            self.assertContains(page, "sent for real through smtp.postmarkapp.com (not Amazon SES)")
+            self.assertNotContains(page, "tok-secret")
+            self.assertNotContains(page, "Check now")
+        self.assertEqual(client.get("/emails/").context["ses"]["mode"], "provider")

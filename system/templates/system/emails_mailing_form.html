@@ -22,10 +22,10 @@
         {% if not mailing %}<fieldset class="se-block se-start" data-se-start-block>
           <legend>Start from</legend>
           <div class="se-groups-grid">
-            {% for key, label in starters %}<div class="se-group">
+            {% for key, label, description in start_cards %}<div class="se-group">
               <label class="se-group-card"><input type="radio" name="start" value="{{ key }}"{% if key == start %} checked{% endif %}>
                 <span class="se-group-top"><span class="se-group-name">{{ label }}</span></span>
-                <span class="se-group-desc">{% if key %}Service message to everyone registered: a heading, a short paragraph, a Book button and small print.{% else %}An empty email with one paragraph.{% endif %}</span>
+                <span class="se-group-desc">{{ description }}</span>
                 <svg class="se-check" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </label>
             </div>{% endfor %}

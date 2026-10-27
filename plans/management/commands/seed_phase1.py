@@ -11,10 +11,11 @@ from django.db import transaction
 from content import seed as content_seed
 from gold import seed as gold_seed
 from journey import seed as journey_seed
+from mailings import seed as mailings_seed
 from notifications import seed as notifications_seed
 from plans import seed as plans_seed
 
-SEEDS = [("plans", plans_seed), ("content", content_seed), ("journey", journey_seed), ("gold", gold_seed), ("notifications", notifications_seed)]
+SEEDS = [("plans", plans_seed), ("content", content_seed), ("journey", journey_seed), ("gold", gold_seed), ("notifications", notifications_seed), ("mailings", mailings_seed)]
 
 
 def seed_all():

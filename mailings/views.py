@@ -1,7 +1,7 @@
 """Public pages: the unsubscribe link and the personal invite link. No login, rate limited, nothing trusted beyond what the signed
 token or the invite row says."""
 from django.contrib.auth.decorators import login_not_required
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
@@ -54,8 +54,11 @@ def invite_link(request, token):
 
 @login_not_required  # PUBLIC: pictures in emails. Mail clients (and their image proxies) fetch these with no session. The id is a random UUID.
 @require_GET
-def email_image(request, image_id):
-    """Stream an uploaded email picture from the (private) media storage. Never changes, so it is cached for a year."""
+def email_image(request, image_id, ext=""):
+    """/email-image/<id>.<ext> or /email-image/<id>/ (the extension in the address is only for caches; the real type comes from the row).
+    Stream an uploaded email picture from the (private) media storage. Never changes, so it is cached for a year."""
+    if not hit("email-image", client_ip(request) or "unknown", 600, 60):  # generous: a mail client fetches every picture of every email it opens
+        return HttpResponse("Too many requests.", status=429, content_type="text/plain")
     image = MailingImage.objects.filter(pk=image_id).first()
     if image is None:
         raise Http404

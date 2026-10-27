@@ -8,7 +8,10 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
+from django.db.models import functions as _f
 from django.utils import timezone
+
+from simple_history.models import HistoricalRecords
 
 from common.models import BaseModel
 
@@ -83,11 +86,34 @@ class MailingImage(BaseModel):
 
     @property
     def path(self):
-        return f"/email-image/{self.pk}/"
+        """With a file extension (CDNs such as Cloudflare cache by extension). The old /email-image/<id>/ keeps working."""
+        return f"/email-image/{self.pk}.{IMAGE_EXTENSIONS[self.content_type]}"
 
     @property
     def url(self):
         return f"{settings.SITE_URL}{self.path}"
+
+
+class MailingTemplate(BaseModel):
+    """A saved starting point for a new group send (System > Emails > Templates): subject, kind, Who and the parts. No people's data,
+    so it has history like other System settings. `key` marks the ones the seed makes (booking_open); a renamed template keeps its key,
+    so seeding again never adds a second copy. Pictures used by a template are never deleted."""
+
+    key = models.SlugField(max_length=40, unique=True, null=True, blank=True, help_text="Set for the built-in ones the seed creates.")
+    name = models.CharField(max_length=120)
+    subject = models.CharField(max_length=200, blank=True)
+    kind = models.CharField(max_length=8, choices=Mailing.KIND_CHOICES, default=Mailing.NEWS)
+    group = models.CharField(max_length=40, blank=True, help_text="A key of mailings.segments.GROUPS, or blank (Who is chosen later).")
+    blocks = models.JSONField(default=list, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [models.UniqueConstraint(_f.Lower("name"), name="mailings_template_name_ci")]
+
+    def __str__(self):
+        return self.name
 
 
 class MailingRecipient(BaseModel):

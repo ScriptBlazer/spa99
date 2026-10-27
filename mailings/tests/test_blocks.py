@@ -9,10 +9,11 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 
 from mailings import blocks, images, sending
-from mailings.models import Mailing, MailingImage
+from mailings.models import Mailing, MailingImage, MailingTemplate
 from mailings.tests.test_mailings import mailing, person
 from notifications.services import preview_email
 from plans.management.commands.seed_phase1 import seed_all
+from system.models import SystemEvent
 from system.tests.test_system import make_user, unlocked_client
 
 
@@ -77,7 +78,7 @@ class RenderTests(TestCase):
         self.assertIn("<h2", html)
         self.assertIn("&lt;b&gt;Sam&lt;/b&gt;", html)
         self.assertIn('href="http://localhost:8000/account/book/"', html)
-        self.assertIn(f'src="http://localhost:8000/email-image/{image.pk}/" width="40" height="20" alt="A &quot;room&quot;"', html)
+        self.assertIn(f'src="http://localhost:8000/email-image/{image.pk}.png" width="40" height="20" alt="A &quot;room&quot;"', html)
         self.assertIn('href="https://example.com/x?a=1&amp;b=2"', html)
         self.assertIn("e-hair", html)
         self.assertIn('class="e-muted"', html)
@@ -124,7 +125,7 @@ class ImageTests(TestCase):
         self.assertEqual((ok.status_code, data["width"], data["height"]), (200, 60, 30))
         image = MailingImage.objects.get(pk=data["id"])
         self.assertRegex(image.file.name, r"^mailings/images/[0-9a-f]{32}\.png$")
-        self.assertEqual(data["url"], f"http://localhost:8000/email-image/{image.pk}/")
+        self.assertEqual(data["url"], f"http://localhost:8000/email-image/{image.pk}.png")
         self.assertEqual(self.post(upload(b"just some text, not a picture", "fake.png")).status_code, 400)
         self.assertEqual(self.post(upload(b"<svg onload=alert(1)>", "x.png")).status_code, 400)
         self.assertEqual(self.post(upload(png(pad=2 * 1024 * 1024))).status_code, 400)
@@ -137,7 +138,8 @@ class ImageTests(TestCase):
 
     def test_the_public_view_streams_with_cache_headers(self):
         image = images.save_upload(upload(png()))
-        response = Client().get(f"/email-image/{image.pk}/")
+        response = Client().get(f"/email-image/{image.pk}.png")
+        self.assertEqual(Client().get(f"/email-image/{image.pk}/").status_code, 200)  # the older address keeps working
         self.assertEqual((response.status_code, response["Content-Type"]), (200, "image/png"))
         self.assertIn("max-age=31536000", response["Cache-Control"])
         self.assertTrue(b"".join(response.streaming_content).startswith(b"\x89PNG"))
@@ -175,12 +177,15 @@ class BuilderTests(TestCase):
         self.assertEqual([p["text"] for p in context["blocks"]], ["One.", "Two."])
 
     def test_the_booking_is_open_starter_prefills(self):
-        context = self.client.get("/emails/mailings/new/?start=booking_open").context
+        context = self.client.get("/emails/mailings/new/?start=booking_open").context  # a key works as well as an id
         self.assertEqual((context["form"]["kind"].value(), context["form"]["group"].value()), ("service", "everyone"))
         self.assertEqual([p["type"] for p in context["blocks"]], ["heading", "paragraph", "button", "small_print"])
         self.assertEqual(context["blocks"][2]["url"], "/account/book/")
         self.assertEqual(self.client.get("/emails/mailings/new/").context["blocks"], [])
         self.assertEqual(blocks.clean(blocks.STARTERS["booking_open"]["blocks"])[1], {})
+        row = MailingTemplate.objects.get(key="booking_open")
+        self.assertEqual(context["start"], str(row.pk))
+        self.assertIn("Service message to Everyone registered: a heading", [d["description"] for d in context["starter_details"]][0])
         self.assertNotIn("!", json.dumps(blocks.STARTERS["booking_open"]))
 
     def test_a_send_with_parts_carries_the_unsubscribe_link_or_the_notice(self):
@@ -196,3 +201,86 @@ class BuilderTests(TestCase):
         self.assertNotIn("Unsubscribe", mail.outbox[-1].body)
         self.assertIn("You are receiving this message", mail.outbox[-1].body)
         self.assertEqual(Mailing.objects.get(pk=service.pk).status, "sent")
+
+
+class ReviewFixTests(TestCase):
+    def test_too_long_an_email_is_refused_and_unknown_parts_do_not_shift_errors(self):
+        full = {"type": "paragraph", "text": "A & B <x> " * 200}
+        _, errors = blocks.clean([full] * 30)
+        self.assertEqual(errors, {"_": [blocks.TOO_LONG]})
+        self.assertEqual(blocks.clean([full] * 10)[1], {})
+        errors = blocks.clean([{"type": "paragraph", "text": "ok"}, {"type": "video"}, {"type": "image", "image": "x", "alt": "a"}])[1]
+        self.assertIn("type", errors["1"])
+        self.assertIn("image", errors["2"])  # numbered by where the part sits
+
+    def test_links_to_this_computer_are_refused_unless_debugging(self):
+        with override_settings(DEBUG=False):
+            self.assertIn("computer", blocks.clean_url("http://localhost:8000/x")[1])
+            self.assertIn("computer", blocks.clean_url("http://127.0.0.1/x")[1])
+            self.assertEqual(blocks.clean_url("https://spa99.uk/x")[1], "")
+        with override_settings(DEBUG=True):
+            self.assertEqual(blocks.clean_url("http://localhost:8000/x")[1], "")
+
+
+class TemplateTests(TestCase):
+    def setUp(self):
+        seed_all()
+        self.user = make_user()
+        self.client = unlocked_client(self.user)
+
+    def save(self, **over):
+        data = {"name": "Mine", "subject": "Hello", "kind": "news", "group": "", "blocks": json.dumps(parts()), **over}
+        return self.client.post("/emails/mailings/templates/save/", data)
+
+    def test_save_overwrite_rename_delete_and_the_audit(self):
+        first = self.save()
+        self.assertEqual((first.status_code, first.json()["created"]), (200, True))
+        again = self.save(name="mine", subject="New")
+        self.assertEqual((again.status_code, again.json()["exists"]), (409, True))  # no silent overwrite
+        self.assertEqual(MailingTemplate.objects.get(name="Mine").subject, "Hello")
+        over = self.save(name="mine", subject="New", overwrite="1")
+        self.assertEqual((over.json()["created"], MailingTemplate.objects.get(pk=over.json()["id"]).subject), (False, "New"))
+        bad = self.save(name="Bad", blocks=json.dumps(parts({"type": "button", "label": "x", "url": "javascript:1"})))
+        self.assertIn("url", bad.json()["errors"]["blocks"]["1"])
+        template = MailingTemplate.objects.get(name="mine")
+        self.assertEqual(self.client.post(f"/emails/templates/{template.pk}/rename/", {"name": "booking is open"}, HTTP_ACCEPT="application/json").status_code, 409)
+        self.assertTrue(self.client.post(f"/emails/templates/{template.pk}/rename/", {"name": "Renamed"}, HTTP_ACCEPT="application/json").json()["ok"])
+        self.assertContains(self.client.get("/emails/templates/"), "Renamed")
+        self.client.post(f"/emails/templates/{template.pk}/delete/")
+        self.assertFalse(MailingTemplate.objects.filter(pk=template.pk).exists())
+        kinds = set(SystemEvent.objects.values_list("kind", flat=True))
+        self.assertTrue({"tpl_saved", "tpl_renamed", "tpl_deleted"} <= kinds)
+
+    def test_save_from_a_mailing_and_the_seed_is_idempotent(self):
+        old = mailing(body="One.\n\nTwo.")
+        done = self.client.post("/emails/mailings/templates/save/", {"name": "From old", "mailing": str(old.pk)}).json()
+        self.assertEqual([p["text"] for p in MailingTemplate.objects.get(pk=done["id"]).blocks], ["One.", "Two."])
+        count = MailingTemplate.objects.count()
+        seed_all()
+        self.assertEqual(MailingTemplate.objects.count(), count)
+        MailingTemplate.objects.filter(key="booking_open").update(name="Edited")
+        seed_all()
+        self.assertEqual(MailingTemplate.objects.filter(key="booking_open").get().name, "Edited")
+
+
+class TestWithoutWhoTests(TestCase):
+    def setUp(self):
+        seed_all()
+        self.user = make_user()
+        self.client = unlocked_client(self.user)
+
+    def test_an_unsaved_mailing_with_no_group_can_be_tested(self):
+        post = {"subject": "Hello {first_name}", "blocks": json.dumps(parts())}
+        self.assertTrue(self.client.post("/emails/mailings/test/", post, HTTP_ACCEPT="application/json").json()["ok"])
+        self.assertEqual(mail.outbox[-1].to, [self.user.email])
+        self.assertIn("Unsubscribe", mail.outbox[-1].body)  # kind defaults to News
+        self.client.post("/emails/mailings/test/", {**post, "kind": "service"})
+        self.assertNotIn("Unsubscribe", mail.outbox[-1].body)
+        bad = self.client.post("/emails/mailings/test/", {"subject": "", "blocks": "[]"}, HTTP_ACCEPT="application/json")
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_a_saved_draft_still_checks_its_wording(self):
+        bad = mailing(body="Hi {nope}", group="")
+        self.assertEqual(self.client.post(f"/emails/mailings/{bad.pk}/test/", HTTP_ACCEPT="application/json").status_code, 400)
+        self.assertEqual(len(mail.outbox), 0)

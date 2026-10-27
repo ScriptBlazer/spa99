@@ -149,18 +149,22 @@ def _count_rows(model, **filters):
 
 # ---------- mailings: checks ----------
 
-def _wording_errors(mailing):
-    """Subject and message problems: {field: [messages]}. A mailing with parts is checked part by part (messages say which part)."""
-    errors = emailbody.validate(emailbody.SPECS["mailing"], subject=mailing.subject)
-    if mailing.blocks:
-        problems = blocks.check_stored(mailing.blocks)
+def wording_errors(subject, body, parts):
+    """Subject and message problems: {field: [messages]}. Parts are checked part by part (messages say which part); no parts = the old body."""
+    errors = emailbody.validate(emailbody.SPECS["mailing"], subject=subject)
+    if parts:
+        problems = blocks.check_stored(parts)
         if problems:
             errors["blocks"] = problems
         return errors
-    errors.update(emailbody.validate(emailbody.SPECS["mailing"], body=mailing.body))
-    if not mailing.body.strip():
+    errors.update(emailbody.validate(emailbody.SPECS["mailing"], body=body))
+    if not (body or "").strip():
         errors.setdefault("body", []).append("Write the message.")
     return errors
+
+
+def _wording_errors(mailing):
+    return wording_errors(mailing.subject, mailing.body, mailing.blocks)
 
 
 def check_mailing(mailing):
