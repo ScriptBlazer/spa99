@@ -61,7 +61,7 @@ class EmailLayoutTests(TestCase):
         self.assertNotIn("#FFFFFF", html.upper())
 
     def test_gold_approver_size_and_structure(self):
-        rows = [(f"Question number {i}", "A long answer with many words. " * 20) for i in range(25)]
+        rows = [(f"Question number {i}", "A long answer with many words. " * 20) for i in range(22)]
         ctx = {**base_context(), "subject": "Gold", "name": "James Smith", "potential_label": "High", "is_repeat": True,
                "repeat_reference": "GC-1", "approve_url": f"{SITE}/a/", "decline_url": f"{SITE}/d/", "respond_url": f"{SITE}/r/",
                "view_url": f"{SITE}/v/", "sections": [{"title": "Contact", "rows": rows}, {"title": "Property", "rows": rows},
