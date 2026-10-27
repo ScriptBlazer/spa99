@@ -40,6 +40,31 @@ def is_ses():
     return settings.EMAIL_BACKEND == SES_BACKEND
 
 
+def backend_problem():
+    """'' when EMAIL_BACKEND is the SES backend, a dev backend, or a real importable other backend (SMTP). Otherwise plain words: a path
+    that mentions SES but is not the SES backend is a typo (counting it as "another provider" would skip the SES gate), and a path that
+    cannot be imported would fail on every send. Both refuse group sends (mode unknown) until fixed."""
+    backend = settings.EMAIL_BACKEND
+    if backend == SES_BACKEND or backend in DEV_BACKENDS:
+        return ""
+    if "ses" in backend.lower():
+        return f"EMAIL_BACKEND looks like a mistyped Amazon SES path. It should be {SES_BACKEND}, so group sends and invites stay off."
+    from django.utils.module_loading import import_string
+
+    try:
+        import_string(backend)
+    except ImportError:
+        return "EMAIL_BACKEND cannot be loaded, so group sends and invites stay off until it is fixed."
+    return ""
+
+
+def provider_warning():
+    host = (getattr(settings, "EMAIL_HOST", "") or "").strip().lower()
+    if host in ("", "localhost", "127.0.0.1"):
+        return "Email settings look incomplete: EMAIL_HOST is not set to your provider's server."
+    return ""
+
+
 def provider_message():
     """Plain words for the banner when another provider sends (the host only; never the user name or password)."""
     host = getattr(settings, "EMAIL_HOST", "") or "another provider"
@@ -64,7 +89,10 @@ def _read():
 
 def ses_status(refresh=False):
     """{mode: production|sandbox|dev|unknown, max_24h, sent_24h, max_rate, allowed, message}. Cached an hour; `refresh=True` reads again."""
-    if is_dev():
+    problem = backend_problem()
+    if problem:
+        status = _blank(UNKNOWN)
+    elif is_dev():
         status = _blank(DEV)
     elif not is_ses():
         status = _blank(PROVIDER)
@@ -88,8 +116,10 @@ def ses_status(refresh=False):
                 pass
     status = dict(status)
     status["allowed"] = status["mode"] in (PRODUCTION, DEV, PROVIDER)
-    status["message"] = "" if status["allowed"] else MESSAGES[status["mode"]]
+    status["message"] = "" if status["allowed"] else (problem or MESSAGES[status["mode"]])
+    status["problem"] = problem
     status["provider"] = provider_message() if status["mode"] == PROVIDER else ""
+    status["warning"] = provider_warning() if status["mode"] == PROVIDER else ""
     return status
 
 

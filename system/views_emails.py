@@ -1,6 +1,8 @@
 """System > Emails (Developer level, unlocked, CSRF): automatic emails, group mailings and invites. Short views; the logic is in
 system/emails.py, mailings/sending.py and mailings/invites.py. A page that is a form answers with a toast and a redirect, or with
 JSON when the script asks for it (`Accept: application/json` or `X-Requested-With: fetch`)."""
+import uuid
+
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -312,8 +314,6 @@ def _send_test(request, back, subject, kind, group, body, parts, label, detail):
     Needs only a subject and wording that passes the checks: no Who, no saved mailing."""
     from mailings import tokens
 
-    if _limited(request, "system-email-test", 5, 600):
-        return _respond(request, False, "Too many test emails. Please wait a few minutes.", back, status=429)
     errors = sending.wording_errors(subject, body, parts)
     if errors:
         return _respond(request, False, " ".join(m for ms in errors.values() for m in ms), back, extra={"errors": errors})
@@ -334,6 +334,8 @@ def _send_test(request, back, subject, kind, group, body, parts, label, detail):
 def mailing_test(request, pk):
     """Test a saved draft (as saved), whatever its Who."""
     mailing = get_object_or_404(Mailing, pk=pk)
+    if _limited(request, "system-email-test", 5, 600):
+        return _respond(request, False, "Too many test emails. Please wait a few minutes.", reverse("system_mailing", args=[mailing.pk]), status=429)
     return _send_test(request, reverse("system_mailing", args=[mailing.pk]), mailing.subject, mailing.kind, mailing.group, mailing.body,
                       mailing.blocks, mailing.name, {"mailing": str(mailing.pk)})
 
@@ -343,6 +345,8 @@ def mailing_test(request, pk):
 def mailing_test_posted(request):
     """Test what is on the form without saving and without Who: POST `subject`, `blocks` (JSON, or `body` for the old form) and `kind`
     (default news, which decides the footer). Answers like the other tests: {"ok", "message"} (400 with `errors` when the wording is not valid)."""
+    if _limited(request, "system-email-test", 5, 600):  # first: a flood of bad forms must not cost a render each
+        return _respond(request, False, "Too many test emails. Please wait a few minutes.", reverse("system_mailing_new"), status=429)
     parts = None
     if "blocks" in request.POST:
         parts, block_errors = mailing_blocks.clean(request.POST["blocks"])
@@ -534,7 +538,10 @@ def template_save(request):
     post = request.POST
     subject, kind, group, raw = post.get("subject", ""), post.get("kind", Mailing.NEWS), post.get("group", ""), post.get("blocks", "[]")
     if post.get("mailing"):
-        mailing = get_object_or_404(Mailing, pk=post["mailing"])
+        try:
+            mailing = get_object_or_404(Mailing, pk=uuid.UUID(post["mailing"]))
+        except ValueError:
+            raise Http404 from None
         subject, kind, group, raw = mailing.subject, mailing.kind, mailing.group, mailing.blocks or mailing_blocks.from_body(mailing.body)
     try:
         template, created = templates_store.save(post.get("name"), subject, kind, group, raw, request.user, overwrite=post.get("overwrite") == "1")
@@ -551,7 +558,7 @@ def template_rename(request, pk):
     template = get_object_or_404(MailingTemplate, pk=pk)
     old = template.name
     try:
-        templates_store.rename(template, request.POST.get("name"))
+        templates_store.rename(template, request.POST.get("name"), request.user)
     except templates_store.TemplateError as error:
         return _respond(request, False, " ".join(m for ms in error.errors.values() for m in ms), reverse("system_templates"), extra={"errors": error.errors},
                         status=409 if error.exists else 400)

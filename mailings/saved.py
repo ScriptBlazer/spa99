@@ -1,6 +1,6 @@
 """Saved email templates (MailingTemplate): checking, saving (with explicit overwrite), renaming and deleting. Views stay short; the
 System audit events are written by the views."""
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models.functions import Lower
 
 from notifications import emailbody
@@ -60,23 +60,31 @@ def save(name, subject, kind, group, raw_blocks, user=None, overwrite=False):
         errors["group"] = ["Choose a group."]
     if errors:
         raise TemplateError(errors)
-    with transaction.atomic():
-        existing = find_by_name(name)
-        if existing is not None and not overwrite:
-            raise TemplateError({"name": [f"A template called '{existing.name}' already exists."]}, exists=True)
-        row = existing or MailingTemplate(created_by=user if getattr(user, "pk", None) else None)
-        row.name, row.subject, row.kind, row.group, row.blocks = name, (subject or "").strip(), kind, group or "", parts
-        row._history_user = user if getattr(user, "pk", None) else None
-        row.save()
+    try:
+        with transaction.atomic():
+            existing = find_by_name(name)
+            if existing is not None and not overwrite:
+                raise TemplateError({"name": [f"A template called '{existing.name}' already exists."]}, exists=True)
+            row = existing or MailingTemplate(created_by=user if getattr(user, "pk", None) else None)
+            row.name, row.subject, row.kind, row.group, row.blocks = name, (subject or "").strip(), kind, group or "", parts
+            row._history_user = user if getattr(user, "pk", None) else None
+            row.save()
+    except IntegrityError:  # two saves of the same new name at once: the database's case-insensitive rule caught the second
+        raise TemplateError({"name": ["A template with this name already exists."]}, exists=True) from None
     return row, existing is None
 
 
-def rename(template, name):
+def rename(template, name, user=None):
     name = clean_name(name)
-    if find_by_name(name, exclude=template) is not None:
-        raise TemplateError({"name": ["Another template already has this name."]}, exists=True)
-    template.name = name
-    template.save(update_fields=["name", "updated_at"])
+    try:
+        with transaction.atomic():
+            if find_by_name(name, exclude=template) is not None:
+                raise TemplateError({"name": ["Another template already has this name."]}, exists=True)
+            template.name = name
+            template._history_user = user if getattr(user, "pk", None) else None
+            template.save(update_fields=["name", "updated_at"])
+    except IntegrityError:
+        raise TemplateError({"name": ["Another template already has this name."]}, exists=True) from None
     return template
 
 

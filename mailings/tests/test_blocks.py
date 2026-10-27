@@ -284,3 +284,40 @@ class TestWithoutWhoTests(TestCase):
         bad = mailing(body="Hi {nope}", group="")
         self.assertEqual(self.client.post(f"/emails/mailings/{bad.pk}/test/", HTTP_ACCEPT="application/json").status_code, 400)
         self.assertEqual(len(mail.outbox), 0)
+
+
+class ReviewRound3Tests(TestCase):
+    def setUp(self):
+        seed_all()
+        self.user = make_user()
+        self.client = unlocked_client(self.user)
+
+    def test_a_name_race_is_a_409_not_a_500_and_rename_is_recorded(self):
+        from unittest import mock
+        from django.db import IntegrityError
+        from mailings import saved
+
+        with mock.patch.object(MailingTemplate, "save", side_effect=IntegrityError("duplicate")):
+            with self.assertRaises(saved.TemplateError) as raised:
+                saved.save("Racer", "S", "news", "", parts(), self.user)
+        self.assertTrue(raised.exception.exists)
+        row, _ = saved.save("One", "S", "news", "", parts(), self.user)
+        saved.rename(row, "Two", self.user)
+        self.assertEqual(row.history.first().history_user, self.user)
+
+    def test_a_bad_mailing_id_is_a_404_and_the_test_limit_comes_first(self):
+        post = self.client.post("/emails/mailings/templates/save/", {"name": "x", "mailing": "not-a-uuid"})
+        self.assertEqual(post.status_code, 404)
+        with mock_limit():
+            self.assertEqual(self.client.post("/emails/mailings/test/", {"subject": "", "blocks": "not json"}, HTTP_ACCEPT="application/json").status_code, 429)
+
+    def test_the_public_image_has_no_rate_limit(self):
+        image = images.save_upload(upload(png()))
+        for _ in range(3):
+            self.assertEqual(Client().get(f"/email-image/{image.pk}.png").status_code, 200)
+
+
+def mock_limit():
+    from unittest import mock
+
+    return mock.patch("system.views_emails.hit", return_value=False)

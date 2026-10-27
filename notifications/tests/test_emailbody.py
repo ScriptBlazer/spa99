@@ -121,3 +121,21 @@ class SesGateTests(SimpleTestCase):
         with mock.patch("boto3.client") as client:
             client.return_value.get_account.return_value = {"ProductionAccessEnabled": False}
             self.assertEqual(ses.ses_status()["mode"], "sandbox")
+
+
+class BackendCheckTests(TestCase):
+    @override_settings(EMAIL_BACKEND="notifications.backends.SesBakend", CACHES=LOCMEM)
+    def test_a_mistyped_ses_path_refuses_sending(self):
+        status = ses.ses_status()
+        self.assertEqual((status["mode"], status["allowed"]), ("unknown", False))
+        self.assertIn("mistyped", status["message"])
+
+    @override_settings(EMAIL_BACKEND="nowhere.Backend", CACHES=LOCMEM)
+    def test_a_backend_that_cannot_be_loaded_refuses_sending(self):
+        self.assertFalse(ses.ses_status()["allowed"])
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend", EMAIL_HOST="localhost")
+    def test_a_provider_with_no_host_warns_but_is_allowed(self):
+        status = ses.ses_status()
+        self.assertEqual((status["mode"], status["allowed"]), ("provider", True))
+        self.assertIn("incomplete", status["warning"])
