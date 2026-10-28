@@ -1,5 +1,5 @@
 {% load feedback_tags %}{# The toast regions (live from page load) and the server's Django messages. Included once per page, by _feedback.html. feedback.js shows each <li> as a toast 100ms after load. #}
-<section class="toasts" aria-label="Notifications">
+<section class="toasts" aria-label="Notifications" {% toast_times %}>
   <ol class="toasts-list" role="status" aria-live="polite" data-toasts-polite></ol>
   <ol class="toasts-list" role="alert" aria-live="assertive" data-toasts-assertive></ol>
 </section>

@@ -218,8 +218,8 @@ class SystemSuppressionTests(TestCase):
 
     def test_developer_sees_the_list_and_removing_is_audit_logged(self):
         client = unlocked_client(make_user())
-        self.assertContains(client.get("/suppressions/"), "gone@example.com")
-        self.assertEqual(client.post(f"/suppressions/{self.row.pk}/remove/").status_code, 302)
+        self.assertContains(client.get("/emails/suppressions/"), "gone@example.com")
+        self.assertEqual(client.post(f"/emails/suppressions/{self.row.pk}/remove/").status_code, 302)
         self.assertFalse(suppression.is_suppressed("gone@example.com"))
         event = SystemEvent.objects.get(kind=SystemEvent.SUPPRESSION_REMOVED)
         self.assertEqual((event.user_label, event.detail["email"]), ("dev@example.com", "gone@example.com"))
@@ -231,8 +231,8 @@ class SystemSuppressionTests(TestCase):
         from system.tests.test_system import sign_in
 
         office_client, _ = sign_in(office)
-        self.assertEqual(office_client.get("/suppressions/").status_code, 404)
-        self.assertEqual(office_client.post(f"/suppressions/{self.row.pk}/remove/").status_code, 404)
+        self.assertEqual(office_client.get("/emails/suppressions/").status_code, 404)
+        self.assertEqual(office_client.post(f"/emails/suppressions/{self.row.pk}/remove/").status_code, 404)
         self.assertTrue(suppression.is_suppressed("gone@example.com"))
         self.assertFalse(SystemEvent.objects.filter(kind=SystemEvent.SUPPRESSION_REMOVED).exists())
-        self.assertEqual(client.get("/suppressions/").status_code, 200)
+        self.assertEqual(client.get("/emails/suppressions/").status_code, 200)

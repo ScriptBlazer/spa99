@@ -13,9 +13,10 @@ from notifications.models import EmailLog
 from plans.models import Plan
 from users.models import InterestRegistration, User
 
+from system import defaults
+
 from . import lists
 
-EMAIL_LIMIT = 50  # the timeline shows the most recent emails sent to the person
 
 
 def _iso(value):
@@ -184,7 +185,7 @@ def timeline(sessions, user=None, interest=None, applications=(), email=""):
                               "Applied for Gold" if e.action == ApplicationEvent.SUBMITTED else f"Gold: {text}",
                               " ".join(x for x in (a.reference, f"by {e.actor_label}" if e.actor_label else "") if x), _href("office_gold_application", a.pk)))
     if email:
-        for log in EmailLog.objects.filter(to__iexact=email).order_by("-created_at")[:EMAIL_LIMIT]:
+        for log in EmailLog.objects.filter(to__iexact=email).order_by("-created_at")[:defaults.get().person_emails_shown]:
             out.append(_entry(log.sent_at or log.created_at, "email", f"Email: {log.subject}", log.get_status_display()))
     out.sort(key=lambda e: e["_at"], reverse=True)
     for e in out:

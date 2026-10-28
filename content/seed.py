@@ -162,7 +162,7 @@ PAGES = {
     "register": ("Register", "Register at Spa 99. Nothing to pay now.", [
         ("intro", "Register", "No payment now. We'll write before the doors open.", "", ""),
         ("journey_note", "", "Your answers come with you.", "", ""),
-        ("sent", "Check your email.", "It works for 24 hours.", "", ""),
+        ("sent", "Check your email.", "It works for {confirm_for}.", "", ""),
         ("verified", "Thank you.", "Your email is confirmed.", "", ""),
     ]),
     "account": ("Your account", "Your Spa 99 account.", [

@@ -6,11 +6,11 @@ from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
 
+from system import defaults
 from gold import services as gold_services
 from gold.models import GoldApplication
 from users.models import InterestRegistration, User
 
-PAGE_SIZE = 50
 _FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
 
@@ -21,11 +21,13 @@ def page_number(request):
         return 1
 
 
-def cut(queryset, page):
-    """(rows of this page, has_next): fetches one extra row instead of counting."""
-    start = (page - 1) * PAGE_SIZE
-    rows = list(queryset[start:start + PAGE_SIZE + 1])
-    return rows[:PAGE_SIZE], len(rows) > PAGE_SIZE
+def cut(queryset, page, size=None):
+    """(rows of this page, has_next): fetches one extra row instead of counting. `size` defaults to System > Defaults > People
+    and Gold lists rows per page (views pass it from their per-request copy)."""
+    size = size or defaults.get().list_page_size
+    start = (page - 1) * size
+    rows = list(queryset[start:start + size + 1])
+    return rows[:size], len(rows) > size
 
 
 # ---------- people ----------
@@ -69,9 +71,9 @@ def person_row(user):
     }
 
 
-def people_page(filters, page):
+def people_page(filters, page, size=None):
     queryset = people_queryset(filters).prefetch_related("journey_sessions", "gold_applications")
-    users, has_next = cut(queryset, page)
+    users, has_next = cut(queryset, page, size)
     return [person_row(u) for u in users], has_next
 
 
@@ -164,8 +166,8 @@ def gold_row(application):
             "sent_back": application.sent_back_at is not None, "invite": invite_state(application), "applied": application.created_at.isoformat()}
 
 
-def gold_page(filters, page):
-    applications, has_next = cut(gold_queryset(filters), page)
+def gold_page(filters, page, size=None):
+    applications, has_next = cut(gold_queryset(filters), page, size)
     return [gold_row(a) for a in applications], has_next
 
 

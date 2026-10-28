@@ -1,5 +1,6 @@
 """Office: host routing and roles, stored-figure pages with a fixed query count, people and Gold actions."""
 import json
+from system.models import SiteDefaults
 from io import StringIO
 
 from django.contrib.auth import get_user_model
@@ -164,6 +165,7 @@ class RoutingAndRoleTests(OfficeTestCase):
 class StoredFigureTests(OfficeTestCase):
     def setUp(self):
         self.owner = staff("Owner", "q@example.com")
+        SiteDefaults.load()  # the defaults row is made on first read; not part of what these counts compare
 
     def queries(self, path):
         client = Client(HTTP_HOST=OFFICE)

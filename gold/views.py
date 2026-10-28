@@ -16,6 +16,8 @@ from journey import engine as journey_engine
 from journey import services as journey_services
 from journey.models import Question
 
+from system import defaults
+
 from . import services
 from . import invites
 from .forms import GoldApplicationForm, GoldSetupForm
@@ -124,7 +126,7 @@ SETUP_SCOPE, SETUP_LIMIT, SETUP_WINDOW = "gold-invite", 20, 3600
 
 
 def _invalid_link(request, status=410):
-    return render(request, "gold/invite_invalid.html", status=status)
+    return render(request, "gold/invite_invalid.html", {"days": defaults.get(request).gold_invite_days}, status=status)
 
 
 @login_not_required  # PUBLIC: the link in the approval email (signed, 14 days, single use, rate limited)
@@ -133,7 +135,7 @@ def _invalid_link(request, status=410):
 def invite_setup(request, token):
     """GET shows the setup form (nothing is used up by opening it); POST creates the account and signs him in."""
     if not hit(SETUP_SCOPE, client_ip(request) or "unknown", SETUP_LIMIT, SETUP_WINDOW):
-        return render(request, "gold/invite_invalid.html", {"throttled": True}, status=429)
+        return render(request, "gold/invite_invalid.html", {"throttled": True, "days": defaults.get(request).gold_invite_days}, status=429)
     status, invite = invites.read_invite(token)
     if status != invites.OK:
         return _invalid_link(request)
@@ -143,7 +145,7 @@ def invite_setup(request, token):
         try:
             user = invites.accept_invite(token, form.cleaned_data)
         except invites.InviteError as error:
-            return render(request, "gold/invite_invalid.html", {"text": error.text}, status=410)
+            return render(request, "gold/invite_invalid.html", {"text": error.text, "days": defaults.get(request).gold_invite_days}, status=410)
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         messages.success(request, "Welcome to Spa 99. Your Gold Card is active.")
         return redirect("account")

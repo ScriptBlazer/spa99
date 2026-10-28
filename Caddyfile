@@ -35,6 +35,10 @@
 }
 
 {$SYSTEM_DOMAIN} {
+	# Email picture uploads are at most 2 MB (mailings/images.py); this keeps anything bigger away from the app.
+	request_body {
+		max_size 5MB
+	}
 	import app
 }
 

@@ -7,12 +7,13 @@ from django import forms
 from django.core.paginator import Paginator
 from django.utils import timezone
 
-from mailings import segments
+from mailings import blocks as mailing_blocks, segments
 from mailings.models import EmailOptOut, Invite, Mailing
 from notifications import emailbody, ses
 from notifications.models import EmailLog, EmailSuppression, NotificationTemplate
 from notifications.seed import DEFAULT_SUBJECTS
 
+from . import defaults
 from .forms import VersionedForm
 from .models import SystemChange
 
@@ -23,12 +24,13 @@ SCHEDULE_FORMATS = ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S")
 
 # ---------- overview ----------
 
-def overview():
+def overview(request=None):
     """Context for /emails/: the SES state and cheap counts."""
     now = timezone.now()
     today = timezone.localtime(now).replace(hour=0, minute=0, second=0, microsecond=0)
     week = now - datetime.timedelta(days=7)
     sent = EmailLog.objects.filter(status=EmailLog.SENT)
+    d = defaults.get(request)
     return {
         "ses": ses.ses_status(),
         "stats": {
@@ -40,8 +42,8 @@ def overview():
             "suppressed_total": EmailSuppression.objects.count(),
             "unsubscribed_no_account": EmailOptOut.objects.count(),
         },
-        "recent_mailings": list(Mailing.objects.all()[:5]),
-        "recent_invite_batches": invite_batches()[:5],
+        "recent_mailings": list(Mailing.objects.all()[:d.recent_mailings]),
+        "recent_invite_batches": invite_batches()[:d.recent_batches],
     }
 
 
@@ -137,9 +139,25 @@ class MailingForm(forms.ModelForm):
         model = Mailing
         fields = ["name", "subject", "body", "kind", "group"]
 
+    block_errors = None  # {"_": [...], "<index>": {field: [...]}} for the parts, when parts were posted
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["body"].required = False
+
     def clean(self):
         data = super().clean()
-        errors = emailbody.validate(emailbody.SPECS["mailing"], subject=data.get("subject"), body=data.get("body"))
+        # Parts (the `blocks` field, JSON) win over the old body. A form without the field is the old plain-body form.
+        if "blocks" in self.data:
+            cleaned, self.block_errors = mailing_blocks.clean(self.data.get("blocks"))
+            if self.block_errors:
+                self.add_error(None, "Check the parts of the email: " + " ".join(mailing_blocks.flat_errors(self.block_errors)))
+            self.cleaned_blocks = cleaned
+            errors = emailbody.validate(emailbody.SPECS["mailing"], subject=data.get("subject"))
+        else:
+            errors = emailbody.validate(emailbody.SPECS["mailing"], subject=data.get("subject"), body=data.get("body"))
+            if not (data.get("body") or "").strip():
+                errors.setdefault("body", []).append("Write the message.")
         for name, messages in errors.items():
             for message in messages:
                 self.add_error(name, message)
@@ -152,7 +170,29 @@ class MailingForm(forms.ModelForm):
 
     def save(self, commit=True):
         self.instance.params = getattr(self, "params", {})
+        if "blocks" in self.data:
+            self.instance.blocks, self.instance.body = self.cleaned_blocks, ""  # the parts replace the old body
         return super().save(commit)
+
+    def errors_json(self):
+        """{field: [messages]} for the script, with `blocks` as {"_": [...], "<index>": {field: [...]}}."""
+        errors = {name: [str(m) for m in messages] for name, messages in self.errors.items() if name != "__all__"}
+        if self.block_errors:
+            errors["blocks"] = self.block_errors
+        if "__all__" in self.errors and not self.block_errors:
+            errors["_"] = [str(m) for m in self.errors["__all__"]]
+        return errors
+
+
+def editor_blocks(form, mailing, template=None):
+    """The parts the editor starts with: what was posted (after a failed save), else the saved parts, else an old body turned into
+    paragraphs, else the chosen saved template's parts, else nothing."""
+    if form is not None and form.is_bound and "blocks" in form.data:
+        parts, _ = mailing_blocks._parse(form.data.get("blocks"))
+        return parts or []
+    if mailing is not None:
+        return mailing.blocks or mailing_blocks.from_body(mailing.body)
+    return list(template.blocks) if template is not None else []
 
 
 def mailing_extra(kind, group_key):

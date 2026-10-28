@@ -702,7 +702,7 @@ function init(button) {
     if (data.version) S.version = data.version;
     if (data.changed) {
       S.applied = true;
-      toast(data.message || 'Saved.', { action: data.undo_url ? { label: data.changed > 1 ? 'Undo all' : 'Undo', onClick: () => postUndo(data.undo_url) } : undefined, timeout: 6000 });
+      toast(data.message || 'Saved.', { action: data.undo_url ? { label: data.changed > 1 ? 'Undo all' : 'Undo', onClick: () => postUndo(data.undo_url) } : undefined });
     } else toast(data.message || 'Nothing to change.', { kind: 'info' });
     setMode('read');
     renderCode();

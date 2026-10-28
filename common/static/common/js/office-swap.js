@@ -150,7 +150,8 @@ function lists() {
       document.querySelectorAll('[data-export-csv]').forEach((link) => { link.href = `${link.dataset.exportBase}${query ? `?${query}` : ''}`; });
       const clear = full ? null : form.querySelector('[data-clear]');
       if (clear) {
-        const changed = [...form.querySelectorAll('input[type="search"], select')].some((el) => el.value)
+        const changed = [...form.querySelectorAll('input[type="search"]')].some((el) => el.value)
+          || [...form.querySelectorAll('select')].some((el) => (el.dataset.default !== undefined ? el.value !== el.dataset.default : el.selectedIndex > 0))
           || [...form.querySelectorAll('.o-seg')].some((seg) => (seg.querySelector('input:checked')?.value || '') !== (seg.dataset.default || ''));
         clear.hidden = !changed;
       }
@@ -171,7 +172,11 @@ function lists() {
     event.preventDefault();
     form.querySelectorAll('input[type="search"]').forEach((el) => { el.value = ''; });
     form.querySelectorAll('input[type="checkbox"]').forEach((el) => { el.checked = false; });
-    form.querySelectorAll('select').forEach((el) => { el.selectedIndex = 0; });
+    form.querySelectorAll('select').forEach((el) => {
+      const wanted = el.dataset.default;
+      const at = wanted === undefined ? -1 : [...el.options].findIndex((o) => o.value === wanted);
+      el.selectedIndex = at >= 0 ? at : 0;
+    });
     form.querySelectorAll('.o-seg').forEach((seg) => {
       const wanted = seg.dataset.default || '';
       const inputs = [...seg.querySelectorAll('input[type="radio"]')];

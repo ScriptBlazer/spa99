@@ -1,0 +1,13 @@
+{% load system_ui %}{% comment %}One default (label and hint left, control and Reset right). Context: row (field, unit, hint, is_default).{% endcomment %}
+{% with field=row.field %}
+<div class="sys-row{% if field.errors %} invalid{% endif %}" data-system-field="{{ field.name }}"{% if field.name|is_risky %} data-risky data-noun="{{ field.name|risky_noun }}" data-plural="{{ field.name|risky_plural }}" data-line="{{ field.name|risky_line }}"{% endif %}>
+  <label for="{{ field.id_for_label }}">{{ field.label }}<small data-default-hint>{{ row.hint }}{% if field.help_text %} · {{ field.help_text }}{% endif %}</small></label>
+  <div>
+    <div class="sys-ctl">
+      {{ field }}{% if row.unit %}<span class="sys-unit">{{ row.unit }}</span>{% endif %}
+      <button type="submit" class="sys-btn sm" form="defaults-reset" name="field" value="{{ field.name }}"{% if row.is_default %} disabled{% endif %}>Reset to default</button>
+    </div>
+    {% if field.errors %}<p class="sys-error" role="alert" id="{{ field.id_for_label }}_error" data-problem data-problem-field="{{ field.html_name }}" data-problem-label="{{ field.label }}">{{ field.errors|join:" " }}</p>{% endif %}
+  </div>
+</div>
+{% endwith %}

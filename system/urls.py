@@ -1,6 +1,7 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
-from . import views, views_code as c, views_emails as e, views_rules as r, views_sales as sl
+from . import views, views_code as c, views_defaults as d, views_emails as e, views_rules as r, views_sales as sl
 from .permissions import unlocked
 
 urlpatterns = [
@@ -32,6 +33,12 @@ urlpatterns = [
     path("emails/mailings/new/", e.mailing_edit, name="system_mailing_new"),
     path("emails/mailings/count/", e.mailing_count, name="system_mailing_count"),
     path("emails/mailings/preview/", e.mailing_preview, name="system_mailing_preview"),
+    path("emails/mailings/test/", e.mailing_test_posted, name="system_mailing_test_posted"),
+    path("emails/mailings/templates/save/", e.template_save, name="system_template_save"),
+    path("emails/templates/", e.templates, name="system_templates"),
+    path("emails/templates/<uuid:pk>/rename/", e.template_rename, name="system_template_rename"),
+    path("emails/templates/<uuid:pk>/delete/", e.template_delete, name="system_template_delete"),
+    path("emails/mailings/images/", e.mailing_image_upload, name="system_mailing_image_upload"),
     path("emails/mailings/<uuid:pk>/", e.mailing_detail, name="system_mailing"),
     path("emails/mailings/<uuid:pk>/edit/", e.mailing_edit, name="system_mailing_edit"),
     path("emails/mailings/<uuid:pk>/progress/", e.mailing_progress, name="system_mailing_progress"),
@@ -53,9 +60,12 @@ urlpatterns = [
     path("sales/<uuid:pk>/", sl.sale_edit, name="system_sale_edit"),
     path("sales/<uuid:pk>/end/", sl.sale_end, name="system_sale_end"),
     path("sales/<uuid:pk>/preview/", sl.sale_preview, name="system_sale_preview"),
-    path("suppressions/", views.suppressions, name="system_suppressions"),
-    path("suppressions/<uuid:pk>/remove/", views.suppression_remove, name="system_suppression_remove"),
+    path("emails/suppressions/", views.suppressions, name="system_suppressions"),
+    path("emails/suppressions/<uuid:pk>/remove/", views.suppression_remove, name="system_suppression_remove"),
+    path("suppressions/", RedirectView.as_view(pattern_name="system_suppressions", permanent=True)),  # moved into Emails (2026-10-27)
     path("settings/", views.site_settings, name="system_settings"),
+    path("defaults/", d.defaults_page, name="system_defaults"),
+    path("defaults/reset/", d.defaults_reset, name="system_defaults_reset"),
     path("password/", unlocked(views.SystemPasswordView.as_view()), name="system_password"),
     path("team/", views.team, name="system_team"),
     path("team/add/", views.team_add, name="system_team_add"),

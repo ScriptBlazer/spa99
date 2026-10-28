@@ -8,6 +8,7 @@ OPENING_PLACEHOLDER = "{opening}"
 
 
 ROOMS_PLACEHOLDER = "{rooms}"
+CONFIRM_PLACEHOLDER = "{confirm_for}"
 NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
 
 
@@ -28,6 +29,11 @@ def fill(text, opening, rooms=None):
         text = text.replace(ROOMS_PLACEHOLDER, rooms)
         if text.startswith(rooms):
             text = text[0].upper() + text[1:]
+    if text and CONFIRM_PLACEHOLDER in text:  # "{confirm_for}": how long the email confirmation link works (System > Defaults)
+        from system import defaults
+
+        hours = defaults.get().email_confirm_hours
+        text = text.replace(CONFIRM_PLACEHOLDER, f"{hours} hour" + ("" if hours == 1 else "s"))
     if text and GOLD_STAR in text:  # "free{gold_star}": the asterisk only while the Gold plan has an annual fee
         text = text.replace(GOLD_STAR, gold_star())
     return text

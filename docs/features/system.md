@@ -24,6 +24,7 @@ Branch `feature/system`. Decisions: PROJECT.md rows 2026-10-23 (three staff fron
 | **Emails** | Gold approver CC and contact email; template wording for each notification. Transport and secrets stay in env |
 | **Approval** (2026-10-25) | Who approves Gold (Approver, Office+) and who gives the final approval to Low potential ones (Final approver, Admin+), and where each person's emails go. See `docs/features/gold-final-approval.md` |
 | **Settings** | Opening date, stage switches (registration / subscribe / book), the journey email switch, wording |
+| **Defaults** (2026-10-27) | What Office pages open on, how many rows lists show, link and sign-in lengths, how long toasts stay; per-row Reset to default. See `docs/features/defaults.md` |
 | **Team** | Team members with level (Office, Admin, Developer, Superuser) and read-only Approver / Final approver labels (set in Approval); add, change level, deactivate, remove from team, merge duplicate accounts |
 
 Later (own phases): stay periods, RFID and Face ID rules, access windows, sales and offers (need the access hardware), content and images.
@@ -122,9 +123,9 @@ Audit fixes: `verify()` walks only up to the head it read first (a write during 
 
 Unlocking System asks for the password AND a lock code (digits only, 6 to 12) from the env var `SYSTEM_UNLOCK_CODE`, so a stolen password alone is not enough. Both are always checked (the code with `hmac.compare_digest`); a failure shows one generic message, "Password or code is wrong."; every failure counts against the same rate limit (5 per 5 minutes). The audit event `unlock_failed` records `detail.reason` as `password` or `code`, never the typed values; the code is never logged or printed. Prod refuses to start when the variable is missing or not 6 to 12 digits. Dev and CI: unset or invalid means password only, the code field is hidden and the startup line warns "SYSTEM_UNLOCK_CODE not set: System unlock uses the password only".
 
-### Email suppressions (2026-10-25)
+### Email suppressions (2026-10-25, moved 2026-10-27)
 
-`/suppressions/` (Developer level, behind the unlock; nav "Email suppressions"): read-only list of `notifications.EmailSuppression` (email, reason, last seen, count) with a **Remove** button (`POST /suppressions/<id>/remove/`). Removing writes a `suppress_removed` security event (detail: email, reason) first; if the event cannot be written nothing is removed. Background: docs/features/email.md.
+Moved into System > Emails as the **Suppressions** tab (Moishe, 2026-10-27): `/emails/suppressions/` (Developer level, behind the unlock; no longer in the System nav; the old `/suppressions/` redirects permanently, 301). Content and actions unchanged: read-only list of `notifications.EmailSuppression` (email, reason, last seen, count) with a **Remove** button (`POST /emails/suppressions/<id>/remove/`). Removing writes a `suppress_removed` security event (detail: email, reason) first; if the event cannot be written nothing is removed. Background: docs/features/email.md.
 
 ### Discount contact link (2026-10-25)
 

@@ -10,7 +10,7 @@ How a legal body is written (one line per block, rendered by `content.legal_rend
 - {contact} is the site's contact email (Site settings), as a link
 - {ico} and {hosting} are filled from the `ico` and `hosting` rows of the privacy page. While a row is empty, dev shows
   a marked placeholder; live drops "({token})" from the line, or the whole line when the token stands alone
-- {version} is the privacy version in Site settings; {opening} is the opening time, as everywhere else
+- {gold_invite_days} is how long a Gold invite link works, in words (System > Defaults); {version} is the privacy version in Site settings; {opening} is the opening time, as everywhere else
 
 Keys: `body` (title and intro), `updated` (the date shown), `part_N` (the numbered parts, in order), `contact`."""
 
@@ -235,7 +235,7 @@ TERMS_PARTS = [
     ("part_6", "The Gold Card", "\n".join([
         "The Gold Card is by application. We decide on each application at our discretion, and we may not give reasons.",
         "Applying does not create an account. If we approve, we email you a personal link to set one up. The link works "
-        "once and expires after 14 days; we can send a new one. Please do not share it.",
+        "once and expires after {gold_invite_days}; we can send a new one. Please do not share it.",
     ])),
     ("part_7", "Images and the virtual tour", "\n".join([
         "The spa is not open yet. Images and the virtual tour show how we intend it to look. They are illustrative, and "

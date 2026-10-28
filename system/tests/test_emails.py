@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from mailings.models import Invite, Mailing, MailingRecipient
+from mailings.models import Invite, Mailing, MailingRecipient, MailingTemplate
 from notifications.models import EmailLog, NotificationTemplate
 from plans.management.commands.seed_phase1 import seed_all
 from system.models import SystemChange, SystemEvent
@@ -19,7 +19,7 @@ from plans.models import Plan
 User = get_user_model()
 LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "emails-tests"}}
 UUID = "00000000-0000-0000-0000-000000000000"
-PATHS = ["/emails/", "/emails/automatic/", "/emails/automatic/verify/", "/emails/mailings/", "/emails/mailings/new/",
+PATHS = ["/emails/", "/emails/suppressions/", "/emails/automatic/", "/emails/automatic/verify/", "/emails/mailings/", "/emails/mailings/new/",
          "/emails/invites/", "/emails/invites/new/", f"/emails/mailings/{UUID}/", f"/emails/invites/{UUID}/"]
 POSTS = ["/emails/automatic/verify/save/", "/emails/automatic/verify/preview/", "/emails/automatic/verify/test/", "/emails/automatic/verify/reset/",
          "/emails/mailings/preview/", f"/emails/mailings/{UUID}/send/", f"/emails/mailings/{UUID}/schedule/", f"/emails/mailings/{UUID}/cancel/",
@@ -58,7 +58,7 @@ class AutomaticEmailTests(TestCase):
                                                      "invite", "gold_approver", "gold_approver_repeat", "gold_final", "gold_sent_back", "gold_respond", "gold_declined"})
         self.assertNotIn("mailing", {e["key"] for e in listing})
         page = self.client.get("/emails/automatic/verify/")
-        self.assertEqual([p["name"] for p in page.context["spec"]["placeholders"]], ["first_name"])
+        self.assertEqual([p["name"] for p in page.context["spec"]["placeholders"]], ["first_name", "valid_for"])
         self.assertTrue(page.context["spec"]["button_required"])
         self.assertIn("Please confirm your email address", page.context["form"].initial["body"])  # the editor shows what is sent
         bad = self.client.post("/emails/automatic/verify/save/", {"subject": "Hi {zzz}", "body": "No link {first_name}"})
@@ -206,3 +206,94 @@ class MailingViewTests(TestCase):
         detail = self.client.get(f"/emails/invites/{batch}/").context
         self.assertEqual((detail["summary"]["sent"], detail["summary"]["skipped"]), (1, 1))
         self.assertEqual(self.client.get(f"/emails/invites/{batch}/progress/").json()["sent"], 1)
+
+
+class MailingEditorPageTests(TestCase):
+    """The parts editor's page (docs/design/EMAIL-BUILDER-UI.md): what the template hands the script, and the Start from choice."""
+
+    def setUp(self):
+        seed_all()
+        self.client = unlocked_client(make_user())
+
+    def test_a_new_page_has_the_start_choice_and_the_editor_data_without_inline_script(self):
+        page = self.client.get("/emails/mailings/new/")
+        html = page.content.decode()
+        self.assertContains(page, "Start from")
+        booking = MailingTemplate.objects.get(key="booking_open")
+        self.assertContains(page, f'value="{booking.pk}"')
+        self.assertContains(page, 'name="blocks"')
+        self.assertContains(page, 'id="se-blocks"')
+        self.assertContains(page, 'id="se-block-types"')
+        self.assertNotIn('name="body"', html)  # the old Body box is gone
+        self.assertEqual(page.context["blocks"], [])
+        self.assertContains(page, f'data-max-parts="{page.context["block_max_parts"]}"')
+        self.assertContains(page, "system-icons.svg")
+
+    def test_the_booking_starter_fills_the_parts_and_ticks_its_card(self):
+        page = self.client.get("/emails/mailings/new/?start=booking_open")
+        self.assertEqual([part["type"] for part in page.context["blocks"]], ["heading", "paragraph", "button", "small_print"])
+        booking = MailingTemplate.objects.get(key="booking_open")
+        self.assertEqual(page.context["start"], str(booking.pk))
+        self.assertContains(page, f'data-start="{booking.pk}"')
+        self.assertContains(page, f'value="{booking.pk}" checked')
+        self.assertContains(page, "Booking is open at Spa 99")  # the subject, from the starter
+
+    def test_an_old_draft_opens_as_paragraphs_with_the_split_note_and_no_start_choice(self):
+        mailing = Mailing.objects.create(name="Old", subject="Hi", body="One\n\nTwo", kind="news", group="everyone")
+        page = self.client.get(f"/emails/mailings/{mailing.pk}/edit/")
+        self.assertEqual(page.context["blocks"], [{"type": "paragraph", "text": "One"}, {"type": "paragraph", "text": "Two"}])
+        self.assertContains(page, "This draft was one block of text.")
+        self.assertNotContains(page, "Start from")
+
+    def test_a_draft_with_parts_has_no_split_note(self):
+        mailing = Mailing.objects.create(name="New", subject="Hi", body="", blocks=[{"type": "heading", "text": "Hello"}], kind="news", group="everyone")
+        page = self.client.get(f"/emails/mailings/{mailing.pk}/edit/")
+        self.assertNotContains(page, "This draft was one block of text.")
+        self.assertEqual(page.context["blocks"], [{"type": "heading", "text": "Hello"}])
+        self.assertTrue(page.context["image_view_base"].endswith("/email-image/"))
+
+
+class SuppressionsMovedTests(TestCase):
+    def test_the_old_address_redirects_permanently_and_the_tab_is_in_emails(self):
+        client = unlocked_client(make_user())
+        old = client.get("/suppressions/")
+        self.assertEqual((old.status_code, old["Location"]), (301, "/emails/suppressions/"))
+        page = client.get("/emails/suppressions/")
+        self.assertContains(page, 'data-tab="suppressions" aria-current="page"')
+        self.assertNotContains(client.get("/emails/"), ">Email suppressions</a>")
+
+
+@override_settings(DEBUG=True, EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend", EMAIL_HOST="smtp.postmarkapp.com", EMAIL_HOST_PASSWORD="tok-secret")
+class ProviderModeTests(TestCase):
+    def test_the_pages_say_who_sends_hide_amazon_numbers_and_never_show_credentials(self):
+        seed_all()
+        client = unlocked_client(make_user())
+        for path in ("/emails/", "/emails/mailings/"):
+            page = client.get(path)
+            self.assertContains(page, "sent for real through smtp.postmarkapp.com (not Amazon SES)")
+            self.assertNotContains(page, "tok-secret")
+            self.assertNotContains(page, "Check now")
+        self.assertEqual(client.get("/emails/").context["ses"]["mode"], "provider")
+
+
+class MailingFormTemplateUiTests(TestCase):
+    """Markup the editor script relies on: the Save as template panel, the test address, and the Templates tab."""
+
+    def setUp(self):
+        seed_all()
+        self.client = unlocked_client(make_user())
+
+    def test_the_form_has_the_save_as_template_panel_and_the_addresses_the_script_posts_to(self):
+        page = self.client.get("/emails/mailings/new/")
+        self.assertContains(page, "data-se-save-template")
+        self.assertContains(page, 'data-se-tpl-name')
+        self.assertContains(page, 'data-test-url="/emails/mailings/test/"')
+        self.assertContains(page, 'data-template-url="/emails/mailings/templates/save/"')
+        booking = MailingTemplate.objects.get(key="booking_open")
+        self.assertContains(page, f'name="start" value="{booking.pk}"')
+
+    def test_the_templates_tab_lists_them_with_rename_and_delete(self):
+        page = self.client.get("/emails/templates/")
+        self.assertContains(page, 'data-tab="templates" aria-current="page"')
+        self.assertContains(page, "Booking is open")
+        self.assertContains(page, "data-system-template-rename")

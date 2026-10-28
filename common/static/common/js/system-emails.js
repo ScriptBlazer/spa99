@@ -1,9 +1,10 @@
 /* System > Emails behaviour (docs/design/SYSTEM-EMAILS.md). Loaded on the Emails pages only. Every page still works as plain forms where it can;
    this adds the live parts: the token editor and the real-email preview, group counts, sending progress, the invite list check.
    Toasts, the confirm modal and the problems modal are the shared ones (feedback.js, form-problems.js).
-   Sections: helpers, token editor, preview, automatic email, group composer, sending progress, invites, overview, start. */
+   Sections: helpers, token editor, preview, automatic email, group composer (the parts editor is system-email-builder.js), sending progress, invites, overview, start. */
 import { toast, confirmModal } from './feedback.js';
 import { collectProblems, showProblems } from './form-problems.js';
+import { initBuilder } from './system-email-builder.js';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -19,6 +20,29 @@ const esc = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 const debounce = (fn, ms) => { let timer = 0; const run = (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }; run.cancel = () => clearTimeout(timer); return run; };
 const NETWORK = 'Could not reach System. Your work is still here.';
 
+/* The 15 minute unlock ran out: System answers a script call with a redirect to /unlock/, which fetch and XHR follow and get a page back.
+   Say so, keep the work, and offer the unlock page in a new tab. */
+const isLocked = (url, type, redirected) => /\/unlock\//.test(url || '') || (redirected && !/json/.test(type || ''));
+const unlockHref = () => document.body.dataset.systemUnlockUrl || '/unlock/';
+function showLocked(message) {
+  const form = $('[data-se-composer]') || $('main form') || $('[data-se-detail]') || $('main, #system-main');
+  if (!form) { toast(message, { kind: 'error' }); return; }
+  let note = $('[data-se-locknote]');
+  if (!note) {
+    note = document.createElement('p');
+    note.className = 'sys-note warn se-locknote';
+    note.dataset.seLocknote = '';
+    note.setAttribute('role', 'alert');
+    form.prepend(note);
+  }
+  const link = document.createElement('a');
+  link.href = unlockHref(); link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Unlock System';
+  note.replaceChildren(`${message} `, link);
+  note.hidden = false;
+}
+const clearLocked = () => { const note = $('[data-se-locknote]'); if (note) note.hidden = true; };
+const LOCKED_SAVE = 'System locked. Unlock it in another tab, then save again.';
+
 /** POST (or GET) as a script: JSON back where the endpoint speaks it. Resolves { ok, status, data, response }; a network failure resolves { ok: false, status: 0 }. */
 async function call(url, { method = 'POST', body, signal, json = true } = {}) {
   const headers = { 'X-CSRFToken': csrf(), 'X-Requested-With': 'fetch' };
@@ -27,7 +51,8 @@ async function call(url, { method = 'POST', body, signal, json = true } = {}) {
     const response = await fetch(url, { method, body: body instanceof FormData || body instanceof URLSearchParams ? body : body ? new URLSearchParams(body) : undefined, credentials: 'same-origin', headers, signal });
     let data = null;
     if (json) { try { data = await response.clone().json(); } catch { data = null; } }
-    return { ok: response.ok, status: response.status, data, response };
+    const locked = isLocked(response.url, response.headers?.get?.('content-type'), response.redirected);
+    return { ok: response.ok && !locked, status: response.status, data: locked ? null : data, response, locked };
   } catch (error) {
     if (error.name === 'AbortError') return { ok: false, status: -1, aborted: true };
     return { ok: false, status: 0, data: null };
@@ -97,7 +122,7 @@ function insertAt(field, text, { block = false } = {}) {
 
 /** The placeholder fields shared by the automatic email editor and the group composer.
  *  known: { subject: Set, body: Set }; needButton: the body must hold {button}. Returns hooks the page uses. */
-function wordingFields(form, { known, needButton = false, onChange = () => {} }) {
+function wordingFields(form, { known, needButton = false, ownPalette = false, onChange = () => {} }) {
   const subject = $('[data-se-subject]', form);
   const body = $('[data-se-body]', form);
   const pre = $('.se-pre', form);
@@ -142,7 +167,7 @@ function wordingFields(form, { known, needButton = false, onChange = () => {} })
     field.addEventListener('focus', () => { focused = field; syncPalette(); });
     field.addEventListener('input', () => { field.closest('.sys-row')?.classList.remove('invalid'); check(); onChange(field); });
   });
-  palette?.addEventListener('click', (event) => {
+  if (!ownPalette) palette?.addEventListener('click', (event) => { // the parts editor (ownPalette) inserts into the part that has focus
     const button = event.target.closest('[data-insert]');
     if (!button) return;
     const text = button.dataset.insert;
@@ -165,7 +190,7 @@ function wordingFields(form, { known, needButton = false, onChange = () => {} })
 
 /* ---------- preview: the real email in a sandboxed frame ---------- */
 
-function previewPane(root, { url, params, onResult = () => {}, sample }) {
+function previewPane(root, { url, params, onResult = () => {}, sample, nothing = () => '' }) {
   const wrap = $('[data-se-frame-wrap]', root);
   const frame = $('[data-se-frame]', root);
   const errorBox = $('[data-se-preview-error]', root);
@@ -196,11 +221,15 @@ function previewPane(root, { url, params, onResult = () => {}, sample }) {
   async function refresh() {
     const mine = ++seq;
     controller?.abort();
+    const none = nothing();
+    if (none) { delete wrap.dataset.busy; errorBox.hidden = true; note.textContent = none; note.hidden = false; onResult({}); return; }
     controller = new AbortController();
     wrap.dataset.busy = '';
     const result = await call(url, { body: params(), signal: controller.signal });
     if (mine !== seq || result.aborted) return;
     delete wrap.dataset.busy;
+    if (result.locked) { errorBox.hidden = true; showLocked('System locked. Unlock it in another tab, then the preview will draw again.'); return; }
+    clearLocked();
     if (!result.data || (!result.ok && result.status !== 200)) { errorBox.hidden = false; note.hidden = true; return; }
     errorBox.hidden = true;
     const data = result.data;
@@ -212,7 +241,10 @@ function previewPane(root, { url, params, onResult = () => {}, sample }) {
       onResult({});
     } else {
       const first = Object.values(data.errors || {}).flat()[0];
-      note.textContent = first ? 'Fix the wording to see the preview.' : 'The preview is not ready.';
+      const empty = root.querySelector('[name=subject]') && !root.querySelector('[name=subject]').value.trim()
+        && !(root.querySelector('[name=body]')?.value || '').trim();
+      note.textContent = empty ? 'Type a subject and message to see the preview.'
+        : first ? 'Fix the wording to see the preview.' : 'The preview is not ready.';
       note.hidden = false;
       onResult(data.errors || {});
     }
@@ -262,7 +294,7 @@ function initEditor(form) {
     onChange: () => { refreshTest(); preview.soon(); },
   });
   const params = () => new URLSearchParams({ subject: fields.subject.value, body: fields.body ? fields.body.value : '' });
-  preview = previewPane(form, { url: form.dataset.previewUrl, params, onResult: (errors) => { fields.setServer(errors); refreshTest(); }, sample: sampleValue ? `Sample: ${sampleValue}` : '' });
+  preview = previewPane(form, { url: form.dataset.previewUrl, params, onResult: (errors) => { fields.setServer(errors); refreshTest(); }, sample: sampleValue ? `Sample name in the preview: ${sampleValue}` : '' });
   widthToggle(form);
   paneSwitch(form, () => preview.refresh());
 
@@ -280,6 +312,7 @@ function initEditor(form) {
     testButton.setAttribute('aria-disabled', 'true');
     const result = await call(form.dataset.testUrl, { body: params() });
     refreshTest();
+    if (result.locked) return showLocked('System locked. Unlock it in another tab, then send the test again.');
     if (result.status === 0) return toast(NETWORK, { kind: 'error' });
     const message = result.data?.message || 'The test could not be sent.';
     if (result.data?.ok) {
@@ -326,6 +359,7 @@ function initComposer(form) {
   let countError = '';
   let counting = false;
   let dirty = false;
+  let typed = false; // something was written (not just a group or kind chosen): switching the starting template then asks first
   let saving = false;
 
   const radio = (name) => form.querySelector(`input[name="${name}"]:checked`);
@@ -339,21 +373,31 @@ function initComposer(form) {
     return out;
   };
   // only the chosen group's options are live: the others are neither checked nor sent
-  const syncOptions = () => $$('.se-group', form).forEach((card) => $$('.se-group-opts select, .se-group-opts input', card).forEach((el) => { el.disabled = card.dataset.group !== group(); }));
+  const syncOptions = () => $$('.se-group[data-group]', form).forEach((card) => $$('.se-group-opts select, .se-group-opts input', card).forEach((el) => { el.disabled = card.dataset.group !== group(); }));
   const needs = (key) => $$('select[required]', $(`.se-group[data-group="${key}"]`, form)).some((s) => !s.value);
 
   const fields = wordingFields(form, {
-    known, onChange: (field) => {
-      dirty = true; refreshBar();
+    known, ownPalette: true, onChange: (field) => {
+      dirty = true; typed = true; refreshBar();
       if (field === fields.subject && nameField && !nameField.dataset.touched) nameField.value = fields.subject.value.slice(0, 60);
       preview.soon();
     },
   });
-  const params = () => new URLSearchParams({ subject: fields.subject.value, body: fields.body.value, kind: kind(), group: group() });
-  const preview = previewPane(form, { url: form.dataset.previewUrl, params, onResult: (errors) => { fields.setServer(errors); refreshBar(); } });
+  // The parts of the email (system-email-builder.js): kept as JSON in the hidden `blocks` input, previewed and saved as such.
+  const builder = initBuilder(form, {
+    known: known.body, drawTokens, insertAt, csrf,
+    onChange: () => { dirty = true; typed = true; refreshBar(); preview.soon(); },
+    locked: () => showLocked('System locked. Unlock it in another tab, then upload the image again.'),
+  });
+  const params = () => new URLSearchParams({ subject: fields.subject.value, blocks: builder.json(), kind: kind(), group: group() });
+  const preview = previewPane(form, {
+    url: form.dataset.previewUrl, params,
+    nothing: () => (builder.count ? '' : 'Add a part to see the preview.'),
+    onResult: (errors) => { const { blocks, ...rest } = errors; fields.setServer(rest); builder.applyErrors(blocks || {}); refreshBar(); },
+  });
   widthToggle(form);
   paneSwitch(form, () => preview.refresh());
-  nameField?.addEventListener('input', () => { nameField.dataset.touched = '1'; dirty = true; });
+  nameField?.addEventListener('input', () => { nameField.dataset.touched = '1'; dirty = true; typed = true; });
   if (nameField && nameField.value) nameField.dataset.touched = '1';
 
   /* ----- counts ----- */
@@ -367,6 +411,7 @@ function initComposer(form) {
     const query = new URLSearchParams({ group: key, kind: kind(), ...optionsOf(key) });
     const result = await call(`${form.dataset.countUrl}?${query}`, { method: 'GET' });
     if (mine !== cardSeq[key] || result.aborted) return;
+    if (result.locked) showLocked('System locked. Unlock it in another tab to see how many people get this.');
     if (!result.ok || !result.data) {
       cardCount.textContent = '-';
       if (asChosen) { counting = false; count = null; countError = 'Could not count. Try again in a moment.'; paintCount(); refreshBar(); }
@@ -384,7 +429,7 @@ function initComposer(form) {
     }
   }
   const countAll = debounce(() => {
-    $$('.se-group', form).forEach((card) => countCard(card.dataset.group, card.dataset.group === group()));
+    $$('.se-group[data-group]', form).forEach((card) => countCard(card.dataset.group, card.dataset.group === group()));
   }, 250);
   const countChosen = debounce(() => { if (group()) countCard(group(), true); }, 250);
 
@@ -409,12 +454,14 @@ function initComposer(form) {
   function refreshBar() {
     const gate = !allowed;
     let reason = '';
-    if (!group()) reason = 'Choose who gets it.';
+    if (!group()) reason = testReason() ? 'Choose who gets it.' : 'Choose who gets it to send. You can test now.';
     else if (counting) reason = 'Counting.';
     else if (countError) reason = countError;
     else if (count === null) reason = 'Choose an option for the group.';
     else if (count === 0) reason = 'Nobody to send to.';
     else if (later() && !whenIso()) reason = 'Choose a date and time.';
+    else if (builder.uploading) reason = 'Wait for the image to finish uploading.';
+    else if (!builder.count) reason = 'Add a part to the email.';
     else if (!fields.valid) reason = 'Fix the placeholders first.';
     if (gate) reason = 'Off until Amazon approves production sending.';
     const label = later() ? (whenIso() ? `Schedule for ${whenText(date.value, time.value)}` : 'Schedule') : (count ? `Send to ${fmt(count)}` : 'Send');
@@ -422,11 +469,20 @@ function initComposer(form) {
     send.setAttribute('aria-disabled', String(!!reason));
     send.dataset.reason = reason;
     note.textContent = reason;
-    testButton.setAttribute('aria-disabled', String(!fields.valid));
+    testButton.setAttribute('aria-disabled', String(!!testReason()));
+  }
+
+  /** Why Send me a test is off right now ('' when it is on). */
+  function testReason() {
+    if (builder.uploading) return 'Wait for the image to finish uploading.';
+    if (!fields.subject.value.trim()) return 'Add a subject to send a test.';
+    if (!builder.count) return 'Add a part to the email.';
+    if (!fields.valid || builder.hasErrors()) return 'Fix the wording first.';
+    return '';
   }
 
   $$('input[name="group"]', form).forEach((r) => r.addEventListener('change', () => { syncOptions(); dirty = true; count = null; countError = ''; countChosen(); paintCount(); refreshBar(); preview.soon(); }));
-  $$('.se-group-opts select, .se-group-opts input', form).forEach((el) => el.addEventListener('change', () => { dirty = true; const key = el.closest('.se-group').dataset.group; if (key === group()) countChosen(); else countCard(key, false); }));
+  $$('.se-group-opts select, .se-group-opts input', form).forEach((el) => el.addEventListener('change', () => { dirty = true; const key = el.closest('.se-group[data-group]').dataset.group; if (key === group()) countChosen(); else countCard(key, false); }));
   $$('input[name="kind"]', form).forEach((r) => r.addEventListener('change', () => { dirty = true; help(); countAll(); refreshBar(); preview.soon(); }));
   $$('input[name="when"]', form).forEach((r) => r.addEventListener('change', () => {
     if (later() && !date.value) { const d = new Date(); d.setDate(d.getDate() + 1); date.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -439,34 +495,47 @@ function initComposer(form) {
   paintCount();
   countAll();
   refreshBar();
+  preview.refresh();
 
   /* ----- save, test, send ----- */
 
-  const problemList = async () => {
-    const found = await collectProblems(form);
-    return found;
-  };
+  const problemList = async () => [...await collectProblems(form), ...builder.problems()];
 
-  /** Save the draft (a normal POST to the form's own address, followed). Resolves the draft id, or '' when something is wrong. */
+  const FIELD_LABELS = { name: 'Name', subject: 'Subject', group: 'Who', kind: 'Kind', _: 'Email' };
+  /** The server's { field: [messages], blocks: {...}, _: [...] } as dialog rows; the parts' errors also land on their cards. */
+  function problemsFrom(errors) {
+    const items = [];
+    Object.entries(errors).forEach(([key, value]) => {
+      if (key === 'blocks') return;
+      items.push({ field: key, label: FIELD_LABELS[key] || '', message: [value].flat().join(' '), control: $(`[name="${key}"]`, form) });
+    });
+    builder.applyErrors(errors.blocks || {});
+    return [...items, ...builder.problems()];
+  }
+
+  /** Save the draft (a script POST to the form's own address, answered as JSON). Resolves the draft id, or '' when something is wrong. */
   async function saveDraft({ quiet = false } = {}) {
     if (saving) return '';
+    if (builder.uploading) { toast('Wait for the image to finish uploading.', { kind: 'error' }); return ''; }
     const found = await problemList();
     if (found.length) { await showProblems(form, found, { opener: saveButton }); return ''; }
     saving = true;
     saveButton.setAttribute('aria-disabled', 'true');
     const data = new FormData(form);
-    ['when'].forEach((name) => data.delete(name));
+    ['when', 'start'].forEach((name) => data.delete(name));
     let id = '';
     try {
-      const response = await fetch(form.action || location.href, { method: 'POST', body: data, credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } });
-      const match = response.redirected ? response.url.match(/mailings\/([0-9a-f-]{36})\/?(?:\?.*)?$/) : null;
-      if (match) id = match[1];
-      else {
-        const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
-        const issues = $$('[data-problem]', doc).map((el) => ({ field: el.dataset.problemField || '', label: el.dataset.problemLabel || '', message: el.textContent.trim() })).filter((i) => i.message);
-        if (issues.length) await showProblems(form, issues.map((i) => ({ ...i, control: form.elements[i.field] || null })), { opener: saveButton });
+      const response = await fetch(form.action || location.href, { method: 'POST', body: data, credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch', Accept: 'application/json', 'X-CSRFToken': csrf() } });
+      let answer = null;
+      const locked = isLocked(response.url, response.headers.get('content-type'), response.redirected);
+      if (!locked) { try { answer = await response.json(); } catch { answer = null; } }
+      if (locked) showLocked(LOCKED_SAVE);
+      else if (answer?.ok && answer.id) { id = answer.id; clearLocked(); }
+      else if (answer?.errors) {
+        const issues = problemsFrom(answer.errors);
+        if (issues.length) await showProblems(form, issues, { opener: saveButton });
         else toast('We could not save the draft. Please try again.', { kind: 'error' });
-      }
+      } else toast('We could not save the draft. Please try again.', { kind: 'error' });
     } catch { toast(NETWORK, { kind: 'error' }); }
     saving = false;
     saveButton.setAttribute('aria-disabled', 'false');
@@ -474,9 +543,32 @@ function initComposer(form) {
     form.dataset.draftId = id;
     form.action = `${base}${id}/edit/`;
     history.replaceState(null, '', form.action);
+    if (startBlock) startBlock.hidden = true; // an Edit draft has no Start from
     dirty = false;
     if (!quiet) toast('Saved as a draft.');
     return id;
+  }
+
+  /* ----- Start from (a new send only): the server draws the chosen template, so changing it reloads the page ----- */
+
+  const startBlock = $('[data-se-start-block]', form);
+  if (startBlock) {
+    const startNote = $('[data-se-start-note]', startBlock);
+    const startRadios = $$('input[name="start"]', startBlock);
+    const current = form.dataset.start || '';
+    let wanted = '';
+    const go = (key) => { dirty = false; location.href = key ? `${location.pathname}?start=${encodeURIComponent(key)}` : location.pathname; };
+    startRadios.forEach((r) => r.addEventListener('change', () => {
+      if (!typed) { go(r.value); return; }
+      wanted = r.value;
+      startNote.hidden = false;
+    }));
+    $('[data-se-start-replace]', startBlock).addEventListener('click', () => go(wanted));
+    $('[data-se-start-keep]', startBlock).addEventListener('click', () => {
+      startRadios.forEach((r) => { r.checked = r.value === current; });
+      startNote.hidden = true;
+      startRadios.find((r) => r.checked)?.focus();
+    });
   }
 
   saveButton.addEventListener('click', () => saveDraft());
@@ -485,16 +577,71 @@ function initComposer(form) {
   window.addEventListener('beforeunload', (event) => { if (dirty && !saving) { event.preventDefault(); event.returnValue = ''; } });
 
   testButton.addEventListener('click', async () => {
-    if (testButton.getAttribute('aria-disabled') === 'true') { note.textContent = 'Fix the placeholders first.'; return; }
-    const id = await saveDraft({ quiet: true });
-    if (!id) return;
-    testButton.setAttribute('aria-disabled', 'true');
-    const result = await call(`${base}${id}/test/`);
+    if (testButton.getAttribute('aria-disabled') === 'true') { note.textContent = testReason(); return; }
+    // A saved draft with a Who is saved again first and tested as saved; anything else is tested as typed, with no Who and nothing saved.
+    let result;
+    if (form.dataset.draftId && group()) {
+      const id = await saveDraft({ quiet: true });
+      if (!id) return;
+      testButton.setAttribute('aria-disabled', 'true');
+      result = await call(`${base}${id}/test/`);
+    } else {
+      testButton.setAttribute('aria-disabled', 'true');
+      result = await call(form.dataset.testUrl, { body: { subject: fields.subject.value, blocks: builder.json(), kind: kind(), name: nameField?.value || '' } });
+    }
     refreshBar();
+    if (result.locked) return showLocked('System locked. Unlock it in another tab, then send the test again.');
     if (result.status === 0) return toast(NETWORK, { kind: 'error' });
     if (result.data?.ok) toast(form.dataset.dev ? 'Test printed in the server log.' : `Test sent to ${$('[data-system-user]')?.textContent.trim() || 'you'}.`);
-    else toast(result.data?.message || 'The test could not be sent.', { kind: 'error' });
+    else {
+      if (result.data?.errors?.blocks) { builder.applyErrors(result.data.errors.blocks); await showProblems(form, builder.problems(), { opener: testButton }); }
+      toast(result.data?.message || 'The test could not be sent.', { kind: 'error' });
+    }
   });
+
+  /* ----- Save as template: a small panel above the bar asks for the name ----- */
+
+  const tpl = $('[data-se-tpl]', form);
+  const tplName = $('[data-se-tpl-name]', form);
+  const tplError = $('[data-se-tpl-error]', form);
+  const tplExists = $('[data-se-tpl-exists]', form);
+  const tplButton = $('[data-se-save-template]', form);
+  let tplBusy = false;
+  const tplClose = (refocus = true) => { tpl.hidden = true; tplExists.hidden = true; tplError.hidden = true; if (refocus) tplButton.focus(); };
+  tplButton.addEventListener('click', () => {
+    if (!tpl.hidden) { tplName.focus(); return; }
+    tplName.value = (nameField?.value || fields.subject.value || '').slice(0, 120);
+    tplError.hidden = true; tplExists.hidden = true; tpl.hidden = false;
+    tplName.focus(); tplName.select();
+    tpl.scrollIntoView({ block: 'nearest' });
+  });
+  async function saveTemplate(overwrite) {
+    if (tplBusy) return;
+    const name = tplName.value.trim();
+    tplError.hidden = true; tplExists.hidden = true;
+    if (!name) { tplError.textContent = 'Give the template a name.'; tplError.hidden = false; tplName.setAttribute('aria-invalid', 'true'); tplName.focus(); return; }
+    if (builder.uploading) { tplError.textContent = 'Wait for the image to finish uploading.'; tplError.hidden = false; return; }
+    tplBusy = true;
+    const body = { name, subject: fields.subject.value, kind: kind(), group: group(), blocks: builder.json() };
+    if (overwrite) body.overwrite = '1';
+    const result = await call(form.dataset.templateUrl, { body });
+    tplBusy = false;
+    if (result.locked) { showLocked('System locked. Unlock it in another tab, then save the template again.'); return; }
+    if (result.status === 0) { toast(NETWORK, { kind: 'error' }); return; }
+    const data = result.data || {};
+    if (result.ok && data.ok) { clearLocked(); tplClose(); toast(`Saved as template ${data.name || name}.`); return; }
+    if (data.exists) { tplExists.firstElementChild.textContent = `A template called ${name} exists. Replace it?`; tplExists.hidden = false; $('[data-se-tpl-replace]', tplExists).focus(); return; }
+    const errors = data.errors || {};
+    if (errors.name?.length) { tplError.textContent = errors.name.join(' '); tplError.hidden = false; tplName.setAttribute('aria-invalid', 'true'); tplName.focus(); }
+    const { name: _n, ...rest } = errors;
+    if (Object.keys(rest).length) { const issues = problemsFrom(rest); if (issues.length) await showProblems(form, issues, { opener: tplButton }); } else if (!errors.name?.length) toast('The template could not be saved. Please try again.', { kind: 'error' });
+  }
+  $('[data-se-tpl-save]', form).addEventListener('click', () => saveTemplate(false));
+  $('[data-se-tpl-replace]', form).addEventListener('click', () => saveTemplate(true));
+  $('[data-se-tpl-keep]', form).addEventListener('click', () => { tplExists.hidden = true; tplName.focus(); });
+  $('[data-se-tpl-cancel]', form).addEventListener('click', () => tplClose());
+  tplName.addEventListener('input', () => { tplName.removeAttribute('aria-invalid'); tplError.hidden = true; tplExists.hidden = true; });
+  tplName.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); saveTemplate(false); } else if (event.key === 'Escape') { event.preventDefault(); tplClose(); } });
 
   send.addEventListener('click', async () => {
     if (send.getAttribute('aria-disabled') === 'true') { note.textContent = send.dataset.reason; return; }
@@ -517,6 +664,7 @@ function initComposer(form) {
     send.setAttribute('aria-disabled', 'true');
     const body = scheduled ? { scheduled_at: whenIso() } : { expected_count: String(n) };
     const result = await call(`${base}${id}/${scheduled ? 'schedule' : 'send'}/`, { body });
+    if (result.locked) { refreshBar(); return showLocked(`System locked. Unlock it in another tab, then ${scheduled ? 'schedule' : 'send'} again. Your draft is saved.`); }
     if (result.status === 0) { refreshBar(); return toast(NETWORK, { kind: 'error' }); }
     if (result.data?.ok) {
       dirty = false;
@@ -548,6 +696,8 @@ function poll(url, paint, { every = 2000 } = {}) {
   const tick = async () => {
     if (document.hidden) return schedule();
     const result = await call(url, { method: 'GET' });
+    if (result.locked) { showLocked('System locked. Unlock it in another tab; progress will carry on here.'); return schedule(); }
+    clearLocked();
     if (result.ok && result.data) { failures = 0; if (await paint(result.data, false)) return; } else failures += 1;
     if (failures >= 3) paint(null, true);
     schedule();
@@ -672,6 +822,7 @@ function initReview(root) {
       const kept = $$('[data-filter][aria-pressed="true"]', root)[0]?.dataset.filter || 'all';
       input.disabled = true;
       const result = await call(root.dataset.reviewUrl, { body: new URLSearchParams({ text: lines.join('\n') }), json: false });
+      if (result.locked) { input.disabled = false; return showLocked('System locked. Unlock it in another tab, then check the list again.'); }
       if (result.status === 0) { input.disabled = false; return toast(NETWORK, { kind: 'error' }); }
       const doc = new DOMParser().parseFromString(await result.response.text(), 'text/html');
       const fresh = $('[data-se-review-root]', doc);

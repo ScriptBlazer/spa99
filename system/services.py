@@ -16,10 +16,9 @@ from django.utils import timezone
 
 from common import levels
 
-from . import audit, changes, sentences
+from . import audit, changes, defaults, sentences
 from .models import JobStatus, SystemChange, SystemEvent
 
-PAGE_SIZE = 50
 SNAPSHOT_STALE_SECONDS = 15 * 60
 
 
@@ -271,7 +270,7 @@ def record_direct(user, section, model_label, obj, field, old, new, sentence=Non
 
 # ---------- the change list ----------
 
-def change_list(params, page=1):
+def change_list(params, page=1, size=None):
     """Filtered, paginated entries (a fixed number of queries). params: section, user (a person's email), q (text in the
     field, row, person or values), range (1, 7 or 30 days, wins over the dates), date_from, date_to (YYYY-MM-DD)."""
     queryset = SystemChange.objects.select_related("user").prefetch_related("undone_by")
@@ -292,7 +291,7 @@ def change_list(params, page=1):
                 queryset = queryset.filter(**{lookup: date.fromisoformat(value)})
             except ValueError:
                 pass
-    result = Paginator(queryset, PAGE_SIZE).get_page(page)
+    result = Paginator(queryset, size or defaults.get().changelog_page_size).get_page(page)
     result.object_list = annotate_batches(result.object_list)
     return result
 

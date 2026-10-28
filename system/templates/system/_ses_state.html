@@ -1,3 +1,6 @@
 {# The SES gate note at the top of Group sends and Invites. Context: ses {mode, allowed, message}. Dev gets an info note, a closed gate a warning with a link to the Overview. #}
 {% if ses.mode == "dev" %}<p class="sys-note se-gate" data-system-ses="dev" data-allowed="1">Development: emails are printed in the server log, not sent.</p>
+{% elif ses.mode == "provider" %}<p class="sys-note se-gate" data-system-ses="provider" data-allowed="1">{{ ses.provider }}</p>{% if ses.warning %}
+<p class="sys-note warn se-gate" data-system-ses-warning role="alert">{{ ses.warning }}</p>{% endif %}
+{% elif ses.problem %}<p class="sys-note warn se-gate" data-system-ses="unknown" data-allowed="0" role="alert">{{ ses.problem }}</p>
 {% elif not ses.allowed %}<p class="sys-note warn se-gate" data-system-ses="{{ ses.mode }}" data-allowed="0">Amazon has not approved production sending yet, so group sends and invites are off. Drafts and tests to yourself work. <a href="{% url 'system_emails' %}">See status</a></p>{% endif %}

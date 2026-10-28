@@ -51,6 +51,11 @@ def render(text, contact="", version="", values=None, show_placeholders=False):
         line = escape(body)
         line = LINK.sub(lambda m: f'<a href="{m.group(2)}">{m.group(1)}</a>', line)
         line = line.replace("{contact}", contact_html).replace("{version}", escape(version))
+        if "{gold_invite_days}" in line:  # Defaults: how long a Gold invite link works
+            from system import defaults
+
+            days = defaults.get().gold_invite_days
+            line = line.replace("{gold_invite_days}", f"{days} day" + ("" if days == 1 else "s"))
         line = _resolve(line, values, show_placeholders)
         if line is None:
             continue

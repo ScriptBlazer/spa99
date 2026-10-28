@@ -1,4 +1,7 @@
+import logging
+
 from django import template
+from django.utils.html import format_html
 
 register = template.Library()
 
@@ -20,3 +23,17 @@ def undo_url(extra_tags):
         if tag.startswith("undo:"):
             return tag[len("undo:"):]
     return ""
+
+
+@register.simple_tag(takes_context=True)
+def toast_times(context):
+    """data attributes for the toast region: how long a toast stays (System > Defaults), in ms. feedback.js reads them and falls back
+    to 4 s / 6 s. Never breaks a page: on any trouble it prints nothing."""
+    try:
+        from system import defaults
+
+        d = defaults.get(context.get("request"))
+        return format_html('data-toast-ms="{}" data-toast-long-ms="{}"', d.toast_seconds * 1000, d.toast_long_seconds * 1000)
+    except Exception:  # noqa: BLE001
+        logging.getLogger("spa99.common").warning("Toast times not read", exc_info=True)
+        return ""

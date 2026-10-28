@@ -8,11 +8,13 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
+from django.db.models import functions as _f
 from django.utils import timezone
+
+from simple_history.models import HistoricalRecords
 
 from common.models import BaseModel
 
-INVITE_DAYS = 30
 
 
 class Mailing(BaseModel):
@@ -24,7 +26,8 @@ class Mailing(BaseModel):
 
     name = models.CharField(max_length=120, help_text="Only shown in System.")
     subject = models.CharField(max_length=200)
-    body = models.TextField(help_text="Paragraphs separated by a blank line; {first_name} is filled in for each person.")
+    body = models.TextField(blank=True, help_text="Older mailings: paragraphs separated by a blank line; {first_name} is filled in for each person. Used only when there are no blocks.")
+    blocks = models.JSONField(default=list, blank=True, help_text="The email as parts (mailings.blocks): a list of {type, ...}. When set, it is used instead of the body.")
     kind = models.CharField(max_length=8, choices=KIND_CHOICES, default=NEWS)
     group = models.CharField(max_length=40, help_text="A key of mailings.segments.GROUPS.")
     params = models.JSONField(default=dict, blank=True, help_text="The group's options (plan, dates, status).")
@@ -54,6 +57,63 @@ class Mailing(BaseModel):
     @property
     def schedule_name(self):
         return f"mailing-{self.pk}"
+
+
+IMAGE_EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png", "image/gif": "gif"}
+
+
+def image_path(instance, filename):
+    """A random name under mailings/images/ (the uploaded name is never kept)."""
+    return f"mailings/images/{secrets.token_hex(16)}.{IMAGE_EXTENSIONS[instance.content_type]}"
+
+
+class MailingImage(BaseModel):
+    """A picture uploaded for an email. The bucket is private, so emails link to /email-image/<id>/ (served by the app); the random
+    id is the primary key. Never deleted while a mailing that was sent uses it (there is no delete yet)."""
+
+    file = models.FileField(upload_to=image_path, max_length=200)
+    content_type = models.CharField(max_length=20, choices=[(k, k) for k in IMAGE_EXTENSIONS])
+    size = models.PositiveIntegerField(help_text="Bytes.")
+    width = models.PositiveIntegerField(null=True, blank=True, help_text="Pixels, read from the file header; blank when it could not be read.")
+    height = models.PositiveIntegerField(null=True, blank=True)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.file.name} ({self.width}x{self.height})"
+
+    @property
+    def path(self):
+        """With a file extension (CDNs such as Cloudflare cache by extension). The old /email-image/<id>/ keeps working."""
+        return f"/email-image/{self.pk}.{IMAGE_EXTENSIONS[self.content_type]}"
+
+    @property
+    def url(self):
+        return f"{settings.SITE_URL}{self.path}"
+
+
+class MailingTemplate(BaseModel):
+    """A saved starting point for a new group send (System > Emails > Templates): subject, kind, Who and the parts. No people's data,
+    so it has history like other System settings. `key` marks the ones the seed makes (booking_open); a renamed template keeps its key,
+    so seeding again never adds a second copy. Pictures used by a template are never deleted."""
+
+    key = models.SlugField(max_length=40, unique=True, null=True, blank=True, help_text="Set for the built-in ones the seed creates.")
+    name = models.CharField(max_length=120)
+    subject = models.CharField(max_length=200, blank=True)
+    kind = models.CharField(max_length=8, choices=Mailing.KIND_CHOICES, default=Mailing.NEWS)
+    group = models.CharField(max_length=40, blank=True, help_text="A key of mailings.segments.GROUPS, or blank (Who is chosen later).")
+    blocks = models.JSONField(default=list, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [models.UniqueConstraint(_f.Lower("name"), name="mailings_template_name_ci")]
+
+    def __str__(self):
+        return self.name
 
 
 class MailingRecipient(BaseModel):
@@ -86,6 +146,12 @@ def new_token():
     return secrets.token_urlsafe(24)
 
 
+def _register_invite_days():
+    from system import defaults
+
+    return defaults.get().register_invite_days
+
+
 class Invite(BaseModel):
     """One person invited to register. The personal link /invite/<token>/ only pre-fills the register form and marks the invite
     opened: nothing else is trusted from it."""
@@ -106,7 +172,7 @@ class Invite(BaseModel):
     opened_at = models.DateTimeField(null=True, blank=True)
     registered_at = models.DateTimeField(null=True, blank=True)
     registered_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
-    expires_at = models.DateTimeField(help_text="The personal link stops working then (30 days after it was created).")
+    expires_at = models.DateTimeField(help_text="The personal link stops working then (System > Defaults days after it was created).")
     message_id = models.CharField(max_length=100, blank=True)
     attempts = models.PositiveSmallIntegerField(default=0)
     retry_at = models.DateTimeField(null=True, blank=True)
@@ -122,7 +188,7 @@ class Invite(BaseModel):
     def save(self, *args, **kwargs):
         self.email = (self.email or "").strip().lower()
         if not self.expires_at:
-            self.expires_at = timezone.now() + timedelta(days=INVITE_DAYS)
+            self.expires_at = timezone.now() + timedelta(days=_register_invite_days())
         super().save(*args, **kwargs)
 
     @property

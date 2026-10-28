@@ -1,6 +1,7 @@
 """Public pages: the unsubscribe link and the personal invite link. No login, rate limited, nothing trusted beyond what the signed
 token or the invite row says."""
 from django.contrib.auth.decorators import login_not_required
+from django.http import FileResponse, Http404
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
@@ -9,6 +10,7 @@ from common.audit import client_ip
 from common.ratelimit import hit
 
 from . import invites, optout, tokens
+from .models import MailingImage
 
 
 def _message(request, title, text, status=200):
@@ -48,3 +50,25 @@ def invite_link(request, token):
     if invite is not None:
         request.session[invites.SESSION_KEY] = invite.token
     return redirect("register")
+
+
+@login_not_required  # PUBLIC: pictures in emails. Mail clients (and their image proxies) fetch these with no session. The id is a random UUID.
+@require_GET
+def email_image(request, image_id, ext=""):
+    """/email-image/<id>.<ext> or /email-image/<id>/ (the extension in the address is only for caches; the real type comes from the row).
+    Stream an uploaded email picture from the (private) media storage. Never changes, so it is cached for a year."""
+    # No rate limit on purpose: Gmail and Outlook fetch through shared proxy addresses, so after a big send one IP legitimately asks for the
+    # same picture thousands of times, and a limit would break the images for real people. It is a primary-key lookup of a random UUID
+    # (an unknown id is a fast 404) and a cached read; the one-year cache header keeps repeat traffic away.
+    image = MailingImage.objects.filter(pk=image_id).first()
+    if image is None:
+        raise Http404
+    try:
+        handle = image.file.open("rb")
+    except (FileNotFoundError, OSError):
+        raise Http404 from None
+    response = FileResponse(handle, content_type=image.content_type)
+    response["Content-Length"] = image.size
+    response["Cache-Control"] = "public, max-age=31536000, immutable"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response

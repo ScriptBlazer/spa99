@@ -1,7 +1,7 @@
 """Gold approval and the account invite (docs/features/gold-application.md, "Approval and invite").
 
 Approve: status approved, approved_at (Gold's month starts here, LC-27), approved_by. A person with no account gets an
-invite (a signed link to a GoldInvite row: 14 days, single use). A person who already has an account gets Gold added
+invite (a signed link to a GoldInvite row: valid for System > Defaults days from when it was made, single use). A person who already has an account gets Gold added
 and a short email. Declined applications never get an invite. Gold on an account is the member's plan
 (users.InterestRegistration.plan = the `gold` plan); no payment step."""
 import logging
@@ -20,13 +20,15 @@ from plans import sales as sale_services
 from plans.models import Plan, SiteSettings
 from users.models import InterestRegistration
 
+from system import defaults
+
 from . import audit
 from .models import ApplicationEvent, GoldApplication, GoldInvite
 
 logger = logging.getLogger("spa99.gold")
 
 INVITE_SALT = "spa99.gold.invite"
-INVITE_DAYS = 14
+TOKEN_CAP_DAYS = 91  # outer limit of the signed token (the longest the setting allows, plus a day). The GoldInvite row's own expires_at is what decides.
 GOLD_SLUG = "gold"
 OK, INVALID = "ok", "invalid"  # bad links are all INVALID: the page never says whether a link expired, was used or never existed
 
@@ -51,7 +53,7 @@ def make_token(invite):
 def read_invite(token):
     """(OK, invite) for a usable link, else (INVALID, None)."""
     try:
-        pk = signing.loads(token, salt=INVITE_SALT, max_age=INVITE_DAYS * 86400 + 3600)
+        pk = signing.loads(token, salt=INVITE_SALT, max_age=TOKEN_CAP_DAYS * 86400)
     except signing.BadSignature:
         return INVALID, None
     try:
@@ -113,7 +115,7 @@ def _queue(function, *args):
 def _new_invite(application):
     now = timezone.now()
     application.invites.filter(used_at__isnull=True, revoked_at__isnull=True).update(revoked_at=now)
-    invite = GoldInvite.objects.create(application=application, expires_at=now + timedelta(days=INVITE_DAYS))
+    invite = GoldInvite.objects.create(application=application, expires_at=now + timedelta(days=defaults.get().gold_invite_days))
     _queue("gold.tasks.send_gold_invite_email", str(invite.pk))
     return invite
 

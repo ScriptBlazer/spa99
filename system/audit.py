@@ -41,6 +41,8 @@ KINDS = {
     SystemEvent.MAILING_SCHEDULED: ("change", "emails", "ok"), SystemEvent.MAILING_SENT: ("change", "emails", "ok"),
     SystemEvent.MAILING_CANCELLED: ("change", "emails", "ok"), SystemEvent.INVITES_SENT: ("change", "emails", "ok"),
     SystemEvent.EMAIL_TEST: ("change", "emails", "ok"),
+    SystemEvent.TEMPLATE_SAVED: ("change", "emails", "ok"), SystemEvent.TEMPLATE_RENAMED: ("change", "emails", "ok"),
+    SystemEvent.TEMPLATE_DELETED: ("change", "emails", "ok"),
 }
 CATEGORIES = [("change", "Changes"), ("security", "Security"), ("undo", "Undos"), ("failure", "Failures")]
 EVENT_SECTION_LABELS = {"security": "Security", "changes": "Change log"}

@@ -1,6 +1,8 @@
 """System > Emails (Developer level, unlocked, CSRF): automatic emails, group mailings and invites. Short views; the logic is in
 system/emails.py, mailings/sending.py and mailings/invites.py. A page that is a form answers with a toast and a redirect, or with
 JSON when the script asks for it (`Accept: application/json` or `X-Requested-With: fetch`)."""
+import uuid
+
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -10,8 +12,9 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from common.ratelimit import hit
-from mailings import invites, segments, sending
-from mailings.models import Invite, Mailing
+from mailings import blocks as mailing_blocks, images, invites, segments, sending
+from mailings import saved as templates_store
+from mailings.models import Invite, Mailing, MailingTemplate
 from notifications import emailbody, ses
 from notifications.models import EmailLog
 from notifications.seed import DEFAULT_SUBJECTS
@@ -164,7 +167,7 @@ def ses_refresh(request):
     status = ses.ses_status(refresh=True)
     if _wants_json(request):
         return JsonResponse({"ok": True, "ses": status})
-    messages.info(request, status["message"] or "Amazon SES allows sending.")
+    messages.info(request, status["message"] or status["provider"] or "Amazon SES allows sending.")
     return redirect("system_emails")
 
 
@@ -176,16 +179,25 @@ def mailings(request):
     return page(request, "system/emails_mailings.html", "emails", {"mailings": logic.mailing_list(request.GET.get("page")), "ses": ses.ses_status()})
 
 
-def _mailing_page(request, form, mailing, status=200):
+def _mailing_page(request, form, mailing, status=200, start=None):
     spec = emailbody.SPECS["mailing"]
     saved_params = mailing.params if mailing else {}
     groups = segments.catalog()
     for group in groups:  # each option carries the value to show: what was typed, else what was saved
         for param in group["params"]:
             param["value"] = (form.data.get(param["name"]) if form.is_bound else saved_params.get(param["name"])) or ""
+    cards = templates_store.details()
     context = {"form": form, "mailing": mailing, "groups": groups, "kind_choices": Mailing.KIND_CHOICES, "ses": ses.ses_status(),
                "placeholders": logic.spec_info(spec)["placeholders"],
-               "count_url": reverse("system_mailing_count"), "preview_url": reverse("system_mailing_preview")}
+               "count_url": reverse("system_mailing_count"), "preview_url": reverse("system_mailing_preview"),
+               # The parts editor (docs/features/email-builder.md, Contract)
+               "blocks": logic.editor_blocks(form, mailing, start), "block_errors": form.block_errors or {},
+               "block_types": {kind: {name: {"max": limit, "required": required} for name, (limit, required) in fields.items()}
+                               for kind, fields in mailing_blocks.TYPES.items()},
+               "block_max_parts": mailing_blocks.MAX_PARTS, "image_upload_url": reverse("system_mailing_image_upload"),
+               "image_max_bytes": images.MAX_BYTES, "image_view_base": f"{settings.SITE_URL}/email-image/", "starters": templates_store.choices(), "starter_details": cards,
+               "start_cards": [("", "Blank", "An empty email with one paragraph.")] + [(d["id"], d["name"], d["description"]) for d in cards], "start": str(start.pk) if start else "",
+               "template_save_url": reverse("system_template_save")}
     return page(request, "system/emails_mailing_form.html", "emails", context, status=status)
 
 
@@ -197,16 +209,26 @@ def mailing_edit(request, pk=None):
     if mailing is not None and not mailing.editable:
         messages.error(request, "Only a draft can be edited.")
         return redirect("system_mailing", pk=mailing.pk)
-    form = logic.MailingForm(request.POST or None, instance=mailing)
+    start = templates_store.resolve(request.GET.get("start")) if mailing is None and request.method == "GET" else None
+    form = logic.MailingForm(request.POST or None, instance=mailing, initial=_starter_fields(start))
     if request.method == "POST" and form.is_valid():
         row = form.save(commit=False)
         row.params = form.params
         if row.created_by_id is None:
             row.created_by = request.user
         row.save()
+        if _wants_json(request):
+            return JsonResponse({"ok": True, "id": str(row.pk), "redirect": reverse("system_mailing", args=[row.pk])})
         messages.success(request, "Saved as a draft.")
         return redirect("system_mailing", pk=row.pk)
-    return _mailing_page(request, form, mailing, status=400 if request.method == "POST" else 200)
+    if request.method == "POST" and _wants_json(request):
+        return JsonResponse({"ok": False, "errors": form.errors_json()}, status=400)
+    return _mailing_page(request, form, mailing, status=400 if request.method == "POST" else 200, start=start)
+
+
+def _starter_fields(start):
+    """Form values for the chosen saved template (New mailing, ?start=<template id or key>)."""
+    return {"name": start.name, "subject": start.subject, "kind": start.kind, "group": start.group} if start else {}
 
 
 @unlocked
@@ -223,7 +245,7 @@ def mailing_detail(request, pk):
         "group": segments.GROUPS.get(mailing.group), "can_send": draft and mailing.status == Mailing.DRAFT and state["allowed"] and not blockers,
         "recipients": logic.mailing_recipients(mailing, status, request.GET.get("page")), "status_filter": status,
         "progress_url": reverse("system_mailing_progress", args=[mailing.pk]),
-        "preview": preview_email("mailing", mailing.subject, mailing.body, logic.mailing_extra(mailing.kind, mailing.group)),
+        "preview": preview_email("mailing", mailing.subject, mailing.body, logic.mailing_extra(mailing.kind, mailing.group), blocks=mailing.blocks),
     }
     return page(request, "system/emails_mailing.html", "emails", context)
 
@@ -254,40 +276,87 @@ def mailing_count(request):
 @unlocked
 @require_POST
 def mailing_preview(request):
-    """Preview of what is typed on the mailing form with the sample name: {"ok", "subject", "html", "text", "errors"}."""
+    """Preview of what is typed on the mailing form with the sample name: {"ok", "subject", "html", "text", "errors"}. With a `blocks`
+    field (JSON) the parts are previewed and part problems come back as errors.blocks = {"_": [...], "<index>": {field: [...]}}."""
+    if _limited(request, "system-mailing-preview", 120, 60):
+        return JsonResponse({"ok": False, "errors": {"_": ["Too many previews. Please wait a moment."]}, "subject": "", "html": "", "text": ""}, status=429)
     subject, body = request.POST.get("subject", ""), request.POST.get("body", "")
-    errors = emailbody.validate(emailbody.SPECS["mailing"], subject=subject, body=body)
+    parts = None
+    if "blocks" in request.POST:
+        parts, block_errors = mailing_blocks.clean(request.POST["blocks"])
+        errors = emailbody.validate(emailbody.SPECS["mailing"], subject=subject)
+        if block_errors:
+            errors["blocks"] = block_errors
+    else:
+        errors = emailbody.validate(emailbody.SPECS["mailing"], subject=subject, body=body)
     if errors:
         return JsonResponse({"ok": False, "errors": errors, "subject": "", "html": "", "text": ""})
     extra = logic.mailing_extra(request.POST.get("kind", Mailing.NEWS), request.POST.get("group", ""))
-    return JsonResponse({"ok": True, "errors": {}, **preview_email("mailing", subject, body, extra)})
+    return JsonResponse({"ok": True, "errors": {}, **preview_email("mailing", subject, body, extra, blocks=parts)})
+
+
+@unlocked
+@require_POST
+def mailing_image_upload(request):
+    """Upload one picture for an email (multipart, field `file`): JPEG, PNG or GIF up to 2 MB, checked from the file content.
+    Answers {"ok", "id", "url", "width", "height"} (width and height are null when the header could not be read) or {"ok": false, "message"}."""
+    if _limited(request, "system-email-image", 30, 600):
+        return JsonResponse({"ok": False, "message": "Too many uploads. Please wait a few minutes."}, status=429)
+    try:
+        image = images.save_upload(request.FILES.get("file"), request.user)
+    except images.ImageError as error:
+        return JsonResponse({"ok": False, "message": str(error)}, status=400)
+    return JsonResponse({"ok": True, "id": str(image.pk), "url": image.url, "width": image.width, "height": image.height})
+
+
+def _send_test(request, back, subject, kind, group, body, parts, label, detail):
+    """Send one mailing's wording to the signed-in developer only (their own first name; News tests carry a real unsubscribe link).
+    Needs only a subject and wording that passes the checks: no Who, no saved mailing."""
+    from mailings import tokens
+
+    errors = sending.wording_errors(subject, body, parts)
+    if errors:
+        return _respond(request, False, " ".join(m for ms in errors.values() for m in ms), back, extra={"errors": errors})
+    context, headers = {"first_name": request.user.first_name, **logic.mailing_extra(kind, group)}, None
+    if kind == Mailing.NEWS:  # a real unsubscribe link for the developer's own address
+        context["unsubscribe_url"] = tokens.unsubscribe_url(request.user.email)
+        headers = tokens.list_unsubscribe_headers(context["unsubscribe_url"])
+    log = send_templated("mailing", [request.user.email], "[Test] " + sending.subject_line(subject, request.user.first_name),
+                         context, headers=headers, body=body, blocks=parts, subject_email=request.user.email)
+    ok = log.status == EmailLog.SENT
+    audit.log_event(SystemEvent.EMAIL_TEST, request, user=request.user, outcome=SystemEvent.OK if ok else SystemEvent.FAILED,
+                    detail={**detail, "status": log.status}, sentence=f"{request.user.email} sent themselves a test of the mailing '{label}' ({log.status})")
+    return _respond(request, ok, "A test is on its way to you." if ok else f"The test could not be sent ({log.get_status_display()}).", back)
 
 
 @unlocked
 @require_POST
 def mailing_test(request, pk):
-    """Send this mailing to the signed-in developer only (their own first name; News tests carry a real unsubscribe link)."""
+    """Test a saved draft (as saved), whatever its Who."""
     mailing = get_object_or_404(Mailing, pk=pk)
-    back = reverse("system_mailing", args=[mailing.pk])
     if _limited(request, "system-email-test", 5, 600):
-        return _respond(request, False, "Too many test emails. Please wait a few minutes.", back, status=429)
-    errors = sending.check_mailing(mailing) if mailing.group in segments.GROUPS else {"group": ["Choose a group."]}
-    errors.pop("group", None)  # a test needs no audience
-    if errors:
-        return _respond(request, False, " ".join(m for ms in errors.values() for m in ms), back)
-    from mailings import tokens
+        return _respond(request, False, "Too many test emails. Please wait a few minutes.", reverse("system_mailing", args=[mailing.pk]), status=429)
+    return _send_test(request, reverse("system_mailing", args=[mailing.pk]), mailing.subject, mailing.kind, mailing.group, mailing.body,
+                      mailing.blocks, mailing.name, {"mailing": str(mailing.pk)})
 
-    context, headers = {"first_name": request.user.first_name, **logic.mailing_extra(mailing.kind, mailing.group)}, None
-    if mailing.kind == Mailing.NEWS:  # a real unsubscribe link for the developer's own address
-        context["unsubscribe_url"] = tokens.unsubscribe_url(request.user.email)
-        headers = tokens.list_unsubscribe_headers(context["unsubscribe_url"])
-    log = send_templated("mailing", [request.user.email], "[Test] " + sending.subject_line(mailing.subject, request.user.first_name),
-                         context, headers=headers, body=mailing.body, subject_email=request.user.email)
-    ok = log.status == EmailLog.SENT
-    audit.log_event(SystemEvent.EMAIL_TEST, request, user=request.user, outcome=SystemEvent.OK if ok else SystemEvent.FAILED,
-                    detail={"mailing": str(mailing.pk), "status": log.status},
-                    sentence=f"{request.user.email} sent themselves a test of the mailing '{mailing.name}' ({log.status})")
-    return _respond(request, ok, "A test is on its way to you." if ok else f"The test could not be sent ({log.get_status_display()}).", back)
+
+@unlocked
+@require_POST
+def mailing_test_posted(request):
+    """Test what is on the form without saving and without Who: POST `subject`, `blocks` (JSON, or `body` for the old form) and `kind`
+    (default news, which decides the footer). Answers like the other tests: {"ok", "message"} (400 with `errors` when the wording is not valid)."""
+    if _limited(request, "system-email-test", 5, 600):  # first: a flood of bad forms must not cost a render each
+        return _respond(request, False, "Too many test emails. Please wait a few minutes.", reverse("system_mailing_new"), status=429)
+    parts = None
+    if "blocks" in request.POST:
+        parts, block_errors = mailing_blocks.clean(request.POST["blocks"])
+        if block_errors:
+            return _respond(request, False, " ".join(mailing_blocks.flat_errors(block_errors)), reverse("system_mailing_new"), extra={"errors": {"blocks": block_errors}})
+    kind = request.POST.get("kind", Mailing.NEWS)
+    kind = kind if kind in (Mailing.NEWS, Mailing.SERVICE) else Mailing.NEWS
+    subject = request.POST.get("subject", "")
+    return _send_test(request, reverse("system_mailing_new"), subject, kind, request.POST.get("group", ""), request.POST.get("body", ""), parts,
+                      request.POST.get("name") or subject, {"unsaved": True})
 
 
 def _mailing_action(request, pk, action, done):
@@ -444,3 +513,65 @@ def invite_resume(request, batch):
     except sending.MailingError as error:
         return _respond(request, False, str(error), back)
     return _respond(request, True, "Sending carries on.", back)
+
+
+# ---------- saved templates ----------
+
+@unlocked
+@require_GET
+def templates(request):
+    return page(request, "system/emails_templates.html", "emails", {"templates": MailingTemplate.objects.all(), "ses": ses.ses_status()})
+
+
+def _template_event(request, kind, sentence, template, **detail):
+    audit.log_event(kind, request, user=request.user, sentence=sentence, detail={"template": str(template.pk), "name": template.name, **detail})
+
+
+@unlocked
+@require_POST
+def template_save(request):
+    """Save as template. POST `name`, and either `mailing` (a saved mailing's id) or `subject`, `kind`, `group`, `blocks` (JSON, as on the form).
+    A name that exists is refused (409, `exists: true`) unless `overwrite=1`. Answers {"ok", "id", "name", "created"}; errors as
+    {"ok": false, "errors": {"name": [...], "blocks": {...}}}."""
+    if _limited(request, "system-template-save", 30, 600):
+        return JsonResponse({"ok": False, "errors": {"_": ["Too many saves. Please wait a few minutes."]}}, status=429)
+    post = request.POST
+    subject, kind, group, raw = post.get("subject", ""), post.get("kind", Mailing.NEWS), post.get("group", ""), post.get("blocks", "[]")
+    if post.get("mailing"):
+        try:
+            mailing = get_object_or_404(Mailing, pk=uuid.UUID(post["mailing"]))
+        except ValueError:
+            raise Http404 from None
+        subject, kind, group, raw = mailing.subject, mailing.kind, mailing.group, mailing.blocks or mailing_blocks.from_body(mailing.body)
+    try:
+        template, created = templates_store.save(post.get("name"), subject, kind, group, raw, request.user, overwrite=post.get("overwrite") == "1")
+    except templates_store.TemplateError as error:
+        return JsonResponse({"ok": False, "errors": error.errors, "exists": error.exists}, status=409 if error.exists else 400)
+    _template_event(request, SystemEvent.TEMPLATE_SAVED, f"{request.user.email} {'saved' if created else 'replaced'} the email template '{template.name}'", template,
+                    created=created)
+    return JsonResponse({"ok": True, "id": str(template.pk), "name": template.name, "created": created})
+
+
+@unlocked
+@require_POST
+def template_rename(request, pk):
+    template = get_object_or_404(MailingTemplate, pk=pk)
+    old = template.name
+    try:
+        templates_store.rename(template, request.POST.get("name"), request.user)
+    except templates_store.TemplateError as error:
+        return _respond(request, False, " ".join(m for ms in error.errors.values() for m in ms), reverse("system_templates"), extra={"errors": error.errors},
+                        status=409 if error.exists else 400)
+    _template_event(request, SystemEvent.TEMPLATE_RENAMED, f"{request.user.email} renamed the email template '{old}' to '{template.name}'", template, old=old)
+    return _respond(request, True, "Renamed.", reverse("system_templates"), extra={"name": template.name})
+
+
+@unlocked
+@require_POST
+def template_delete(request, pk):
+    """Delete a saved template. Pictures it uses stay (they are separate files, kept for the mailings that sent them)."""
+    template = get_object_or_404(MailingTemplate, pk=pk)
+    _template_event(request, SystemEvent.TEMPLATE_DELETED, f"{request.user.email} deleted the email template '{template.name}'", template)
+    template._history_user = request.user
+    template.delete()
+    return _respond(request, True, "Template deleted.", reverse("system_templates"))

@@ -23,11 +23,10 @@ from django.db.models.functions import Coalesce
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
-from . import audit, services
+from . import audit, defaults, services
 from .changes import SECTION_LABELS
 from .models import SystemChange, SystemEvent
 
-PAGE_SIZE = 25
 PARAMS = ("section", "user", "category", "kind", "q", "range", "date_from", "date_to")
 CHANGE_KINDS = {"created", "updated", "deleted", "direct"}
 
@@ -123,20 +122,21 @@ def _page_number(raw):
         return 1
 
 
-def audit_feed(params, page=1):
+def audit_feed(params, page=1, size=None):
     """One page of the feed (see the module doc for the shape). Queries: 2 counts, 2 group heads, 2 item loads, 1 undone."""
+    size = size or defaults.get().audit_page_size  # System > Defaults
     changes, events = filtered(params)
     number = _page_number(page)
     group_count = changes.annotate(gk=_group_key()).order_by().values("gk").distinct().count()
     total = group_count + events.count()
-    num_pages = max(1, -(-total // PAGE_SIZE))
+    num_pages = max(1, -(-total // size))
     number = min(number, num_pages)
-    want = number * PAGE_SIZE
+    want = number * size
     change_heads = list(changes.annotate(gk=_group_key()).order_by().values("gk").annotate(latest=Max("created_at")).order_by("-latest", "-gk")[:want])
     event_heads = list(events.order_by("-created_at", "-id").values("id", "created_at")[:want])
     merged = [(h["latest"], str(h["gk"]), "batch") for h in change_heads] + [(h["created_at"], str(h["id"]), "event") for h in event_heads]
     merged.sort(reverse=True)
-    chosen = merged[(number - 1) * PAGE_SIZE: want]
+    chosen = merged[(number - 1) * size: want]
     batch_keys = [key for _t, key, kind in chosen if kind == "batch"]
     event_ids = [key for _t, key, kind in chosen if kind == "event"]
 
@@ -164,8 +164,8 @@ def audit_feed(params, page=1):
         day["entries"] = totals.get(day["date"], 0)
     return {"days": days, "page": {
         "number": number, "num_pages": num_pages, "total": total, "has_next": number < num_pages, "has_previous": number > 1,
-        "next_number": number + 1, "previous_number": number - 1, "size": PAGE_SIZE,
-        "remaining": max(0, total - number * PAGE_SIZE)}}
+        "next_number": number + 1, "previous_number": number - 1, "size": size,
+        "remaining": max(0, total - number * size)}}
 
 
 def _day_totals(changes, events, dates):
@@ -333,10 +333,11 @@ def _by_day(groups):
     return days
 
 
-def page_of(params, entry_id):
+def page_of(params, entry_id, size=None):
     """The page of the feed that holds this entry's group (1 when unknown): groups newer than it, divided by the page size."""
     import uuid
 
+    size = size or defaults.get().audit_page_size
     try:
         entry_id = uuid.UUID(str(entry_id))
     except ValueError:
@@ -352,7 +353,7 @@ def page_of(params, entry_id):
         moment = row.created_at
     ahead = (changes.annotate(gk=_group_key()).order_by().values("gk").annotate(latest=Max("created_at")).filter(latest__gt=moment).count()
              + events.filter(created_at__gt=moment).count())
-    return ahead // PAGE_SIZE + 1
+    return ahead // size + 1
 
 
 def entry_detail(raw_id):

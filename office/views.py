@@ -27,6 +27,8 @@ from users import services as user_services
 from users import views as user_views
 from users.models import User
 
+from system import defaults
+
 from . import lists, profile, selectors
 from . import leads as lead_lists
 from .permissions import admin, approver, final_approver, reader
@@ -51,7 +53,7 @@ def _varied(response):
 
 # ---------- dashboard and analytics ----------
 
-def _remembered_range(request, key, allowed, default):
+def _remembered_range(request, key, allowed, default):  # `default` comes from System > Defaults
     """?range= wins and is remembered in the session for the next visit; otherwise the remembered one."""
     asked = request.GET.get("range")
     if asked in allowed:
@@ -65,20 +67,20 @@ def _remembered_range(request, key, allowed, default):
 @reader
 @require_GET
 def dashboard(request):
-    data = selectors.dashboard(_remembered_range(request, "office_range_dashboard", selectors.DASHBOARD_RANGES, "7d"))
+    data = selectors.dashboard(_remembered_range(request, "office_range_dashboard", selectors.DASHBOARD_RANGES, defaults.get(request).dashboard_range), request)
     return render(request, "office/dashboard.html", {"data": data, "greeting": _greeting(request.user), "section": "dashboard"})
 
 
 @reader
 @require_GET
 def dashboard_json(request):
-    return JsonResponse(selectors.dashboard(request.GET.get("range", "7d")))
+    return JsonResponse(selectors.dashboard(request.GET.get("range", defaults.get(request).dashboard_range), request))
 
 
 @reader
 @require_GET
 def analytics(request):
-    name = _remembered_range(request, "office_range_analytics", selectors.ANALYTICS_RANGES, "30d")
+    name = _remembered_range(request, "office_range_analytics", selectors.ANALYTICS_RANGES, defaults.get(request).analytics_range)
     context = {"data": selectors.analytics(name), "pages": selectors.pages(name), "section": "analytics"}
     return render(request, "office/analytics.html", context)
 
@@ -86,13 +88,13 @@ def analytics(request):
 @reader
 @require_GET
 def analytics_data(request):
-    return JsonResponse(selectors.analytics(request.GET.get("range", "30d")))
+    return JsonResponse(selectors.analytics(request.GET.get("range", defaults.get(request).analytics_range), request))
 
 
 @reader
 @require_GET
 def analytics_pages(request):
-    return JsonResponse(selectors.pages(request.GET.get("range", "30d")))
+    return JsonResponse(selectors.pages(request.GET.get("range", defaults.get(request).analytics_range), request))
 
 
 # ---------- people ----------
@@ -102,7 +104,7 @@ def analytics_pages(request):
 @never_cache
 def people(request):
     filters, page = lists.people_filters(request), lists.page_number(request)
-    rows, has_next = lists.people_page(filters, page)
+    rows, has_next = lists.people_page(filters, page, defaults.get(request).list_page_size)
     total = selectors.counters(K.REGISTRATIONS).get((K.REGISTRATIONS, ""), 0)
     context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "total_registered": total,
                "plans": list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order").values("slug", "name")), "section": "people"}
@@ -116,12 +118,12 @@ def people_csv(request):
 
 
 def _timeline_context(request, person):
-    """The timeline for the page: 20 events, grouped by day; ?tl=2 (HTMX 'Show earlier') asks for the next 20."""
+    """The timeline for the page: the default number of events, grouped by day; ?tl=2 (HTMX 'Show earlier') asks for the next page."""
     try:
         number = max(int(request.GET.get("tl", "1")), 1)
     except ValueError:
         number = 1
-    days, more = lead_lists.timeline_page(person["timeline"], number)
+    days, more = lead_lists.timeline_page(person["timeline"], number, defaults.get(request).timeline_page_size)
     for day in days:
         for item in day["items"]:
             item["time"] = f"{timezone.localtime(datetime.fromisoformat(item['at'])):%H:%M}" if item["at"] else ""  # the day is the heading above
@@ -185,11 +187,12 @@ def person_delete(request, pk):
 @never_cache
 def leads(request):
     filters, number = lead_lists.filters_from(request), lists.page_number(request)
-    rows, has_next = lead_lists.page(filters, number)
-    filtered = lead_lists.is_filtered(filters)
-    summary = selectors.leads_summary(filters["range"])
+    rows, has_next = lead_lists.page(filters, number, defaults.get(request).leads_page_size)
+    filtered = lead_lists.is_filtered(filters, request)
+    summary = selectors.leads_summary(filters["range"], request)
     context = {"rows": rows, "has_next": has_next, "page": number, "filters": filters, "filtered": filtered, "summary": summary,
-               "total_leads": None if filtered else summary.get("leads_total"), "choices": lead_lists.filter_choices(), "section": "leads"}
+               "total_leads": None if filtered else summary.get("leads_total"), "choices": lead_lists.filter_choices(), "section": "leads",
+               "site_defaults": defaults.get(request)}
     return _varied(render(request, _fragment(request, "office/leads.html", "office/_leads_rows.html"), context))
 
 
@@ -254,7 +257,7 @@ def lead_delete(request, pk):
 @never_cache
 def gold(request):
     filters, page = lists.gold_filters(request), lists.page_number(request)
-    rows, has_next = lists.gold_page(filters, page)
+    rows, has_next = lists.gold_page(filters, page, defaults.get(request).list_page_size)
     stored = selectors.counters(K.GOLD_APPLICATIONS, K.GOLD_BY_STATUS)
     context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "section": "gold",
                "final_approver_missing": not approval.final_approver_exists(),

@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from common import levels
 from common.tasks import enqueue
+from system import defaults
 
 from . import audit, invites, rating
 from .models import ApplicationEvent, GoldApplication
@@ -26,7 +27,6 @@ logger = logging.getLogger("spa99.gold")
 
 AWAITING = "awaiting_final"  # result of approve(): sent for final approval (not approved)
 FINAL_SALT = "spa99.gold.final"
-FINAL_DAYS = 14
 
 
 class NoteTooLong(ValueError):
@@ -87,9 +87,9 @@ def make_final_token(application):
 
 
 def token_is_valid(token, application):
-    """Bad signature, expired (14 days), another application, a spent round: all the same answer, False."""
+    """Bad signature, expired (System > Defaults days, read when checked), another application, a spent round: all the same answer, False."""
     try:
-        data = signing.loads(token, salt=FINAL_SALT, max_age=FINAL_DAYS * 86400)
+        data = signing.loads(token, salt=FINAL_SALT, max_age=defaults.get().gold_approval_days * 86400)
     except signing.BadSignature:
         return False
     return (isinstance(data, dict) and application.status == GoldApplication.AWAITING_FINAL
@@ -108,7 +108,7 @@ def make_approve_token(application):
 
 def approve_token_is_valid(token, application):
     try:
-        return signing.loads(token or "", salt=APPROVE_SALT, max_age=FINAL_DAYS * 86400) == str(application.pk)
+        return signing.loads(token or "", salt=APPROVE_SALT, max_age=defaults.get().gold_approval_days * 86400) == str(application.pk)
     except signing.BadSignature:
         return False
 

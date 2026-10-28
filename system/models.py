@@ -2,12 +2,18 @@
 (security events). Both are append-only and hash-chained (system/audit.py): each row carries `seq` (one running number
 across both tables), `prev_hash` and `hash`."""
 from django.conf import settings
-from django.db import models, transaction
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
+import logging
+
+from django.db import DatabaseError, models, transaction
 from datetime import timedelta
 
 from django.utils import timezone
 
-from common.models import UUIDModel
+from simple_history.models import HistoricalRecords
+
+from common.models import TimeStampedModel, UUIDModel
 
 
 class AppendOnlyError(Exception):
@@ -178,6 +184,7 @@ class SystemEvent(AuditRow):
     CODE_EDIT = "code_edit"
     MAILING_SCHEDULED, MAILING_SENT, MAILING_CANCELLED = "mailing_scheduled", "mailing_sent", "mailing_cancelled"
     INVITES_SENT, EMAIL_TEST = "invites_sent", "email_test"
+    TEMPLATE_SAVED, TEMPLATE_RENAMED, TEMPLATE_DELETED = "tpl_saved", "tpl_renamed", "tpl_deleted"
     KIND_CHOICES = [
         (SIGN_IN, "Signed in"), (SIGN_IN_FAILED, "Sign-in failed"), (UNLOCK, "Unlocked"), (UNLOCK_FAILED, "Unlock failed"),
         (UNLOCK_RATE_LIMITED, "Unlock blocked (too many tries)"), (LOCK_MANUAL, "Locked"), (LOCK_IDLE, "Locked (idle)"),
@@ -188,6 +195,7 @@ class SystemEvent(AuditRow):
         (UNDO_CODE_FAILED, "Undo code wrong"), (UNDO_RATE_LIMITED, "Undo blocked (too many tries)"),
         (CODE_EDIT, "Edited as code"), (MAILING_SCHEDULED, "Mailing scheduled"), (MAILING_SENT, "Mailing sent"),
         (MAILING_CANCELLED, "Mailing cancelled"), (INVITES_SENT, "Invites sent"), (EMAIL_TEST, "Test email sent"),
+        (TEMPLATE_SAVED, "Email template saved"), (TEMPLATE_RENAMED, "Email template renamed"), (TEMPLATE_DELETED, "Email template deleted"),
     ]
     OK, FAILED, BLOCKED = "ok", "failed", "blocked"
     OUTCOME_CHOICES = [(OK, "OK"), (FAILED, "Failed"), (BLOCKED, "Blocked")]
@@ -215,3 +223,106 @@ class SystemEvent(AuditRow):
         return {"t": "event", "created_at": self.created_at, "kind": self.kind, "outcome": self.outcome, "section": self.section,
                 "sentence": self.sentence, "user_label": self.user_label, "ip": self.ip_address, "ua": self.user_agent,
                 "path": self.path, "batch_id": self.batch_id, "detail": self.detail}
+
+
+# ---------- Defaults (System > Defaults) ----------
+
+_warned = []  # logged once per process
+
+
+def _number(label, default, low, high, help_text=""):
+    return models.PositiveSmallIntegerField(label, default=default, validators=[MinValueValidator(low), MaxValueValidator(high)], help_text=help_text)
+
+
+class SiteDefaults(UUIDModel, TimeStampedModel):
+    """The editable defaults of the site (singleton, `SiteDefaults.load()`; system/defaults.py reads it). A separate model from
+    plans.SiteSettings on purpose: Settings stays the small page of switches, and this one is plain numbers and pre-selected
+    choices that the Office, journey and emails read. Every default is today's value in code (CODE_DEFAULTS is the hint shown on the
+    page and what "Reset to default" restores). The row is created on first read, never by a migration.
+    Choices (ranges, show, sort) are checked in clean() against the constants of the pages that own them (imported lazily so this
+    model never imports the Office)."""
+
+    GOLD_NUDGES = [("panel", "Panel"), ("line", "One line"), ("none", "Nothing")]
+
+    singleton_key = models.CharField(max_length=10, default="site", unique=True, editable=False)
+
+    # Office
+    leads_range = models.CharField("Leads: last seen range", max_length=5, default="30d")
+    leads_show = models.CharField("Leads: show", max_length=12, default="all")
+    leads_sort = models.CharField("Leads: sort", max_length=12, default="last_seen")
+    leads_page_size = _number("Leads: rows per page", 25, 5, 200)
+    list_page_size = _number("People and Gold lists: rows per page", 50, 5, 200)
+    dashboard_range = models.CharField("Dashboard: default range", max_length=5, default="7d")
+    analytics_range = models.CharField("Analytics: default range", max_length=5, default="30d")
+    dashboard_hot_leads = _number("Dashboard: hot leads shown", 5, 1, 50)
+    dashboard_activity = _number("Dashboard: activity shown", 10, 1, 50)
+    dashboard_gold_waiting = _number("Dashboard: Gold waiting shown", 5, 1, 50)
+    dashboard_latest = _number("Dashboard: latest registrations shown", 5, 1, 50)
+    analytics_options = _number("Analytics: options shown per question", 6, 1, 12, "Takes effect at the next Analytics refresh.")
+    top_pages = _number("Top pages shown", 10, 1, 50, "Takes effect at the next Analytics refresh.")
+    timeline_page_size = _number("Person page: timeline events per page", 20, 5, 100)
+    person_emails_shown = _number("Person page: emails shown", 50, 1, 200)
+
+    # Website and journey
+    result_reasons = _number("Result: reasons shown", 3, 1, 6)
+    gold_nudge_high = models.CharField("Gold nudge: High potential", max_length=5, choices=GOLD_NUDGES, default="panel")
+    gold_nudge_medium = models.CharField("Gold nudge: Medium potential", max_length=5, choices=GOLD_NUDGES, default="line")
+    gold_nudge_low = models.CharField("Gold nudge: Low potential", max_length=5, choices=GOLD_NUDGES, default="none")
+    opener_lines = _number("Home opener: lines shown", 1, 1, 5)
+
+    # Gold
+    gold_invite_days = _number("Gold invite link valid (days)", 14, 1, 90, "A new value applies to links made from now on; links already sent keep the date they were given.")
+    gold_approval_days = _number("Approve / final approval email link valid (days)", 14, 1, 90, "These links carry no stored date, so a new value applies to links already sent too.")
+
+    # Emails
+    register_invite_days = _number("Register invite link valid (days)", 30, 1, 365, "A new value applies to invites made from now on; invites already sent keep their date.")
+    recent_mailings = _number("Recent mailings shown", 5, 1, 50)
+    recent_batches = _number("Recent invite batches shown", 5, 1, 50)
+
+    # Sign-in
+    office_session_days = _number("Office sign-in lasts (days)", 30, 1, 30, "Applies to sign-ins from now on. At most 30: the privacy notice says team sign-ins last up to 30 days.")
+    email_confirm_hours = _number("Email confirmation link valid (hours)", 24, 1, 168, "Applies to links already sent too. The wording of the confirmation email is edited in Emails.")
+
+    # System
+    changelog_page_size = _number("Change log rows per page", 50, 10, 200)
+    audit_page_size = _number("Audit feed rows per page", 25, 5, 100)
+    dashboard_recent_changes = _number("Dashboard recent changes", 10, 1, 50)
+
+    # Notifications
+    toast_seconds = _number("On-screen notification stays (seconds)", 4, 2, 30)
+    toast_long_seconds = _number("On-screen notification with a button or warning stays (seconds)", 6, 2, 60, "Errors always stay until closed.")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "site defaults"
+        verbose_name_plural = "site defaults"
+
+    def __str__(self):
+        return "Site defaults"
+
+    @classmethod
+    def load(cls):
+        """The one row (made on first read). If the database cannot be read (table missing before migrate, a blip) it logs once and
+        returns an unsaved copy with the code defaults, so a public page never answers 500 because of this."""
+        try:
+            obj, _ = cls.objects.get_or_create(singleton_key="site")
+            return obj
+        except DatabaseError:
+            if not _warned:
+                _warned.append(True)
+                logging.getLogger("spa99.system").warning("Site defaults not readable; using the code defaults", exc_info=True)
+            return cls()
+
+    @classmethod
+    def code_default(cls, name):
+        return cls._meta.get_field(name).get_default()
+
+    def clean(self):
+        from office import leads, selectors
+
+        allowed = {"leads_range": leads.RANGES, "leads_show": leads.SHOWS, "leads_sort": leads.SORTS,
+                   "dashboard_range": selectors.DASHBOARD_RANGES, "analytics_range": selectors.ANALYTICS_RANGES}
+        errors = {name: "Pick one of the choices." for name, choices in allowed.items() if getattr(self, name) not in choices}
+        if errors:
+            raise ValidationError(errors)

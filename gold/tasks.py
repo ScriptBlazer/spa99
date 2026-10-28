@@ -103,7 +103,7 @@ def send_gold_invite_email(invite_id):
     queue. Returns a status string, never the EmailLog."""
     from django.conf import settings
 
-    from .invites import INVITE_DAYS, make_token
+    from .invites import make_token
     from .models import GoldInvite
 
     invite = GoldInvite.objects.select_related("application").filter(pk=invite_id).first()
@@ -113,7 +113,7 @@ def send_gold_invite_email(invite_id):
     url = f"{settings.SITE_URL}/gold/invite/{make_token(invite)}/"
     log = send_templated(
         "gold_invite", [application.email], subject_for("gold_invite", first_name=application.first_name),
-        {"first_name": application.first_name, "url": url, "valid_days": INVITE_DAYS},
+        {"first_name": application.first_name, "url": url, "valid_days": max(1, round((invite.expires_at - invite.created_at).total_seconds() / 86400))},
         subject_email=application.email,
     )
     if log.status == log.SENT:
