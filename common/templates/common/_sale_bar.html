@@ -1,6 +1,6 @@
 {% load static sale_tags membership_tags %}{% if sale_preview_offer %}<link rel="stylesheet" href="{% static 'common/css/sale-bar.css' %}">
 {# A preview link opened with GET only offers the preview; the POST below spends it (link scanners never POST). #}
-<div class="sale-bar sale-bar--offer on-gold" data-sale-offer>
+<div class="sale-bar sale-bar--offer on-light" data-sale-offer>
   <form class="container sale-bar-inner" method="post" action="{% url 'sale_preview_start' %}">{% csrf_token %}
     <input type="hidden" name="token" value="{{ sale_preview_offer.token }}"><input type="hidden" name="next" value="{{ request.path }}">
     <span class="sale-bar-preview">Preview</span><span class="sale-bar-name">{{ sale_preview_offer.name }}</span>
@@ -10,7 +10,7 @@
 {% elif sale_bar %}{% sale_bar_view sale_bar as sb %}
 {# The sale bar (docs/design/SYSTEM-SALES.md 1). Server decides if it shows; sale-bar.js only counts down and removes it at the end. Always on, not dismissible. #}
 <link rel="stylesheet" href="{% static 'common/css/sale-bar.css' %}">
-<div class="sale-bar on-gold" data-sale-bar{% if sale_bar.preview %} data-preview{% endif %} data-sale="{{ sale_bar.id }}" data-ends="{{ sale_bar.ends_at }}" data-now="{{ sb.now }}"{% if sb.upcoming %} data-upcoming{% endif %}>
+<div class="sale-bar on-light" data-sale-bar{% if sale_bar.preview %} data-preview{% endif %} data-sale="{{ sale_bar.id }}" data-ends="{{ sale_bar.ends_at }}" data-now="{{ sb.now }}"{% if sb.upcoming %} data-upcoming{% endif %}>
   <div class="container sale-bar-inner">
     {% memberships_shown as show_memberships %}<a class="sale-bar-link" href="{% if show_memberships %}{% url 'memberships' %}#plans{% else %}{% url 'journey' %}{% endif %}">
       {% if sale_bar.preview %}<span class="sale-bar-preview">Preview</span>{% endif %}

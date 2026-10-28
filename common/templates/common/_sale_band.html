@@ -1,7 +1,7 @@
 {% load static sale_tags membership_tags %}{% if sale_bar %}{% sale_bar_view sale_bar as sb %}{% memberships_shown as show_memberships %}{% memberships_url as mem_url %}
 {# The sale band (docs/design/SYSTEM-SALES.md Round 2). Used on Home (tone="raised") and Memberships (tone="deep"); every other page keeps the slim strip. Not dismissible. #}
 <link rel="stylesheet" href="{% static 'common/css/sale-band.css' %}">
-<section class="sale-band on-gold sale-band--{{ tone|default:'raised' }}" aria-labelledby="sale-band-title" data-sale-band data-ends="{{ sale_bar.ends_at }}" data-now="{{ sb.now }}"{% if sb.upcoming %} data-upcoming{% endif %}{% if tone == "raised" %} data-scene="sale"{% endif %}>
+<section class="sale-band on-light sale-band--{{ tone|default:'raised' }}" aria-labelledby="sale-band-title" data-sale-band data-ends="{{ sale_bar.ends_at }}" data-now="{{ sb.now }}"{% if sb.upcoming %} data-upcoming{% endif %}{% if tone == "raised" %} data-scene="sale"{% endif %}>
   <div class="container grid sale-band-grid"{% if tone != "raised" %} data-reveal="stagger"{% endif %}>
     <div class="sale-band-text">
       {% if sale_bar.preview %}<p class="sale-band-preview"{% if tone == "raised" %} data-fade{% endif %}>Preview</p>{% endif %}

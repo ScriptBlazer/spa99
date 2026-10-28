@@ -437,13 +437,12 @@ Unchanged (section 1), still dismissible, still at the top of every other full-h
 5. Preview marker and End preview on both bands; upcoming preview shows the start line.
 6. Screenshots for design review: Home and Memberships at 375 and 1440 with the band in view (live, under 1 day, under 1 hour, preview upcoming), one other page with the strip, and Home at 2560.
 
-## Update 2026-10-28: the bar and the band are gold (Moishe)
+## Update 2026-10-28 (later): the bar and the band are cream (Moishe; supersedes the gold version the same day)
 
-The sale stands out from the dark site. This supersedes the espresso-raised bar (section 1) and the espresso-raised / espresso band grounds (Round 2) wherever they disagree.
+Gold was tried and dropped. The sale bar, the Start preview notice and the sale band (Home and Memberships) are cream (`--color-cream`, `#F5F2D8`) with espresso text, so they stand out from the dark site and the always-espresso header. This supersedes the espresso-raised bar (section 1) and the espresso ground of the band (Round 2).
 
-- **Scope:** new `.on-gold` surface in `base.css` (like `.on-dark`): `--s-bg` `--color-gold` (`#E5AC6E`), `--s-text` `--color-espresso`. The bar (`.sale-bar`, the Start preview notice `.sale-bar--offer`) and the band (`.sale-band`, Home and Memberships, both tones) use `on-gold` instead of `on-dark`. No new tokens.
-- **Text:** everything is `--color-espresso`, 6.17:1 on gold (AA). The muted espresso (`--color-text-muted`) is only 2.99 on gold, so there is no muted tone: hierarchy comes from weight (name 500, the count 500) and spacing, not colour. Covers name, percent, plans, separators, countdown, "ends in", Preview tag (1px `currentColor` border), End preview, Start preview (underlined), band heading, numerals, labels, the "Ends ..." line. Gold is no longer used for any sale text on these surfaces.
-- **Button:** the band button is the dark variant through the surface tokens (`--s-accent` espresso, `--s-on-accent` gold): espresso with gold text (6.17), never gold on gold.
-- **Focus:** `--color-focus` (espresso) 2px outline, 6.17 on gold. **Hover:** underline on the offer (bar) and End preview; the arrow icon is `currentColor` (espresso). 
-- **`prefers-contrast: more`:** the espresso overrides are removed (gold with espresso is already 6.17).
-- **Header beside it:** unchanged. Over a dark hero the transparent header sits under a gold bar (a clear step, no line); after scroll it is solid espresso; on cream pages it is as before. The spa/home/book "mentions" stay on espresso scenes (gold name there is unchanged).
+- **Scope:** the existing `.on-light` surface (no new scope, no new tokens; `.on-gold` is removed). The bar, `.sale-bar--offer` and `.sale-band` use `on-light` instead of `on-dark`.
+- **Text:** name, percent, plans, countdown numerals and the band heading and offer: `--color-text` (espresso, 10.95 on cream). Quiet parts (separators, "ends in", "starts ...", Preview tag, End preview, arrow icon, band labels and the "Ends ..." line): `--color-text-muted` (5.32 on cream, AA). `prefers-contrast: more`: those go `--color-text`. Gold is not used for any sale text on cream (gold on cream fails AA); there is no gold accent on the bar or band.
+- **Band button:** `.btn-primary` in its light look: espresso background, cream text. **Focus:** `--color-focus` (espresso) 2px, clear on cream. **Hover:** unchanged (offer and End preview underline).
+- **Memberships band** (`--deep`) is `--color-cream-raised` (`#FBF9EC`), one step lighter, because that page is cream and the band would otherwise vanish. Home band and the bar are `--color-cream`.
+- **Header:** always espresso, so the cream bar above it (and over a dark hero) is the contrast the decision wants.

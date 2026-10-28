@@ -32,6 +32,6 @@ Decided 2026-10-25 (PROJECT.md). Built on `feature/sales` (see Built below).
 - **Preview link:** signed, single-use, valid an hour, this browser only. Opening it (GET) never starts anything, so chat and email link scanners cannot use it up: the page shows a small bar-styled notice with a "Start preview" button. Only the button (a CSRF-checked POST to `/sale-preview/`) spends the link and starts the hour; the bar then shows on every public page ("Preview" tag, "End preview" link). A second browser pressing the same link does nothing; the first keeps its hour. Back after End preview reloads the page (bfcache).
 - Wording for plan lists: "all memberships", "all memberships and single visits", "single visits".
 
-## Update 2026-10-28: gold bar and band
+## Update 2026-10-28: cream bar and band
 
-The sale bar and the sale band (Home and Memberships) now use the brand gold (`--color-gold`) with espresso text via the `.on-gold` surface (base.css), so the sale stands out from the dark site. All text espresso (6.17 AA), the band button is the espresso variant, focus ring espresso. Details: `docs/design/SYSTEM-SALES.md` (Update 2026-10-28). Sale mentions (`docs/design/SALE-MENTIONS.md`) stay on the espresso scenes.
+The sale bar, the Start preview notice and the sale band (Home and Memberships) are cream (`--color-cream`) with espresso text through the existing `.on-light` surface; muted parts use `--color-text-muted` (AA), the band button is espresso with cream text. The Memberships band is `--color-cream-raised` so it reads on a cream page. (A gold version was tried and dropped the same day.) Details: `docs/design/SYSTEM-SALES.md` (Update 2026-10-28, later). Sale mentions (`docs/design/SALE-MENTIONS.md`) stay on the espresso scenes.
