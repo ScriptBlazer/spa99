@@ -1,5 +1,5 @@
 {% load static sale_tags membership_tags %}{% if sale_bar %}{% sale_bar_view sale_bar as sb %}
-{# The sale bar (docs/design/SYSTEM-SALES.md 1). Server decides if it shows; sale-bar.js only counts down, dismisses and removes it at the end. #}
+{# The sale bar (docs/design/SYSTEM-SALES.md 1). Server decides if it shows; sale-bar.js only counts down and removes it at the end. Always on, not dismissible. #}
 <link rel="stylesheet" href="{% static 'common/css/sale-bar.css' %}">
 <div class="sale-bar on-dark" data-sale-bar data-sale="{{ sale_bar.id }}" data-ends="{{ sale_bar.ends_at }}" data-now="{{ sb.now }}"{% if sb.upcoming %} data-upcoming{% endif %}>
   <div class="container sale-bar-inner">
@@ -13,8 +13,7 @@
       <span class="sr-only">{% if sb.upcoming %}Starts {{ sb.starts_label }}.{% else %}Ends {{ sb.ends_sr }}.{% endif %}</span>
       {% include "common/_icon.html" with name="arrow-right" %}
     </a>
-    {% if sale_bar.preview %}<a class="sale-bar-end-preview" href="?sale_preview=end">End preview</a>{% endif %}
-    <button type="button" class="sale-bar-close" data-sale-close aria-label="Hide the sale bar">{% include "common/_icon.html" with name="x" %}</button>
+    {% if sale_bar.preview %}<a class="sale-bar-end-preview" href="?sale_preview=end" aria-label="End preview"><span class="sale-bar-end-long">End preview</span><span class="sale-bar-end-short" aria-hidden="true">End</span></a>{% endif %}
   </div>
 </div>
 <script type="module" src="{% static 'common/js/sale-bar.js' %}"></script>

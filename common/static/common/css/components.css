@@ -9,10 +9,10 @@
 .frame > picture, .frame > .photo { position: absolute; inset: 0; }
 
 /* ---------- header and navigation ---------- */
-.site-header { position: sticky; top: 0; z-index: 10; height: var(--header-h); border-bottom: 1px solid var(--s-hair); }
+.site-header { position: sticky; top: var(--sale-top); z-index: 10; height: var(--header-own-h); border-bottom: 1px solid var(--s-hair); }
 .header-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); height: 100%; }
 .brand { display: inline-flex; align-items: center; color: var(--color-text-inverse); text-decoration: none; }
-.brand .logo { height: calc(var(--header-h) * 0.65); width: auto; }
+.brand .logo { height: calc(var(--header-own-h) * 0.65); width: auto; }
 .logo-swan { fill: var(--color-gold); }
 .logo-text { fill: currentColor; }
 .nav-desktop, .header-actions { display: none; }
@@ -31,8 +31,8 @@
 
 .menu { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; overflow-y: auto; }
 .menu::backdrop { background: var(--color-bg-inverse); }
-.menu-bar { display: flex; align-items: center; justify-content: space-between; height: var(--header-h); border-bottom: 1px solid var(--s-hair); }
-.menu-body { display: flex; flex-direction: column; gap: var(--space-5); padding-block: var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom)); min-height: calc(100% - var(--header-h)); }
+.menu-bar { display: flex; align-items: center; justify-content: space-between; height: var(--header-own-h); border-bottom: 1px solid var(--s-hair); }
+.menu-body { display: flex; flex-direction: column; gap: var(--space-5); padding-block: var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom)); min-height: calc(100% - var(--header-own-h)); }
 .menu nav { display: grid; gap: var(--space-4); }
 .menu nav a { font-family: var(--font-display); font-size: var(--text-xl); letter-spacing: var(--tracking-display); line-height: var(--leading-tight); text-decoration: none; }
 .menu nav a[aria-current="page"] { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 6px; }
@@ -40,6 +40,9 @@
 .menu-actions .btn-block { justify-self: stretch; }
 .menu-meta { margin-top: auto; }
 body:has(dialog[open]) { overflow: hidden; }
+/* With the sale bar on, the open menu starts under it and the bar stays visible (no backdrop over it). */
+html.has-sale .menu { inset: var(--sale-top) 0 0 0; height: calc(100% - var(--sale-top)); }
+html.has-sale .menu::backdrop { background: transparent; }
 
 /* ---------- buttons ---------- */
 .btn {

@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% load content_tags pages_tags static %}
 {% block html_attrs %} data-page="marketing"{% endblock %}
-{# The tour is one fixed canvas that never scrolls, so no sale bar here (docs/design/SYSTEM-SALES.md 1.1). #}
-{% block sale_bar %}{% endblock %}{% block sale_html %}{% endblock %}
 {% block body_class %}page-tour{% endblock %}
 {% block head_extra %}
 <link rel="stylesheet" href="{% static 'common/css/tour.css' %}">

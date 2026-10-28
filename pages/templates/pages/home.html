@@ -4,8 +4,6 @@
 {% block body_class %}page-home{% endblock %}
 {% block header_mode %}overlay{% endblock %}
 {% block head_title %}{% include "common/_head.html" with title="Spa 99 | Beyond Luxury" description=meta.meta_description %}{% endblock %}
-{# The sale shows as a band after the hero, not the slim strip (docs/design/SYSTEM-SALES.md Round 2). #}
-{% block sale_bar %}{% endblock %}{% block sale_html %}{% endblock %}
 {% block head_extra %}
 {% hero_video as hv_head %}{% if hv_head.poster %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="{{ hv_head.poster }}" media="(min-width: 48em)">
 <link rel="preload" as="image" type="image/webp" fetchpriority="high" href="{{ hv_head.poster_portrait }}" media="(max-width: 47.99em)">{% endif %}

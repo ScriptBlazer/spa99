@@ -236,8 +236,8 @@ def start_preview(request):
         if getattr(request, "session", None) is not None:
             request.session.pop(PREVIEW_KEY, None)
         return
-    if getattr(request, "session", None) is None:
-        return
+    if getattr(request, "session", None) is None or request.method != "GET":
+        return  # a HEAD or other probe (link unfurlers, scanners) must not use up the single-use link
     sale = sale_from_token(request.GET.get(PREVIEW_PARAM, ""), spend=True)  # single use: the first browser to open it gets the hour
     if sale is not None:
         request.session[PREVIEW_KEY] = {"sale": str(sale.pk), "until": time.time() + PREVIEW_SECONDS}
