@@ -1,7 +1,7 @@
 """Starting FAQ for the Ask us chat, drafted only from the site's own copy (content/seed.py, docs/features/website.md). Only creates
 what is missing; never overwrites what Moishe edited in System > FAQ. Hours, rooms, plans and prices are not repeated here: the
 assistant reads them live from the app."""
-from .models import FaqItem
+from .models import FaqItem, KnowledgeNote
 
 # (question, answer, suggested)
 FAQ = [
@@ -28,3 +28,22 @@ FAQ = [
 def run(ensure):
     for order, (question, answer, suggested) in enumerate(FAQ, start=1):
         ensure(FaqItem, {"question": question}, {"answer": answer, "order": order, "suggested": suggested, "visible": True})
+    run_notes(ensure)
+
+
+# (topic, title, text): short facts from the site's own copy and the agreed rules (docs/SPA99_RULES.md). No prices.
+NOTES = [
+    ("lockers", "Lockers", "Lockers are included in every membership and are assigned when you book."),
+    ("lockers", "Phones", "No phones in the spa: they stay in your locker."),
+    ("visiting", "What to bring", "Come with nothing. Towels, robe, slippers, toiletries and trunks are all supplied."),
+    ("facilities", "Included in every visit", "Every visit includes every room and all areas, with free drinks and free ice lollies."),
+    ("booking", "Length of a visit", "A booked visit is a two-hour slot, and you may stay as long as you like."),
+    ("booking", "When booking opens", "Booking opens with membership. Register and we will write before the doors open."),
+    ("policies", "Who it is for", "Spa 99 is for men only, aged 18 and over."),
+    ("gold", "How the Gold Card works", "The Gold Card is by application. Each application is read personally, and if it is a fit, we invite you."),
+]
+
+
+def run_notes(ensure):
+    for order, (topic, title, text) in enumerate(NOTES, start=1):
+        ensure(KnowledgeNote, {"title": title}, {"topic": topic, "text": text, "order": order, "active": True})

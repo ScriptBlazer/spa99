@@ -57,6 +57,20 @@ class ChatButtonTests(TestCase):
         self.assertNotIn("value=\"on\"", html[html.index('data-chat-tpl="email"'):][:2500].split("consent")[1][:80])  # not pre-ticked
 
     @KEY
+    def test_cream_card_with_assistant_name_and_fallbacks(self):
+        html = Client().get("/").content.decode()
+        self.assertIn('class="chat on-light"', html)
+        self.assertNotIn("on-dark\" aria-labelledby=\"ask-us-title", html)
+        self.assertIn("Spa 99 Assistant", html)  # the fallback until System > Assistant sets a name
+        self.assertIn("Ask us anything.", html)
+
+    def test_assistant_words_from_context(self):
+        html = render_to_string("chat/_chat.html", {"chat_gate": GATE, "chat_handoff": {"email": "h@x.test", "mailto": "", "whatsapp_url": ""}, "chat_suggested": [],
+                                                    "chat_assistant": {"name": "Ask Spa 99", "welcome_heading": "Hello.", "welcome_line": "Anything about the spa."}})
+        for words in ("Ask Spa 99", "Hello.", "Anything about the spa."):
+            self.assertIn(words, html)
+
+    @KEY
     def test_fallback_chips_until_faq_questions_are_suggested(self):
         html = Client().get("/").content.decode()
         for question in ("When do you open?", "What is included in a membership?", "What is the Gold Card?", "Where are you?"):
@@ -82,7 +96,7 @@ class ChatButtonTests(TestCase):
 
         css = open(finders.find("common/css/chat.css")).read()
         tokens = open(finders.find("common/css/tokens.css")).read()
-        self.assertIn("--chat-w: 27rem", tokens)
+        self.assertIn("--chat-w: 23.75rem", tokens)
         self.assertIn("--z-chat-entry: 30", tokens)
         self.assertIn('@import "chat.css"', open(finders.find("common/css/app.css")).read())
         self.assertNotRegex(css, r"#[0-9a-fA-F]{3,8}\b")  # no ad-hoc colours

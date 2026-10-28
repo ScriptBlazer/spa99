@@ -2,12 +2,12 @@
 Everything here is static; common/js/chat.js fills it. Without JavaScript the pill stays hidden, so there is never a button that does nothing.{% endcomment %}
 <button type="button" class="chat-pill" data-chat-open aria-haspopup="dialog" aria-controls="ask-us" aria-label="Ask us" hidden>{% include "common/_mark.html" %}<span class="chat-pill-label">Ask us</span></button>
 
-<dialog id="ask-us" class="chat on-dark" aria-labelledby="ask-us-title" data-chat
+<dialog id="ask-us" class="chat on-light" aria-labelledby="ask-us-title" data-chat
   data-state-url="{% url 'chat:state' %}" data-message-url="{% url 'chat:message' %}" data-email-url="{% url 'chat:email' %}"
   data-privacy-url="{% url 'privacy' %}#chat" data-contact-email="{{ chat_handoff.email }}">
   <div class="chat-sheet">
     <header class="chat-head">
-      <h2 class="chat-title" id="ask-us-title" tabindex="-1">{% include "common/_mark.html" %}<span>Ask us</span></h2>
+      <h2 class="chat-title" id="ask-us-title" tabindex="-1">{% include "common/_mark.html" %}<span data-chat-name>{{ chat_assistant.name|default:"Spa 99 Assistant" }}</span></h2>
       <div class="chat-head-actions">
         <button type="button" class="menu-toggle chat-head-btn" data-chat-new hidden>New chat</button>
         <button type="button" class="menu-toggle chat-head-btn" data-chat-close>Close</button>
@@ -16,8 +16,8 @@ Everything here is static; common/js/chat.js fills it. Without JavaScript the pi
 
     <div class="chat-body" data-chat-scroll>
       <div class="chat-welcome" data-chat-welcome>
-        <p class="chat-welcome-title" data-chat-welcome-title>Ask us anything.</p>
-        <p class="chat-welcome-line" data-chat-welcome-line>The spa, memberships, hours or the Gold Card.</p>
+        <p class="chat-welcome-title" data-chat-welcome-title>{{ chat_assistant.welcome_heading|default:"Ask us anything." }}</p>
+        <p class="chat-welcome-line" data-chat-welcome-line>{{ chat_assistant.welcome_line|default:"The spa, memberships, hours or the Gold Card." }}</p>
         <ul class="chat-chips" data-chat-chips>
           {% for question in chat_suggested %}<li><button type="button" class="chat-chip" data-chat-chip>{{ question }}</button></li>
           {% empty %}<li><button type="button" class="chat-chip" data-chat-chip>When do you open?</button></li>

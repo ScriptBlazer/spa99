@@ -262,7 +262,7 @@ def lead_delete(request, pk):
 def chats(request):
     """The Ask us conversations, newest first, a page at a time (one extra row instead of a count). View only."""
     first = Message.objects.filter(conversation=OuterRef("pk"), role=Message.USER).order_by("created_at").values("text")[:1]
-    queryset = Conversation.objects.annotate(preview=Subquery(first)).select_related("user")
+    queryset = Conversation.objects.filter(staff_test=False).annotate(preview=Subquery(first)).select_related("user")
     page = lists.page_number(request)
     rows, has_next = lists.cut(queryset, page, defaults.get(request).list_page_size)
     return render(request, "office/chats.html", {"rows": rows, "has_next": has_next, "page": page, "section": "chats"})

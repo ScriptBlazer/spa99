@@ -39,7 +39,7 @@
 .menu-actions { display: grid; gap: var(--space-3); justify-items: start; }
 .menu-actions .btn-block { justify-self: stretch; }
 .menu-meta { margin-top: auto; }
-body:has(dialog[open]) { overflow: hidden; }
+body:has(dialog[open]:not(.chat)) { overflow: hidden; }   /* the desktop chat card leaves the page scrollable; its phone sheet locks in chat.css */
 /* With the sale bar on, the open menu starts under it and the bar stays visible (no backdrop over it). */
 html.has-sale .menu { inset: var(--sale-top) 0 0 0; height: calc(100% - var(--sale-top)); }
 html.has-sale .menu::backdrop { background: transparent; }

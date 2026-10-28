@@ -23,9 +23,9 @@ from pages.access import memberships_visible
 from plans.models import SiteSettings
 from system import defaults as system_defaults
 
-from . import knowledge, llm
+from . import config, knowledge, llm
 from .models import Conversation, FaqItem, Message
-from .prompt import KNOWLEDGE_HEADER, MESSAGES, SYSTEM_RULES
+from .prompt import KNOWLEDGE_HEADER, MESSAGES, SYSTEM_RULES, personality
 
 logger = logging.getLogger("spa99.chat")
 abuse_logger = logging.getLogger("spa99.chat.abuse")
@@ -40,6 +40,12 @@ def handoff_links(reason=""):
     email = site.contact_address
     return {"reason": reason, "whatsapp_url": site.discount_contact_url or "", "email": email,
             "mailto": f"mailto:{email}?subject=A%20question%20for%20Spa%2099" if email else ""}
+
+
+def assistant_card(request=None):
+    """What the panel shows about the assistant: {name, welcome_heading, welcome_line}."""
+    cfg = config.get(request)
+    return {"name": cfg.name, "welcome_heading": cfg.welcome_heading, "welcome_line": cfg.welcome_line}
 
 
 def suggested_questions(limit=4):
@@ -64,11 +70,11 @@ def cap_reached(request=None):
 
 
 def daily_cap_reached(request=None):
-    """Soft daily cap: the monthly cap divided by CHAT_DAILY_CAP_DIVISOR, counted from midnight London. Hand-off only until tomorrow."""
+    """Soft daily cap: a share of the monthly cap (System > Assistant > Limits, 5% by default), counted from midnight London. Hand-off only until tomorrow."""
     cap = system_defaults.get(request).chat_monthly_cap_gbp
     midnight = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
     spent = Message.objects.filter(created_at__gte=midnight).aggregate(total=Sum("cost_pence"))["total"]
-    return Decimal(spent or 0) >= Decimal(cap) * 100 / settings.CHAT_DAILY_CAP_DIVISOR
+    return Decimal(spent or 0) >= Decimal(cap) * config.get(request).daily_cap_percent
 
 
 def too_busy():
@@ -89,10 +95,12 @@ def abuse(event, request, **detail):
 
 
 def within_rate_limits(request, token):
-    """Per browser (the page's chat cookie) and per IP, each 10 messages in 10 minutes and 40 a day (settings.CHAT_RATES)."""
+    """Per browser (the page's chat cookie) and per IP: messages per 10 minutes and per day (System > Assistant > Limits)."""
     ip = client_ip(request) or "unknown"
+    cfg = config.get(request)
+    windows = ((cfg.rate_per_10_minutes, 600), (cfg.rate_per_day, 86400))
     for scope, who in (("browser", token or "none"), ("ip", ip)):
-        for number, (limit, seconds) in enumerate(settings.CHAT_RATES[scope]):
+        for number, (limit, seconds) in enumerate(windows):
             if not hit(f"chat-{scope}-{number}", who, limit, seconds):
                 abuse("rate_limited", request, scope=scope, window=seconds)
                 return False
@@ -167,6 +175,8 @@ def attach(conversation, request, session=None):
 
 
 def prices_allowed(request, conversation):
+    if hasattr(conversation, "_force_prices"):  # the System test console picks with or without prices
+        return conversation._force_prices
     return bool(memberships_visible(request) or conversation.lead_email)
 
 
@@ -226,7 +236,7 @@ def _store(conversation, text, usage=None, stop_reason="", handoff=False, offere
 
 
 def _done(conversation, ok, stop_reason="", **extra):
-    left = max(settings.CHAT_MAX_MESSAGES - conversation.message_count, 0)
+    left = max(getattr(conversation, "_max_messages", config.get().max_messages) - conversation.message_count, 0)
     return sse("done", {"conversation_id": str(conversation.pk), "ok": ok, "stop_reason": stop_reason, "messages_left": left, **extra})
 
 
@@ -279,6 +289,7 @@ def reply_events(request, conversation):
     """SSE strings for one reply. Never raises: any failure becomes an error or hand-off event. If the visitor's connection drops
     (the generator is closed) after the model was called, the reply is still stored and billed (known usage or an estimate)."""
     conversation._reply_stored, conversation._billing = False, None
+    conversation._max_messages = config.get(request).max_messages
     try:
         yield from _reply(request, conversation)
     except GeneratorExit:
@@ -312,10 +323,11 @@ def _reply(request, conversation):
     text, _digest = knowledge.build(prices)
     emitted, suppressed, final = [], False, None
     history = api_history(conversation)
-    chars = len(SYSTEM_RULES) + len(KNOWLEDGE_HEADER) + len(text) + sum(len(m["content"]) for m in history)
+    voice = personality(config.get(request))
+    chars = len(SYSTEM_RULES) + len(voice) + len(KNOWLEDGE_HEADER) + len(text) + sum(len(m["content"]) for m in history)
     conversation._billing = {"emitted": emitted, "usage": None, "chars": chars}  # from here the model call is billed, whatever happens
     try:
-        for kind, payload in llm.stream_reply(SYSTEM_RULES, KNOWLEDGE_HEADER + text, history):
+        for kind, payload in llm.stream_reply(SYSTEM_RULES, KNOWLEDGE_HEADER + text, history, voice):
             if kind == "final":
                 final = payload
                 conversation._billing["usage"] = payload["usage"]

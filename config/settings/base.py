@@ -177,14 +177,11 @@ CHAT_MAX_TOKENS = 500  # per reply, thinking included (always on for this model,
 CHAT_TIMEOUT_SECONDS = 45  # wall-clock limit for one streamed reply; the SDK's own timeout is per read
 CHAT_GBP_PER_USD = "0.79"  # fixed rate used to turn token cost (USD) into pence for the cap. Update by hand if the rate moves a lot
 CHAT_RETENTION_DAYS = 90  # the privacy notice says 90
-# Abuse limits (docs/features/ai-chat.md, Security). All server side; the numbers live here, in one place.
-CHAT_MAX_MESSAGE_CHARS = 500  # the panel's limit (docs/design/ASK-US-CHAT.md)
+# Abuse limits (docs/features/ai-chat.md, Security). All server side. The editable ones (messages per conversation, characters, rates,
+# daily cap share, on/off) live in System > Assistant > Limits (chat.AssistantSettings); the rest are here.
 CHAT_MAX_LINES = 6  # a message with more lines than this is treated as pasted text or code
-CHAT_MAX_MESSAGES = 12  # visitor messages in one conversation
 CHAT_HISTORY_MESSAGES = 8  # the last this-many messages are sent to the model, no more
-CHAT_RATES = {"browser": ((10, 600), (40, 86400)), "ip": ((10, 600), (40, 86400))}  # (messages, seconds) windows: 10 per 10 minutes and 40 a day
 CHAT_MAX_CONVERSATIONS_PER_HOUR = 200  # new conversations, whole site
-CHAT_DAILY_CAP_DIVISOR = 20  # the day's spending stops the chat at the monthly cap divided by this (soft daily cap)
 CHAT_OFF_TOPIC_LIMIT = 2  # off-topic or refused turns after which the conversation is closed
 CHAT_COOKIE = "spa99_chat"  # set by GET /chat/state/: proves the request comes from the page
 CHAT_COOKIE_SECONDS = 24 * 60 * 60

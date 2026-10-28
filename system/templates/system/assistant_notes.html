@@ -1,0 +1,31 @@
+{% extends "system/assistant_base.html" %}
+{% load system_ui %}
+{% block title %}Knowledge notes{% endblock %}
+{% block main %}
+{% include "system/_page_header.html" with title="Assistant" description="Short facts by topic that the assistant may use. No prices: they come from the plans, after an email." %}
+{% include "system/_assistant_tabs.html" with tab="notes" %}
+<section class="sys-panel" aria-labelledby="n-h"><header><h2 id="n-h">Notes</h2></header>
+  <div class="sys-scroll"><table class="sys-table">
+    <thead><tr><th scope="col">Topic</th><th scope="col">Title</th><th scope="col">Text</th><th scope="col" class="sys-num">Order</th><th scope="col">Active</th><th scope="col"><span class="sr">Save</span></th></tr></thead>
+    <tbody>
+    {% for row in rows %}{% with pk=row.obj.pk f=row.form %}
+      <tr data-system-note="{{ pk }}" data-row-label="{{ row.obj.title|truncatechars:40 }}"{% if not row.obj.active %} data-hidden{% endif %}>
+        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_note_save' pk %}" data-problems data-system-form="note" data-noun="note" data-plural="notes">{% csrf_token %}</form>{% token f.row_token pk %}{% cell f.topic pk "Topic" %}</td>
+        <td>{% cell f.title pk "Title" %}</td>
+        <td>{% cell f.text pk "Text" %}</td>
+        <td class="sys-num">{% cell f.order pk "Order" %}</td>
+        <td>{% cell f.active pk "Active" %}</td>
+        <td><button type="submit" form="f-{{ pk }}" class="sys-btn sm sys-rowsave">Save</button></td>
+      </tr>
+      {% if f.errors %}<tr class="sys-rowerr" data-problem-form="f-{{ pk }}"><td colspan="6" class="sys-error" role="alert">{{ f|error_spans }}</td></tr>{% endif %}
+    {% endwith %}{% empty %}<tr><td class="sys-empty" colspan="6">No notes yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+<details class="sys-panel" data-system-add="note"{% if add_form.errors %} open{% endif %}><summary class="sys-add">Add a note</summary>
+  <form method="post" action="{% url 'system_note_add' %}" data-problems data-system-form="note-add" data-system-add class="sys-group">{% csrf_token %}
+    {% include "system/_fields.html" with form=add_form %}
+    <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add note</button></div>
+  </form>
+</details>
+{% endblock %}

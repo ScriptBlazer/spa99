@@ -7,7 +7,7 @@ import hashlib
 import logging
 
 from django.core.cache import cache
-from django.urls import reverse
+from django.urls import get_urlconf, reverse, set_urlconf
 from django.utils import timezone
 
 from pages import services as page_services
@@ -15,7 +15,7 @@ from plans import sales
 from plans import services as plan_services
 from plans.models import Closure, Plan, SiteSettings
 
-from .models import FaqItem
+from .models import FaqItem, KnowledgeNote
 
 logger = logging.getLogger("spa99.chat")
 CACHE_SECONDS = 60
@@ -54,7 +54,7 @@ def _hours():
 def _plan(plan, site, ranges, prices):
     card = plan_services.plan_display(plan, site.vat_rate, ranges)
     lines = [f"- {plan.name} ({page_services.character(plan)}): {card['short_description'].replace('*', '')}".rstrip(": ")]
-    lines.append("  " + "; ".join(card["facts"] + card["pills"][:1]) + ".")
+    lines.append("  " + "; ".join(dict.fromkeys(card["facts"] + card["pills"])) + ".")
     perks = [p.get("phrase") or f"{p.get('label', '')}: {p.get('value', '')}" for p in page_services.public_perks(plan)]
     if plan.kind == Plan.FREE_BY_APPLICATION:
         perks = [p.get("phrase") or p.get("label", "") for p in page_services.public_perks(plan)]  # Gold: what it holds, never decisions
@@ -72,7 +72,7 @@ def _plan(plan, site, ranges, prices):
 
 def _plans(site, prices):
     ranges = plan_services.hours_ranges()
-    out = ["MEMBERSHIPS AND SINGLE VISIT", "Off-peak is the daytime period; peak is the evening. Booking is not available in the chat."]
+    out = ["MEMBERSHIPS AND SINGLE VISIT", "Off-peak is the daytime period; peak is the evening. Booking itself is not available in the chat."]
     if not prices:
         out.append("PRICES ARE NOT AVAILABLE TO THIS VISITOR YET. Do not state or hint at any price, fee or discount.")
     for plan in plan_services.visible_plans():
@@ -82,6 +82,38 @@ def _plans(site, prices):
         if offer:
             out.append(f"Sale on now: {offer['text']}")
     return out
+
+
+def _span(minutes):
+    hours, rest = divmod(minutes, 60)
+    return f"{hours} hour{'s' if hours != 1 else ''}" if not rest else f"{minutes} minutes"
+
+
+def _booking(site):
+    """The agreed booking rules (docs/SPA99_RULES.md sections 03 and 05), with the numbers read live. Booking is not open yet."""
+    ranges = plan_services.hours_ranges()
+    off_peak = [p.name for p in plan_services.visible_plans() if p.is_daytime_only]
+    out = ["BOOKING RULES (agreed; booking is not open yet, so full booking details come when booking opens)",
+           f"- A visit is a {_span(site.slot_length_minutes)} slot. Slots start every {site.slot_step_minutes} minutes inside opening hours.",
+           f"- Book at least {site.booking_notice_minutes} minutes before the start. First entry is from 10 minutes before the start. Arrive any time during the slot, and stay as long as you like.",
+           "- One booking per person per spa day (a spa day runs 5am to 3am the next morning), counting guest visits.",
+           "- A slot must start and end inside opening hours: it cannot run into the cleaning hours or the Shabbos and Yom Tov closing. Bookings are allowed up to 1 hour before closing for Shabbos and Yom Tov.",
+           "- How far ahead you can book, how many bookings you can hold at once, the cancellation time and guests depend on the membership (see each one above). Cancelling in time frees the place straight away.",
+           "- A guest joins the member's booking, in the same slot, with their own account. Guest visits do not roll over."]
+    if off_peak and ranges["daytime"]:
+        out.append(f"- Off-peak memberships ({', '.join(off_peak)}) must finish within off-peak hours, {ranges['daytime']}.")
+    return out
+
+
+def _notes(prices):
+    order = [key for key, _ in KnowledgeNote.TOPICS]
+    notes = sorted(KnowledgeNote.objects.filter(active=True), key=lambda n: (order.index(n.topic) if n.topic in order else len(order), n.order, n.title))
+    if not prices:
+        notes = [n for n in notes if "£" not in n.title and "£" not in n.text]
+    if not notes:
+        return []
+    labels = dict(KnowledgeNote.TOPICS)
+    return ["KNOWLEDGE NOTES (written by the team, by topic)"] + [f"- {labels.get(n.topic, 'Other')}: {n.title}. {n.text}" for n in notes]
 
 
 def _rooms():
@@ -128,8 +160,18 @@ def _pages(prices):
 
 
 def _build(prices):
+    """Always with the public site's URLs: the System test console builds this on the System host, whose URLs have no tour or journey pages."""
+    previous = get_urlconf()
+    set_urlconf("config.urls")
+    try:
+        return _build_text(prices)
+    finally:
+        set_urlconf(previous)
+
+
+def _build_text(prices):
     site = SiteSettings.load()
-    blocks = [_about(site), _hours(), _plans(site, prices), _rooms(), _gold(), _faq(prices), _pages(prices)]
+    blocks = [_about(site), _hours(), _plans(site, prices), _booking(site), _rooms(), _gold(), _notes(prices), _faq(prices), _pages(prices)]
     return "\n\n".join("\n".join(block) for block in blocks if block)
 
 

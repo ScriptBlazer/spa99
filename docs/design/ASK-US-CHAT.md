@@ -134,3 +134,15 @@ From BRAND, no new colours: `--color-espresso`, `--color-espresso-raised`, `--co
 
 ## 7. Check before done
 375x667 and 1440x800: pill never over a CTA, Continue bar, footer link or field; hidden on the first half screen of every scene; panel open, streaming, email block, hand-off, cap state and error each screenshotted; Esc, Tab loop and focus return work; VoiceOver reads one finished reply once; reduced motion shows no movement; espresso contrast holds for every string (muted 6.50, gold 6.17, danger-inverse 6.81).
+
+---
+
+## Revision 2026-10-28 (Moishe: "too big", cream panel)
+
+This revision wins over sections 2 to 5 where they differ. Everything not mentioned stays.
+
+- **Compact card on desktop (64em+):** `--chat-w` 23.75rem (380px), height 70vh (max 40rem), docked bottom right above the pill area (`bottom: space-4 + chip-h + space-2`), radius `--radius-md`, `--shadow-raised`. Phone keeps the full-height sheet.
+- **Cream panel** (`class="chat on-light"`): cream background, espresso text, `--s-*` light tokens. Buttons are espresso with cream text (`.btn-primary` on-light), secondary is an espresso outline. Links are espresso, underlined (gold fails AA on cream). The header swan is espresso; gold stays only on the pill's swan (espresso pill, unchanged, reads as a small dark object on cream and a raised tab on espresso). Visitor bubbles: `--color-cream-raised` with a hairline. Hand-off and email blocks: 1px `--s-line` border, transparent fill (so field underlines keep their contrast).
+- **Smaller type and spacing:** body 15px (`--chat-text`), welcome heading 24px (`--chat-heading`), chips 14px (`--text-sm`), header 16px (`--text-base`), hints and privacy 13px (`--chat-small`). Spacing `--space-3` (16px) for padding and gaps, header height `--chip-h`. The compose input stays 16px (a smaller input makes iOS zoom the page); the Send button and chips stay 44px targets. New derived tokens: `--chat-text`, `--chat-small`, `--chat-heading` (BRAND section 8).
+- **Header** shows the assistant name (System > Assistant, fallback "Spa 99 Assistant") beside the swan. "New chat" and "Close" are smaller, muted, 44px targets.
+- **Welcome words** (heading, line) come from System > Assistant (`chat_assistant`, also in `/chat/state/`), with the fallbacks "Ask us anything." and "The spa, memberships, hours or the Gold Card.". The pill still says "Ask us".

@@ -149,3 +149,7 @@ Moved into System > Emails as the **Suppressions** tab (Moishe, 2026-10-27): `/e
 ### Emails section: audit events (2026-10-25)
 
 New `SystemEvent` kinds (category change, section emails): `mailing_scheduled`, `mailing_sent` (written when a group send starts: recipients, group, params), `mailing_cancelled`, `invites_sent` (invites, skipped) and `email_test` (a test email to the signed-in developer). Edits to an automatic email's subject or wording, and Reset to default, go through the normal change log with undo (`notifications.NotificationTemplate`, section Emails). Migration `system.0009` is choices only. Pages and endpoints: `docs/features/system-emails.md`.
+
+### Assistant section (2026-10-28)
+
+System > **Assistant** (`/assistant/`, Developer level behind the unlock) holds everything about the public Ask us chat in one place, as tabs: **Overview and test**, **Knowledge notes**, **FAQ** (moved here from `/faq/`, which redirects), **Personality and rules**, **Limits**. Every save goes through the change log (section "Assistant", undoable): `chat.FaqItem`, `chat.KnowledgeNote`, `chat.AssistantSettings`, and the monthly cap field on `SiteDefaults`. Views `system/views_assistant.py`, `views_faq.py`; forms `forms_faq.py`. See `docs/features/ai-chat.md` for what each tab does.

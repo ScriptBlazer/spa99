@@ -58,12 +58,13 @@ def usage_of(message):
             "cache_read": getattr(usage, "cache_read_input_tokens", 0) or 0, "cache_write": getattr(usage, "cache_creation_input_tokens", 0) or 0}
 
 
-def stream_reply(rules, knowledge, history):
+def stream_reply(rules, knowledge, history, personality=""):
     """Generator. Yields ("delta", text) for each piece of text, then once ("final", {...}) with text, stop_reason, tools
     [(name, input)] and usage. Raises anthropic errors (and TimeoutError past CHAT_TIMEOUT_SECONDS) for the caller to turn into a hand-off."""
     client = get_client()
     deadline = time.monotonic() + settings.CHAT_TIMEOUT_SECONDS
-    system = [{"type": "text", "text": rules}, {"type": "text", "text": knowledge, "cache_control": {"type": "ephemeral"}}]
+    system = [{"type": "text", "text": rules}] + ([{"type": "text", "text": personality}] if personality else []) \
+        + [{"type": "text", "text": knowledge, "cache_control": {"type": "ephemeral"}}]
     with client.messages.stream(model=settings.CHAT_MODEL, max_tokens=settings.CHAT_MAX_TOKENS, system=system, messages=history,
                                 tools=TOOLS, output_config={"effort": "low"}) as stream:
         parts = []

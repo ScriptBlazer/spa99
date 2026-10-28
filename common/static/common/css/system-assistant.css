@@ -1,0 +1,15 @@
+/* System > Assistant: tabs and the test console. Reuses the System tokens. */
+.system .sa-tabs { display: flex; gap: var(--sys-1); margin-bottom: var(--sys-4); overflow-x: auto; scrollbar-width: none; }
+.system .sa-tabs a { display: inline-flex; align-items: center; height: 28px; padding: 0 var(--sys-3); border-radius: var(--sys-radius); color: var(--sys-text-2); font-weight: 500; text-decoration: none; white-space: nowrap; }
+.system .sa-tabs a:hover { background: var(--sys-subtle); text-decoration: none; }
+.system .sa-tabs a[aria-current] { background: var(--sys-selected); color: var(--sys-text); font-weight: 600; }
+.system .sa-figures { display: flex; flex-wrap: wrap; gap: var(--sys-4); margin-bottom: var(--sys-4); }
+.system .sa-figures p { margin: 0; }
+.system .sa-figures strong { display: block; font-size: var(--sys-fs-md); }
+.system .sa-log { display: flex; flex-direction: column; gap: var(--sys-3); margin-bottom: var(--sys-3); min-height: 3rem; }
+.system .sa-log p { margin: 0; white-space: pre-wrap; }
+.system .sa-who { font-size: var(--sys-fs-sm); color: var(--sys-text-3); }
+.system .sa-form { display: flex; flex-wrap: wrap; gap: var(--sys-2); align-items: center; }
+.system .sa-form textarea { flex: 1 1 24rem; }
+.system .sa-pre { max-height: 24rem; overflow: auto; white-space: pre-wrap; font: 400 var(--sys-fs-sm) var(--sys-mono); }
+@media (max-width: 760px) { .system .sa-tabs a { height: 36px; flex: none; } }

@@ -16,7 +16,7 @@ from .views import form_status, page, saved
 def _page(request, bound=None, status=200):
     bound = bound or {}
     rows = [{"obj": o, "form": bound.get(str(o.pk)) or FaqForm(instance=o, prefix=str(o.pk))} for o in FaqItem.objects.all()]
-    return page(request, "system/faq.html", "faq", {"rows": rows, "add_form": bound.get("new") or FaqForm(prefix="new")}, status)
+    return page(request, "system/faq.html", "assistant", {"rows": rows, "add_form": bound.get("new") or FaqForm(prefix="new")}, status)
 
 
 @unlocked

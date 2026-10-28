@@ -1,8 +1,9 @@
-{% extends "system/base.html" %}
+{% extends "system/assistant_base.html" %}
 {% load system_ui %}
 {% block title %}FAQ{% endblock %}
 {% block main %}
-{% include "system/_page_header.html" with title="FAQ" description="Questions and answers the Ask us assistant may use. It answers from these and the site's own data, and never goes beyond them. Tick Suggested to show a question as a tap-to-ask chip (the first four, in order)." %}
+{% include "system/_page_header.html" with title="Assistant" description="Questions and answers the Ask us assistant may use. It answers from these and the site's own data, and never goes beyond them. Tick Suggested to show a question as a tap-to-ask chip (the first four, in order)." %}
+{% include "system/_assistant_tabs.html" with tab="faq" %}
 <section class="sys-panel" aria-labelledby="faq-h"><header><h2 id="faq-h">Entries</h2></header>
   <div class="sys-scroll"><table class="sys-table">
     <thead><tr><th scope="col">Question</th><th scope="col">Answer</th><th scope="col" class="sys-num">Order</th><th scope="col">Suggested</th><th scope="col">Shown</th><th scope="col"><span class="sr">Save</span></th></tr></thead>

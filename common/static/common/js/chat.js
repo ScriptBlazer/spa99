@@ -51,6 +51,10 @@ function start() {
   const live = $('[data-chat-live]');
   const newButton = $('[data-chat-new]');
   const title = $('#ask-us-title');
+  const nameNode = $('[data-chat-name]');
+  // the welcome words come from System > Assistant (rendered into the page); New chat puts them back
+  COPY.welcomeTitle = welcomeTitle.textContent.trim() || COPY.welcomeTitle;
+  COPY.welcomeLine = welcomeLine.textContent.trim() || COPY.welcomeLine;
   const urls = { state: root.dataset.stateUrl, message: root.dataset.messageUrl, email: root.dataset.emailUrl };
   const phone = matchMedia('(max-width: 63.99em)');
   const coarse = matchMedia('(pointer: coarse)');
@@ -266,6 +270,13 @@ function start() {
         const data = await response.json();
         st.loaded = true;
         if (data.max_message_chars) { st.maxChars = data.max_message_chars; input.setAttribute('maxlength', String(st.maxChars)); }
+        const assistant = data.assistant || data.chat_assistant;
+        if (assistant) {
+          if (assistant.name) nameNode.textContent = assistant.name;
+          if (assistant.welcome_heading) COPY.welcomeTitle = assistant.welcome_heading;
+          if (assistant.welcome_line) COPY.welcomeLine = assistant.welcome_line;
+          if (!st.started && !st.unavailable) { welcomeTitle.textContent = COPY.welcomeTitle; welcomeLine.textContent = COPY.welcomeLine; }
+        }
         if (data.handoff) st.handoff = { ...st.handoff, ...data.handoff };
         if (data.privacy_url && privacy.querySelector('a')) privacy.querySelector('a').href = `${data.privacy_url.replace(/#.*$/, '')}#chat`;
         if (data.enabled === false || data.capped) setUnavailable(data.handoff);
@@ -550,7 +561,7 @@ function start() {
   function open() {
     if (root.open) return;
     document.querySelectorAll('dialog.menu[open]').forEach((menu) => menu.close());
-    root.showModal();
+    if (phone.matches) root.showModal(); else root.show(); // desktop: a floating card, the page stays scrollable (Moishe, 2026-10-28)
     fitViewport();
     pill.setAttribute('aria-expanded', 'true');
     if (coarse.matches || st.unavailable || form.hidden) title.focus({ preventScroll: true }); else input.focus({ preventScroll: true });
@@ -559,6 +570,7 @@ function start() {
   }
   const close = () => { if (root.open) root.close(); };
   pill.addEventListener('click', open);
+  root.addEventListener('keydown', (event) => { if (event.key === 'Escape' && root.open && !phone.matches) { event.preventDefault(); close(); } }); // Esc for the non-modal card
   root.querySelector('[data-chat-close]').addEventListener('click', close);
   root.addEventListener('click', (event) => { if (event.target === root) close(); }); // the backdrop
   root.addEventListener('click', (event) => { if (event.target.closest('a[data-chat-link]')) close(); }); // same-site links: leave the panel, follow the link

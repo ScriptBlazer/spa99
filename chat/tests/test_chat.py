@@ -12,7 +12,7 @@ from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from chat import knowledge, llm, services
-from chat.models import Conversation, FaqItem, Message
+from chat.models import AssistantSettings, Conversation, FaqItem, KnowledgeNote, Message
 from journey.models import JourneySession
 from office.tests.test_office import OFFICE, OfficeTestCase, get, staff
 from plans.management.commands.seed_phase1 import seed_all
@@ -177,11 +177,14 @@ class GuardTests(ChatTestCase):
         self.assertFalse(self.client.get("/journey/").context["chat_button"])
         self.assertEqual(self.client.get("/chat/state/").json()["suggested"][0], "When do you open?")
 
-    @override_settings(CACHES=LOCMEM, CHAT_RATES={"browser": ((2, 600),), "ip": ((50, 600),)})
+    @override_settings(CACHES=LOCMEM)
     def test_rate_limit_per_browser(self):
         from django.core.cache import cache
 
         cache.clear()
+        row = AssistantSettings.load()
+        row.rate_per_10_minutes = 2
+        row.save()
         self.fake(*[(["ok"], final())] * 2)
         for _ in range(2):
             self.assertEqual(ask(self.client).status_code, 200)
@@ -324,11 +327,14 @@ class SecurityTests(ChatTestCase):
         self.assertEqual(fake.calls, [])
         self.assertFalse(JourneySession.objects.exclude(lead_email="").exists())
 
-    @override_settings(CACHES=LOCMEM, CHAT_RATES={"browser": ((50, 600),), "ip": ((50, 600), (2, 86400))})
+    @override_settings(CACHES=LOCMEM)
     def test_daily_limit_per_ip_and_abuse_is_logged_without_the_ip(self):
         from django.core.cache import cache
 
         cache.clear()
+        row = AssistantSettings.load()
+        row.rate_per_day = 2
+        row.save()
         self.fake(*[(["ok"], final())] * 2)
         for _ in range(2):
             self.assertEqual(ask(self.client).status_code, 200)
@@ -458,25 +464,133 @@ class SystemFaqTests(ChatTestCase):
     def test_faq_edit_is_audited_and_hidden_entries_leave_the_knowledge(self):
         user = make_user()
         client = unlocked_client(user)
-        self.assertEqual(Client(HTTP_HOST="system.localhost").get("/faq/").status_code, 404)
-        page = client.get("/faq/")
+        self.assertEqual(Client(HTTP_HOST="system.localhost").get("/assistant/faq/").status_code, 404)
+        page = client.get("/assistant/faq/")
         self.assertEqual(page.status_code, 200)
         item = FaqItem.objects.get(question="Where are you?")
         form = [r["form"] for r in page.context["rows"] if r["obj"].pk == item.pk][0]
         data = form_data(form, str(item.pk), answer="Vale Road, N4.")
-        self.assertEqual(client.post(f"/faq/{item.pk}/", data).status_code, 302)
+        self.assertEqual(client.post(f"/assistant/faq/{item.pk}/", data).status_code, 302)
         change = SystemChange.objects.get(model_label="chat.faqitem", field="answer")
-        self.assertEqual((change.section, change.user, change.new_value), ("faq", user, "Vale Road, N4."))
+        self.assertEqual((change.section, change.user, change.new_value), ("assistant", user, "Vale Road, N4."))
         self.assertIn("Vale Road, N4.", knowledge.build(False)[0])
-        page = client.get("/faq/")  # a fresh version token
+        page = client.get("/assistant/faq/")  # a fresh version token
         form = [r["form"] for r in page.context["rows"] if r["obj"].pk == item.pk][0]
         data = form_data(form, str(item.pk))
         data.pop(f"{item.pk}-visible")  # an unticked box is simply not posted
-        self.assertEqual(client.post(f"/faq/{item.pk}/", data).status_code, 302)
+        self.assertEqual(client.post(f"/assistant/faq/{item.pk}/", data).status_code, 302)
         self.assertNotIn("Vale Road, N4.", knowledge.build(False)[0])
-        added = client.post("/faq/add/", {"new-question": "Parking?", "new-answer": "Ask us.", "new-order": "20"})
+        added = client.post("/assistant/faq/add/", {"new-question": "Parking?", "new-answer": "Ask us.", "new-order": "20"})
         self.assertEqual(added.status_code, 302)
         self.assertTrue(SystemChange.objects.filter(model_label="chat.faqitem", kind="created").exists())
+
+
+class AssistantTests(ChatTestCase):
+    """System > Assistant: notes, personality, limits, switch and the test console."""
+
+    def setUp(self):
+        super().setUp()
+        self.user = make_user()
+        self.system = unlocked_client(self.user)
+
+    def test_notes_and_booking_rules_temperatures_and_lockers_are_in_the_knowledge(self):
+        text, _ = knowledge.build(prices=False)
+        self.assertIn("Lockers are included in every membership and are assigned when you book.", text)
+        self.assertIn("110–120°C", text)
+        self.assertIn("9–11°C", text)
+        self.assertIn("BOOKING RULES", text)
+        self.assertIn("full booking details come when booking opens", text)
+        self.assertIn("2 hours slot", text)
+        self.assertIn("Cancel up to 10 hours before", text)
+        self.assertIn("3 bookings at a time", text)
+        self.assertNotIn("£", text)
+        note = KnowledgeNote.objects.get(title="Lockers")
+        KnowledgeNote.objects.filter(pk=note.pk).update(active=False)
+        self.assertNotIn("assigned when you book", knowledge.build(False)[0])
+        self.assertEqual(knowledge.build(False)[1], knowledge.build(False)[1])  # stable ordering: same bytes
+
+    def test_notes_are_edited_in_system_and_a_price_is_refused(self):
+        page = self.system.get("/assistant/notes/")
+        self.assertEqual(page.status_code, 200)
+        added = self.system.post("/assistant/notes/add/", {"new-topic": "visiting", "new-title": "Parking", "new-text": "Street parking nearby.", "new-order": "9", "new-active": "on"})
+        self.assertEqual(added.status_code, 302)
+        self.assertTrue(SystemChange.objects.filter(model_label="chat.knowledgenote", kind="created").exists())
+        priced = self.system.post("/assistant/notes/add/", {"new-topic": "other", "new-title": "Cost", "new-text": "Only £10.", "new-order": "9", "new-active": "on"})
+        self.assertEqual(priced.status_code, 400)
+        self.assertFalse(KnowledgeNote.objects.filter(title="Cost").exists())
+
+    def test_personality_feeds_the_prompt_but_never_replaces_the_rules(self):
+        fake = self.fake((["ok"], final()))
+        page = self.system.get("/assistant/personality/")
+        form = page.context["forms"][0]["form"]
+        data = {"name": "Spa 99 Assistant", "welcome_heading": "Ask us anything.", "welcome_line": "Hello.", "tone_notes": "Warm and dry.",
+                "always": "Mention the loungers when asked about rest.", "never": "Never mention other spas.", "row_token": form.initial["row_token"]}
+        self.assertEqual(self.system.post("/assistant/personality/save/", data).status_code, 302)
+        events(ask(self.client, "Hello"))
+        system = fake.system_text()
+        self.assertIn("Warm and dry.", system)
+        self.assertIn("Mention the loungers", system)
+        self.assertIn("Never mention other spas.", system)
+        self.assertIn("the rule above wins", system)
+        self.assertIn("Answer only from the KNOWLEDGE block", system)  # the hard rules stay
+        card = self.client.get("/chat/state/").json()["assistant"]
+        self.assertEqual((card["name"], card["welcome_line"]), ("Spa 99 Assistant", "Hello."))
+        self.assertEqual(self.client.get("/").context["chat_assistant"]["welcome_line"], "Hello.")
+
+    def test_switch_off_hides_the_button_and_refuses_everything(self):
+        fake = self.fake((["ok"], final()))
+        self.assertEqual(self.system.post("/assistant/switch/").status_code, 302)
+        self.assertFalse(AssistantSettings.load().enabled)
+        self.assertEqual(ask(self.client).status_code, 404)
+        self.assertEqual(self.client.get("/chat/state/").status_code, 404)
+        self.assertEqual(self.client.post("/chat/email/", "{}", content_type="application/json").status_code, 404)
+        response = self.client.get("/")
+        self.assertFalse(response.context["chat_enabled"] or response.context["chat_button"])
+        self.assertEqual(fake.calls, [])
+        self.system.post("/assistant/switch/")
+        self.assertTrue(self.client.get("/").context["chat_button"])
+
+    def test_limits_are_editable_within_bounds_and_the_cap_keeps_its_home(self):
+        page = self.system.get("/assistant/limits/")
+        forms_ = page.context["forms"]
+        token = forms_[0]["form"].initial["row_token"]
+        good = {"enabled": "on", "daily_cap_percent": "10", "rate_per_10_minutes": "5", "rate_per_day": "20", "max_messages": "8", "max_chars": "300", "row_token": token}
+        self.assertEqual(self.system.post("/assistant/limits/save/", good).status_code, 302)
+        row = AssistantSettings.load()
+        self.assertEqual((row.rate_per_10_minutes, row.max_messages, row.max_chars), (5, 8, 300))
+        self.assertEqual(self.client.get("/chat/state/").json()["max_message_chars"], 300)
+        bad = self.system.post("/assistant/limits/save/", {**good, "rate_per_day": "9999", "max_messages": "1", "row_token": AssistantSettings.load() and ""})
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(AssistantSettings.load().rate_per_day, 20)
+        page = self.system.get("/assistant/limits/")
+        cap_token = page.context["forms"][1]["form"].initial["row_token"]
+        self.assertEqual(self.system.post("/assistant/limits/cap/", {"chat_monthly_cap_gbp": "40", "row_token": cap_token}).status_code, 302)
+        self.assertEqual(SiteDefaults.load().chat_monthly_cap_gbp, 40)
+        self.assertTrue(SystemChange.objects.filter(field="chat_monthly_cap_gbp", section="assistant").exists())
+        self.assertEqual(self.system.post("/assistant/limits/cap/", {"chat_monthly_cap_gbp": "0"}).status_code, 400)
+
+    def test_test_console_is_for_developers_not_rate_limited_counted_in_spend_and_hidden_from_the_office(self):
+        fake = self.fake(*[(["Tier 2 is £399."], final())] * 3)
+        anonymous = Client(HTTP_HOST="system.localhost")
+        self.assertEqual(anonymous.post("/assistant/test/", {"message": "hi"}).status_code, 404)
+        self.assertEqual(Client(HTTP_HOST="system.localhost").get("/assistant/").status_code, 404)
+        self.assertEqual(self.system.get("/assistant/").status_code, 200)
+        with override_settings(CACHES=LOCMEM):
+            row = AssistantSettings.load()
+            row.rate_per_10_minutes = 1
+            row.save()
+            replies = [self.system.post("/assistant/test/", {"message": "How much is Tier 2?", "prices": "yes"}) for _ in range(3)]
+        self.assertEqual([r.status_code for r in replies], [200, 200, 200])  # visitor rate limits do not apply
+        body = replies[0].json()
+        self.assertIn("£399", fake.system_text(0))  # with prices
+        self.assertIn("Tier 2", body["system"])
+        self.assertIn("£399", body["text"])
+        without = self.system.post("/assistant/test/", {"message": "price?", "prices": "no", "conversation_id": body["conversation_id"]})
+        self.assertEqual(without.status_code, 200)
+        self.assertFalse(Conversation.objects.filter(staff_test=False).exists())
+        self.assertGreater(services.spent_this_month_pence(), 0)  # counted in spend
+        overview = self.system.get("/assistant/")
+        self.assertEqual(overview.context["today"], 0)  # not a visitor conversation
 
 
 class OfficeChatsTests(OfficeTestCase):
@@ -491,3 +605,5 @@ class OfficeChatsTests(OfficeTestCase):
         self.assertEqual(get(None, "/chats/").status_code, 302)
         self.assertEqual(get(staff(None, "nolevel@example.com"), "/chats/").status_code, 404)
         self.assertEqual(Client(HTTP_HOST=OFFICE).post("/chats/").status_code, 302)
+        Conversation.objects.create(staff_test=True, message_count=1)
+        self.assertEqual(len(get(viewer, "/chats/").context["rows"]), 1)  # staff tests are left out

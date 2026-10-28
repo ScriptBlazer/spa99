@@ -19,6 +19,7 @@ from journey import services as journey_services
 from journey import views as journey_views
 from pages.access import memberships_visible
 
+from . import config as assistant_config
 from . import llm, services
 from .models import Conversation, Message
 
@@ -70,9 +71,11 @@ def _gate(request):
 
 def config(request):
     """What the panel needs, as plain data (also used by the state endpoint)."""
-    return {"enabled": llm.enabled(), "max_message_chars": settings.CHAT_MAX_MESSAGE_CHARS, "honeypot_field": HONEYPOT_FIELD, "max_messages": settings.CHAT_MAX_MESSAGES,
+    cfg = assistant_config.get(request)
+    return {"enabled": assistant_config.is_on(request), "max_message_chars": cfg.max_chars, "honeypot_field": HONEYPOT_FIELD, "max_messages": cfg.max_messages,
+            "assistant": services.assistant_card(request),
             "suggested": services.suggested_questions(), "handoff": services.handoff_links(), "prices_visible": memberships_visible(request),
-            "capped": services.cap_reached(request) if llm.enabled() else False, "privacy_url": "/privacy/"}
+            "capped": services.cap_reached(request) if assistant_config.is_on(request) else False, "privacy_url": "/privacy/"}
 
 
 @login_not_required  # PUBLIC: visitors have no account. Sets the CSRF cookie the POST endpoints need.
@@ -81,7 +84,7 @@ def config(request):
 @never_cache
 @rate_limited_json("chat-state", 120, 60)
 def state(request):
-    if not llm.enabled():
+    if not assistant_config.is_on(request):
         raise Http404
     response = JsonResponse(config(request))
     if _page_cookie(request) is None:
@@ -95,7 +98,7 @@ def state(request):
 @require_POST
 def message(request):
     """{"conversation_id"?, "message"} or {"conversation_id", "retry": true} (answer the pending question again after the email)."""
-    if not llm.enabled():
+    if not assistant_config.is_on(request):
         raise Http404
     refused = _gate(request)
     if refused:
@@ -117,7 +120,7 @@ def message(request):
         if not services.prices_allowed(request, conversation):  # no email yet: answering again would only loop on the model
             services.abuse("retry_without_email", request)
             return JsonResponse({"error": "Leave your email to see prices.", "code": "needs_email"}, status=403)
-        if conversation.message_count >= settings.CHAT_MAX_MESSAGES:  # a retry is a message too
+        if conversation.message_count >= assistant_config.get(request).max_messages:  # a retry is a message too
             return _refuse("conversation_full", "This conversation is full.", 409)
         conversation.message_count += 1
         conversation.save(update_fields=["message_count", "updated_at"])
@@ -126,9 +129,9 @@ def message(request):
         text = text.strip() if isinstance(text, str) else ""
         if not text:
             return JsonResponse({"error": "Write a question first.", "code": "empty"}, status=400)
-        if len(text) > settings.CHAT_MAX_MESSAGE_CHARS:
-            return JsonResponse({"error": "That is the limit for one message.", "code": "too_long", "max_length": settings.CHAT_MAX_MESSAGE_CHARS}, status=400)
-        if conversation is not None and conversation.message_count >= settings.CHAT_MAX_MESSAGES:
+        if len(text) > assistant_config.get(request).max_chars:
+            return JsonResponse({"error": "That is the limit for one message.", "code": "too_long", "max_length": assistant_config.get(request).max_chars}, status=400)
+        if conversation is not None and conversation.message_count >= assistant_config.get(request).max_messages:
             return _refuse("conversation_full", "This conversation is full.", 409)
         if conversation is None:
             if services.too_busy():
@@ -152,7 +155,7 @@ def message(request):
 def email(request):
     """{"conversation_id"?, "email", "consent": true}. 200 {"saved", "conversation_id", "retry"}; 400 {"errors": {"email", "consent"}}.
     `retry` true: send POST /chat/message/ {conversation_id, retry: true} and the pending price question is answered, with prices."""
-    if not llm.enabled():
+    if not assistant_config.is_on(request):
         raise Http404
     refused = _gate(request)
     if refused:
