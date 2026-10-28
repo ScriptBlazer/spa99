@@ -17,7 +17,7 @@ Decided by Moishe 2026-10-28 (PROJECT.md): an own-build, full-AI chat on the pub
 ## Cost and limits
 - Model: `claude-opus-5-5` (project default), effort `low`, streaming, prompt caching on the stable system prompt + knowledge.
 - Monthly cap **£25** (editable on the System Defaults page). Spend is computed from each reply's token usage and stored; at the cap the chat shows only the hand-off buttons until the next month.
-- Per-visitor limits: e.g. 20 messages per 10 minutes per browser/IP, max message length, max conversation length.
+- Per-visitor limits: 10 messages per 10 minutes and 40 a day per browser and per IP, 500 characters a message, 12 messages a conversation (see Security).
 - If the API key is missing or Anthropic is down: the panel shows the hand-off buttons (never an error page).
 
 ## Logs and privacy
@@ -29,7 +29,7 @@ Decided by Moishe 2026-10-28 (PROJECT.md): an own-build, full-AI chat on the pub
 - `ANTHROPIC_API_KEY` in `Secrets/.env` and on the server (never in git or chat). `.env.example` documents it. Chat is off (button hidden) when the key is not set.
 
 ## Status (2026-10-28)
-Backend built on `feature/ai-chat` (app `chat`); the panel (frontend) is next. 958 tests pass; every Claude call in the tests is mocked. Not yet tried against the real API (no key here): do one live check with a real `ANTHROPIC_API_KEY` before launch (a normal question, a price question, an off-topic one, and one reply that hits the output cap).
+Backend and panel (Ask us button, streaming panel) built on `feature/ai-chat`, then reviewed and fixed (below). The full suite passes (see the PR for the count); every Claude call in the tests is mocked. Not yet tried against the real API (no key here): do one live check with a real `ANTHROPIC_API_KEY` before launch (a normal question, a price question, an off-topic one, and one reply that hits the output cap).
 
 ## Built
 - **Models** (`chat/models.py`): `Conversation` (uuid, created, `last_at`, journey `session`, signed-in `user`, `lead_email`, `total_cost_pence`, `message_count`, `ended_by_cap`, `off_topic_count`, `ended_off_topic`), `Message` (role, text, input/output/cache-read/cache-write tokens, `cost_pence` (4 decimals), `stop_reason`, `flagged_handoff`, `offered_email`, `off_topic`), `FaqItem` (question, answer, order, visible, `suggested`; history on, edited in System > FAQ, audited). No history tables on conversations and messages (append-only logs deleted after 90 days). No IP stored.
@@ -71,6 +71,17 @@ A stream that stops without `done` is a cut connection: show "That answer did no
 ### `POST /chat/email/` (JSON, `X-CSRFToken`, same cookies)
 `{"conversation_id"?, "email", "consent": true, "website"?}`. Saves a lead exactly as the journey gate (same consent wording and `LeadError` messages, journey session made if needed, `spa99_journey` cookie set). 200 `{"saved": true, "conversation_id", "retry": bool}`; 400 `{"errors": {"email", "consent"}}`. **Re-asking the pending question is the frontend's job, one call:** when `retry` is true, send `POST /chat/message/ {"conversation_id", "retry": true}` and stream the answer, which now includes prices (the question is not stored twice). Signed-in visitors skip the form (`offer_email` is not sent to them).
 
+## Review fixes (2026-10-28)
+- A reply whose usage never arrives (visitor closes the page mid-stream, timeout, cut stream) is still stored and billed: the request's size at 3 characters a token plus the whole output cap. A connection that never opened costs nothing.
+- `POST /chat/email/` makes a conversation only after the lead is saved; the hourly "busy" limit counts only conversations with at least one visitor message.
+- `retry` needs prices to be allowed (403 `needs_email` otherwise) and counts as a message toward the conversation limit and the rate limits.
+- Declined turns (off-topic, pasted code, injection phrases, refusals) and our own canned lines are left out of the history sent to Claude on later turns.
+- A conversation stores a hash of the page cookie that started it: the id alone cannot continue someone else's chat.
+- FAQ text may not contain a "£" (System rejects it); an older entry that does is left out of the no-price knowledge.
+- The privacy notice heading has the anchor `#chat` (`### Title {#id}` in a legal body). Existing database rows get it only when the line is pasted again in Control.
+- The DB cache holds 100 000 entries (was 10 000), so a flood of keys cannot push rate-limit counters out.
+- Gunicorn now runs `gthread` with `GUNICORN_THREADS` threads (default 8, `GUNICORN_WORKERS` unchanged): a streamed reply holds a thread for a few seconds, not a whole worker.
+
 ## Security (no free tokens for anyone)
 All enforced on the server; none of the refusals below calls Claude. Numbers are in `config/settings/base.py` (`CHAT_*`, one block); only the monthly cap is editable in System.
 - **Output**: `max_tokens` 500 (thinking is always on for this model, so keep an eye on truncations in the first live week); a reply that hits it ends with "..." and the hand-off, never continues.
@@ -80,4 +91,4 @@ All enforced on the server; none of the refusals below calls Claude. Numbers are
 - **Off-topic counter**: after 2 off-topic, refused or code turns the server closes the conversation (hand-off only, no more model calls) and flags it in the Office Chats list.
 - **Bots and other sites**: the hidden `website` field, device-type bots refused, `Origin`/`Sec-Fetch-Site` must be this site, CSRF, and no model call without the signed page cookie from `GET /chat/state/`.
 - **Logging**: each abuse signal (rate limit, honeypot, bot, cross-origin, no cookie, code, injection, cap, busy) is one `spa99.chat.abuse` log line with the IP hashed with the visitor counter's daily salt, which is deleted the next day. Nothing about it is stored in the database.
-- **Gunicorn**: a streamed reply holds one sync worker for the seconds it takes (`max_tokens` 500, `CHAT_TIMEOUT_SECONDS` 45). Fine at this traffic; move to more workers or gthread if the chat gets busy.
+- **Gunicorn**: a streamed reply holds one thread for the seconds it takes (`max_tokens` 500, `CHAT_TIMEOUT_SECONDS` 45, checked at the end of the stream too). The live server runs gthread, 8 threads a worker.

@@ -4,6 +4,7 @@ proposals are in docs/features/legal.md. Written into content rows by `seed_phas
 
 How a legal body is written (one line per block, rendered by `content.legal_render`):
 - a plain line is a paragraph
+- "### Title {#id}" gives a small heading an anchor (lowercase letters, digits and dashes), e.g. /privacy/#chat
 - "- " starts a list item (lines in a row make one list)
 - "### " starts a small heading inside a part
 - [words](/path/) or [words](https://...) is a link
@@ -65,7 +66,7 @@ PRIVACY_PARTS = [
         "- Whether you would like news from us by email, and which version of this notice you accepted.",
         "- Our decision and, if we approve, the date and the invitation we send you.",
         "- If our team writes to you about your application (for example to ask a question), a record of that email.",
-        "### When you use the Ask us chat",
+        "### When you use the Ask us chat {#chat}",
         "- What you type to the assistant and its replies, with the time. If you gave your email to see prices, or you are "
         "signed in, the chat is linked to it. We do not store your IP address with a chat.",
         "### Change history",

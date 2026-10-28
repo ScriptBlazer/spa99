@@ -73,5 +73,7 @@ def stream_reply(rules, knowledge, history):
             if time.monotonic() > deadline:
                 raise TimeoutError("chat reply took too long")
         final = stream.get_final_message()
+    if time.monotonic() > deadline:  # a stream that stalled to the end counts as too slow too (the caller bills an estimate)
+        raise TimeoutError("chat reply took too long")
     tools = [(block.name, dict(block.input or {})) for block in final.content if block.type == "tool_use"]
     yield "final", {"text": "".join(parts), "stop_reason": final.stop_reason, "tools": tools, "usage": usage_of(final)}

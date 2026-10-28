@@ -108,12 +108,21 @@ function start() {
   window.addEventListener('offline', updateOffline);
 
   /* ---------- light markdown, as nodes ---------- */
+  /** Only our own pages, mail to our own address, and the WhatsApp link we gave the panel. Anything else is shown as plain text. */
+  const WHATSAPP_HOSTS = new Set(['wa.me', 'api.whatsapp.com']);
   function safeLink(raw) {
     if (/^\/(?!\/)/.test(raw)) return { href: raw, external: false };
     try {
       const url = new URL(raw);
-      if (url.protocol === 'mailto:') return { href: url.href, external: true };
-      if (url.protocol === 'https:' || url.protocol === 'http:') return { href: url.href, external: url.origin !== location.origin };
+      if (url.protocol === 'mailto:') {
+        const to = decodeURIComponent(url.pathname).toLowerCase();
+        const own = [st.handoff.email, baseHandoff.email].filter(Boolean).map((a) => a.toLowerCase());
+        return to && own.includes(to) ? { href: url.href, external: true } : null;
+      }
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+      if (url.origin === location.origin) return { href: url.href, external: false };
+      const given = [st.handoff.whatsapp_url, baseHandoff.whatsapp_url].filter(Boolean).map((u) => { try { return new URL(u).host; } catch { return ''; } });
+      if (url.protocol === 'https:' && WHATSAPP_HOSTS.has(url.host) && given.some((h) => WHATSAPP_HOSTS.has(h) && h === url.host)) return { href: url.href, external: true };
     } catch { /* not a URL */ }
     return null;
   }
@@ -401,7 +410,7 @@ function start() {
     st.fails += 1;
     if (!turn.reply) bot.node.remove();
     announce(COPY.failed);
-    if (st.fails >= MAX_FAILS) { note(COPY.failed); handoffBlock(turn.handoff); return; }
+    if (st.fails >= MAX_FAILS || st.last?.retry) { note(COPY.failed); handoffBlock(turn.handoff); return; }
     const retry = linkButton(COPY.retry, () => { notice.remove(); bot.node.remove(); run({ ...st.last }); });
     const notice = note(COPY.failed, ' ', retry);
   }

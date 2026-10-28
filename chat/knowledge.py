@@ -106,8 +106,10 @@ def _gold():
     return out
 
 
-def _faq():
+def _faq(prices):
     items = list(FaqItem.objects.filter(visible=True))
+    if not prices:  # an entry that mentions a price waits for the email like any other price
+        items = [i for i in items if "£" not in i.question and "£" not in i.answer]
     if not items:
         return []
     out = ["FAQ (written by the team; these answers win over anything else)"]
@@ -127,7 +129,7 @@ def _pages(prices):
 
 def _build(prices):
     site = SiteSettings.load()
-    blocks = [_about(site), _hours(), _plans(site, prices), _rooms(), _gold(), _faq(), _pages(prices)]
+    blocks = [_about(site), _hours(), _plans(site, prices), _rooms(), _gold(), _faq(prices), _pages(prices)]
     return "\n\n".join("\n".join(block) for block in blocks if block)
 
 

@@ -40,6 +40,7 @@ class Conversation(BaseModel):
     lead_email = models.EmailField(blank=True, db_index=True, help_text="Given in the chat to see prices (a lead, as at the journey gate).")
     total_cost_pence = models.DecimalField(max_digits=10, decimal_places=4, default=0)
     message_count = models.PositiveIntegerField(default=0, help_text="Messages from the visitor.")
+    browser_hash = models.CharField(max_length=64, blank=True, editable=False, help_text="Hash of the page cookie that started the chat: the id alone cannot continue it.")
     ended_by_cap = models.BooleanField(default=False, help_text="The monthly spending cap stopped a reply in this chat.")
     off_topic_count = models.PositiveSmallIntegerField(default=0, help_text="Turns that were off-topic, refused or looked like code.")
     ended_off_topic = models.BooleanField(default=False, help_text="Closed by the server after too many off-topic turns. Flagged in the Office list.")

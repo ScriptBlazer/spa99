@@ -110,7 +110,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Cache: the database (table spa99_cache; `manage.py createcachetable`, run on start by entrypoint.sh), so the rate limits
 # (sign-in, unlock) are shared by every gunicorn worker. Works on SQLite and Postgres. Tests and the e2e run override it.
-CACHES = {"default": {"BACKEND": "django.core.cache.backends.db.DatabaseCache", "LOCATION": "spa99_cache", "OPTIONS": {"MAX_ENTRIES": 10000}}}
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.db.DatabaseCache", "LOCATION": "spa99_cache", "OPTIONS": {"MAX_ENTRIES": 100000}}}
 
 AUTH_USER_MODEL = "users.User"
 LOGIN_URL = "/login/"

@@ -108,11 +108,19 @@ def message(request):
         return JsonResponse({"error": "Not available."}, status=403)
     if not services.within_rate_limits(request, _page_cookie(request)):
         return _refuse("rate_limited", "Too many messages. Please wait a few minutes.", 429)
-    conversation = services.find_conversation(request, data.get("conversation_id"))
+    token = _page_cookie(request)
+    conversation = services.find_conversation(request, data.get("conversation_id"), token)
     retry = data.get("retry") is True
     if retry:
         if conversation is None or not services.pending_question(conversation):
             return JsonResponse({"error": "Nothing to answer again.", "code": "nothing_pending"}, status=400)
+        if not services.prices_allowed(request, conversation):  # no email yet: answering again would only loop on the model
+            services.abuse("retry_without_email", request)
+            return JsonResponse({"error": "Leave your email to see prices.", "code": "needs_email"}, status=403)
+        if conversation.message_count >= settings.CHAT_MAX_MESSAGES:  # a retry is a message too
+            return _refuse("conversation_full", "This conversation is full.", 409)
+        conversation.message_count += 1
+        conversation.save(update_fields=["message_count", "updated_at"])
     else:
         text = data.get("message")
         text = text.strip() if isinstance(text, str) else ""
@@ -126,7 +134,7 @@ def message(request):
             if services.too_busy():
                 services.abuse("busy", request)
                 return _refuse("busy", "Our assistant is busy just now.", 503)
-            conversation = Conversation.objects.create()
+            conversation = Conversation.objects.create(browser_hash=services.browser_hash(token))
         Message.objects.create(conversation=conversation, role=Message.USER, text=text)
         conversation.message_count += 1
         conversation.save(update_fields=["message_count", "updated_at"])
@@ -155,15 +163,14 @@ def email(request):
     if data.get(HONEYPOT_FIELD):
         services.abuse("honeypot", request)
         return JsonResponse({"saved": True, "retry": False})  # a bot: pretend, store nothing
-    conversation = services.find_conversation(request, data.get("conversation_id"))
+    token = _page_cookie(request)
+    conversation = services.find_conversation(request, data.get("conversation_id"), token)
     if request.user.is_authenticated:  # signed in: his account is his address and prices are already shown
         return JsonResponse({"saved": True, "conversation_id": str(conversation.pk) if conversation else None,
                              "retry": bool(conversation and services.pending_question(conversation))})
     session, _ = journey_views._session_for(request)  # the journey session of this browser (made if there is none), as at the gate
-    if conversation is None:
-        conversation = Conversation.objects.create(session=session)
-    try:
-        services.lead_saved(conversation, session, data.get("email"), data.get("consent"))
+    try:  # a conversation is only made once the lead is saved: a failed attempt leaves nothing behind
+        conversation = services.lead_saved(conversation, session, data.get("email"), data.get("consent"), token)
     except journey_services.LeadError as error:
         return journey_views._with_cookie(JsonResponse({"errors": error.errors}, status=400), session)
     body = {"saved": True, "conversation_id": str(conversation.pk), "retry": services.pending_question(conversation)}

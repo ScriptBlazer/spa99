@@ -74,7 +74,7 @@ def daily_cap_reached(request=None):
 def too_busy():
     """Too many new conversations this hour, whole site."""
     since = timezone.now() - timedelta(hours=1)
-    return Conversation.objects.filter(created_at__gte=since).count() >= settings.CHAT_MAX_CONVERSATIONS_PER_HOUR
+    return Conversation.objects.filter(created_at__gte=since, message_count__gte=1).count() >= settings.CHAT_MAX_CONVERSATIONS_PER_HOUR
 
 
 def abuse(event, request, **detail):
@@ -123,7 +123,12 @@ def journey_session(request):
     return journey_services.session_from_cookies(request.COOKIES, getattr(request, "user", None))
 
 
-def find_conversation(request, conversation_id):
+def browser_hash(token):
+    """What a conversation stores of the page cookie: a hash, so the id alone cannot continue someone else's chat."""
+    return hashlib.sha256(f"chat-browser|{token}".encode()).hexdigest() if token else ""
+
+
+def find_conversation(request, conversation_id, token=None):
     """The visitor's own conversation, or None (unknown id, or it belongs to someone else's account or browser)."""
     if not conversation_id:
         return None
@@ -134,6 +139,8 @@ def find_conversation(request, conversation_id):
     except Exception:  # noqa: BLE001 - a malformed id (ValidationError)
         return None
     if conversation is None:
+        return None
+    if conversation.browser_hash and conversation.browser_hash != browser_hash(token):
         return None
     user = request.user if request.user.is_authenticated else None
     if conversation.user_id and (user is None or user.pk != conversation.user_id):
@@ -169,24 +176,32 @@ def pending_question(conversation):
     return bool(last and last.role == Message.ASSISTANT and last.offered_email)
 
 
+DECLINED_STOPS = ("cap", "unavailable", "refusal", "off_topic", "closed")
+
+
 def api_history(conversation):
-    """The turns sent to Claude: plain text only, the last CHAT_HISTORY_MESSAGES, starting with a visitor message, without the
-    email-offer replies (the question is answered again after the email)."""
-    rows = list(conversation.messages.filter(offered_email=False).order_by("-created_at", "-id").values_list("role", "text")[:settings.CHAT_HISTORY_MESSAGES])
+    """The turns sent to Claude: plain text only, the last CHAT_HISTORY_MESSAGES, starting with a visitor message. Left out: the
+    email-offer replies (the question is answered again after the email), declined (off-topic) turns with their canned replies, so
+    pasted code or an injection phrase never reaches the model on a later turn, and our own hand-off lines."""
+    rows = conversation.messages.filter(offered_email=False, off_topic=False).exclude(role=Message.ASSISTANT, stop_reason__in=DECLINED_STOPS)
+    rows = list(rows.order_by("-created_at", "-id").values_list("role", "text")[:settings.CHAT_HISTORY_MESSAGES])
     rows.reverse()
     while rows and rows[0][0] != Message.USER:
         rows.pop(0)
     return [{"role": role, "content": text} for role, text in rows]
 
 
-def lead_saved(conversation, session, email, consent):
-    """The email given in the chat becomes a lead exactly as at the journey gate (journey.services.save_lead).
+def lead_saved(conversation, session, email, consent, token=None):
+    """The email given in the chat becomes a lead exactly as at the journey gate (journey.services.save_lead). The conversation is
+    made only now (None = a new one), so a failed attempt leaves nothing behind. Returns the conversation.
     Raises journey_services.LeadError."""
     clean = journey_services.save_lead(session, email, consent)
+    if conversation is None:
+        conversation = Conversation.objects.create(session=session, browser_hash=browser_hash(token))
     conversation.lead_email = clean
     conversation.session = conversation.session or session
     conversation.save(update_fields=["lead_email", "session", "updated_at"])
-    return clean
+    return conversation
 
 
 # ---------- the streamed reply ----------
@@ -195,17 +210,18 @@ def sse(event, data):
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-def _store(conversation, text, usage=None, stop_reason="", handoff=False, offered=False):
+def _store(conversation, text, usage=None, stop_reason="", handoff=False, offered=False, off_topic=False):
     usage = usage or {}
     pence = llm.cost_pence(usage.get("input", 0), usage.get("output", 0), usage.get("cache_read", 0), usage.get("cache_write", 0))
     with transaction.atomic():
         Message.objects.create(conversation=conversation, role=Message.ASSISTANT, text=text, input_tokens=usage.get("input", 0),
                                output_tokens=usage.get("output", 0), cache_read_tokens=usage.get("cache_read", 0),
                                cache_write_tokens=usage.get("cache_write", 0), cost_pence=pence, stop_reason=stop_reason[:30],
-                               flagged_handoff=handoff, offered_email=offered)
+                               flagged_handoff=handoff, offered_email=offered, off_topic=off_topic)
         conversation.total_cost_pence = Decimal(conversation.total_cost_pence) + pence
         conversation.last_at = timezone.now()
         conversation.save(update_fields=["total_cost_pence", "last_at", "updated_at"])
+    conversation._reply_stored = True  # reply_events checks it when the visitor's connection drops
     return pence
 
 
@@ -214,10 +230,16 @@ def _done(conversation, ok, stop_reason="", **extra):
     return sse("done", {"conversation_id": str(conversation.pk), "ok": ok, "stop_reason": stop_reason, "messages_left": left, **extra})
 
 
-def _ended(conversation, reason, message_key, error=False):
+def estimate_usage(chars):
+    """A conservative bill for a model call whose usage never arrived (cut stream, timeout, closed connection): the request's size
+    at 3 characters a token, uncached, plus the whole output cap. Caps can then never be outrun by dropping connections."""
+    return {"input": chars // 3 + 1, "output": settings.CHAT_MAX_TOKENS}
+
+
+def _ended(conversation, reason, message_key, error=False, usage=None):
     """A reply the server ends itself (cap, Anthropic down, refusal): the words, the hand-off buttons, done."""
     text = MESSAGES[message_key]
-    _store(conversation, text, stop_reason=reason, handoff=True)
+    _store(conversation, text, usage, stop_reason=reason, handoff=True)
     yield sse("error", {"reason": reason, "message": text}) if error else sse("delta", {"text": text})
     yield sse("handoff", handoff_links(reason))
     yield _done(conversation, False, reason)
@@ -233,7 +255,7 @@ def _off_topic_turn(conversation, text, usage=None, stop_reason="off_topic", han
     last_user = conversation.messages.filter(role=Message.USER).order_by("-created_at", "-id").first()
     if last_user:
         Message.objects.filter(pk=last_user.pk).update(off_topic=True)
-    _store(conversation, text, usage, stop_reason, handoff=closed or handoff)
+    _store(conversation, text, usage, stop_reason, handoff=closed or handoff, off_topic=True)
     return closed
 
 
@@ -254,7 +276,20 @@ def _after_decline(conversation, closed):
 
 
 def reply_events(request, conversation):
-    """SSE strings for one reply. Never raises: any failure becomes an error or hand-off event."""
+    """SSE strings for one reply. Never raises: any failure becomes an error or hand-off event. If the visitor's connection drops
+    (the generator is closed) after the model was called, the reply is still stored and billed (known usage or an estimate)."""
+    conversation._reply_stored, conversation._billing = False, None
+    try:
+        yield from _reply(request, conversation)
+    except GeneratorExit:
+        billing = conversation._billing
+        if billing and not conversation._reply_stored:
+            text = "".join(billing["emitted"]).strip() or MESSAGES["unavailable"]
+            _store(conversation, text, billing["usage"] or estimate_usage(billing["chars"]), "aborted", handoff=False)
+        raise
+
+
+def _reply(request, conversation):
     if conversation.ended_off_topic:  # closed: no model call, buttons only
         yield sse("delta", {"text": MESSAGES["closed"]})
         yield sse("handoff", handoff_links("off_topic_limit"))
@@ -276,10 +311,14 @@ def reply_events(request, conversation):
     prices = prices_allowed(request, conversation)
     text, _digest = knowledge.build(prices)
     emitted, suppressed, final = [], False, None
+    history = api_history(conversation)
+    chars = len(SYSTEM_RULES) + len(KNOWLEDGE_HEADER) + len(text) + sum(len(m["content"]) for m in history)
+    conversation._billing = {"emitted": emitted, "usage": None, "chars": chars}  # from here the model call is billed, whatever happens
     try:
-        for kind, payload in llm.stream_reply(SYSTEM_RULES, KNOWLEDGE_HEADER + text, api_history(conversation)):
+        for kind, payload in llm.stream_reply(SYSTEM_RULES, KNOWLEDGE_HEADER + text, history):
             if kind == "final":
                 final = payload
+                conversation._billing["usage"] = payload["usage"]
                 continue
             if suppressed:
                 continue
@@ -290,11 +329,13 @@ def reply_events(request, conversation):
                 yield sse("delta", {"text": payload})
     except (anthropic.RateLimitError, anthropic.APIStatusError, anthropic.APIConnectionError, TimeoutError) as error:
         logger.warning("Chat reply failed: %s", type(error).__name__)
-        yield from _ended(conversation, "unavailable", "unavailable", error=True)
+        # A refusal to connect costs nothing; a stream cut part-way, or a timeout, was billed
+        billed = bool(emitted) or isinstance(error, TimeoutError) or (isinstance(error, anthropic.APIStatusError) and bool(emitted))
+        yield from _ended(conversation, "unavailable", "unavailable", error=True, usage=estimate_usage(chars) if billed else None)
         return
     except Exception:  # noqa: BLE001 - the visitor must never meet an error page
         logger.exception("Chat reply failed")
-        yield from _ended(conversation, "unavailable", "unavailable", error=True)
+        yield from _ended(conversation, "unavailable", "unavailable", error=True, usage=estimate_usage(chars))
         return
     if final is None or final["stop_reason"] == "refusal":
         closed = _off_topic_turn(conversation, MESSAGES["refusal"], (final or {}).get("usage"), "refusal", handoff=True)
