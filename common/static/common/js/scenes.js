@@ -178,11 +178,24 @@ function initGlow() {
   });
 }
 
-/** Header (8.10): transparent over the first dark scene, solid after 64px. Always visible (Moishe, 2026-10-28: no hide on scroll). */
+/** Header (8.10): transparent over the first dark scene, solid after 64px, hidden on scroll down past the first screen. */
 function initHeader() {
   const header = document.querySelector('.site-header');
   if (!header) return;
+  const show = () => gsap.to(header, { yPercent: 0, duration: 0.45, overwrite: true });
   ScrollTrigger.create({ start: 64, end: 'max', toggleClass: { targets: header, className: 'is-solid' } });
+  let last = 0;
+  ScrollTrigger.create({
+    start: () => window.innerHeight, end: 'max', onLeaveBack: show,
+    onUpdate: (self) => {
+      const y = self.scroll(), delta = y - last;
+      if (Math.abs(delta) < 8) return;
+      last = y;
+      if (header.contains(document.activeElement) || document.querySelector('[data-menu][open]')) return show();
+      gsap.to(header, { yPercent: delta > 0 ? -100 : 0, duration: 0.45, overwrite: true });
+    },
+  });
+  cleanups.push(() => gsap.set(header, { clearProps: 'transform' }));
 }
 
 /** Lenis (2.5): desktop with a fine pointer only, behind html[data-smooth="on"]. */
