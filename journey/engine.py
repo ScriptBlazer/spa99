@@ -185,10 +185,10 @@ def complete(session):
     return build_result(session, suggestion, rating)
 
 
-def sale_line_for(plan):
+def sale_line_for(plan, vat):
     """The sale sentence for the suggested plan, only while a sale is live and covers it (never a preview), the same words the Register
     screen shows; else None. Built when the result is fetched, so it is gone once the sale ends."""
-    return sale_services.register_line(sale_services.register_offer(), plan.slug) or None
+    return sale_services.register_line(sale_services.register_offer(vat_rate=vat), plan.slug) or None
 
 
 def build_result(session, suggestion, rating):
@@ -200,7 +200,7 @@ def build_result(session, suggestion, rating):
         return {"suggested": None, "others": [], "gold": {"potential": rating.level, "presentation": "none"}, "copy": copy}
     suggested = plan_services.plan_display(suggestion.plan, vat)
     suggested["reasons"] = suggestion.reasons
-    suggested["sale_line"] = sale_line_for(suggestion.plan)
+    suggested["sale_line"] = sale_line_for(suggestion.plan, vat)
     others = []
     for plan in plans:
         if plan.pk != suggestion.plan.pk:

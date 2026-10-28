@@ -119,7 +119,7 @@ def kept_price(interest, vat_rate=None):
     vat = SiteSettings.load().vat_rate if vat_rate is None else vat_rate
     unit = "month" if months == 1 else "months"
     return {
-        "name": interest.sale_name, "percent": percent, "months": months, "plan_name": plan.name,
+        "name": interest.sale_name, "percent": percent, "months": months, "plan_name": plan.name, "plan_kind": plan.kind,
         "plan_slugs": [p.slug for p in interest.sale.plans.all()] if interest.sale_id else [plan.slug],  # plans that keep the price
         "locked_at": interest.sale_locked_at,
         **price_lines(plan, percent, vat),
@@ -239,7 +239,14 @@ def mention(sale_bar, now=None):
         return None
     now = now or timezone.now()
     upcoming = parse_datetime(sale_bar["starts_at"]) > now
-    return {"until": sale_until(sale_bar, now), "from": sale_from(sale_bar, now) if upcoming else "", "upcoming": upcoming,
+    keep = f"{sale_bar['percent']}% off {sale_bar['plans_text']}"
+    if sale_bar.get("only_visit"):
+        pass  # a single visit has no months
+    elif sale_bar.get("has_visit"):
+        keep += f", with memberships {months_phrase(sale_bar['months'])}"
+    else:
+        keep += f" {months_phrase(sale_bar['months'])}"
+    return {"keep": keep, "until": sale_until(sale_bar, now), "from": sale_from(sale_bar, now) if upcoming else "", "upcoming": upcoming,
             "months_phrase": months_phrase(sale_bar["months"])}
 
 
@@ -265,6 +272,7 @@ def bar(sale, preview=False):
     return {
         "id": str(sale.pk), "name": sale.name, "percent": sale.percent_off, "plans_text": plans_text(sale),
         "plan_slugs": [p.slug for p in sale.plans.all()], "months": sale.months_at_price,
+        "has_visit": any(p.kind == Plan.ONE_OFF for p in sale.plans.all()), "only_visit": all(p.kind == Plan.ONE_OFF for p in sale.plans.all()),
         "starts_at": sale.starts_at.isoformat(), "ends_at": sale.window_end.isoformat(), "preview": preview,
     }
 

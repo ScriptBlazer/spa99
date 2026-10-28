@@ -20,7 +20,7 @@ def at(*args):
 
 
 def bar(ends, starts=at(2026, 12, 1, 9, 0), months=3):
-    return {"ends_at": ends.isoformat(), "starts_at": starts.isoformat(), "months": months}
+    return {"percent": 20, "plans_text": "Tier 2", "ends_at": ends.isoformat(), "starts_at": starts.isoformat(), "months": months}
 
 
 class PhrasingTests(TestCase):
@@ -104,6 +104,16 @@ class MentionPageTests(TestCase):
         self.assertNotIn("until", spa[spa.index("sale-mention-when"):spa.index("sale-mention-when") + 100])
         self.assertIn("sale-mention--note", self.client.get("/book/").content.decode())
 
+    def test_note_wording_with_a_single_visit(self):
+        make_sale(start=-1, end=80, plans=("single-visit",))
+        self.assertIn("to keep 20% off single visits.", self.client.get("/book/").content.decode())
+        make_sale(start=100, end=200, plans=("tier-2",), name="Later")
+        Sale = type(sales.live_sale())
+        Sale.objects.all().delete()
+        make_sale(start=-1, end=80, plans=("tier-2", "single-visit"))
+        html = self.client.get("/book/").content.decode()
+        self.assertIn("20% off Tier 2 and single visit, with memberships for your first 3 months.", html)
+
     def test_partial_renders_nothing_without_a_sale(self):
         out = Template('{% include "common/_sale_mention.html" with kind="note" %}').render(Context({"sale_bar": None}))
         self.assertEqual(out.strip(), "")
@@ -124,9 +134,29 @@ class JourneyResultLineTests(TestCase):
         self.assertRegex(line, r"^Register during the Christmas sale and keep £\d+(\.\d\d)? a month for your first 3 months\.$")
         self.assertEqual(engine.preview(make_session(**self.answers()))["suggested"]["sale_line"], line)
 
-    def test_none_when_the_plan_is_not_in_the_sale_and_never_for_a_preview(self):
+    def test_none_when_the_plan_is_not_in_the_sale(self):
         make_sale(start=-1, end=80, plans=("tier-3",))
         self.assertIsNone(engine.complete(make_session(**self.answers()))["suggested"]["sale_line"])
+
+    def test_never_for_a_previewed_sale(self):
+        sale = make_sale(start=24, end=100, plans=("tier-2",))
+        self.client.post("/sale-preview/", {"token": sales.preview_token(sale), "next": "/"})  # this browser now sees the bar for it
+        self.assertIn("data-preview", self.client.get("/visit/").content.decode())
+        self.assertIsNone(engine.complete(make_session(**self.answers()))["suggested"]["sale_line"])
+
+    def test_gated_result_gives_no_sale_line(self):
+        from django.test import Client
+        from journey.models import JourneySession
+        from plans.models import SiteSettings
+        SiteSettings.objects.update(journey_email_gate=True)
+        make_sale(start=-1, end=80, plans=("tier-2",))
+        session = make_session(**self.answers())
+        client = Client()
+        client.cookies["spa99_journey"] = session.key
+        reply = client.get("/journey/result/")
+        self.assertEqual(reply.status_code, 403)  # no email yet: no plan, no price, no sale line
+        self.assertTrue(reply.json()["needs_email"])
+        self.assertNotIn("sale_line", reply.content.decode())
 
     def test_an_upcoming_sale_gives_no_line(self):
         make_sale(start=100, end=200, plans=("tier-2",))  # a preview would show it on the bar; the result never promises it

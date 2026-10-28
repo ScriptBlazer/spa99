@@ -22,7 +22,7 @@ html[data-page="marketing"] .sale-bar { position: fixed; inset: 0 0 auto 0; }
 .sale-bar-end-preview { flex: none; display: flex; align-items: center; height: 100%; margin-left: auto; padding-left: var(--space-3); white-space: nowrap; color: var(--color-text-muted); text-decoration: none; }
 @media (hover: hover) and (pointer: fine) {
   .sale-bar-link:hover .sale-bar-offer { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
-  .sale-bar-end-preview:hover { color: var(--color-text-inverse); }
+  .sale-bar-end-preview:hover { color: var(--color-text); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
 }
 @media (max-width: 47.99em) {
   .sale-bar-preview ~ .sale-bar-name { max-width: 6rem; }
@@ -53,8 +53,8 @@ html[data-page="marketing"] .sale-bar { position: fixed; inset: 0 0 auto 0; }
 .sale-mention--note .mark-glyph { flex: none; width: 0.75rem; margin-top: 0.25rem; color: var(--color-gold); }
 .soon .sale-mention--note { margin-top: 0; justify-self: center; justify-content: center; text-align: center; }
 /* the journey result line: under the suggested price, same look as the Memberships .tier-sale line */
-.result-sale { display: flex; align-items: flex-start; gap: var(--space-2); margin-top: var(--space-3); max-width: 22rem; font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-snug); color: var(--color-gold); }   /* the journey is espresso */
-.result-sale .mark-glyph { flex: none; width: 0.75rem; margin-top: 0.15rem; color: var(--color-gold); }
+.result-sale { display: flex; align-items: flex-start; gap: var(--space-2); margin-top: var(--space-3); max-width: 22rem; font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-snug); color: var(--s-text); }
+.result-sale .mark-glyph { flex: none; width: 0.75rem; margin-top: 0.15rem; color: var(--s-accent); }  /* decoration; the result page follows the surface (cream, or espresso if it ever goes dark) */
 @media (prefers-contrast: more) {
   .sale-mention-sep, .sale-mention-when { color: var(--color-text-inverse); }
 }
