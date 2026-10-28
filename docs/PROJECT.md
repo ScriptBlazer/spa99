@@ -493,3 +493,5 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-28 | Moishe: no Back to top button after all (the header already returns on the slightest scroll up). Removed. |
 | 2026-10-28 | Moishe: the sale bar and the Home sale section turn gold (brand caramel #E5AC6E) with espresso text, so the sale stands out from the dark site. |
 | 2026-10-28 | Moishe did not like the gold bar and section; switch both to cream with espresso text (gold only as small accents that keep AA contrast). |
+| 2026-10-28 | Moishe: sale bar and sale sections back to the original espresso look (gold and cream both rejected). |
+| 2026-10-28 | Moishe: the Home "Three memberships. One single visit." section shows only when the visitor can see the tiers (email given at the journey, signed in, or Memberships public); otherwise it is left out. |

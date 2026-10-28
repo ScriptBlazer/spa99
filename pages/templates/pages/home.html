@@ -182,7 +182,8 @@
   </div>
 </section>
 
-{# R5. Memberships, briefly (cream). #}
+{# R5. Memberships, briefly (cream). Only when the visitor can see the tiers (Moishe, 2026-10-28). #}
+{% memberships_shown as plans_visible %}{% if plans_visible %}
 <section class="scene plans-scene on-light" data-scene="plans" aria-labelledby="teaser-title">
   <div class="thread" aria-hidden="true"></div>
   <div class="scene-stage">
@@ -208,6 +209,7 @@
     </div>
   </div>
 </section>
+{% endif %}
 
 {# R6b. The Gold Card: about 85% of a screen. A 3D card (docs/design/GOLD-CARD-3D.md): the swan draws itself on its face as you scroll (scrubbed, no pin). #}
 <section class="scene gold-scene on-dark" data-scene="gold" data-glow aria-labelledby="gold-title">

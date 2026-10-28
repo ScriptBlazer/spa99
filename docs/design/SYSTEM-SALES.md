@@ -437,12 +437,6 @@ Unchanged (section 1), still dismissible, still at the top of every other full-h
 5. Preview marker and End preview on both bands; upcoming preview shows the start line.
 6. Screenshots for design review: Home and Memberships at 375 and 1440 with the band in view (live, under 1 day, under 1 hour, preview upcoming), one other page with the strip, and Home at 2560.
 
-## Update 2026-10-28 (later): the bar and the band are cream (Moishe; supersedes the gold version the same day)
+## Update 2026-10-28 (final): colours are back to the original espresso
 
-Gold was tried and dropped. The sale bar, the Start preview notice and the sale band (Home and Memberships) are cream (`--color-cream`, `#F5F2D8`) with espresso text, so they stand out from the dark site and the always-espresso header. This supersedes the espresso-raised bar (section 1) and the espresso ground of the band (Round 2).
-
-- **Scope:** the existing `.on-light` surface (no new scope, no new tokens; `.on-gold` is removed). The bar, `.sale-bar--offer` and `.sale-band` use `on-light` instead of `on-dark`.
-- **Text:** name, percent, plans, countdown numerals and the band heading and offer: `--color-text` (espresso, 10.95 on cream). Quiet parts (separators, "ends in", "starts ...", Preview tag, End preview, arrow icon, band labels and the "Ends ..." line): `--color-text-muted` (5.32 on cream, AA). `prefers-contrast: more`: those go `--color-text`. Gold is not used for any sale text on cream (gold on cream fails AA); there is no gold accent on the bar or band.
-- **Band button:** `.btn-primary` in its light look: espresso background, cream text. **Focus:** `--color-focus` (espresso) 2px, clear on cream. **Hover:** unchanged (offer and End preview underline).
-- **Memberships band** (`--deep`) is `--color-cream-raised` (`#FBF9EC`), one step lighter, because that page is cream and the band would otherwise vanish. Home band and the bar are `--color-cream`.
-- **Header:** always espresso, so the cream bar above it (and over a dark hero) is the contrast the decision wants.
+Gold and then cream were tried for the bar and the band the same day and both dropped (Moishe: "go back to original"). The sale bar, the Start preview notice and the sale bands (Home and Memberships) are as originally specified above: `on-dark`, espresso-raised bar, espresso-raised / espresso bands, gold name, cream and muted-cream text, the on-dark button and focus ring. No `.on-gold` or `.on-cream` scope exists. Everything else added on this branch stays (always-visible sticky bar, no dismiss, the Start preview button, the sale mentions, single-visit wording).

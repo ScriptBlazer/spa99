@@ -1,28 +1,27 @@
 /* Sale band (docs/design/SYSTEM-SALES.md Round 2). Home and Memberships only. Tokens only, rem and clamp() so it grows with wide.css. No borders, no radius, no shadow. */
-.sale-band { color: var(--color-text); padding-block: var(--space-6); font-variant-numeric: tabular-nums; }
-.sale-band--raised { background: var(--color-cream); }  /* cream since 2026-10-28 */
-.sale-band--deep { background: var(--color-cream-raised); }  /* Memberships is a cream page: one step lighter so the band still reads */
+.sale-band { color: var(--color-text-inverse); padding-block: var(--space-6); font-variant-numeric: tabular-nums; }
+.sale-band--raised { background: var(--color-espresso-raised); }
+.sale-band--deep { background: var(--color-espresso); }
 .sale-band-grid { row-gap: 0; }
 .sale-band-grid > * { grid-column: 1 / -1; min-width: 0; }
-.sale-band-preview { display: inline-block; margin-bottom: var(--space-3); padding: 0 var(--space-2); border: 1px solid var(--color-text-muted); border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--color-text-muted); }
-.sale-band-name { max-width: var(--measure-display); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500; line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--color-text); }
-.sale-band-offer { max-width: var(--measure); margin-top: var(--space-4); font-size: var(--text-lg); line-height: var(--leading-snug); color: inherit; }
-.sale-band-keep { color: var(--color-text-muted); }
+.sale-band-preview { display: inline-block; margin-bottom: var(--space-3); padding: 0 var(--space-2); border: 1px solid var(--color-hairline-inverse); border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--color-text-muted-inverse); }
+.sale-band-name { max-width: var(--measure-display); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500; line-height: var(--leading-tight); letter-spacing: var(--tracking-display); color: var(--color-gold); }
+.sale-band-offer { max-width: var(--measure); margin-top: var(--space-4); font-size: var(--text-lg); line-height: var(--leading-snug); color: var(--color-text-inverse); }
+.sale-band-keep { color: var(--color-text-muted-inverse); }
 .sale-band-time { margin-top: var(--space-5); transition: opacity var(--duration-base) var(--ease-soft); }
 .sale-band-count { display: flex; gap: var(--space-4); transition: opacity var(--duration-base) var(--ease-soft); }
 .sale-band-count.is-leaving { opacity: 0; }
 .sale-band-unit { display: grid; justify-items: start; }
-.sale-band-num { font-size: var(--text-2xl); font-weight: 300; line-height: var(--leading-display); color: inherit; }
-.sale-band-label { margin-top: var(--space-2); font-size: var(--text-sm); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--color-text-muted); }
-.sale-band-ends { margin-top: var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted); }
-.sale-band-starts, .sale-band-over { font-size: var(--text-lg); line-height: var(--leading-snug); color: inherit; }
-.sale-band-over { color: var(--color-text-muted); }
+.sale-band-num { font-size: var(--text-2xl); font-weight: 300; line-height: var(--leading-display); color: var(--color-text-inverse); }
+.sale-band-label { margin-top: var(--space-2); font-size: var(--text-sm); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--color-text-muted-inverse); }
+.sale-band-ends { margin-top: var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted-inverse); }
+.sale-band-starts, .sale-band-over { font-size: var(--text-lg); line-height: var(--leading-snug); color: var(--color-text-inverse); }
+.sale-band-over { color: var(--color-text-muted-inverse); }
 .sale-band-actions { margin-top: var(--space-5); }
 .sale-band-actions .btn .icon { margin-left: var(--space-2); }
-.sale-band-end-preview { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; display: flex; align-items: center; min-height: var(--chip-h, 2.75rem); margin-top: var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted); }
-.sale-band a:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
-@media (hover: hover) and (pointer: fine) { .sale-band-end-preview:hover { text-decoration-thickness: 2px; } }
-@media (prefers-contrast: more) { .sale-band-keep, .sale-band-label, .sale-band-ends, .sale-band-over, .sale-band-preview, .sale-band-end-preview { color: var(--color-text); } }
+.sale-band-end-preview { display: flex; align-items: center; min-height: var(--chip-h, 2.75rem); margin-top: var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted-inverse); }
+.sale-band a:focus-visible { outline: 2px solid var(--color-focus-inverse); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .sale-band-end-preview:hover { color: var(--color-text-inverse); } }
 @media (min-width: 48em) {
   .sale-band-actions { display: flex; align-items: center; }
   .sale-band-end-preview { margin: 0 0 0 var(--space-4); }
@@ -33,4 +32,8 @@
   .sale-band-text { grid-column: 1 / 8; grid-row: 1; }
   .sale-band-actions { grid-column: 1 / 8; grid-row: 2; }
   .sale-band-time { grid-column: 8 / 13; grid-row: 1 / 3; align-self: end; margin-top: 0; }
+}
+@media (prefers-contrast: more) {
+  .sale-band--raised, .sale-band--deep { background: var(--color-espresso); }
+  .sale-band-keep, .sale-band-label { color: var(--color-text-inverse); }
 }
