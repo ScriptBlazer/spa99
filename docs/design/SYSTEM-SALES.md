@@ -106,7 +106,7 @@ Decision (Moishe, 2026-10-28): while a sale is live, or previewed in this browse
 
 - **One offset.** `html.has-sale` is set by the server (so no layout jump). `html.has-sale { --sale-top: var(--sale-h) }`; `--header-h = --header-own-h + --sale-top`. Everything that clears the top of the page (heroes, `scroll-padding-top` for `#plans` and other anchors, sticky side panels, the tour controls) already uses `--header-h`, so it clears bar plus header.
 - **Normal pages:** bar `position: sticky; top: 0; z-index: 11`; header sticky at `top: var(--sale-top)`.
-- **Marketing pages** (fixed header over scenes): bar fixed at `inset: 0 0 auto 0`; header fixed at `inset: var(--sale-top) 0 auto 0`. The header's hide-on-scroll slides it up under the bar; the bar stays.
+- **Marketing pages** (fixed header over scenes): bar fixed at `inset: 0 0 auto 0`; header fixed at `inset: var(--sale-top) 0 auto 0`. The header always stays visible (2026-10-28; its hide-on-scroll was removed). Before, its hide-on-scroll slid it up under the bar; the bar stays.
 - **Mobile menu:** opens under the bar (`inset: var(--sale-top) 0 0 0`, backdrop transparent so the bar stays visible).
 - **End:** at the end time the bar fades (opacity, instant under reduced motion), gets `hidden`, and `has-sale` is removed. This is a one-time layout move: the header goes up to 0 and, on marketing pages, content under it shifts by the bar height; a sticky bar in flow scrolls the page by its height so the content stays put. The server stops sending the bar at the same moment.
 - **Print:** the bar is hidden and `--sale-top` is 0.

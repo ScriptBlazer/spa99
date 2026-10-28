@@ -85,7 +85,7 @@ Shared everywhere:
 - **Pointer light**: a soft gold glow follows the pointer on dark scenes, desktop with a fine pointer only.
 - **Hero**: a looping muted video (6-10s, warm water, steam or light), or a living still (a 48s scale cycle and drifting steam) until the video exists. No Pause control (Moishe, 2026-10-23). Video loads after the page, never on Save-Data.
 - **Text on photographs and video** is allowed on marketing scenes, always on the solid part of the legibility veil (`--color-veil`). Text groups sit vertically centred and left aligned, not at the bottom of the screen (IMMERSIVE section 0).
-- **Header** overlays the first dark scene, turns solid after 64px, hides on scroll down and returns on scroll up.
+- **Header** overlays the first dark scene, turns solid after 64px, stays visible while scrolling (Moishe, 2026-10-28; it used to hide on scroll down).
 - **Page changes** cross-fade (View Transitions, opacity only, 240ms out, 480ms in); the header stays put.
 - **Smooth scrolling is off** (flag `data-smooth` on `<html>`, code kept for later).
 - **Loops** slower than one cycle per 15s, paused when off screen or the tab is hidden.
