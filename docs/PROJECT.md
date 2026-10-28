@@ -495,3 +495,4 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-28 | Moishe did not like the gold bar and section; switch both to cream with espresso text (gold only as small accents that keep AA contrast). |
 | 2026-10-28 | Moishe: sale bar and sale sections back to the original espresso look (gold and cream both rejected). |
 | 2026-10-28 | Moishe: the Home "Three memberships. One single visit." section shows only when the visitor can see the tiers (email given at the journey, signed in, or Memberships public); otherwise it is left out. |
+| 2026-10-28 | Moishe: Home memberships section a little shorter (about 78% of a screen instead of a full screen), not small. |

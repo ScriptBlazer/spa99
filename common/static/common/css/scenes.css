@@ -188,6 +188,7 @@ html.lenis, html.lenis body { height: auto; }
 
 /* ---------- R5 memberships, briefly ---------- */
 .plans-scene .grid { row-gap: var(--space-5); }
+.plans-scene, .plans-scene .scene-stage { min-height: min(var(--scene-h), 78svh); }   /* a little shorter than a full screen (Moishe, 2026-10-28) */
 .plans-head, .plans-list { grid-column: 1 / -1; }
 .plans-head .actions { margin-top: var(--space-4); }
 .plans-rows li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-4); align-items: baseline; padding-block: var(--space-3); border-top: 1px solid var(--s-hair); }
