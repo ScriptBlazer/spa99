@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static content_tags pages_tags sale_tags %}
 {# Memberships round 2 (docs/design/MEMBERSHIPS-R2.md): slim key cards, tag column with the choice and Continue. Cream page (Moishe, 2026-10-22), selected card is espresso with a gold hairline. Sheen = the .tier-sheen span (delete it, or `.tier-sheen{display:none}`, to remove). SWITCHES: preselect = the `highlight` plan in plans/services (selected_plan_slug), or clear it by passing selected_slug="" from the view. #}
-{% block html_attrs %} data-page="marketing"{% endblock %}{% block back_to_top %}{% endblock %}
+{% block html_attrs %} data-page="marketing"{% endblock %}
 {% block body_class %}page-mem on-light{% endblock %}
 {% block header_mode %}solid{% endblock %}
 {% block main %}

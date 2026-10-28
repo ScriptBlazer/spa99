@@ -202,7 +202,6 @@ function initHeader() {
 function startLenis() {
   if (!window.Lenis) return;
   lenis = new window.Lenis({ lerp: 0.1, smoothWheel: true, syncTouch: false });
-  window.spaLenis = lenis;   // back-to-top.js scrolls through it
   lenis.on('scroll', ScrollTrigger.update);
   const tick = (t) => lenis.raf(t * 1000);
   gsap.ticker.add(tick);
@@ -221,7 +220,7 @@ function startLenis() {
   document.addEventListener('click', anchor);
   cleanups.push(() => {
     mo.disconnect(); document.removeEventListener('click', anchor);
-    gsap.ticker.remove(tick); lenis?.destroy(); lenis = null; window.spaLenis = null; gsap.ticker.lagSmoothing(500, 33);
+    gsap.ticker.remove(tick); lenis?.destroy(); lenis = null; gsap.ticker.lagSmoothing(500, 33);
   });
 }
 

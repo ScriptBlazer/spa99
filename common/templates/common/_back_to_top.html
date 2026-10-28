@@ -1,6 +1,0 @@
-{% load static %}{# Back to top (docs/design/IMMERSIVE.md, header behaviour). Public marketing and content pages only: base_reduced, member_base, the memberships page (its own bottom bar) and the tour override the back_to_top block with nothing. #}
-<span class="btt-sentinel" data-btt-sentinel aria-hidden="true"></span>
-<a class="back-to-top" href="#top" data-back-to-top aria-label="Back to top">
-  {% include "common/_icon.html" with name="arrow-up" %}<span class="btt-text">Top</span>
-</a>
-<script type="module" src="{% static 'common/js/back-to-top.js' %}"></script>
