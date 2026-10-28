@@ -4,8 +4,6 @@
 {% block body_class %}page-home{% endblock %}
 {% block header_mode %}overlay{% endblock %}
 {% block head_title %}{% include "common/_head.html" with title="Spa 99 | Beyond Luxury" description=meta.meta_description %}{% endblock %}
-{# The sale shows as a band after the hero, not the slim strip (docs/design/SYSTEM-SALES.md Round 2). #}
-{% block sale_bar %}{% endblock %}{% block sale_html %}{% endblock %}
 {% block head_extra %}
 {% hero_video as hv_head %}{% if hv_head.poster %}<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="{{ hv_head.poster }}" media="(min-width: 48em)">
 <link rel="preload" as="image" type="image/webp" fetchpriority="high" href="{{ hv_head.poster_portrait }}" media="(max-width: 47.99em)">{% endif %}
@@ -184,7 +182,8 @@
   </div>
 </section>
 
-{# R5. Memberships, briefly (cream). #}
+{# R5. Memberships, briefly (cream). Only when the visitor can see the tiers (Moishe, 2026-10-28). #}
+{% memberships_shown as plans_visible %}{% if plans_visible %}
 <section class="scene plans-scene on-light" data-scene="plans" aria-labelledby="teaser-title">
   <div class="thread" aria-hidden="true"></div>
   <div class="scene-stage">
@@ -210,6 +209,7 @@
     </div>
   </div>
 </section>
+{% endif %}
 
 {# R6b. The Gold Card: about 85% of a screen. A 3D card (docs/design/GOLD-CARD-3D.md): the swan draws itself on its face as you scroll (scrubbed, no pin). #}
 <section class="scene gold-scene on-dark" data-scene="gold" data-glow aria-labelledby="gold-title">
@@ -238,6 +238,7 @@
         <h2 id="opening-title" class="opening-date" data-rise>{{ home.opening.heading }}</h2>
         <p class="lead opening-address" data-fade>{{ site_settings.address_one_line }}</p>
         <p class="small opening-hours" data-fade>{% hours_note %}</p>
+        {% include "common/_sale_mention.html" with kind="note" fade=True %}
       </div>
       <div class="opening-action actions" data-fade><a class="btn btn-primary btn-block-phone" href="{% url 'register' %}">{{ home.opening.cta_label }}</a></div>
     </div>

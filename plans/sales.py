@@ -5,6 +5,7 @@ saving or ending a sale takes a row lock on the SiteSettings singleton (`lock`),
 SQLite ignores select_for_update (it serialises writers anyway); nothing here is Postgres-only."""
 import time
 import uuid
+from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.core import signing
@@ -12,6 +13,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from .models import Plan, Sale, SiteSettings
 
@@ -117,7 +119,7 @@ def kept_price(interest, vat_rate=None):
     vat = SiteSettings.load().vat_rate if vat_rate is None else vat_rate
     unit = "month" if months == 1 else "months"
     return {
-        "name": interest.sale_name, "percent": percent, "months": months, "plan_name": plan.name,
+        "name": interest.sale_name, "percent": percent, "months": months, "plan_name": plan.name, "plan_kind": plan.kind,
         "plan_slugs": [p.slug for p in interest.sale.plans.all()] if interest.sale_id else [plan.slug],  # plans that keep the price
         "locked_at": interest.sale_locked_at,
         **price_lines(plan, percent, vat),
@@ -189,7 +191,78 @@ def register_offer(vat_rate=None, request=None):
     vat = SiteSettings.load().vat_rate if vat_rate is None else vat_rate
     unit = "month" if sale.months_at_price == 1 else "months"
     return {**bar(sale), "prices": {p.slug: price_lines(p, sale.percent_off, vat) for p in sale.plans.all()},
+            "kinds": {p.slug: p.kind for p in sale.plans.all()},
             "text": f"Register during the {sale.name} and keep {sale.percent_off}% off {plans_text(sale)} for {sale.months_at_price} {unit} from your first payment."}
+
+
+# ---------- the words for the mentions (docs/design/SALE-MENTIONS.md 2) ----------
+
+def months_phrase(months):
+    """'for your first month' (1) or 'for your first 3 months'."""
+    return "for your first month" if months == 1 else f"for your first {months} months"
+
+
+def _day(local):
+    return f"{local.day} {local:%B}"
+
+
+def sale_until(sale_bar, now=None):
+    """The sale's end for 'until {end}' / 'by {end}', London time, no weekday or year.
+    Ends at 00:00: the day before ('24 December'); except the coming midnight: 'midnight tonight'. Ends at 23:59: that date.
+    Any other time: '24 December, 18:00'; today: '18:00 today'."""
+    now = timezone.localtime(now or timezone.now())
+    end = timezone.localtime(parse_datetime(sale_bar["ends_at"]))
+    if end.hour == 0 and end.minute == 0:
+        if end.date() == now.date() + timedelta(days=1):
+            return "midnight tonight"
+        return _day(end - timedelta(days=1))
+    if end.hour == 23 and end.minute == 59:
+        return _day(end)
+    clock = f"{end:%H:%M}"
+    return f"{clock} today" if end.date() == now.date() else f"{_day(end)}, {clock}"
+
+
+def sale_from(sale_bar, now=None):
+    """The start of an upcoming (previewed) sale: '1 December', '1 December, 09:00', or '09:00 today'."""
+    now = timezone.localtime(now or timezone.now())
+    start = timezone.localtime(parse_datetime(sale_bar["starts_at"]))
+    if start.hour == 0 and start.minute == 0:
+        return _day(start)
+    clock = f"{start:%H:%M}"
+    return f"{clock} today" if start.date() == now.date() else f"{_day(start)}, {clock}"
+
+
+def mention(sale_bar, now=None):
+    """What the sale mentions print (None without a sale): the end phrase, the 'from' phrase when the sale has not started,
+    and the months phrase."""
+    if not sale_bar:
+        return None
+    now = now or timezone.now()
+    upcoming = parse_datetime(sale_bar["starts_at"]) > now
+    keep = f"{sale_bar['percent']}% off {sale_bar['plans_text']}"
+    if sale_bar.get("only_visit"):
+        pass  # a single visit has no months
+    elif sale_bar.get("has_visit"):
+        keep += f", with memberships {months_phrase(sale_bar['months'])}"
+    else:
+        keep += f" {months_phrase(sale_bar['months'])}"
+    return {"keep": keep, "until": sale_until(sale_bar, now), "from": sale_from(sale_bar, now) if upcoming else "", "upcoming": upcoming,
+            "months_phrase": months_phrase(sale_bar["months"])}
+
+
+def _money(value):
+    value = Decimal(value)
+    return f"£{value:.0f}" if value == value.to_integral_value() else f"£{value:.2f}"
+
+
+def register_line(offer, slug):
+    """The calm sentence for a plan in the live sale (a `register_offer`), or '': 'Register during the Christmas sale and keep £76 a month
+    for your first 3 months.' ('a visit' for the single visit). The Register screen and the journey result both use this."""
+    prices = (offer or {}).get("prices", {}).get(slug)
+    if not prices:
+        return ""
+    period = "a visit" if offer.get("kinds", {}).get(slug) == Plan.ONE_OFF else "a month"
+    return f"Register during the {offer['name']} and keep {_money(prices['sale_price_ex_vat'])} {period} {months_phrase(offer['months'])}."
 
 
 # ---------- the public bar ----------
@@ -199,6 +272,7 @@ def bar(sale, preview=False):
     return {
         "id": str(sale.pk), "name": sale.name, "percent": sale.percent_off, "plans_text": plans_text(sale),
         "plan_slugs": [p.slug for p in sale.plans.all()], "months": sale.months_at_price,
+        "has_visit": any(p.kind == Plan.ONE_OFF for p in sale.plans.all()), "only_visit": all(p.kind == Plan.ONE_OFF for p in sale.plans.all()),
         "starts_at": sale.starts_at.isoformat(), "ends_at": sale.window_end.isoformat(), "preview": preview,
     }
 
@@ -229,18 +303,41 @@ def sale_from_token(token, max_age=PREVIEW_SECONDS, spend=False):
     return sale
 
 
-def start_preview(request):
-    """A valid `?sale_preview=` token on a public page puts the sale in this browser's session for an hour (called by
-    plans.middleware.SalePreviewMiddleware, so it works whether or not the page reads the bar)."""
-    if request.GET.get(PREVIEW_PARAM) == "end":  # the "End preview" link in the bar
-        if getattr(request, "session", None) is not None:
-            request.session.pop(PREVIEW_KEY, None)
-        return
+def end_preview(request):
+    """`?sale_preview=end` (the "End preview" link in the bar) drops this browser's preview."""
+    if getattr(request, "session", None) is not None:
+        request.session.pop(PREVIEW_KEY, None)
+
+
+def preview_offer(request):
+    """A preview link opened with GET does NOT start anything (chat and email link scanners GET links, and would use up the single use):
+    the page shows a "Start preview" notice instead. Returns {token, name} for a valid, unspent link on a public page, else None.
+    Nothing is shown when this browser is already previewing that sale."""
+    token = request.GET.get(PREVIEW_PARAM, "") if request.method == "GET" and is_public_host(request) else ""
+    if not token or token == "end":
+        return None
+    sale = sale_from_token(token)  # not spent
+    if sale is None:
+        return None
+    nonce = signing.loads(token, salt=PREVIEW_SALT).get("n", "")
+    if cache.get(f"sale-preview-used:{nonce}"):
+        return None
+    current = _preview_sale(request)
+    if current is not None and current.pk == sale.pk:
+        return None
+    return {"token": token, "name": sale.name}
+
+
+def start_preview(request, token):
+    """POST from the "Start preview" button: spends the single-use link and puts the sale in this browser's session for an hour.
+    Returns True when it started. A second browser, an expired or spent link, or an ended sale does nothing."""
     if getattr(request, "session", None) is None:
-        return
-    sale = sale_from_token(request.GET.get(PREVIEW_PARAM, ""), spend=True)  # single use: the first browser to open it gets the hour
-    if sale is not None:
-        request.session[PREVIEW_KEY] = {"sale": str(sale.pk), "until": time.time() + PREVIEW_SECONDS}
+        return False
+    sale = sale_from_token(token or "", spend=True)
+    if sale is None:
+        return False
+    request.session[PREVIEW_KEY] = {"sale": str(sale.pk), "until": time.time() + PREVIEW_SECONDS}
+    return True
 
 
 def _preview_sale(request):

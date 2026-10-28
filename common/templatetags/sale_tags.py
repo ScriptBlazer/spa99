@@ -1,7 +1,6 @@
 """Sales on the public site: the bar's server-rendered text and the calm sale lines under prices.
 `sale_bar_view` turns the `sale_bar` dict (ISO strings) into what the template prints; `sale_line` gives the line for one plan."""
 import math
-from decimal import Decimal
 
 from django import template
 from django.utils import timezone
@@ -52,9 +51,7 @@ def sale_bar_view(sale_bar):
             "lead": lead, "tail": tail, "has_days": has_days, "units": units}
 
 
-def _money(value):
-    value = Decimal(value)
-    return f"£{value:.0f}" if value == value.to_integral_value() else f"£{value:.2f}"
+_money = sales._money
 
 
 @register.simple_tag(takes_context=True)
@@ -82,21 +79,10 @@ def sale_line(context, slug, sentence="tier"):
     return f"{bar['name']}: {price} {period} for your first {months} {unit}"
 
 
-def _price(value):
-    return _money(value)
-
-
 @register.simple_tag
 def register_sale_line(register_sale, slug):
     """'Register during the Christmas sale and keep £76 a month for your first 3 months.' for a plan the live sale covers, else ''."""
-    if not register_sale:
-        return ""
-    prices = register_sale["prices"].get(slug)
-    if not prices:
-        return ""
-    months = register_sale["months"]
-    unit = "month" if months == 1 else "months"
-    return f"Register during the {register_sale['name']} and keep {_price(prices['sale_price_ex_vat'])} a month for your first {months} {unit}."
+    return sales.register_line(register_sale, slug)
 
 
 @register.simple_tag
@@ -104,8 +90,8 @@ def kept_line(kept):
     """'You keep £76 a month for your first 3 months, from the Christmas sale.' from the member's kept_price."""
     if not kept:
         return ""
-    unit = "month" if kept["months"] == 1 else "months"
-    return f"You keep {_price(kept['sale_price_ex_vat'])} a month for your first {kept['months']} {unit}, from the {kept['name']}."
+    period = "a visit" if kept.get("plan_kind") == Plan.ONE_OFF else "a month"
+    return f"You keep {_money(kept['sale_price_ex_vat'])} {period} {sales.months_phrase(kept['months'])}, from the {kept['name']}."
 
 
 @register.filter
@@ -119,3 +105,9 @@ def ends_in(when_dt):
 def sale_plan_prices():
     """Every plan with its ex-VAT price, for the System form's live 'What people see' panel."""
     return [{"pk": p.pk, "name": p.name, "price": f"{p.price_ex_vat:.2f}", "single": p.kind == p.ONE_OFF} for p in Plan.objects.all()]
+
+
+@register.simple_tag
+def sale_mention_view(sale_bar):
+    """The words for common/_sale_mention.html: until, from, upcoming, months_phrase (see plans.sales.mention)."""
+    return sales.mention(sale_bar)

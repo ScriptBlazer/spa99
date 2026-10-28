@@ -4,8 +4,6 @@
 {% block html_attrs %} data-page="marketing"{% endblock %}
 {% block body_class %}page-mem on-light{% endblock %}
 {% block header_mode %}solid{% endblock %}
-{# The sale shows as a band after the tier cards, not the slim strip (docs/design/SYSTEM-SALES.md Round 2). #}
-{% block sale_bar %}{% endblock %}{% block sale_html %}{% endblock %}
 {% block main %}
 {% page_content "memberships" as m %}
 

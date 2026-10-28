@@ -10,6 +10,8 @@ Spec: `docs/features/sales.md`. Brand: `docs/BRAND.md` (tokens, 7B motion, "neve
 
 ## 1. Public sale bar
 
+> **2026-10-28 rebuild: see 1.6 and 1.7. The bar is always visible and not dismissible. Wherever 1.1 to 1.5 and the later rounds mention the close button (`[x]`, `data-sale-close`), dismissing, sessionStorage, `sale-off`, `--sale-shift`, or leave out Home, Memberships and the tour, 1.6 and 1.7 win.**
+
 ### 1.1 Where it shows
 
 - Every page that uses the full site header (`common/_header.html`): Home, The spa, Virtual tour index, Memberships, Gold Card, Book, Visit us, Register, Sign in, legal pages, unsubscribe.
@@ -98,31 +100,17 @@ Format, by time left (minutes always rounded **up**, so it never shows "0m" whil
 - Clock skew: offset = server `data-now` minus client now at load; all maths uses `Date.now() + offset`. `visibilitychange` to visible recomputes at once and reschedules.
 - Screen readers: the moving countdown is `aria-hidden`; the link's accessible text ends with the fixed `sr-only` "Ends Thursday 24 December, 23:59." Never `aria-live`.
 
-### 1.6 Header, hero and scroll
+### 1.6 and 1.7 (2026-10-28 rebuild: replaces the old 1.6 header/scroll and 1.7 dismiss/end)
 
-The bar is **in normal flow and scrolls away**. It never overlays the header or the hero, and it never follows the page down.
+Decision (Moishe, 2026-10-28): while a sale is live, or previewed in this browser, the bar is **always** at the very top of every public page that uses the full header, with the site header sticky directly under it. Home, Memberships and the Virtual tour now carry the bar too (they also keep the band). The bar is **not dismissible**: no X, no `sessionStorage`, no head-script check, no `sale-off`, no `--sale-shift`, no dock animation, no IntersectionObserver. The old text about scrolling away, docking, dismiss and the fade/focus move no longer applies.
 
-- **Sticky-header pages** (`.site-header { position: sticky; top: 0 }`): nothing to change. The bar sits above, scrolls off, the header sticks at 0 as today.
-- **Marketing pages** (`html[data-page="marketing"]`, fixed header at `inset: 0 0 auto 0`): the header must start below the bar and dock at 0 as the bar scrolls off. Use transform only (BRAND 7):
-  - `html.has-sale` (set server side on `<html>` when the bar renders) gives the fixed header `transform: translateY(var(--sale-shift, 0px))`.
-  - Supported browsers: CSS scroll-driven animation, no JS. `@supports (animation-timeline: scroll())` → `html.has-sale[data-page="marketing"] .site-header { animation: sale-dock linear both; animation-timeline: scroll(root); animation-range: 0 var(--sale-h); }` with `@keyframes sale-dock { from { transform: translateY(var(--sale-h)); } to { transform: none; } }`.
-  - Otherwise: `sale-bar.js` watches the bar with one IntersectionObserver (thresholds 0 to 1 in 0.05 steps) and sets `--sale-shift` to `ratio × sale-h` on the header. No scroll listener.
-  - No JS and no scroll timeline: `html.has-sale:not(.js)[data-page="marketing"] .site-header { position: absolute; top: var(--sale-h); }` (it scrolls with the page; the static layout already keeps the header solid).
-  - This is position tracking the scroll, not an animation: it stays on under reduced motion.
-- **First screens**: so a 100svh hero still fits one screen, subtract the bar once, only for the first scene of each page: `html.has-sale` → `.hero-first`, the spa door scene, `.gold-hero`, `.mem-stage`, `.book-hero`, `.signin`, `.register--solo .register-grid` get `min-height: calc(<their current value> - var(--sale-h))`. Nothing else changes; `--header-h` and `--scene-pad-top` are untouched.
-- **Pins** (Home hero, The spa door): call `ScrollTrigger.refresh()` after the bar is removed (dismiss or end). Nothing else in `scenes.js` changes.
-- **Page transitions**: `.sale-bar { view-transition-name: sale-bar; }` so the bar stays put while the page cross-fades (safe: the bar is solid, it has no backdrop blur, unlike the header).
-- **Anchors**: `scroll-padding-top` stays `var(--header-h) + space`; the bar has scrolled away by then.
-- **Menu dialog**: unchanged, covers the bar.
-- Stacking: the bar is not positioned above the header layer; no new z-index.
-
-### 1.7 Dismiss and end
-
-- **Dismiss** (`×`): bar fades `opacity 1 → 0` over `--duration-base` (400ms) `--ease-soft`, then gets `hidden`, `html` gets `sale-off` (drops `has-sale` rules, header shift goes to 0), and focus moves to the header brand link. Stores `sessionStorage['spa99.sale.dismissed'] = '<sale pk>'` inside `try { } catch (e) { }` (private mode and blocked storage must not break the page; the bar simply hides for this page only).
-- **No flash on the next page**: add to the inline script in `common/_head.html`: `try{if(sessionStorage.getItem("spa99.sale.dismissed")===d.dataset.sale)d.classList.add("sale-off")}catch(e){}` with `data-sale="{{ sale.pk }}"` on `<html>` when a sale is live. `html.sale-off .sale-bar { display: none; }` plus the `has-sale` rules scoped `:not(.sale-off)`. A new sale (new pk) shows again.
-- **End** (countdown reaches zero): same fade and removal. If the bar is out of view at that moment (IntersectionObserver says not intersecting), remove it without fade and `window.scrollBy(0, -barHeight)` in the same frame so the page does not jump. The next request renders no bar (server).
-- **Reduced motion**: the fade is instant (`--duration-base` is 0ms there); everything else is the same.
-- No entrance animation: the bar is there on first paint (BRAND 7B: navigation and sticky things are not animated).
+- **One offset.** `html.has-sale` is set by the server (so no layout jump). `html.has-sale { --sale-top: var(--sale-h) }`; `--header-h = --header-own-h + --sale-top`. Everything that clears the top of the page (heroes, `scroll-padding-top` for `#plans` and other anchors, sticky side panels, the tour controls) already uses `--header-h`, so it clears bar plus header.
+- **Normal pages:** bar `position: sticky; top: 0; z-index: 11`; header sticky at `top: var(--sale-top)`.
+- **Marketing pages** (fixed header over scenes): bar fixed at `inset: 0 0 auto 0`; header fixed at `inset: var(--sale-top) 0 auto 0`. The header's hide-on-scroll slides it up under the bar; the bar stays.
+- **Mobile menu:** opens under the bar (`inset: var(--sale-top) 0 0 0`, backdrop transparent so the bar stays visible).
+- **End:** at the end time the bar fades (opacity, instant under reduced motion), gets `hidden`, and `has-sale` is removed. This is a one-time layout move: the header goes up to 0 and, on marketing pages, content under it shifts by the bar height; a sticky bar in flow scrolls the page by its height so the content stays put. The server stops sending the bar at the same moment.
+- **Print:** the bar is hidden and `--sale-top` is 0.
+- **Preview bar:** "Preview" tag; "End preview" at the right edge (`right: var(--page-margin)` from 48em, lining up with the header edge; on phone just "End"). After End preview, Back reloads a page restored from the bfcache.
 
 ### 1.8 Files
 
@@ -130,7 +118,7 @@ The bar is **in normal flow and scrolls away**. It never overlays the header or 
 
 ### 1.9 Preview (developer only)
 
-From System "Preview on site" the site renders as if the sale were live for that browser session only (the link is signed and single-use: the first browser that opens it gets a one-hour session flag, later opens of the same link do nothing, and it is no use to anyone else). The bar gets one extra item before the name: `Preview` in `--color-text-muted-inverse`, 1px full `--color-hairline-inverse` border, `--radius-sm`, `0 var(--space-2)`, and a text link "End preview" just left of the close button. Countdown counts to the sale's end. Prices on Memberships and Register show the sale lines (section 2). Upcoming sales show "Preview · starts 1 Dec, 09:00" on desktop, "Preview" on phone.
+From System "Preview on site" the site renders as if the sale were live for that browser session only (the link is signed and single-use; opening it only shows a "Start preview" notice, and pressing the button (POST, CSRF) gives that browser a one-hour session flag; link scanners that GET it cannot use it up, later presses of the same link do nothing, and it is no use to anyone else). The bar gets one extra item before the name: `Preview` in `--color-text-muted-inverse`, 1px full `--color-hairline-inverse` border, `--radius-sm`, `0 var(--space-2)`, and a text link "End preview" just left of the close button. Countdown counts to the sale's end. Prices on Memberships and Register show the sale lines (section 2). Upcoming sales show "Preview · starts 1 Dec, 09:00" on desktop, "Preview" on phone.
 
 ---
 
@@ -234,7 +222,7 @@ Empty (3.1), loading (save button "Saving", disabled), error (`.sys-note.error` 
 
 ## 4. Accessibility
 
-- Bar: one link and one button, both reachable right after the skip link; 44px targets on phone; AA pairs listed in 1.3; countdown hidden from screen readers with a fixed sr-only end time; no live region; dismiss moves focus to the header brand.
+- Bar: one link (plus "End preview" in a preview), reachable right after the skip link; 44px targets on phone; AA pairs listed in 1.3; countdown hidden from screen readers with a fixed sr-only end time; no live region.
 - Price lines are real text inside the existing described-by groups; the swan glyph is `aria-hidden`; meaning never depends on colour (no strike-through to decode).
 - System: `fieldset`/`legend` for Plans and Starts; read-only locked values are plain text with the reason in the DOM; modal focus starts on Cancel; all copy in full sentences.
 - Reduced motion: the bar fade becomes instant; header docking still tracks the scroll (it is position, not decoration); nothing else here moves.
@@ -285,7 +273,7 @@ None. Everything is existing `--sys-*`.
 1. Bar renders server side only while a sale is live (or previewing), on full-header pages only, after the skip link and above the header; espresso-raised, no borders, one line, 44px phone / 40px desktop.
 2. Copy and countdown exactly as 1.4 and 1.5 (rounded up, padded after the first unit, phone drops minutes over a day); tabular numerals; ticks on minute boundaries; skew-corrected; no jitter.
 3. Marketing pages: header starts under the bar and docks at 0 as it scrolls away (scroll timeline, IO fallback, no-JS absolute fallback); first screens still fit at 375x667 and 1440x800; pins refresh after removal; no overlap of bar and header at any scroll position.
-4. Dismiss fades (400ms, instant under reduced motion), stores the sale pk in sessionStorage inside try/catch, does not flash on the next page, moves focus to the header brand; a new sale shows again.
+4. (Removed 2026-10-28: the bar is not dismissible.)
 5. At zero the bar leaves without a page jump; a reload shows no bar.
 6. Tier cards, single visit, continue bar, register plan card and My Spa 99 show the sale lines of section 2 with the regular price unchanged; no strike-through, no red, no badges; register line follows the chosen chip.
 7. System Sales: list grouped Live / Upcoming / Past with the badges and empty state of 3.1; form fields, preview panel, locked fields with written reasons, overlap error, save confirm, End now and Delete modals, toasts with Undo, all in existing `sys-*` classes; no one-sided borders anywhere.
@@ -448,3 +436,7 @@ Unchanged (section 1), still dismissible, still at the top of every other full-h
 4. Reveal as R2.5 (lineRise + staggered fade on Home, data-reveal on Memberships); nothing moves under reduced motion; numbers never animate.
 5. Preview marker and End preview on both bands; upcoming preview shows the start line.
 6. Screenshots for design review: Home and Memberships at 375 and 1440 with the band in view (live, under 1 day, under 1 hour, preview upcoming), one other page with the strip, and Home at 2560.
+
+## Update 2026-10-28 (final): colours are back to the original espresso
+
+Gold and then cream were tried for the bar and the band the same day and both dropped (Moishe: "go back to original"). The sale bar, the Start preview notice and the sale bands (Home and Memberships) are as originally specified above: `on-dark`, espresso-raised bar, espresso-raised / espresso bands, gold name, cream and muted-cream text, the on-dark button and focus ring. No `.on-gold` or `.on-cream` scope exists. Everything else added on this branch stays (always-visible sticky bar, no dismiss, the Start preview button, the sale mentions, single-visit wording).

@@ -9,6 +9,7 @@
       <h1 id="book-title" class="statement">{{ b.placeholder.heading }}</h1>
       <p class="muted">{{ b.placeholder.body }}</p>
       <p class="soon-month">{{ b.opening_month.heading }}</p>
+      {% include "common/_sale_mention.html" with kind="note" %}
       <div class="actions soon-actions">
         <a class="btn btn-primary" href="{% url 'register' %}">{{ b.placeholder.cta_label }}</a>
         <a class="btn-quiet" href="{% url 'spa' %}">See the spa</a>

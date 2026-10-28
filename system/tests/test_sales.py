@@ -125,7 +125,9 @@ class SalesTests(TestCase):
         token = link.split("sale_preview=")[1]
         public = Client()
         self.assertFalse(public.get("/memberships/").context["sale_bar"])
-        self.assertEqual(public.get(f"/memberships/?sale_preview={token}").context["sale_bar"]["name"], "Christmas sale")
+        self.assertFalse(public.get(f"/memberships/?sale_preview={token}").context["sale_bar"])  # a GET only offers it
+        public.post("/sale-preview/", {"token": token, "next": "/memberships/"})
+        self.assertEqual(public.get("/memberships/").context["sale_bar"]["name"], "Christmas sale")
         self.assertEqual(public.get("/memberships/").context["sale_bar"]["preview"], True)  # same browser keeps it
         self.assertFalse(Client().get("/memberships/").context["sale_bar"])  # another browser does not
         office = Client(HTTP_HOST="office.localhost")

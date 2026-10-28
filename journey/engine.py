@@ -8,6 +8,7 @@ from django.utils import timezone
 from content import services as content_services
 from gold import rating as gold_rating
 from insights import metrics
+from plans import sales as sale_services
 from plans import services as plan_services
 
 from . import services
@@ -184,6 +185,12 @@ def complete(session):
     return build_result(session, suggestion, rating)
 
 
+def sale_line_for(plan, vat):
+    """The sale sentence for the suggested plan, only while a sale is live and covers it (never a preview), the same words the Register
+    screen shows; else None. Built when the result is fetched, so it is gone once the sale ends."""
+    return sale_services.register_line(sale_services.register_offer(vat_rate=vat), plan.slug) or None
+
+
 def build_result(session, suggestion, rating):
     vat = plan_services.SiteSettings.load().vat_rate
     plans = list(plan_services.monthly_plans())
@@ -193,6 +200,7 @@ def build_result(session, suggestion, rating):
         return {"suggested": None, "others": [], "gold": {"potential": rating.level, "presentation": "none"}, "copy": copy}
     suggested = plan_services.plan_display(suggestion.plan, vat)
     suggested["reasons"] = suggestion.reasons
+    suggested["sale_line"] = sale_line_for(suggestion.plan, vat)
     others = []
     for plan in plans:
         if plan.pk != suggestion.plan.pk:
