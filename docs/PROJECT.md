@@ -492,3 +492,4 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-28 | Moishe: during a sale, mention it in more places on the site, elegantly (e.g. the "Find the right way to visit" call-to-action and the "Launching January 2027" footer band), on top of the bar. Designer picks the places. |
 | 2026-10-28 | Moishe: no Back to top button after all (the header already returns on the slightest scroll up). Removed. |
 | 2026-10-28 | Moishe: the sale bar and the Home sale section turn gold (brand caramel #E5AC6E) with espresso text, so the sale stands out from the dark site. |
+| 2026-10-28 | Moishe did not like the gold bar and section; switch both to cream with espresso text (gold only as small accents that keep AA contrast). |
