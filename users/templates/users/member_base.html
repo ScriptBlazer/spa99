@@ -3,7 +3,7 @@
 {% comment %}My Spa 99 shell (docs/design/MEMBER.md 2). Desktop: espresso sidebar. Phone: top bar plus four bottom tabs. Own head (data-page="member"), app.css plus member.css, shared app.js, never scenes.js. The sub-screen (password_change) hides the tabs and shows the back link.{% endcomment %}
 {% block html_attrs %} data-page="member"{% endblock %}
 {% block head_title %}{% include "common/_head.html" with title=member_title|add:" | My Spa 99" %}{% endblock %}
-{% block sale_bar %}{% endblock %}{% block sale_html %}{% endblock %}
+{% block sale_bar %}{% endblock %}{% block sale_html %}{% endblock %}{% block back_to_top %}{% endblock %}
 {% block head_extra %}<link rel="stylesheet" href="{% static 'common/css/member.css' %}">{% endblock %}
 {% block body_class %}member{% if request.resolver_match.url_name == 'password_change' %} member--sub{% endif %}{% endblock %}
 {% block header %}
