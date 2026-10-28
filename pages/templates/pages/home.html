@@ -236,6 +236,7 @@
         <h2 id="opening-title" class="opening-date" data-rise>{{ home.opening.heading }}</h2>
         <p class="lead opening-address" data-fade>{{ site_settings.address_one_line }}</p>
         <p class="small opening-hours" data-fade>{% hours_note %}</p>
+        {% include "common/_sale_mention.html" with kind="note" fade=True %}
       </div>
       <div class="opening-action actions" data-fade><a class="btn btn-primary btn-block-phone" href="{% url 'register' %}">{{ home.opening.cta_label }}</a></div>
     </div>

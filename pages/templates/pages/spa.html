@@ -101,6 +101,7 @@
   <div class="sp-band-pattern" data-pattern aria-hidden="true"></div>
   <div class="container grid sp-band-grid">
     <div class="sp-band-main">
+      {% include "common/_sale_mention.html" with kind="eyebrow" %}
       <h2 class="statement" id="next-title" data-rise>{{ spa.next.heading }}</h2>
       {% memberships_shown as prices_shown %}{% if next_from and prices_shown %}<p class="small muted" data-fade>{{ next_from }}</p>{% endif %}
     </div>

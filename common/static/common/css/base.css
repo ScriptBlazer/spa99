@@ -52,7 +52,25 @@ summary { cursor: pointer; }
   --s-accent: var(--color-gold);
   --s-on-accent: var(--color-espresso);
 }
-.on-light, .on-dark { background: var(--s-bg); color: var(--s-text); }
+/* The sale: brand gold with espresso text (2026-10-28). Every text is espresso (6.17 on gold); the muted espresso is only 2.99 there, so there is no muted tone. The button is the dark variant (espresso with gold text). */
+.on-gold {
+  --s-bg: var(--color-gold);
+  --s-text: var(--color-espresso);
+  --s-muted: var(--color-espresso);
+  --s-line: var(--color-espresso);
+  --s-hair: var(--color-hairline);
+  --s-raised: var(--color-gold);
+  --s-field: transparent;
+  --s-well: var(--color-gold);
+  --s-well-line: var(--color-espresso);
+  --s-label: var(--color-espresso);
+  --s-edge: var(--color-espresso);
+  --s-focus: var(--color-focus);
+  --s-danger: var(--color-danger);
+  --s-accent: var(--color-espresso);
+  --s-on-accent: var(--color-gold);
+}
+.on-light, .on-dark, .on-gold { background: var(--s-bg); color: var(--s-text); }
 body { background: var(--s-bg); color: var(--s-text); font-family: var(--font-body); font-size: var(--text-body); line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
 .muted { color: var(--s-muted); }
 

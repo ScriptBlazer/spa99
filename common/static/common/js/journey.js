@@ -304,6 +304,7 @@ function renderResult(data) {
     el('p', { class: 'result-label small', text: copyOf('result_label').body }),
     el('h1', { class: 'display result-tier', tabindex: '-1', text: `${s.name}.` }),
     el('p', { class: 'result-price num', text: s.price_line }),
+    s.sale_line ? el('p', { class: 'result-sale' }, goldMark(), el('span', { text: s.sale_line })) : null,
     el('p', { class: 'result-char', text: s.character_line }),
     el('div', { class: 'why' }, el('h2', { text: copyOf('why').heading }), el('ul', { class: 'reasons' }, (s.reasons || []).map((r) => el('li', { text: r })))),
     el('div', { class: 'result-actions' },

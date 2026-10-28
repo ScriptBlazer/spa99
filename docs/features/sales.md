@@ -31,3 +31,7 @@ Decided 2026-10-25 (PROJECT.md). Built on `feature/sales` (see Built below).
 - **System > Sales:** list, new/edit with live preview of the bar and prices, locked fields on a live sale, End now with confirm, "Start now" (the server uses its own now, so a stale page never gives a past-start error).
 - **Preview link:** signed, single-use, valid an hour, this browser only. Opening it (GET) never starts anything, so chat and email link scanners cannot use it up: the page shows a small bar-styled notice with a "Start preview" button. Only the button (a CSRF-checked POST to `/sale-preview/`) spends the link and starts the hour; the bar then shows on every public page ("Preview" tag, "End preview" link). A second browser pressing the same link does nothing; the first keeps its hour. Back after End preview reloads the page (bfcache).
 - Wording for plan lists: "all memberships", "all memberships and single visits", "single visits".
+
+## Update 2026-10-28: gold bar and band
+
+The sale bar and the sale band (Home and Memberships) now use the brand gold (`--color-gold`) with espresso text via the `.on-gold` surface (base.css), so the sale stands out from the dark site. All text espresso (6.17 AA), the band button is the espresso variant, focus ring espresso. Details: `docs/design/SYSTEM-SALES.md` (Update 2026-10-28). Sale mentions (`docs/design/SALE-MENTIONS.md`) stay on the espresso scenes.

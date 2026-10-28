@@ -5,6 +5,7 @@ saving or ending a sale takes a row lock on the SiteSettings singleton (`lock`),
 SQLite ignores select_for_update (it serialises writers anyway); nothing here is Postgres-only."""
 import time
 import uuid
+from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.core import signing
@@ -12,6 +13,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from .models import Plan, Sale, SiteSettings
 
@@ -189,7 +191,71 @@ def register_offer(vat_rate=None, request=None):
     vat = SiteSettings.load().vat_rate if vat_rate is None else vat_rate
     unit = "month" if sale.months_at_price == 1 else "months"
     return {**bar(sale), "prices": {p.slug: price_lines(p, sale.percent_off, vat) for p in sale.plans.all()},
+            "kinds": {p.slug: p.kind for p in sale.plans.all()},
             "text": f"Register during the {sale.name} and keep {sale.percent_off}% off {plans_text(sale)} for {sale.months_at_price} {unit} from your first payment."}
+
+
+# ---------- the words for the mentions (docs/design/SALE-MENTIONS.md 2) ----------
+
+def months_phrase(months):
+    """'for your first month' (1) or 'for your first 3 months'."""
+    return "for your first month" if months == 1 else f"for your first {months} months"
+
+
+def _day(local):
+    return f"{local.day} {local:%B}"
+
+
+def sale_until(sale_bar, now=None):
+    """The sale's end for 'until {end}' / 'by {end}', London time, no weekday or year.
+    Ends at 00:00: the day before ('24 December'); except the coming midnight: 'midnight tonight'. Ends at 23:59: that date.
+    Any other time: '24 December, 18:00'; today: '18:00 today'."""
+    now = timezone.localtime(now or timezone.now())
+    end = timezone.localtime(parse_datetime(sale_bar["ends_at"]))
+    if end.hour == 0 and end.minute == 0:
+        if end.date() == now.date() + timedelta(days=1):
+            return "midnight tonight"
+        return _day(end - timedelta(days=1))
+    if end.hour == 23 and end.minute == 59:
+        return _day(end)
+    clock = f"{end:%H:%M}"
+    return f"{clock} today" if end.date() == now.date() else f"{_day(end)}, {clock}"
+
+
+def sale_from(sale_bar, now=None):
+    """The start of an upcoming (previewed) sale: '1 December', '1 December, 09:00', or '09:00 today'."""
+    now = timezone.localtime(now or timezone.now())
+    start = timezone.localtime(parse_datetime(sale_bar["starts_at"]))
+    if start.hour == 0 and start.minute == 0:
+        return _day(start)
+    clock = f"{start:%H:%M}"
+    return f"{clock} today" if start.date() == now.date() else f"{_day(start)}, {clock}"
+
+
+def mention(sale_bar, now=None):
+    """What the sale mentions print (None without a sale): the end phrase, the 'from' phrase when the sale has not started,
+    and the months phrase."""
+    if not sale_bar:
+        return None
+    now = now or timezone.now()
+    upcoming = parse_datetime(sale_bar["starts_at"]) > now
+    return {"until": sale_until(sale_bar, now), "from": sale_from(sale_bar, now) if upcoming else "", "upcoming": upcoming,
+            "months_phrase": months_phrase(sale_bar["months"])}
+
+
+def _money(value):
+    value = Decimal(value)
+    return f"£{value:.0f}" if value == value.to_integral_value() else f"£{value:.2f}"
+
+
+def register_line(offer, slug):
+    """The calm sentence for a plan in the live sale (a `register_offer`), or '': 'Register during the Christmas sale and keep £76 a month
+    for your first 3 months.' ('a visit' for the single visit). The Register screen and the journey result both use this."""
+    prices = (offer or {}).get("prices", {}).get(slug)
+    if not prices:
+        return ""
+    period = "a visit" if offer.get("kinds", {}).get(slug) == Plan.ONE_OFF else "a month"
+    return f"Register during the {offer['name']} and keep {_money(prices['sale_price_ex_vat'])} {period} {months_phrase(offer['months'])}."
 
 
 # ---------- the public bar ----------

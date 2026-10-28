@@ -1,25 +1,25 @@
-/* Sale bar (docs/design/SYSTEM-SALES.md 1). Tokens only. Always on top while a sale is live: sticky at 0 with the header sticky directly under it
+/* Sale bar (docs/design/SYSTEM-SALES.md 1; gold with espresso text since 2026-10-28). Tokens only. Always on top while a sale is live: sticky at 0 with the header sticky directly under it
    (--sale-top). On the marketing pages the header is fixed over the scenes, so the bar is fixed too. Not dismissible, no borders. */
-.sale-bar { position: sticky; top: 0; z-index: 11; height: var(--sale-h); background: var(--color-espresso-raised); color: var(--color-text-inverse); font-size: var(--text-sm); line-height: var(--leading-snug); font-variant-numeric: tabular-nums; view-transition-name: sale-bar; transition: opacity var(--duration-base) var(--ease-soft); }
+.sale-bar { position: sticky; top: 0; z-index: 11; height: var(--sale-h); background: var(--color-gold); color: var(--color-espresso); font-size: var(--text-sm); line-height: var(--leading-snug); font-variant-numeric: tabular-nums; view-transition-name: sale-bar; transition: opacity var(--duration-base) var(--ease-soft); }
 html[data-page="marketing"] .sale-bar { position: fixed; inset: 0 0 auto 0; }
 .sale-bar.is-leaving { opacity: 0; }
 .sale-bar[hidden] { display: none; }
 .sale-bar-inner { position: relative; height: 100%; display: flex; align-items: center; }
 .sale-bar-link { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; white-space: nowrap; color: inherit; text-decoration: none; height: 100%; }
-.sale-bar-name { color: var(--color-gold); font-weight: 500; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 12rem; }
-.sale-bar-sep { margin-inline: var(--space-2); color: var(--color-text-muted-inverse); }
-.sale-bar-ends { color: var(--color-text-muted-inverse); }
+.sale-bar-name { color: inherit; font-weight: 500; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 12rem; }
+.sale-bar-sep { margin-inline: var(--space-2); color: inherit; }
+.sale-bar-ends { color: inherit; }
 .sale-bar-time [data-sale-count] { font-weight: 500; }
-.sale-bar-starts { color: var(--color-text-muted-inverse); }
+.sale-bar-starts { color: inherit; }
 .sale-bar-plans, .sale-bar-ends, .sale-bar-link .icon, .sale-bar-starts, .sale-bar-end-long { display: none; }
-.sale-bar-link .icon { width: 1rem; height: 1rem; margin-left: var(--space-2); color: var(--color-text-muted-inverse); }
-.sale-bar-preview { flex: none; margin-right: var(--space-2); padding: 0 var(--space-2); border: 1px solid var(--color-hairline-inverse); border-radius: var(--radius-sm); color: var(--color-text-muted-inverse); }
-.sale-bar-link:focus-visible, .sale-bar-end-preview:focus-visible { outline: 2px solid var(--color-focus-inverse); outline-offset: -2px; }
+.sale-bar-link .icon { width: 1rem; height: 1rem; margin-left: var(--space-2); color: inherit; }
+.sale-bar-preview { flex: none; margin-right: var(--space-2); padding: 0 var(--space-2); border: 1px solid currentColor; border-radius: var(--radius-sm); color: inherit; }
+.sale-bar-link:focus-visible, .sale-bar-end-preview:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .sale-bar--offer .sale-bar-inner { gap: var(--space-3); }
 .sale-bar--offer .sale-bar-preview { margin-right: 0; }
-.sale-bar-start { flex: none; height: 100%; min-width: var(--chip-h, 2.75rem); margin-left: auto; padding: 0 0 0 var(--space-3); border: 0; background: none; font: inherit; font-weight: 500; color: var(--color-gold); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; cursor: pointer; }
-.sale-bar-start:focus-visible { outline: 2px solid var(--color-focus-inverse); outline-offset: -2px; }
-.sale-bar-end-preview { flex: none; display: flex; align-items: center; height: 100%; margin-left: auto; padding-left: var(--space-3); white-space: nowrap; color: var(--color-text-muted-inverse); text-decoration: none; }
+.sale-bar-start { flex: none; height: 100%; min-width: var(--chip-h, 2.75rem); margin-left: auto; padding: 0 0 0 var(--space-3); border: 0; background: none; font: inherit; font-weight: 500; color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; cursor: pointer; }
+.sale-bar-start:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.sale-bar-end-preview { flex: none; display: flex; align-items: center; height: 100%; margin-left: auto; padding-left: var(--space-3); white-space: nowrap; color: inherit; text-decoration: none; }
 @media (hover: hover) and (pointer: fine) {
   .sale-bar-link:hover .sale-bar-offer { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
   .sale-bar-end-preview:hover { color: var(--color-text-inverse); }
@@ -39,5 +39,21 @@ html[data-page="marketing"] .sale-bar { position: fixed; inset: 0 0 auto 0; }
   .sale-bar-name { max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) { .sale-bar { transition: none; } }
-@media (prefers-contrast: more) { .sale-bar { background: var(--color-espresso); } .sale-bar-sep { color: var(--color-text-inverse); } }
 @media print { .sale-bar { display: none; } html.has-sale { --sale-top: 0px; } }
+
+/* Sale mentions (docs/design/SALE-MENTIONS.md): one quiet sentence before a Register / Tailor button. On espresso only. No motion of their own. */
+.sale-mention { max-width: var(--measure); line-height: var(--leading-snug); color: var(--color-text-inverse); }
+.sale-mention-name { color: var(--color-gold); font-weight: 500; }
+.sale-mention--eyebrow { margin-bottom: var(--space-3); font-size: var(--text-sm); font-weight: 500; letter-spacing: var(--tracking-body); text-wrap: balance; }
+.sale-mention--eyebrow > span:not(.sr-only):not(.sale-mention-sep) { white-space: nowrap; }
+.sale-mention-sep { margin-inline: var(--space-2); color: var(--color-text-muted-inverse); }
+.sale-mention-when { color: var(--color-text-muted-inverse); }
+.sale-mention--note { display: flex; align-items: flex-start; gap: var(--space-2); margin-top: var(--space-4); font-size: var(--text-base); font-weight: 400; text-align: start; }
+.sale-mention--note .mark-glyph { flex: none; width: 0.75rem; margin-top: 0.25rem; color: var(--color-gold); }
+.soon .sale-mention--note { margin-top: 0; justify-self: center; justify-content: center; text-align: center; }
+/* the journey result line: under the suggested price, same look as the Memberships .tier-sale line */
+.result-sale { display: flex; align-items: flex-start; gap: var(--space-2); margin-top: var(--space-3); max-width: 22rem; font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-snug); color: var(--color-gold); }   /* the journey is espresso */
+.result-sale .mark-glyph { flex: none; width: 0.75rem; margin-top: 0.15rem; color: var(--color-gold); }
+@media (prefers-contrast: more) {
+  .sale-mention-sep, .sale-mention-when { color: var(--color-text-inverse); }
+}
