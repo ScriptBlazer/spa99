@@ -163,17 +163,20 @@ class EndNowAndPreviewTests(TestCase):
         self.assertIsNone(sales.sale_bar_for_request(request()))  # upcoming: no bar without the link
         token = sales.preview_token(sale)
         opened = request(f"/?sale_preview={token}")
-        sales.start_preview(opened)
+        self.assertEqual(sales.preview_offer(opened)["name"], "Christmas sale")  # a GET only offers
+        self.assertIsNone(sales.sale_bar_for_request(opened))
+        opened = request()
+        self.assertTrue(sales.start_preview(opened, token))
         shown = sales.sale_bar_for_request(opened)
         self.assertEqual((shown["name"], shown["plans_text"], shown["preview"]), ("Christmas sale", "Tier 2 and Tier 3", True))
         self.assertIsNone(sales.sale_bar_for_request(request("/", "config.urls_system")))
         garbage = request("/?sale_preview=garbage")
-        sales.start_preview(garbage)
+        self.assertFalse(sales.start_preview(garbage, "garbage"))
         self.assertIsNone(sales.sale_bar_for_request(garbage))
         with mock.patch("django.core.signing.time.time", return_value=time.time() + sales.PREVIEW_SECONDS + 5):
             self.assertIsNone(sales.sale_from_token(token))
-        req = request(f"/?sale_preview={token}")
-        sales.start_preview(req)  # opened: the browser keeps it for an hour, then it stops
+        req = request()
+        sales.start_preview(req, token)  # started: the browser keeps it for an hour, then it stops
         again = request()
         again.session = req.session
         self.assertIsNotNone(sales.sale_bar_for_request(again))

@@ -100,4 +100,7 @@ if (bar) {
     tick();
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { clearTimeout(timer); tick(); } });
   }
+
+  // After "End preview", Back may restore this page from the back/forward cache with the old preview bar: reload it.
+  if ('preview' in bar.dataset) window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
 }

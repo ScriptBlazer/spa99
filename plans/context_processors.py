@@ -15,4 +15,5 @@ def site(request):
 def sale(request):
     """`sale_bar` for public pages: {id, name, percent, plans_text, plan_slugs, months, starts_at, ends_at (ISO), preview} or None.
     Lazy (one query, only when a template reads it); None on the office, control and system hosts and when no sale is on."""
-    return {"sale_bar": SimpleLazyObject(lambda: sales.sale_bar_for_request(request))}
+    return {"sale_bar": SimpleLazyObject(lambda: sales.sale_bar_for_request(request)),
+            "sale_preview_offer": SimpleLazyObject(lambda: sales.preview_offer(request))}

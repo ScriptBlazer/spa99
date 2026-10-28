@@ -229,18 +229,41 @@ def sale_from_token(token, max_age=PREVIEW_SECONDS, spend=False):
     return sale
 
 
-def start_preview(request):
-    """A valid `?sale_preview=` token on a public page puts the sale in this browser's session for an hour (called by
-    plans.middleware.SalePreviewMiddleware, so it works whether or not the page reads the bar)."""
-    if request.GET.get(PREVIEW_PARAM) == "end":  # the "End preview" link in the bar
-        if getattr(request, "session", None) is not None:
-            request.session.pop(PREVIEW_KEY, None)
-        return
-    if getattr(request, "session", None) is None or request.method != "GET":
-        return  # a HEAD or other probe (link unfurlers, scanners) must not use up the single-use link
-    sale = sale_from_token(request.GET.get(PREVIEW_PARAM, ""), spend=True)  # single use: the first browser to open it gets the hour
-    if sale is not None:
-        request.session[PREVIEW_KEY] = {"sale": str(sale.pk), "until": time.time() + PREVIEW_SECONDS}
+def end_preview(request):
+    """`?sale_preview=end` (the "End preview" link in the bar) drops this browser's preview."""
+    if getattr(request, "session", None) is not None:
+        request.session.pop(PREVIEW_KEY, None)
+
+
+def preview_offer(request):
+    """A preview link opened with GET does NOT start anything (chat and email link scanners GET links, and would use up the single use):
+    the page shows a "Start preview" notice instead. Returns {token, name} for a valid, unspent link on a public page, else None.
+    Nothing is shown when this browser is already previewing that sale."""
+    token = request.GET.get(PREVIEW_PARAM, "") if request.method == "GET" and is_public_host(request) else ""
+    if not token or token == "end":
+        return None
+    sale = sale_from_token(token)  # not spent
+    if sale is None:
+        return None
+    nonce = signing.loads(token, salt=PREVIEW_SALT).get("n", "")
+    if cache.get(f"sale-preview-used:{nonce}"):
+        return None
+    current = _preview_sale(request)
+    if current is not None and current.pk == sale.pk:
+        return None
+    return {"token": token, "name": sale.name}
+
+
+def start_preview(request, token):
+    """POST from the "Start preview" button: spends the single-use link and puts the sale in this browser's session for an hour.
+    Returns True when it started. A second browser, an expired or spent link, or an ended sale does nothing."""
+    if getattr(request, "session", None) is None:
+        return False
+    sale = sale_from_token(token or "", spend=True)
+    if sale is None:
+        return False
+    request.session[PREVIEW_KEY] = {"sale": str(sale.pk), "until": time.time() + PREVIEW_SECONDS}
+    return True
 
 
 def _preview_sale(request):
