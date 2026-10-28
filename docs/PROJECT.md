@@ -496,3 +496,4 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-10-28 | Moishe: sale bar and sale sections back to the original espresso look (gold and cream both rejected). |
 | 2026-10-28 | Moishe: the Home "Three memberships. One single visit." section shows only when the visitor can see the tiers (email given at the journey, signed in, or Memberships public); otherwise it is left out. |
 | 2026-10-28 | Moishe: Home memberships section a little shorter (about 78% of a screen instead of a full screen), not small. |
+| 2026-10-28 | AI chat spec written (`docs/features/ai-chat.md`): own build on Claude (Console), public "Ask us" panel, data from the app + an FAQ edited in System, hard rules in code (no prices before email, Spa 99 topics only), hand-off to WhatsApp/email, £25 monthly cap on the Defaults page, chats in the Office for 90 days, chat hidden when the API key is missing. Branch `feature/ai-chat`. |
