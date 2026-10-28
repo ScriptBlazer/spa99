@@ -361,7 +361,15 @@ class ReviewFixTests(ChatTestCase):
         response = ask(self.client, "Hi")
         stream = iter(response.streaming_content)
         next(stream)  # the visitor reads one piece, then goes away
-        response.close()
+        # Closing a response fires request_finished, which would close the test's DB connection (Postgres in CI breaks
+        # every later test). The real server closes it after the request anyway; here only the generator must stop.
+        from django.core.signals import request_finished
+        from django.db import close_old_connections
+        request_finished.disconnect(close_old_connections)
+        try:
+            response.close()
+        finally:
+            request_finished.connect(close_old_connections)
         reply = Message.objects.get(role="assistant")
         self.assertEqual((reply.stop_reason, reply.text), ("aborted", "Hello"))
         self.assertGreater(reply.cost_pence, 0)
