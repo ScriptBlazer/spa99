@@ -1,0 +1,30 @@
+/* Back to top: a small espresso-glass pill, bottom right, cream text and a gold arrow. Reads on dark scenes and cream sections alike.
+   Stacking: below the header (10), the menu (30), toasts and modals; above page content. */
+.btt-sentinel { position: absolute; top: 100svh; left: 0; width: 1px; height: 1px; pointer-events: none; }
+.back-to-top {
+  position: fixed; z-index: 9; right: calc(var(--page-margin) + env(safe-area-inset-right)); bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-width: 2.75rem; min-height: 2.75rem; padding: 0 var(--space-3);
+  border: 1px solid var(--color-hairline-inverse); border-radius: 999px;
+  background: var(--color-header-solid); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  color: var(--color-text-inverse); box-shadow: var(--shadow-raised);
+  font-family: var(--font-body); font-size: var(--text-sm); line-height: 1; letter-spacing: var(--tracking-label); text-transform: uppercase; text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 0; visibility: hidden; transform: translateY(var(--rise));
+  transition: opacity var(--duration-base) var(--ease-soft), transform var(--duration-base) var(--ease-soft), visibility 0s linear var(--duration-base);
+}
+.back-to-top .icon { width: 1rem; height: 1rem; color: var(--color-gold); transition: transform var(--duration-press) var(--ease-soft); }
+.back-to-top.is-visible { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+.back-to-top:focus-visible { outline: 2px solid var(--color-focus-inverse); outline-offset: 3px; }
+@media (hover: hover) { .back-to-top:hover .icon { transform: translateY(-2px); } }
+/* phone: the arrow alone in a round 44px button (the label stays for screen readers through aria-label) */
+@media (max-width: 47.99em) {
+  .back-to-top { padding: 0; width: 2.75rem; }
+  .btt-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .back-to-top, .back-to-top.is-visible { transform: none; transition: opacity var(--duration-press) linear, visibility 0s linear var(--duration-press); }
+  .back-to-top.is-visible { transition-delay: 0s; }
+  .back-to-top .icon { transition: none; }
+}
+@media print { .back-to-top, .btt-sentinel { display: none; } }
