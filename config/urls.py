@@ -13,6 +13,7 @@ urlpatterns = [
     path("sale-preview/", preview_start, name="sale_preview_start"),  # public: POST from the "Start preview" button (signed link, CSRF)
     path("journey/", include("journey.urls")),
     path("gold/", include("gold.urls")),
+    path("chat/", include("chat.urls")),  # the Ask us chat (public host only)
     path("", include("mailings.urls")),  # public: unsubscribe and personal invite links
     path("", include("users.urls")),  # login, logout
     path("", include("users.urls_public")),  # register interest, verify, reset, account

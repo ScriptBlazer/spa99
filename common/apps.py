@@ -53,7 +53,7 @@ class CommonConfig(AppConfig):
         if sys.argv[1:2] == ["runserver"] and os.environ.get("RUN_MAIN") != "true":
             return
         logger.info(
-            "Spa 99 startup: settings=%s env=[%s] private=%s database=%s hosts=[%s] media=%s sentry=%s",
+            "Spa 99 startup: settings=%s env=[%s] private=%s database=%s hosts=[%s] media=%s sentry=%s chat=%s",
             report["settings"],
             ", ".join(report["env_sources"]) or "none",
             report["private_dir"],
@@ -61,6 +61,7 @@ class CommonConfig(AppConfig):
             report.get("hosts", ""),
             report["media"],
             report.get("sentry", "off"),
+            report.get("chat", "off"),
         )
         if report.get("media_is_local") and report["settings"].endswith("prod"):
             logger.warning(

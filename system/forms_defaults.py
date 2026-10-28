@@ -12,7 +12,7 @@ GROUPS = [
                 ("dashboard_gold_waiting", "shown"), ("dashboard_latest", "shown"), ("analytics_options", "shown"), ("top_pages", "shown"),
                 ("timeline_page_size", "events"), ("person_emails_shown", "emails")]),
     ("Website and journey", [("result_reasons", "reasons"), ("gold_nudge_high", ""), ("gold_nudge_medium", ""), ("gold_nudge_low", ""),
-                             ("opener_lines", "lines")]),
+                             ("opener_lines", "lines"), ("chat_monthly_cap_gbp", "£ a month")]),
     ("Gold", [("gold_invite_days", "days"), ("gold_approval_days", "days")]),
     ("Emails", [("register_invite_days", "days"), ("recent_mailings", "shown"), ("recent_batches", "shown")]),
     ("Sign-in", [("office_session_days", "days"), ("email_confirm_hours", "hours")]),

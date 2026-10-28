@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import views, views_code as c, views_defaults as d, views_emails as e, views_rules as r, views_sales as sl
+from . import views, views_code as c, views_defaults as d, views_faq as fq, views_emails as e, views_rules as r, views_sales as sl
 from .permissions import unlocked
 
 urlpatterns = [
@@ -64,6 +64,9 @@ urlpatterns = [
     path("emails/suppressions/<uuid:pk>/remove/", views.suppression_remove, name="system_suppression_remove"),
     path("suppressions/", RedirectView.as_view(pattern_name="system_suppressions", permanent=True)),  # moved into Emails (2026-10-27)
     path("settings/", views.site_settings, name="system_settings"),
+    path("faq/", fq.faq, name="system_faq"),
+    path("faq/add/", fq.faq_save, name="system_faq_add"),
+    path("faq/<uuid:pk>/", fq.faq_save, name="system_faq_save"),
     path("defaults/", d.defaults_page, name="system_defaults"),
     path("defaults/reset/", d.defaults_reset, name="system_defaults_reset"),
     path("password/", unlocked(views.SystemPasswordView.as_view()), name="system_password"),

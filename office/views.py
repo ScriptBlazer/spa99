@@ -13,6 +13,9 @@ from django.utils.cache import patch_vary_headers
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
+from chat import services as chat_services
+from chat.models import Conversation, Message
+from django.db.models import OuterRef, Subquery
 from gold import actions as gold_actions
 from gold import approval, audit, invites
 from gold import services as gold_services
@@ -232,6 +235,7 @@ def lead_export(request, pk):
         return redirect("office_person_export", pk=data.pk)
     body = {"email": data["email"], "sessions": journey_services.export_lead(data["email"]),
             "emails": journey_services.export_lead_emails(data["email"]),
+            "chats": chat_services.export_conversations(email=data["email"]),
             "gold_applications": gold_services.export_applications(data["email"])}
     response = JsonResponse(body, json_dumps_params={"indent": 2})
     response["Content-Disposition"] = 'attachment; filename="spa99-lead.json"'
@@ -248,6 +252,28 @@ def lead_delete(request, pk):
     cleared = journey_services.erase_lead_data(data["email"])
     messages.success(request, f"The email was cleared from {cleared} journey{'s' if cleared != 1 else ''}. The answers stay, without it.")
     return redirect("office_leads")
+
+
+# ---------- chats (Ask us) ----------
+
+@reader
+@require_GET
+@never_cache
+def chats(request):
+    """The Ask us conversations, newest first, a page at a time (one extra row instead of a count). View only."""
+    first = Message.objects.filter(conversation=OuterRef("pk"), role=Message.USER).order_by("created_at").values("text")[:1]
+    queryset = Conversation.objects.annotate(preview=Subquery(first)).select_related("user")
+    page = lists.page_number(request)
+    rows, has_next = lists.cut(queryset, page, defaults.get(request).list_page_size)
+    return render(request, "office/chats.html", {"rows": rows, "has_next": has_next, "page": page, "section": "chats"})
+
+
+@reader
+@require_GET
+@never_cache
+def chat_detail(request, pk):
+    conversation = get_object_or_404(Conversation.objects.select_related("user"), pk=pk)
+    return render(request, "office/chat_detail.html", {"conversation": conversation, "messages_list": conversation.messages.all(), "section": "chats"})
 
 
 # ---------- gold ----------

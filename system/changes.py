@@ -18,6 +18,7 @@ MODEL_SECTIONS = {
     "system.sitedefaults": "defaults",
     "plans.plan": "plans",
     "plans.sale": "sales",
+    "chat.faqitem": "faq",
     "plans.openingrule": "hours",
     "plans.closure": "hours",
     "gold.goldchoice": "gold",
@@ -40,7 +41,7 @@ FIELD_SECTIONS = {
 }
 SECTION_LABELS = {
     "plans": "Plans and pricing", "hours": "Hours and closures", "gold": "Gold rules", "journey": "Journey",
-    "emails": "Emails", "settings": "Settings", "defaults": "Defaults", "team": "Team", "approval": "Approval", "sales": "Sales",
+    "emails": "Emails", "settings": "Settings", "defaults": "Defaults", "team": "Team", "approval": "Approval", "sales": "Sales", "faq": "FAQ",
 }
 SKIP_FIELDS = {"id", "created_at", "updated_at", "singleton_key"}
 
