@@ -41,6 +41,7 @@
   {% tour_modules as tour_mods %}{{ tour_mods|json_script:"tour-modules" }}
 </div>
 {% endblock %}
+{% block chat %}{% endblock %}{# full-screen 3D with its own corners: no Ask us here (ASK-US-CHAT 1) #}
 {% block scripts %}
 {# The only script on this page until the gate passes: it loads three.js and the engine itself (VIRTUAL-TOUR 4.2). #}
 <script type="module" src="{% static 'common/js/tour/boot.js' %}"></script>

@@ -1,0 +1,78 @@
+{% load static %}{% comment %}The Ask us chat: the pill and the panel (docs/design/ASK-US-CHAT.md). Rendered by base.html only when `chat_button` is true.
+Everything here is static; common/js/chat.js fills it. Without JavaScript the pill stays hidden, so there is never a button that does nothing.{% endcomment %}
+<button type="button" class="chat-pill" data-chat-open aria-haspopup="dialog" aria-controls="ask-us" aria-label="Ask us" hidden>{% include "common/_mark.html" %}<span class="chat-pill-label">Ask us</span></button>
+
+<dialog id="ask-us" class="chat on-dark" aria-labelledby="ask-us-title" data-chat
+  data-state-url="{% url 'chat:state' %}" data-message-url="{% url 'chat:message' %}" data-email-url="{% url 'chat:email' %}"
+  data-privacy-url="{% url 'privacy' %}#chat" data-contact-email="{{ chat_handoff.email }}">
+  <div class="chat-sheet">
+    <header class="chat-head">
+      <h2 class="chat-title" id="ask-us-title" tabindex="-1">{% include "common/_mark.html" %}<span>Ask us</span></h2>
+      <div class="chat-head-actions">
+        <button type="button" class="menu-toggle chat-head-btn" data-chat-new hidden>New chat</button>
+        <button type="button" class="menu-toggle chat-head-btn" data-chat-close>Close</button>
+      </div>
+    </header>
+
+    <div class="chat-body" data-chat-scroll>
+      <div class="chat-welcome" data-chat-welcome>
+        <p class="chat-welcome-title" data-chat-welcome-title>Ask us anything.</p>
+        <p class="chat-welcome-line" data-chat-welcome-line>The spa, memberships, hours or the Gold Card.</p>
+        <ul class="chat-chips" data-chat-chips>
+          {% for question in chat_suggested %}<li><button type="button" class="chat-chip" data-chat-chip>{{ question }}</button></li>
+          {% empty %}<li><button type="button" class="chat-chip" data-chat-chip>When do you open?</button></li>
+          <li><button type="button" class="chat-chip" data-chat-chip>What is included in a membership?</button></li>
+          <li><button type="button" class="chat-chip" data-chat-chip>What is the Gold Card?</button></li>
+          <li><button type="button" class="chat-chip" data-chat-chip>Where are you?</button></li>{% endfor %}
+        </ul>
+        <p class="chat-person" data-chat-person>Prefer a person? <button type="button" class="chat-link" data-chat-person-open>Message our team</button>.</p>
+      </div>
+      <div class="chat-log" role="log" aria-live="off" aria-label="Conversation" data-chat-log></div>
+    </div>
+
+    <form class="chat-compose" data-chat-form novalidate>
+      <p class="chat-offline small" data-chat-offline hidden>You seem to be offline.</p>
+      <div class="chat-compose-row">
+        <label class="sr-only" for="ask-us-input">Your question</label>
+        <textarea id="ask-us-input" class="chat-input" name="message" rows="1" maxlength="500" placeholder="Ask a question" autocomplete="off" enterkeyhint="send" data-chat-input></textarea>
+        <button type="submit" class="btn btn-primary chat-send" aria-label="Send" data-chat-send>{% include "common/_icon.html" with name="arrow-right" %}</button>
+      </div>
+      <p class="chat-limit small" data-chat-limit hidden></p>
+      <p class="chat-privacy small" data-chat-privacy>AI assistant. Chats are kept for 90 days. <a href="{% url 'privacy' %}#chat">Privacy notice</a></p>
+    </form>
+
+    <p class="sr-only" aria-live="polite" data-chat-live></p>
+  </div>
+
+  <template data-chat-tpl="handoff">
+    <div class="chat-block chat-handoff" data-chat-handoff>
+      <p class="chat-block-line">Our team will gladly help.</p>
+      <div class="chat-actions">
+        <a class="btn btn-primary" data-chat-whatsapp href="{{ chat_handoff.whatsapp_url }}" target="_blank" rel="noopener">WhatsApp us</a>
+        <a class="btn btn-secondary" data-chat-mail href="{{ chat_handoff.mailto }}">Email us</a>
+      </div>
+      <p class="chat-block-address small" data-chat-address>{{ chat_handoff.email }}</p>
+    </div>
+  </template>
+
+  <template data-chat-tpl="email">
+    <form class="chat-block chat-email" novalidate data-chat-email>
+      <p class="chat-block-line">We share prices once we have your email. Leave it here and we will show them in this chat.</p>
+      <div class="field">
+        <label for="ask-us-email">{{ chat_gate.email_label }}</label>
+        <input id="ask-us-email" class="input" type="email" name="email" autocomplete="email" inputmode="email" aria-describedby="ask-us-email-msg">
+        <p class="feedback" id="ask-us-email-msg" data-error-for="email" aria-live="polite" data-state="hint"></p>
+      </div>
+      <div class="field">
+        <label class="check"><input type="checkbox" name="consent" aria-describedby="ask-us-consent-msg"><span>{{ chat_gate.consent }} <a href="{% url 'privacy' %}">{{ chat_gate.privacy_label }}</a></span></label>
+        <p class="feedback" id="ask-us-consent-msg" data-error-for="consent" aria-live="polite" data-state="hint"></p>
+      </div>
+      <div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
+      <div class="chat-actions">
+        <button type="submit" class="btn btn-primary" data-chat-email-save>Show prices</button>
+        <button type="button" class="btn-quiet" data-chat-email-skip>Not now</button>
+      </div>
+    </form>
+  </template>
+</dialog>
+<script type="module" src="{% static 'common/js/chat.js' %}"></script>

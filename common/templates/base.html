@@ -16,6 +16,7 @@
 </main>
 {% block footer %}{% include "common/_footer.html" %}{% endblock %}
 {% block feedback %}{% include "common/_feedback.html" %}{% endblock %}
+{% block chat %}{% if chat_button %}{% include "chat/_chat.html" %}{% endif %}{% endblock %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

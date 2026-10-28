@@ -15,7 +15,10 @@ def chat(request):
     button = enabled and not request.path.startswith(HIDDEN_PREFIXES)
     if not button:
         return {"chat_enabled": enabled, "chat_button": False}
+    from journey.copy import GATE
+
     from . import services
 
     return {"chat_enabled": True, "chat_button": True, "chat_handoff": SimpleLazyObject(services.handoff_links),
-            "chat_suggested": SimpleLazyObject(services.suggested_questions)}
+            "chat_suggested": SimpleLazyObject(services.suggested_questions),
+            "chat_gate": GATE}  # the journey's own consent words, reused word for word in the email block

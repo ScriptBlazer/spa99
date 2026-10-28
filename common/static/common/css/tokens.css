@@ -156,6 +156,8 @@
   --gc-tilt-max: 6deg;                         /* derived: pointer tilt cap */
   /* The spa page (docs/design/SPA-PAGE.md 7.3). Derived. */
   --chip-h: 2.75rem;                           /* a link chip: 44px tap target */
+  --chat-w: 27rem;                             /* proposed, Ask us: desktop panel width */
+  --z-chat-entry: 30;                          /* proposed, Ask us: the pill; above sticky bars (20), below toasts (100) */
   --pill-h: 2rem;                              /* a static pill */
   --frame-h-feature: min(68svh, 34rem);        /* max height of a feature frame, desktop */
   --tile-w-phone: 72vw;                        /* a tile in the phone scroll row */
