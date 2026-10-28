@@ -1,0 +1,31 @@
+{% extends "system/assistant_base.html" %}
+{% load system_ui %}
+{% block title %}FAQ{% endblock %}
+{% block main %}
+{% include "system/_page_header.html" with title="Assistant" description="Questions and answers the Ask us assistant may use. It answers from these and the site's own data, and never goes beyond them. Tick Suggested to show a question as a tap-to-ask chip (the first four, in order)." %}
+{% include "system/_assistant_tabs.html" with tab="faq" %}
+<section class="sys-panel" aria-labelledby="faq-h"><header><h2 id="faq-h">Entries</h2></header>
+  <div class="sys-scroll"><table class="sys-table">
+    <thead><tr><th scope="col">Question</th><th scope="col">Answer</th><th scope="col" class="sys-num">Order</th><th scope="col">Suggested</th><th scope="col">Shown</th><th scope="col"><span class="sr">Save</span></th></tr></thead>
+    <tbody>
+    {% for row in rows %}{% with pk=row.obj.pk f=row.form %}
+      <tr data-system-faq="{{ pk }}" data-row-label="{{ row.obj.question|truncatechars:40 }}"{% if not row.obj.visible %} data-hidden{% endif %}>
+        <td><form id="f-{{ pk }}" method="post" action="{% url 'system_faq_save' pk %}" data-problems data-system-form="faq" data-noun="FAQ entry" data-plural="FAQ entries">{% csrf_token %}</form>{% token f.row_token pk %}{% cell f.question pk "Question" %}</td>
+        <td>{% cell f.answer pk "Answer" %}</td>
+        <td class="sys-num">{% cell f.order pk "Order" %}</td>
+        <td>{% cell f.suggested pk "Suggested" %}</td>
+        <td>{% cell f.visible pk "Shown" %}</td>
+        <td><button type="submit" form="f-{{ pk }}" class="sys-btn sm sys-rowsave">Save</button></td>
+      </tr>
+      {% if f.errors %}<tr class="sys-rowerr" data-problem-form="f-{{ pk }}"><td colspan="6" class="sys-error" role="alert">{{ f|error_spans }}</td></tr>{% endif %}
+    {% endwith %}{% empty %}<tr><td class="sys-empty" colspan="6">No entries yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+<details class="sys-panel" data-system-add="faq"{% if add_form.errors %} open{% endif %}><summary class="sys-add">Add an entry</summary>
+  <form method="post" action="{% url 'system_faq_add' %}" data-problems data-system-form="faq-add" data-system-add class="sys-group">{% csrf_token %}
+    {% include "system/_fields.html" with form=add_form %}
+    <div class="sys-inline-save" style="display:block"><button type="submit" class="sys-btn primary">Add entry</button></div>
+  </form>
+</details>
+{% endblock %}

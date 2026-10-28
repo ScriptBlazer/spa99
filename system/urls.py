@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import views, views_code as c, views_defaults as d, views_emails as e, views_rules as r, views_sales as sl
+from . import views, views_code as c, views_defaults as d, views_faq as fq, views_assistant as asst, views_emails as e, views_rules as r, views_sales as sl
 from .permissions import unlocked
 
 urlpatterns = [
@@ -64,6 +64,21 @@ urlpatterns = [
     path("emails/suppressions/<uuid:pk>/remove/", views.suppression_remove, name="system_suppression_remove"),
     path("suppressions/", RedirectView.as_view(pattern_name="system_suppressions", permanent=True)),  # moved into Emails (2026-10-27)
     path("settings/", views.site_settings, name="system_settings"),
+    path("assistant/", asst.assistant, name="system_assistant"),
+    path("assistant/switch/", asst.assistant_switch, name="system_assistant_switch"),
+    path("assistant/test/", asst.assistant_test, name="system_assistant_test"),
+    path("assistant/notes/", asst.notes, name="system_notes"),
+    path("assistant/notes/add/", asst.note_save, name="system_note_add"),
+    path("assistant/notes/<uuid:pk>/", asst.note_save, name="system_note_save"),
+    path("assistant/faq/", fq.faq, name="system_faq"),
+    path("assistant/faq/add/", fq.faq_save, name="system_faq_add"),
+    path("assistant/faq/<uuid:pk>/", fq.faq_save, name="system_faq_save"),
+    path("assistant/personality/", asst.personality_page, name="system_personality"),
+    path("assistant/personality/save/", asst.personality_save, name="system_personality_save"),
+    path("assistant/limits/", asst.limits, name="system_limits"),
+    path("assistant/limits/save/", asst.limits_save, name="system_limits_save"),
+    path("assistant/limits/cap/", asst.cap_save, name="system_limits_cap"),
+    path("faq/", RedirectView.as_view(pattern_name="system_faq", permanent=True)),  # moved under Assistant
     path("defaults/", d.defaults_page, name="system_defaults"),
     path("defaults/reset/", d.defaults_reset, name="system_defaults_reset"),
     path("password/", unlocked(views.SystemPasswordView.as_view()), name="system_password"),

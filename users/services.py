@@ -9,6 +9,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from chat import services as chat_services
 from common.models import LoginEvent
 from common.tasks import enqueue, erase_task_records
 from gold import services as gold_services
@@ -273,6 +274,7 @@ def export_user_data(user):
         **({"approval_emails": {"use_account_email": delivery.use_account_email, "other_email": delivery.other_email}} if delivery else {}),
         "interest": _export_interest(user),
         "journey_sessions": _export_sessions(user),
+        "chats": chat_services.export_conversations(user=user, email=user.email if user.email_verified_at else None),
         "gold_applications": gold_services.export_applications(user.email) if user.email_verified_at else [],  # by email only once the address is proven his
         "emails": [
             {"template": e.template, "subject": e.subject, "status": e.status, "sent_at": _plain(e.sent_at)}
@@ -381,6 +383,7 @@ def delete_user_data(user):
     rows that copy their details. Journey sessions are anonymised (kept for statistics, no longer linked).
     Erasure overrides the "history is never deleted" rule because history holds personal data."""
     pk, email = user.pk, user.email
+    chat_services.erase_conversations(user=user)  # before the sessions are unlinked (chats are also found through the account's sessions)
     anonymised = _anonymise_sessions(user)
     proven = bool(user.email_verified_at)  # rows found only by email are his only once the address is proven (an unverified account may carry someone else's address)
     if proven:

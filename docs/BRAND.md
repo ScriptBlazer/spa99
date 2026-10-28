@@ -294,6 +294,11 @@ Kept in sync with `common/static/common/css/tokens.css`. Brand values are the fo
   --gc-tilt-max: 6deg;                         /* derived: pointer tilt cap */
   /* The spa page (docs/design/SPA-PAGE.md 7.3). Derived. */
   --chip-h: 2.75rem;                           /* derived: a link chip, 44px tap target */
+  --chat-w: 23.75rem;                          /* proposed, Ask us (revision 2026-10-28): desktop card width, 380px */
+  --chat-text: 0.9375rem;                      /* derived, Ask us: panel body, 15px */
+  --chat-small: 0.8125rem;                     /* derived, Ask us: hints and privacy line, 13px */
+  --chat-heading: 1.5rem;                      /* derived, Ask us: welcome heading, 24px */
+  --z-chat-entry: 30;                          /* proposed, Ask us: the pill; above sticky bars (20), below toasts (100) */
   --pill-h: 2rem;                              /* derived: a static pill */
   --frame-h-feature: min(68svh, 34rem);        /* derived: max height of a feature frame, desktop */
   --tile-w-phone: 72vw;                        /* derived: a tile in the phone scroll row */

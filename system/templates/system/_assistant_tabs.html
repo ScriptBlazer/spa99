@@ -1,0 +1,8 @@
+{# Sub-navigation of System > Assistant. Context: tab (overview, notes, faq, personality, limits). #}
+<nav class="sa-tabs" aria-label="Assistant">
+  <a href="{% url 'system_assistant' %}"{% if tab == "overview" %} aria-current="page"{% endif %}>Overview and test</a>
+  <a href="{% url 'system_notes' %}"{% if tab == "notes" %} aria-current="page"{% endif %}>Knowledge notes</a>
+  <a href="{% url 'system_faq' %}"{% if tab == "faq" %} aria-current="page"{% endif %}>FAQ</a>
+  <a href="{% url 'system_personality' %}"{% if tab == "personality" %} aria-current="page"{% endif %}>Personality and rules</a>
+  <a href="{% url 'system_limits' %}"{% if tab == "limits" %} aria-current="page"{% endif %}>Limits</a>
+</nav>

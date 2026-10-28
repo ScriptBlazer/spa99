@@ -1,0 +1,17 @@
+{% extends "office/base.html" %}
+{% load office_tags %}
+{% block title %}Chat | Spa 99 Office{% endblock %}
+{% block main %}
+<p><a class="o-quiet" href="{% url 'office_chats' %}">Chats</a></p>
+<h1>Chat, {{ conversation.created_at|dt }}</h1>
+<p class="o-totalline">{% if conversation.user %}{{ conversation.user.email }} (signed in){% elif conversation.lead_email %}{{ conversation.lead_email }} (gave their email in the chat){% else %}Anonymous{% endif %}
+  · {{ conversation.message_count }} message{{ conversation.message_count|pluralize }} · {{ conversation.total_cost_pence|floatformat:2 }}p{% if conversation.ended_by_cap %} · stopped by the spending cap{% endif %}{% if conversation.ended_off_topic %} · closed after off-topic turns{% endif %}</p>
+<div class="o-card">
+  <ol class="o-chat" style="list-style:none;margin:0;padding:var(--space-4)">
+  {% for m in messages_list %}
+    <li style="margin-bottom:var(--space-4)"><p><strong>{% if m.role == "user" %}Visitor{% else %}Spa 99{% endif %}</strong> <span class="o-quiet">{{ m.created_at|dt }}{% if m.off_topic %} · off-topic{% endif %}{% if m.flagged_handoff %} · hand-off shown{% endif %}{% if m.offered_email %} · asked for an email{% endif %}{% if m.role == "assistant" and m.stop_reason %} · {{ m.stop_reason }}, {{ m.input_tokens }} in, {{ m.output_tokens }} out, {{ m.cache_read_tokens }} cached, {{ m.cost_pence|floatformat:2 }}p{% endif %}</span></p>
+      <p style="white-space:pre-wrap">{{ m.text }}</p></li>
+  {% endfor %}
+  </ol>
+</div>
+{% endblock %}

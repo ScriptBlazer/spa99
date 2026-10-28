@@ -178,6 +178,9 @@ def erase_lead(email):
     email = (email or "").strip()
     if not email:
         return 0
+    from chat import services as chat_services  # local: chat reads the journey session
+
+    chat_services.erase_conversations(email=email)  # chats where the address was given
     ids = list(JourneySession.objects.filter(lead_email__iexact=email).values_list("pk", flat=True))
     JourneySession.objects.filter(pk__in=ids).update(lead_email="", lead_at=None, lead_privacy_version="")
     JourneySession.history.model.objects.filter(lead_email__iexact=email).update(lead_email="", lead_at=None, lead_privacy_version="")
@@ -192,9 +195,11 @@ def erase_lead_data(email):
     email = (email or "").strip()
     if not email:
         return 0
+    from chat import services as chat_services
     from mailings.erasure import erase_address
     from notifications.models import EmailLog
 
+    chat_services.erase_conversations(email=email)
     ids = list(JourneySession.objects.filter(lead_email__iexact=email).values_list("pk", flat=True))
     for pk in ids:
         JourneySession.objects.filter(pk=pk).update(key=new_session_key(), person_key="", referrer="", lead_email="", lead_at=None, lead_privacy_version="")

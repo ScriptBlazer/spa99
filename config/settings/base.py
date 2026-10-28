@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "system",
     "control",
     "pages",
+    "chat",
 ]
 
 MIDDLEWARE = [
@@ -97,6 +98,7 @@ TEMPLATES = [
                 "users.context.member_area",
                 "office.context.office",
                 "system.context.system",
+                "chat.context.chat",
             ],
         },
     },
@@ -108,7 +110,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Cache: the database (table spa99_cache; `manage.py createcachetable`, run on start by entrypoint.sh), so the rate limits
 # (sign-in, unlock) are shared by every gunicorn worker. Works on SQLite and Postgres. Tests and the e2e run override it.
-CACHES = {"default": {"BACKEND": "django.core.cache.backends.db.DatabaseCache", "LOCATION": "spa99_cache", "OPTIONS": {"MAX_ENTRIES": 10000}}}
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.db.DatabaseCache", "LOCATION": "spa99_cache", "OPTIONS": {"MAX_ENTRIES": 100000}}}
 
 AUTH_USER_MODEL = "users.User"
 LOGIN_URL = "/login/"
@@ -167,6 +169,22 @@ SYSTEM_UNLOCK_SECONDS = 15 * 60  # System asks for the password again after this
 SYSTEM_AUDIT_RETENTION_DAYS = int(ENV.get("SYSTEM_AUDIT_RETENTION_DAYS", "0") or 0)  # 0 = keep the audit log forever; used only by `manage.py prune_audit_log`
 SYSTEM_SESSION_AGE = 12 * 60 * 60  # a System sign-in lasts 12 hours at most
 
+
+# "Ask us" chat (docs/features/ai-chat.md). The key is a secret: never logged or printed. Blank = the chat is off (button hidden).
+ANTHROPIC_API_KEY = (ENV.get("ANTHROPIC_API_KEY", "") or "").strip()
+CHAT_MODEL = "claude-opus-5-5"
+CHAT_MAX_TOKENS = 500  # per reply, thinking included (always on for this model, effort "low"): replies are a few sentences. A reply that hits it ends with "..." and the hand-off, never continues
+CHAT_TIMEOUT_SECONDS = 45  # wall-clock limit for one streamed reply; the SDK's own timeout is per read
+CHAT_GBP_PER_USD = "0.79"  # fixed rate used to turn token cost (USD) into pence for the cap. Update by hand if the rate moves a lot
+CHAT_RETENTION_DAYS = 90  # the privacy notice says 90
+# Abuse limits (docs/features/ai-chat.md, Security). All server side. The editable ones (messages per conversation, characters, rates,
+# daily cap share, on/off) live in System > Assistant > Limits (chat.AssistantSettings); the rest are here.
+CHAT_MAX_LINES = 6  # a message with more lines than this is treated as pasted text or code
+CHAT_HISTORY_MESSAGES = 8  # the last this-many messages are sent to the model, no more
+CHAT_MAX_CONVERSATIONS_PER_HOUR = 200  # new conversations, whole site
+CHAT_OFF_TOPIC_LIMIT = 2  # off-topic or refused turns after which the conversation is closed
+CHAT_COOKIE = "spa99_chat"  # set by GET /chat/state/: proves the request comes from the page
+CHAT_COOKIE_SECONDS = 24 * 60 * 60
 
 LANGUAGE_CODE = "en-gb"
 TIME_ZONE = "Europe/London"
@@ -252,6 +270,7 @@ def build_startup_report(settings_module):
         "hosts": f"office={OFFICE_HOST} control={CONTROL_HOST} system={SYSTEM_HOST}",
         "media": MEDIA_DESCRIPTION,
         "sentry": SENTRY_STATE,
+        "chat": "on" if ANTHROPIC_API_KEY else "off",
         "unlock_code_set": bool(SYSTEM_UNLOCK_CODE),
         "unlock_code_invalid": bool(SYSTEM_UNLOCK_CODE_RAW) and not SYSTEM_UNLOCK_CODE_VALID,
         "media_is_local": MEDIA_IS_LOCAL,

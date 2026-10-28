@@ -8,6 +8,7 @@ SCHEDULES = [
     {"name": "heartbeat", "func": "common.tasks.heartbeat", "schedule_type": Schedule.HOURLY},
     {"name": "metrics-rollup", "func": "insights.rollup.scheduled", "schedule_type": Schedule.HOURLY},
     {"name": "system-audit-verify", "func": "system.audit.scheduled", "schedule_type": Schedule.HOURLY},
+    {"name": "chat-prune", "func": "chat.tasks.prune_scheduled", "schedule_type": Schedule.DAILY, "at": (3, 30)},  # Ask us chats older than 90 days
     # Daily from the next 00:01 London (`at`): "today" starts empty and the Dashboard must not wait for the next hourly run
     {"name": "metrics-rollup-midnight", "func": "insights.rollup.scheduled", "schedule_type": Schedule.DAILY, "at": (0, 1)},
 ]

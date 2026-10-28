@@ -18,6 +18,9 @@ MODEL_SECTIONS = {
     "system.sitedefaults": "defaults",
     "plans.plan": "plans",
     "plans.sale": "sales",
+    "chat.faqitem": "assistant",
+    "chat.knowledgenote": "assistant",
+    "chat.assistantsettings": "assistant",
     "plans.openingrule": "hours",
     "plans.closure": "hours",
     "gold.goldchoice": "gold",
@@ -29,6 +32,7 @@ MODEL_SECTIONS = {
     "notifications.notificationtemplate": "emails",
 }
 FIELD_SECTIONS = {
+    ("system.sitedefaults", "chat_monthly_cap_gbp"): "assistant",
     ("plans.sitesettings", "gold_approver_emails"): "emails",
     ("plans.sitesettings", "gold_approver_cc"): "emails",
     ("plans.sitesettings", "contact_email"): "emails",
@@ -40,7 +44,7 @@ FIELD_SECTIONS = {
 }
 SECTION_LABELS = {
     "plans": "Plans and pricing", "hours": "Hours and closures", "gold": "Gold rules", "journey": "Journey",
-    "emails": "Emails", "settings": "Settings", "defaults": "Defaults", "team": "Team", "approval": "Approval", "sales": "Sales",
+    "emails": "Emails", "settings": "Settings", "defaults": "Defaults", "team": "Team", "approval": "Approval", "sales": "Sales", "assistant": "Assistant",
 }
 SKIP_FIELDS = {"id", "created_at", "updated_at", "singleton_key"}
 

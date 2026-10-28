@@ -12,7 +12,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from . import audit, changes, services
 
-SECTIONS = {"plans", "hours", "gold", "journey", "emails", "settings", "team", "approval", "sales", "changes"}
+SECTIONS = {"plans", "hours", "gold", "journey", "emails", "settings", "team", "approval", "sales", "assistant", "faq", "changes"}
 
 
 def gate(request):

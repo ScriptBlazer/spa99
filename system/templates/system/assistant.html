@@ -1,0 +1,36 @@
+{% extends "system/assistant_base.html" %}
+{% block title %}Assistant{% endblock %}
+{% block main %}
+{% include "system/_page_header.html" with title="Assistant" description="The Ask us assistant on the public site: what it knows, how it sounds, what it may spend." %}
+{% include "system/_assistant_tabs.html" with tab="overview" %}
+<section class="sys-panel" aria-labelledby="sa-over-h"><header><h2 id="sa-over-h">This month</h2></header>
+  <div class="sa-figures">
+    <p><strong>£{{ spent_pounds }} of £{{ cap }}</strong>spent this month (visitors and tests)</p>
+    <p><strong>£{{ spent_today_pounds }}</strong>today, soft cap £{{ daily_cap }}</p>
+    <p><strong>{{ today }}</strong>conversations today</p>
+    <p><strong>{{ month }}</strong>conversations this month</p>
+    <p><strong>{% if key_set %}{% if enabled %}On{% else %}Off{% endif %}{% else %}No API key{% endif %}</strong>assistant</p>
+  </div>
+  <form method="post" action="{% url 'system_assistant_switch' %}">{% csrf_token %}
+    <button type="submit" class="sys-btn">{% if enabled %}Turn off{% else %}Turn on{% endif %}</button>
+    <span class="sys-muted">{% if enabled %}Turning it off hides the Ask us button and refuses every chat request at once.{% else %}The button is hidden and chats are refused.{% endif %}</span>
+  </form>
+</section>
+<section class="sys-panel" aria-labelledby="sa-test-h"><header><h2 id="sa-test-h">Test console</h2></header>
+  {% if not key_set %}<p class="sys-note">Set ANTHROPIC_API_KEY to test.</p>{% else %}
+  <p class="sys-muted">Talks to the real assistant with the live knowledge. Not counted against visitor limits, counted in spend, left out of the Office chats.</p>
+  <form method="post" action="{% url 'system_assistant_test' %}" data-assistant-test>{% csrf_token %}
+    <input type="hidden" name="conversation_id" value="">
+    <div class="sa-log" data-test-log aria-live="polite"></div>
+    <div class="sa-form">
+      <textarea name="message" rows="2" maxlength="1000" aria-label="Question" placeholder="Ask it something"></textarea>
+      <label><input type="radio" name="prices" value="no" checked> Without prices</label>
+      <label><input type="radio" name="prices" value="yes"> With prices</label>
+      <button type="submit" class="sys-btn primary">Send</button>
+      <button type="button" class="sys-btn" data-test-reset>New test</button>
+    </div>
+    <details><summary>What was sent to the model</summary><pre class="sa-pre" data-test-knowledge></pre></details>
+    <details><summary>Events</summary><pre class="sa-pre" data-test-events></pre></details>
+  </form>{% endif %}
+</section>
+{% endblock %}

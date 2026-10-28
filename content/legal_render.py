@@ -48,6 +48,11 @@ def render(text, contact="", version="", values=None, show_placeholders=False):
             continue
         kind = "li" if raw.startswith("- ") else "h3" if raw.startswith("### ") else "p"
         body = raw[2:] if kind == "li" else raw[4:] if kind == "h3" else raw
+        anchor = ""
+        if kind == "h3":  # "### Title {#id}" gives the heading an id, so a link can point at it (/privacy/#chat)
+            found = re.search(r"\s*\{#([a-z0-9-]+)\}$", body)
+            if found:
+                anchor, body = f' id="{found.group(1)}"', body[:found.start()]
         line = escape(body)
         line = LINK.sub(lambda m: f'<a href="{m.group(2)}">{m.group(1)}</a>', line)
         line = line.replace("{contact}", contact_html).replace("{version}", escape(version))
@@ -63,6 +68,6 @@ def render(text, contact="", version="", values=None, show_placeholders=False):
             items.append(line)
             continue
         close_list()
-        out.append(f"<{kind}>{line}</{kind}>")
+        out.append(f"<{kind}{anchor}>{line}</{kind}>")
     close_list()
     return mark_safe("\n".join(out))

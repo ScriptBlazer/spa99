@@ -4,6 +4,7 @@ proposals are in docs/features/legal.md. Written into content rows by `seed_phas
 
 How a legal body is written (one line per block, rendered by `content.legal_render`):
 - a plain line is a paragraph
+- "### Title {#id}" gives a small heading an anchor (lowercase letters, digits and dashes), e.g. /privacy/#chat
 - "- " starts a list item (lines in a row make one list)
 - "### " starts a small heading inside a part
 - [words](/path/) or [words](https://...) is a link
@@ -15,7 +16,7 @@ How a legal body is written (one line per block, rendered by `content.legal_rend
 Keys: `body` (title and intro), `updated` (the date shown), `part_N` (the numbered parts, in order), `contact`."""
 
 UPDATED = "26 October 2026"
-PRIVACY_UPDATED = "27 October 2026"  # Postmark added as the email sender
+PRIVACY_UPDATED = "28 October 2026"  # Ask us chat (Anthropic) added; earlier: Postmark added as the email sender
 PRIVACY_VERSION = "2026-10-26"  # SiteSettings.privacy_version; recorded on everyone who accepts this notice
 
 COMPANY_LINE = ("Spa 99 is run by BML SPA 99 LIMITED, a company registered in England (company number 16930909). "
@@ -65,6 +66,9 @@ PRIVACY_PARTS = [
         "- Whether you would like news from us by email, and which version of this notice you accepted.",
         "- Our decision and, if we approve, the date and the invitation we send you.",
         "- If our team writes to you about your application (for example to ask a question), a record of that email.",
+        "### When you use the Ask us chat {#chat}",
+        "- What you type to the assistant and its replies, with the time. If you gave your email to see prices, or you are "
+        "signed in, the chat is linked to it. We do not store your IP address with a chat.",
         "### Change history",
         "- Earlier versions of your details (a change history): when your account, registration or Gold Card "
         "application changes, we keep the previous version, so we can see what changed and put mistakes right. "
@@ -98,6 +102,9 @@ PRIVACY_PARTS = [
         "to understand which membership suits people (your answers, linked to your address, show us what people "
         "choose). Basis: your consent. You can withdraw it at any time by following the unsubscribe link in any email "
         "or by writing to {contact}; we then stop emailing you and delete the address.",
+        "### To answer your questions in the chat",
+        "The Ask us assistant answers questions about Spa 99 from our own information. It does not make decisions about "
+        "you. Basis: legitimate interests.",
         "### To keep the site and your account safe",
         "Sign-in records, limits on repeated attempts, error reports and our team's activity records. Basis: "
         "legitimate interests.",
@@ -144,6 +151,8 @@ PRIVACY_PARTS = [
         "- Sentry: receives error reports when something breaks. Reports leave out names, email addresses and IP "
         "addresses, but can include your account's internal number and the type of browser.",
         "- Microsoft 365: our mailbox, where emails you send us are kept.",
+        "- Anthropic: provides the AI assistant in the Ask us chat. It receives what you type in the chat, with our own "
+        "information about the spa, so it can answer. It does not receive your name or email address.",
         "Gold Card applications are emailed to the people who decide on them for us. They may work for BML Group. "
         "Applications are not shared more widely.",
         "We may also share information when the law requires it, or to protect someone's safety. If the business is "
@@ -154,6 +163,9 @@ PRIVACY_PARTS = [
         "as protecting personal data properly.",
         "Postmark is based in the United States, so the emails we send you pass through and are briefly stored there. "
         "This is covered by the UK-US data bridge or the UK International Data Transfer Agreement.",
+        "Anthropic, which runs the Ask us assistant, is based in the United States, so what you type in the chat is "
+        "processed there. This is covered by the UK-US data bridge or the UK International Data Transfer Agreement. "
+        "Please do not put personal or sensitive details in the chat.",
         "If a provider handles information outside the UK, for example for support, we make sure the safeguards UK law "
         "requires are in place, such as the UK International Data Transfer Agreement or the UK-US data bridge.",
     ])),
@@ -171,6 +183,7 @@ PRIVACY_PARTS = [
         "- Records of emails we send: two years.",
         "- Emails you send us: two years after we last hear from you.",
         "- Visitor counter codes: deleted the next day.",
+        "- Ask us chats: 90 days, then deleted automatically.",
         "- Error reports: 90 days.",
         "- Change history: two years, or until you delete your account, whichever comes first.",
         "- Our team's activity records: two years.",

@@ -269,6 +269,8 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
     gold_nudge_medium = models.CharField("Gold nudge: Medium potential", max_length=5, choices=GOLD_NUDGES, default="line")
     gold_nudge_low = models.CharField("Gold nudge: Low potential", max_length=5, choices=GOLD_NUDGES, default="none")
     opener_lines = _number("Home opener: lines shown", 1, 1, 5)
+    chat_monthly_cap_gbp = _number("Ask us chat: monthly spending cap (£)", 25, 1, 1000,
+                                   "At the cap the chat shows only the hand-off buttons until the next month. Takes effect at once.")
 
     # Gold
     gold_invite_days = _number("Gold invite link valid (days)", 14, 1, 90, "A new value applies to links made from now on; links already sent keep the date they were given.")
