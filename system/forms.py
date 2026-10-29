@@ -138,7 +138,9 @@ class SettingsForm(VersionedForm):
         # One-line help for the Launch group, set here so the model's own help_text (and so a migration) stays as it is.
         for name, help_text in LAUNCH_HELP.items():
             self.fields[name].help_text = help_text
-        self.fields["whatsapp_number"].widget.attrs.update({"placeholder": "+44 7441 919990", "inputmode": "tel", "autocomplete": "off"})
+        self.fields["whatsapp_number"].widget.attrs.update({"placeholder": "447441919990", "inputmode": "tel", "autocomplete": "off"})
+        self.fields["whatsapp_number"].help_text = ("Digits only, starting with the country code and no +, e.g. 447441919990 (UK 07441 919990). "
+                                                     "If you type +44 or a leading 0 it is tidied for you. Empty = the WhatsApp buttons are hidden.")
         self.fields["whatsapp_message"].required = False  # empty = the link opens the chat with no message ready
         self.fields["whatsapp_rate_message"].required = False  # empty = the general message is used
         self.fields["code_theme_default"].required = False  # a post without it (older forms, scripts) keeps the saved theme
