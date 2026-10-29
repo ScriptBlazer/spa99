@@ -6,6 +6,7 @@ APP_USER="${APP_USER:-ubuntu}"
 APP_HOME="/home/${APP_USER}"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a   # restart services automatically instead of the purple prompt
 
 step() { printf '\n==> %s\n' "$*"; }
 note() { printf '    %s\n' "$*"; }
