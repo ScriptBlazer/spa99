@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import views, views_code as c, views_defaults as d, views_faq as fq, views_assistant as asst, views_emails as e, views_rules as r, views_sales as sl
+from . import views, views_code as c, views_defaults as d, views_faq as fq, views_assistant as asst, views_emails as e, views_rules as r, views_sales as sl, views_payments as pay
 from .permissions import unlocked
 
 urlpatterns = [
@@ -51,13 +51,20 @@ urlpatterns = [
     path("emails/invites/", e.invites_list, name="system_invites"),
     path("emails/invites/new/", e.invites_new, name="system_invites_new"),
     path("emails/invites/review/", e.invites_review, name="system_invites_review"),
+    path("emails/invites/problems/", e.invites_problems, name="system_invites_problems"),
     path("emails/invites/send/", e.invites_send, name="system_invites_send"),
     path("emails/invites/<uuid:batch>/", e.invite_batch, name="system_invite_batch"),
     path("emails/invites/<uuid:batch>/progress/", e.invite_progress, name="system_invite_progress"),
     path("emails/invites/<uuid:batch>/resume/", e.invite_resume, name="system_invite_resume"),
+    path("payments/", pay.payments_page, name="system_payments"),
+    path("payments/open/", pay.payments_open, name="system_payments_open"),
+    path("payments/schedule/", pay.payments_schedule, name="system_payments_schedule"),
+    path("payments/schedule/cancel/", pay.payments_cancel_schedule, name="system_payments_cancel_schedule"),
+    path("payments/close/", pay.payments_close, name="system_payments_close"),
     path("sales/", sl.sale_list, name="system_sales"),
     path("sales/new/", sl.sale_edit, name="system_sale_new"),
     path("sales/<uuid:pk>/", sl.sale_edit, name="system_sale_edit"),
+    path("sales/<uuid:pk>/extend/", sl.sale_extend, name="system_sale_extend"),
     path("sales/<uuid:pk>/end/", sl.sale_end, name="system_sale_end"),
     path("sales/<uuid:pk>/preview/", sl.sale_preview, name="system_sale_preview"),
     path("emails/suppressions/", views.suppressions, name="system_suppressions"),

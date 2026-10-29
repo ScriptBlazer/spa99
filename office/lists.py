@@ -32,9 +32,14 @@ def cut(queryset, page, size=None):
 
 # ---------- people ----------
 
+SALE_OPTIONS = [("yes", "Holds a sale price"), ("no", "No sale price"), ("expired", "Sale price ended"), ("at_risk", "At risk of losing it")]
+PAYMENT_OPTIONS = [("not_started", "Not started"), ("invited", "Invited"), ("paid", "Set up"), ("manual", "Set up manually"), ("lapsed", "Lapsed")]
+
+
 def people_filters(request):
     return {"q": request.GET.get("q", "").strip(), "plan": request.GET.get("plan", ""),
-            "verified": request.GET.get("verified", ""), "marketing": request.GET.get("marketing", "")}
+            "verified": request.GET.get("verified", ""), "marketing": request.GET.get("marketing", ""),
+            "sale": request.GET.get("sale", ""), "payment": request.GET.get("payment", "")}
 
 
 def people_queryset(filters):
@@ -49,7 +54,33 @@ def people_queryset(filters):
         people = people.filter(email_verified_at__isnull=filters["verified"] == "no")
     if filters["marketing"] in ("yes", "no"):
         people = people.filter(marketing_consent=filters["marketing"] == "yes")
+    sale = {"yes": Q(interest__sale_percent_off__isnull=False, interest__sale_expired_at__isnull=True),
+            "no": Q(interest__sale_percent_off__isnull=True),
+            "expired": Q(interest__sale_expired_at__isnull=False),
+            "at_risk": Q(interest__payment_status="invited", interest__sale_percent_off__isnull=False, interest__sale_expired_at__isnull=True)}
+    if filters.get("sale") in sale:
+        people = people.filter(sale[filters["sale"]])
+    if filters.get("payment") == "manual":
+        people = people.filter(interest__payment_status="paid", interest__payment_source="manual")
+    elif filters.get("payment") in ("not_started", "invited", "paid", "lapsed"):
+        people = people.filter(interest__payment_status=filters["payment"])
     return people
+
+
+def sale_label(interest):
+    """'20% for 6 months' (kept), 'Ended' (the window closed unpaid: the snapshot stays), or ''."""
+    if not interest.sale_percent_off:
+        return ""
+    if interest.sale_expired_at:
+        return "Ended"
+    months = interest.sale_months or 1
+    return f"{interest.sale_percent_off}% for {months} month{'' if months == 1 else 's'}"
+
+
+def payment_label(interest):
+    if interest.payment_status == "paid":
+        return "Set up manually" if interest.payment_source == "manual" else "Set up online"
+    return dict(InterestRegistration.PAYMENT_CHOICES).get(interest.payment_status, "")
 
 
 def journey_state(sessions):
@@ -68,6 +99,8 @@ def person_row(user):
         "verified": bool(user.email_verified_at), "marketing": user.marketing_consent,
         "journey": journey_state(sessions), "registered": interest.created_at.isoformat(),
         "gold_application_id": str(gold[0].pk) if gold else "",
+        "sale": sale_label(interest), "sale_ended": bool(interest.sale_expired_at), "payment": payment_label(interest),
+        "payment_status": interest.payment_status,
     }
 
 
@@ -87,15 +120,40 @@ def people_csv(filters):
     response["Content-Disposition"] = 'attachment; filename="spa99-people.csv"'
     writer = csv.writer(response)
     writer.writerow(["account_id", "first_name", "last_name", "email", "mobile", "membership", "source", "email_verified",
-                     "marketing_consent", "registered_at"])
+                     "marketing_consent", "registered_at", "sale_name", "sale_percent_off", "sale_months", "sale_status", "payment_status", "payment_source"])
     for user in people_queryset(filters).iterator():
         interest = user.interest
         writer.writerow([safe_cell(x) for x in (
             user.public_id, user.first_name, user.last_name, user.email, user.mobile or "",
             interest.plan.name if interest.plan_id else "", interest.source,
             "yes" if user.email_verified_at else "no", "yes" if user.marketing_consent else "no",
-            timezone.localtime(interest.created_at).strftime("%Y-%m-%d %H:%M"))])
+            timezone.localtime(interest.created_at).strftime("%Y-%m-%d %H:%M"),
+            interest.sale_name, interest.sale_percent_off or "", interest.sale_months or "",
+            ("expired" if interest.sale_expired_at else "kept") if interest.sale_percent_off else "",
+            interest.payment_status, interest.payment_source)])
     return response
+
+
+def membership_block(interest):
+    """The sale snapshot and the payment state for the person page (plain data; the page draws it)."""
+    from plans.models import Subscription
+
+    if interest is None:
+        return None
+    sale = None
+    if interest.sale_percent_off:
+        sale = {"name": interest.sale_name, "percent": interest.sale_percent_off, "months": interest.sale_months, "locked_at": interest.sale_locked_at,
+                "status": "expired" if interest.sale_expired_at else "kept", "expired_at": interest.sale_expired_at}
+    history, previous = [], None
+    for row in interest.history.order_by("history_date"):
+        if previous is not None and row.payment_status != previous:
+            history.append({"at": row.history_date, "text": dict(InterestRegistration.PAYMENT_CHOICES).get(row.payment_status, row.payment_status)})
+        previous = row.payment_status
+    subs = list(Subscription.objects.filter(registration=interest).select_related("plan", "created_by").order_by("-created_at"))
+    active = next((s for s in subs if s.status == Subscription.ACTIVE), None)
+    return {"sale": sale, "payment_status": interest.payment_status, "payment_label": payment_label(interest),
+            "due_at": interest.payment_due_at, "invite_sent_at": interest.payment_invite_sent_at, "reminder_sent_at": interest.payment_reminder_sent_at, "paid_at": interest.paid_at,
+            "history": history, "subscription": active, "subscriptions": subs}
 
 
 def person_detail(user):
@@ -113,6 +171,7 @@ def person_detail(user):
         "is_staff": user.is_staff,
         "interest": None if interest is None else {"plan": interest.plan.name if interest.plan_id else "", "source": interest.source,
                                                    "registered": interest.created_at.isoformat()},
+        "membership": membership_block(interest),
         "gold_applications": [{"id": str(a.pk), "reference": a.reference, "status": a.status, "potential": a.potential_level}
                               for a in user.gold_applications.all()],
         **profile.account_profile(user, interest),

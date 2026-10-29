@@ -18,7 +18,7 @@
     <h1>{% if current_plan %}{{ current_plan.name }}{% else %}Choose your membership{% endif %}</h1>
     {% if current_plan %}<p class="lead num" data-price>&pound;{{ current_plan.price_whole }} a month, ex VAT (&pound;{{ current_plan.price_inc }} inc VAT)</p>
     {% if kept_price %}<p class="m-sale"><span class="mark-glyph" aria-hidden="true"></span>{% kept_line kept_price %}</p>{% endif %}
-    <p class="muted">Nothing to pay now. Billing opens in {{ opening }}.</p>{% endif %}
+    {% payment_note whatsapp=False css_class="muted" status=interest.payment_status %}{% endif %}
     {% discount_line %}
     {% if suggested_plan %}<p class="muted" data-suggestion>Based on your answers: {{ suggested_plan.name }}.</p>
     {% if suggestion_differs %}<form method="post" action="{% url 'account_interest' %}">{% csrf_token %}<input type="hidden" name="plan" value="{{ suggested_plan.slug }}"><button type="submit" class="btn-quiet" data-working-text="Saving">Switch to {{ suggested_plan.name }}</button></form>{% endif %}{% endif %}

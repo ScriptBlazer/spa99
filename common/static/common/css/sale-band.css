@@ -12,7 +12,7 @@
 .sale-band-count { display: flex; gap: var(--space-4); transition: opacity var(--duration-base) var(--ease-soft); }
 .sale-band-count.is-leaving { opacity: 0; }
 .sale-band-unit { display: grid; justify-items: start; }
-.sale-band-num { font-size: var(--text-2xl); font-weight: 300; line-height: var(--leading-display); color: var(--color-text-inverse); }
+.sale-band-num { font-size: var(--text-2xl); font-weight: 300; line-height: var(--leading-display); color: var(--color-text-inverse); font-variant-numeric: tabular-nums; }
 .sale-band-label { margin-top: var(--space-2); font-size: var(--text-sm); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--color-text-muted-inverse); }
 .sale-band-ends { margin-top: var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted-inverse); }
 .sale-band-starts, .sale-band-over { font-size: var(--text-lg); line-height: var(--leading-snug); color: var(--color-text-inverse); }

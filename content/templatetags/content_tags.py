@@ -71,3 +71,16 @@ def legal_text(context, text, doc=None):
         values = {key: rows[key].body for key in legal_render.PLACEHOLDERS}
     return legal_render.render(text, contact=site.contact_address, version=site.privacy_version, values=values,
                                show_placeholders=settings.DEBUG)
+
+
+@register.inclusion_tag("users/_payment_note.html")
+def payment_note(whatsapp=True, css_class="no-payment", status=""):
+    """{% payment_note %}: 'No payment is taken now. When we open, you'll have 2 weeks to set up your membership.' (the length is the
+    payment window in System > Defaults) and, for a special discount, a WhatsApp link from Site settings (the line is left out when no link is set)."""
+    from django.conf import settings
+
+    from plans import payments
+    from plans.models import SiteSettings
+
+    return {"opened": payments.opened_ever(), "live": settings.ONLINE_PAYMENTS_LIVE, "paid": status == "paid", "window": payments.site_window_phrase(),
+            "url": payments.whatsapp_url() if whatsapp or payments.opened_ever() else "", "email": SiteSettings.load().contact_address, "css_class": css_class}

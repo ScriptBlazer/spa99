@@ -106,6 +106,12 @@ def _invite_values(ctx):
     return {"valid_for": _plural(_row_days(ctx, defaults.get().register_invite_days), "day")}
 
 
+def _payment_open_values(ctx):
+    closes = ctx.get("closes_on", "")
+    return {"window_line": f"You have until {closes} to set it up, at your own pace." if closes else "",
+            "opening_line": "Spa 99 is getting ready to open its doors." if closes else "Thank you for registering with Spa 99."}
+
+
 VALID_FOR = {"valid_for": "How long the link works, in words (e.g. '24 hours', '14 days'). Set in System > Defaults"}
 _FIRST = {"first_name": "The person's first name"}
 _SAMPLE_URL = "https://spa99.uk/example-link/"
@@ -172,6 +178,31 @@ SPECS = {spec.key: spec for spec in [
         "Registering is free and there is nothing to pay. Use your personal link to start: your name and email are already filled in. The link works for {valid_for}."
         "\n\n{button}\n\nIf you were not expecting this, you can ignore this email.",
         button_label="Register for Spa 99", button_required=True, subject_placeholders=_FIRST, values=_invite_values),
+    EmailSpec(
+        "payment_window_open", "Payments are open",
+        {**_FIRST, "closes_on": "The last day of the window, e.g. 13 November (empty for someone who registered after payments opened)",
+         "window_line": "'You have until <date> to set it up, at your own pace.' (empty when there is no window)",
+         "opening_line": "'Spa 99 is getting ready to open its doors.' (a neutral thank-you line for someone who registered after payments opened)",
+         "sale_line": "The launch price line (empty for members without one)"},
+        {"first_name": "James", "closes_on": "13 November", "window_line": "You have until 13 November to set it up, at your own pace.",
+         "opening_line": "Spa 99 is getting ready to open its doors.",
+         "sale_line": "Your launch price of 20% off for your first 6 months is kept when you set up by 13 November."},
+        "Hello {first_name},\n\n{opening_line}\n\nYour membership can now be set up.\n\n{window_line}\n\n{sale_line}\n\n{button}\n\nIf you have any questions, reply to this email and it will reach the team.",
+        button_label="Set up my membership", button_required=True, subject_placeholders=_FIRST, values=_payment_open_values),
+    EmailSpec(
+        "payment_window_reminder", "Payment reminder",
+        {**_FIRST, "closes_on": "The last day of the window, e.g. 13 November", "sale_line": "The launch price line (empty for members without one)"},
+        {"first_name": "James", "closes_on": "13 November", "sale_line": "Your launch price of 20% off for your first 6 months is kept when you set up by 13 November."},
+        "Hello {first_name},\n\nA gentle reminder that your membership can be set up until {closes_on}.\n\n{sale_line}\n\n{button}\n\n"
+        "If you have already set it up, or you would rather wait, there is nothing more to do. Questions? Reply to this email.",
+        button_label="Set up my membership", button_required=True, subject_placeholders=_FIRST),
+    EmailSpec(
+        "payment_staff_alert", "Payment window: launch prices at risk (to staff)",
+        {"count_line": "'N members will lose their launch price on <date>.'", "people": "The members, each a link to their Office page"},
+        {"count_line": "3 members will lose their launch price on 13 November (4 days left).",
+         "people": Rich(f'<a href="{_SAMPLE_URL}" style="{LINK_STYLE}">James Smith</a>', f"James Smith: {_SAMPLE_URL}")},
+        "Hello,\n\n{count_line}\n\nThey registered during a sale and have not set up their membership yet:\n\n{people}\n\n{button}",
+        button_label="Open the list in the Office", button_required=False, button_fallback=False, subject_placeholders={"count": "How many members"}),
     # Sent by an approver from the Office (docs/features/gold-actions.md). Respond: the typed {message} sits in this wording.
     # Declined: this wording only PREFILLS the decline form; the approver can edit it, and what is sent is exactly that text.
     EmailSpec(

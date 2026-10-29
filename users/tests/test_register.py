@@ -374,7 +374,8 @@ class NoPaymentAndDiscountLineTests(TestCase):
     def test_register_says_registering_is_free_and_shows_no_whatsapp_line(self):
         SiteSettings.objects.update(discount_contact_url="https://wa.me/447000000000")
         html = Client().get("/register/").content.decode()
-        self.assertIn("Registering is free. Payment will be taken before your first booking.", html)
+        self.assertIn("No payment is taken now. When we open, you&rsquo;ll have 2 weeks to set up your membership.", html)
+        self.assertIn("WhatsApp us", html)  # the special-discount line (the old "better rate" line is not on Register)
         self.assertNotIn("better rate", html)
 
     def test_whatsapp_line_is_on_the_signed_in_membership_page(self):

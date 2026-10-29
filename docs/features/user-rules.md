@@ -52,3 +52,6 @@ Each person's approval emails go to their account email, or to another address c
 - Members sign in on the website and land in the member area. Team members sign in on their own address (Office, Control, System) and land on its home page.
 - Office sign-in lasts 30 days. System locks after the set idle minutes (default 15) and ends after the set hours (default 12). Member sign-in lasts 2 weeks.
 - No access = a plain "not found" (staff addresses never admit what is there).
+
+## Payment window actions (2026-10-29)
+Admin and above (Office person page, audited): set up a membership manually (edit, cancel), restore a lapsed sale price (reason required). Developer (System, unlocked): open, schedule, cancel the schedule and close payments; Defaults. Office level can see the sale and payment state, not change it.

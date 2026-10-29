@@ -9,7 +9,7 @@ html[data-page="marketing"] .sale-bar { position: fixed; inset: 0 0 auto 0; }
 .sale-bar-name { color: var(--color-gold); font-weight: 500; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 12rem; }
 .sale-bar-sep { margin-inline: var(--space-2); color: var(--color-text-muted-inverse); }
 .sale-bar-ends { color: var(--color-text-muted-inverse); }
-.sale-bar-time [data-sale-count] { font-weight: 500; }
+.sale-bar-time [data-sale-count] { font-weight: 500; font-variant-numeric: tabular-nums; }
 .sale-bar-starts { color: var(--color-text-muted-inverse); }
 .sale-bar-plans, .sale-bar-ends, .sale-bar-link .icon, .sale-bar-starts, .sale-bar-end-long { display: none; }
 .sale-bar-link .icon { width: 1rem; height: 1rem; margin-left: var(--space-2); color: var(--color-text-muted-inverse); }
@@ -26,7 +26,6 @@ html[data-page="marketing"] .sale-bar { position: fixed; inset: 0 0 auto 0; }
 }
 @media (max-width: 47.99em) {
   .sale-bar-preview ~ .sale-bar-name { max-width: 6rem; }
-  .sale-bar-m { display: none; }
 }
 @media (min-width: 48em) {
   .sale-bar-inner { justify-content: center; }

@@ -4,30 +4,43 @@
 {% include "system/_emails_tabs.html" with tab="invites" %}
 <div class="se-title"><a class="se-back" href="{% url 'system_invites_new' %}">Start again</a><h2>Check the list</h2></div>
 {% include "system/_ses_state.html" %}
+{% if report.errors %}<p class="sys-note error se-state" data-se-state="file-error"><strong>This file can't be imported.</strong> Fix it and upload it again.</p>{% endif %}
 {% for error in report.errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ error }}</p>{% endfor %}
 {% if report.errors %}<p><a class="sys-btn" href="{% url 'system_invites_new' %}">Start again</a></p>{% else %}
 <div data-se-review-root data-review-url="{% url 'system_invites_review' %}">
-<section class="sys-panel se-review-panel" data-system-invite-report data-ok="{{ report.ok }}" data-total="{{ report.total }}">
-  <header><h2><span class="mono">{{ report.ok|floatformat:"0g" }}</span> of <span class="mono">{{ report.total|floatformat:"0g" }}</span> can be invited</h2></header>
+{% if report.blocked %}<p class="sys-note error se-state" role="alert" data-se-state="blocked"><strong>Needs fixing.</strong> {{ report.problems }} row{{ report.problems|pluralize }} must be fixed before anything is imported{% if report.warnings %}, and {{ report.warnings }} heads-up{{ report.warnings|pluralize }} below{% endif %}.</p>
+{% elif not report.ok %}<p class="sys-note warning se-state" data-se-state="nobody"><strong>Nobody to invite.</strong> Every row is skipped, as written below.</p>
+{% elif report.warnings %}<p class="sys-note warning se-state" data-se-state="warnings"><strong>Ready, with {{ report.warnings }} heads-up{{ report.warnings|pluralize }}.</strong> Read them below. You can import anyway: those rows are skipped or merged as written.</p>
+{% else %}<p class="sys-note success se-state" data-se-state="ready"><strong>Ready.</strong> Every row checks out.</p>{% endif %}
+<section class="sys-panel se-review-panel" data-system-invite-report data-ok="{{ report.ok }}" data-total="{{ report.total }}" data-problems-count="{{ report.problems }}">
+  <header><h2 data-se-summary>{{ report.summary }}</h2></header>
+  {% if report.blocked %}<p class="sys-note error se-fixnote" role="alert" data-se-blocked>The import is off until {{ report.problems }} row{{ report.problems|pluralize }} {{ report.problems|pluralize:"is,are" }} fixed. Fix the address below and press Check, or fix the file and <a href="{% url 'system_invites_new' %}">upload it again</a>.</p>{% endif %}
+  {% if report.groups %}<div class="se-groups" data-se-groups>{% for g in report.groups %}
+    <p class="se-group {{ g.level }}" data-group="{{ g.key }}" data-level="{{ g.level }}"><span class="sys-badge {% if g.level == 'error' %}danger{% else %}info{% endif %}">{% if g.level == 'error' %}Fix{% else %}Heads-up{% endif %}</span> <strong class="mono">{{ g.count }}</strong> {{ g.label }} <span class="sys-muted">Row{{ g.count|pluralize }} {{ g.lines }}.</span></p>
+  {% endfor %}</div>{% endif %}
   <div class="se-chips" role="group" aria-label="Show" data-system-invite-counts>
     <button type="button" class="sys-pill" aria-pressed="true" data-filter="all">All {{ report.total }}</button>
-    {% for key, label in status_labels.items %}{% for k, n in report.counts.items %}{% if k == key and n %}<button type="button" class="sys-pill" aria-pressed="false" data-filter="{{ key }}" data-count="{{ key }}">{% if key == "ok" %}Ready{% elif key == "duplicate" %}Duplicate{% elif key == "member" %}Already a member{% elif key == "invited" %}Already invited{% elif key == "suppressed" %}Suppressed{% elif key == "opted_out" %}Unsubscribed{% else %}Invalid{% endif %} {{ n }}</button>{% endif %}{% endfor %}{% endfor %}
+    {% for key, label in status_labels.items %}{% for k, n in report.counts.items %}{% if k == key and n %}<button type="button" class="sys-pill" aria-pressed="false" data-filter="{{ key }}" data-count="{{ key }}">{{ label }} {{ n }}</button>{% endif %}{% endfor %}{% endfor %}
   </div>
   <div class="sys-scroll"><table class="sys-table se-review" data-system-invite-rows>
-    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Check</th></tr></thead>
-    <tbody>{% for r in report.rows %}<tr data-status="{{ r.status }}" data-line="{{ r.line }}">
+    <thead><tr><th scope="col">Row</th><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Check</th></tr></thead>
+    <tbody>{% for r in report.rows %}<tr data-status="{{ r.status }}" data-level="{{ r.level }}" data-line="{{ r.line }}">
+      <td class="mono sys-muted">{{ r.line }}</td>
       <td>{{ r.name|default:"-" }}</td>
-      <td class="mono">{% if r.status == "invalid" %}<input type="text" class="se-fix" value="{{ r.email }}" aria-label="Fix the email address on line {{ r.line }}" data-se-fix data-old="{{ r.email }}" inputmode="email" autocomplete="off" spellcheck="false"> <button type="button" class="sys-btn sm" data-se-recheck>Check</button>{% else %}{{ r.email }}{% endif %}</td>
-      <td>{% if r.status == "ok" %}<span class="sys-badge ok">Ready</span>{% elif r.status == "duplicate" %}<span class="sys-badge">Duplicate</span> <span class="sys-muted">{{ r.message }}</span>{% elif r.status == "member" %}<span class="sys-badge info">Already a member</span>{% elif r.status == "invited" %}<span class="sys-badge info">Already invited</span>{% elif r.status == "suppressed" %}<span class="sys-badge danger">Suppressed</span>{% elif r.status == "opted_out" %}<span class="sys-badge">Unsubscribed</span>{% else %}<span class="sys-badge danger">Invalid email</span>{% endif %}</td>
+      <td class="mono">{% if r.status == "invalid" %}<input type="text" class="se-fix" value="{{ r.email }}" aria-label="Fix the email address on row {{ r.line }}" data-se-fix data-old="{{ r.email }}" inputmode="email" autocomplete="off" spellcheck="false"> <button type="button" class="sys-btn sm" data-se-recheck>Check</button>{% else %}{{ r.email }}{% endif %}</td>
+      <td>{% if r.status == "ok" and not r.no_name %}<span class="sys-badge ok">Ready</span>{% elif r.no_name %}<span class="sys-badge ok">Ready</span> <span class="sys-muted">{{ r.message }}</span>{% elif r.level == "error" %}<span class="sys-badge danger">Fix</span> <span class="sys-muted">{{ r.message }}</span>{% else %}<span class="sys-badge info">Skipped</span> <span class="sys-muted">{{ r.message }}</span>{% endif %}</td>
     </tr>{% endfor %}</tbody>
   </table></div>
-  <p class="se-skipnote sys-muted" data-se-skipnote>{% if report.total != report.ok %}{{ report.total|add:"0" }} rows, {{ report.ok }} ready. Everything not marked Ready is skipped.{% else %}Every row is ready.{% endif %}</p>
+  <p class="se-skipnote sys-muted" data-se-skipnote>{% if report.problems %}Nothing is imported until every row marked Fix is sorted out.{% elif report.total != report.ok %}Rows not marked Ready are skipped or merged, as written beside them.{% else %}Every row is ready.{% endif %}</p>
 </section>
-<form method="post" action="{% url 'system_invites_send' %}" class="se-formbar se-sendbar" data-se-send-form data-ok="{{ report.ok }}" data-skipped="{{ report.total|add:0 }}" data-allowed="{{ ses.allowed|yesno:'1,0' }}" data-gate="{{ ses.message }}">{% csrf_token %}
-  <input type="hidden" name="expected_ok" value="{{ report.ok }}"><textarea name="text" hidden data-se-list>{{ text }}</textarea>
-  <button type="button" class="sys-btn primary" data-se-send-invites{% if not report.ok or not ses.allowed %} aria-disabled="true"{% endif %}>Send {{ report.ok }} invite{{ report.ok|pluralize }}</button>
+<form method="post" action="{% url 'system_invites_send' %}" class="se-formbar se-sendbar" data-se-send-form data-ok="{{ report.ok }}" data-skipped="{{ report.skipped }}" data-allowed="{{ ses.allowed|yesno:'1,0' }}" data-gate="{{ ses.message }}">{% csrf_token %}
+  <input type="hidden" name="expected_ok" value="{{ report.ok }}"><input type="hidden" name="token" value="{{ token }}"><textarea name="text" hidden data-se-list>
+{{ text }}</textarea>
+  <button type="button" class="sys-btn primary" data-se-send-invites{% if not report.can_import or not ses.allowed %} aria-disabled="true"{% endif %}>{% if report.warnings and not report.blocked %}Import anyway and send{% else %}Import and send{% endif %} {{ report.ok }} invite{{ report.ok|pluralize }}</button>
   <a class="sys-btn" href="{% url 'system_invites_new' %}">Start again</a>
-  {% if not ses.allowed %}<span class="sys-muted se-reason">Off until Amazon approves production sending.</span>{% elif not report.ok %}<span class="sys-muted se-reason">Nobody in this list can be invited.</span>{% endif %}
+  {% if report.groups %}<button type="submit" class="sys-btn" formaction="{% url 'system_invites_problems' %}" formnovalidate data-se-problems-csv>Download problem rows (CSV)</button>{% endif %}
+  {% if not ses.allowed %}<span class="sys-muted se-reason">Off until Amazon approves production sending.</span>{% elif report.blocked %}<span class="sys-muted se-reason">Fix the rows marked Fix first.</span>{% elif not report.ok %}<span class="sys-muted se-reason">Nobody in this list can be invited.</span>{% endif %}
+  <span class="sys-muted se-reason" data-se-progress hidden role="status">Importing, please wait. Do not press Back.</span>
   <span class="sys-muted se-reason"><a href="{% url 'system_email_edit' 'invite' %}">Edit the invite wording</a></span>
 </form>
 </div>

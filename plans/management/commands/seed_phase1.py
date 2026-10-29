@@ -19,6 +19,21 @@ from plans import seed as plans_seed
 SEEDS = [("plans", plans_seed), ("content", content_seed), ("journey", journey_seed), ("gold", gold_seed), ("notifications", notifications_seed), ("mailings", mailings_seed), ("chat", chat_seed)]
 
 
+INITIAL_STAFF_ALERT_EMAIL = "moishe@spa99.uk"  # the ONE place this address lives: first value of System > Defaults > Payment alert emails
+
+
+def _seed_staff_alert_email():
+    """Fill the payment alert address only while the field is empty, so an edit (even to a different address) is never overwritten."""
+    from system.models import SiteDefaults
+
+    row = SiteDefaults.load()
+    if row.staff_alert_seeded:  # only ever the first time: clearing the field later is respected (use the on/off switch to stop the emails)
+        return
+    if not row.staff_alert_emails:
+        SiteDefaults.objects.filter(pk=row.pk).update(staff_alert_emails=INITIAL_STAFF_ALERT_EMAIL)
+    SiteDefaults.objects.filter(pk=row.pk).update(staff_alert_seeded=True)
+
+
 def seed_all():
     """Run every seed. Returns Counter of 'app.Model' -> rows created."""
     created = Counter()
@@ -31,6 +46,7 @@ def seed_all():
 
     for _, module in SEEDS:
         module.run(ensure)
+    _seed_staff_alert_email()
     return created
 
 

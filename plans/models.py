@@ -389,13 +389,13 @@ class Sale(BaseModel):
 
     name = models.CharField(max_length=80, help_text='Shown on the site bar, e.g. "Christmas sale".')
     percent_off = models.PositiveSmallIntegerField(
-        "% off", validators=[MinValueValidator(1), MaxValueValidator(MAX_PERCENT)], help_text="1 to 90. Locked once the sale is live.")
+        "% off", validators=[MinValueValidator(1), MaxValueValidator(MAX_PERCENT)], help_text="1 to 90. Changing it applies to new sign-ups only; people who registered keep theirs.")
     plans = models.ManyToManyField(Plan, related_name="sales")
     starts_at = models.DateTimeField(db_index=True, help_text="London time.")
     ends_at = models.DateTimeField(db_index=True, help_text="London time.")
     months_at_price = models.PositiveSmallIntegerField(
         "months at the sale price", validators=[MinValueValidator(1), MaxValueValidator(MAX_MONTHS)],
-        help_text="How long a person who registers during the sale keeps the sale price once billing starts. Locked once live.")
+        help_text="How long a person who registers during the sale keeps the sale price once billing starts. Changing it applies to new sign-ups only.")
     ended_early_at = models.DateTimeField(null=True, blank=True, help_text="Set by End now.")
     created_by = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
 
@@ -455,16 +455,145 @@ class Sale(BaseModel):
             raise ValidationError(errors)
 
     def _clean_against_stored(self, stored, errors):
-        """A live sale's % off, months and start are locked (people already hold them). An ended-early sale can only be put back
-        while its original end is still in the future."""
+        """A live sale's start is locked (it has begun). Name, % off, months and the end can change: people who already registered keep
+        the snapshot they were given, so an edit only applies to new sign-ups. An ended-early sale can only be put back while its
+        original end is still in the future."""
         if stored.status() == "live":
-            for name in ("percent_off", "months_at_price", "starts_at"):
+            for name in ("starts_at",):
                 now_value, was = getattr(self, name), getattr(stored, name)
                 if name == "starts_at":  # forms drop microseconds
                     now_value, was = now_value.replace(microsecond=0), was.replace(microsecond=0)
                 if now_value != was:
-                    errors[name] = "This cannot change once the sale is live: people already hold it."
+                    errors[name] = "The start cannot change once the sale has started."
             if self.ends_at <= timezone.now() and self.ended_early_at is None:
                 errors["ends_at"] = "Use End now to end a live sale."
         if stored.ended_early_at and self.ended_early_at is None and self.ends_at <= timezone.now():
             errors["ended_early_at"] = "The original end time has passed, so this sale cannot be put back."
+
+
+# ---------- Payment window (docs/features/payment-window.md) ----------
+
+class PaymentWindow(BaseModel):
+    """The time, after Spa 99 opens, in which registered members set up their paid membership (and keep a launch price).
+    Opened by hand from System > Payments (now or scheduled). Only one window is active (scheduled or open) at a time: the
+    conditional unique constraint on `is_active` makes the database refuse a second one, whatever two clicks do."""
+
+    DRAFT, SCHEDULED, OPEN, CLOSED, CANCELLED = "draft", "scheduled", "open", "closed", "cancelled"
+    STATUS_CHOICES = [(DRAFT, "Draft"), (SCHEDULED, "Scheduled"), (OPEN, "Open"), (CLOSED, "Closed"), (CANCELLED, "Cancelled")]
+    ACTIVE = (SCHEDULED, OPEN)
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=DRAFT, db_index=True)
+    is_active = models.BooleanField(default=False, editable=False, help_text="True while scheduled or open (kept in step by save()).")
+    scheduled_for = models.DateTimeField(null=True, blank=True)
+    opened_at = models.DateTimeField(null=True, blank=True)
+    closes_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    window_days = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Length used when it opened (from System > Defaults at that time).")
+    opened_by = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    reminder_sent_at = models.DateTimeField(null=True, blank=True, help_text="When the reminder round was started (once per window).")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [models.UniqueConstraint(fields=["is_active"], condition=models.Q(is_active=True), name="one_active_payment_window")]
+
+    def __str__(self):
+        return f"Payment window ({self.status})"
+
+    def save(self, *args, **kwargs):
+        self.is_active = self.status in self.ACTIVE
+        fields = kwargs.get("update_fields")
+        if fields is not None and "status" in fields:
+            kwargs["update_fields"] = list({*fields, "is_active"})
+        super().save(*args, **kwargs)
+
+
+class PaymentNotice(BaseModel):
+    """One email owed to one member in one window. Unique per (window, member, kind): the database makes "at most once" true,
+    and the claim (queued to sending, a conditional update) makes two workers safe. Doubles as the send queue."""
+
+    INVITE, REMINDER = "invite", "reminder"
+    KIND_CHOICES = [(INVITE, "Payments are open"), (REMINDER, "Reminder")]
+    QUEUED, SENDING, SENT, SKIPPED, FAILED = "queued", "sending", "sent", "skipped", "failed"
+    STATUS_CHOICES = [(QUEUED, "Queued"), (SENDING, "Sending"), (SENT, "Sent"), (SKIPPED, "Skipped"), (FAILED, "Failed")]
+
+    window = models.ForeignKey(PaymentWindow, on_delete=models.CASCADE, related_name="notices")
+    registration = models.ForeignKey("users.InterestRegistration", on_delete=models.CASCADE, related_name="payment_notices")
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=QUEUED, db_index=True)
+    reason = models.CharField(max_length=200, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [models.UniqueConstraint(fields=["window", "registration", "kind"], name="one_payment_notice_per_member_kind")]
+
+    def __str__(self):
+        return f"{self.kind} {self.status}"
+
+
+class PaymentMark(BaseModel):
+    """The idempotency record of "this member has paid / is set up" (plans.payments.mark_paid). The key is unique: a Stripe webhook
+    delivered twice, or a double click, finds the row and changes nothing."""
+
+    registration = models.ForeignKey("users.InterestRegistration", on_delete=models.CASCADE, related_name="payment_marks")
+    source = models.CharField(max_length=20)
+    idempotency_key = models.CharField(max_length=120, unique=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.source} {self.idempotency_key}"
+
+
+class Subscription(BaseModel):
+    """A member's paid membership. Today only `source=manual` (set up in the Office for people who pay directly, outside the
+    website: the agreed price is for the record and invoicing, nothing is charged). The Stripe phase uses the same table
+    (`source=stripe`, `external_id` unique when set). One active subscription per member, enforced by the database."""
+
+    MANUAL, STRIPE = "manual", "stripe"
+    SOURCE_CHOICES = [(MANUAL, "Set up manually"), (STRIPE, "Online (Stripe)")]
+    ACTIVE, CANCELLED = "active", "cancelled"
+    STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled")]
+
+    registration = models.ForeignKey("users.InterestRegistration", on_delete=models.CASCADE, related_name="subscriptions")
+    plan = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name="+")
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=MANUAL)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=ACTIVE, db_index=True)
+    start_date = models.DateField()
+    agreed_price_ex_vat = models.DecimalField(
+        "agreed price ex VAT", max_digits=8, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal("0"))],
+        help_text="Per month, for the record and invoicing. It may differ from the list price. No payment is taken by the website.")
+    billing_note = models.TextField(blank=True)
+    external_id = models.CharField(max_length=100, null=True, blank=True, unique=True, help_text="Stripe subscription id (later).")
+    created_by = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [models.UniqueConstraint(fields=["registration"], condition=models.Q(status="active"), name="one_active_subscription_per_member")]
+
+    def __str__(self):
+        return f"{self.source} subscription ({self.status})"
+
+
+class PaymentStaffAlert(BaseModel):
+    """One row per window and day: the staff were warned that sale holders are about to lose their launch price. The unique
+    constraint makes "once a day" true even if the job runs twice."""
+
+    window = models.ForeignKey(PaymentWindow, on_delete=models.CASCADE, related_name="staff_alerts")
+    day = models.DateField()
+    at_risk = models.PositiveIntegerField(default=0)
+    emailed = models.PositiveSmallIntegerField(default=0, help_text="Staff emailed.")
+
+    class Meta:
+        ordering = ["-day"]
+        constraints = [models.UniqueConstraint(fields=["window", "day"], name="one_staff_alert_per_day")]
+
+    def __str__(self):
+        return f"{self.day}: {self.at_risk} at risk"

@@ -841,16 +841,37 @@ function initReview(root) {
 
     const form = $('[data-se-send-form]', root);
     const sendButton = $('[data-se-send-invites]', root);
+    let busy = false; // a confirm is open or the import is on its way: a second click does nothing
+    const progress = $('[data-se-progress]', root);
+    const lock = (on) => {
+      busy = on;
+      if (!on) delete form.dataset.submitted;
+      if (!sendButton) return;
+      sendButton.toggleAttribute('data-busy', on);
+      if (on) { sendButton.setAttribute('aria-disabled', 'true'); sendButton.dataset.label = sendButton.textContent; sendButton.textContent = 'Importing...'; }
+      else if (sendButton.dataset.label) { sendButton.textContent = sendButton.dataset.label; if (Number(form.dataset.ok) && form.dataset.allowed === '1' && !$('[data-se-blocked]', root)) sendButton.removeAttribute('aria-disabled'); }
+      if (progress) progress.hidden = !on;
+    };
+    // Coming back with the Back button shows the page as it was left (disabled): let the person act again; the server answers a repeat with the same batch.
+    window.addEventListener('pageshow', (event) => { if (event.persisted) lock(false); });
+    form?.addEventListener('submit', (event) => {
+      if (event.submitter && event.submitter.hasAttribute('data-se-problems-csv')) return; // the CSV download is a plain submit
+      if (busy && form.dataset.submitted) { event.preventDefault(); return; }
+      form.dataset.submitted = '1';
+      lock(true);
+    });
     sendButton?.addEventListener('click', async () => {
-      if (sendButton.getAttribute('aria-disabled') === 'true') return;
+      if (busy || sendButton.getAttribute('aria-disabled') === 'true') return;
+      busy = true; // held while the confirm is open
       const ok = Number(form.dataset.ok);
-      const skipped = Number($('[data-system-invite-report]', root).dataset.total) - ok;
+      const skipped = Number(form.dataset.skipped || 0);
       const yes = await confirmModal({
         title: `Send ${fmt(ok)} ${plural(ok, 'invite', 'invites')}?`,
         body: `${skipped ? `${fmt(skipped)} ${plural(skipped, 'is', 'are')} skipped. ` : ''}Each person gets a personal Register link.`,
         confirmLabel: `Send ${fmt(ok)} ${plural(ok, 'invite', 'invites')}`, tone: IS_LIVE ? 'danger' : 'neutral', opener: sendButton,
       });
-      if (yes) form.requestSubmit();
+      busy = false;
+      if (yes && !form.dataset.submitted) form.requestSubmit();
     });
   };
   wire();

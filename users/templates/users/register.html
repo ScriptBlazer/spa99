@@ -93,7 +93,7 @@
 
       <div class="form-submit">
         <button type="submit" class="btn btn-primary btn-block" data-working-text="One moment">{{ site_settings.wording }}</button>
-        <p class="no-payment">Registering is free. Payment will be taken before your first booking.</p>
+        {% payment_note %}
         {% if register_sale %}<p class="no-payment" data-sale-note hidden>Your sale price is saved with your registration.</p>{% endif %}
         <p class="form-foot small"><span class="muted">Already registered?</span> <a class="btn-quiet small" href="{% url 'login' %}">Sign in</a></p>
       </div>

@@ -1,0 +1,50 @@
+{% extends "system/base.html" %}
+{# Context: window (latest or active, may be None), counts, warning, notices (status -> number), window_phrase, window_days, no_alert_email, invite_total. docs/features/payment-window.md #}
+{% block main %}
+{% include "system/_page_header.html" with title="Payments" description="Open payments when Spa 99 is ready. Members then have a set time to set up their membership. No card is taken here yet." %}
+{% if not online_live %}<p class="sys-note error" role="alert" data-payments-not-live>Card payments are not live yet. If you open payments now, members are told we will be in touch (or to WhatsApp or email us) and staff set their memberships up manually in the Office.</p>{% endif %}
+{% if alerts_off %}<p class="sys-note" role="status" data-alerts-off>Alert emails are switched off in <a href="{% url 'system_defaults' %}">Defaults</a>.</p>
+{% elif no_alert_email %}<p class="sys-note" role="status" data-no-alert-email>No alert email set. <a href="{% url 'system_defaults' %}">Set one in Defaults</a> to be warned by email before launch prices end.</p>{% endif %}
+{% if warning %}<p class="sys-note error" role="alert" data-payments-warning>{{ warning.count }} member{{ warning.count|pluralize }} will lose their launch price on {{ warning.closes_on }} ({{ warning.days_left }} day{{ warning.days_left|pluralize }} left).</p>{% endif %}
+
+<section class="sys-panel" aria-labelledby="pay-state-h" data-payments-state="{{ window.status|default:'none' }}">
+  <header><h2 id="pay-state-h">The window</h2></header>
+  {% if window and window.status == "open" %}
+    <div class="sys-state"><span>Status</span><span class="sys-badge ok">Open</span></div>
+    <div class="sys-state"><span>Opened</span><span>{{ window.opened_at|date:"j M Y, H:i" }}</span></div>
+    <div class="sys-state"><span>Closes</span><span>{{ window.closes_at|date:"j M Y, H:i" }}</span></div>
+    <div class="sys-state"><span>Reminder</span><span>{% if window.reminder_sent_at %}Started {{ window.reminder_sent_at|date:"j M, H:i" }}{% else %}Not yet{% endif %}</span></div>
+    <div class="sys-state"><span>Emails</span><span>{{ notices.sent|default:0 }} sent, {{ notices.queued|default:0 }} waiting, {{ notices.failed|default:0 }} failed, {{ notices.skipped|default:0 }} skipped</span></div>
+    <form method="post" action="{% url 'system_payments_close' %}" data-system-confirm="payments" data-confirm-title="Close payments now?" data-confirm-body="Members who have not set up lose any launch price. Their accounts stay and they can still join at the normal price." data-confirm-action="Close payments" data-line="">{% csrf_token %}<button type="submit" class="sys-btn">Close early</button></form>
+  {% elif window and window.status == "scheduled" %}
+    <div class="sys-state"><span>Status</span><span class="sys-badge info">Scheduled</span></div>
+    <div class="sys-state"><span>Opens</span><span>{{ window.scheduled_for|date:"j M Y, H:i" }} (London time)</span></div>
+    <form method="post" action="{% url 'system_payments_cancel_schedule' %}">{% csrf_token %}<button type="submit" class="sys-btn">Cancel the schedule</button></form>
+  {% else %}
+    <div class="sys-state"><span>Status</span><span class="sys-badge">{% if window %}Closed{% else %}Not opened yet{% endif %}</span></div>
+    {% if window and window.closed_at %}<div class="sys-state"><span>Last window</span><span>{{ window.opened_at|date:"j M" }} to {{ window.closed_at|date:"j M Y, H:i" }}</span></div>{% endif %}
+  {% endif %}
+  {% if not window or window.status != "open" %}
+  <div class="sys-actions">
+    <form method="post" action="{% url 'system_payments_open' %}" data-system-confirm="payments" data-confirm-title="Open payments now?" data-confirm-body="This emails {{ counts.registered }} member{{ counts.registered|pluralize }}. They get {{ window_phrase }} to set up." data-confirm-action="Open payments" data-line="">{% csrf_token %}<button type="submit" class="sys-btn primary" data-payments-open>Open payments now</button></form>
+    <form method="post" action="{% url 'system_payments_schedule' %}" class="sys-ctl">{% csrf_token %}
+      <label class="sr-only" for="pay-when">Open on</label><input type="datetime-local" id="pay-when" name="when" required><span class="sys-unit">London time</span>
+      <button type="submit" class="sys-btn">Schedule for this time</button></form>
+  </div>
+  <p class="sys-muted">The window lasts {{ window_days }} days ({{ window_phrase }}); change it in <a href="{% url 'system_defaults' %}">Defaults</a>.</p>
+  {% endif %}
+</section>
+
+<section class="sys-panel" aria-labelledby="pay-counts-h">
+  <header><h2 id="pay-counts-h">Members</h2></header>
+  <div class="sys-state"><span>Registered (will be emailed)</span><span data-count="registered">{{ counts.registered }}</span></div>
+  <div class="sys-state"><span>Email not confirmed (not emailed)</span><span>{{ counts.unconfirmed }}</span></div>
+  <div class="sys-state"><span>Holding a launch price</span><span data-count="sale_holders">{{ counts.sale_holders }}</span></div>
+  <div class="sys-state"><span>Invited, not set up yet</span><span>{{ counts.invited }}</span></div>
+  <div class="sys-state"><span>Paid online</span><span data-count="paid_online">{{ counts.paid_online }}</span></div>
+  <div class="sys-state"><span>Set up manually</span><span data-count="set_up_manually">{{ counts.set_up_manually }}</span></div>
+  <div class="sys-state"><span>At risk (launch price, not set up)</span><span data-count="at_risk">{{ counts.at_risk }}</span></div>
+  <div class="sys-state"><span>Lapsed (window closed, not set up)</span><span data-count="lapsed">{{ counts.lapsed }}</span></div>
+  <div class="sys-state"><span>Launch prices ended</span><span>{{ counts.sale_expired }}</span></div>
+</section>
+{% endblock %}

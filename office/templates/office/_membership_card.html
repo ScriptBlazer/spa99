@@ -1,0 +1,46 @@
+{% comment %}Sale price snapshot, payment state and the manual set-up (Admin and up). Context: person.membership, office_can, plans.{% endcomment %}
+{% with m=person.membership %}{% if m %}
+<section class="o-card" data-person-membership aria-labelledby="p-membership"><h2 id="p-membership" class="o-h3">Sale price and payment</h2>
+  <dl class="o-rows">
+    {% if m.sale %}
+    <div><dt>Sale</dt><dd data-sale-name>{{ m.sale.name }}</dd></div>
+    <div><dt>Price kept</dt><dd data-sale-terms>{{ m.sale.percent }}% off for {{ m.sale.months }} month{{ m.sale.months|pluralize }}</dd></div>
+    <div><dt>Locked in</dt><dd>{{ m.sale.locked_at|date:"j M Y, H:i" }}</dd></div>
+    <div><dt>Status</dt><dd data-sale-status>{% if m.sale.status == "expired" %}Ended {{ m.sale.expired_at|date:"j M Y" }}{% else %}Kept{% endif %}</dd></div>
+    {% else %}<div><dt>Sale</dt><dd class="o-muted">No sale price</dd></div>{% endif %}
+    <div><dt>Payment</dt><dd data-payment-status="{{ m.payment_status }}">{{ m.payment_label }}</dd></div>
+    {% if m.due_at %}<div><dt>Due by</dt><dd data-payment-due>{{ m.due_at|date:"j M Y" }}</dd></div>{% endif %}
+    {% if m.invite_sent_at %}<div><dt>Invited</dt><dd>{{ m.invite_sent_at|date:"j M Y, H:i" }}</dd></div>{% endif %}
+    {% if m.reminder_sent_at %}<div><dt>Reminded</dt><dd>{{ m.reminder_sent_at|date:"j M Y, H:i" }}</dd></div>{% endif %}
+    {% if m.paid_at %}<div><dt>Set up</dt><dd>{{ m.paid_at|date:"j M Y, H:i" }}</dd></div>{% endif %}
+    {% for h in m.history %}<div><dt class="o-muted">History</dt><dd class="o-muted">{{ h.text }}, {{ h.at|date:"j M Y" }}</dd></div>{% endfor %}
+  </dl>
+  {% if m.sale and m.sale.status == "expired" and office_can.can_setup %}
+  <details data-restore-sale><summary class="btn btn-secondary btn-block">Restore the sale price</summary>
+    <form method="post" action="{% url 'office_person_restore_sale' person.id %}">{% csrf_token %}
+      <div class="o-filter-group"><label class="o-filter-label" for="rs-reason">Reason (required)</label><textarea id="rs-reason" name="reason" rows="2" maxlength="300" required></textarea></div>
+      <p class="o-sub">Gives the price back and starts a new window from today.</p>
+      <button type="submit" class="btn btn-primary btn-sm" data-working-text="Saving">Restore</button></form></details>
+  {% endif %}
+  {% with sub=m.subscription %}
+  {% if sub %}
+  <h3 class="o-subhead">Membership set up manually</h3>
+  <dl class="o-rows" data-manual-subscription>
+    <div><dt>Plan</dt><dd>{{ sub.plan.name }}</dd></div>
+    <div><dt>Starts</dt><dd>{{ sub.start_date|date:"j M Y" }}</dd></div>
+    <div><dt>Agreed price</dt><dd>{% if sub.agreed_price_ex_vat is not None %}&pound;{{ sub.agreed_price_ex_vat }} ex VAT a month{% else %}Not recorded{% endif %}</dd></div>
+    {% if sub.billing_note %}<div><dt>Billing note</dt><dd>{{ sub.billing_note }}</dd></div>{% endif %}
+    <div><dt>Set up by</dt><dd>{{ sub.created_by.get_full_name|default:sub.created_by.email }}</dd></div>
+  </dl>
+  {% if office_can.can_setup %}
+  <details><summary class="o-quiet">Edit</summary>
+    <form method="post" action="{% url 'office_person_setup_edit' person.id %}">{% csrf_token %}{% include "office/_setup_fields.html" with sub=sub %}<button type="submit" class="btn btn-secondary btn-sm">Save</button></form></details>
+  <form method="post" action="{% url 'office_person_setup_cancel' person.id %}">{% csrf_token %}
+    <button type="submit" class="o-danger-link" data-confirm data-confirm-danger data-confirm-title="Cancel this membership?" data-confirm-body="No payment is taken or refunded here. The member goes back to not set up." data-confirm-label="Cancel membership" data-confirm-cancel="Keep">Cancel this membership</button></form>
+  {% endif %}
+  {% elif office_can.can_setup and not person.is_staff %}
+  <details data-manual-setup><summary class="btn btn-secondary btn-block">Set up membership manually</summary>
+    <p class="o-sub">For a member who pays directly, outside the website. Nothing is charged. The sale price, if any, is kept.</p>
+    <form method="post" action="{% url 'office_person_setup' person.id %}">{% csrf_token %}{% include "office/_setup_fields.html" %}<button type="submit" class="btn btn-primary btn-sm" data-working-text="Saving">Set up membership</button></form></details>
+  {% endif %}{% endwith %}
+</section>{% endif %}{% endwith %}

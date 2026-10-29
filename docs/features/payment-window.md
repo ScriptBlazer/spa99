@@ -15,7 +15,7 @@ No payment is taken at registration. When Spa 99 is ready, staff open payments f
 - **System > Defaults**: `payment_window_days` (14, 3-60), `payment_reminder_days_before` (3, 1-30), `payment_staff_alert_days_before` (7, 1-60), `staff_alert_emails` (comma list, up to 5, validated, empty in code).
 
 ## Rules (`plans/payments.py`)
-- **Who is in it:** active accounts with a confirmed email and a paid-kind plan (not Gold). Unconfirmed members are not emailed (an unproven address is not his); they are counted on the page and join the window when they confirm (the job picks them up).
+- **Who is in it:** active accounts with a confirmed email, any plan (Gold included). Unconfirmed members are not emailed (an unproven address is not his); they are counted on the page and join the window when they confirm (the job picks them up).
 - **Open now** (`open_now`): under a lock, finds an open window and does nothing (so a double click or two tabs open once); else opens (a scheduled one is converted), creates one invite notice per member, marks them `invited`, queues the send. **Schedule** (`schedule`, London time, at least a minute ahead) / **cancel schedule** / **close early**.
 - **Send**: background slices (paced like group sends, SES gate checked, suppression guard and `EmailLog` through `send_templated`). A notice is claimed (queued to sending) before sending, so two workers never send twice; a dead send is marked failed, never retried.
 - **Job** `plans.tasks.tick` (every 5 minutes, `register_schedules`): opens a due scheduled window; for an open one: closes it at `closes_at`, adds members who confirmed since, starts the one reminder when due (skipped if the window is shorter than the reminder lead), warns staff, sends what is queued.
@@ -42,3 +42,18 @@ Plain ORM, conditional unique constraints, `select_for_update` (ignored by SQLit
 
 ## Env vars
 None new.
+
+## Update 2026-10-29: two sale modes, Gold, restore
+- **Before payments open:** a sale is register-only; the price is kept for the window (snapshot), as above.
+- **After payments open (window open or closed):** a new registrant gets the `payment_window_open` email when they confirm their email (the job picks them up), so they can set up straight away. **No personal window, no due date, no lapse timer, no reminder** (`payment_due_at` stays empty; the close and lapse logic only touch members who have one). A sale running then does **not** snapshot a kept price (`plans.sales.snapshot_fields` and `register_offer` check `payments.opened_ever()`); the sale price is applied at checkout in the Stripe phase. Until then staff use the manual set-up, which records the agreed price. The email's `{window_line}` ("You have until ... ") is empty for them. Register copy after opening: "Payments are open. Set up your membership from your member area." Edge: someone who registered before opening but confirms later, while the window is still open, shares the window's end.
+- `InterestRegistration.payment_due_at`: the member's own due date (the window's end for those invited at opening; a restored price gets a new one). The close job (`lapse_due`), the reminder and the staff warnings all use it. Early close lapses everyone who has one.
+- **Gold members** are in the window, the counts, the emails and the alerts like everyone (Gold pricing). Manual set-up allows the Gold plan.
+- **Restore a lapsed sale price** (Office person page, Admin and up, reason required): clears `sale_expired_at`, sets a new due date (now + window days), puts a lapsed member back to invited; event `sale_restored` (who, why, when) in the audit log.
+- **Imported invitees** follow the normal rule: a snapshot only if they register while a sale runs and before payments open; nothing else grants it.
+
+## Review fixes (2026-10-29)
+- Cancelling a manual set-up: window open, back to invited with the window's end (none for someone who registered after opening); window closed, a sale holder gets their own due date; payments never opened, not started.
+- Editing a manual membership is audited (`setup_edited`, old and new values; the billing note text stays on the subscription). The audit log carries the member's account ID (`public_id`), never an email; the restore reason is stored on the registration (`sale_restore_reason`) and its history, erased with the member.
+- The job keeps running while the next window is only scheduled. Reminders use the newest invite's window and a restore clears the old reminder. A member confirming after an early close does not share the closed window's end.
+- Staff warnings compare London dates (first alert on day 7) and go out from 09:00 London time. `staff_alert_emails_on` (default on) stops the emails without clearing the field; the seed fills the field only the first time (`staff_alert_seeded`).
+- `ONLINE_PAYMENTS_LIVE = False` (settings): System > Payments warns before opening; the member pages say "we'll be in touch, or WhatsApp or email us"; set-up members see "Your membership is set up". The open email's first line is `{opening_line}`.

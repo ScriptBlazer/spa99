@@ -24,6 +24,7 @@ from gold.models import GoldApplication
 from insights.metrics import K
 from journey import services as journey_services
 from journey.models import JourneySession
+from plans import payments
 from plans.models import Plan
 from common import levels
 from users import services as user_services
@@ -33,6 +34,7 @@ from users.models import User
 from system import defaults
 
 from . import lists, profile, selectors
+from .forms import ManualSetupForm
 from . import leads as lead_lists
 from .permissions import admin, approver, final_approver, reader
 
@@ -71,7 +73,8 @@ def _remembered_range(request, key, allowed, default):  # `default` comes from S
 @require_GET
 def dashboard(request):
     data = selectors.dashboard(_remembered_range(request, "office_range_dashboard", selectors.DASHBOARD_RANGES, defaults.get(request).dashboard_range), request)
-    return render(request, "office/dashboard.html", {"data": data, "greeting": _greeting(request.user), "section": "dashboard"})
+    warning = payments.staff_warning() if levels.at_least(request.user, levels.ADMIN) else None
+    return render(request, "office/dashboard.html", {"data": data, "greeting": _greeting(request.user), "section": "dashboard", "payment_warning": warning})
 
 
 @reader
@@ -110,7 +113,8 @@ def people(request):
     rows, has_next = lists.people_page(filters, page, defaults.get(request).list_page_size)
     total = selectors.counters(K.REGISTRATIONS).get((K.REGISTRATIONS, ""), 0)
     context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "total_registered": total,
-               "plans": list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order").values("slug", "name")), "section": "people"}
+               "plans": list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order").values("slug", "name")), "section": "people",
+               "sale_options": lists.SALE_OPTIONS, "payment_options": lists.PAYMENT_OPTIONS}
     return _varied(render(request, _fragment(request, "office/people.html", "office/_people_rows.html"), context))
 
 
@@ -155,8 +159,74 @@ def _person_extras(request, person):
 def person(request, pk):
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
     person = lists.person_detail(user)
-    context = {"person": person, "section": "people", **_timeline_context(request, person), **_person_extras(request, person)}
+    context = {"person": person, "section": "people", "setup_plans": ManualSetupForm().fields["plan"].queryset,
+               **_timeline_context(request, person), **_person_extras(request, person)}
     return render(request, "office/_timeline.html" if request.headers.get("HX-Request") and "tl" in request.GET else "office/person.html", context)
+
+
+def _setup_result(request, user, action):
+    """Run a manual set-up action from a posted form; a refusal is a toast, never a 500."""
+    from django.core.exceptions import ValidationError
+
+    form = ManualSetupForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, " ".join(m for errors in form.errors.values() for m in errors))
+        return redirect("office_person", pk=user.pk)
+    data = form.cleaned_data
+    try:
+        action(data)
+    except ValidationError as error:
+        messages.error(request, " ".join(error.messages))
+    else:
+        messages.success(request, "Saved.")
+    return redirect("office_person", pk=user.pk)
+
+
+@admin
+@require_POST
+def person_setup(request, pk):
+    """Set up a membership manually (a member who pays directly). Admin and up; audited; one active membership per member."""
+    user = get_object_or_404(User, pk=pk, interest__isnull=False)
+    return _setup_result(request, user, lambda d: payments.set_up_manually(user.interest, request.user, d["plan"], d["start_date"], d["agreed_price"], d["billing_note"]))
+
+
+@admin
+@require_POST
+def person_restore_sale(request, pk):
+    """Give a lapsed sale price back. Admin and up; a reason is required; audited with who, why and when."""
+    from django.core.exceptions import ValidationError
+
+    user = get_object_or_404(User, pk=pk, interest__isnull=False)
+    try:
+        payments.restore_sale(user.interest, request.user, request.POST.get("reason", ""))
+    except ValidationError as error:
+        messages.error(request, " ".join(error.messages))
+    else:
+        messages.success(request, "The sale price was restored.")
+    return redirect("office_person", pk=user.pk)
+
+
+@admin
+@require_POST
+def person_setup_edit(request, pk):
+    user = get_object_or_404(User, pk=pk, interest__isnull=False)
+    sub = payments.active_subscription(user.interest)
+    if sub is None:
+        messages.error(request, "There is no active membership to edit.")
+        return redirect("office_person", pk=user.pk)
+    return _setup_result(request, user, lambda d: payments.edit_manual(sub, request.user, d["plan"], d["start_date"], d["agreed_price"], d["billing_note"]))
+
+
+@admin
+@require_POST
+def person_setup_cancel(request, pk):
+    user = get_object_or_404(User, pk=pk, interest__isnull=False)
+    sub = payments.active_subscription(user.interest)
+    if sub is None or not payments.cancel_manual(sub, request.user):
+        messages.error(request, "There is no active membership to cancel.")
+    else:
+        messages.success(request, "The membership was cancelled.")
+    return redirect("office_person", pk=user.pk)
 
 
 @admin
