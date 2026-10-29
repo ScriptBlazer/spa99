@@ -1,6 +1,6 @@
 # Go live
 
-Do these in order. Live starts with an empty database, so it needs no backfills. Server commands run in the folder that holds `docker-compose.yml`.
+Do these in order. Live starts with an empty database, so it needs no backfills. Server commands run in `~/spa99` (the folder that holds `docker-compose.yml`).
 
 ## Waiting for Moishe
 
@@ -8,7 +8,6 @@ None of these block the launch. Each has a safe default already in place.
 
 1. **Background jobs: no Redis.** The jobs use the database as their queue (django-q2, ORM broker), with 4 job workers in one worker container. Reason: at this size Redis would add a container, memory and a failure point without a real gain. Override: say "add Redis" and it becomes one extra container plus a settings change.
 2. **Personal-data retention** (privacy notice proposals, `docs/features/legal.md`). Today these are kept forever: sign-in records, email records, journey emails with no account, change history and the System audit log. Needs your and the solicitor's yes on the periods, then clean-up jobs get built. The quick one: set `SYSTEM_AUDIT_RETENTION_DAYS=730` in `.env` and the daily housekeeping job prunes the audit log to 2 years.
-3. **RDS backup retention:** the privacy notice says backups are replaced within 35 days. Set RDS automatic backups to between 7 and 35 days (35 is RDS's maximum).
 
 **What lives on the server:** only `.env` and Caddy's certificates. The database is RDS (with its own backups), uploads are in S3, static files are inside the image, logs go to `docker compose logs`. Losing the server loses nothing but `.env`, so keep a copy of it in your private folder.
 
@@ -16,31 +15,57 @@ None of these block the launch. Each has a safe default already in place.
 
 1. **GitHub and Docker Hub**
    - Docker Hub: create a **private** repository `spa99`. Make two access tokens (Account settings > Personal access tokens): **Read & Write** for GitHub, **Read-only** for the server.
-   - GitHub (repo > Settings > Secrets and variables > Actions): add `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (the Read & Write token).
-   - Merge `docker-live` (and anything else for launch) into `main`. Wait for the green tick.
-   - Release: `git tag 1.0.0 && git push origin 1.0.0`. Actions runs the tests on Postgres and, only if green, pushes `<username>/spa99:1.0.0` and `:latest`. Check both appear on Docker Hub.
+   - GitHub (repo > Settings > Secrets and variables > Actions): add `DOCKERHUB_USERNAME` (`scriptblazer`) and `DOCKERHUB_TOKEN` (the Read & Write token).
+   - Merge `claude/docker-live-d1d28a` (and anything else for launch) into `main`. Wait for the green tick.
+   - Release: `git tag 1.0.0 && git push origin 1.0.0`. Actions runs the tests on Postgres and, only if they pass, pushes `scriptblazer/spa99:1.0.0` and `:latest`. Check that both appear on Docker Hub.
 
 2. **AWS** (region eu-west-2, London)
-   - **RDS PostgreSQL:** automatic backups **on, 7 to 35 days**. Security group: port 5432 from the server only. Copy the endpoint; it goes in `DATABASE_URL` (URL-encode symbols in the password).
-   - **S3:** a **private** bucket (Block all public access on). The site refuses to start without it.
-   - **IAM role for the server** with `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` on `arn:aws:s3:::<bucket>/*` and `s3:ListBucket` on `arn:aws:s3:::<bucket>`. (Add `ses:SendRawEmail` and `ses:GetAccount` only when moving to SES.)
-   - **EC2** (x86_64, e.g. t3.small, Ubuntu): attach the role. Security group: **80 and 443** open to all, 22 from your IP only. Set the instance metadata **hop limit to 2** (Actions > Instance settings > Modify instance metadata options), or the containers can't use the role and S3 fails. Install Docker with the compose plugin.
+   - **EC2** (done): t3.medium, Ubuntu 26.04 x86_64, 30 GB gp3 encrypted, termination protection on. Security group `spa99-web`: 22 from your IP, 80 and 443 open to all. IAM role `spa99-ec2` (S3 policy for `spa99-media`, plus SSM). **Elastic IP 3.8.30.182** allocated and attached.
+     - Set the instance metadata **hop limit to 2** (Actions > Instance settings > Modify instance metadata options), or the containers can't use the role and S3 fails.
+   - **S3** (done): private bucket `spa99-media` (Block all public access on). The role allows `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` on `arn:aws:s3:::spa99-media/*` and `s3:ListBucket` on `arn:aws:s3:::spa99-media`. (Add `ses:SendRawEmail` and `ses:GetAccount` only when moving to SES.)
+   - **RDS PostgreSQL:** Create database > Standard create > PostgreSQL.
+     - Instance **db.t4g.small**, storage **gp3** with **storage auto scaling on**.
+     - Connectivity: the **same VPC as the EC2**, **Public access: No**. New security group (e.g. `spa99-db`) with one inbound rule: PostgreSQL **5432** from the security group **`spa99-web`** (not from an IP).
+     - **Additional configuration > Initial database name: `spa99`**. Without it RDS creates no database and the site can't connect.
+     - Automatic backups **on, 14 days**.
+     - Copy the endpoint. `DATABASE_URL=postgres://<user>:<password>@<endpoint>:5432/spa99` (URL-encode symbols in the password).
 
 3. **Postmark** (approved 2026-10-29, Basic, 10,000 a month)
    - Sender domain `spa99.uk`: add its **DKIM** and **Return-Path** records in Cloudflare (DNS only). Wait until both show green in Postmark.
    - Copy the **Server API token** (for `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD`).
 
-4. **Server `.env`**
-   - Log in to Docker Hub once: `docker login -u <username>` (password: the Read-only token).
-   - Copy `docker-compose.yml`, `Caddyfile` and `.env.example` to the server. Rename `.env.example` to `.env` and fill it in. Every line is explained there.
-   - Required (the site will not start without them, and the error lists what's wrong): `SECRET_KEY` (new, in single quotes), `DATABASE_URL`, `AWS_STORAGE_BUCKET_NAME`, `SYSTEM_UNLOCK_CODE`, `ADMIN_PATH`, `DEFAULT_FROM_EMAIL`, the four `*_DOMAIN`s, `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD` (the Postmark token).
-   - Also: `IMAGE=<username>/spa99`, `APP_TAG=1.0.0`, `SENTRY_DSN`, `ANTHROPIC_API_KEY` (blank = chat off), `POSTMARK_WEBHOOK_USER` / `_PASSWORD` (step 9).
+4. **Server: Docker and files.** From your Mac, in the project folder:
+   ```bash
+   ssh -i "/Users/moishe/Library/CloudStorage/OneDrive-Personal/Developer/Keys/spa99.pem" ubuntu@3.8.30.182 mkdir -p spa99
+   scp -i "/Users/moishe/Library/CloudStorage/OneDrive-Personal/Developer/Keys/spa99.pem" docker-compose.yml Caddyfile .env.example ubuntu@3.8.30.182:spa99/
+   ssh -i "/Users/moishe/Library/CloudStorage/OneDrive-Personal/Developer/Keys/spa99.pem" ubuntu@3.8.30.182
+   ```
+   On the server:
+   ```bash
+   curl -fsSL https://get.docker.com | sudo sh
+   sudo usermod -aG docker ubuntu
+   exit
+   ```
+   Log back in (the ssh line above), then:
+   ```bash
+   docker compose version
+   docker login -u scriptblazer
+   cd ~/spa99
+   cp .env.example .env
+   nano .env
+   ```
+   - If the Docker script says Ubuntu 26.04 isn't supported yet, follow the apt repository steps at docs.docker.com/engine/install/ubuntu instead, then carry on from `sudo usermod`.
+   - `docker login`: paste the **Read-only** token as the password. It stays logged in.
+   - **Every server command from here on runs in `~/spa99`.**
+
+5. **Server `.env`** (every line is explained in the file)
+   - Required (the site will not start without them, and the error lists what's wrong): `SECRET_KEY` (new, in single quotes), `DATABASE_URL`, `AWS_STORAGE_BUCKET_NAME=spa99-media`, `SYSTEM_UNLOCK_CODE`, `ADMIN_PATH`, `DEFAULT_FROM_EMAIL`, the four `*_DOMAIN`s, and `EMAIL_HOST_USER` / `EMAIL_HOST_PASSWORD` (the Postmark token).
+   - Also: `IMAGE=scriptblazer/spa99`, `APP_TAG=1.0.0`, `SENTRY_DSN`, `ANTHROPIC_API_KEY` (blank = chat off), `POSTMARK_WEBHOOK_USER` / `_PASSWORD` (step 9).
    - Leave out: `EMAIL_BACKEND` (blank = Postmark SMTP), `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (the server uses its role), `DEBUG`, `DJANGO_SETTINGS_MODULE`, `SPA99_PRIVATE_DIR`, `Q_SYNC`.
    - Save a copy of the finished `.env` in your private folder.
+   - **DNS** (done): the GoDaddy parking A record is deleted; `spa99.uk`, `www`, `office`, `system` and `control` point at **3.8.30.182**, grey cloud (DNS only) until step 10.
 
-5. **DNS** (Cloudflare, **grey cloud / DNS only** for now): A records for `spa99.uk`, `www`, `office`, `system` and `control` pointing at the server's IP (use an Elastic IP so it never changes).
-
-6. **Start:** `docker compose pull && docker compose up -d`. No manual steps: web runs the migrations and creates the cache table, then starts gunicorn (static files are already in the image); the worker waits for web to be healthy, registers the recurring jobs and starts; Caddy gets the certificates once DNS points at the server (step 5) and 80/443 are open.
+6. **Start:** `docker compose pull && docker compose up -d`. No manual steps: web runs the migrations and creates the cache table, then starts gunicorn (static files are already in the image); the worker waits for web to be healthy, registers the recurring jobs and starts; Caddy gets the certificates once DNS points at the server (step 5, grey cloud) and 80/443 are open.
    - `docker compose logs web | head -30`: the startup line must say `settings=config.settings.prod`, `database=postgresql:...`, `media=s3:<bucket>/prod/`, `email=smtp:smtp.postmarkapp.com`.
    - `docker compose logs caddy`: it should say the certificates were obtained.
    - If web keeps restarting: `docker compose logs web` shows the list of missing or wrong `.env` values.
@@ -63,6 +88,7 @@ None of these block the launch. Each has a safe default already in place.
     - Turn the records **orange** (proxied). Turn on "Always use HTTPS".
     - Leave **Bot Fight Mode off**: it blocks Postmark webhooks and uptime checks.
     - Check `/health/` and a sign-in again.
+    - Certificate renewal keeps working through Cloudflare (Caddy renews on its own). If it ever fails, check `docker compose logs caddy`; turning the records grey for a few minutes lets Caddy renew, then turn them orange again.
 
 11. **Sentry:** `docker compose run --rm web python manage.py sentry_test`. The test error must appear in Sentry, tagged with the release (e.g. 1.0.0).
 
@@ -99,11 +125,11 @@ Nothing grows without limit on disk: every container's log is capped at 5 x 10 M
 | System audit log | forever (`SYSTEM_AUDIT_RETENTION_DAYS=0`) | `housekeeping` once the setting is above 0 (see "Waiting for Moishe") |
 | Sign-in records, email records, change history, journey emails | forever for now | not yet: retention periods await the solicitor ("Waiting for Moishe") |
 | WhatsApp click counts (`LinkClickDay`) | forever (counts only, no personal data) | kept on purpose |
-| Database backups | RDS automatic backups, 7 to 35 days | RDS |
+| Database backups | RDS automatic backups, 14 days | RDS |
 
 ## After launch
 
-- **Backups:** live uses RDS automatic backups (daily, kept 7+ days) plus a snapshot before risky releases. `scripts/backup_db.sh` is for your Mac's SQLite only.
+- **Backups:** live uses RDS automatic backups (daily, kept 14 days) plus a snapshot before risky releases. `scripts/backup_db.sh` is for your Mac's SQLite only.
 - **HSTS:** after a week of clean HTTPS, set `SECURE_HSTS_SECONDS=31536000` in `.env` and `docker compose up -d`.
 - **Uptime alert:** a free check (UptimeRobot or Better Stack) on `https://spa99.uk/health/`.
 - **Stay off the server for 2 days:** urgent fixes only.

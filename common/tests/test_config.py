@@ -94,6 +94,7 @@ class StorageAndDatabaseTests(SimpleTestCase):
         storage, _ = build_media_storage(self.env(AWS_STORAGE_BUCKET_NAME="b"), "prod/", "/x", require_credentials=False)
         self.assertNotIn("access_key", storage["OPTIONS"])
         self.assertEqual(storage["OPTIONS"]["location"], "prod/")
+        self.assertEqual(storage["OPTIONS"]["endpoint_url"], "https://s3.eu-west-2.amazonaws.com")
 
     def test_database_defaults_and_description_hide_credentials(self):
         sqlite = build_databases(None, "/tmp/db.sqlite3")

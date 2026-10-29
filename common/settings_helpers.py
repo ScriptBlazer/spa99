@@ -42,9 +42,13 @@ def build_media_storage(env, location_prefix, local_media_dir, require_credentia
     secret_key = env.get("AWS_SECRET_ACCESS_KEY")
     has_credentials = bool(access_key and secret_key)
     if bucket and (has_credentials or not require_credentials):
+        region = env.get("AWS_S3_REGION_NAME", "eu-west-2")
         options = {
             "bucket_name": bucket,
-            "region_name": env.get("AWS_S3_REGION_NAME", "eu-west-2"),
+            "region_name": region,
+            # Regional endpoint: signed links point straight at the bucket's region (no global-endpoint redirect,
+            # which breaks presigned URLs for newer buckets).
+            "endpoint_url": f"https://s3.{region}.amazonaws.com",
             "location": location_prefix,
             "default_acl": None,
             "querystring_auth": True,  # private bucket, signed URLs

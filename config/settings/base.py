@@ -169,7 +169,7 @@ SYSTEM_UNLOCK_CODE_VALID = bool(re.fullmatch(r"[0-9]{6,12}", SYSTEM_UNLOCK_CODE_
 SYSTEM_UNLOCK_CODE = SYSTEM_UNLOCK_CODE_RAW if SYSTEM_UNLOCK_CODE_VALID else ""
 SYSTEM_ENV_LABEL = ENV.get("SYSTEM_ENV_LABEL", "DEV").upper()  # DEV or LIVE: the label System shows in the title bar and stripe (prod default LIVE)
 SYSTEM_UNLOCK_SECONDS = 15 * 60  # System asks for the password again after this much idle time
-SYSTEM_AUDIT_RETENTION_DAYS = int(ENV.get("SYSTEM_AUDIT_RETENTION_DAYS", "0") or 0)  # 0 = keep the audit log forever; used only by `manage.py prune_audit_log`
+SYSTEM_AUDIT_RETENTION_DAYS = int(ENV.get("SYSTEM_AUDIT_RETENTION_DAYS", "0") or 0)  # 0 = keep the audit log forever; above 0 the daily housekeeping job (and `manage.py prune_audit_log`) prunes older rows
 SYSTEM_SESSION_AGE = 12 * 60 * 60  # a System sign-in lasts 12 hours at most
 
 
