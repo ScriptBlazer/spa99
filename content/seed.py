@@ -100,7 +100,7 @@ PAGES = {
     "gold": ("Gold Card", "The Spa 99 Gold Card: free{gold_star}, by application, for BML clients: past, present and future.", [
         ("hero", "The Gold Card.", "For BML clients: past, present and future. Free{gold_star}, by application.", "Apply", "/gold-card/apply/"),
         ("who", "Who it is for.",
-         "Owners and investors\nDevelopers\nBlock, estate and portfolio managers\nPeople at property and management firms\nAgents and brokers\nProperty lawyers", "", ""),
+         "Current BML clients\nPast BML clients\nFuture BML clients", "", ""),
         ("who_note", "", "Not a BML client yet? You're still welcome to apply.", "", ""),
         ("holds", "What it holds.", "", "", ""),
         ("holds_lead", "", "The fullest membership, and a little more.", "", ""),

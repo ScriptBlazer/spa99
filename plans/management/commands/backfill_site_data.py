@@ -215,6 +215,9 @@ OLD_GOLD_SECTIONS = [  # page key, section key, field, old value, new value (202
     ("memberships", "gold_cta", "body", "The Gold Card is free{gold_star}, by application.",  # the line the Memberships page actually shows
      f"The Gold Card is for BML clients: past, present and future. Free{{gold_star}}, by application."),
     ("gold", "hero", "body", "For people who own, build and manage property. Free{gold_star}, by application.", f"{BML_CLIENTS} Free{{gold_star}}, by application."),
+    ("gold", "who", "body",
+     "Owners and investors\nDevelopers\nBlock, estate and portfolio managers\nPeople at property and management firms\nAgents and brokers\nProperty lawyers",
+     "Current BML clients\nPast BML clients\nFuture BML clients"),
     ("gold", "who_note", "body", "Not in property? You're still welcome to apply.", "Not a BML client yet? You're still welcome to apply."),
     ("journey", "gold_panel", "body",
      "With your line of work, you may be invited to hold the Gold Card. It's free{gold_star}, by application, and your answers come with you.",
