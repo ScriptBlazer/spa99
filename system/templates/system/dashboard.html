@@ -43,6 +43,21 @@
     <div class="sys-bars" role="img" aria-label="Clicks over the last 30 days" data-whatsapp-trend>{% for b in whatsapp.bars %}<span class="sys-bar" style="--h:{{ b.pct }}" title="{{ b.day|date:'j M' }}: {{ b.count }}"></span>{% endfor %}</div>
     <p class="sys-from" data-whatsapp-by-source><span class="sys-muted">Where from</span>
       {% for row in whatsapp.top_sources %}<span class="sys-badge">{{ row.label }} {{ row.count }}</span>{% empty %}<span class="sys-muted">No clicks yet.</span>{% endfor %}</p>
+    <details class="sys-more" data-whatsapp-more><summary>More details</summary>
+      <div class="sys-more-grid">
+        <div class="sys-scroll"><table class="sys-table">
+          <caption class="sys-muted">Last 30 days (days with clicks)</caption>
+          <thead><tr><th scope="col">Day</th><th scope="col" class="num">Clicks</th></tr></thead>
+          <tbody>{% for d in whatsapp.by_day %}{% if d.count %}<tr><td>{{ d.day|date:"D j M" }}</td><td class="num mono">{{ d.count }}</td></tr>{% endif %}{% empty %}{% endfor %}
+          {% if not whatsapp.month %}<tr><td colspan="2" class="sys-muted">No clicks in the last 30 days.</td></tr>{% endif %}</tbody>
+        </table></div>
+        <div class="sys-scroll"><table class="sys-table">
+          <caption class="sys-muted">Where from (all time)</caption>
+          <thead><tr><th scope="col">Page</th><th scope="col" class="num">Clicks</th></tr></thead>
+          <tbody>{% for row in whatsapp.by_source %}<tr><td>{{ row.source|cut:"_"|capfirst }}</td><td class="num mono">{{ row.count }}</td></tr>{% empty %}<tr><td colspan="2" class="sys-muted">No clicks yet.</td></tr>{% endfor %}</tbody>
+        </table></div>
+      </div>
+    </details>
   </div>
 </section>
 {% endblock %}

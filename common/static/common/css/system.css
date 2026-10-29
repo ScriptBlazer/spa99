@@ -201,3 +201,10 @@ body.system.live { --sys-stripe: 3px; }
 .sys-pad > form.sys-pad, form.sys-pad > p { margin-top: 0; }
 .sys-pad > :first-child { margin-top: 0; } .sys-pad > :last-child { margin-bottom: 0; }
 @media (max-width: 48em) { .sys-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Dashboard: "More details" under the WhatsApp box (2026-10-29) */
+.sys-more { margin-top: var(--sys-4); border-top: 1px solid var(--sys-line); padding-top: var(--sys-3); }
+.sys-more > summary { cursor: pointer; color: var(--sys-text-2); font-weight: 500; }
+.sys-more-grid { display: grid; gap: var(--sys-4); margin-top: var(--sys-3); }
+@media (min-width: 48em) { .sys-more-grid { grid-template-columns: 1fr 1fr; align-items: start; } }
+.sys-more caption { text-align: left; padding-bottom: var(--sys-2); }
