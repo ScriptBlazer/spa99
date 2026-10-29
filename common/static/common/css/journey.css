@@ -76,6 +76,7 @@
 .reasons li::before { content: ""; flex: none; width: 0.875rem; height: 1.25rem; margin-top: 0.1875rem; background: var(--color-caramel); -webkit-mask: url("../img/mark-espresso.svg") center / contain no-repeat; mask: url("../img/mark-espresso.svg") center / contain no-repeat; }
 .result-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-top: var(--space-5); }
 .gold-line-note { margin-top: var(--space-4); }
+.whatsapp-rate { margin-top: var(--space-4); max-width: none; }
 .not-you { margin-top: var(--space-4); }
 .not-you .btn-quiet { font-size: var(--text-sm); }
 .others { margin-top: var(--space-7); }

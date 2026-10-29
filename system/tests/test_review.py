@@ -32,7 +32,7 @@ class SignInLimitTests(TestCase):
                 self.assertEqual(client.get("/").status_code, 200, minutes)
         with mock.patch("system.services.time.time", return_value=start + 12 * 3600 + 60):
             response = client.get("/")
-        self.assertEqual((response.status_code, response["Location"]), (302, "/login/"))
+        self.assertEqual((response.status_code, response["Location"]), (302, "/dev-login/"))
         self.assertEqual(client.get("/").status_code, 404)  # signed out now
 
 
@@ -67,10 +67,10 @@ class NotFoundBeforeCsrfTests(TestCase):
     def test_the_sign_in_post_still_needs_its_csrf_token_and_a_developer_is_not_blocked(self):
         user = make_user()
         anonymous = Client(HTTP_HOST="system.localhost", enforce_csrf_checks=True)
-        self.assertEqual(anonymous.post("/login/", {"username": user.email, "password": PASSWORD}).status_code, 403)
+        self.assertEqual(anonymous.post("/dev-login/", {"username": user.email, "password": PASSWORD}).status_code, 403)
         client = Client(HTTP_HOST="system.localhost", enforce_csrf_checks=True)
-        token = client.get("/login/").cookies["csrftoken"].value
-        self.assertEqual(client.post("/login/", {"username": user.email, "password": PASSWORD, "csrfmiddlewaretoken": token}).status_code, 302)
+        token = client.get("/dev-login/").cookies["csrftoken"].value
+        self.assertEqual(client.post("/dev-login/", {"username": user.email, "password": PASSWORD, "csrfmiddlewaretoken": token}).status_code, 302)
         self.assertEqual(client.post("/lock/").status_code, 403)  # a real developer without a token: the ordinary CSRF refusal
 
 

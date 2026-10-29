@@ -196,6 +196,24 @@ class Invite(BaseModel):
         return self.expires_at <= timezone.now()
 
 
+class InviteImport(BaseModel):
+    """The one-time token the review page hands out for an invite import: tied to the person and the hash of the exact list. The first
+    confirmation claims it (batch_id is set by one conditional update), so a double click, lag, back-and-resubmit or two tabs make one
+    batch; any later confirmation is answered with that batch. Holds no addresses, only the hash."""
+
+    token = models.CharField(max_length=64, unique=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    content_hash = models.CharField(max_length=64)
+    batch_id = models.UUIDField(null=True, blank=True, unique=True, help_text="Set when the import was made; the batch this token produced.")
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"import {self.token[:6]}... ({'used' if self.batch_id else 'open'})"
+
+
 class EmailOptOut(BaseModel):
     """An address that clicked Unsubscribe and has no account (an invitee, a Gold applicant). People with an account use
     `User.marketing_consent` instead (their choice is logged in history and shows in My Spa 99). Kept like EmailSuppression:

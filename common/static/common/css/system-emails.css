@@ -301,3 +301,12 @@ body.system {
 .system .se-templates input[type=text] { width: 180px; }
 .se-templates .sys-num { text-align: right; }
 @media (max-width: 48em) { .system .se-templates input[type=text] { width: 140px; } .se-tpl { padding: var(--sys-3); } }
+
+/* invite import: errors and warnings */
+.se-groups { padding: var(--sys-3) var(--sys-4); display: grid; gap: var(--sys-2); border-bottom: 1px solid var(--sys-line); }
+.se-group { margin: 0; font-size: var(--sys-fs-sm); }
+.se-group.error strong { color: var(--sys-danger); }
+.se-fixnote { margin: var(--sys-3) var(--sys-4) 0; }
+.se-review tr[data-level="error"] td { background: color-mix(in srgb, var(--sys-danger) 6%, transparent); }
+.se-review td.sys-muted { width: 3.5em; }
+.sys-btn[data-busy] { opacity: .65; cursor: progress; }

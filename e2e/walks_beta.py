@@ -468,12 +468,12 @@ def beta_access(w):
             assert all(code == 404 for code in wrong.values()), f"Expected 404 everywhere; got {wrong}"
     system = w.page()
     with w.step("A member cannot sign in on System, and its pages answer 404", system):
-        system.goto(f"{SYSTEM}/login/")
+        system.goto(f"{SYSTEM}/dev-login/")
         system.locator("input[name=username]").fill(email)
         system.locator("input[name=password]").fill(PASSWORD)
         with system.expect_navigation():
             system.locator("[data-system-signin] button[type=submit]").click()
-        assert "/login/" in system.url and system.locator("[data-system-error]").count() == 1
+        assert "/dev-login/" in system.url and system.locator("[data-system-error]").count() == 1
         wrong = {path: system.goto(SYSTEM + path).status for path in ("/", "/plans/", "/team/")}
         assert all(code == 404 for code in wrong.values()), f"Expected 404 everywhere; got {wrong}"
     office_level = w.page()
@@ -482,12 +482,12 @@ def beta_access(w):
         wrong = {path: office_level.goto(CONTROL + path).status for path in ("/", "/rooms/", "/library/")}
         assert all(code == 404 for code in wrong.values()), f"Expected 404 everywhere; got {wrong}"
     with w.step("Office level cannot use System either: sign-in refused, 404 pages", office_level):
-        office_level.goto(f"{SYSTEM}/login/")
+        office_level.goto(f"{SYSTEM}/dev-login/")
         office_level.locator("input[name=username]").fill(OLIVE["email"])
         office_level.locator("input[name=password]").fill(PASSWORD)
         with office_level.expect_navigation():
             office_level.locator("[data-system-signin] button[type=submit]").click()
-        assert "/login/" in office_level.url and office_level.locator("[data-system-error]").count() == 1
+        assert "/dev-login/" in office_level.url and office_level.locator("[data-system-error]").count() == 1
         assert office_level.goto(f"{SYSTEM}/plans/").status == 404
     signed_out = w.page()
     with w.step("Signed out: /account/ shows the sign-in page, Office and Control ask to sign in, System answers 404", signed_out):
@@ -818,35 +818,42 @@ def beta_counting(w):
 def beta_system_refusals(w):
     page = w.page()
     with w.step("Developer signs in on System (still locked)", page):
-        page.goto(f"{SYSTEM}/login/")
+        page.goto(f"{SYSTEM}/dev-login/")
         page.locator("input[name=username]").fill(DEV["email"])
         page.locator("input[name=password]").fill(PASSWORD)
         with page.expect_navigation():
             page.locator("[data-system-signin] button[type=submit]").click()
-        assert "/login/" not in page.url
+        assert "/dev-login/" not in page.url
     failed_before = dbtool("events", "unlock_failed")["count"]
-    with w.step("Wrong lock code and wrong password, several times: always the same refusal, still locked", page):
+    with w.step("Wrong lock codes: each says how many tries are left (5, 4, 3, 2, 1), the 6th starts a wait, still locked", page):
         page.goto(f"{SYSTEM}/plans/")
         page.wait_for_selector("[data-system-unlock]")
-        for password, code in ((PASSWORD, "000000"), (PASSWORD, "111111"), (PASSWORD, "123456"), ("Wrong-Password-1!", UNLOCK_CODE), ("Wrong-Password-1!", "000000")):
-            page.locator("[data-system-unlock] input[name=password]").fill(password)
-            page.locator("[data-system-unlock] input[name=code]").fill(code)
+        assert page.locator("[data-system-unlock] input[name=password]").count() == 0, "The unlock still asks for a password"
+        for typed, left in (("000000", 5), ("111111", 4), ("123456", 3), ("654321", 2), ("222222", 1)):
+            page.locator("[data-system-unlock] input[name=code]").fill(typed)
             with page.expect_navigation():
                 page.locator("[data-system-unlock] button[type=submit]").click()
-            assert "wrong" in page.locator("[data-system-error]").inner_text().lower(), f"No refusal for {password!r} / {code!r}"
+            message = page.locator("[data-system-error]").inner_text().lower()
+            expected = f"{left} more {'try' if left == 1 else 'tries'}"
+            assert "wrong code" in message and expected in message, f"Expected '{expected}', the page says: {message!r}"
             lines = problems_modal(page)  # the same refusal, listed in the shared dialog; closing it keeps the form
-            assert any("wrong" in line.lower() for line in lines), f"The problems dialog says: {lines}"
+            assert any(expected in line.lower() for line in lines), f"The problems dialog says: {lines}"
             close_problems(page)
             assert page.locator("[data-system-unlock]").count() == 1
+        page.locator("[data-system-unlock] input[name=code]").fill("000001")
+        with page.expect_navigation():
+            page.locator("[data-system-unlock] button[type=submit]").click()
+        assert "too many tries" in page.locator("[data-lockout]").inner_text().lower(), "No wait message after the 6th wrong try"
+        assert page.locator("[data-system-unlock] input[name=code]").is_disabled(), "The form is not disabled during the wait"
         page.goto(f"{SYSTEM}/plans/")
         assert page.locator("[data-system-plans]").count() == 0, "System opened after wrong codes"
     with w.step("Every failure is in the audit events (unlock_failed), and the audit chain is still intact", page):
-        assert dbtool("events", "unlock_failed")["count"] - failed_before == 5, "Not every failed unlock was logged"
+        assert dbtool("events", "unlock_failed")["count"] - failed_before == 6, "Not every failed unlock was logged"
         code, output = manage("verify_audit_log")
         assert code == 0, output[-400:]
-    with w.step("Unlock with the right password and code", page):
+    with w.step("The countdown ends on its own (about a minute), the form comes back, and the right code unlocks", page):
         page.goto(f"{SYSTEM}/plans/")
-        page.locator("[data-system-unlock] input[name=password]").fill(PASSWORD)
+        page.wait_for_selector("[data-system-unlock] input[name=code]:not([disabled])", timeout=75000)
         page.locator("[data-system-unlock] input[name=code]").fill(UNLOCK_CODE)
         with page.expect_navigation():
             page.locator("[data-system-unlock] button[type=submit]").click()

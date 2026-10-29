@@ -102,9 +102,12 @@ def snapshot_fields(plan, held=None, now=None):
     Never adds a snapshot once the sale has ended. `held` is the current InterestRegistration (None for a new one)."""
     if plan is None:
         return dict(EMPTY_SNAPSHOT)
+    from . import payments
+
+    after_launch = payments.opened_ever()  # payments are open (or were): the sale price is applied at checkout, nothing is snapshotted
     if held is not None and held.sale_percent_off and held.sale_id and covers(held.sale, plan):
         return {name: getattr(held, name) for name in EMPTY_SNAPSHOT}
-    sale = live_sale(now)
+    sale = None if after_launch else live_sale(now)
     if covers(sale, plan):
         return {"sale": sale, "sale_name": sale.name, "sale_percent_off": sale.percent_off, "sale_months": sale.months_at_price,
                 "sale_locked_at": now or timezone.now()}
@@ -113,8 +116,8 @@ def snapshot_fields(plan, held=None, now=None):
 
 def kept_price(interest, vat_rate=None):
     """What a person keeps, for the member screens: None without a snapshot or plan, else a plain dict with a ready sentence."""
-    if interest is None or not interest.sale_percent_off or interest.plan is None:
-        return None
+    if interest is None or not interest.sale_percent_off or interest.plan is None or interest.sale_expired_at:
+        return None  # an expired price is shown nowhere as kept (the snapshot itself stays on the row)
     plan, percent, months = interest.plan, interest.sale_percent_off, interest.sale_months
     vat = SiteSettings.load().vat_rate if vat_rate is None else vat_rate
     unit = "month" if months == 1 else "months"
@@ -182,11 +185,43 @@ def end_now(sale, user):
     return sale
 
 
+EXTENSIONS = {"1h": timedelta(hours=1), "1d": timedelta(days=1), "1w": timedelta(weeks=1)}
+
+
+@transaction.atomic
+def extend_end(sale, user, by=None, ends_at=None):
+    """Move a running or upcoming sale's end: `by` is "1h", "1d" or "1w" added to the current end, or `ends_at` is a new time (earlier
+    or later). Never earlier than now (checked against the server's clock) and after the start. An ended sale cannot be touched. Logged,
+    and the bar reads the stored end, so it follows at once. Returns the sale."""
+    from system import services as system_services
+
+    lock()
+    sale = Sale.objects.select_for_update().get(pk=sale.pk)
+    now = timezone.now()
+    if sale.status(now) == "ended":
+        raise ValidationError("This sale has ended, so its end time cannot be changed. Copy it to run it again.")
+    if by is not None:
+        if by not in EXTENSIONS:
+            raise ValidationError("Choose +1 hour, +1 day or +1 week.")
+        ends_at = sale.ends_at + EXTENSIONS[by]
+    if ends_at is None:
+        raise ValidationError("Pick the new end time.")
+    if ends_at <= now:
+        raise ValidationError("The end time cannot be in the past. Pick a later time, or use Stop now to end the sale.")
+    if ends_at <= sale.starts_at:
+        raise ValidationError("The sale must end after it starts.")
+    sale.ends_at = ends_at
+    system_services.save_logged(sale, user, fields=["ends_at"])  # full_clean: no overlap with another sale
+    return sale
+
+
 def register_offer(vat_rate=None, request=None):
     """For the register and choose-a-tier screens: the live sale (never a preview: nothing is promised for a sale that is not on) with
     each covered plan's price lines, or None. `text` is the factual sentence; `prices` is keyed by plan slug."""
+    from . import payments
+
     sale = live_sale_for_request(request) if request is not None else live_sale()
-    if sale is None:
+    if sale is None or payments.opened_ever():  # after launch nothing is "kept" at registration
         return None
     vat = SiteSettings.load().vat_rate if vat_rate is None else vat_rate
     unit = "month" if sale.months_at_price == 1 else "months"

@@ -12,12 +12,12 @@
 {% else %}
 {% with a=application %}
 <section class="o-card o-confirm" data-gold-final data-state="open" data-action="{{ action }}" aria-labelledby="final-h">
-  <p class="o-sub">Final approval, Low potential</p>
+  <p class="o-sub">Final approval, {{ a.potential|capfirst }} potential</p>
   <h1 id="final-h">{{ a.name }}</h1>
   <p class="o-badges">{% include "office/_badge.html" with potential=a.potential %} {% include "office/_badge.html" with status="awaiting_final" %}</p>
   {% if a.property_line %}<p class="o-confirm-line">{{ a.property_line }}</p>{% endif %}
   <p class="o-sub">Applied {{ a.applied|dmy }}</p>
-  {% if a.final_requested_by %}<p class="o-callout" data-final-by>Approved by {{ a.final_requested_by|first_word }}{% if a.final_requested_at %} on {{ a.final_requested_at|dm }}{% endif %}, but the potential is Low. Are you sure?</p>{% endif %}
+  {% if a.final_requested_by %}<p class="o-callout" data-final-by>Approved by {{ a.final_requested_by|first_word }}{% if a.final_requested_at %} on {{ a.final_requested_at|dm }}{% endif %}, but the potential is {{ a.potential|capfirst }}. Are you sure?</p>{% endif %}
   <form method="post" action="{% url 'office_gold_final_confirm' a.id %}" class="o-confirm-form" data-final-confirm-form>{% csrf_token %}
     <input type="hidden" name="token" value="{{ token }}">
     <button type="submit" class="btn btn-primary btn-block o-confirm-go">Confirm approval</button>

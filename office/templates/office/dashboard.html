@@ -6,6 +6,8 @@
 {# DOM order is the phone order; the desktop grid places the cards (css). Everything is server-rendered: rings, sparklines, numbers. Plain counts, no percent. #}
 {% include "office/_range.html" with place="page" ranges=data.ranges current=data.range %}
 <p class="o-error" data-error hidden role="status"><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+{% if payment_warning %}<p class="o-error" role="alert" data-payment-warning>{{ payment_warning.count }} member{{ payment_warning.count|pluralize }} will lose their launch price on {{ payment_warning.closes_on }} ({{ payment_warning.days_left }} day{{ payment_warning.days_left|pluralize }} left).
+  <a class="o-quiet" href="{% url 'office_people' %}?sale=at_risk">See who</a></p>{% endif %}
 <div class="o-dash" data-office-dashboard>
 
   <header class="o-greeting" data-office-greeting>

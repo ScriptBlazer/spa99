@@ -69,8 +69,8 @@ class CommonConfig(AppConfig):
                 "replaced. Set AWS_STORAGE_BUCKET_NAME."
             )
         if report.get("unlock_code_invalid"):
-            logger.warning("SYSTEM_UNLOCK_CODE is not 6 to 12 digits: System unlock uses the password only")
+            logger.warning("SYSTEM_UNLOCK_CODE is not 6 to 12 digits: System unlock asks for no code (set 6 to 12 digits)")
         elif not report.get("unlock_code_set", True):
-            logger.warning("SYSTEM_UNLOCK_CODE not set: System unlock uses the password only")
+            logger.warning("SYSTEM_UNLOCK_CODE not set: System unlock asks for no code, a signed-in Developer just presses Unlock")
         for key in report["missing_keys"]:
             logger.warning("%s is missing from the environment / .env (see .env.example)", key)

@@ -19,7 +19,7 @@ from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
 FILTERED = "[Filtered]"
 ALLOWED_HEADERS = {"accept", "accept-language", "user-agent", "host", "content-type", "content-length"}  # allowlist: no IP, Referer, cookies
-SENSITIVE_PATHS = ("/journey/", "/register/", "/gold-card/apply/", "/login/", "/unlock/")
+SENSITIVE_PATHS = ("/journey/", "/register/", "/gold-card/apply/", "/login/", "/dev-login/", "/unlock/")
 SENSITIVE_WORDS = ("password", "token", "secret", "key", "email", "phone", "mobile", "name", "address")
 IGNORED_ERRORS = [Http404, PermissionDenied, DisallowedHost, RequestAborted]
 DISCONNECT_ERRORS = (ConnectionResetError, BrokenPipeError)  # ignored only when the event has a request (a client left)

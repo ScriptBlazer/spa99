@@ -396,16 +396,16 @@ def system(w):
     dev, admin_user = STAFF["dev"], STAFF["admin"]
     page = w.page()
     with w.step("Developer signs in on the System address", page):
-        page.goto(f"{SYSTEM}/login/")
+        page.goto(f"{SYSTEM}/dev-login/")
         page.locator("input[name=username]").fill(dev["email"])
         page.locator("input[name=password]").fill(PASSWORD)
         with page.expect_navigation():
             page.locator("[data-system-signin] button[type=submit]").click()
-        assert "/login/" not in page.url, f"Sign-in failed: {page.locator('[data-system-error]').all_inner_texts()}"
-    with w.step("System is locked: unlock with password and lock code", page):
+        assert "/dev-login/" not in page.url, f"Sign-in failed: {page.locator('[data-system-error]').all_inner_texts()}"
+    with w.step("System is locked: unlock with the lock code only", page):
         page.goto(f"{SYSTEM}/plans/")
         page.wait_for_selector("[data-system-unlock]")
-        page.locator("[data-system-unlock] input[name=password]").fill(PASSWORD)
+        assert page.locator("[data-system-unlock] input[name=password]").count() == 0, "The unlock still asks for a password"
         page.locator("[data-system-unlock] input[name=code]").fill(UNLOCK_CODE)
         with page.expect_navigation():
             page.locator("[data-system-unlock] button[type=submit]").click()
@@ -434,13 +434,13 @@ def system(w):
         assert code == 0, output[-600:]
     other = w.page()
     with w.step("An Admin cannot use System: sign-in refused, pages answer 404", other):
-        other.goto(f"{SYSTEM}/login/")
+        other.goto(f"{SYSTEM}/dev-login/")
         other.locator("input[name=username]").fill(admin_user["email"])
         other.locator("input[name=password]").fill(PASSWORD)
         with other.expect_navigation():
             other.locator("[data-system-signin] button[type=submit]").click()
-        assert "/login/" in other.url and other.locator("[data-system-error]").count() == 1, "An Admin got past the System sign-in"
-        assert any("wrong" in line.lower() for line in problems_modal(other)), "The refusal is not listed in the problems dialog"
+        assert "/dev-login/" in other.url and other.locator("[data-system-error]").count() == 1, "An Admin got past the System sign-in"
+        assert any("not recognised" in line.lower() for line in problems_modal(other)), "The refusal is not listed in the problems dialog"
         for path in ("/", "/plans/", "/changes/"):
             status = other.goto(f"{SYSTEM}{path}").status
             assert status == 404, f"{path} answered {status} to an Admin (expected 404)"

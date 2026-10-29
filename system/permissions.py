@@ -1,5 +1,5 @@
 """System access. Three steps: be allowed (Developer level or superuser, signed in on THIS host within 12 hours),
-be unlocked (password asked again, 15 idle minutes), then the view. Anyone not allowed gets a plain 404, anonymous
+be unlocked (lock code asked, 15 idle minutes), then the view. Anyone not allowed gets a plain 404, anonymous
 included (system.middleware does the same check before CSRF)."""
 from functools import wraps
 from urllib.parse import urlencode, urlsplit
@@ -12,7 +12,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from . import audit, changes, services
 
-SECTIONS = {"plans", "hours", "gold", "journey", "emails", "settings", "team", "approval", "sales", "assistant", "faq", "changes"}
+SECTIONS = {"plans", "hours", "gold", "journey", "emails", "settings", "team", "approval", "sales", "payments", "assistant", "faq", "changes"}
 
 
 def gate(request):
@@ -23,7 +23,7 @@ def gate(request):
     if not services.sign_in_valid(request.session):
         audit.log_event(audit.SystemEvent.SESSION_EXPIRED, request, user=request.user, detail={"max_hours": services.session_age_seconds() // 3600})
         logout(request)
-        return redirect("/login/")
+        return redirect("/dev-login/")
     return None
 
 

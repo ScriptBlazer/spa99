@@ -128,7 +128,7 @@ class GoldApplication(BaseModel):
     CONTACTED = "contacted"
     APPROVED = "approved"
     DECLINED = "declined"
-    AWAITING_FINAL = "awaiting_final"  # a Low potential approval waiting for a final approver (docs/features/gold-final-approval.md)
+    AWAITING_FINAL = "awaiting_final"  # an approval waiting for a final approver (docs/features/gold-final-approval.md)
     STATUS_CHOICES = [(NEW, "New"), (CONTACTED, "Contacted"), (APPROVED, "Approved"), (DECLINED, "Declined"),
                       (AWAITING_FINAL, "Awaiting final approval")]
     WAITING = (NEW, CONTACTED)  # in the approvers' queue
@@ -182,7 +182,7 @@ class GoldApplication(BaseModel):
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", editable=False)
 
-    # Final approval (Low potential only). Every step is also a history row (who, when, the note).
+    # Final approval (the potentials ticked in System > Approval). Every step is also a history row (who, when, the note).
     final_requested_at = models.DateTimeField(null=True, blank=True, help_text="When an approver sent it for final approval.")
     final_requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", editable=False)

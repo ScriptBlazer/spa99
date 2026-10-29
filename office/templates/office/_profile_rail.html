@@ -11,6 +11,7 @@
   </dl>
 </section>
 {% endif %}
+{% if person.kind == "account" %}{% include "office/_membership_card.html" %}{% endif %}
 <section class="o-card" data-person-source aria-labelledby="p-source"><h2 id="p-source" class="o-h3">Source</h2>
   {% with first=person.journeys.0 latest=latest_journey %}
   {% if person.source %}<dl class="o-rows">

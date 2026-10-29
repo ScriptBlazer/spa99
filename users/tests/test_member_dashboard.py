@@ -198,7 +198,7 @@ class StaffHostLoginRedirectTests(TestCase):
         user.save()
         for host in (dj.OFFICE_HOST, dj.SYSTEM_HOST, dj.CONTROL_HOST):
             self.client.logout()
-            response = self.client.post("/login/", {"username": user.email, "password": "Correct-horse-9"}, HTTP_HOST=host)
+            response = self.client.post("/dev-login/" if host == dj.SYSTEM_HOST else "/login/", {"username": user.email, "password": "Correct-horse-9"}, HTTP_HOST=host)  # System signs in at /dev-login/
             self.assertEqual(response.status_code, 302, host)
             self.assertNotIn("/account/", response["Location"], host)
 

@@ -29,7 +29,7 @@ def make_user(email="dev@example.com", system=True, staff=True, superuser=False)
 
 def sign_in(user, host=SYSTEM, password=PASSWORD):
     client = Client(HTTP_HOST=host)
-    response = client.post("/login/", {"username": user.email, "password": password})
+    response = client.post("/dev-login/", {"username": user.email, "password": password})
     return client, response
 
 
@@ -55,7 +55,9 @@ class AccessTests(TestCase):
             self.assertEqual(client.post("/team/00000000-0000-0000-0000-000000000000/roles/").status_code, 404)
 
     def test_sign_in_page_is_open_but_only_developers_get_in(self):
-        self.assertEqual(Client(HTTP_HOST=SYSTEM).get("/login/").status_code, 200)
+        self.assertEqual(Client(HTTP_HOST=SYSTEM).get("/dev-login/").status_code, 200)
+        self.assertEqual(Client(HTTP_HOST=SYSTEM).get("/login/").status_code, 404)  # the old address is as unknown as any other
+        self.assertEqual(Client(HTTP_HOST=SYSTEM).post("/login/", {"username": "x", "password": "y"}).status_code, 404)
         _, response = sign_in(make_user("office@example.com", system=False))
         self.assertEqual(response.status_code, 200)  # the ordinary "wrong email or password" answer, no redirect
         self.assertContains(response, "data-system-error")
@@ -65,9 +67,10 @@ class AccessTests(TestCase):
         self.assertEqual(response.status_code, 302)
         locked = client.get("/changes/")
         self.assertEqual((locked.status_code, locked["Location"]), (302, "/unlock/?next=%2Fchanges%2F"))
-        self.assertEqual(client.post("/unlock/", {"password": "wrong"}).status_code, 200)
-        self.assertEqual(client.get("/changes/").status_code, 302)  # still locked
-        self.assertRedirects(client.post("/unlock/", {"password": PASSWORD, "next": "/changes/"}), "/changes/")
+        with override_settings(SYSTEM_UNLOCK_CODE="493021"):
+            self.assertEqual(client.post("/unlock/", {"code": "000000"}).status_code, 200)
+            self.assertEqual(client.get("/changes/").status_code, 302)  # still locked
+            self.assertRedirects(client.post("/unlock/", {"code": "493021", "next": "/changes/"}), "/changes/")
         response = client.get("/changes/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow")
@@ -88,18 +91,6 @@ class AccessTests(TestCase):
         self.assertEqual(client.get("/", HTTP_HOST=SYSTEM).status_code, 404)
         self.assertEqual(client.post("/unlock/", {"password": PASSWORD}, HTTP_HOST=SYSTEM).status_code, 404)
         self.assertEqual(client.get("/changes/", HTTP_HOST=SYSTEM).status_code, 404)
-
-    @override_settings(CACHES=LOCMEM)
-    def test_unlock_attempts_are_rate_limited(self):
-        from django.core.cache import cache
-
-        cache.clear()
-        self.addCleanup(cache.clear)
-        client, _ = sign_in(make_user())
-        codes = [client.post("/unlock/", {"password": "nope"}).status_code for _ in range(7)]
-        self.assertEqual(codes[:5], [200] * 5)
-        self.assertEqual(codes[5:], [429, 429])
-        self.assertEqual(client.post("/unlock/", {"password": PASSWORD}).status_code, 429)  # even the right one waits
 
 
 class ChangeLogTests(TestCase):

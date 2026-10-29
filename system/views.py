@@ -12,24 +12,23 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from common.audit import client_ip
-from common.ratelimit import hit
 from notifications.models import EmailSuppression
+from pages import clicks
 from plans.models import SiteSettings
 from users.forms import SignInForm
 from users.views import LoginView, TeamPasswordView
 
 
 from . import approval as approval_service
-from . import audit, changes, codeview, defaults, feed, services
+from . import audit, changes, codeview, defaults, feed, services, throttle
 from . import team as team_service
-from .forms import EmailsForm, SettingsForm
+from .forms import ApprovalForm, EmailsForm, SettingsForm
 from .forms_rules import RISKY
 from .models import SystemChange, SystemEvent
 from .permissions import signed_in, unlocked
 
 NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", "system_plans"), ("hours", "Hours and closures", "system_hours"),
-       ("gold", "Gold rules", "system_gold"), ("approval", "Approval", "system_approval"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("sales", "Sales", "system_sales"), ("assistant", "Assistant", "system_assistant"),
+       ("gold", "Gold rules", "system_gold"), ("approval", "Approval", "system_approval"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("sales", "Sales", "system_sales"), ("payments", "Payments", "system_payments"), ("assistant", "Assistant", "system_assistant"),
        ("settings", "Settings", "system_settings"), ("defaults", "Defaults", "system_defaults"), ("team", "Team", "system_team"), ("changes", "Audit log", "system_changes")]
 
 
@@ -74,13 +73,24 @@ class SystemAuthForm(SignInForm):
 
 
 class SystemLoginView(LoginView):
-    """The shared sign-in view (rate limited per IP) with System's own template. Signing in does not unlock."""
+    """The shared sign-in view with System's own template, at /dev-login/. Wrong tries escalate (system.throttle): per email
+    and IP, and per IP. While waiting nothing is checked. Signing in does not unlock."""
 
     template_name = "system/login.html"
     authentication_form = SystemAuthForm
     redirect_authenticated_user = False
 
+    def locked_response(self, seconds, status=429):
+        context = {"form": self.get_form_class()(self.request), "next": self.request.POST.get("next") or self.request.GET.get("next", ""), **throttle.lock_context(seconds)}
+        return render(self.request, self.template_name, context, status=status)
+
+    def get(self, request, *args, **kwargs):
+        seconds = throttle.wait_seconds(throttle.sign_in_buckets(request, "")[1:])  # a page view knows no email: only the address-wide wait shows
+        return self.locked_response(seconds, 200) if seconds else super().get(request, *args, **kwargs)
+
     def form_valid(self, form):
+        throttle.clear(throttle.sign_in_success_buckets(self.buckets))
+        throttle.refund([b for b in self.buckets if b.scope == "signin-ip"])  # keep its wrong tries, drop this good one
         response = super().form_valid(form)
         self.request.session.set_expiry(services.session_age_seconds())
         self.request.session[services.SIGNED_IN_KEY] = time.time()  # the 12 hour limit counts from here
@@ -89,38 +99,49 @@ class SystemLoginView(LoginView):
         return response
 
     def form_invalid(self, form):
-        audit.log_event(SystemEvent.SIGN_IN_FAILED, self.request, email=self.request.POST.get("username", "").strip().lower(),
-                        detail={"reason": "wrong email or password"})
-        return super().form_invalid(form)
+        email = self.request.POST.get("username", "").strip().lower()
+        tries = self.tries  # counted before the password was checked (post)
+        audit.log_event(SystemEvent.SIGN_IN_FAILED, self.request, email=email, detail={"reason": "wrong email or password"})
+        if tries.started:  # one row per lockout, never one per blocked hit
+            audit.log_event(SystemEvent.SIGN_IN_FAILED, self.request, email=email, outcome=SystemEvent.BLOCKED,
+                            detail={"rate_limited": True, "wait_seconds": tries.wait})
+        if tries.wait:
+            return self.locked_response(tries.wait)
+        context = self.get_context_data(form=form, error_text=f"Email or password not recognised. {throttle.tries_text(tries.left)}.")
+        return self.render_to_response(context)  # 200; the same words whether or not the email exists
 
     def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        if response.status_code == 429:  # the shared sign-in refused: too many tries from this IP
-            audit.log_event(SystemEvent.SIGN_IN_FAILED, request, email=request.POST.get("username", "").strip().lower(),
-                            outcome=SystemEvent.BLOCKED, detail={"rate_limited": True}, dedupe_seconds=300, dedupe_any_person=True)  # per IP: a typed email cannot multiply rows
-        return response
+        self.buckets = throttle.sign_in_buckets(request, request.POST.get("username", ""))
+        self.tries = throttle.reserve(self.buckets)  # counted first, atomically; refused = waiting, the password is not checked at all
+        if not self.tries.allowed:
+            return self.locked_response(self.tries.wait)
+        return super(LoginView, self).post(request, *args, **kwargs)  # Django's own, skipping the shared flat limit
 
 
 @signed_in
 @require_http_methods(["GET", "POST"])
 def unlock(request):
-    target = safe_next(request, "/")
-    error = ""
+    """Asks for the lock code only (being here already means a Developer signed in with their password)."""
+    context = {"next": safe_next(request, "/"), "code_required": services.code_required()}
+    buckets = throttle.unlock_buckets(request)
     if request.method == "POST":
-        by_ip = hit("system-unlock", f"{request.user.pk}:{client_ip(request) or 'unknown'}", 5, 300)
-        by_person = hit("system-unlock-person", request.user.pk, 10, 900)  # whatever the IP: many addresses cannot multiply the tries
-        if not (by_ip and by_person):
-            audit.log_event(SystemEvent.UNLOCK_RATE_LIMITED, request, user=request.user, dedupe_seconds=300)
-            return render(request, "system/unlock.html", {"next": target, "error": "Too many attempts. Please wait a few minutes.", "code_required": services.code_required()}, status=429)
-        password_ok = request.user.check_password(request.POST.get("password", ""))
-        code_ok = services.code_matches(request.POST.get("code", ""))  # both always checked, one generic answer
-        if password_ok and code_ok:
+        tries = throttle.reserve(buckets)  # counted first, atomically
+        if not tries.allowed:  # waiting: the code is not checked at all, and a blocked hit is not logged again
+            return render(request, "system/unlock.html", {**context, **throttle.lock_context(tries.wait)}, status=429)
+        if services.code_matches(request.POST.get("code", "")):
+            throttle.clear(buckets)
             services.unlock(request.session)
             audit.log_event(SystemEvent.UNLOCK, request, user=request.user)
-            return redirect(target)
-        audit.log_event(SystemEvent.UNLOCK_FAILED, request, user=request.user, detail={"reason": "password" if not password_ok else "code"})
-        error = "Password or code is wrong."
-    return render(request, "system/unlock.html", {"next": target, "error": error, "code_required": services.code_required()})
+            return redirect(context["next"])
+        audit.log_event(SystemEvent.UNLOCK_FAILED, request, user=request.user, detail={"reason": "code"})
+        if tries.started:
+            audit.log_event(SystemEvent.UNLOCK_RATE_LIMITED, request, user=request.user, detail={"wait_seconds": tries.wait})
+        if tries.wait:
+            return render(request, "system/unlock.html", {**context, **throttle.lock_context(tries.wait)}, status=429)
+        context["error"] = f"Wrong code. {throttle.tries_text(tries.left)}."
+    else:
+        context.update(throttle.lock_context(throttle.wait_seconds(buckets)))
+    return render(request, "system/unlock.html", context)
 
 
 @signed_in
@@ -161,7 +182,8 @@ def sign_out(request):
 def dashboard(request):
     site = SiteSettings.load()
     context = {"health": services.health_report(), "recent": services.recent_changes(defaults.get(request).dashboard_recent_changes), "site": site,
-               "stages": [("Registration", site.register_interest_open), ("Subscribe", site.subscribe_open), ("Book", site.booking_open)]}
+               "stages": [("Registration", site.register_interest_open), ("Subscribe", site.subscribe_open), ("Book", site.booking_open)],
+               "whatsapp": clicks.summary()}
     return page(request, "system/dashboard.html", "dashboard", context)
 
 
@@ -230,20 +252,24 @@ SCRIPT_CODE_ASK = "Enter the System code to undo a script change."
 
 def _script_code_gate(request, section):
     """Undoing a script's change asks for the System code again. None = go ahead, else the JSON refusal. Same code check and
-    same rate limit buckets as /unlock/ (so the two cannot be brute-forced side by side); wrong tries are written to the log."""
+    same wrong-try wait as /unlock/ (so the two cannot be brute-forced side by side); wrong tries are written to the log."""
     if not services.code_required():
         return None  # no code configured (dev, CI): nothing to ask, the same as the unlock
     typed = request.POST.get("code", "")
     if not typed.strip():
         return JsonResponse({"ok": False, "needs_code": True, "message": SCRIPT_CODE_ASK}, status=403)
-    by_ip = hit("system-unlock", f"{request.user.pk}:{client_ip(request) or 'unknown'}", 5, 300)
-    by_person = hit("system-unlock-person", request.user.pk, 10, 900)
-    if not (by_ip and by_person):
-        audit.log_event(SystemEvent.UNDO_RATE_LIMITED, request, user=request.user, section=section, dedupe_seconds=300)
-        return JsonResponse({"ok": False, "needs_code": True, "message": "Too many attempts. Please wait a few minutes."}, status=429)
+    buckets = throttle.unlock_buckets(request)
+    tries = throttle.reserve(buckets)  # counted first, atomically
+    if not tries.allowed:
+        return JsonResponse({"ok": False, "needs_code": True, "message": f"Too many tries. Try again in {throttle.spoken(tries.wait)}."}, status=429)
     if not services.code_matches(typed):
         audit.log_event(SystemEvent.UNDO_CODE_FAILED, request, user=request.user, section=section)
-        return JsonResponse({"ok": False, "needs_code": True, "message": "That code is wrong."}, status=403)
+        if tries.started:
+            audit.log_event(SystemEvent.UNDO_RATE_LIMITED, request, user=request.user, section=section, detail={"wait_seconds": tries.wait})
+        if tries.wait:
+            return JsonResponse({"ok": False, "needs_code": True, "message": f"Too many tries. Try again in {throttle.spoken(tries.wait)}."}, status=429)
+        return JsonResponse({"ok": False, "needs_code": True, "message": f"That code is wrong. {throttle.tries_text(tries.left)}."}, status=403)
+    throttle.clear(buckets)
     return None
 
 
@@ -415,9 +441,9 @@ def team_merge(request):
 # ---------- approval: who approves Gold, and who gives the final approval ----------
 
 @unlocked
-@require_GET
+@require_http_methods(["GET", "POST"])
 def approval(request):
-    return page(request, "system/approval.html", "approval", approval_service.context(request.user))
+    return _edit_site(request, ApprovalForm, "system/approval.html", "approval", extra=lambda: approval_service.context(request.user))
 
 
 def _approval_action(request, action, text="Saved.", nothing="Nothing changed."):

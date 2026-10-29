@@ -1,11 +1,27 @@
 {% extends "system/base.html" %}
 {% block main %}
-{% include "system/_page_header.html" with title="Approval" description="Who approves Gold applications, and who gives the final approval to Low-potential ones. Team only shows these roles; they are set here." %}
-{% if final_approver_missing %}<p class="sys-note warn sys-approval-note" role="status" data-final-approver-missing><strong>No final approver:</strong> Low-potential approvals go straight through.</p>{% endif %}
+{% include "system/_page_header.html" with title="Approval" description="Who approves Gold applications, and who gives the final approval to the ones that need it. Team only shows these roles; they are set here." %}
+<form method="post" data-problems data-system-form="approval">{% csrf_token %}
+  <section class="sys-panel" data-system-final-switch>
+    {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
+    {{ form.row_token }}
+    {% include "system/_field_row.html" with field=form.final_approval_on %}
+    <div class="sys-row{% if form.final_approval_potentials.errors %} invalid{% endif %}" data-system-field="final_approval_potentials">
+      <label>{{ form.final_approval_potentials.label }}<small>Used only while final approval is on. Default: Low.</small></label>
+      <div><div class="sys-ctl">{% for box in form.final_approval_potentials %}<label class="sys-check">{{ box.tag }} {{ box.choice_label }}</label> {% endfor %}</div>
+        {% if form.final_approval_potentials.errors %}<p class="sys-error" role="alert" data-problem>{{ form.final_approval_potentials.errors|join:" " }}</p>{% endif %}</div>
+    </div>
+    <p class="sys-muted" data-system-final-explain>Off: approvals go straight through. On: approvals for the ticked potentials wait for a final approver (Low by default).</p>
+    {% if final_nothing_ticked %}<p class="sys-note warn" role="status" data-final-nothing-waits><strong>Nothing waits:</strong> final approval is on, but no potential is ticked, so every approval goes straight through.</p>{% endif %}
+    {% if not final_on and awaiting_final_count %}<p class="sys-note" role="status" data-final-still-waiting>{{ awaiting_final_count }} application{{ awaiting_final_count|pluralize }} already waiting for final approval stay{{ awaiting_final_count|pluralize:"s," }} as {{ awaiting_final_count|pluralize:"it is,they are" }}. A final approver can still confirm or send {{ awaiting_final_count|pluralize:"it,them" }} back.</p>{% endif %}
+  </section>
+  <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>
+</form>
+{% if final_approver_missing %}<p class="sys-note warn sys-approval-note" role="status" data-final-approver-missing><strong>No final approver:</strong> final approval is on, so set one below. Until then approvals go straight through.</p>{% endif %}
 
 {% url 'system_approval_approvers_add' as approvers_add %}{% url 'system_approval_final_add' as final_add %}
 {% include "system/_approval_panel.html" with role="approver" title="Approvers" intro="Office level and above. They approve, decline and resend Gold applications, and get an email for each one." people=approvers candidates=approver_candidates add_url=approvers_add add_label="Add approvers" field_label="Team members to add as approvers" %}
-{% include "system/_approval_panel.html" with role="final" title="Final approvers" intro="Admin level and above. Low-potential approvals wait for a final approver before the applicant hears anything." people=final_approvers candidates=final_candidates add_url=final_add add_label="Add final approvers" field_label="Team members to add as final approvers" %}
+{% include "system/_approval_panel.html" with role="final" title="Final approvers" intro="Admin level and above. While final approval is on, approvals for the ticked potentials wait for a final approver before the applicant hears anything." people=final_approvers candidates=final_candidates add_url=final_add add_label="Add final approvers" field_label="Team members to add as final approvers" %}
 
 <p class="sys-muted sys-approval-cc" data-system-approval-cc>Copied on each Gold application email: {% if cc %}<span class="mono">{{ cc|join:", " }}</span>{% else %}nobody{% endif %}. Change it in <a href="{% url 'system_emails' %}">Emails</a>.</p>
 {% endblock %}

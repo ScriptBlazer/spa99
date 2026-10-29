@@ -1,0 +1,6 @@
+{# Context: plans, optional sub (to prefill). #}
+<div class="o-filter-group"><label class="o-filter-label" for="su-plan">Plan</label>
+  <select id="su-plan" name="plan" class="o-select" required>{% for p in setup_plans %}<option value="{{ p.pk }}"{% if sub.plan_id == p.pk or not sub and person.interest.plan == p.name %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></div>
+<div class="o-filter-group"><label class="o-filter-label" for="su-start">Start date</label><input id="su-start" type="date" name="start_date" value="{{ sub.start_date|date:'Y-m-d' }}" required></div>
+<div class="o-filter-group"><label class="o-filter-label" for="su-price">Agreed price ex VAT, a month (optional)</label><input id="su-price" type="number" step="0.01" min="0" name="agreed_price" value="{{ sub.agreed_price_ex_vat|default_if_none:'' }}"></div>
+<div class="o-filter-group"><label class="o-filter-label" for="su-note">Billing note</label><textarea id="su-note" name="billing_note" rows="2" maxlength="1000">{{ sub.billing_note }}</textarea></div>

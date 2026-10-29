@@ -60,7 +60,9 @@ class SalePageTests(TestCase):
     def test_the_bar_renders_the_countdown_for_no_js(self):
         make_sale(start=-1, end=26)
         html = self.client.get("/visit/").content.decode()
-        self.assertRegex(html, r"data-sale-count>1d 0[0-3]h")
+        self.assertRegex(html, r"data-sale-count>1d 0[0-3]h \d\dm \d\ds")
+        band = self.client.get("/memberships/").content.decode()
+        self.assertRegex(band, r"sale-band-label\">seconds?</span>")
 
     def test_band_text_and_lines_while_live(self):
         make_sale(start=-1, end=80)

@@ -15,6 +15,7 @@ from gold import services as gold_services
 from gold.models import ApproverDelivery, GoldApplication
 from gold.tests.test_gold import application_data
 from plans.management.commands.seed_phase1 import seed_all
+from plans.models import SiteSettings
 from plans.tests.helpers import make_team_member
 
 User = get_user_model()
@@ -44,6 +45,7 @@ class FinalApprovalTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         seed_all()
+        SiteSettings.objects.filter(singleton_key="site").update(final_approval_on=True)  # final approval is off by default
         cls.approver = make_team_member("approver@example.test", levels.OFFICE, approver=True)
         cls.approver2 = make_team_member("approver2@example.test", levels.OFFICE, approver=True)
         cls.final = make_team_member("final@example.test", levels.ADMIN, final=True)
@@ -180,3 +182,54 @@ class FinalApprovalTests(TestCase):
         approval.approve(application, self.approver)
         self.assertEqual(mail.outbox, [])
         self.assertTrue(EmailLog.objects.filter(template="gold_final", status="suppressed").exists())
+
+
+class FinalSwitchTests(TestCase):
+    """The switch (off by default) and the ticked potentials decide what waits."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+        cls.approver = make_team_member("approver@example.test", levels.OFFICE, approver=True)
+
+    def set_site(self, **values):
+        SiteSettings.objects.filter(singleton_key="site").update(**values)
+
+    def test_the_default_is_off_and_low_only(self):
+        site = SiteSettings.load()
+        self.assertFalse(site.final_approval_on)
+        self.assertEqual(site.final_potential_list, ["low"])
+
+    def test_off_means_low_goes_through_even_with_a_final_approver(self):
+        make_team_member("final@example.test", levels.ADMIN, final=True)
+        self.assertEqual(approval.approve(low_application(), self.approver), invites.INVITED)
+
+    def test_on_with_a_final_approver_low_waits(self):
+        make_team_member("final@example.test", levels.ADMIN, final=True)
+        self.set_site(final_approval_on=True)
+        self.assertEqual(approval.approve(low_application(), self.approver), approval.AWAITING)
+
+    def test_on_with_no_final_approver_goes_through_and_warns(self):
+        self.set_site(final_approval_on=True)
+        low = low_application()
+        self.assertTrue(approval.final_approver_missing())
+        self.assertEqual(approval.approve(low, self.approver), invites.INVITED)
+
+    def test_medium_waits_only_when_ticked(self):
+        make_team_member("final@example.test", levels.ADMIN, final=True)
+        self.set_site(final_approval_on=True)
+        medium = low_application()
+        GoldApplication.objects.filter(pk=medium.pk).update(potential_level="medium")
+        self.assertEqual(approval.approve(medium, self.approver), invites.INVITED)  # only Low is ticked
+        again = low_application(email="med@example.com", first_name="Med")
+        GoldApplication.objects.filter(pk=again.pk).update(potential_level="medium")
+        self.set_site(final_approval_potentials="low,medium")
+        self.assertEqual(approval.approve(again, self.approver), approval.AWAITING)
+        self.assertEqual(mail.outbox[-1].subject, "Final approval: Med Cohen (Medium potential)")
+
+    def test_nothing_ticked_means_nothing_waits(self):
+        make_team_member("final@example.test", levels.ADMIN, final=True)
+        self.set_site(final_approval_on=True, final_approval_potentials="")
+        self.assertEqual(approval.final_waits(), [])
+        self.assertFalse(approval.final_approver_missing())
+        self.assertEqual(approval.approve(low_application(), self.approver), invites.INVITED)

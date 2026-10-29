@@ -38,6 +38,9 @@
         </div>{% endfor %}
       </div>
       {% endif %}
+      {% if spa.intro.cta_label %}<div class="actions door-cta" data-fade>
+        <a class="btn btn-primary btn-block-phone" href="{{ spa.intro.cta_url|default:'/journey/' }}">{{ spa.intro.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
+      </div>{% endif %}
       <nav class="door-chips" aria-label="The rooms" data-fade-row>
         <ul class="chips" data-scroller>{% for f in facilities %}<li><a class="chip" href="#{{ f.slug }}">{{ f.name }}</a></li>{% endfor %}</ul>
       </nav>

@@ -1,14 +1,18 @@
 """System > Emails: access, editing the automatic emails (logged, undoable), mailings and invites through the views, and the audit
 events. Mocked: in-memory outbox, SES is the dev/locmem path or a patched boto3."""
+import csv
+import io
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from mailings.models import Invite, Mailing, MailingRecipient, MailingTemplate
+from mailings import invites as invites_module
+from mailings.models import Invite, InviteImport, Mailing, MailingRecipient, MailingTemplate
 from notifications.models import EmailLog, NotificationTemplate
 from plans.management.commands.seed_phase1 import seed_all
 from system.models import SystemChange, SystemEvent
@@ -23,7 +27,7 @@ PATHS = ["/emails/", "/emails/suppressions/", "/emails/automatic/", "/emails/aut
          "/emails/invites/", "/emails/invites/new/", f"/emails/mailings/{UUID}/", f"/emails/invites/{UUID}/"]
 POSTS = ["/emails/automatic/verify/save/", "/emails/automatic/verify/preview/", "/emails/automatic/verify/test/", "/emails/automatic/verify/reset/",
          "/emails/mailings/preview/", f"/emails/mailings/{UUID}/send/", f"/emails/mailings/{UUID}/schedule/", f"/emails/mailings/{UUID}/cancel/",
-         "/emails/invites/review/", "/emails/invites/send/", "/emails/ses/refresh/"]
+         "/emails/invites/review/", "/emails/invites/send/", "/emails/invites/problems/", "/emails/ses/refresh/"]
 
 
 def member(email, consent=True):
@@ -55,7 +59,7 @@ class AutomaticEmailTests(TestCase):
     def test_list_edit_context_and_save_through_the_change_log_with_undo(self):
         listing = self.client.get("/emails/automatic/").context["emails"]
         self.assertEqual({e["key"] for e in listing}, {"verify", "welcome", "password_reset", "password_changed", "team_invite", "gold_ack", "gold_invite", "gold_active",
-                                                     "invite", "gold_approver", "gold_approver_repeat", "gold_final", "gold_sent_back", "gold_respond", "gold_declined"})
+                                                     "invite", "gold_approver", "gold_approver_repeat", "gold_final", "gold_sent_back", "gold_respond", "gold_declined", "payment_window_open", "payment_window_reminder", "payment_staff_alert"})
         self.assertNotIn("mailing", {e["key"] for e in listing})
         page = self.client.get("/emails/automatic/verify/")
         self.assertEqual([p["name"] for p in page.context["spec"]["placeholders"]], ["first_name", "valid_for"])
@@ -182,7 +186,8 @@ class MailingViewTests(TestCase):
             mailing = self.create()
             self.assertFalse(self.client.get(f"/emails/mailings/{mailing.pk}/").context["can_send"])
             response = self.client.post(f"/emails/mailings/{mailing.pk}/send/", HTTP_ACCEPT="application/json")
-            invites = self.client.post("/emails/invites/send/", {"text": "a@example.com"}, HTTP_ACCEPT="application/json")
+            invites = self.client.post("/emails/invites/send/", {"text": "a@example.com", "token": invites_module.issue_token(self.dev, "a@example.com")},
+                                       HTTP_ACCEPT="application/json")
         for answer in (response, invites):
             self.assertEqual(answer.status_code, 400)
             self.assertIn("sandbox", answer.json()["message"])
@@ -190,14 +195,27 @@ class MailingViewTests(TestCase):
         self.assertFalse(MailingRecipient.objects.exists() or Invite.objects.exists())
         cache.clear()
 
+    def review(self, text, client=None):
+        return (client or self.client).post("/emails/invites/review/", {"text": text})
+
+    def test_invites_review_page_says_ready_heads_up_or_needs_fixing(self):
+        self.assertContains(self.review("Al,al@example.com"), 'data-se-state="ready"')
+        warn = self.review("Al,al@example.com\nAl,al@example.com")
+        self.assertContains(warn, 'data-se-state="warnings"')
+        self.assertContains(warn, "Import anyway and send 1 invite")
+        self.assertContains(self.review("Al,al@example.com\nBad,not-an-email"), 'data-se-state="blocked"', status_code=200)
+        self.assertContains(self.client.post("/emails/invites/review/", {"text": ""}), 'data-se-state="file-error"', status_code=400)
+
     def test_invites_review_then_send_writes_the_event_and_tracks_the_batch(self):
         member("already@example.com")
-        review = self.client.post("/emails/invites/review/", {"text": "Al Smith,al@example.com\nAlready,already@example.com\nbad"})
-        self.assertEqual((review.context["report"]["ok"], review.context["report"]["counts"]["member"], review.context["report"]["counts"]["invalid"]), (1, 1, 1))
+        review = self.review("Al Smith,al@example.com\nAlready,already@example.com")
+        report = review.context["report"]
+        self.assertEqual((report["ok"], report["counts"]["member"], report["can_import"]), (1, 1, True))
+        self.assertContains(review, "1 will be invited")
         self.assertFalse(Invite.objects.exists())  # review writes nothing
         too_big = self.client.post("/emails/invites/review/", {"text": "x@example.com\n" + "y" * 1_100_000})
         self.assertEqual(too_big.status_code, 400)
-        sent = self.client.post("/emails/invites/send/", {"text": review.context["text"], "expected_ok": "1"})
+        sent = self.client.post("/emails/invites/send/", {"text": review.context["text"], "expected_ok": "1", "token": review.context["token"]})
         batch = Invite.objects.first().batch_id
         self.assertRedirects(sent, f"/emails/invites/{batch}/", fetch_redirect_response=False)
         self.assertEqual([m.to for m in mail.outbox], [["al@example.com"]])
@@ -206,6 +224,61 @@ class MailingViewTests(TestCase):
         detail = self.client.get(f"/emails/invites/{batch}/").context
         self.assertEqual((detail["summary"]["sent"], detail["summary"]["skipped"]), (1, 1))
         self.assertEqual(self.client.get(f"/emails/invites/{batch}/progress/").json()["sent"], 1)
+
+    def test_errors_give_no_token_and_the_import_refuses(self):
+        review = self.review("Al,al@example.com\nBad,nope")
+        self.assertEqual((review.context["report"]["blocked"], review.context["token"]), (True, ""))
+        self.assertContains(review, "1 need")
+        self.assertContains(review, "Download problem rows")
+        answer = self.client.post("/emails/invites/send/", {"text": review.context["text"], "token": ""}, HTTP_ACCEPT="application/json")
+        self.assertEqual(answer.status_code, 400)
+        forged = invites_module.issue_token(self.dev, review.context["text"])  # a token for the broken list still cannot import it
+        again = self.client.post("/emails/invites/send/", {"text": review.context["text"], "token": forged}, HTTP_ACCEPT="application/json")
+        self.assertEqual(again.status_code, 400)
+        self.assertIn("fixing", again.json()["message"])
+        self.assertFalse(Invite.objects.exists())
+
+    def test_confirming_twice_with_one_token_makes_one_batch_and_sends_once(self):
+        review = self.review("Al Smith,al@example.com\nBo,bo@example.com")
+        data = {"text": review.context["text"], "expected_ok": "2", "token": review.context["token"]}
+        first = self.client.post("/emails/invites/send/", data, HTTP_ACCEPT="application/json")
+        second = self.client.post("/emails/invites/send/", data, HTTP_ACCEPT="application/json")  # double click, lag, back and resubmit, second tab
+        self.assertEqual((first.status_code, second.status_code), (200, 200))
+        self.assertEqual((first.json()["repeated"], second.json()["repeated"]), (False, True))
+        self.assertEqual(first.json()["batch"], second.json()["batch"])
+        self.assertEqual(len({i.batch_id for i in Invite.objects.all()}), 1)
+        self.assertEqual((Invite.objects.count(), len(mail.outbox), SystemEvent.objects.filter(kind=SystemEvent.INVITES_SENT).count()), (2, 2, 1))
+        self.assertEqual(InviteImport.objects.get().batch_id.hex, first.json()["batch"].replace("-", ""))
+
+    def test_a_token_from_another_list_or_another_person_is_refused(self):
+        one = self.review("Al,al@example.com")
+        self.review("Bo,bo@example.com")
+        other = self.client.post("/emails/invites/send/", {"text": "Bo,bo@example.com", "token": one.context["token"]}, HTTP_ACCEPT="application/json")
+        self.assertEqual(other.status_code, 400)
+        self.assertIn("not the one", other.json()["message"])
+        edited = self.client.post("/emails/invites/send/", {"text": "Al,al@example.com\nCy,cy@example.com", "token": one.context["token"]}, HTTP_ACCEPT="application/json")
+        self.assertEqual(edited.status_code, 400)
+        stranger = unlocked_client(make_user("second@example.com"))
+        theirs = stranger.post("/emails/invites/send/", {"text": "Al,al@example.com", "token": one.context["token"]}, HTTP_ACCEPT="application/json")
+        self.assertIn("someone else", theirs.json()["message"])
+        self.assertEqual(self.client.post("/emails/invites/send/", {"text": "Al,al@example.com", "token": "nonsense"}, HTTP_ACCEPT="application/json").status_code, 400)
+        self.assertFalse(Invite.objects.exists())
+
+    def test_browser_line_ends_and_an_uploaded_file_still_match_the_token(self):
+        upload = self.client.post("/emails/invites/review/", {"file": SimpleUploadedFile("list.csv", "\ufeffName;Email\r\nAl;al@example.com\r\n".encode("utf-8"))})
+        self.assertEqual(upload.context["report"]["ok"], 1)
+        browser_text = upload.context["text"].replace("\n", "\r\n")  # a textarea submits CRLF
+        sent = self.client.post("/emails/invites/send/", {"text": browser_text, "token": upload.context["token"]}, HTTP_ACCEPT="application/json")
+        self.assertEqual(sent.status_code, 200)
+        self.assertEqual(Invite.objects.get().name, "Al")
+
+    def test_problem_rows_download_is_a_safe_csv(self):
+        response = self.client.post("/emails/invites/problems/", {"text": "Al,al@example.com\n=HYPERLINK(1),evil@example.com\nBad,nope\nMem,al@example.com"})
+        self.assertEqual(response["Content-Type"], "text/csv; charset=utf-8")
+        rows = list(csv.reader(io.StringIO(response.content.decode("utf-8-sig"))))
+        self.assertEqual(rows[0], ["Row", "Level", "Name", "Email", "What to do"])
+        self.assertEqual([(r[0], r[1]) for r in rows[1:]], [("1", "Fix this"), ("2", "Fix this"), ("3", "Fix this"), ("4", "Fix this")])  # rows 1 and 4: one address, two names
+        self.assertTrue(rows[2][2].startswith("'="))
 
 
 class MailingEditorPageTests(TestCase):

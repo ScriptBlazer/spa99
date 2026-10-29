@@ -14,16 +14,19 @@ DEFAULT_SUBJECTS = {
         "Gold Card application: {name} ({potential} potential) - repeat application",
         "To the approver when the same person applies again.",
     ),
-    "gold_final": ("Final approval: {name} (Low potential)", "To every final approver when an approver approves a Low potential application."),
+    "gold_final": ("Final approval: {name} ({potential} potential)", "To every final approver when an approver approves an application that needs final approval."),
     "gold_sent_back": (
-        "{name} was approved, but the potential is Low. Are you sure?",
-        "To every approver when a final approver sends a Low potential application back.",
+        "{name} was approved, but the potential is {potential}. Are you sure?",
+        "To every approver when a final approver sends an application back.",
     ),
     "gold_invite": ("Your Spa 99 Gold Card is approved", "To the applicant when Barry approves: the link to set up the account."),
     "gold_active": ("Your Spa 99 Gold Card is active", "To an existing member when Barry approves their Gold application."),
     "gold_ack": ("Your Spa 99 Gold Card application", "To the applicant after they apply."),
     "gold_respond": ("A message about your Spa 99 Gold Card application", "To the applicant when an approver clicks Respond on a Gold application."),
     "gold_declined": ("Your Spa 99 Gold Card application", "To the applicant when an approver declines AND ticks Email the applicant (off by default)."),
+    "payment_window_open": ("Your Spa 99 membership can now be set up", "To every registered member when payments open (System > Payments)."),
+    "payment_window_reminder": ("A gentle reminder about your Spa 99 membership", "Once, a few days before the payment window closes, to members who have not set up."),
+    "payment_staff_alert": ("{count} member(s) are about to lose their launch price", "To the alert addresses in System > Defaults, once a day near the end of the window, while launch-price holders have not set up."),
     "invite": ("You are invited to register for Spa 99", "To a person on an invite list (System > Emails > Invites): the personal register link."),
 }
 

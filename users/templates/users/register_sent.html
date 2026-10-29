@@ -9,6 +9,7 @@
     <div class="register-panel register-panel--sm" data-reveal>
       <h1>{{ r.sent.heading }}</h1>
       <p class="lead">{% if email %}We've sent a link to <strong>{{ email }}</strong>. {% else %}We've sent you a link. {% endif %}{{ r.sent.body }}</p>
+      {% payment_note css_class="small muted" %}
       <div class="actions">
         <form method="post" action="{% url 'resend_verification' %}" data-resend>{% csrf_token %}
           <button type="submit" class="btn-quiet" data-working-text="Sending">Send it again</button>

@@ -20,7 +20,18 @@ def discount_line(context):
     from plans.models import SiteSettings
 
     site = context.get("site_settings") or SiteSettings.load()
-    return {"url": site.discount_contact_url, "show_placeholder": settings.DEBUG}
+    from pages.links import short_url
+
+    return {"url": short_url("membership", site), "show_placeholder": settings.DEBUG}  # the short link counts the click, then forwards
+
+
+@register.inclusion_tag("users/_whatsapp_rate_line.html", takes_context=True)
+def whatsapp_rate_line(context, source):
+    """{% whatsapp_rate_line "memberships" %}: one quiet 'Looking for a better rate? WhatsApp us.' line on the short link, counted under
+    `source`. Nothing at all while no WhatsApp link is set in System > Settings."""
+    from pages.links import short_url
+
+    return {"url": short_url(source, context.get("site_settings"))}
 
 
 @register.inclusion_tag("content/_gold_fee_note.html")
@@ -71,3 +82,16 @@ def legal_text(context, text, doc=None):
         values = {key: rows[key].body for key in legal_render.PLACEHOLDERS}
     return legal_render.render(text, contact=site.contact_address, version=site.privacy_version, values=values,
                                show_placeholders=settings.DEBUG)
+
+
+@register.inclusion_tag("users/_payment_note.html")
+def payment_note(whatsapp=True, css_class="no-payment", status="", source="register"):
+    """{% payment_note %}: 'No payment is taken now. When we open, you'll have 2 weeks to set up your membership.' (the length is the
+    payment window in System > Defaults) and, for a special discount, a WhatsApp link from Site settings (the line is left out when no link is set)."""
+    from django.conf import settings
+
+    from plans import payments
+    from plans.models import SiteSettings
+
+    return {"opened": payments.opened_ever(), "live": settings.ONLINE_PAYMENTS_LIVE, "paid": status == "paid", "window": payments.site_window_phrase(),
+            "url": payments.whatsapp_url(source) if whatsapp or payments.opened_ever() else "", "email": SiteSettings.load().contact_address, "css_class": css_class}

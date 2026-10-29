@@ -327,6 +327,19 @@ def _export_interest(user):
         "changes": [
             {"at": row.history_date.isoformat(), "plan_id": row.plan_id} for row in interest.history.order_by("history_date")
         ],
+        "payment": {
+            "status": interest.payment_status, "source": interest.payment_source, "invite_sent_at": _plain(interest.payment_invite_sent_at),
+            "reminder_sent_at": _plain(interest.payment_reminder_sent_at), "paid_at": _plain(interest.paid_at),
+            "due_at": _plain(interest.payment_due_at), "sale_restore_reason": interest.sale_restore_reason,
+            "sale_expired_at": _plain(interest.sale_expired_at),
+            "status_changes": [{"at": row.history_date.isoformat(), "status": row.payment_status} for row in interest.history.order_by("history_date")],
+            "notices": [{"kind": n.kind, "status": n.status, "sent_at": _plain(n.sent_at)} for n in interest.payment_notices.order_by("created_at")],
+            "subscriptions": [
+                {"plan": s.plan.name, "source": s.source, "status": s.status, "start_date": _plain(s.start_date),
+                 "agreed_price_ex_vat": str(s.agreed_price_ex_vat) if s.agreed_price_ex_vat is not None else None, "billing_note": s.billing_note,
+                 "created_at": s.created_at.isoformat(), "cancelled_at": _plain(s.cancelled_at)}
+                for s in interest.subscriptions.select_related("plan").order_by("created_at")],
+        },
     }
 
 
@@ -408,12 +421,15 @@ def delete_user_data(user):
                            marketing=user.marketing_consent, amount=-1)
     if user.email_verified_at:
         metrics.email_verified(user.email_verified_at, amount=-1)
-    user.delete()  # cascades the InterestRegistration
+    from plans.models import Subscription
+
+    subscription_history = Subscription.history.model.objects.filter(registration_id__in=interest_ids).delete()[0]  # billing notes are personal
+    user.delete()  # cascades the InterestRegistration, its payment notices, marks and subscriptions
     interest_history = InterestRegistration.history.model.objects.filter(id__in=interest_ids).delete()[0]
     removed_history = User.history.model.objects.filter(id=pk).delete()[0]
     return {
         "login_events": removed_logins, "history_rows": removed_history, "email_logs": removed_emails,
-        "interest_history_rows": interest_history, "journey_sessions_anonymised": anonymised, **gold,
+        "interest_history_rows": interest_history + subscription_history, "journey_sessions_anonymised": anonymised, **gold,
         "queue_records": gold["queue_records"] + queue,
     }
 

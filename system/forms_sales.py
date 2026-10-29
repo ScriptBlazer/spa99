@@ -11,7 +11,7 @@ from plans.models import Plan, Sale
 from .forms import VersionedForm
 
 WHEN = ["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S"]
-LIVE_LOCKED = ("percent_off", "months_at_price", "starts_at")
+LIVE_LOCKED = ("starts_at",)  # name, % off, months and the end can change on a live sale: people who registered keep their snapshot
 
 
 class WhenField(forms.DateTimeField):
@@ -70,8 +70,8 @@ class SaleForm(VersionedForm):
 
     def clean_ends_at(self):
         ends = self.cleaned_data["ends_at"]
-        if self.status == "live" and ends <= timezone.now():
-            raise forms.ValidationError("Use End now to end a live sale.")
+        if self.status != "ended" and ends <= timezone.now():
+            raise forms.ValidationError("The end time cannot be in the past. Pick a later time, or use Stop now to end the sale.")
         return ends
 
     def clean(self):

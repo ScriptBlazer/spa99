@@ -3,14 +3,14 @@
 {% block section %}unlock{% endblock %}
 {% block main %}
 <h1>System is locked</h1>
-<p class="sys-muted" style="color:var(--sys-text-2)">Signed in as <span class="mono">{{ request.user.email }}</span>. Enter your password{% if code_required %} and lock code{% endif %} to continue.</p>
+<p class="sys-muted" style="color:var(--sys-text-2)">Signed in as <span class="mono">{{ request.user.email }}</span>. {% if code_required %}Enter your lock code to continue.{% else %}Press Unlock to continue.{% endif %}</p>
+{% if locked_seconds %}{% include "system/_lockout.html" %}{% endif %}
 <form method="post" action="{% url 'system_unlock' %}" data-problems data-system-unlock style="display:grid;gap:12px">
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ next }}">
-  <label>Password <input type="password" name="password" autocomplete="current-password" autofocus required{% if error %} aria-invalid="true" aria-describedby="unlock-error"{% endif %}></label>
-  {% if code_required %}<label>Lock code <input type="password" name="code" inputmode="numeric" pattern="[0-9]*" autocomplete="off" minlength="6" maxlength="12" required{% if error %} aria-invalid="true"{% endif %}></label>{% endif %}
-  {% if error %}<p class="sys-error" id="unlock-error" data-system-error data-problem data-problem-label="" data-problem-field="password" role="alert">{{ error }}</p>{% endif %}
-  <button type="submit" class="sys-btn primary">Unlock</button>
+  {% if code_required %}<label>Lock code <input type="password" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="64" required{% if not locked_seconds %} autofocus{% endif %}{% if locked_seconds %} disabled{% endif %}{% if error %} aria-invalid="true" aria-describedby="unlock-error"{% endif %}></label>{% endif %}
+  {% if error %}<p class="sys-error" id="unlock-error" data-system-error data-problem data-problem-label="" data-problem-field="code" role="alert">{{ error }}</p>{% endif %}
+  <button type="submit" class="sys-btn primary"{% if locked_seconds %} disabled{% endif %}>Unlock</button>
 </form>
 <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit" class="sys-btn link" style="width:auto;height:auto;padding:0">Not you? Sign out</button></form>
 {% endblock %}

@@ -110,3 +110,6 @@ Validation lengths, duplicate-submit windows, queue and retry internals, UI timi
 - Lock idle minutes and longest System sign-in already live in Settings, with env fallbacks.
 - `notify_booking_open`, the address fields and `privacy_version` have no System form today (admin only).
 - Only the audit log has a retention setting; other data has none (see the clean-up jobs item in PROJECT.md).
+
+## Payments group (2026-10-29)
+`payment_window_days` (14, 3 to 60), `payment_reminder_days_before` (3, 1 to 30), `payment_staff_alert_days_before` (7, 1 to 60), `staff_alert_emails` (comma separated, up to 5, empty in code; `seed_phase1` fills it once while empty; empty shows "No alert email set" here and on System > Payments). Reset to default restores the code values.

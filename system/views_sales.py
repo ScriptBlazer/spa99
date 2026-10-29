@@ -36,7 +36,7 @@ def sale_list(request):
 
 
 def _form_page(request, form, sale, status=200):
-    context = {"form": form, "sale": sale, "state": form.status, "locked_fields": form.locked_fields, "read_only": form.status == "ended"}
+    context = {"extend_choices": [("1h", "+1 hour"), ("1d", "+1 day"), ("1w", "+1 week")], "form": form, "sale": sale, "state": form.status, "locked_fields": form.locked_fields, "read_only": form.status == "ended"}
     return page(request, "system/sales_form.html", "sales", context, status=status)
 
 
@@ -85,6 +85,19 @@ def sale_end(request, pk):
         return _respond(request, False, " ".join(error.messages), "system_sales")
     saved(request, f"{sale.name} has ended.")
     return redirect("system_sales")
+
+
+@unlocked
+@require_POST
+def sale_extend(request, pk):
+    """Move the end: `by` = 1h, 1d or 1w from the current end. The server's clock decides what "past" means."""
+    sale = get_object_or_404(Sale, pk=pk)
+    try:
+        sales.extend_end(sale, request.user, by=request.POST.get("by", ""))
+    except ValidationError as error:
+        return _respond(request, False, " ".join(error.messages), f"/sales/{sale.pk}/")
+    saved(request, "The end time was moved.")
+    return redirect("system_sale_edit", pk=sale.pk)
 
 
 @unlocked

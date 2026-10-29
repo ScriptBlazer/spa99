@@ -30,6 +30,21 @@ class ApprovalTests(TestCase):
         self.admin = make_team_member("admin@example.com", levels.ADMIN)
         self.client = unlocked_client(self.dev)
 
+    def test_the_switch_and_the_ticked_potentials_are_saved_and_logged(self):
+        from system.models import SystemChange
+
+        token = self.client.get("/approval/").context["form"].initial["row_token"]
+        response = self.client.post("/approval/", {"final_approval_on": "on", "final_approval_potentials": ["medium", "low"], "row_token": token})
+        self.assertEqual(response.status_code, 302)
+        site = SiteSettings.load()
+        self.assertEqual((site.final_approval_on, site.final_approval_potentials), (True, "low,medium"))
+        self.assertTrue(SystemChange.objects.filter(section="approval", field="final_approval_on").exists())
+        page = self.client.get("/approval/")
+        self.assertFalse(page.context["final_nothing_ticked"])
+        self.client.post("/approval/", {"final_approval_on": "on", "row_token": page.context["form"].initial["row_token"]})
+        self.assertEqual(SiteSettings.load().final_approval_potentials, "")
+        self.assertTrue(self.client.get("/approval/").context["final_nothing_ticked"])
+
     def test_only_developers_see_the_page_and_it_gives_the_frontend_its_context(self):
         for user in (self.office, self.admin):
             client, _ = sign_in(user)
@@ -39,7 +54,9 @@ class ApprovalTests(TestCase):
         context = page.context
         self.assertEqual(sorted(c["email"] for c in context["approver_candidates"]), ["admin@example.com", "office@example.com"])
         self.assertEqual([c["email"] for c in context["final_candidates"]], ["admin@example.com"])  # Office level is never offered
-        self.assertTrue(context["final_approver_missing"])
+        self.assertFalse(context["final_approver_missing"])  # the switch is off by default
+        SiteSettings.objects.filter(singleton_key="site").update(final_approval_on=True)
+        self.assertTrue(self.client.get("/approval/").context["final_approver_missing"])
         self.assertEqual(set(context["approver_candidates"][0]), {"id", "name", "email", "level", "level_label"})
         self.assertEqual(context["cc"], [])
 
@@ -139,6 +156,7 @@ class ApprovalReviewTests(TestCase):
         from plans.management.commands.seed_phase1 import seed_all
 
         seed_all()
+        SiteSettings.objects.filter(singleton_key="site").update(final_approval_on=True)  # final approval is off by default
         self.GoldApplication = GoldApplication
         self.dev = dev()
         self.approver = make_team_member("approver@example.com", levels.OFFICE, approver=True)

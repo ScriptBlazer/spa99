@@ -43,9 +43,12 @@ KINDS = {
     SystemEvent.EMAIL_TEST: ("change", "emails", "ok"),
     SystemEvent.TEMPLATE_SAVED: ("change", "emails", "ok"), SystemEvent.TEMPLATE_RENAMED: ("change", "emails", "ok"),
     SystemEvent.TEMPLATE_DELETED: ("change", "emails", "ok"),
+    SystemEvent.PAYMENTS_OPENED: ("change", "payments", "ok"), SystemEvent.PAYMENTS_SCHEDULED: ("change", "payments", "ok"),
+    SystemEvent.PAYMENTS_CLOSED: ("change", "payments", "ok"), SystemEvent.PAYMENTS_CANCELLED: ("change", "payments", "ok"),
+    SystemEvent.SALE_RESTORED: ("change", "payments", "ok"), SystemEvent.SETUP_EDITED: ("change", "payments", "ok"), SystemEvent.SETUP_MANUAL: ("change", "payments", "ok"), SystemEvent.SETUP_CANCELLED: ("change", "payments", "ok"),
 }
 CATEGORIES = [("change", "Changes"), ("security", "Security"), ("undo", "Undos"), ("failure", "Failures")]
-EVENT_SECTION_LABELS = {"security": "Security", "changes": "Change log"}
+EVENT_SECTION_LABELS = {"security": "Security", "changes": "Change log", "payments": "Payments"}
 
 
 def kinds_in(category):
@@ -205,7 +208,7 @@ def default_sentence(kind, email, detail):
         SystemEvent.SIGN_IN_FAILED: f"Sign-in failed for {email or 'an unknown email'}" + (" (too many tries, blocked)" if detail.get("rate_limited") else ""),
         SystemEvent.UNLOCK: f"{who} unlocked System",
         SystemEvent.UNLOCK_FAILED: f"{who} typed the wrong {'code' if detail.get('reason') == 'code' else 'password'} to unlock",
-        SystemEvent.UNLOCK_RATE_LIMITED: f"{who} was blocked from unlocking (too many wrong passwords)",
+        SystemEvent.UNLOCK_RATE_LIMITED: f"{who} was blocked from unlocking (too many wrong codes)",
         SystemEvent.LOCK_MANUAL: f"{who} locked System",
         SystemEvent.LOCK_IDLE: f"System locked after {int(detail.get('idle_seconds', 0)) // 60} idle minutes ({who})",
         SystemEvent.SIGN_OUT: f"{who} signed out",

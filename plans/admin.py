@@ -6,7 +6,7 @@ from common.admin import ExportCsvMixin
 
 from content import images
 
-from .models import Closure, Facility, OpeningRule, Plan, Sale, SiteSettings
+from .models import Closure, Facility, OpeningRule, PaymentMark, PaymentNotice, PaymentStaffAlert, PaymentWindow, Plan, Sale, SiteSettings, Subscription
 
 
 class PlanForm(forms.ModelForm):
@@ -67,3 +67,43 @@ class SaleAdmin(ExportCsvMixin, SimpleHistoryAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+class ReadOnlyAdmin(ExportCsvMixin, admin.ModelAdmin):
+    """Payment window records: visible and exportable for Moishe, changed only through System > Payments and the Office."""
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(PaymentWindow)
+class PaymentWindowAdmin(ReadOnlyAdmin):
+    list_display = ("status", "scheduled_for", "opened_at", "closes_at", "closed_at", "opened_by")
+
+
+@admin.register(PaymentNotice)
+class PaymentNoticeAdmin(ReadOnlyAdmin):
+    list_display = ("window", "registration", "kind", "status", "sent_at")
+    list_filter = ("kind", "status")
+
+
+@admin.register(Subscription)
+class SubscriptionAdmin(ReadOnlyAdmin):
+    list_display = ("registration", "plan", "source", "status", "start_date", "agreed_price_ex_vat")
+    list_filter = ("source", "status")
+
+
+@admin.register(PaymentMark)
+class PaymentMarkAdmin(ReadOnlyAdmin):
+    list_display = ("registration", "source", "idempotency_key", "created_at")
+
+
+@admin.register(PaymentStaffAlert)
+class PaymentStaffAlertAdmin(ReadOnlyAdmin):
+    list_display = ("window", "day", "at_risk", "emailed")

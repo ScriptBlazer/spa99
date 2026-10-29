@@ -48,10 +48,10 @@ class UserAdmin(ExportCsvMixin, SimpleHistoryAdmin, BaseUserAdmin):
 @admin.register(InterestRegistration)
 class InterestRegistrationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
     list_display = ("user", "plan", "source", "created_at")
-    list_filter = ("plan", "source")
+    list_filter = ("plan", "source", "payment_status")
     search_fields = ("user__email", "user__first_name", "user__last_name")
     date_hierarchy = "created_at"
-    readonly_fields = ("user", "source", "journey_session", "sale", "sale_name", "sale_percent_off", "sale_months", "sale_locked_at")  # the plan stays editable: its change is counted by a signal
+    readonly_fields = ("user", "source", "journey_session", "sale", "sale_name", "sale_percent_off", "sale_months", "sale_locked_at", "sale_expired_at", "payment_status", "payment_source", "payment_invite_sent_at", "payment_reminder_sent_at", "paid_at", "payment_due_at")  # the plan stays editable: its change is counted by a signal
 
     def save_model(self, request, obj, form, change):
         if change and "plan" in form.changed_data:  # same kept-price rule as the site (plans.sales.snapshot_fields)

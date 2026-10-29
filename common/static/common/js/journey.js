@@ -310,6 +310,10 @@ function renderResult(data) {
     el('div', { class: 'result-actions' },
       el('a', { class: 'btn btn-primary btn-block-phone', href: registerUrl(s.slug) }, ctaText, ' ', arrowIcon()),
       el('button', { type: 'button', class: 'btn-quiet', 'data-restart': '', text: copyOf('start_again').cta })),
+    config.whatsappUrl
+      ? el('p', { class: 'whatsapp-rate small muted' }, 'Looking for a better rate? ',
+        el('a', { class: 'btn-quiet small', href: config.whatsappUrl, target: '_blank', rel: 'noopener noreferrer' }, 'WhatsApp us', el('span', { class: 'sr-only', text: ' (opens in a new tab)' })), '.')
+      : null,
     presentation === 'line'
       ? el('p', { class: 'gold-line-note' }, `${goldLineCopy.body} `, el('a', { href: config.urls.goldApply, text: goldLineCopy.cta }))
       : null,

@@ -12,7 +12,7 @@ from django.utils import timezone
 from gold.models import GoldApplication
 from journey.models import JourneySession
 from mailings import invites, optout, segments, sending, tokens
-from mailings.models import EmailOptOut, Invite, Mailing, MailingRecipient
+from mailings.models import EmailOptOut, Invite, InviteImport, Mailing, MailingRecipient
 from notifications import suppression
 from notifications.models import EmailSuppression
 from plans.management.commands.seed_phase1 import seed_all
@@ -329,20 +329,82 @@ class InviteImportTests(TestCase):
     def setUpTestData(cls):
         seed_all()
 
-    def test_report_flags_invalid_repeated_members_waiting_and_suppressed(self):
+    def statuses(self, text):
+        return [(r["email"], r["status"]) for r in invites.check(text)["rows"]]
+
+    def test_report_flags_members_waiting_suppressed_and_unsubscribed_as_warnings(self):
         person("member@example.com")
         suppression.add("bounced@example.com", EmailSuppression.HARD_BOUNCE)
         EmailOptOut.objects.create(email="quiet@example.com")
         Invite.objects.create(name="W", email="waiting@example.com", batch_id="00000000-0000-0000-0000-000000000001", status=Invite.SENT)
         Invite.objects.create(name="D", email="done@example.com", batch_id="00000000-0000-0000-0000-000000000001", status=Invite.REGISTERED)
         report = invites.check(
-            "name,email\nAl Smith,al@example.com\nBad,not-an-email\nAl Again,AL@example.com\nMem,member@example.com\n"
-            "Bo,bounced@example.com\nWait,waiting@example.com\nDone,done@example.com\nQ,quiet@example.com")
+            "name,email\nAl Smith,al@example.com\nMem,member@example.com\nBo,bounced@example.com\nWait,waiting@example.com\n"
+            "Done,done@example.com\nQ,quiet@example.com")
         self.assertEqual([(r["email"], r["status"]) for r in report["rows"]], [
-            ("al@example.com", "ok"), ("not-an-email", "invalid"), ("al@example.com", "duplicate"), ("member@example.com", "member"),
-            ("bounced@example.com", "suppressed"), ("waiting@example.com", "invited"), ("done@example.com", "ok"), ("quiet@example.com", "opted_out")])
-        self.assertEqual((report["ok"], report["total"], report["counts"]["invalid"], report["counts"]["duplicate"]), (2, 8, 1, 1))
-        self.assertEqual(report["rows"][0]["line"], 2)  # the header row is skipped, lines count from the file
+            ("al@example.com", "ok"), ("member@example.com", "member"), ("bounced@example.com", "suppressed"), ("waiting@example.com", "invited"),
+            ("done@example.com", "ok"), ("quiet@example.com", "opted_out")])
+        self.assertEqual((report["ok"], report["total"], report["skipped"], report["problems"]), (2, 6, 4, 0))
+        self.assertTrue(report["can_import"])  # warnings never block
+        self.assertEqual(report["rows"][0]["line"], 2)  # the header row is row 1
+        self.assertEqual(report["summary"], "2 will be invited \u00b7 4 skipped")
+        self.assertEqual({g["key"]: g["level"] for g in report["groups"]}, {"member": "warning", "suppressed": "warning", "invited": "warning", "opted_out": "warning"})
+
+    def test_errors_block_the_import_and_name_the_rows(self):
+        report = invites.check("name,email\nAl,al@example.com\nBad,not-an-email\n=cmd|x,evil@example.com\n@Bo,bo@example.com\n-1,neg@example.com\n"
+                               "A,dup@example.com\nB,DUP@example.com\n" + "N" * 101 + ",long@example.com")
+        by_line = {r["line"]: r["status"] for r in report["rows"]}
+        self.assertEqual(by_line, {2: "ok", 3: "invalid", 4: "unsafe", 5: "unsafe", 6: "unsafe", 7: "ambiguous", 8: "ambiguous", 9: "invalid"})
+        self.assertEqual((report["problems"], report["blocked"], report["can_import"]), (7, True, False))
+        self.assertTrue(all(g["level"] == "error" for g in report["groups"]))
+        self.assertIn("rows 7, 8", next(r for r in report["rows"] if r["line"] == 7)["message"])
+        self.assertEqual(report["summary"], "1 will be invited \u00b7 7 need fixing")
+        self.assertEqual(invites.create_batch("name,email\nBad,not-an-email", None), (None, invites.check("name,email\nBad,not-an-email")))
+        self.assertFalse(Invite.objects.exists())
+
+    def test_repeats_are_warnings_and_imported_once(self):
+        clean = invites.check("Al,al@example.com\nAl,al@example.com\nAl,AL@Example.com\nSam,sam@example.com\nSam,other@example.com")
+        self.assertEqual([r["status"] for r in clean["rows"]], ["ok", "duplicate", "case_duplicate", "ok", "ok"])  # same name, different emails: fine
+        self.assertEqual(invites.check(" Al , al@example.com \nAl,al@example.com")["rows"][1]["status"], "duplicate")  # spaces around a cell do not matter
+        self.assertEqual((clean["ok"], clean["merged"], clean["blocked"], clean["can_import"]), (3, 2, False, True))
+        self.assertEqual(clean["summary"], "3 will be invited \u00b7 2 repeated rows merged")
+        batch, _ = invites.create_batch("Al,al@example.com\nAl,al@example.com\nAl,AL@Example.com", None)
+        self.assertEqual(Invite.objects.filter(batch_id=batch).count(), 1)
+
+    def test_a_missing_name_is_a_warning_and_imports_with_a_blank_name(self):
+        report = invites.check("a@example.com\nBo,bo@example.com")
+        self.assertEqual((report["ok"], report["counts"]["no_name"], report["rows"][0]["level"], report["can_import"]), (2, 1, "warning", True))
+        batch, _ = invites.create_batch("a@example.com", None)
+        self.assertEqual(Invite.objects.get(batch_id=batch).name, "")
+
+    def test_a_blank_and_a_named_row_for_one_address_are_the_same_person(self):
+        report = invites.check("a@example.com\nAl,a@example.com")
+        self.assertEqual([r["status"] for r in report["rows"]], ["ok", "duplicate"])
+        self.assertEqual(report["rows"][0]["name"], "Al")
+
+    def test_headers_in_many_spellings_and_split_names(self):
+        for text in ("E-mail,Name\nal@example.com,Al Smith", "Email Address;First Name;Last Name\nal@example.com;Al;Smith", " EMAIL , full name \r\n al@example.com , Al Smith ",
+                     "First name,Last name,E-Mail\nAl,Smith,al@example.com", "\ufeffName;Email\r\n\"Al Smith\";\"al@example.com\"\r\n"):
+            report = invites.check(text.encode("utf-8"))
+            self.assertEqual([(r["name"], r["email"]) for r in report["rows"]], [("Al Smith", "al@example.com")], text)
+
+    def test_extra_columns_such_as_phone_numbers_are_ignored_by_the_formula_check(self):
+        report = invites.check("Name,Email,Phone\nAl,al@example.com,+44 7911 123456\nBo,bo@example.com,-020-7946-0000\n=Bad,cy@example.com,1")
+        self.assertEqual([r["status"] for r in report["rows"]], ["ok", "ok", "unsafe"])  # only the name and email cells are checked
+
+    def test_file_level_errors(self):
+        self.assertIn("no email column", invites.check("Name,Phone\nAl,0123")["errors"][0])
+        self.assertIn("empty", invites.check("  \n\n")["errors"][0])
+        self.assertIn("Excel", invites.check(b"PK\x03\x04junk")["errors"][0])
+        self.assertIn("does not look like", invites.check(b"a@b.com\x00\x01\x02")["errors"][0])
+        self.assertIn("encoding", invites.check(b"\x81\x8d@example.com")["errors"][0])
+        self.assertFalse(invites.check("Name,Phone\nAl,0123")["can_import"])
+
+    def test_excel_exports_cp1252_utf16_and_quoted_newlines(self):
+        self.assertEqual(invites.check("Name;Email\nJos\u00e9;jose@example.com".encode("cp1252"))["rows"][0]["name"], "Jos\u00e9")
+        self.assertEqual(invites.check("Name\tEmail\nAl\tal@example.com".encode("utf-16"))["rows"][0]["email"], "al@example.com")
+        report = invites.check('Name,Email\r"Al\nSmith",al@example.com\rBo,bo@example.com\r')  # Mac line ends, a name across two lines
+        self.assertEqual([(r["name"], r["line"]) for r in report["rows"]], [("Al Smith", 2), ("Bo", 4)])
 
     def test_csv_and_paste_variants(self):
         for text in ("Al Smith;al@example.com\nBo Jones;bo@example.com", '"Smith, Al","al@example.com"\n"Jones, Bo","bo@example.com"',
@@ -374,9 +436,19 @@ class InviteFlowTests(TestCase):
         sending.start_invites(batch, self.admin)
         return batch
 
+    def test_a_token_claims_one_batch_and_a_racing_second_claim_gets_the_same_one(self):
+        text = "Al Smith,al@example.com"
+        row = invites.find_token(invites.issue_token(self.admin, text), self.admin, text)
+        stale = InviteImport.objects.get(pk=row.pk)  # what the losing request loaded before the winner committed
+        batch, _ = invites.create_batch(text, self.admin, row)
+        again, report = invites.create_batch(text, self.admin, stale)
+        self.assertEqual((again, report.get("existing")), (batch, True))
+        self.assertEqual(Invite.objects.count(), 1)
+        self.assertEqual(InviteImport.objects.get().batch_id, batch)
+
     def test_batch_sends_a_personal_link_with_unsubscribe_and_each_invite_once(self):
         member_user = person("member@example.com")
-        batch = self.send("Al Smith,al@example.com\nMem,member@example.com\nbad")
+        batch = self.send("Al Smith,al@example.com\nMem,member@example.com")
         self.assertEqual(sorted(Invite.objects.filter(batch_id=batch).values_list("email", "status")),
                          [("al@example.com", "sent"), ("member@example.com", "skipped")])
         self.assertEqual(len(mail.outbox), 1)

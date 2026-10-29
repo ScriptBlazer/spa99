@@ -102,6 +102,18 @@ class InterestRegistration(BaseModel):
     sale_percent_off = models.PositiveSmallIntegerField(null=True, blank=True)
     sale_months = models.PositiveSmallIntegerField(null=True, blank=True)
     sale_locked_at = models.DateTimeField(null=True, blank=True, help_text="When the sale price was locked in.")
+    sale_expired_at = models.DateTimeField(null=True, blank=True, help_text="Set when a payment window closed without this person setting up. The snapshot above is never deleted.")
+
+    # Payment window state (docs/features/payment-window.md). Set by plans.payments only; `paid` comes from mark_paid (Stripe later, or a manual set-up).
+    NOT_STARTED, INVITED, PAID, LAPSED = "not_started", "invited", "paid", "lapsed"
+    PAYMENT_CHOICES = [(NOT_STARTED, "Not started"), (INVITED, "Invited"), (PAID, "Set up"), (LAPSED, "Lapsed")]
+    payment_status = models.CharField(max_length=12, choices=PAYMENT_CHOICES, default=NOT_STARTED, db_index=True)
+    payment_source = models.CharField(max_length=10, blank=True, help_text="stripe or manual, once set up.")
+    payment_invite_sent_at = models.DateTimeField(null=True, blank=True)
+    payment_reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    sale_restore_reason = models.CharField(max_length=300, blank=True, help_text="Why a lapsed sale price was last restored (Admin+). Kept here, not in the audit log, so erasing the member erases it.")
+    payment_due_at = models.DateTimeField(null=True, blank=True, help_text="When this member's own payment window ends (a late registrant has their own). The close job and the staff warnings use it.")
 
     history = HistoricalRecords()
 

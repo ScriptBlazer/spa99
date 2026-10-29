@@ -38,7 +38,7 @@ PAGES = {
         ("opening", "{opening}.", "BML House, 99c Vale Road, London N4.", "Register", "/register/"),
     ]),
     "spa": ("The spa", "Sauna, cold plunge, relaxing zone, massage room and gym at BML House, 99c Vale Road.", [
-        ("intro", "The spa.", "{rooms} spaces, one quiet visit.", "", ""),
+        ("intro", "The spa.", "{rooms} spaces, one quiet visit.", "Tailor your membership", "/journey/"),  # 2026-10-29: the hero button, as on Home
         ("opener_1", "Open {hours}.", "Cleaning hours {cleaning}. Closed {closure}.", "", ""),
         ("opener_2", "For men only.", "18 and over.", "", ""),
         ("opener_3", "Heat, steam, cold and rest.", "{Rooms} rooms, all part of the same visit.", "", ""),

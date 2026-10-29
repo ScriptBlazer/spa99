@@ -1,0 +1,5 @@
+{# Server-rendered wait. Without JS the time is text and the form stays disabled until a reload; system-bare.js ticks it. #}
+<p class="sys-note error" data-lockout data-seconds="{{ locked_seconds }}">
+  <span style="position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap" role="status" aria-live="polite" data-lockout-announce>Too many tries. Try again in {{ locked_spoken }}.</span>
+  <span aria-hidden="true" data-lockout-visible>Too many tries. Try again in <strong data-lockout-time style="font-variant-numeric:tabular-nums">{{ locked_clock }}</strong></span>
+</p>

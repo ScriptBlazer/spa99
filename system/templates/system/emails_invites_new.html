@@ -13,7 +13,7 @@
       <div data-se-mode="paste">
         <label for="invites-text" class="se-label">The list</label>
         <textarea id="invites-text" name="text" rows="8" data-invites-text placeholder="Name, email" spellcheck="false" autocomplete="off"></textarea>
-        <p class="sys-muted se-help">One person per line: name, email. A header row is fine. Up to {{ max_rows }} rows or 1 MB.</p>
+        <p class="sys-muted se-help">One person per line: name, email. A header row is fine (Email, Name, or First name and Last name); commas, semicolons and Excel CSV files all work. Up to {{ max_rows }} rows or 1 MB.</p>
       </div>
       <div data-se-mode="upload" hidden>
         <label class="se-drop" data-se-drop for="invites-file"><span data-se-drop-text>Drop a CSV here or choose a file</span><input id="invites-file" type="file" name="file" accept=".csv,.txt,text/csv,text/plain"></label>

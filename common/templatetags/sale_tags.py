@@ -13,19 +13,21 @@ register = template.Library()
 
 
 def count_parts(seconds):
-    """(days, hours, minutes) left, minutes rounded up so a live sale never says 0m."""
-    minutes = max(1, math.ceil(seconds / 60))
-    return minutes // 1440, (minutes % 1440) // 60, minutes % 60
+    """(days, hours, minutes, seconds) left, seconds rounded up so a live sale never says 0s."""
+    total = max(1, math.ceil(seconds))
+    return total // 86400, (total % 86400) // 3600, (total % 3600) // 60, total % 60
 
 
 def count_text(seconds):
-    """Same format as sale-bar.js: '3d 04h' + minutes part, '4h 12m', '12m'. Returns (text before minutes, minutes part, has_days)."""
-    days, hours, minutes = count_parts(seconds)
+    """Same format as sale-bar.js: '3d 04h 12m 45s', '4h 12m 45s', '12m 45s', '45s'. Returns (text, has_days)."""
+    days, hours, minutes, secs = count_parts(seconds)
     if days:
-        return f"{days}d {hours:02d}h", f" {minutes:02d}m", True
+        return f"{days}d {hours:02d}h {minutes:02d}m {secs:02d}s", True
     if hours:
-        return f"{hours}h", f" {minutes:02d}m", False
-    return f"{minutes}m", "", False
+        return f"{hours}h {minutes:02d}m {secs:02d}s", False
+    if minutes:
+        return f"{minutes}m {secs:02d}s", False
+    return f"{secs}s", False
 
 
 def when(value, with_weekday=False):
@@ -38,17 +40,19 @@ def sale_bar_view(sale_bar):
     now = timezone.now()
     starts, ends = parse_datetime(sale_bar["starts_at"]), parse_datetime(sale_bar["ends_at"])
     upcoming = starts > now
-    lead, tail, has_days = count_text((ends - now).total_seconds())
-    days, hours, minutes = count_parts((ends - now).total_seconds())
+    text, has_days = count_text((ends - now).total_seconds())
+    days, hours, minutes, secs = count_parts((ends - now).total_seconds())
+    plural = lambda n, word: word if n == 1 else word + "s"
     units = []   # the band's numerals: leading unit unpadded, later ones two digits, a unit that is not needed is left out
     if days:
-        units = [(str(days), "day" if days == 1 else "days"), (f"{hours:02d}", "hour" if hours == 1 else "hours"), (f"{minutes:02d}", "minute" if minutes == 1 else "minutes")]
-    elif hours:
-        units = [(str(hours), "hour" if hours == 1 else "hours"), (f"{minutes:02d}", "minute" if minutes == 1 else "minutes")]
-    else:
-        units = [(str(minutes), "minute" if minutes == 1 else "minutes")]
+        units.append((str(days), plural(days, "day")))
+    if days or hours:
+        units.append((f"{hours:02d}" if days else str(hours), plural(hours, "hour")))
+    if days or hours or minutes:
+        units.append((f"{minutes:02d}" if days or hours else str(minutes), plural(minutes, "minute")))
+    units.append((f"{secs:02d}" if days or hours or minutes else str(secs), plural(secs, "second")))
     return {"upcoming": upcoming, "starts_label": when(starts), "starts_long": when(starts, True), "ends_sr": when(ends, True), "now": now.isoformat(),
-            "lead": lead, "tail": tail, "has_days": has_days, "units": units}
+            "text": text, "has_days": has_days, "units": units}
 
 
 _money = sales._money
@@ -96,9 +100,9 @@ def kept_line(kept):
 
 @register.filter
 def ends_in(when_dt):
-    """'3d 04h', '4h 12m', '12m': the System list's time left (same format as the bar, server-rendered at load)."""
-    lead, tail, has_days = count_text((when_dt - timezone.now()).total_seconds())
-    return lead if has_days else lead + tail
+    """'3d 04h', '4h 12m', '12m': the System list's time left (minutes precision, no seconds racing in a list)."""
+    days, hours, minutes, _ = count_parts(math.ceil((when_dt - timezone.now()).total_seconds() / 60) * 60)
+    return f"{days}d {hours:02d}h" if days else f"{hours}h {minutes:02d}m" if hours else f"{minutes}m"
 
 
 @register.simple_tag

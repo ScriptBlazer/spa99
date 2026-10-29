@@ -185,6 +185,9 @@ class SystemEvent(AuditRow):
     MAILING_SCHEDULED, MAILING_SENT, MAILING_CANCELLED = "mailing_scheduled", "mailing_sent", "mailing_cancelled"
     INVITES_SENT, EMAIL_TEST = "invites_sent", "email_test"
     TEMPLATE_SAVED, TEMPLATE_RENAMED, TEMPLATE_DELETED = "tpl_saved", "tpl_renamed", "tpl_deleted"
+    PAYMENTS_OPENED, PAYMENTS_SCHEDULED, PAYMENTS_CLOSED = "payments_opened", "payments_scheduled", "payments_closed"
+    PAYMENTS_CANCELLED, SETUP_MANUAL, SETUP_CANCELLED = "payments_cancelled", "setup_manual", "setup_cancelled"
+    SALE_RESTORED, SETUP_EDITED = "sale_restored", "setup_edited"
     KIND_CHOICES = [
         (SIGN_IN, "Signed in"), (SIGN_IN_FAILED, "Sign-in failed"), (UNLOCK, "Unlocked"), (UNLOCK_FAILED, "Unlock failed"),
         (UNLOCK_RATE_LIMITED, "Unlock blocked (too many tries)"), (LOCK_MANUAL, "Locked"), (LOCK_IDLE, "Locked (idle)"),
@@ -196,6 +199,9 @@ class SystemEvent(AuditRow):
         (CODE_EDIT, "Edited as code"), (MAILING_SCHEDULED, "Mailing scheduled"), (MAILING_SENT, "Mailing sent"),
         (MAILING_CANCELLED, "Mailing cancelled"), (INVITES_SENT, "Invites sent"), (EMAIL_TEST, "Test email sent"),
         (TEMPLATE_SAVED, "Email template saved"), (TEMPLATE_RENAMED, "Email template renamed"), (TEMPLATE_DELETED, "Email template deleted"),
+        (PAYMENTS_OPENED, "Payments opened"), (PAYMENTS_SCHEDULED, "Payments scheduled"), (PAYMENTS_CLOSED, "Payments closed"),
+        (PAYMENTS_CANCELLED, "Payments schedule cancelled"), (SETUP_MANUAL, "Membership set up manually"), (SETUP_CANCELLED, "Manual membership cancelled"),
+        (SALE_RESTORED, "Sale price restored"), (SETUP_EDITED, "Manual membership edited"),
     ]
     OK, FAILED, BLOCKED = "ok", "failed", "blocked"
     OUTCOME_CHOICES = [(OK, "OK"), (FAILED, "Failed"), (BLOCKED, "Blocked")]
@@ -228,6 +234,15 @@ class SystemEvent(AuditRow):
 # ---------- Defaults (System > Defaults) ----------
 
 _warned = []  # logged once per process
+
+
+def validate_staff_alert_emails(value):
+    """Up to 5 valid addresses, comma separated (blank is allowed: no alert email)."""
+    from common.validators import split_emails, validate_email_list
+
+    validate_email_list(value)
+    if len(split_emails(value)) > 5:
+        raise ValidationError("Enter at most 5 addresses.")
 
 
 def _number(label, default, low, high, help_text=""):
@@ -290,6 +305,17 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
     audit_page_size = _number("Audit feed rows per page", 25, 5, 100)
     dashboard_recent_changes = _number("Dashboard recent changes", 10, 1, 50)
 
+    # Payments
+    payment_window_days = _number("Payment window (days)", 14, 3, 60, "How long members have to set up their membership once payments open. Applies to windows opened from now on.")
+    payment_reminder_days_before = _number("Payment reminder: days before it closes", 3, 1, 30, "One gentle reminder email to members who have not set up yet.")
+    payment_staff_alert_days_before = _number("Staff warning: days before it closes", 7, 1, 60, "From then until it closes, staff are warned once a day about launch-price holders who have not set up.")
+
+    staff_alert_emails_on = models.BooleanField("Payment alert emails on", default=True, help_text="Untick to stop the alert emails without clearing the addresses. The notice in the Office and System still shows.")
+    staff_alert_seeded = models.BooleanField(default=False, editable=False)
+    staff_alert_emails = models.CharField(
+        "Payment alert emails", max_length=500, blank=True, default="", validators=[validate_staff_alert_emails],
+        help_text="Where the warning about launch-price holders who have not set up is emailed. Up to 5 addresses, separated by commas. Empty: no email is sent (the notice still shows in the Office and System).")
+
     # Notifications
     toast_seconds = _number("On-screen notification stays (seconds)", 4, 2, 30)
     toast_long_seconds = _number("On-screen notification with a button or warning stays (seconds)", 6, 2, 60, "Errors always stay until closed.")
@@ -328,3 +354,14 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
         errors = {name: "Pick one of the choices." for name, choices in allowed.items() if getattr(self, name) not in choices}
         if errors:
             raise ValidationError(errors)
+
+
+class WrongTries(models.Model):
+    """Wrong-try counter behind the sign-in and unlock wait (system.throttle). One row per hashed key (never an email or IP in
+    clear). Counted with an atomic F() update BEFORE the secret is checked, so parallel requests cannot all be verified.
+    Not audit data: rows are forgotten after a quiet day."""
+
+    key = models.CharField(max_length=64, primary_key=True)
+    count = models.PositiveIntegerField(default=0)
+    locked_until = models.FloatField(default=0, help_text="Unix time the wait ends (0 = none).")
+    last_at = models.FloatField(default=0, db_index=True, help_text="Unix time of the latest attempt.")

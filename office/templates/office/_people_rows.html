@@ -5,9 +5,11 @@
   <td class="c-plan" data-col="plan">{{ p.plan }}</td>
   <td class="c-verified" data-col="verified">{% if p.verified %}Verified{% else %}Not yet{% endif %}</td>
   <td class="c-marketing" data-col="marketing"><span class="o-only-wide">{% if p.marketing %}Yes{% else %}No{% endif %}</span></td>
+  <td class="c-sale" data-col="sale">{{ p.sale }}</td>
+  <td class="c-payment" data-col="payment">{{ p.payment }}</td>
   <td class="c-journey" data-col="journey">{{ p.journey|journey_label }}</td>
   <td class="c-date num" data-col="registered"><span class="o-only-wide">{{ p.registered|dt }}</span><span class="o-only-narrow">{{ p.registered|relative }}</span></td>
   <td class="c-gold" data-col="gold">{% if p.gold_application_id %}<a class="o-goldlink" href="{% url 'office_gold_application' p.gold_application_id %}">Gold</a>{% endif %}</td>
 </tr>
-{% empty %}<tr class="o-empty-row" data-empty><td colspan="8"><p>No one matches that. Try fewer filters.</p></td></tr>{% endfor %}
-{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="8"><a class="btn btn-secondary btn-sm" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}
+{% empty %}<tr class="o-empty-row" data-empty><td colspan="10"><p>No one matches that. Try fewer filters.</p></td></tr>{% endfor %}
+{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="10"><a class="btn btn-secondary btn-sm" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}

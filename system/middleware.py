@@ -6,7 +6,7 @@ from django.views.defaults import page_not_found
 
 from . import audit, changes, services
 
-OPEN_PATHS = ("/login/", "/health/", "/robots.txt")
+OPEN_PATHS = ("/dev-login/", "/health/", "/robots.txt")
 # browsers ask for these on their own: still a plain 404, but never written to the audit log as an access attempt
 QUIET_PATHS = ("/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png")
 
@@ -50,7 +50,7 @@ class SystemGateMiddleware:
             if not services.sign_in_valid(request.session):
                 audit.log_event(audit.SystemEvent.SESSION_EXPIRED, request, user=user, detail={"max_hours": services.session_age_seconds() // 3600})
                 request.session.flush()  # the 12 hour sign-in is over: signed out, back to the sign-in
-                return redirect("/login/")
+                return redirect("/dev-login/")
         return self.get_response(request)
 
 

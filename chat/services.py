@@ -20,6 +20,7 @@ from common.ratelimit import hit
 from insights import visitors
 from journey import services as journey_services
 from pages.access import memberships_visible
+from pages.links import short_url
 from plans.models import SiteSettings
 from system import defaults as system_defaults
 
@@ -38,7 +39,7 @@ NEXT_STEPS = {"journey": ("Tailor your membership", "/journey/"), "register": ("
 def handoff_links(reason=""):
     site = SiteSettings.load()
     email = site.contact_address
-    return {"reason": reason, "whatsapp_url": site.discount_contact_url or "", "email": email,
+    return {"reason": reason, "whatsapp_url": short_url("chat", site), "email": email,
             "mailto": f"mailto:{email}?subject=A%20question%20for%20Spa%2099" if email else ""}
 
 

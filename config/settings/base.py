@@ -155,6 +155,9 @@ POSTMARK_WEBHOOK_PASSWORD = (ENV.get("POSTMARK_WEBHOOK_PASSWORD", "") or "").str
 MAILING_RATE_PER_SECOND = 10
 # Absolute links used in emails (no trailing slash).
 SITE_WEBGL = ENV.bool("SITE_WEBGL", True)  # false = the 3D Gold Card never loads (CSS card only); read by base.html as data-webgl
+# Card payments (Stripe phase). While False, an opened payment window tells members "we'll be in touch" and staff set people up manually.
+ONLINE_PAYMENTS_LIVE = False
+
 SITE_URL = ENV.get("SITE_URL", f"https://{DOMAIN}").rstrip("/")
 CONTROL_URL = ENV.get("CONTROL_URL", f"https://{CONTROL_HOST}").rstrip("/")
 OFFICE_URL = ENV.get("OFFICE_URL", f"https://{OFFICE_HOST}").rstrip("/")

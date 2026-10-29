@@ -29,12 +29,16 @@
             <label class="o-seg-item"><input type="radio" name="marketing" value="yes"{% if filters.marketing == "yes" %} checked{% endif %}><span>Yes</span></label>
             <label class="o-seg-item"><input type="radio" name="marketing" value="no"{% if filters.marketing == "no" %} checked{% endif %}><span>No</span></label>
           </fieldset></div>
+        <div class="o-filter-group"><label class="o-filter-label" for="f-sale">Sale price</label>
+          <select id="f-sale" name="sale" class="o-select"><option value="">All</option>{% for v, l in sale_options %}<option value="{{ v }}"{% if filters.sale == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+        <div class="o-filter-group"><label class="o-filter-label" for="f-payment">Payment</label>
+          <select id="f-payment" name="payment" class="o-select"><option value="">All</option>{% for v, l in payment_options %}<option value="{{ v }}"{% if filters.payment == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
       </div>
     </div>
     {% if office_can.can_export %}<a class="btn btn-secondary btn-sm o-export" href="{% url 'office_people_csv' %}?{{ request.GET.urlencode }}" data-export-csv data-export-base="{% url 'office_people_csv' %}">Export CSV</a>{% endif %}
   </div>
   <p class="o-totalline"><span data-total data-region="total">{{ total_registered|num }} people</span>
-    <a class="o-quiet" href="{% url 'office_people' %}" data-clear{% if not filters.q and not filters.plan and not filters.verified and not filters.marketing %} hidden{% endif %}>Clear</a>
+    <a class="o-quiet" href="{% url 'office_people' %}" data-clear{% if not filters.q and not filters.plan and not filters.verified and not filters.marketing and not filters.sale and not filters.payment %} hidden{% endif %}>Clear</a>
     <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button></p>
   <dialog class="o-sheet" data-filter-sheet aria-labelledby="sheet-h">
     <div class="o-sheet-head"><h2 id="sheet-h">Filters</h2></div>
@@ -45,7 +49,7 @@
 <div class="o-card o-tablecard" data-list-card>
   <table class="o-list o-list--people">
     <caption class="sr-only">People who have registered</caption>
-    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Membership</th><th scope="col">Verified</th><th scope="col">Marketing</th><th scope="col">Journey</th><th scope="col" class="num">Registered</th><th scope="col">Gold</th></tr></thead>
+    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Membership</th><th scope="col">Verified</th><th scope="col">Marketing</th><th scope="col">Sale price</th><th scope="col">Payment</th><th scope="col">Journey</th><th scope="col" class="num">Registered</th><th scope="col">Gold</th></tr></thead>
     <tbody data-region="list" data-office-list="people">{% include "office/_people_rows.html" %}</tbody>
   </table>
 </div>

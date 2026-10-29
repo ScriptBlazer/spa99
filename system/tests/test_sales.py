@@ -58,24 +58,54 @@ class SalesTests(TestCase):
         listing = self.client.get("/sales/")
         self.assertEqual([s.pk for s in listing.context["upcoming"]], [sale.pk])
 
-    def test_a_live_sale_locks_percent_months_and_start_but_allows_name_end_and_plans(self):
+    def test_a_live_sale_locks_only_the_start_and_edits_leave_existing_snapshots_alone(self):
+        from users import services
+        from users.models import InterestRegistration
+        from users.tests.test_register import cleaned
+
         sale = make_sale()
+        holder = services.register_interest(cleaned(email="h@example.com", mobile="07912345670", plan="tier-2")).user.interest
         before = self.client.get(f"/sales/{sale.pk}/")
-        self.assertEqual(set(before.context["locked_fields"]), {"percent_off", "months_at_price", "starts_at"})
+        self.assertEqual(set(before.context["locked_fields"]), {"starts_at"})
         data = form(name="Christmas sale 2", percent_off=50, months_at_price=9, start=5, end=48, plans=[p.pk for p in Plan.objects.filter(slug__in=["tier-1", "tier-2"])])
         data["row_token"] = before.context["form"].initial["row_token"]
         data["starts_at"] = local(sale.starts_at)
         response = self.client.post(f"/sales/{sale.pk}/", data)
         self.assertEqual(response.status_code, 302, response.context and response.context["form"].errors)
         sale.refresh_from_db()
-        self.assertEqual((sale.name, sale.percent_off, sale.months_at_price), ("Christmas sale 2", 20, 3))  # locked values ignored
+        self.assertEqual((sale.name, sale.percent_off, sale.months_at_price), ("Christmas sale 2", 50, 9))
         self.assertGreater(sale.ends_at, timezone.now() + timedelta(hours=40))
         self.assertEqual({p.slug for p in sale.plans.all()}, {"tier-1", "tier-2"})
-        # the model itself refuses too (admin, shell)
-        sale.percent_off = 50
+        holder.refresh_from_db()
+        self.assertEqual((holder.sale_name, holder.sale_percent_off, holder.sale_months), ("Christmas sale", 20, 3))  # the snapshot is theirs
+        self.assertEqual(InterestRegistration.objects.filter(sale_percent_off=50).count(), 0)
+        # the start cannot move once it has begun (the model refuses too: admin, shell)
+        sale.starts_at -= HOUR
         from django.core.exceptions import ValidationError
         with self.assertRaises(ValidationError):
             sale.full_clean()
+
+    def test_the_end_cannot_be_in_the_past_but_can_be_extended_or_stopped(self):
+        sale = make_sale(end=2)
+        end = sale.ends_at
+        token = self.client.get(f"/sales/{sale.pk}/").context["form"].initial["row_token"]
+        data = {**form(start=-1, end=-1), "starts_at": local(sale.starts_at), "row_token": token}
+        refused = self.client.post(f"/sales/{sale.pk}/", data)
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("cannot be in the past", str(refused.context["form"].errors))
+        sale.refresh_from_db()
+        self.assertEqual(sale.ends_at, end)
+        for by, delta in (("1h", HOUR), ("1d", 24 * HOUR), ("1w", 7 * 24 * HOUR)):
+            before = Sale.objects.get(pk=sale.pk).ends_at
+            self.assertEqual(self.client.post(f"/sales/{sale.pk}/extend/", {"by": by}).status_code, 302)
+            self.assertEqual(Sale.objects.get(pk=sale.pk).ends_at, before + delta)
+        self.assertTrue(SystemChange.objects.filter(model_label="plans.sale", field="ends_at", section="sales").exists())
+        self.client.post(f"/sales/{sale.pk}/extend/", {"by": "5y"})  # not one of the choices
+        self.assertEqual(self.client.post(f"/sales/{sale.pk}/end/").status_code, 302)
+        sale.refresh_from_db()
+        self.assertEqual(sale.status(), "ended")
+        self.client.post(f"/sales/{sale.pk}/extend/", {"by": "1d"})  # an ended sale stays ended
+        self.assertEqual(Sale.objects.get(pk=sale.pk).status(), "ended")
 
     def test_stale_form_gets_409_and_an_ended_sale_is_read_only(self):
         sale = make_sale(start=5, end=30)

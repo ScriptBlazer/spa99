@@ -1,12 +1,13 @@
 """System > Emails (Developer level, unlocked, CSRF): automatic emails, group mailings and invites. Short views; the logic is in
 system/emails.py, mailings/sending.py and mailings/invites.py. A page that is a form answers with a toast and a redirect, or with
 JSON when the script asks for it (`Accept: application/json` or `X-Requested-With: fetch`)."""
+import csv
 import uuid
 
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -437,52 +438,88 @@ def invites_new(request):
 
 
 def _uploaded_text(request):
-    """(text, error) from the pasted box or the uploaded file."""
+    """(text, error) from the pasted box or the uploaded file (read as bytes: the encoding is checked in `invites.decode`)."""
     upload = request.FILES.get("file")
     if upload is not None:
         if upload.size > invites.MAX_BYTES:
             return "", f"The file is larger than {invites.MAX_BYTES // 1024 // 1024} MB."
-        return upload.read().decode("utf-8-sig", errors="replace"), ""
-    return request.POST.get("text", ""), ""
+        text, error = invites.decode(upload.read())
+        return invites.canonical(text), error
+    return invites.canonical(request.POST.get("text", "")), ""
 
 
 @unlocked
 @require_POST
 def invites_review(request):
-    """Check the list and show the report (nothing is written). The page sends `text` back with Send."""
+    """Check the list and show the report (nothing is written but a one-time token). The page sends `text` and `token` back with Import."""
     text, error = _uploaded_text(request)
-    report = invites.check(text) if not error else {"rows": [], "counts": {}, "errors": [error], "ok": 0, "total": 0}
-    context = {"report": report, "text": text, "ses": ses.ses_status(), "status_labels": invites.STATUS_LABELS}
+    report = invites.check(text) if not error else {**invites.check(""), "errors": [error]}
+    token = invites.issue_token(request.user, text) if report["can_import"] else ""
+    context = {"report": report, "text": text, "token": token, "ses": ses.ses_status(), "status_labels": invites.STATUS_LABELS}
     return page(request, "system/emails_invites_review.html", "emails", context, status=400 if report["errors"] else 200)
 
 
 @unlocked
 @require_POST
+def invites_problems(request):
+    """The rows that need fixing or have a heads-up, as a CSV download (cells starting with = + - @ are made safe for Excel)."""
+    report = invites.check(invites.canonical(request.POST.get("text", "")))
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="invite-problems.csv"'
+    response.write("\ufeff")
+    writer = csv.writer(response)
+    writer.writerow(["Row", "Level", "Name", "Email", "What to do"])
+    safe = lambda v: f"'{v}" if str(v).startswith(invites.FORMULA_START) else v  # noqa: E731
+    for line, level, name, email, message in invites.problem_rows(report):
+        writer.writerow([line, "Fix this" if level == invites.ERROR else "Heads-up", safe(name), safe(email), message])
+    for error in report["errors"]:
+        writer.writerow(["", "Fix this", "", "", error])
+    return response
+
+
+def _import_response(request, batch_id, report, repeated=False):
+    ok = report.get("ok", 0)
+    waiting = Invite.objects.filter(batch_id=batch_id, status__in=(Invite.QUEUED, Invite.SENDING, Invite.SENT, Invite.OPENED)).count() if repeated else ok
+    message = "This list was already imported. Here is the batch." if repeated else f"Sending {ok} invite{'' if ok == 1 else 's'}."
+    return _respond(request, True, message, reverse("system_invite_batch", args=[batch_id]),
+                    extra={"batch": str(batch_id), "invites": waiting, "repeated": repeated})
+
+
+@unlocked
+@require_POST
 def invites_send(request):
-    """Make the batch from the checked list (checked again here) and queue the sending. `expected_ok` must match the report."""
+    """Make the batch from the checked list (checked again here) and queue the sending. Needs the review page's one-time `token` for exactly
+    this list: a second confirmation with the same token (double click, lag, back, two tabs) returns the existing batch and sends nothing."""
     new = reverse("system_invites_new")
     if _limited(request, "system-invites-start", 6, 600):
         return _respond(request, False, "Too many sends. Please wait a few minutes.", new, status=429)
+    text = invites.canonical(request.POST.get("text", ""))
+    try:
+        row = invites.find_token(request.POST.get("token", ""), request.user, text)
+    except invites.TokenRefused as error:
+        return _respond(request, False, str(error), new)
+    if row.batch_id:  # already done: answer with it, before anything is checked again (its people are now "invited")
+        return _import_response(request, row.batch_id, {}, repeated=True)
     try:
         ses.require_sending_allowed()
     except ses.SendingRefused as error:
         return _respond(request, False, str(error), new)
-    text = request.POST.get("text", "")
-    expected = request.POST.get("expected_ok", "")
     report = invites.check(text)
-    if report["errors"]:
-        return _respond(request, False, " ".join(report["errors"]), new)
+    if report["errors"] or report["blocked"]:
+        return _respond(request, False, " ".join(report["errors"]) or f"{report['problems']} row(s) need fixing before the import.", new)
     if not report["ok"]:
         return _respond(request, False, "Nobody in this list can be invited.", new)
+    expected = request.POST.get("expected_ok", "")
     if expected.isdigit() and int(expected) != report["ok"]:
-        return _respond(request, False, f"The list changed: {report['ok']} can be invited now, not {expected}. Check it and send again.", new)
-    batch_id, report = invites.create_batch(text, request.user)
+        return _respond(request, False, f"The list changed: {report['ok']} can be invited now, not {expected}. Check it and import again.", new)
+    batch_id, report = invites.create_batch(text, request.user, row)
+    if report.get("existing"):  # another request won the claim a moment ago
+        return _import_response(request, batch_id, report, repeated=True)
     try:
         sending.start_invites(batch_id, request.user, request)
     except sending.MailingError as error:
-        return _respond(request, False, str(error), new)
-    return _respond(request, True, f"Sending {report['ok']} invite{'' if report['ok'] == 1 else 's'}.", reverse("system_invite_batch", args=[batch_id]),
-                    extra={"batch": str(batch_id), "invites": report["ok"]})
+        return _respond(request, False, str(error), reverse("system_invite_batch", args=[batch_id]))
+    return _import_response(request, batch_id, report)
 
 
 @unlocked

@@ -12,13 +12,16 @@
     {% if state != "ended" %}
     <form method="post" action="{% url 'system_sale_preview' sale.pk %}" data-ss-preview>{% csrf_token %}<button type="submit" class="sys-btn">Preview on site</button></form>
     {% if state == "live" %}
-    <form method="post" action="{% url 'system_sale_end' sale.pk %}" data-system-confirm="sale" data-confirm-title="End {{ sale.name }} now?" data-confirm-body="The bar and the sale prices leave the site at once. {% if sale.interests.count == 0 %}Nobody has registered during it yet.{% else %}The {{ sale.interests.count }} {% if sale.interests.count == 1 %}person who registered keeps{% else %}people who registered keep{% endif %} their price.{% endif %}" data-confirm-action="End sale now" data-line="">{% csrf_token %}<button type="submit" class="sys-btn">End now</button></form>
+    <form method="post" action="{% url 'system_sale_end' sale.pk %}" data-system-confirm="sale" data-confirm-title="End {{ sale.name }} now?" data-confirm-body="The bar and the sale prices leave the site at once. {% if sale.interests.count == 0 %}Nobody has registered during it yet.{% else %}The {{ sale.interests.count }} {% if sale.interests.count == 1 %}person who registered keeps{% else %}people who registered keep{% endif %} their price.{% endif %}" data-confirm-action="End sale now" data-line="">{% csrf_token %}<button type="submit" class="sys-btn">Stop now</button></form>
     {% else %}
     <form method="post" action="{% url 'system_sale_end' sale.pk %}" data-system-confirm="sale" data-confirm-title="Delete {{ sale.name }}?" data-confirm-body="It has not started, so nobody has this price." data-confirm-action="Delete sale" data-line="">{% csrf_token %}<button type="submit" class="sys-btn">Delete</button></form>
     {% endif %}
     {% else %}<a class="sys-btn" href="{% url 'system_sale_new' %}?copy={{ sale.pk }}">Copy</a>{% endif %}
   </div>{% endif %}</div>
-{% if sale and state != "ended" %}<p class="ss-hint">Only you see the preview, in this browser.</p>{% endif %}
+{% if sale and state != "ended" %}<p class="ss-hint">Only you see the preview, in this browser.</p>
+<div class="sys-actions" data-sale-extend aria-label="Change the end time"><span>Ends {{ sale.window_end|date:"j M Y, H:i" }}. Move it:</span>
+  {% for key, label in extend_choices %}<form method="post" action="{% url 'system_sale_extend' sale.pk %}">{% csrf_token %}<input type="hidden" name="by" value="{{ key }}"><button type="submit" class="sys-btn sm">{{ label }}</button></form>{% endfor %}</div>
+<p class="ss-hint" data-sale-edit-note>Changes apply to new sign-ups. People who already registered keep the price they were given.</p>{% endif %}
 {% include "system/_sale_link.html" %}
 {% if read_only %}<p class="sys-note" role="status" data-system-sale-readonly>This sale has ended. Copy it to run it again.</p>{% endif %}
 <form method="post" class="ss-form" data-system-form="sale" data-sale-form data-state="{{ state }}"{% if not sale %} data-new{% else %} data-percent="{{ sale.percent_off }}" data-months="{{ sale.months_at_price }}" data-ends-was="{{ form.ends_at.initial|date:"Y-m-d\TH:i" }}"{% endif %} data-problems novalidate>{% csrf_token %}

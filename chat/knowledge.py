@@ -11,6 +11,7 @@ from django.urls import get_urlconf, reverse, set_urlconf
 from django.utils import timezone
 
 from pages import services as page_services
+from pages.links import short_path
 from plans import sales
 from plans import services as plan_services
 from plans.models import Closure, Plan, SiteSettings
@@ -37,7 +38,7 @@ def _about(site):
         _line("Opening", site.opening_label),
         "Booking is open." if site.booking_open else "Booking is not open yet. Visitors can register now and we write before the doors open.",
         _line("Contact email", contact),
-        _line("WhatsApp link", site.discount_contact_url),
+        _line("WhatsApp link", short_path('chat') if site.discount_contact_url else ""),
     )]
 
 

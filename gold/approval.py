@@ -4,10 +4,10 @@ Recipients are people, not typed addresses: every active person holding the Appr
 Final approver group (Admin level or higher), each at their account email or their own other address
 (gold.ApproverDelivery, set in System > Approval).
 
-Flow: an approver approves a Low potential application and, when at least one final approver exists, it becomes
+Flow: an approver approves an application whose potential is ticked in System > Approval and, while the final approval switch is on and at least one final approver exists, it becomes
 `awaiting_final` (not approved, the applicant is told nothing). A final approver then confirms (the normal approval runs)
 or sends it back (status back to new, every approver is emailed, and the next approval goes through at once because
-`sent_back_at` is set). The final approver cannot decline. No final approver: Low goes through as before."""
+`sent_back_at` is set). The final approver cannot decline. Switch off (the default), nothing ticked or no final approver: it goes through."""
 import logging
 
 from django.conf import settings
@@ -18,9 +18,10 @@ from django.utils import timezone
 
 from common import levels
 from common.tasks import enqueue
+from plans.models import SiteSettings
 from system import defaults
 
-from . import audit, invites, rating
+from . import audit, invites
 from .models import ApplicationEvent, GoldApplication
 
 logger = logging.getLogger("spa99.gold")
@@ -138,8 +139,25 @@ def _queue(function, *args):
         logger.exception("Could not queue %s", function)
 
 
+def final_potentials():
+    """Potentials that wait for final approval right now: the ticked ones while the switch is on, otherwise none."""
+    site = SiteSettings.load()
+    return site.final_potential_list if site.final_approval_on else []
+
+
+def final_waits():
+    """Potentials that will really wait: switch on, ticked, and a final approver exists (else approvals go straight through)."""
+    potentials = final_potentials()
+    return potentials if potentials and final_approver_exists() else []
+
+
+def final_approver_missing():
+    """The Office warning: the switch is on, something is ticked, and nobody holds the Final approver role."""
+    return bool(final_potentials()) and not final_approver_exists()
+
+
 def needs_final_review(application):
-    return (application.potential_level == rating.LOW and not application.final_review_done and final_approver_exists())
+    return application.potential_level in final_waits() and not application.final_review_done
 
 
 def approve(application, actor, channel=audit.SYSTEM):
@@ -148,13 +166,13 @@ def approve(application, actor, channel=audit.SYSTEM):
     if needs_final_review(application):
         with transaction.atomic():
             fresh = GoldApplication.objects.select_for_update().get(pk=application.pk)
-            sent = (fresh.status in GoldApplication.WAITING and fresh.potential_level == rating.LOW and not fresh.final_review_done)
+            sent = (fresh.status in GoldApplication.WAITING and fresh.potential_level in final_waits() and not fresh.final_review_done)
             if sent:
                 fresh.final_previous_status = fresh.status
                 fresh.status, fresh.final_requested_at, fresh.final_requested_by = GoldApplication.AWAITING_FINAL, timezone.now(), actor
                 fresh.save()
                 audit.record(fresh, ApplicationEvent.SENT_FOR_FINAL, actor=actor, channel=channel, from_status=fresh.final_previous_status,
-                             to_status=GoldApplication.AWAITING_FINAL, meta={"potential": rating.LOW})
+                             to_status=GoldApplication.AWAITING_FINAL, meta={"potential": fresh.potential_level})
         if sent:
             logger.info("Gold %s sent for final approval by %s", application.reference, actor.pk)
             _queue("gold.tasks.send_gold_final_email", str(application.pk))
@@ -191,7 +209,7 @@ def send_back(application, actor, note="", channel=audit.SYSTEM):
         fresh.status, fresh.sent_back_at, fresh.sent_back_by, fresh.sent_back_note = restore, timezone.now(), actor, note
         fresh.save()
         audit.record(fresh, ApplicationEvent.SENT_BACK, actor=actor, channel=channel, from_status=GoldApplication.AWAITING_FINAL,
-                     to_status=restore, message=note, meta={"reason": "Low potential, are you sure?"})
+                     to_status=restore, message=note, meta={"reason": f"{application.potential_level.capitalize()} potential, are you sure?"})
     logger.info("Gold %s sent back by final approver %s", application.reference, actor.pk)
     _queue("gold.tasks.send_gold_sent_back_email", str(application.pk))
     application.refresh_from_db()
