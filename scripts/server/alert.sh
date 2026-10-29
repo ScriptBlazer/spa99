@@ -27,16 +27,25 @@ fi
 
 send() {
   # -K - keeps the token out of the process list; --data-urlencode escapes the text.
-  printf 'url = "https://api.telegram.org/bot%s/sendMessage"\n' "$TELEGRAM_BOT_TOKEN" |
-    curl -sS -m 20 -o /dev/null -K - \
+  # Returns non-zero (and says why) when Telegram refuses, e.g. "chat not found".
+  local reply
+  reply="$(printf 'url = "https://api.telegram.org/bot%s/sendMessage"\n' "$TELEGRAM_BOT_TOKEN" |
+    curl -sS -m 20 -K - \
       --data-urlencode "chat_id=$TELEGRAM_ADMIN_CHAT_ID" \
-      --data-urlencode "text=$1" || echo "alert.sh: Telegram send failed" >&2
+      --data-urlencode "text=$1" 2>&1)" || { echo "alert.sh: Telegram send failed: $reply" >&2; return 1; }
+  if ! printf '%s' "$reply" | jq -e '.ok == true' >/dev/null 2>&1; then
+    echo "alert.sh: Telegram refused: $(printf '%s' "$reply" | jq -r '.description // "unknown reply"' 2>/dev/null)" >&2
+    return 1
+  fi
 }
 
 if [ "${1:-}" = "--test" ]; then
-  send "✅ $SERVER_NAME: test message from alert.sh ($(date -u '+%Y-%m-%d %H:%M UTC'))"
-  echo "Test message sent (check Telegram)."
-  exit 0
+  if send "✅ $SERVER_NAME: test message from alert.sh ($(date -u '+%Y-%m-%d %H:%M UTC'))"; then
+    echo "Test message sent (check Telegram)."
+    exit 0
+  fi
+  echo "Test message NOT delivered (see the reason above)."
+  exit 1
 fi
 
 touch "$STATE_FILE"
