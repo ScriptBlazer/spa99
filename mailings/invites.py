@@ -1,6 +1,7 @@
-"""Invites: read a pasted list or CSV, check it, write the batch, follow the personal link, and notice the sign-up.
+"""Lists and invites: read a pasted list or CSV and check it (used to save an uploaded list), follow the personal invite link, and notice the sign-up.
+The one-time token (InviteImport) guards a list save against a double click.
 
-The import never trusts the file: every row is parsed and checked here, and the server checks it again when the batch is made
+The import never trusts the file: every row is parsed and checked here, and the server checks it again when the list is saved
 (the review page is only a preview). Two levels: errors (invalid, unsafe, ambiguous rows and whole-file problems) block the import until
 fixed; warnings (repeats, members, already invited, suppressed, unsubscribed, no name) are allowed and the row is skipped or merged."""
 import csv
@@ -8,18 +9,14 @@ import hashlib
 import io
 import re
 import secrets
-import uuid
 from datetime import timedelta
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
 from django.utils import timezone
 
 from common.validators import normalise_email
 from notifications.models import EmailSuppression
 from users.models import User
-
-from system import defaults
 
 from .models import EmailOptOut, Invite, InviteImport
 
@@ -88,8 +85,10 @@ def canonical(text):
     return (text or "").replace("\r\n", "\n").replace("\r", "\n")
 
 
-def content_hash(text):
-    return hashlib.sha256(canonical(text).encode("utf-8")).hexdigest()
+def content_hash(text, scope=""):
+    """Hash of the list as the server reads it. `scope` ties it to what it is for (the id of the list being added to), so a token for one
+    target cannot save into another."""
+    return hashlib.sha256(f"{scope}\0{canonical(text)}".encode("utf-8")).hexdigest()
 
 
 def _delimiter(sample):
@@ -300,51 +299,26 @@ def problem_rows(report):
     return sorted(rows, key=lambda r: (r[1] != ERROR, r[0]))
 
 
-def issue_token(user, text):
+def issue_token(user, text, scope=""):
     """A one-time import token for this person and exactly this list (its hash). Written when the review page is drawn."""
     InviteImport.objects.filter(created_at__lt=timezone.now() - timedelta(days=TOKEN_DAYS), batch_id__isnull=True).delete()
-    return InviteImport.objects.create(user=user, content_hash=content_hash(text), token=secrets.token_urlsafe(32)).token
+    return InviteImport.objects.create(user=user, content_hash=content_hash(text, scope), token=secrets.token_urlsafe(32)).token
 
 
 class TokenRefused(Exception):
     """The token is missing, unknown, someone else's, or for a different list. The message is plain words for the page."""
 
 
-def find_token(token, user, text):
+def find_token(token, user, text, scope=""):
     """The InviteImport row for this person and exactly this list, else TokenRefused."""
     row = InviteImport.objects.filter(token=token or "").first() if token else None
     if row is None:
         raise TokenRefused("This check has expired. Check the list again.")
     if row.user_id != getattr(user, "pk", None):
         raise TokenRefused("This check belongs to someone else. Check the list again.")
-    if row.content_hash != content_hash(text):
+    if row.content_hash != content_hash(text, scope):
         raise TokenRefused("The list is not the one that was checked. Check it again.")
     return row
-
-
-@transaction.atomic
-def create_batch(raw, user, token_row=None):
-    """Check the list again and write the batch: `queued` invites for the ok rows, `skipped` ones (with the reason) for valid addresses
-    that cannot be invited (already a member, waiting, suppressed, unsubscribed). Repeated and problem rows are only in the report.
-    Refuses (batch_id None, nothing written) while anything needs fixing. With a `token_row` the batch is claimed with one conditional
-    update, so two requests with the same token make one batch: the loser gets the winner's batch_id and `report["existing"] = True`.
-    Returns (batch_id, report). Nothing is sent here."""
-    report = check(raw)
-    if report["errors"] or report["blocked"] or not report["rows"]:
-        return None, report
-    batch_id = uuid.uuid4()
-    if token_row is not None:
-        if not InviteImport.objects.filter(pk=token_row.pk, batch_id__isnull=True).update(batch_id=batch_id, used_at=timezone.now()):
-            existing = InviteImport.objects.get(pk=token_row.pk).batch_id
-            return existing, {**report, "existing": True}
-    expires_at = timezone.now() + timedelta(days=defaults.get().register_invite_days)  # read once for the whole batch
-    for item in report["rows"]:
-        if item["status"] not in ("ok", "member", "invited", "suppressed", "opted_out"):
-            continue
-        Invite.objects.create(
-            name=item["name"], email=item["email"], batch_id=batch_id, expires_at=expires_at, created_by=user if getattr(user, "pk", None) else None,
-            status=Invite.QUEUED if item["status"] == "ok" else Invite.SKIPPED, reason="" if item["status"] == "ok" else item["message"].replace(" (skipped)", ""))
-    return batch_id, report
 
 
 def batch_summary(batch_id):

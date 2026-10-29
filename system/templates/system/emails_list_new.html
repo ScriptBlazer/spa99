@@ -1,0 +1,42 @@
+{% extends "system/emails_base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Emails" description="What the site sends, and what you send." %}
+{% include "system/_emails_tabs.html" with tab="groups" %}
+<div class="se-title"><a class="se-back" href="{% if target %}{% url 'system_list' target.pk %}{% else %}{% url 'system_groups' %}{% endif %}">{% if target %}{{ target.name }}{% else %}Groups{% endif %}</a><h2>{% if target %}Add more people to {{ target.name }}{% else %}New list{% endif %}</h2></div>
+{% include "system/_ses_state.html" %}
+{% if error %}<p class="sys-note error" role="alert">{{ error }}</p>{% endif %}
+{% if problems %}<section class="sys-note error se-problems" role="alert" data-system-list-problems><p><strong>Fix these, then check the list again.</strong></p>
+  <ul>{% for line in problems %}<li>{{ line }}</li>{% endfor %}</ul></section>{% endif %}
+<form method="post" action="{% url 'system_list_review' %}" enctype="multipart/form-data" data-system-list-import data-se-import data-problems novalidate>{% csrf_token %}
+  {% if target %}<input type="hidden" name="list" value="{{ target.pk }}">{% endif %}
+  {% if not target %}<section class="sys-panel se-add">
+    <header><h2>The list</h2></header>
+    <div class="sys-pad">
+      <div class="sys-row se-field"><label for="list-name">Name <small>Only you see this.</small></label>
+        <div><input type="text" id="list-name" name="name" value="{{ name }}" maxlength="120" required autocomplete="off" data-se-list-name></div></div>
+      <div class="sys-row se-field"><label for="list-category">Category <small>Optional, e.g. Gym members.</small></label>
+        <div><input type="text" id="list-category" name="category" value="{{ category }}" maxlength="60" list="list-categories" autocomplete="off">
+          <datalist id="list-categories">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist></div></div>
+    </div>
+  </section>{% endif %}
+  <section class="sys-panel se-add">
+    <header><h2>Add people</h2>
+      <div class="sys-seg se-mode" role="radiogroup" aria-label="How to add them"><label><input type="radio" name="mode" value="paste" checked> Paste</label><label><input type="radio" name="mode" value="upload"> Upload CSV</label></div>
+    </header>
+    <div class="se-body">
+      <div data-se-mode="paste">
+        <label for="invites-text" class="se-label">The list</label>
+        <textarea id="invites-text" name="text" rows="8" data-invites-text placeholder="Name, email" spellcheck="false" autocomplete="off">{{ text }}</textarea>
+        <p class="sys-muted se-help">One person per line: name, email. A header row is fine (Email, Name, or First name and Last name); commas, semicolons and Excel CSV files all work. Phone columns are ignored. Up to {{ max_rows }} rows or 1 MB.</p>
+      </div>
+      <div data-se-mode="upload" hidden>
+        <label class="se-drop" data-se-drop for="invites-file"><span data-se-drop-text>Drop a CSV here or choose a file</span><input id="invites-file" type="file" name="file" accept=".csv,.txt,text/csv,text/plain"></label>
+        <p class="sys-muted se-help">Name and email columns, either order. Up to {{ max_rows }} rows or 1 MB.</p>
+      </div>
+      <p class="se-live-error" data-se-live="list" role="alert" hidden></p>
+    </div>
+  </section>
+  <p class="sys-muted se-help">Checking the list sends nothing. Saving it sends nothing either.</p>
+  <div class="se-formbar"><button type="submit" class="sys-btn primary" data-se-check>Check list</button></div>
+</form>
+{% endblock %}

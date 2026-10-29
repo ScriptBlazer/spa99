@@ -66,7 +66,7 @@ STARTERS = {
             {"type": PARAGRAPH, "text": "Hello {first_name},\n\nBooking is now open at Spa 99. You can choose a time that suits you and reserve your first visit "
                                         "from your account, whenever you are ready."},
             {"type": BUTTON, "label": "Book your first visit", "url": "/account/book/"},
-            {"type": SMALL_PRINT, "text": "Spa 99, 99 Vale Road, London N4. If you have any questions, reply to this email and it will reach the team."},
+            {"type": SMALL_PRINT, "text": "Spa 99, __ADDRESS__. If you have any questions, reply to this email and it will reach the team."},
         ],
     },
 }

@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from common.admin import ExportCsvMixin
 
-from .models import EmailOptOut, Invite, Mailing, MailingRecipient
+from .models import ContactList, ContactListMember, EmailOptOut, Invite, Mailing, MailingRecipient
 
 
 class ReadOnlyMixin:
@@ -42,3 +42,20 @@ class InviteAdmin(ReadOnlyMixin, ExportCsvMixin, admin.ModelAdmin):
 class EmailOptOutAdmin(ReadOnlyMixin, ExportCsvMixin, admin.ModelAdmin):
     list_display = ("email", "source", "created_at")
     search_fields = ("email",)
+
+
+@admin.register(ContactList)
+class ContactListAdmin(ReadOnlyMixin, ExportCsvMixin, admin.ModelAdmin):
+    """Read-only: lists are made and changed in System > Emails > Groups (every change is audit logged there)."""
+
+    list_display = ("name", "category", "created_by", "created_at")
+    search_fields = ("name", "category")
+
+
+@admin.register(ContactListMember)
+class ContactListMemberAdmin(ReadOnlyMixin, ExportCsvMixin, admin.ModelAdmin):
+    """Personal data: visible and exportable here, erased with the person."""
+
+    list_display = ("email", "name", "list", "added_at")
+    list_filter = ("list",)
+    search_fields = ("email", "name")

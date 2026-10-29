@@ -514,6 +514,8 @@ class PaymentWindow(BaseModel):
     window_days = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Length used when it opened (from System > Defaults at that time).")
     opened_by = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     reminder_sent_at = models.DateTimeField(null=True, blank=True, help_text="When the reminder round was started (once per window).")
+    confirmed_count = models.PositiveIntegerField(null=True, blank=True, help_text="Members the person confirmed when scheduling. If more are eligible when the time comes, payments do not open.")
+    note = models.CharField(max_length=300, blank=True, help_text="Why a scheduled opening did not happen (shown on System > Payments).")
 
     history = HistoricalRecords()
 

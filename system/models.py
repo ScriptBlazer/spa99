@@ -185,6 +185,8 @@ class SystemEvent(AuditRow):
     MAILING_SCHEDULED, MAILING_SENT, MAILING_CANCELLED = "mailing_scheduled", "mailing_sent", "mailing_cancelled"
     INVITES_SENT, EMAIL_TEST = "invites_sent", "email_test"
     TEMPLATE_SAVED, TEMPLATE_RENAMED, TEMPLATE_DELETED = "tpl_saved", "tpl_renamed", "tpl_deleted"
+    LIST_CREATED, LIST_CHANGED, LIST_DELETED = "list_created", "list_changed", "list_deleted"
+    MAILING_RETURNED = "mailing_returned"
     PAYMENTS_OPENED, PAYMENTS_SCHEDULED, PAYMENTS_CLOSED = "payments_opened", "payments_scheduled", "payments_closed"
     PAYMENTS_CANCELLED, SETUP_MANUAL, SETUP_CANCELLED = "payments_cancelled", "setup_manual", "setup_cancelled"
     SALE_RESTORED, SETUP_EDITED = "sale_restored", "setup_edited"
@@ -199,6 +201,8 @@ class SystemEvent(AuditRow):
         (CODE_EDIT, "Edited as code"), (MAILING_SCHEDULED, "Mailing scheduled"), (MAILING_SENT, "Mailing sent"),
         (MAILING_CANCELLED, "Mailing cancelled"), (INVITES_SENT, "Invites sent"), (EMAIL_TEST, "Test email sent"),
         (TEMPLATE_SAVED, "Email template saved"), (TEMPLATE_RENAMED, "Email template renamed"), (TEMPLATE_DELETED, "Email template deleted"),
+        (LIST_CREATED, "Uploaded list created"), (LIST_CHANGED, "Uploaded list changed"), (LIST_DELETED, "Uploaded list deleted"),
+        (MAILING_RETURNED, "Scheduled send went back to draft"),
         (PAYMENTS_OPENED, "Payments opened"), (PAYMENTS_SCHEDULED, "Payments scheduled"), (PAYMENTS_CLOSED, "Payments closed"),
         (PAYMENTS_CANCELLED, "Payments schedule cancelled"), (SETUP_MANUAL, "Membership set up manually"), (SETUP_CANCELLED, "Manual membership cancelled"),
         (SALE_RESTORED, "Sale price restored"), (SETUP_EDITED, "Manual membership edited"),
@@ -309,6 +313,8 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
     payment_window_days = _number("Payment window (days)", 14, 3, 60, "How long members have to set up their membership once payments open. Applies to windows opened from now on.")
     payment_reminder_days_before = _number("Payment reminder: days before it closes", 3, 1, 30, "One gentle reminder email to members who have not set up yet.")
     payment_staff_alert_days_before = _number("Staff warning: days before it closes", 7, 1, 60, "From then until it closes, staff are warned once a day about launch-price holders who have not set up.")
+
+    payment_staff_alert_hour = _number("Staff warning: earliest hour (London time)", 9, 0, 23, "The daily staff warning is sent from this hour (24-hour clock), once a day.")
 
     staff_alert_emails_on = models.BooleanField("Payment alert emails on", default=True, help_text="Untick to stop the alert emails without clearing the addresses. The notice in the Office and System still shows.")
     staff_alert_seeded = models.BooleanField(default=False, editable=False)

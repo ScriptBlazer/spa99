@@ -23,7 +23,7 @@ Launch mail goes through Postmark, so its bounces reach the same `notifications.
 - Valid records we ignore answer 200 (Postmark retries anything else). A body that is not a JSON object: 400.
 - Same upsert as SES (`suppression.add`: lower case, first_seen / last_seen, count, invites and mailing rows marked bounced). The feedback id is the Postmark record `ID`, so a retry of the same record changes nothing; a new bounce for the same address updates `last_seen`. `EmailLog` is not touched: it stores no Postmark message id (SES does not update it either).
 - Logs hold the record type and a count, never the address or the credentials.
-- Setup: see `docs/GO-LIVE.md` step 7. Tests: `notifications/tests/test_postmark_feedback.py`.
+- Setup: see `docs/GO-LIVE.md` steps 3 and 9. Tests: `notifications/tests/test_postmark_feedback.py`.
 
 ## Seeing and removing (System, Developer level, behind the unlock)
 

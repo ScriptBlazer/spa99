@@ -18,8 +18,10 @@ from common.models import BaseModel
 
 
 class Mailing(BaseModel):
-    NEWS, SERVICE = "news", "service"
-    KIND_CHOICES = [(NEWS, "News (marketing: only people who opted in, with unsubscribe)"), (SERVICE, "Service message (no unsubscribe, says why they get it)")]
+    NEWS, SERVICE, INVITATION = "news", "service", "invitation"
+    KIND_CHOICES = [(NEWS, "News (marketing: only people who opted in, with unsubscribe)"), (SERVICE, "Service message (no unsubscribe, says why they get it)"),
+                    (INVITATION, "Invitation (to an uploaded list: with unsubscribe and a personal register link)")]
+    MARKETING = (NEWS, INVITATION)  # these carry the unsubscribe link and headers
     DRAFT, SCHEDULED, SENDING, PAUSED, SENT, CANCELLED, FAILED = "draft", "scheduled", "sending", "paused", "sent", "cancelled", "failed"
     STATUS_CHOICES = [(DRAFT, "Draft"), (SCHEDULED, "Scheduled"), (SENDING, "Sending"), (PAUSED, "Paused"), (SENT, "Sent"), (CANCELLED, "Cancelled"), (FAILED, "Failed")]
     EDITABLE = (DRAFT,)
@@ -28,11 +30,13 @@ class Mailing(BaseModel):
     subject = models.CharField(max_length=200)
     body = models.TextField(blank=True, help_text="Older mailings: paragraphs separated by a blank line; {first_name} is filled in for each person. Used only when there are no blocks.")
     blocks = models.JSONField(default=list, blank=True, help_text="The email as parts (mailings.blocks): a list of {type, ...}. When set, it is used instead of the body.")
-    kind = models.CharField(max_length=8, choices=KIND_CHOICES, default=NEWS)
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES, default=NEWS)
+    automatic_key = models.SlugField(max_length=40, blank=True, help_text="Set when this sends an automatic email's wording (mailings.automatic), e.g. 'invite'. The wording then comes from that email.")
     group = models.CharField(max_length=40, help_text="A key of mailings.segments.GROUPS.")
     params = models.JSONField(default=dict, blank=True, help_text="The group's options (plan, dates, status).")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=DRAFT, db_index=True)
     scheduled_at = models.DateTimeField(null=True, blank=True)
+    confirmed_count = models.PositiveIntegerField(null=True, blank=True, help_text="The number of people the person confirmed when scheduling. If more would get it when the time comes, it goes back to draft.")
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
     error = models.CharField(max_length=300, blank=True, help_text="Why it failed or could not start.")
@@ -102,7 +106,7 @@ class MailingTemplate(BaseModel):
     key = models.SlugField(max_length=40, unique=True, null=True, blank=True, help_text="Set for the built-in ones the seed creates.")
     name = models.CharField(max_length=120)
     subject = models.CharField(max_length=200, blank=True)
-    kind = models.CharField(max_length=8, choices=Mailing.KIND_CHOICES, default=Mailing.NEWS)
+    kind = models.CharField(max_length=12, choices=Mailing.KIND_CHOICES, default=Mailing.NEWS)
     group = models.CharField(max_length=40, blank=True, help_text="A key of mailings.segments.GROUPS, or blank (Who is chosen later).")
     blocks = models.JSONField(default=list, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
@@ -204,7 +208,9 @@ class InviteImport(BaseModel):
     token = models.CharField(max_length=64, unique=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
     content_hash = models.CharField(max_length=64)
-    batch_id = models.UUIDField(null=True, blank=True, unique=True, help_text="Set when the import was made; the batch this token produced.")
+    batch_id = models.UUIDField(null=True, blank=True, unique=True, help_text="Set when the import was made; the batch (or uploaded list save) this token produced.")
+    contact_list = models.ForeignKey("mailings.ContactList", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                     help_text="The uploaded list this token saved people into (a repeat answers with it).")
     used_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -212,6 +218,46 @@ class InviteImport(BaseModel):
 
     def __str__(self):
         return f"import {self.token[:6]}... ({'used' if self.batch_id else 'open'})"
+
+
+class ContactList(BaseModel):
+    """An uploaded list of people (System > Emails > Groups). Saved from a CSV that passed invites.check(); nothing is sent when it is
+    saved. A group send can pick it ("Uploaded list"). Names and categories are not personal data; the members are (ContactListMember)."""
+
+    name = models.CharField(max_length=120)
+    category = models.CharField(max_length=60, blank=True, help_text="Optional, free text (e.g. Gym members).")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [models.UniqueConstraint(_f.Lower("name"), name="mailings_list_name_ci")]
+
+    def __str__(self):
+        return self.name
+
+
+class ContactListMember(BaseModel):
+    """One address on an uploaded list. Personal data: erased with the person (mailings.erasure), exported with their data. No history
+    (it would copy the addresses). Whether he can be emailed is decided when a send is made (segments), never stored here."""
+
+    list = models.ForeignKey(ContactList, on_delete=models.CASCADE, related_name="members")
+    email = models.EmailField(help_text="Lower case.")
+    name = models.CharField(max_length=100, blank=True)
+    added_at = models.DateTimeField(default=timezone.now)
+    source_row = models.PositiveIntegerField(default=0, help_text="The row number in the file it came from (the header is row 1).")
+
+    class Meta:
+        ordering = ["email"]
+        constraints = [models.UniqueConstraint(fields=["list", "email"], name="mailings_member_once")]
+        indexes = [models.Index(fields=["email"])]
+
+    def __str__(self):
+        return self.email
+
+    def save(self, *args, **kwargs):
+        self.email = (self.email or "").strip().lower()
+        super().save(*args, **kwargs)
 
 
 class EmailOptOut(BaseModel):

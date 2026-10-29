@@ -27,7 +27,6 @@ from users.models import InterestRegistration
 logger = logging.getLogger("spa99.payments")
 
 BATCH = 500
-ALERT_HOUR = 9
 SLICE_SECONDS = 50
 STALE_SECONDS = 600
 
@@ -181,7 +180,7 @@ def open_now(user, now=None):
     return window, True
 
 
-def schedule(user, when, now=None):
+def schedule(user, when, now=None, confirmed=None):
     """Schedule opening for `when` (a later time). Replaces the time of an already scheduled window. Refused while one is open."""
     now = now or timezone.now()
     if when <= now + timedelta(minutes=1):
@@ -195,6 +194,7 @@ def schedule(user, when, now=None):
             window = window or PaymentWindow()
             window._history_user = user
             window.status, window.scheduled_for, window.opened_by = PaymentWindow.SCHEDULED, when, user
+            window.confirmed_count, window.note = confirmed, ""
             window.save()
     except IntegrityError:
         raise ValidationError("A payment window is already scheduled or open.") from None
@@ -551,7 +551,7 @@ def run_staff_alert(now=None):
     from notifications.services import send_templated, subject_for
 
     now = now or timezone.now()
-    if timezone.localtime(now).hour < ALERT_HOUR:  # a sensible hour: from 09:00 London time, once a day
+    if timezone.localtime(now).hour < _defaults().payment_staff_alert_hour:  # System > Defaults (09:00 London time by default), once a day
         return None
     warning = staff_warning(now)
     if warning is None:
@@ -622,11 +622,24 @@ def tick(now=None):
                 fresh = PaymentWindow.objects.select_for_update().get(pk=window.pk)
                 if fresh.status != PaymentWindow.SCHEDULED:
                     return "already opened"
+                eligible_now = eligible().count()
+                held = fresh.confirmed_count is not None and eligible_now > fresh.confirmed_count  # more members than were confirmed: do not open
                 fresh._history_user = fresh.opened_by
-                invited = _open(fresh, fresh.opened_by, now)
-            _log("payments_opened", fresh.opened_by, f"Payments opened as scheduled: {invited} member(s) invited, closes {when_text(fresh.closes_at)}",
-                 {"members": invited, "closes_at": fresh.closes_at.isoformat(), "scheduled": True})
-            window = fresh
+                if held:
+                    fresh.status = PaymentWindow.CANCELLED
+                    fresh.note = f"Did not open: {eligible_now} members now, {fresh.confirmed_count} confirmed. Schedule it again."
+                    fresh.save()
+                else:
+                    invited = _open(fresh, fresh.opened_by, now)
+            if held:
+                _log("payments_cancelled", fresh.opened_by, f"Scheduled payments did not open: {eligible_now} members now, {fresh.confirmed_count} confirmed",
+                     {"now": eligible_now, "confirmed": fresh.confirmed_count})
+                parts.append("scheduled opening held back")
+                window = None
+            else:
+                _log("payments_opened", fresh.opened_by, f"Payments opened as scheduled: {invited} member(s) invited, closes {when_text(fresh.closes_at)}",
+                     {"members": invited, "closes_at": fresh.closes_at.isoformat(), "scheduled": True})
+                window = fresh
         else:
             parts.append("next window scheduled")  # only the opening waits; late invites, reminders, lapses, alerts and sends carry on
     if window is not None and window.status == PaymentWindow.OPEN and window.closes_at <= now:

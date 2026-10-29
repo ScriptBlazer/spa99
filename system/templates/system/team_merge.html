@@ -10,6 +10,7 @@
 </section>
 {% if preview %}
 <section class="sys-panel" aria-label="What moves" data-system-merge-preview>
+  <div class="sys-pad">
   <h2>Merge {{ remove_user.email }} into {{ keep_user.email }}?</h2>
   <ul>
     <li>Membership: {{ preview.membership }}</li>
@@ -24,6 +25,7 @@
     <input type="hidden" name="keep" value="{{ keep_user.email }}"><input type="hidden" name="remove" value="{{ remove_user.email }}"><input type="hidden" name="confirm" value="1">
     <button type="submit" class="sys-btn primary">Merge the accounts</button> <a class="sys-btn" href="{% url 'system_team' %}">Cancel</a>
   </form>
+  </div>
 </section>
 {% endif %}
 {% endblock %}

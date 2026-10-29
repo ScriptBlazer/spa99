@@ -48,11 +48,11 @@ None of these block the launch. Each has a safe default already in place.
 7. **First data** (once; Postmark domain must be green first, or the invites never arrive)
    - Preview: `docker compose run --rm web python manage.py setup_live --dry-run`. It lists everything and sends nothing.
    - Run: `docker compose run --rm web python manage.py setup_live`. It loads the seed, the team levels, System values (contact email, Gold CC, WhatsApp, staff alerts), and creates moishe@spa99.uk (Developer + Final approver) and barry@spa99.uk (Admin + Approver), each invited by email. It refuses to run if email doesn't work.
-   - The output must end with "invite sent" for both. Open the invite and choose your password within 1 hour (expired: Forgot password on spa99.uk).
+   - The output must end with "invite sent" for both, then a "Launch state" and "Next steps" block. Open the invite and choose your password within 1 hour (expired: System > Team, resend, or Forgot password on spa99.uk).
 
 8. **Checks**
    - `https://spa99.uk/health/` answers OK.
-   - Sign in at `https://system.spa99.uk/dev-login/`, unlock with the lock code. Check the opening date, the email settings, and that Memberships is still hidden.
+   - Sign in at `https://system.spa99.uk/dev-login/`, unlock with the lock code. Settings > Launch: Memberships public off, final approval as you want it, payments not opened. Defaults: payment alert address and caps. Emails: send a test to yourself.
    - Do it yourself, on a phone too: the journey and email, register and confirm, apply for Gold (the approver email arrives and "Review application" opens it in the Office).
    - Upload a picture in System > Emails: it must show (proves S3 and the role work).
 

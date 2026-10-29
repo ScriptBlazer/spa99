@@ -63,7 +63,7 @@ class Command(BaseCommand):
         self.dry = options["dry_run"]
         if not self.dry and not options["no_email_check"] and settings.EMAIL_BACKEND in NO_EMAIL_BACKENDS:
             raise CommandError("Email is not set up (EMAIL_BACKEND only prints or drops mail), so the team invites would never arrive. "
-                               "Set up Postmark first (docs/GO-LIVE.md step 7), send yourself a test, then run this again. "
+                               "Set up Postmark first (docs/GO-LIVE.md step 3), send yourself a test, then run this again. "
                                "--no-email-check runs it anyway (then use Forgot password once email works).")
         self.problems = self.changed = self.left = 0
         self.invites = []
@@ -77,6 +77,7 @@ class Command(BaseCommand):
         verb = "would be set" if self.dry else "set"
         self.stdout.write(f"{'Dry run (nothing saved, nothing sent)' if self.dry else 'Done'}: {self.changed} {verb}, {self.left} already set (left alone), "
                           f"{self.problems} problem{'s' if self.problems != 1 else ''}.")
+        self.next_steps()
 
     # ---------- the steps ----------
 
@@ -93,6 +94,30 @@ class Command(BaseCommand):
         self.site_settings()
         self.email_subjects()
         self.say(f"final_approval_on: left at its default ({'on' if FINAL_APPROVAL_ON else 'off'}); turn it on in System > Approval")
+
+    def next_steps(self):
+        """The closing block. It only reads the launch switches (never changes them) so the soft-launch state is visible at a glance."""
+        if self.dry:
+            return self.say("\nNothing was saved. Run it again without --dry-run to do it.")
+        site, defaults = SiteSettings.load(), SiteDefaults.load()
+
+        def state(on):
+            return "ON" if on else "off"
+
+        self.say("\nLaunch state (changed in System > Settings > Launch, never by this script):\n"
+                 f"  Memberships public: {state(site.memberships_public)} (off = hidden until you open it)\n"
+                 f"  Journey asks for an email: {state(site.journey_email_gate)}\n"
+                 f"  Final approval: {state(site.final_approval_on)}\n"
+                 f"  Booking open: {state(site.booking_open)}\n"
+                 f"  Payments: not opened by this script (window is {defaults.payment_window_days} days once you open them)\n"
+                 "  This script never emails the public; the only mail it sends is a new team member's invite.")
+        self.say("\nNext steps:\n"
+                 "  1. Moishe and Barry: open the invite email (the link lasts 1 hour) and choose a password. Link expired? System > Team, resend.\n"
+                 f"  2. Sign in at {settings.SYSTEM_URL}/dev-login/, then enter the unlock code (SYSTEM_UNLOCK_CODE in the live .env).\n"
+                 "  3. Check Settings > Launch: Memberships public off, final approval as you want it. Do not open payments yet.\n"
+                 "  4. Check Defaults (payment alert address, caps) and Emails (a test to yourself).\n"
+                 "  5. Check /health/ answers OK and the worker is running (System dashboard: queue and last jobs).\n"
+                 "  6. Take a database backup before opening anything to the public.")
 
     def say(self, text):
         self.stdout.write(text)

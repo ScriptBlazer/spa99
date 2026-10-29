@@ -17,7 +17,7 @@ GROUPS = [
     ("Emails", [("register_invite_days", "days"), ("recent_mailings", "shown"), ("recent_batches", "shown")]),
     ("Sign-in", [("office_session_days", "days"), ("email_confirm_hours", "hours")]),
     ("System", [("changelog_page_size", "rows"), ("audit_page_size", "rows"), ("dashboard_recent_changes", "shown")]),
-    ("Payments", [("payment_window_days", "days"), ("payment_reminder_days_before", "days"), ("payment_staff_alert_days_before", "days"), ("staff_alert_emails_on", ""), ("staff_alert_emails", "")]),
+    ("Payments", [("payment_window_days", "days"), ("payment_reminder_days_before", "days"), ("payment_staff_alert_days_before", "days"), ("payment_staff_alert_hour", "o'clock"), ("staff_alert_emails_on", ""), ("staff_alert_emails", "")]),
     ("Notifications", [("toast_seconds", "seconds"), ("toast_long_seconds", "seconds")]),
 ]
 FIELDS = [name for _title, rows in GROUPS for name, _unit in rows]

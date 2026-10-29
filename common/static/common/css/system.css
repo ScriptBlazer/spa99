@@ -178,3 +178,45 @@ body.system.live { --sys-stripe: 3px; }
 @media (pointer: coarse) { .sys-nav a { height: 40px; } }
 @media (prefers-reduced-motion: reduce) { .system *, .system *::before, .system *::after { animation-name: sys-fade !important; transition-property: opacity, background-color, border-color !important; transform: none !important; } @keyframes sys-fade { from { opacity: 0; } } }
 .sys-tile .f { margin-top: auto; padding-top: var(--sys-2); } .sys-tile .f form { margin: 0; }
+
+/* dashboard: the compact WhatsApp box (four figures, a 30-day trend, the top sources) */
+.sys-figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sys-3); }
+.sys-fig .l { color: var(--sys-text-2); font-size: var(--sys-fs-sm); }
+.sys-fig .v { font: 600 var(--sys-fs-lg)/1.3 var(--sys-mono); }
+.sys-bars { display: flex; align-items: flex-end; gap: 2px; height: var(--sys-6); margin-top: var(--sys-3); border-bottom: 1px solid var(--sys-line); }
+.sys-bar { flex: 1 1 0; min-width: 0; height: calc(var(--h) * 1%); min-height: 1px; background: var(--sys-control); border-radius: 1px 1px 0 0; }
+.sys-bar:last-child { background: var(--sys-accent); }
+.sys-from { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-2); margin-top: var(--sys-3); }
+
+/* page structure helpers: a gap between a form-wrapped panel and what follows, notes above panels, panel bodies without a table */
+.system .sys-main > form + :is(.sys-panel, form, section) { margin-top: var(--sys-4); }
+.system .sys-main > .sys-note { margin-bottom: var(--sys-3); }
+.sys-group > h3 + .sys-muted { margin: calc(-1 * var(--sys-1)) 0 var(--sys-2); }
+.sys-sub { margin: calc(-1 * var(--sys-2)) 0 var(--sys-4); }
+.sys-pad > .sys-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-2) var(--sys-3); margin-top: var(--sys-3); }
+.sys-pad > .sys-actions form, .sys-pad > form + form { margin: 0; }
+.sys-pad > .sys-muted, .sys-pad > form, .sys-pad > ul { margin-top: var(--sys-3); }
+.sys-pad > ul { list-style: disc; padding-left: var(--sys-5); } .sys-pad > ul > li + li { margin-top: var(--sys-1); }
+.sys-pad > p, .sys-pad > h2 { margin-bottom: var(--sys-3); }
+.sys-pad > form.sys-pad, form.sys-pad > p { margin-top: 0; }
+.sys-pad > :first-child { margin-top: 0; } .sys-pad > :last-child { margin-bottom: 0; }
+@media (max-width: 48em) { .sys-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Dashboard: "More details" under the WhatsApp box (2026-10-29) */
+.sys-more { margin-top: var(--sys-4); border-top: 1px solid var(--sys-line); padding-top: var(--sys-3); }
+.sys-more > summary { cursor: pointer; color: var(--sys-text-2); font-weight: 500; }
+.sys-more-grid { display: grid; gap: var(--sys-4); margin-top: var(--sys-3); }
+@media (min-width: 48em) { .sys-more-grid { grid-template-columns: 1fr 1fr; align-items: start; } }
+.sys-more caption { text-align: left; padding-bottom: var(--sys-2); }
+
+/* Pager (system/_pager.html): range text, First/Previous, numbers, Next/Last. Narrow: Previous, "Page n of N", Next only. */
+.sys-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sys-2) var(--sys-4); padding: var(--sys-3) var(--sys-4); border-top: 1px solid var(--sys-line); }
+.sys-pager-range { font-size: var(--sys-fs-sm); }
+.sys-pager-list { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-1); list-style: none; margin: 0; padding: 0; }
+.sys-pager-list [aria-disabled="true"] { opacity: .45; cursor: default; pointer-events: none; }
+.sys-pager-now { display: none; font-size: var(--sys-fs-sm); padding: 0 var(--sys-2); }
+@media (max-width: 40em) {
+  .sys-pager-edge, .sys-pager-num { display: none; }
+  .sys-pager-now { display: block; }
+  .sys-pager-list { flex-wrap: nowrap; width: 100%; justify-content: space-between; }
+}

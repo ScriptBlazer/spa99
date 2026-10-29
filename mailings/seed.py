@@ -4,8 +4,11 @@ from .models import MailingTemplate
 
 
 def run(ensure):
+    from plans.models import SiteSettings
+
+    address = SiteSettings.load().address_one_line  # Settings is the one source of the address
     for key, starter in blocks.STARTERS.items():
         if not MailingTemplate.objects.filter(key=key).exists() and MailingTemplate.objects.filter(name__iexact=starter["name"]).exists():
             continue  # someone already made one with this name: do not clash with it
         ensure(MailingTemplate, {"key": key}, {"name": starter["name"], "subject": starter["subject"], "kind": starter["kind"],
-                                               "group": starter["group"], "blocks": starter["blocks"]})
+                                               "group": starter["group"], "blocks": [{**b, **({"text": b["text"].replace("__ADDRESS__", address)} if "__ADDRESS__" in b.get("text", "") else {})} for b in starter["blocks"]]})

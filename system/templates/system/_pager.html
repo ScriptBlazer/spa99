@@ -1,0 +1,15 @@
+{# Page numbers for a Paginator page. Context: page (from Paginator.get_page). Hidden with one page. Links keep the query string and replace only `page`. #}
+{% load system_ui %}{% if page.has_other_pages %}
+<nav class="sys-pager" aria-label="Pages" data-system-pager>
+  <p class="sys-pager-range sys-muted">Showing <span class="mono">{{ page.start_index }}&ndash;{{ page.end_index }}</span> of <span class="mono">{{ page.paginator.count }}</span></p>
+  <ul class="sys-pager-list">
+    {% if page.has_previous %}<li class="sys-pager-edge"><a class="sys-btn sm" href="{% page_url 1 %}" rel="first">First</a></li><li><a class="sys-btn sm" href="{% page_url page.previous_page_number %}" rel="prev">Previous</a></li>
+    {% else %}<li class="sys-pager-edge"><span class="sys-btn sm" aria-disabled="true">First</span></li><li><span class="sys-btn sm" aria-disabled="true">Previous</span></li>{% endif %}
+    <li class="sys-pager-now sys-muted mono">Page {{ page.number }} of {{ page.paginator.num_pages }}</li>
+    {% page_window page as numbers %}{% for n in numbers %}{% if n is None %}<li class="sys-pager-num sys-muted" aria-hidden="true">&hellip;</li>
+    {% elif n == page.number %}<li class="sys-pager-num"><a class="sys-btn sm primary" href="{% page_url n %}" aria-current="page">{{ n }}</a></li>
+    {% else %}<li class="sys-pager-num"><a class="sys-btn sm" href="{% page_url n %}">{{ n }}</a></li>{% endif %}{% endfor %}
+    {% if page.has_next %}<li><a class="sys-btn sm" href="{% page_url page.next_page_number %}" rel="next">Next</a></li><li class="sys-pager-edge"><a class="sys-btn sm" href="{% page_url page.paginator.num_pages %}" rel="last">Last</a></li>
+    {% else %}<li><span class="sys-btn sm" aria-disabled="true">Next</span></li><li class="sys-pager-edge"><span class="sys-btn sm" aria-disabled="true">Last</span></li>{% endif %}
+  </ul>
+</nav>{% endif %}

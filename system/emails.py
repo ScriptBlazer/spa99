@@ -8,7 +8,7 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 
 from mailings import blocks as mailing_blocks, segments
-from mailings.models import EmailOptOut, Invite, Mailing
+from mailings.models import ContactList, EmailOptOut, Invite, Mailing
 from notifications import emailbody, ses
 from notifications.models import EmailLog, EmailSuppression, NotificationTemplate
 from notifications.seed import DEFAULT_SUBJECTS
@@ -145,6 +145,12 @@ class MailingForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["body"].required = False
 
+    def clean_kind(self):
+        kind = self.cleaned_data["kind"]
+        if kind == Mailing.INVITATION and not (self.instance and self.instance.automatic_key):
+            raise forms.ValidationError("Choose News or Service message. An invitation is sent from the Invitation to register email.")
+        return kind
+
     def clean(self):
         data = super().clean()
         # Parts (the `blocks` field, JSON) win over the old body. A form without the field is the old plain-body form.
@@ -198,10 +204,10 @@ def editor_blocks(form, mailing, template=None):
 def mailing_extra(kind, group_key):
     """Footer context for a preview or test of a mailing: the sample unsubscribe link (News) or the 'why you get this' line (Service)."""
     from mailings import tokens
-    from mailings.sending import NEWS_NOTICE
+    from mailings.sending import INVITE_NOTICE, NEWS_NOTICE
 
-    if kind == Mailing.NEWS:
-        return {"unsubscribe_url": tokens.unsubscribe_url("james@example.com"), "notice": NEWS_NOTICE}
+    if kind in Mailing.MARKETING:
+        return {"unsubscribe_url": tokens.unsubscribe_url("james@example.com"), "notice": INVITE_NOTICE if kind == Mailing.INVITATION else NEWS_NOTICE}
     group = segments.GROUPS.get(group_key)
     return {"notice": f"You are receiving this message {group.reason if group else segments.REASON_ACCOUNT}."}
 
@@ -228,7 +234,16 @@ def mailing_list(page=1):
     return Paginator(Mailing.objects.all(), PAGE).get_page(page)
 
 
-# ---------- invites ----------
+# ---------- groups and uploaded lists ----------
+
+def lists_table():
+    """Every uploaded list with its size, newest changes last (the Groups tab)."""
+    from django.db.models import Count
+
+    return ContactList.objects.select_related("created_by").annotate(people=Count("members")).order_by("name")
+
+
+# ---------- past invite batches (read only) ----------
 
 def invite_batches():
     """One line per import: when, who, and how many invites in each state."""

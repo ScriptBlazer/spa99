@@ -43,6 +43,8 @@ KINDS = {
     SystemEvent.EMAIL_TEST: ("change", "emails", "ok"),
     SystemEvent.TEMPLATE_SAVED: ("change", "emails", "ok"), SystemEvent.TEMPLATE_RENAMED: ("change", "emails", "ok"),
     SystemEvent.TEMPLATE_DELETED: ("change", "emails", "ok"),
+    SystemEvent.LIST_CREATED: ("change", "emails", "ok"), SystemEvent.LIST_CHANGED: ("change", "emails", "ok"), SystemEvent.LIST_DELETED: ("change", "emails", "ok"),
+    SystemEvent.MAILING_RETURNED: ("failure", "emails", "blocked"),
     SystemEvent.PAYMENTS_OPENED: ("change", "payments", "ok"), SystemEvent.PAYMENTS_SCHEDULED: ("change", "payments", "ok"),
     SystemEvent.PAYMENTS_CLOSED: ("change", "payments", "ok"), SystemEvent.PAYMENTS_CANCELLED: ("change", "payments", "ok"),
     SystemEvent.SALE_RESTORED: ("change", "payments", "ok"), SystemEvent.SETUP_EDITED: ("change", "payments", "ok"), SystemEvent.SETUP_MANUAL: ("change", "payments", "ok"), SystemEvent.SETUP_CANCELLED: ("change", "payments", "ok"),
