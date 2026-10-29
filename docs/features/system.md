@@ -153,3 +153,6 @@ New `SystemEvent` kinds (category change, section emails): `mailing_scheduled`, 
 ### Assistant section (2026-10-28)
 
 System > **Assistant** (`/assistant/`, Developer level behind the unlock) holds everything about the public Ask us chat in one place, as tabs: **Overview and test**, **Knowledge notes**, **FAQ** (moved here from `/faq/`, which redirects), **Personality and rules**, **Limits**. Every save goes through the change log (section "Assistant", undoable): `chat.FaqItem`, `chat.KnowledgeNote`, `chat.AssistantSettings`, and the monthly cap field on `SiteDefaults`. Views `system/views_assistant.py`, `views_faq.py`; forms `forms_faq.py`. See `docs/features/ai-chat.md` for what each tab does.
+
+## Payments (2026-10-29)
+New nav item **Payments** (`/payments/`, Developer + unlock, audited): open payments now (confirm), schedule, cancel the schedule, close early, status, dates and member counts (paid online, set up manually, at risk, lapsed). Sales: extend the end (+1h, +1d, +1w), edit % and months on a live sale (existing registrations keep theirs), Stop now. Defaults gains a Payments group. Spec: `docs/features/payment-window.md`.

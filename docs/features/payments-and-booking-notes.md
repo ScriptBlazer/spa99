@@ -43,3 +43,7 @@ Status: **notes for later phases** (Stripe payments, booking system). Decided by
 - All money and booking writes go through services, never views or admin saves.
 - Every create action is audited (who, when, source).
 - Backfills are scripts with a dry run, never migrations.
+
+## Sales after launch (decided 2026-10-29)
+
+After payments open, a sale is "pay now". At checkout, a member pays the sale price if a sale is live at the moment the Checkout Session is created. Record which sale was applied on the subscription. There is no register-and-keep window for sales after launch.

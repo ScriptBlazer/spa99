@@ -88,3 +88,6 @@ New env vars: `OFFICE_DOMAIN`, `OFFICE_URL` (optional). Nothing is Postgres-only
 ## Leads and the full person page (2026-10-26)
 
 See `docs/features/office-leads.md` (Leads list, lead page, linking of journeys to the account on verify, lead figures in the snapshots, richer dashboard).
+
+## Sale price and payment (2026-10-29)
+People list: **Sale price** and **Payment** columns and filters (holds a sale price, none, ended, at risk; not started, invited, set up, set up manually, lapsed); Admin+ CSV includes sale and payment columns. Person page: card "Sale price and payment" (sale name, %, months, locked at, kept or ended, payment status and history). **Set up membership manually** (Admin and up, audited, one active per member; edit and cancel later) for members who pay directly. The Dashboard shows the launch-price warning (Admin and up). See `payment-window.md`.
