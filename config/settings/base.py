@@ -9,7 +9,7 @@ from pathlib import Path
 
 from common.envloader import load_env
 from common.observability import init_sentry
-from common.settings_helpers import build_databases, build_media_storage, describe_database
+from common.settings_helpers import build_databases, build_media_storage, describe_database, describe_email
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ENV = load_env(BASE_DIR)
@@ -272,6 +272,7 @@ def build_startup_report(settings_module):
         "database": describe_database(DATABASES),
         "hosts": f"office={OFFICE_HOST} control={CONTROL_HOST} system={SYSTEM_HOST}",
         "media": MEDIA_DESCRIPTION,
+        "email": describe_email(EMAIL_BACKEND, EMAIL_HOST),
         "sentry": SENTRY_STATE,
         "chat": "on" if ANTHROPIC_API_KEY else "off",
         "unlock_code_set": bool(SYSTEM_UNLOCK_CODE),
