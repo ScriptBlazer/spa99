@@ -16,6 +16,7 @@ from .models import LinkClickDay
 logger = logging.getLogger("spa99.pages")
 BOT_WORDS = ("bot", "crawler", "spider", "preview", "facebookexternalhit", "whatsapp/", "curl", "python-requests")
 BY_SOURCE_MAX = 20
+TOP_SOURCES = 3
 # A referring page on our own site, by route name, becomes a short key. Anything else (a faked or unknown path) is "other", so the
 # table can never grow with made-up sources.
 PAGE_KEYS = {"register": "register", "register_sent": "register", "memberships": "membership", "account_membership": "membership", "home": "home",
@@ -69,7 +70,8 @@ def record(request, key=KEY):
 
 
 def summary(key=KEY, today=None):
-    """Stored figures for System: totals (today, 7 days, 30 days, all time), the last 30 days by day, and by source (all time, top 20)."""
+    """Stored figures for System: totals (today, 7 days, 30 days, all time), the last 30 days by day (newest first) and as trend bars (oldest
+    first), and by source (all time, top 20; the top 3 as pill labels)."""
     today = today or timezone.localdate()
     rows = LinkClickDay.objects.filter(key=key)
 
@@ -80,5 +82,9 @@ def summary(key=KEY, today=None):
     per_day = dict(rows.filter(day__gte=first).values_list("day").annotate(n=Sum("count")))
     by_day = [{"day": today - timedelta(days=i), "count": per_day.get(today - timedelta(days=i), 0)} for i in range(30)]
     by_source = [{"source": s, "count": n} for s, n in rows.values_list("source").annotate(n=Sum("count")).order_by("-n", "source")[:BY_SOURCE_MAX]]
+    peak = max((d["count"] for d in by_day), default=0)
+    # Oldest first, for the small trend on the Dashboard: pct is each day's height against the busiest day (a day with clicks never shows as empty).
+    bars = [{"day": d["day"], "count": d["count"], "pct": max(8, round(d["count"] * 100 / peak)) if d["count"] else 0} for d in reversed(by_day)]
+    top_sources = [{"label": r["source"].replace("_", " ").capitalize(), "count": r["count"]} for r in by_source[:TOP_SOURCES]]
     return {"today": total(today), "week": total(today - timedelta(days=6)), "month": total(first), "all": total(),
-            "by_day": by_day, "by_source": by_source}
+            "by_day": by_day, "by_source": by_source, "bars": bars, "top_sources": top_sources}

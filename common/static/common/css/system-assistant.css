@@ -10,6 +10,6 @@
 .system .sa-log p { margin: 0; white-space: pre-wrap; }
 .system .sa-who { font-size: var(--sys-fs-sm); color: var(--sys-text-3); }
 .system .sa-form { display: flex; flex-wrap: wrap; gap: var(--sys-2); align-items: center; }
-.system .sa-form textarea { flex: 1 1 24rem; }
-.system .sa-pre { max-height: 24rem; overflow: auto; white-space: pre-wrap; font: 400 var(--sys-fs-sm) var(--sys-mono); }
+.system .sa-form textarea { flex: 1 1 20rem; min-width: 0; }
+.system .sa-pre { max-width: 100%; max-height: 24rem; overflow: auto; white-space: pre-wrap; font: 400 var(--sys-fs-sm) var(--sys-mono); }
 @media (max-width: 760px) { .system .sa-tabs a { height: 36px; flex: none; } }

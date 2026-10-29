@@ -4,6 +4,7 @@
 {% include "system/_page_header.html" with title="Assistant" description="The Ask us assistant on the public site: what it knows, how it sounds, what it may spend." %}
 {% include "system/_assistant_tabs.html" with tab="overview" %}
 <section class="sys-panel" aria-labelledby="sa-over-h"><header><h2 id="sa-over-h">This month</h2></header>
+  <div class="sys-pad">
   <div class="sa-figures">
     <p><strong>£{{ spent_pounds }} of £{{ cap }}</strong>spent this month (visitors and tests)</p>
     <p><strong>£{{ spent_today_pounds }}</strong>today, soft cap £{{ daily_cap }}</p>
@@ -15,8 +16,10 @@
     <button type="submit" class="sys-btn">{% if enabled %}Turn off{% else %}Turn on{% endif %}</button>
     <span class="sys-muted">{% if enabled %}Turning it off hides the Ask us button and refuses every chat request at once.{% else %}The button is hidden and chats are refused.{% endif %}</span>
   </form>
+  </div>
 </section>
 <section class="sys-panel" aria-labelledby="sa-test-h"><header><h2 id="sa-test-h">Test console</h2></header>
+  <div class="sys-pad">
   {% if not key_set %}<p class="sys-note">Set ANTHROPIC_API_KEY to test.</p>{% else %}
   <p class="sys-muted">Talks to the real assistant with the live knowledge. Not counted against visitor limits, counted in spend, left out of the Office chats.</p>
   <form method="post" action="{% url 'system_assistant_test' %}" data-assistant-test>{% csrf_token %}
@@ -32,5 +35,6 @@
     <details><summary>What was sent to the model</summary><pre class="sa-pre" data-test-knowledge></pre></details>
     <details><summary>Events</summary><pre class="sa-pre" data-test-events></pre></details>
   </form>{% endif %}
+  </div>
 </section>
 {% endblock %}

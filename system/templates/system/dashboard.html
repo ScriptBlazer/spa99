@@ -27,28 +27,22 @@
     <div class="sys-pad">
       {% for label, on in stages %}<div class="sys-state" data-system-stage="{{ label }}"><span>{{ label }}</span><span class="sys-badge {% if on %}ok{% endif %}">{{ on|yesno:"On,Off" }}</span></div>{% endfor %}
       {% if site.opening_date %}<div class="sys-state"><span>Opening date</span><span class="mono">{{ site.opening_date|date:"j M Y" }}</span></div>{% endif %}
-      <p class="sys-muted" style="margin-top:8px"><a href="{% url 'system_settings' %}">Change in Settings</a>. Switches change only there, behind a confirm.</p>
+      <p class="sys-muted sys-hint"><a href="{% url 'system_settings' %}">Change in Settings</a>. Switches change only there, behind a confirm.</p>
     </div>
   </section>
 </div>
 <section class="sys-panel" data-system-whatsapp aria-labelledby="dash-whatsapp">
   <header><h2 id="dash-whatsapp">WhatsApp clicks</h2><span class="sys-muted">spa99.uk/whatsapp, counted only, no personal data</span></header>
-  <section class="sys-tiles" aria-label="WhatsApp click totals">
-    <div class="sys-tile" data-whatsapp-total="today"><div class="l">Today</div><div class="v">{{ whatsapp.today }}</div></div>
-    <div class="sys-tile" data-whatsapp-total="week"><div class="l">7 days</div><div class="v">{{ whatsapp.week }}</div></div>
-    <div class="sys-tile" data-whatsapp-total="month"><div class="l">30 days</div><div class="v">{{ whatsapp.month }}</div></div>
-    <div class="sys-tile" data-whatsapp-total="all"><div class="l">All time</div><div class="v">{{ whatsapp.all }}</div></div>
-  </section>
-  <div class="sys-cols">
-    <div class="sys-scroll" data-whatsapp-by-day><table class="sys-table">
-      <thead><tr><th scope="col">Day</th><th scope="col" class="sys-num">Clicks</th></tr></thead>
-      <tbody>{% for row in whatsapp.by_day %}<tr><td>{{ row.day|date:"D j M" }}</td><td class="sys-num">{{ row.count }}</td></tr>{% endfor %}</tbody>
-    </table></div>
-    <div class="sys-scroll" data-whatsapp-by-source><table class="sys-table">
-      <thead><tr><th scope="col">Where from (all time)</th><th scope="col" class="sys-num">Clicks</th></tr></thead>
-      <tbody>{% for row in whatsapp.by_source %}<tr><td>{{ row.source }}</td><td class="sys-num">{{ row.count }}</td></tr>
-      {% empty %}<tr><td class="sys-empty" colspan="2">No clicks yet.</td></tr>{% endfor %}</tbody>
-    </table></div>
+  <div class="sys-pad">
+    <div class="sys-figs" aria-label="WhatsApp click totals">
+      <div class="sys-fig" data-whatsapp-total="today"><div class="l">Today</div><div class="v">{{ whatsapp.today }}</div></div>
+      <div class="sys-fig" data-whatsapp-total="week"><div class="l">7 days</div><div class="v">{{ whatsapp.week }}</div></div>
+      <div class="sys-fig" data-whatsapp-total="month"><div class="l">30 days</div><div class="v">{{ whatsapp.month }}</div></div>
+      <div class="sys-fig" data-whatsapp-total="all"><div class="l">All time</div><div class="v">{{ whatsapp.all }}</div></div>
+    </div>
+    <div class="sys-bars" role="img" aria-label="Clicks over the last 30 days" data-whatsapp-trend>{% for b in whatsapp.bars %}<span class="sys-bar" style="--h:{{ b.pct }}" title="{{ b.day|date:'j M' }}: {{ b.count }}"></span>{% endfor %}</div>
+    <p class="sys-from" data-whatsapp-by-source><span class="sys-muted">Where from</span>
+      {% for row in whatsapp.top_sources %}<span class="sys-badge">{{ row.label }} {{ row.count }}</span>{% empty %}<span class="sys-muted">No clicks yet.</span>{% endfor %}</p>
   </div>
 </section>
 {% endblock %}

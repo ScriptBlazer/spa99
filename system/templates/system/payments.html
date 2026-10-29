@@ -9,6 +9,7 @@
 
 <section class="sys-panel" aria-labelledby="pay-state-h" data-payments-state="{{ window.status|default:'none' }}">
   <header><h2 id="pay-state-h">The window</h2></header>
+  <div class="sys-pad">
   {% if window and window.status == "open" %}
     <div class="sys-state"><span>Status</span><span class="sys-badge ok">Open</span></div>
     <div class="sys-state"><span>Opened</span><span>{{ window.opened_at|date:"j M Y, H:i" }}</span></div>
@@ -33,10 +34,12 @@
   </div>
   <p class="sys-muted">The window lasts {{ window_days }} days ({{ window_phrase }}); change it in <a href="{% url 'system_defaults' %}">Defaults</a>.</p>
   {% endif %}
+  </div>
 </section>
 
 <section class="sys-panel" aria-labelledby="pay-counts-h">
   <header><h2 id="pay-counts-h">Members</h2></header>
+  <div class="sys-pad">
   <div class="sys-state"><span>Registered (will be emailed)</span><span data-count="registered">{{ counts.registered }}</span></div>
   <div class="sys-state"><span>Email not confirmed (not emailed)</span><span>{{ counts.unconfirmed }}</span></div>
   <div class="sys-state"><span>Holding a launch price</span><span data-count="sale_holders">{{ counts.sale_holders }}</span></div>
@@ -46,5 +49,6 @@
   <div class="sys-state"><span>At risk (launch price, not set up)</span><span data-count="at_risk">{{ counts.at_risk }}</span></div>
   <div class="sys-state"><span>Lapsed (window closed, not set up)</span><span data-count="lapsed">{{ counts.lapsed }}</span></div>
   <div class="sys-state"><span>Launch prices ended</span><span>{{ counts.sale_expired }}</span></div>
+  </div>
 </section>
 {% endblock %}
