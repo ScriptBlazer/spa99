@@ -63,7 +63,7 @@ Retention periods in the notice are **proposals**. Nothing deletes on these sche
 | Visitor counter hashes and salt | Next day | Built (roll-up) |
 | Sentry error reports | 90 days | Sentry plan default; set it in Sentry |
 | Change history (simple-history rows) | 2 years, or until the account is deleted | Kept forever; erased with the account. Needs a pruning job (e.g. `django-simple-history`'s `clean_old_history --days 730`) |
-| Team activity (`SystemChange`, `SystemEvent`) | 2 years | `SYSTEM_AUDIT_RETENTION_DAYS=0` keeps forever; set `730` and schedule `prune_audit_log` |
+| Team activity (`SystemChange`, `SystemEvent`) | 2 years | `SYSTEM_AUDIT_RETENTION_DAYS=0` keeps forever; set `730` and the daily housekeeping job prunes it (2026-10-29) |
 | Journey email (`JourneySession.lead_email`, the gate before the suggestion) | 2 years after given, or until unsubscribe / withdrawn consent / registration | Not enforced yet: needs a clean-up job; export and erase by hand with `manage.py lead_data` |
 | Backups | Replaced within 35 days | Live backups not set up yet (local script keeps 30) |
 

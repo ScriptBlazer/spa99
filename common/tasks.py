@@ -13,6 +13,40 @@ def heartbeat():
     return now.isoformat()
 
 
+FAILED_TASK_DAYS = 30  # failed background jobs stay visible in the admin this long (successful ones: Q_CLUSTER save_limit)
+
+
+def housekeeping():
+    """Daily clean-up so tables never grow forever: expired sessions, old failed jobs, quiet wrong-try counters, and the
+    System audit log when SYSTEM_AUDIT_RETENTION_DAYS is set (0 = keep forever). Each part runs even if another fails."""
+    from datetime import timedelta
+    import time
+
+    from django.conf import settings
+    from django.contrib.sessions.models import Session
+    from django_q.models import Failure
+
+    from system import audit
+    from system.models import WrongTries
+    from system.throttle import QUIET_SECONDS
+
+    now = timezone.now()
+    jobs = {
+        "sessions": lambda: Session.objects.filter(expire_date__lt=now).delete()[0],
+        "failed_jobs": lambda: Failure.objects.filter(stopped__lt=now - timedelta(days=FAILED_TASK_DAYS)).delete()[0],
+        "wrong_tries": lambda: WrongTries.objects.filter(last_at__lt=time.time() - QUIET_SECONDS).delete()[0],
+        "audit": lambda: audit.prune(settings.SYSTEM_AUDIT_RETENTION_DAYS) if settings.SYSTEM_AUDIT_RETENTION_DAYS else "kept",
+    }
+    results = {}
+    for name, job in jobs.items():
+        try:
+            results[name] = job()
+        except Exception:  # one broken part must not stop the others; Sentry gets it through the log
+            logger.exception("Housekeeping part %s failed", name)
+            results[name] = "failed"
+    return f"housekeeping {results}"
+
+
 def enqueue(function_path, *args, **kwargs):
     """Queue `function_path` (e.g. 'common.tasks.heartbeat') for the worker. Runs inline when Q_CLUSTER sync is on."""
     from django_q.tasks import async_task

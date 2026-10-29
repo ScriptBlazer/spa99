@@ -63,7 +63,7 @@ class Command(BaseCommand):
         self.dry = options["dry_run"]
         if not self.dry and not options["no_email_check"] and settings.EMAIL_BACKEND in NO_EMAIL_BACKENDS:
             raise CommandError("Email is not set up (EMAIL_BACKEND only prints or drops mail), so the team invites would never arrive. "
-                               "Set up Postmark first (docs/GO-LIVE.md step 7), send yourself a test, then run this again. "
+                               "Set up Postmark first (docs/GO-LIVE.md step 3), send yourself a test, then run this again. "
                                "--no-email-check runs it anyway (then use Forgot password once email works).")
         self.problems = self.changed = self.left = 0
         self.invites = []

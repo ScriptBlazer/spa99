@@ -17,10 +17,12 @@ No visible pages. Everything later phases sit on.
 - Login does not write user history (last_login is set by a queryset update); the `LoginEvent` is the record.
 - Erasing a person deletes their history rows too (history holds personal data). This is the one exception to "history is never deleted".
 - Roles (Django Groups) are not created yet: the permission levels need approval first (RULES.md section 23).
-- Prod refuses to start without a real `SECRET_KEY` and `DATABASE_URL`. HSTS stays off until the site has run on HTTPS without problems.
+- Prod refuses to start (one ImproperlyConfigured listing every problem, never values) unless these are real: `SECRET_KEY` (not dev/short/placeholder), `DATABASE_URL` (postgres only), `SYSTEM_UNLOCK_CODE` (6-12 digits), `ADMIN_PATH` (not the default), `DEFAULT_FROM_EMAIL`, `AWS_STORAGE_BUCKET_NAME`, the four `*_DOMAIN`s (bare hosts, not localhost), and with SMTP (the live default, Postmark) `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`. Mail backends that print or drop mail are refused. Rules in `common.settings_helpers.prod_config_errors`; `common/tests/test_env_example.py` keeps `.env.example` listing every variable the code reads (2026-10-29).
+- HSTS: `SECURE_HSTS_SECONDS` from env, default 3600 at launch (raise to a year after a week of clean HTTPS); no includeSubDomains, no preload (2026-10-29).
+- The image's `collectstatic` runs on `config.settings.build` (base settings, no secrets), so no fake values are baked into the image.
 - Mail transport and the sender come only from env: `DEFAULT_FROM_EMAIL` (required in prod), `SERVER_EMAIL`, `EMAIL_HOST/PORT/HOST_USER/HOST_PASSWORD/USE_TLS/BACKEND`. Recipients (Gold approver, CC, contact email) are `SiteSettings` fields edited in System (2026-10-23; `CONTACT_EMAIL`, `GOLD_APPROVER_EMAILS`, `GOLD_APPROVER_CC` env vars are gone). Hosts: `DOMAIN`, `CONTROL_DOMAIN`, `OFFICE_DOMAIN`, `SYSTEM_DOMAIN` (+ `*_URL`); the startup log line lists them. Nothing is hard-coded; DKIM is signed by the mail provider/DNS. Dev has a dev-only From default and the console backend.
 - `ALLOWED_HOSTS` in the environment adds to the defaults (DOMAIN, CONTROL_DOMAIN, OFFICE_DOMAIN, SYSTEM_DOMAIN, localhost, 127.0.0.1); it does not replace them.
-- Prod also refuses to start if `ADMIN_PATH` is unset or still the committed default. Prod logs a loud warning if media is on local disk.
+- Prod also refuses to start if `ADMIN_PATH` is unset or still the committed default. Prod refuses to start if media would be on local disk (no bucket).
 - `DJANGO_SETTINGS_MODULE` is also read from the private / project `.env` (manage.py, wsgi, asgi). Tests use `config.settings.test`, which ignores `.env` files.
 - Static files use `common.storage.SpaStaticFilesStorage` so ES module imports get hashed names (cache busting).
 - `export_user_data` covers everything `delete_user_data` removes: profile, login events (by user and by attempted email) and history rows.

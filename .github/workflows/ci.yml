@@ -1,4 +1,10 @@
+# Tests on every push and pull request. A version tag (1.2.3, no "v") also builds the live image, only if the tests pass:
+#   git tag 1.2.3 && git push origin 1.2.3   ->   <DOCKERHUB_USERNAME>/spa99:1.2.3 and :latest on Docker Hub.
+# Repo secrets: DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker Hub Read & Write access token).
 name: CI
+
+permissions:
+  contents: read
 
 on:
   push:
@@ -37,7 +43,7 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - name: No missing migrations
         run: python manage.py makemigrations --check --dry-run
-      - name: Deploy checks (prod settings, dummy values; HSTS is off on purpose)
+      - name: Deploy checks (prod settings, dummy values)
         run: python manage.py check --deploy --settings=config.settings.prod
         env:
           DJANGO_SETTINGS_MODULE: config.settings.prod
@@ -46,6 +52,17 @@ jobs:
           DEFAULT_FROM_EMAIL: "Spa 99 <ci@example.com>"
           SYSTEM_UNLOCK_CODE: "000000"  # dummy, CI only
           AWS_STORAGE_BUCKET_NAME: ci-only-bucket  # dummy: prod refuses to start without a bucket
+          DOMAIN: spa99.uk
+          OFFICE_DOMAIN: office.spa99.uk
+          SYSTEM_DOMAIN: system.spa99.uk
+          CONTROL_DOMAIN: control.spa99.uk
+          EMAIL_HOST: smtp.postmarkapp.com
+          EMAIL_HOST_USER: ci-only-token
+          EMAIL_HOST_PASSWORD: ci-only-token
+      - name: Image static build (same command as the Dockerfile)
+        run: python manage.py collectstatic --noinput
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.build
       - name: Tests
         run: python manage.py test
 
@@ -56,6 +73,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
+      - name: Tag must be a plain version (1.2.3)
+        run: echo "${{ github.ref_name }}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - name: Log in to Docker Hub
@@ -68,6 +87,8 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64
+          platforms: linux/amd64  # the EC2 server is x86_64; no multi-arch needed
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/spa99:${{ github.ref_name }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/spa99:${{ github.ref_name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/spa99:latest

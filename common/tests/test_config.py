@@ -94,6 +94,7 @@ class StorageAndDatabaseTests(SimpleTestCase):
         storage, _ = build_media_storage(self.env(AWS_STORAGE_BUCKET_NAME="b"), "prod/", "/x", require_credentials=False)
         self.assertNotIn("access_key", storage["OPTIONS"])
         self.assertEqual(storage["OPTIONS"]["location"], "prod/")
+        self.assertEqual(storage["OPTIONS"]["endpoint_url"], "https://s3.eu-west-2.amazonaws.com")
 
     def test_database_defaults_and_description_hide_credentials(self):
         sqlite = build_databases(None, "/tmp/db.sqlite3")
@@ -115,6 +116,13 @@ class ProdSettingsTests(SimpleTestCase):
         "DEFAULT_FROM_EMAIL": "Spa 99 <noreply@example.com>",
         "SYSTEM_UNLOCK_CODE": "493021",
         "AWS_STORAGE_BUCKET_NAME": "spa99-media-test",
+        "DOMAIN": "spa99.uk",
+        "OFFICE_DOMAIN": "office.spa99.uk",
+        "SYSTEM_DOMAIN": "system.spa99.uk",
+        "CONTROL_DOMAIN": "control.spa99.uk",
+        "EMAIL_HOST": "smtp.postmarkapp.com",
+        "EMAIL_HOST_USER": "token-1234",
+        "EMAIL_HOST_PASSWORD": "token-1234",
     }
 
     def import_prod(self, environ):
@@ -140,7 +148,10 @@ class ProdSettingsTests(SimpleTestCase):
         self.assertFalse(settings.DEBUG)
         self.assertEqual(settings.DATABASES["default"]["OPTIONS"]["sslmode"], "require")
         self.assertIn("https://control.spa99.uk", settings.CSRF_TRUSTED_ORIGINS)
-        self.assertEqual(settings.SECURE_HSTS_SECONDS, 0)
+        self.assertEqual(settings.SECURE_HSTS_SECONDS, 3600)  # 1 hour at launch; raised in .env later
+        self.assertFalse(settings.SECURE_HSTS_INCLUDE_SUBDOMAINS)
+        self.assertEqual(settings.SECURE_PROXY_SSL_HEADER, ("HTTP_X_FORWARDED_PROTO", "https"))
+        self.assertTrue(settings.SESSION_COOKIE_SECURE and settings.CSRF_COOKIE_SECURE and settings.SECURE_SSL_REDIRECT)
 
     def test_refuses_missing_or_dev_secret_key(self):
         for secret in (None, "", "dev-insecure-key-not-for-production-use-0123456789abcdef", "change-me-please"):
@@ -204,14 +215,54 @@ class ProdSettingsTests(SimpleTestCase):
         for host in ("spa99.uk", "control.spa99.uk", "localhost", "127.0.0.1", "extra.example.com"):
             self.assertIn(host, settings.ALLOWED_HOSTS)
 
-    def test_prod_refuses_local_media_and_defaults_to_ses(self):
+    def test_prod_refuses_local_media_and_defaults_to_smtp(self):
         environ = {**self.GOOD}
         environ.pop("AWS_STORAGE_BUCKET_NAME")
         with self.assertRaises(ImproperlyConfigured):  # uploads would be lost on the next deploy
             self.import_prod(environ)
         settings = self.import_prod(self.GOOD)
         self.assertFalse(settings.STARTUP_REPORT["media_is_local"])
+        self.assertEqual(settings.EMAIL_BACKEND, "django.core.mail.backends.smtp.EmailBackend")  # Postmark at launch
+
+    def test_smtp_needs_host_user_and_password_but_ses_does_not(self):
+        for key in ("EMAIL_HOST", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD"):
+            environ = {**self.GOOD}
+            environ.pop(key)
+            with self.subTest(key=key), self.assertRaisesRegex(ImproperlyConfigured, key):
+                self.import_prod(environ)
+        ses = {k: v for k, v in self.GOOD.items() if not k.startswith("EMAIL_")}
+        settings = self.import_prod({**ses, "EMAIL_BACKEND": "notifications.backends.SesBackend"})
         self.assertEqual(settings.EMAIL_BACKEND, "notifications.backends.SesBackend")
+
+    def test_refuses_mail_backends_that_do_not_send(self):
+        for backend in ("django.core.mail.backends.console.EmailBackend", "django.core.mail.backends.locmem.EmailBackend"):
+            with self.subTest(backend=backend), self.assertRaises(ImproperlyConfigured):
+                self.import_prod({**self.GOOD, "EMAIL_BACKEND": backend})
+
+    def test_refuses_sqlite_placeholders_and_missing_domains(self):
+        bad = (
+            {"DATABASE_URL": "sqlite:///db.sqlite3"},
+            {"AWS_STORAGE_BUCKET_NAME": "<your-bucket>"},
+            {"DOMAIN": "localhost"},
+            {"OFFICE_DOMAIN": "https://office.spa99.uk"},
+            {"SECRET_KEY": "too-short-but-random-Zx81"},
+        )
+        for change in bad:
+            with self.subTest(change=change), self.assertRaises(ImproperlyConfigured):
+                self.import_prod({**self.GOOD, **change})
+        environ = {**self.GOOD}
+        environ.pop("SYSTEM_DOMAIN")
+        with self.assertRaisesRegex(ImproperlyConfigured, "SYSTEM_DOMAIN"):
+            self.import_prod(environ)
+
+    def test_every_problem_is_listed_at_once_without_values(self):
+        with self.assertRaises(ImproperlyConfigured) as caught:
+            self.import_prod({"SECRET_KEY": "dev-insecure-key-not-for-production-use-0123456789abcdef", "EMAIL_HOST_PASSWORD": "pw-secret-99"})
+        message = str(caught.exception)
+        for key in ("SECRET_KEY", "DATABASE_URL", "SYSTEM_UNLOCK_CODE", "AWS_STORAGE_BUCKET_NAME", "DOMAIN", "EMAIL_HOST_USER"):
+            self.assertIn(key, message)
+        self.assertNotIn("pw-secret-99", message)
+        self.assertNotIn("dev-insecure", message)
 
 
 class CorruptEnvFileTests(SimpleTestCase):
