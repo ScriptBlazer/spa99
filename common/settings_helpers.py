@@ -128,6 +128,9 @@ def prod_config_errors(env, dev_secret_key, default_admin_path, email_backend):
         errors.append("EMAIL_BACKEND prints or drops mail; live must really send (leave it blank for SMTP/Postmark).")
     if email_backend == SMTP_BACKEND:
         missing = [key for key in PROD_SMTP_KEYS if not (env.get(key) or "").strip()]
+        placeholders = [key for key in PROD_SMTP_KEYS if key not in missing and _looks_like_placeholder(env.get(key))]
+        if placeholders:
+            errors.append(f"{', '.join(placeholders)} still hold the placeholder from .env.example.")
         if missing:
             errors.append(f"SMTP email needs {', '.join(missing)} (Postmark: host smtp.postmarkapp.com, user and password = server token).")
         elif (env.get("EMAIL_HOST") or "").strip() == "localhost":
