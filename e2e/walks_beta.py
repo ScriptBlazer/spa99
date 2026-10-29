@@ -825,11 +825,11 @@ def beta_system_refusals(w):
             page.locator("[data-system-signin] button[type=submit]").click()
         assert "/dev-login/" not in page.url
     failed_before = dbtool("events", "unlock_failed")["count"]
-    with w.step("Wrong lock codes: each says how many tries are left (4, 3, 2, 1), the 5th starts a wait, still locked", page):
+    with w.step("Wrong lock codes: each says how many tries are left (5, 4, 3, 2, 1), the 6th starts a wait, still locked", page):
         page.goto(f"{SYSTEM}/plans/")
         page.wait_for_selector("[data-system-unlock]")
         assert page.locator("[data-system-unlock] input[name=password]").count() == 0, "The unlock still asks for a password"
-        for typed, left in (("000000", 4), ("111111", 3), ("123456", 2), ("654321", 1)):
+        for typed, left in (("000000", 5), ("111111", 4), ("123456", 3), ("654321", 2), ("222222", 1)):
             page.locator("[data-system-unlock] input[name=code]").fill(typed)
             with page.expect_navigation():
                 page.locator("[data-system-unlock] button[type=submit]").click()
@@ -843,12 +843,12 @@ def beta_system_refusals(w):
         page.locator("[data-system-unlock] input[name=code]").fill("000001")
         with page.expect_navigation():
             page.locator("[data-system-unlock] button[type=submit]").click()
-        assert "too many tries" in page.locator("[data-lockout]").inner_text().lower(), "No wait message after the 5th wrong try"
+        assert "too many tries" in page.locator("[data-lockout]").inner_text().lower(), "No wait message after the 6th wrong try"
         assert page.locator("[data-system-unlock] input[name=code]").is_disabled(), "The form is not disabled during the wait"
         page.goto(f"{SYSTEM}/plans/")
         assert page.locator("[data-system-plans]").count() == 0, "System opened after wrong codes"
     with w.step("Every failure is in the audit events (unlock_failed), and the audit chain is still intact", page):
-        assert dbtool("events", "unlock_failed")["count"] - failed_before == 5, "Not every failed unlock was logged"
+        assert dbtool("events", "unlock_failed")["count"] - failed_before == 6, "Not every failed unlock was logged"
         code, output = manage("verify_audit_log")
         assert code == 0, output[-400:]
     with w.step("The countdown ends on its own (about a minute), the form comes back, and the right code unlocks", page):

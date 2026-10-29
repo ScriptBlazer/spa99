@@ -49,7 +49,7 @@ Each person's approval emails go to their account email, or to another address c
 
 ## U5. Sign-in
 
-- Members sign in on the website and land in the member area. Team members sign in on their own address (Office, Control, System) and land on its home page. System sign-in is at `/dev-login/` (the old `/login/` is a plain 404), and System then asks only for the lock code. Wrong tries on the System sign-in and unlock show the tries left; 5 wrong in a row wait 1 minute, then each further wrong try adds a minute (cap 60), with a live countdown.
+- Members sign in on the website and land in the member area. Team members sign in on their own address (Office, Control, System) and land on its home page. System sign-in is at `/dev-login/` (the old `/login/` is a plain 404), and System then asks only for the lock code. Wrong tries on the System sign-in and unlock show the tries left; 6 wrong in a row wait 1 minute, then each further wrong try adds a minute (cap 60), with a live countdown.
 - Office sign-in lasts 30 days. System locks after the set idle minutes (default 15) and ends after the set hours (default 12). Member sign-in lasts 2 weeks.
 - No access = a plain "not found" (staff addresses never admit what is there).
 

@@ -23,7 +23,7 @@ from common.audit import client_ip
 
 from .models import WrongTries
 
-FREE_TRIES = 5
+FREE_TRIES = 6  # Moishe 2026-10-29: the first wrong try says "5 more tries"
 MAX_WAIT_MINUTES = 60
 QUIET_SECONDS = 24 * 3600
 

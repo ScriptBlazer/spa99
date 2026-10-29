@@ -5,6 +5,7 @@ from django.core.cache import cache
 from django.test import TestCase, override_settings
 
 from plans.models import SiteSettings
+from system import throttle
 from system.models import SystemChange, SystemEvent
 from system.tests.test_extras import SETTINGS_POST
 from system.tests.test_system import PASSWORD, make_user, sign_in
@@ -50,11 +51,11 @@ class UndoScriptChangeTests(TestCase):
 
     def test_a_wrong_code_is_refused_logged_as_a_failure_and_rate_limited(self):
         change = self.script_change()
-        for _ in range(4):
+        for _ in range(throttle.FREE_TRIES - 1):
             response = self.undo(change, code="000000")
             self.assertEqual((response.status_code, response.json()["needs_code"]), (403, True))
-        self.assertEqual(self.undo(change, code="000000").status_code, 429)  # the 5th wrong try starts the wait
-        self.assertEqual(SystemEvent.objects.filter(kind="undo_code_failed", outcome="failed").count(), 5)
+        self.assertEqual(self.undo(change, code="000000").status_code, 429)  # the last free try starts the wait
+        self.assertEqual(SystemEvent.objects.filter(kind="undo_code_failed", outcome="failed").count(), throttle.FREE_TRIES)
         blocked = self.undo(change, code=CODE)  # even the right code is refused once the limit is spent
         self.assertEqual(blocked.status_code, 429)
         self.assertTrue(SystemEvent.objects.filter(kind="undo_rate_limited", outcome="blocked").exists())
