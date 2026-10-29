@@ -8,6 +8,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from common.audit import client_ip
 from common.ratelimit import hit
+from system import defaults
 
 from . import invites, optout, tokens
 from .models import MailingImage
@@ -39,17 +40,21 @@ def unsubscribe(request, token):
     return render(request, "mailings/unsubscribe.html", {"done": False, "email": _mask(email), "token": token})
 
 
-@login_not_required  # PUBLIC: the personal link in an invite. Sends the person to Register (opened is marked when Register renders).
+@login_not_required  # PUBLIC: the personal link in an invite. Marks it opened, then sends the person to the questionnaire or Register (System > Defaults).
 @require_GET
 def invite_link(request, token):
-    """The session remembers the invite so Register can pre-fill name and email (and mark it opened when it renders). A link that is unknown, expired or not sent yet
-    looks the same as a good one: the person lands on Register."""
+    """The session remembers the invite so the questionnaire's email step and Register can pre-fill name and email. A link that is unknown,
+    expired or not sent yet looks the same as a good one: same redirect, nothing remembered."""
     if not hit("invite-link", client_ip(request) or "unknown", 60, 60):
         return _message(request, "Please wait", "Too many attempts. Please try again in a minute.", status=429)
     invite = invites.good_invite(token)
     if invite is not None:
         request.session[invites.SESSION_KEY] = invite.token
-    return redirect("register")
+        invites.mark_opened(invite)  # a real click (SENT only, once); a mail scanner's GET also counts, an accepted limit
+    to = request.GET.get("to")  # a button in a group mailing picks its own destination; anything else uses the System > Defaults choice
+    if to not in ("journey", "register"):
+        to = defaults.get(request).invite_landing
+    return redirect("register" if to == "register" else "journey")
 
 
 @login_not_required  # PUBLIC: pictures in emails. Mail clients (and their image proxies) fetch these with no session. The id is a random UUID.

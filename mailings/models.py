@@ -59,6 +59,13 @@ class Mailing(BaseModel):
         return self.status in self.EDITABLE
 
     @property
+    def has_personal_links(self):
+        """Does a Button part link to a personal (tracked) link? Then each person gets an Invite row and the send follows the invitation rules."""
+        from .blocks import has_personal
+
+        return has_personal(self.blocks)
+
+    @property
     def schedule_name(self):
         return f"mailing-{self.pk}"
 

@@ -31,12 +31,21 @@ HEADING, PARAGRAPH, BUTTON, IMAGE, DIVIDER, SMALL_PRINT = "heading", "paragraph"
 TYPES = {
     HEADING: {"text": (120, True)},
     PARAGRAPH: {"text": (2000, True)},
-    BUTTON: {"label": (40, True), "url": (URL_MAX, True)},
+    BUTTON: {"label": (40, True), "url": (URL_MAX, True), "link": (20, False)},
     IMAGE: {"image": (36, True), "alt": (200, True), "url": (URL_MAX, False)},
     DIVIDER: {},
     SMALL_PRINT: {"text": (500, True)},
 }
-TEXT_PARTS = (HEADING, PARAGRAPH, SMALL_PRINT)  # {first_name} works here
+TEXT_PARTS = (HEADING, PARAGRAPH, SMALL_PRINT)  # {first_name} works here, and in a button's label
+# What a Button links to: the typed web address (same for everyone), or a personal tracked link (each person's own Invite).
+LINK_URL, LINK_JOURNEY, LINK_REGISTER = "url", "personal_journey", "personal_register"
+LINKS = (LINK_URL, LINK_JOURNEY, LINK_REGISTER)
+PERSONAL_DEST = {LINK_JOURNEY: "journey", LINK_REGISTER: "register"}  # the `to=` of /invite/<token>/?to=
+
+
+def sample_links():
+    """Preview and test: both personal links show the sample address, which explains itself."""
+    return {dest: f"{settings.SITE_URL}/example-link/" for dest in PERSONAL_DEST.values()}
 ONE_LINE = {(HEADING, "text"), (BUTTON, "label"), (IMAGE, "alt"), (BUTTON, "url"), (IMAGE, "url")}
 FIELD_NAMES = {"text": "text", "label": "label", "url": "link", "alt": "alt text", "image": "image"}
 REQUIRED_WORDS = {
@@ -93,6 +102,8 @@ def clean_url(value):
         return "", ""
     if len(url) > URL_MAX:
         return url, f"The link can be at most {URL_MAX} characters."
+    if "{" in url or "}" in url:
+        return url, "Placeholders don't work in links"
     if _BAD_URL_CHARS.search(url):
         return url, URL_HELP
     if url.startswith("/"):
@@ -135,9 +146,23 @@ def _text_errors(kind, name, text):
     limit, _ = TYPES[kind][name]
     if len(text) > limit:
         return [f"The {FIELD_NAMES[name]} can be at most {limit} characters."]
-    if kind in TEXT_PARTS:
+    if kind in TEXT_PARTS or (kind, name) == (BUTTON, "label"):
         return emailbody.validate(emailbody.SPECS["mailing"], body=text).get("body", [])
     return []
+
+
+def link_of(part):
+    """A button's link kind; a part saved before the choice existed is a web address."""
+    return part.get("link") if isinstance(part, dict) and part.get("link") in LINKS else LINK_URL
+
+
+def has_personal(blocks):
+    return any(isinstance(p, dict) and p.get("type") == BUTTON and link_of(p) in PERSONAL_DEST for p in (blocks or []))
+
+
+def personal_links(base):
+    """{"journey": url, "register": url} for one person, from their invite link `base` (.../invite/<token>/)."""
+    return {dest: f"{base}?to={dest}" for dest in PERSONAL_DEST.values()}
 
 
 def _clean_part(part):
@@ -147,7 +172,19 @@ def _clean_part(part):
         return None, {"type": ["Unknown part type."]}
     kind = part["type"]
     cleaned = {"type": kind}
+    link = LINK_URL
+    if kind == BUTTON:
+        link = part.get("link") or LINK_URL
+        if link not in LINKS:
+            errors["link"] = ["Choose what the button links to."]
+            link = LINK_URL
+        cleaned["link"] = link
     for name, (limit, required) in TYPES[kind].items():
+        if name == "link":
+            continue  # checked above
+        if kind == BUTTON and name == "url" and link != LINK_URL:
+            cleaned["url"] = ""  # a personal link needs no web address
+            continue
         value = part.get(name)
         value = value.strip() if isinstance(value, str) else ""
         if kind == PARAGRAPH or kind == SMALL_PRINT:
@@ -205,7 +242,7 @@ def clean(raw):
     cleaned = [part for part in cleaned if part is not None]
     if not any(part["type"] != DIVIDER for part in cleaned) and len(parts) <= MAX_PARTS and "_" not in errors:
         errors["_"] = ["Add at least one part that is not a divider."]
-    if not errors and len(render(cleaned, {"first_name": "Christopher"})[0].encode()) > HTML_MAX:
+    if not errors and len(render(cleaned, {"first_name": "Christopher", "personal_links": sample_links()})[0].encode()) > HTML_MAX:
         errors["_"] = [TOO_LONG]
     return cleaned, errors
 
@@ -255,6 +292,7 @@ def _image(part):
 def render(blocks, values):
     """(body_html, body_text, preheader) for the layout. `values` are the placeholder values ({"first_name": ...}). Unknown parts are skipped."""
     html, text, paragraphs, others = [], [], [], []
+    values = {**values, "first_name": str(values.get("first_name") or "").strip() or "there"}  # no name: "Hi there," not "Hi ,"
     for part in blocks or []:
         kind = part.get("type") if isinstance(part, dict) else None
         if kind in TEXT_PARTS:
@@ -264,10 +302,16 @@ def render(blocks, values):
             html.append(str(part_html))
             text.append(part_text)
             (paragraphs if kind == PARAGRAPH else others).append(part_text)
-        elif kind == BUTTON and part.get("label") and part.get("url"):
-            url = absolute_url(part["url"])
-            html.append(emailbody._button_html(url, part["label"], True))
-            text.append(f"{part['label']}:\n{url}")
+        elif kind == BUTTON and part.get("label") and (part.get("url") or link_of(part) in PERSONAL_DEST):
+            if link_of(part) in PERSONAL_DEST:
+                url = (values.get("personal_links") or {}).get(PERSONAL_DEST[link_of(part)], "")
+            else:
+                url = absolute_url(part["url"])
+            if not url:
+                continue  # a personal link with no invite (never sent this way): no button rather than a broken one
+            label = " ".join(part["label"].replace("{first_name}", values["first_name"]).split())
+            html.append(emailbody._button_html(url, label, True))
+            text.append(f"{label}:\n{url}")
         elif kind == IMAGE and part.get("image"):
             html.append(_image(part))
             link = f"\n{absolute_url(part['url'])}" if part.get("url") else ""

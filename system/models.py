@@ -262,6 +262,7 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
     model never imports the Office)."""
 
     GOLD_NUDGES = [("panel", "Panel"), ("line", "One line"), ("none", "Nothing")]
+    INVITE_LANDINGS = [("journey", "The questionnaire"), ("register", "Register")]
 
     singleton_key = models.CharField(max_length=10, default="site", unique=True, editable=False)
 
@@ -297,6 +298,8 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
 
     # Emails
     register_invite_days = _number("Register invite link valid (days)", 30, 1, 365, "A new value applies to invites made from now on; invites already sent keep their date.")
+    invite_landing = models.CharField("Invitation link goes to", max_length=10, choices=INVITE_LANDINGS, default="journey", db_default="journey",
+                                      help_text="Where the button in 'Invitation to register' takes people.")
     recent_mailings = _number("Recent mailings shown", 5, 1, 50)
     recent_batches = _number("Recent invite batches shown", 5, 1, 50)
 

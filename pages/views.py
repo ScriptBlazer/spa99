@@ -152,7 +152,17 @@ def _copy(page_key, keys):
     }
 
 
+def _invite_email(request):
+    """The email of the invite in this browser's session ('' when none, or it is no longer good). Marks nothing."""
+    from mailings import invites
+
+    token = request.session.get(invites.SESSION_KEY)
+    invite = invites.good_invite(token) if token else None
+    return invite.email if invite is not None else ""
+
+
 @login_not_required  # PUBLIC: the guided journey (JSON endpoints do the saving; this is the shell)
+@never_cache  # the page carries this browser's invite email
 @ensure_csrf_cookie
 @require_GET
 def journey(request, slug=""):
@@ -173,6 +183,7 @@ def journey(request, slug=""):
         "membershipsHidden": not shown,
         "whatsappUrl": short_url("journey"),  # '' while no WhatsApp link is set: the result then shows no line
         "emailGate": SiteSettings.load().journey_email_gate,
+        "inviteEmail": _invite_email(request),  # from a personal invite link: starts the email step filled in (still editable)
         "signedIn": request.user.is_authenticated,  # "Not you?" is for shared devices, never for a known person
         "goldFeeNote": plan_services.gold_fee_note(),  # shown under the Gold panel; '' while the fee is empty
     }

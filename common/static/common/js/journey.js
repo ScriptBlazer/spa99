@@ -349,6 +349,7 @@ function renderGate() {
   const input = el('input', { id: 'lead-email', name: 'email', type: 'email', class: 'input', autocomplete: 'email', inputmode: 'email', 'aria-describedby': 'lead-email-msg' });
   const emailMsg = el('p', { class: 'feedback', id: 'lead-email-msg', 'aria-live': 'polite', 'data-state': 'hint' });
   const consent = el('input', { type: 'checkbox', id: 'lead-consent', name: 'consent', 'aria-describedby': 'lead-consent-msg' });
+  if (config.inviteEmail) input.value = config.inviteEmail; // from a personal invite link; he can change it. The consent box is never ticked for him.
   const consentMsg = el('p', { class: 'feedback', id: 'lead-consent-msg', 'aria-live': 'polite', 'data-state': 'hint' });
   const primary = el('button', { type: 'submit', class: 'btn btn-primary', 'data-gate-primary': '' }, g.cta || '', ' ', arrowIcon());
   const back = el('button', { type: 'button', class: 'btn-quiet', 'data-back': '', text: copyOf('back').cta });

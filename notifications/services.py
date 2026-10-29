@@ -53,7 +53,7 @@ def render_editable(key, context, body=None, values=None, button_url=None):
     if values is None:
         values = emailbody.values_for(spec, context)
     url = button_url if button_url is not None else (context or {}).get("url", "")
-    return emailbody.render(spec, text, values, button_url=url)
+    return emailbody.render(spec, text, values, button_url=url, button_label=emailbody.button_label_for(spec))
 
 
 def render_email(template, ctx, body=None, values=None, button_url=None, blocks=None):
@@ -64,7 +64,9 @@ def render_email(template, ctx, body=None, values=None, button_url=None, blocks=
     if blocks and template == "mailing":  # a group mailing built from parts (mailings/blocks.py); no parts = the old body
         from mailings import blocks as mailing_blocks
 
-        ctx["body_html"], ctx["body_text"], preheader = mailing_blocks.render(blocks, values if values is not None else emailbody.values_for(spec, ctx))
+        shown = dict(values if values is not None else emailbody.values_for(spec, ctx))
+        shown.setdefault("personal_links", ctx.get("personal_links") or {})  # each person's own tracked links, when the parts have them
+        ctx["body_html"], ctx["body_text"], preheader = mailing_blocks.render(blocks, shown)
         ctx.setdefault("preheader", preheader)
         layout = "_body"
     elif ctx.get("plain_body") is not None:  # words typed by a person, sent as typed (the Gold decline message)
@@ -101,6 +103,10 @@ def preview_email(key, subject, body, extra=None, blocks=None):
     values = emailbody.sample_values(spec)
     ctx = {**base_context(), "subject": fill_subject(subject, values), "url": f"{settings.SITE_URL}/example-link/",
            **_staff_sample_context(key), **(extra or {})}
+    if blocks:  # a personal-link button shows the sample link in a preview
+        from mailings import blocks as mailing_blocks
+
+        ctx.setdefault("personal_links", mailing_blocks.sample_links())
     html, text = render_email(key, ctx, body=body if body and body.strip() else spec.default_body, values=values, blocks=blocks)
     return {"subject": ctx["subject"], "html": html, "text": text}
 

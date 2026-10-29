@@ -42,14 +42,18 @@ const LIST_WORDS = { 'Add at least one part that is not a divider.': 'Add someth
 
 /* ---------- field specs: what each part shows (the limits come from the server, as block_types) ---------- */
 
+const LINK_CHOICES = [['url', 'Web address'], ['personal_journey', 'Personal link: questionnaire'], ['personal_register', 'Personal link: Register']];
+
 const SPECS = {
-  heading: { label: 'Heading', fields: [{ name: 'text', label: 'Text', control: 'line', place: true }] },
-  paragraph: { label: 'Paragraph', fields: [{ name: 'text', label: 'Text', control: 'area', rows: 5, place: true, hint: 'A blank line starts a new paragraph.' }] },
+  heading: { label: 'Heading', fields: [{ name: 'text', label: 'Text', control: 'line', place: true, hint: 'You can use {first_name}.' }] },
+  paragraph: { label: 'Paragraph', fields: [{ name: 'text', label: 'Text', control: 'area', rows: 5, place: true, hint: 'A blank line starts a new paragraph. You can use {first_name}.' }] },
   button: {
     label: 'Button',
     fields: [
-      { name: 'label', label: 'Label', control: 'line', hint: 'Short, like Book your visit.' },
-      { name: 'url', label: 'Link', control: 'url', hint: 'A full address (https://...) or a page on the site, like /memberships/.' },
+      { name: 'label', label: 'Label', control: 'line', place: true, hint: 'Short, like Book your visit. You can use {first_name}.' },
+      { name: 'link', label: 'Link to', control: 'select', options: LINK_CHOICES, fallback: 'url',
+        hint: 'A personal link is made for each person, so you can see who opened it and who registered. Only for uploaded lists and journey leads.' },
+      { name: 'url', label: 'Web address', showWhen: 'url', control: 'url', hint: 'A full address (https://...) or a page on the site, like /memberships/.' },
     ],
   },
   image: {
@@ -61,7 +65,7 @@ const SPECS = {
     ],
   },
   divider: { label: 'Divider', fields: [], note: 'A thin line between sections.' },
-  small_print: { label: 'Small print', fields: [{ name: 'text', label: 'Text', control: 'area', rows: 3, place: true, hint: 'Shown small and grey, for terms or details.' }] },
+  small_print: { label: 'Small print', fields: [{ name: 'text', label: 'Text', control: 'area', rows: 3, place: true, hint: 'Shown small and grey, for terms or details. You can use {first_name}.' }] },
 };
 
 /** deps: { known (Set of placeholder names), drawTokens, insertAt, csrf, onChange(kind) } where kind is 'structure' | 'field' | 'image'. */
@@ -112,7 +116,7 @@ export function initBuilder(form, deps) {
     const kind = SPECS[raw?.type] ? raw.type : null;
     if (!kind) return null;
     const data = {};
-    SPECS[kind].fields.forEach((f) => { data[f.name] = typeof raw[f.name] === 'string' ? raw[f.name] : ''; });
+    SPECS[kind].fields.forEach((f) => { data[f.name] = typeof raw[f.name] === 'string' && raw[f.name] ? raw[f.name] : (f.fallback || ''); });
     return { key: ++counter, type: kind, data, errors: {}, touched: new Set(), editing: '', up: null, imgError: null, el: null, refs: {} };
   }
 
@@ -150,7 +154,8 @@ export function initBuilder(form, deps) {
 
   function buildField(part, f) {
     const id = `se-p${part.key}-${f.name}`;
-    const row = h('div', { class: 'sys-row se-field', 'data-field': f.name });
+    const row = h('div', { class: 'sys-row se-field', 'data-field': f.name, ...(f.showWhen ? { 'data-show-when': f.showWhen } : {}) });
+    if (f.showWhen) row.hidden = part.data.link !== f.showWhen;
     if (f.control === 'image') {
       const host = h('div', { class: 'se-image', 'data-se-image': true });
       part.refs.image = host;
@@ -160,7 +165,11 @@ export function initBuilder(form, deps) {
     const label = h('label', { for: id }, f.label, f.optional ? h('small', { text: 'Optional' }) : null);
     const wrap = h('div');
     let control;
-    if (f.control === 'area') {
+    if (f.control === 'select') {
+      control = h('select', { id }, ...f.options.map(([value, text]) => h('option', { value, text })));
+      control.value = part.data[f.name];
+      wrap.append(control);
+    } else if (f.control === 'area') {
       const pre = h('pre', { class: 'se-pre', 'aria-hidden': 'true' });
       control = h('textarea', { id, rows: f.rows, spellcheck: 'true' });
       control.value = part.data[f.name];
@@ -185,8 +194,10 @@ export function initBuilder(form, deps) {
     part.refs[`err-${f.name}`] = errorNode;
     if (count) part.refs[`count-${f.name}`] = count;
 
+    const showLinkFields = () => $$('[data-show-when]', part.el).forEach((node) => { node.hidden = part.data.link !== node.dataset.showWhen; });
     control.addEventListener('input', () => {
       part.data[f.name] = control.value;
+      if (f.name === 'link') showLinkFields();
       part.editing = f.name;
       part.errors[f.name] = []; // an error clears on that field's next input
       paintErrors();

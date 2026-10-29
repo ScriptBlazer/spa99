@@ -417,9 +417,14 @@ function initComposer(form) {
     },
   });
   // The parts of the email (system-email-builder.js): kept as JSON in the hidden `blocks` input, previewed and saved as such.
+  let hadPersonal = false;
   const builder = initBuilder(form, {
     known: known.body, drawTokens, insertAt, csrf,
-    onChange: () => { dirty = true; typed = true; refreshBar(); preview.soon(); },
+    onChange: () => {
+      dirty = true; typed = true; refreshBar(); preview.soon();
+      const personal = /personal_/.test($('[data-se-blocks]', form)?.value || '');
+      if (personal !== hadPersonal) { hadPersonal = personal; countAll(); } // a personal link changes who can get it (account groups are refused)
+    },
     locked: () => showLocked('System locked. Unlock it in another tab, then upload the image again.'),
   });
   const params = () => new URLSearchParams({ subject: fields.subject.value, blocks: builder.json(), kind: kind(), group: group() });
@@ -442,6 +447,7 @@ function initComposer(form) {
     const mine = (cardSeq[key] = (cardSeq[key] || 0) + 1);
     if (asChosen) { counting = true; countError = ''; paintCount(); }
     const query = new URLSearchParams({ group: key, kind: kind(), ...optionsOf(key) });
+    if (/personal_/.test($('[data-se-blocks]', form)?.value || '')) query.set('personal', '1'); // a personal-link button follows the invitation rules
     const result = await call(`${form.dataset.countUrl}?${query}`, { method: 'GET' });
     if (mine !== cardSeq[key] || result.aborted) return;
     if (result.locked) showLocked('System locked. Unlock it in another tab to see how many people get this.');

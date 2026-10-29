@@ -134,3 +134,14 @@ Code: `mailings/blocks.py` (parts), `mailings/images.py` (pictures), `system/vie
 ## Uploaded lists and Invitation (2026-10-29)
 - The Who cards now include **Uploaded list** (option `list_id`, a select of the saved lists). A list gets News only from this composer: a Service message to a list is refused by the live count (`errors.group`) and by the server. `kind` also has the value `invitation` (max length 12 now, also on templates), used only by a group send of the "Invitation to register" email (`Mailing.automatic_key = "invite"`), never typed in the composer (the form refuses it).
 - **Send** on the composer saves the draft, then asks the server for the pop-up summary (`GET /emails/mailings/<id>/confirm/`) and posts `confirm=yes` with the `expected_count` it showed to `/send/` or `/schedule/`. The server refuses without them. See docs/features/system-emails.md.
+
+
+## Personal links and {first_name} (1.0.2, 2026-10-29)
+
+Moishe: the builder must do tracked personal links itself; the automatic "Invitation to register" is one ready-made version.
+
+- **Button part: `link`.** `url` (Web address, the same for everyone; the default, and what parts saved earlier mean), `personal_journey` ("Personal link: questionnaire") or `personal_register` ("Personal link: Register"). Validated in `blocks.clean` (anything else is an error on the part's `link`); a personal link needs no web address and the stored `url` is blanked. Helpers: `blocks.has_personal`, `link_of`, `personal_links`, `sample_links`; `Mailing.has_personal_links` is computed, nothing is stored.
+- **`{first_name}`** (the existing placeholder mechanism, `emailbody`) works in heading, paragraph, small print and now the **button label** (validated the same way). With no first name it becomes "there" ("Hi there,"), the same fallback as subjects.
+- **Builder screen.** The Button part has a "Link to" select; the web address field is hidden unless "Web address". Text parts say "You can use {first_name}." and the button label takes the placeholder palette.
+- **Preview and Send me a test** show the tester's own first name (preview: James) and `/example-link/` for personal links (it explains itself); no Invite row is made. The live count (`GET /emails/mailings/count/?personal=1`) and the saved-draft count apply the invitation rules.
+- **Sending** works like an invitation: see "Personal links in group mailings" in `docs/features/system-emails.md` (Invite per person, `/invite/<token>/?to=journey|register`, News or Invitation kind, uploaded lists and Journey leads only, account groups refused with "Personal links are for people without an account. Use a web address for this group.", members and already invited skipped, unsubscribe always, idempotent).
