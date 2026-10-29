@@ -13,7 +13,11 @@ Run these in order. Live starts with an empty database, so it needs no backfills
 
 4. **Postgres (RDS):** create the database and turn on automatic daily backups (7 days or more). Allow connections from the server only (security group). Copy the connection string; it goes in `DATABASE_URL`. If the password has symbols, URL-encode it.
 5. **S3:** create a private bucket for uploaded files. The site refuses to start without one.
-6. **Server (EC2):** install Docker. In the security group, open ports 80 and 443 only.
+6. **Server (EC2):** prepare it with the setup script (`scripts/server/`, details in its README). In the security group, allow port 22 (your IP only), 80 and 443.
+   - From your Mac, in the repo: `scp -r scripts/server spa99:~/server-setup`, then `ssh spa99 'sudo bash ~/server-setup/bootstrap.sh'`. It installs updates, Docker (logs capped), 2 GB swap, fail2ban, key-only SSH, `~/spa99` and `~/scripts`, and the cron jobs. Safe to run again.
+   - Log out and back in (so the docker group applies).
+   - Alerts: create a Telegram bot with @BotFather, find your chat id, put both in `~/scripts/.alert.env` (see the README), then run `~/scripts/alert.sh --test` and check the message arrives.
+   - Run `~/scripts/server-health.sh` and read it through. (The site and certificate lines fail until step 12, that is expected.)
    - Set the instance metadata hop limit to **2**. Without this, the containers can't use the server's role, so S3 and SES fail.
    - Give the server role a policy with:
      - `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` and `s3:ListBucket` on the bucket
@@ -95,7 +99,7 @@ Run these in order. Live starts with an empty database, so it needs no backfills
 
 - **Soft launch:** keep Memberships hidden. People get the journey and the email gate and can register. Turn Memberships on only when prices are final.
 - **Stay off the server for 2 days:** no new features or deploys for the first 48 hours. Only urgent fixes.
-- **Uptime alert:** add a free check (UptimeRobot or Better Stack) on `https://spa99.uk/health/` that emails you if the site goes down.
+- **Uptime alert:** the server alerts itself by Telegram (step 6), but it cannot tell you if the whole server is off. Add a free outside check (UptimeRobot or Better Stack) on `https://spa99.uk/health/` that emails you if the site goes down.
 - **Cloudflare:** turn on "Always use HTTPS". Keep Bot Fight Mode off (step 18).
 - **Real phone test:** do the journey, register and apply for Gold on an iPhone and an Android, not just your Mac.
 - **Tell Barry:** where the Office is and how Gold approvals arrive.
