@@ -74,13 +74,13 @@ class GoldWordingTests(TestCase):
         open_memberships()
 
     def test_the_gold_card_is_for_bml_clients_everywhere_it_is_described(self):
-        said = "For BML clients: past, present and future."
-        self.assertIn(said, Client().get("/gold-card/").content.decode())
-        self.assertIn(said, Client().get("/").content.decode())
-        self.assertIn("The Gold Card is for BML clients: past, present and future.", Client().get("/memberships/").content.decode())
+        said = "a free membership"
+        self.assertIn("A free membership* for BML clients, past, present and future, by approval.", Client().get("/gold-card/").content.decode())
+        self.assertIn("A free membership* for BML clients, past, present and future, by approval.", Client().get("/").content.decode())
+        self.assertIn("The Gold Card: a free membership* for BML clients, past, present and future, by approval.", Client().get("/memberships/").content.decode())
         self.assertIn("for BML clients", Section.objects.get(page__key="memberships", key="gold_line").body)
-        self.assertIn("Not a BML client yet? You&#x27;re still welcome to apply.", Client().get("/gold-card/").content.decode())
-        self.assertIn("for BML clients: past, present and future", Page.objects.get(key="gold").meta_description)
+        self.assertIn("Every application is reviewed personally. Not a BML client yet? You&#x27;re still welcome to apply.", Client().get("/gold-card/").content.decode())
+        self.assertIn("for BML clients, past, present and future, by approval", Page.objects.get(key="gold").meta_description)
         self.assertIn(said.lower(), Plan.objects.get(slug="gold").short_description.lower())
         self.assertIn(said.lower(), Section.objects.get(page__key="journey", key="gold_panel").body.lower())
         self.assertIn(said.lower(), Section.objects.get(page__key="journey", key="gold_line").body.lower())
@@ -111,15 +111,15 @@ class BackfillTests(TestCase):
             self.assertEqual(SiteSettings.load().whatsapp_number, "", url)
 
     def test_the_gold_copy_is_updated_on_exact_old_wording_only_and_once(self):
-        for page_key, key, field, old, new in backfill.OLD_GOLD_SECTIONS:
-            Section.objects.filter(page__key=page_key, key=key).update(**{field: old})
-        Page.objects.filter(key="gold").update(meta_description=backfill.OLD_GOLD_META[1])
-        Plan.objects.filter(slug="gold").update(short_description=backfill.OLD_GOLD_PLAN[0])
-        FaqItem.objects.filter(question="What is the Gold Card?").update(answer=backfill.OLD_GOLD_FAQ[0])
+        for page_key, key, field, olds, new in backfill.OLD_GOLD_SECTIONS:
+            Section.objects.filter(page__key=page_key, key=key).update(**{field: olds[0]})  # the original live wording
+        Page.objects.filter(key="gold").update(meta_description=backfill.OLD_GOLD_META[1][0])
+        Plan.objects.filter(slug="gold").update(short_description=backfill.OLD_GOLD_PLAN[0][0])
+        FaqItem.objects.filter(question="What is the Gold Card?").update(answer=backfill.OLD_GOLD_FAQ[0][0])
         Section.objects.filter(page__key="gold", key="who_note").update(body="Not in property? You're still welcome (edited by hand).")  # edited: kept
         text = run_backfill()
         self.assertIn("content.Section (Gold: for BML clients)", text)
-        for page_key, key, field, old, new in backfill.OLD_GOLD_SECTIONS:
+        for page_key, key, field, olds, new in backfill.OLD_GOLD_SECTIONS:
             expected = "Not in property? You're still welcome (edited by hand)." if key == "who_note" else new
             self.assertEqual(getattr(Section.objects.get(page__key=page_key, key=key), field), expected, key)
         self.assertEqual(Page.objects.get(key="gold").meta_description, backfill.OLD_GOLD_META[2])

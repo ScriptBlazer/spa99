@@ -56,7 +56,7 @@ PLANS = [
             {"key": "events", "label": "BML members' events", "value": "Yes", "phrase": "BML members' events",
              "note": GOLD_PERK_NOTES["events"]},
         ],
-        "short_description": "Free{gold_star}, by application. For BML clients: past, present and future.", "order": 4,
+        "short_description": "A free membership{gold_star} for BML clients, past, present and future, by approval.", "order": 4,
     },
     {
         "slug": "single-visit", "name": "Single visit", "kind": Plan.ONE_OFF, "price_ex_vat": Decimal("99.00"),

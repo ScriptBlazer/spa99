@@ -208,31 +208,22 @@ def _midlands(changed):
         changed["gold.GoldApplication (location Rest of London becomes Midlands)"] += 1
 
 
-BML_CLIENTS = "For BML clients: past, present and future."
-OLD_GOLD_SECTIONS = [  # page key, section key, field, old value, new value (2026-10-29)
-    ("home", "gold_teaser", "body", "For people in property. Free{gold_star}, by application.", f"{BML_CLIENTS} Free{{gold_star}}, by application."),
-    ("memberships", "gold_line", "body", "There is also the Gold Card, for people in property.", "There is also the Gold Card, for BML clients: past, present and future."),
-    ("memberships", "gold_cta", "body", "The Gold Card is free{gold_star}, by application.",  # the line the Memberships page actually shows
-     f"The Gold Card is for BML clients: past, present and future. Free{{gold_star}}, by application."),
-    ("gold", "hero", "body", "For people who own, build and manage property. Free{gold_star}, by application.", f"{BML_CLIENTS} Free{{gold_star}}, by application."),
+GOLD_LINE = "A free membership{gold_star} for BML clients, past, present and future, by approval."
+OLD_GOLD_SECTIONS = [  # page key, section key, field, old values (the original, then the brief interim wording), new value (2026-10-29)
+    ('home', 'gold_teaser', "body", ('For people in property. Free{gold_star}, by application.', 'For BML clients: past, present and future. Free{gold_star}, by application.'), 'A free membership{gold_star} for BML clients, past, present and future, by approval.'),
+    ('memberships', 'gold_line', "body", ('There is also the Gold Card, for people in property.', 'There is also the Gold Card, for BML clients: past, present and future.'), 'There is also the Gold Card, a free membership for BML clients, by approval.'),
+    ('memberships', 'gold_cta', "body", ('The Gold Card is free{gold_star}, by application.', 'The Gold Card is for BML clients: past, present and future. Free{gold_star}, by application.'), 'The Gold Card: a free membership{gold_star} for BML clients, past, present and future, by approval.'),
+    ('gold', 'hero', "body", ('For people who own, build and manage property. Free{gold_star}, by application.', 'For BML clients: past, present and future. Free{gold_star}, by application.'), 'A free membership{gold_star} for BML clients, past, present and future, by approval.'),
+    ('gold', 'who_note', "body", ("Not in property? You're still welcome to apply.", "Not a BML client yet? You're still welcome to apply."), "Every application is reviewed personally. Not a BML client yet? You're still welcome to apply."),
+    ('journey', 'gold_panel', "body", ("With your line of work, you may be invited to hold the Gold Card. It's free{gold_star}, by application, and your answers come with you.", "The Gold Card is for BML clients: past, present and future. It's free{gold_star}, by application, and your answers come with you."), 'The Gold Card is a free membership{gold_star} for BML clients, past, present and future, by approval. Your answers come with you.'),
+    ('journey', 'gold_line', "body", ('You may be eligible for the Gold Card.', 'The Gold Card is for BML clients: past, present and future.'), 'The Gold Card: a free membership for BML clients, by approval.'),
     ("gold", "who", "body",
-     "Owners and investors\nDevelopers\nBlock, estate and portfolio managers\nPeople at property and management firms\nAgents and brokers\nProperty lawyers",
+     ("Owners and investors\nDevelopers\nBlock, estate and portfolio managers\nPeople at property and management firms\nAgents and brokers\nProperty lawyers",),
      "Current BML clients\nPast BML clients\nFuture BML clients"),
-    ("gold", "who_note", "body", "Not in property? You're still welcome to apply.", "Not a BML client yet? You're still welcome to apply."),
-    ("journey", "gold_panel", "body",
-     "With your line of work, you may be invited to hold the Gold Card. It's free{gold_star}, by application, and your answers come with you.",
-     "The Gold Card is for BML clients: past, present and future. It's free{gold_star}, by application, and your answers come with you."),
-    ("journey", "gold_line", "body", "You may be eligible for the Gold Card.", "The Gold Card is for BML clients: past, present and future."),
 ]
-OLD_GOLD_META = ("gold", "The Spa 99 Gold Card: free{gold_star}, by application, for people in property.",
-                 "The Spa 99 Gold Card: free{gold_star}, by application, for BML clients: past, present and future.")
-OLD_GOLD_PLAN = ("Free{gold_star}, by application. For people in property.", f"Free{{gold_star}}, by application. {BML_CLIENTS}")
-OLD_GOLD_FAQ = (
-    "The Gold Card is for people who own, build and manage property: owners and investors, developers, block, estate and portfolio "
-    "managers, people at property and management firms, agents and brokers, and property lawyers. Not in property? You are still welcome to apply. It holds "
-    "the fullest membership, and a little more. It is by application: each application is read personally, and if it is a fit, we invite you.",
-    "The Gold Card is for BML clients: past, present and future. Not a BML client yet? You are still welcome to apply. It holds "
-    "the fullest membership, and a little more. It is by application: each application is read personally, and if it is a fit, we invite you.")
+OLD_GOLD_META = ("gold", ('The Spa 99 Gold Card: free{gold_star}, by application, for people in property.', 'The Spa 99 Gold Card: free{gold_star}, by application, for BML clients: past, present and future.'), 'The Spa 99 Gold Card: a free membership for BML clients, past, present and future, by approval.')
+OLD_GOLD_PLAN = (('Free{gold_star}, by application. For people in property.', 'Free{gold_star}, by application. For BML clients: past, present and future.'), GOLD_LINE)
+OLD_GOLD_FAQ = (('The Gold Card is for people who own, build and manage property: owners and investors, developers, block, estate and portfolio managers, people at property and management firms, agents and brokers, and property lawyers. Not in property? You are still welcome to apply. It holds the fullest membership, and a little more. It is by application: each application is read personally, and if it is a fit, we invite you.', 'The Gold Card is for BML clients: past, present and future. Not a BML client yet? You are still welcome to apply. It holds the fullest membership, and a little more. It is by application: each application is read personally, and if it is a fit, we invite you.'), 'The Gold Card is a free membership for BML clients, past, present and future, by approval. Every application is reviewed personally, so being a BML client does not make it automatic. Not a BML client yet? You are still welcome to apply. It holds the fullest membership, and a little more. If it is a fit, we invite you.')
 WA_LINK = re.compile(r"^https://wa\.me/(\d{8,15})/?$")
 
 
@@ -242,21 +233,21 @@ def _whatsapp_and_gold_2026_10_29():
     from plans.models import SiteSettings
 
     changed = Counter()
-    for page_key, key, field, old, new in OLD_GOLD_SECTIONS:
-        for section in Section.objects.filter(page__key=page_key, key=key, **{field: old}):
+    for page_key, key, field, olds, new in OLD_GOLD_SECTIONS:
+        for section in Section.objects.filter(page__key=page_key, key=key, **{f"{field}__in": olds}):
             setattr(section, field, new)
             section.save()
             changed["content.Section (Gold: for BML clients)"] += 1
-    key, old, new = OLD_GOLD_META
-    for page in Page.objects.filter(key=key, meta_description=old):
+    key, olds, new = OLD_GOLD_META
+    for page in Page.objects.filter(key=key, meta_description__in=olds):
         page.meta_description = new
         page.save()
         changed["content.Page (Gold meta description)"] += 1
-    for plan in Plan.objects.filter(slug="gold", short_description=OLD_GOLD_PLAN[0]):
+    for plan in Plan.objects.filter(slug="gold", short_description__in=OLD_GOLD_PLAN[0]):
         plan.short_description = OLD_GOLD_PLAN[1]
         plan.save()
         changed["plans.Plan (Gold short description)"] += 1
-    for item in FaqItem.objects.filter(question="What is the Gold Card?", answer=OLD_GOLD_FAQ[0]):
+    for item in FaqItem.objects.filter(question="What is the Gold Card?", answer__in=OLD_GOLD_FAQ[0]):
         item.answer = OLD_GOLD_FAQ[1]
         item.save()
         changed["chat.FaqItem (What is the Gold Card?)"] += 1

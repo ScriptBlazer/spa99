@@ -129,7 +129,7 @@ def _rooms():
 def _gold():
     facts = page_services.gold_facts()
     out = ["THE GOLD CARD",
-           "By application, for BML clients: past, present and future (others may apply too). Each application is read by a person, and only the team decides. "
+           "By approval: a free membership for BML clients, past, present and future (others may apply too). Each application is read by a person, and only the team decides. "
            "Never say whether someone will be accepted. Apply at /gold-card/apply/."]
     if facts:
         out.append("- " + "; ".join(f"{f['value']} {f['label']}" for f in facts["figures"]) + ".")
