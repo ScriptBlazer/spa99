@@ -60,9 +60,11 @@ Run these in order. Live starts with an empty database, so it needs no backfills
 
 ## D. First data (once only, straight after step 12)
 
-14. `docker compose run --rm web python manage.py seed_phase1`. It loads plans, facilities and site text, and only adds rows that are missing.
-15. `docker compose run --rm web python manage.py setup_roles`. It creates the team levels and approval groups.
-16. `docker compose run --rm web python manage.py createsuperuser`. Use your own email and a strong password.
+**Before this step, email must work** (step 7 done, Postmark domain verified). In Postmark, check the domain shows as verified (DKIM and Return-Path green). Until Postmark approves the account, mail only reaches @spa99.uk addresses, which is fine for moishe@ and barry@.
+
+14. Preview: `docker compose run --rm web python manage.py setup_live --dry-run`. It lists everything it would set and sends nothing.
+15. Run it: `docker compose run --rm web python manage.py setup_live`. It loads the starting data (seed), the team levels, creates moishe@spa99.uk (Developer + Final approver) and barry@spa99.uk (Admin + Approver) with no password, and fills contact email, Gold CC, WhatsApp link and the payment alert address. It refuses to run if email is not set up (the invites would never arrive).
+16. Check the output ends with "invite sent" for both. Open the "You've been added to the Spa 99 team" email and choose your password within 1 hour (expired: use Forgot password on spa99.uk). Then sign in at `https://system.spa99.uk/dev-login/`. No `createsuperuser` needed.
 
 ## E. Checks, then switch Cloudflare on
 

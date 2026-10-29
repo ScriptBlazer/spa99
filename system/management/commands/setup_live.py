@@ -12,6 +12,7 @@ Not a migration, on purpose (data and seeds never go in migrations).
 """
 from io import StringIO
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
@@ -27,6 +28,9 @@ from system import audit
 from system.models import SiteDefaults, SystemEvent
 from system.services import ChangeRefused, record_direct, save_logged
 from users.management.commands.create_team_member import make_member
+
+# Backends that never deliver: a real run refuses them, so the team invites can't silently go nowhere.
+NO_EMAIL_BACKENDS = {"django.core.mail.backends.console.EmailBackend", "django.core.mail.backends.dummy.EmailBackend"}
 
 # ======================================================================================================================
 # THE LIVE VALUES. Edit them here and nowhere else (never in app code). Everything below this block is logic only.
@@ -53,9 +57,14 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true", help="Show what would be done; change nothing and send nothing.")
+        parser.add_argument("--no-email-check", action="store_true", help="Run even though email only prints or drops mail (the invites will not arrive).")
 
     def handle(self, *args, **options):
         self.dry = options["dry_run"]
+        if not self.dry and not options["no_email_check"] and settings.EMAIL_BACKEND in NO_EMAIL_BACKENDS:
+            raise CommandError("Email is not set up (EMAIL_BACKEND only prints or drops mail), so the team invites would never arrive. "
+                               "Set up Postmark first (docs/GO-LIVE.md step 7), send yourself a test, then run this again. "
+                               "--no-email-check runs it anyway (then use Forgot password once email works).")
         self.problems = self.changed = self.left = 0
         self.invites = []
         try:

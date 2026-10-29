@@ -30,6 +30,17 @@ class SetupLiveTests(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             return run(*args)
 
+    def test_a_real_run_refuses_when_email_only_prints(self):
+        from django.core.management.base import CommandError
+        with self.settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend"):
+            with self.assertRaisesMessage(CommandError, "Email is not set up"):
+                run()
+            self.assertFalse(User.objects.filter(email="moishe@spa99.uk").exists())
+            self.assertIn("Dry run", run("--dry-run"))  # the preview still works
+            with self.captureOnCommitCallbacks(execute=True):
+                run("--no-email-check")
+        self.assertTrue(User.objects.filter(email="moishe@spa99.uk").exists())
+
     def test_a_dry_run_writes_nothing_and_sends_nothing(self):
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             text = run("--dry-run")
