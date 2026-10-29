@@ -1,5 +1,7 @@
 # Live stack: Caddy (HTTPS) -> web (gunicorn) + worker (background jobs). The database is managed PostgreSQL
-# (DATABASE_URL in .env), never a container. Image is built by GitHub Actions and pulled by tag.
+# (DATABASE_URL in .env), never a container; uploads live in S3. The image is built by GitHub Actions and pulled by tag:
+# change APP_TAG in .env, then `docker compose pull && docker compose up -d`. Nothing is ever built on the server.
+# The only data on the server: .env and Caddy's certificates (the caddy_data / caddy_config volumes).
 # Docker keeps each container's log in a file that otherwise grows forever: cap it at 5 x 10 MB per container.
 x-logging: &logging
   driver: json-file
@@ -14,10 +16,10 @@ services:
     restart: unless-stopped
     ports: ["80:80", "443:443"]
     environment:
-      DOMAIN: ${DOMAIN}
-      CONTROL_DOMAIN: ${CONTROL_DOMAIN}
-      OFFICE_DOMAIN: ${OFFICE_DOMAIN}
-      SYSTEM_DOMAIN: ${SYSTEM_DOMAIN}
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      CONTROL_DOMAIN: ${CONTROL_DOMAIN:?set CONTROL_DOMAIN in .env}
+      OFFICE_DOMAIN: ${OFFICE_DOMAIN:?set OFFICE_DOMAIN in .env}
+      SYSTEM_DOMAIN: ${SYSTEM_DOMAIN:?set SYSTEM_DOMAIN in .env}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -27,7 +29,7 @@ services:
         condition: service_healthy
 
   web:
-    image: ${IMAGE}:${APP_TAG}
+    image: ${IMAGE:?set IMAGE in .env}:${APP_TAG:?set APP_TAG in .env}
     logging: *logging
     restart: unless-stopped
     env_file: .env
@@ -43,14 +45,15 @@ services:
       start_period: 40s
 
   worker:
-    image: ${IMAGE}:${APP_TAG}
+    image: ${IMAGE:?set IMAGE in .env}:${APP_TAG:?set APP_TAG in .env}
     logging: *logging
     restart: unless-stopped
     env_file: .env
     environment:
       APP_VERSION: ${APP_TAG}  # Sentry release
       DJANGO_SETTINGS_MODULE: config.settings.prod
-    command: ["worker"]
+    command: ["worker"]  # never migrates: it waits for web, which migrates before it reports healthy
+    stop_grace_period: 60s  # lets a running job (an email batch) finish on deploy
     depends_on:
       web:
         condition: service_healthy
