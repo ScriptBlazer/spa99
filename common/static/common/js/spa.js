@@ -60,6 +60,9 @@ if (gsap && ScrollTrigger) {
     lineRise(q('.door-title'), { trigger: false, delay: 0.2 });
     const first = [...(q('[data-opener-line]')?.children || [])];
     if (first.length) gsap.fromTo(first, { opacity: 0, y: desktop ? 12 : 8 }, { opacity: 1, y: 0, duration: 0.8, delay: 0.6 });
+    // the "Tailor your membership" button follows the line (2026-10-29)
+    const cta = q('.door-cta');
+    if (cta) gsap.fromTo(cta, { opacity: 0, y: desktop ? 12 : 8 }, { opacity: 1, y: 0, duration: 0.8, delay: 0.9 });
 
     // on scroll: the window shrinks onto the frame (0.15 to 0.85); the veil holds, then clears once the picture has left the words; the lights come up
     const focus = OPENER_FOCUS[mode][desktop ? 'desktop' : 'phone'];

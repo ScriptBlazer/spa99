@@ -1,4 +1,4 @@
-"""The lock code: asked with the password, compared in constant time, one generic error, never logged."""
+"""The lock code: the only thing /unlock/ asks for, compared in constant time, never logged."""
 import logging
 
 from django.test import TestCase, override_settings
@@ -20,30 +20,29 @@ class UnlockCodeTests(TestCase):
     def locked(self):
         return self.client.get("/changes/").status_code == 302
 
-    def test_right_password_and_right_code_unlock(self):
-        self.assertTrue(self.attempt(password=PASSWORD, code=CODE).status_code == 302 and not self.locked())
+    def test_the_code_alone_unlocks_and_the_form_does_not_ask_for_a_password(self):
+        page = self.client.get("/unlock/")
+        self.assertNotContains(page, 'name="password"')
+        self.assertContains(page, 'name="code"')
+        self.assertContains(page, 'inputmode="numeric"')
+        self.assertContains(page, 'autocomplete="one-time-code"')
+        self.assertContains(page, "Enter your lock code")
+        self.assertTrue(self.attempt(code=CODE).status_code == 302 and not self.locked())
         self.assertTrue(SystemEvent.objects.filter(kind="unlock").exists())
 
-    def test_a_wrong_code_is_refused_with_the_generic_error_and_logged_as_code(self):
-        response = self.attempt(password=PASSWORD, code="000000")
-        self.assertEqual((response.status_code, response.context["error"]), (200, "Password or code is wrong."))
+    def test_a_password_is_not_a_code(self):
+        response = self.attempt(password=PASSWORD)
+        self.assertEqual((response.status_code, response.context["error"].startswith("Wrong code.")), (200, True))
         self.assertTrue(self.locked())
-        self.assertEqual(self.attempt(password=PASSWORD).context["error"], "Password or code is wrong.")  # no code at all
+        self.assertEqual(self.attempt(code="000000").status_code, 200)
         event = SystemEvent.objects.filter(kind="unlock_failed").order_by("created_at").first()
         self.assertEqual(event.detail, {"reason": "code"})
 
-    def test_a_wrong_password_is_refused_with_the_same_error_and_logged_as_password(self):
-        response = self.attempt(password="wrong", code=CODE)
-        self.assertEqual(response.context["error"], "Password or code is wrong.")
-        self.assertTrue(self.locked())
-        self.assertEqual(SystemEvent.objects.get(kind="unlock_failed").detail, {"reason": "password"})
-
-    def test_the_code_field_is_on_the_form_and_the_code_never_reaches_logs_or_audit(self):
-        self.assertContains(self.client.get("/unlock/"), 'name="code"')
-        with self.assertNoLogs(level=logging.DEBUG) if False else self.assertLogs(level=logging.DEBUG) as logs:
+    def test_the_code_never_reaches_logs_or_audit(self):
+        with self.assertLogs(level=logging.DEBUG) as logs:
             logging.getLogger("spa99.test").info("marker")
-            self.attempt(password="wrong", code="111111")
-            self.attempt(password=PASSWORD, code=CODE)
+            self.attempt(code="111111")
+            self.attempt(code=CODE)
         text = "\n".join(logs.output)
         self.assertNotIn(CODE, text)
         self.assertNotIn("111111", text)
@@ -53,8 +52,10 @@ class UnlockCodeTests(TestCase):
 
 
 class NoCodeConfiguredTests(TestCase):
-    def test_without_a_code_unlock_is_password_only_and_the_field_is_hidden(self):
+    """Dev and CI only: prod refuses to start without a code (config.settings.prod)."""
+
+    def test_without_a_code_the_signed_in_developer_just_presses_unlock(self):
         client, _ = sign_in(make_user())
         self.assertNotContains(client.get("/unlock/"), 'name="code"')
-        self.assertEqual(client.post("/unlock/", {"password": PASSWORD}).status_code, 302)
+        self.assertEqual(client.post("/unlock/").status_code, 302)
         self.assertEqual(client.get("/changes/").status_code, 200)

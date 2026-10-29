@@ -213,7 +213,7 @@ Today  Fri 23 Oct 2026                                                        38
        81.2.69.160 · Safari 18 on macOS · req 7f3a9c
  [↺] Moishe undid 1 change from 14:05 in Settings                                   14:20
  [!] Sign-in failed for moishe@berko.media · wrong password                          14:02
-       81.2.69.160 · Chrome 130 on Windows · /login/
+       81.2.69.160 · Chrome 130 on Windows · /dev-login/
  [⌂] Moishe unlocked System                                                          13:58
 ```
 

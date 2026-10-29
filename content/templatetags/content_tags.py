@@ -25,6 +25,15 @@ def discount_line(context):
     return {"url": short_url("membership", site), "show_placeholder": settings.DEBUG}  # the short link counts the click, then forwards
 
 
+@register.inclusion_tag("users/_whatsapp_rate_line.html", takes_context=True)
+def whatsapp_rate_line(context, source):
+    """{% whatsapp_rate_line "memberships" %}: one quiet 'Looking for a better rate? WhatsApp us.' line on the short link, counted under
+    `source`. Nothing at all while no WhatsApp link is set in System > Settings."""
+    from pages.links import short_url
+
+    return {"url": short_url(source, context.get("site_settings"))}
+
+
 @register.inclusion_tag("content/_gold_fee_note.html")
 def gold_fee_note(css_class="fee-note"):
     """{% gold_fee_note %}: '*An annual admin fee of £199 + VAT applies.' from the Gold plan's annual fee; nothing while empty."""

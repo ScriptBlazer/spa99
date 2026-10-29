@@ -184,7 +184,7 @@ class SiteSettings(BaseModel):
 
     discount_contact_url = models.URLField(
         "Discount contact link (WhatsApp)", max_length=300, blank=True, validators=[URLValidator(schemes=["https"])],
-        help_text="Barry's personal WhatsApp link (https only), shown as 'Looking for a better rate?' on the sign-up and "
+        help_text="The spa's WhatsApp link (https only), shown as 'Looking for a better rate?' on the sign-up and "
                   "choose-membership screens. Empty = the line is hidden on live (dev shows a 'link to come' marker).")
 
     final_approval_on = models.BooleanField(

@@ -10,7 +10,7 @@ from system import views
 urlpatterns = [
     path("health/", health),  # public: monitoring
     path("robots.txt", login_not_required(lambda request: HttpResponse("User-agent: *\nDisallow: /\n", content_type="text/plain"))),
-    path("login/", views.SystemLoginView.as_view(), name="login"),
+    path("dev-login/", views.SystemLoginView.as_view(), name="login"),
     path("logout/", views.sign_out, name="logout"),  # POST only
     path("", include("system.urls")),
 ]

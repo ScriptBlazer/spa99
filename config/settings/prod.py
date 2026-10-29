@@ -11,7 +11,7 @@ if not SECRET_KEY or SECRET_KEY == DEV_SECRET_KEY or any(m in SECRET_KEY.lower()
 if not ENV.get("DEFAULT_FROM_EMAIL"):
     raise ImproperlyConfigured("DEFAULT_FROM_EMAIL must be set in production (the From address of every email).")
 if not SYSTEM_UNLOCK_CODE:  # missing or not 6 to 12 digits
-    raise ImproperlyConfigured("SYSTEM_UNLOCK_CODE must be set in production: digits only, 6 to 12 (asked with the password to unlock System).")
+    raise ImproperlyConfigured("SYSTEM_UNLOCK_CODE must be set in production: digits only, 6 to 12 (the only thing System unlock asks for).")
 if not ENV.get("DATABASE_URL"):
     raise ImproperlyConfigured("DATABASE_URL must be set in production (managed PostgreSQL).")
 

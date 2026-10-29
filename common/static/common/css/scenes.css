@@ -412,6 +412,7 @@ html.motion .frame-media, html.motion .window-media, html.motion .hero-window, h
 .door-words { grid-row: 2; }
 .door-title { max-width: none; }
 .door-chips { margin-top: var(--space-4); }
+.door-cta { margin-top: var(--space-4); }
 .door-zoom { position: absolute; inset: 0; }                       /* scenes: eases the old zoomed-in door back as it shrinks, so the whole swan fits the frame */
 .door-still { position: absolute; inset: 0; }
 .door-still .photo, .door-still picture { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
@@ -440,6 +441,7 @@ html.motion .frame-media, html.motion .window-media, html.motion .hero-window, h
   .door-target { grid-column: 9 / -1; grid-row: 1; order: 0; height: min(39rem, 72svh); }
   .opener-lines { margin-top: var(--space-5); }
   .door-chips { margin-top: var(--space-5); }
+  .door-cta { margin-top: var(--space-5); }
   .opener-note { font-size: var(--text-base); }
   .door-still .photo { object-position: 64% 40%; }
   .opener-scene[data-opener="door"] .door-still .photo { object-position: 62% 45%; }

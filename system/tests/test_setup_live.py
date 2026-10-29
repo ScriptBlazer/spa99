@@ -64,7 +64,7 @@ class SetupLiveTests(TestCase):
         self.assertEqual(sorted(m.to[0] for m in mail.outbox), ["barry@spa99.uk", "moishe@spa99.uk"])
         site = SiteSettings.load()
         self.assertEqual((site.contact_email, site.gold_approver_cc, site.discount_contact_url),
-                         ("hello@spa99.uk", "moishe@spa99.uk", "https://wa.me/447530117902"))
+                         ("hello@spa99.uk", "moishe@spa99.uk", "https://wa.me/447441919990"))
         self.assertFalse(site.final_approval_on)
         self.assertEqual(SiteDefaults.load().staff_alert_emails, "moishe@spa99.uk")
         self.assertNotIn("/reset/", text)  # no link is ever printed
@@ -87,7 +87,7 @@ class SetupLiveTests(TestCase):
         text = self.real_run()
         self.assertEqual(SiteSettings.load().contact_email, "info@elsewhere.test")
         self.assertIn("contact_email: already set (left alone)", text)
-        self.assertEqual(SiteSettings.load().discount_contact_url, "https://wa.me/447530117902")  # the others are still filled
+        self.assertEqual(SiteSettings.load().discount_contact_url, "https://wa.me/447441919990")  # the others are still filled
 
     def test_an_existing_account_only_gains_and_never_loses(self):
         from plans.tests.helpers import make_team_member

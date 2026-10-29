@@ -86,7 +86,7 @@ Spec: `docs/design/SPA-PAGE.md`. Context of `pages.views.spa`:
 - `visit_pills`: `{"book": [...], "arrive": [...], "stay": [...]}` from `visit_pills()`. Book: window from visible monthly plans ("Book 1 to 7 days ahead"), cancel hours only when all plans agree, then the `booking_pending` row while booking is closed, then `step_1_pills`. Arrive: `step_2_pills`. Stay: "Open 5am to 3am", "Closed for Shabbos and Yom Tov", then `step_3_pills`.
 - `next_from`: the `next_from` row with `{price}` and `{price_inc}` filled from the lowest visible monthly plan (with the pound sign), "" if none.
 
-Content rows on page `spa`: `intro` (body uses `{rooms}`, replaced with the visible room count in words: "Eight spaces, one quiet visit."), `facts_rooms`, `facts_hours`, `facts_men`, `tiles_intro`, `how_it_works`, `step_1..3`, `step_1_pills`, `step_2_pills`, `step_3_pills` (one pill per line), `booking_pending`, `next` (button "Tailor your membership"), `next_from`, `next_link`. Read them with `{% page_content "spa" as spa %}`.
+Content rows on page `spa`: `intro` (body uses `{rooms}`, replaced with the visible room count in words: "Eight spaces, one quiet visit."; its button "Tailor your membership" to `/journey/` shows in the hero under the hours line, as on Home, 2026-10-29; `backfill_site_data` fills it only while both its label and link are empty), `facts_rooms`, `facts_hours`, `facts_men`, `tiles_intro`, `how_it_works`, `step_1..3`, `step_1_pills`, `step_2_pills`, `step_3_pills` (one pill per line), `booking_pending`, `next` (button "Tailor your membership", kept at the bottom), `next_from`, `next_link`. Read them with `{% page_content "spa" as spa %}`.
 
 Facility fields (Control): `display, image_name, image_focus, detail_image, detail_image_name, detail_alt, facts`. Control rejects image names that are not in the manifest and facts that are not up to 4 texts of 32 characters or fewer. Seed values are in `plans/seed.py` (`FACILITY_SPA_PAGE`); existing databases get them with `backfill_site_data` (empty slots only).
 
@@ -106,3 +106,5 @@ Decisions are in docs/PROJECT.md (row dated 2026-10-26) and docs/SPA99_RULES.md 
 ## To do for the booking build
 
 - **Shabbos and Yom Tov cut-off (decided 2026-10-26, not built):** bookings are allowed up to 1 hour before closing (see the CAL-07 override in `docs/SPA99_RULES.md`). Apply it in the booking rules when the booking system is built.
+
+**WhatsApp line (2026-10-29).** One quiet line, "Looking for a better rate? WhatsApp us.", under the tiers on the public Memberships page (beside the "Compare memberships" link, not on each card) and on the journey result (under the buttons). The Visit page shows "WhatsApp" under the email. All go through the counted short link (`from=memberships`, `journey`, `visit`), open in a new tab with a hidden "(opens in a new tab)", and are left out while no WhatsApp link is set. Full list of places: system.md, "WhatsApp short link".

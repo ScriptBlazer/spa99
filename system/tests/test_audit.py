@@ -25,6 +25,9 @@ def kinds():
     return list(SystemEvent.objects.order_by("seq").values_list("kind", flat=True))
 
 
+CACHE = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "audit-tests"}}
+
+
 class EventTests(TestCase):
     def setUp(self):
         self.user = make_user()
@@ -34,9 +37,10 @@ class EventTests(TestCase):
 
     def test_sign_in_unlock_lock_out_are_recorded_with_ip_and_browser(self):
         client = self.visitor()
-        client.post("/login/", {"username": self.user.email, "password": PASSWORD})
-        client.post("/unlock/", {"password": "wrong"})
-        client.post("/unlock/", {"password": PASSWORD})
+        client.post("/dev-login/", {"username": self.user.email, "password": PASSWORD})
+        with override_settings(SYSTEM_UNLOCK_CODE="493021"):
+            client.post("/unlock/", {"code": "000000"})
+            client.post("/unlock/", {"code": "493021"})
         client.post("/lock/")
         client.post("/logout/")
         self.assertEqual(kinds(), ["sign_in", "unlock_failed", "unlock", "lock_manual", "sign_out"])
@@ -45,7 +49,7 @@ class EventTests(TestCase):
         self.assertEqual(SystemEvent.objects.get(kind="unlock_failed").outcome, "failed")
 
     def test_failed_sign_in_on_system_records_the_email_but_the_public_host_does_not(self):
-        self.visitor().post("/login/", {"username": "Nobody@Example.com", "password": "x"})
+        self.visitor().post("/dev-login/", {"username": "Nobody@Example.com", "password": "x"})
         event = SystemEvent.objects.get()
         self.assertEqual((event.kind, event.user, event.user_label), ("sign_in_failed", None, "nobody@example.com"))
         Client(HTTP_HOST="localhost").post("/login/", {"username": "x@example.com", "password": "x"})
@@ -66,12 +70,13 @@ class EventTests(TestCase):
             client.get("/")
         self.assertIn("session_expired", kinds())
 
+    @override_settings(CACHES=CACHE)
     def test_unlock_rate_limit_is_recorded_once(self):
         client, _ = sign_in(self.user)
-        with mock.patch("system.views.hit", return_value=False):
-            for _ in range(3):
-                client.post("/unlock/", {"password": "x"})
-        self.assertEqual(kinds().count("unlock_rate_limited"), 1)
+        with override_settings(SYSTEM_UNLOCK_CODE="493021"):
+            for _ in range(8):
+                client.post("/unlock/", {"code": "000000"})
+        self.assertEqual(kinds().count("unlock_rate_limited"), 1)  # one row per lockout, not per blocked hit
 
     def test_access_denied_is_deduped_per_ip(self):
         stranger = self.visitor()
@@ -303,7 +308,6 @@ class StoredCheckTests(TestCase):
         self.assertEqual(SystemEvent.objects.filter(kind="audit_check").count(), 1)
 
 
-CACHE = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "audit-tests"}}
 
 
 class ReviewFixTests(TestCase):
@@ -342,18 +346,18 @@ class ReviewFixTests(TestCase):
         b.get("/")
         self.assertEqual(SystemEvent.objects.filter(kind="access_denied", ip_address="203.0.113.2").count(), 1)
 
-    def test_rate_limited_sign_ins_are_one_row_per_ip_whatever_email_is_typed(self):
+    @override_settings(CACHES=CACHE)
+    def test_a_sign_in_spray_from_one_ip_writes_one_blocked_row_per_lockout(self):
         client = Client(HTTP_HOST=SYSTEM, REMOTE_ADDR="203.0.113.5")
-        with mock.patch("users.views._throttled", return_value=True):
-            for n in range(12):
-                client.post("/login/", {"username": f"x{n}@example.com", "password": "x"})
-        self.assertEqual(SystemEvent.objects.filter(kind="sign_in_failed").count(), 1)
+        for n in range(14):
+            client.post("/dev-login/", {"username": f"x{n}@example.com", "password": "x"})
+        self.assertEqual(SystemEvent.objects.filter(kind="sign_in_failed", outcome="blocked").count(), 1)
         self.assertNotIn("x0@example.com", feed.people())
 
     def test_attacker_typed_text_is_escaped_on_the_page_and_neutralised_in_the_csv(self):
         attacker = Client(HTTP_HOST=SYSTEM)
-        attacker.post("/login/", {"username": "<script>alert(1)</script>", "password": "x"})
-        attacker.post("/login/", {"username": "=HYPERLINK(1)", "password": "x"})
+        attacker.post("/dev-login/", {"username": "<script>alert(1)</script>", "password": "x"})
+        attacker.post("/dev-login/", {"username": "=HYPERLINK(1)", "password": "x"})
         client = unlocked_client(self.user)
         page = client.get("/changes/", {"category": "failure"}).content.decode()
         self.assertNotIn("<script>alert(1)</script>", page)

@@ -354,3 +354,14 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
         errors = {name: "Pick one of the choices." for name, choices in allowed.items() if getattr(self, name) not in choices}
         if errors:
             raise ValidationError(errors)
+
+
+class WrongTries(models.Model):
+    """Wrong-try counter behind the sign-in and unlock wait (system.throttle). One row per hashed key (never an email or IP in
+    clear). Counted with an atomic F() update BEFORE the secret is checked, so parallel requests cannot all be verified.
+    Not audit data: rows are forgotten after a quiet day."""
+
+    key = models.CharField(max_length=64, primary_key=True)
+    count = models.PositiveIntegerField(default=0)
+    locked_until = models.FloatField(default=0, help_text="Unix time the wait ends (0 = none).")
+    last_at = models.FloatField(default=0, db_index=True, help_text="Unix time of the latest attempt.")

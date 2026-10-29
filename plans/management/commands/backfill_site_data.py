@@ -610,6 +610,8 @@ def _spa_page():
         for section in Section.objects.filter(page=page):  # saved one by one so the change is in the history
             if section.key == "intro" and section.body == OLD_SPA_INTRO:
                 section.body = "{rooms} spaces, one quiet visit."
+            elif section.key == "intro" and not section.cta_label and not section.cta_url:  # 2026-10-29: the hero button (fills an empty one only)
+                section.cta_label, section.cta_url = "Tailor your membership", "/journey/"
             elif section.key == "next" and section.cta_label == "Explore your membership":
                 section.cta_label = "Tailor your membership"
             else:

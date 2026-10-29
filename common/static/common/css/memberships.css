@@ -43,6 +43,7 @@ html:has(.page-mem) { scroll-padding-bottom: calc(var(--bar-h) + var(--space-3))
 .mem-gold-hook .mark { flex: none; width: 1rem; height: auto; color: var(--color-caramel); }   /* decoration only */
 .mem-gold-btn { width: auto; margin-top: var(--space-3); }
 .mem-more { margin-top: var(--space-2); text-align: center; }
+.mem-more .discount-line { margin-top: var(--space-3); text-align: inherit; }
 .mem-more-link { gap: var(--space-2); font-size: var(--text-base); font-weight: 600; text-decoration-thickness: 1.5px; text-underline-offset: 0.3em; }
 .mem-more-link .icon { width: 1rem; height: 1rem; }
 @media (hover: hover) and (pointer: fine) { .mem-more-link:hover .icon { transform: translateY(2px); } }

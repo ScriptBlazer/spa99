@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 
 PATH = "/whatsapp/"
 KEY = "whatsapp"
-SOURCES = ("register", "membership", "plans", "chat", "email", "other")  # the allowlist for ?from= (anything else is counted as "other")
+SOURCES = ("register", "membership", "memberships", "journey", "visit", "plans", "chat", "email", "other")  # the allowlist for ?from= (anything else is counted as "other")
 
 
 def short_path(source="other"):

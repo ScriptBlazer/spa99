@@ -158,7 +158,7 @@ class ModelRuleTests(RulesTestCase):
 
 class HeaderTests(RulesTestCase):
     def test_every_system_response_is_never_cached_and_may_not_be_framed(self):
-        for client, path in ((self.client, "/plans/"), (self.client, "/changes/export.csv"), (Client(HTTP_HOST=SYSTEM), "/plans/"), (Client(HTTP_HOST=SYSTEM), "/login/")):
+        for client, path in ((self.client, "/plans/"), (self.client, "/changes/export.csv"), (Client(HTTP_HOST=SYSTEM), "/plans/"), (Client(HTTP_HOST=SYSTEM), "/dev-login/")):
             response = client.get(path)
             self.assertIn("no-store", response["Cache-Control"], path)
             self.assertIn("no-cache", response["Cache-Control"], path)
@@ -190,40 +190,3 @@ class AuditAndAdminTests(RulesTestCase):
         self.assertFalse(SystemEvent.objects.filter(kind=SystemEvent.SUPPRESSION_REMOVED).exists())
         self.assertTrue(EmailSuppression.objects.filter(pk=row.pk).exists())
         self.assertContains(self.client.get("/emails/suppressions/"), "data-system-confirm")
-
-
-class UnlockLimitTests(TestCase):
-    @override_settings(CACHES=LOCMEM)
-    def test_one_person_is_limited_whatever_the_address(self):
-        from django.core.cache import cache
-
-        cache.clear()
-        user = make_user()
-        client = Client(HTTP_HOST=SYSTEM)
-        client.post("/login/", {"username": user.email, "password": PASSWORD})
-        codes = [client.post("/unlock/", {"password": "wrong"}, REMOTE_ADDR=f"10.0.0.{n}").status_code for n in range(1, 12)]
-        self.assertEqual(codes[:10], [200] * 10)  # a new address each time: the per-address limit (5) never trips
-        self.assertEqual(codes[10], 429)
-        self.assertTrue(SystemEvent.objects.filter(kind=SystemEvent.UNLOCK_RATE_LIMITED).exists())
-        cache.clear()
-
-
-class LastSuperuserTests(TestCase):
-    def setUp(self):
-        call_command("setup_roles", stdout=StringIO())
-
-    def test_the_last_active_superuser_cannot_be_demoted_removed_or_deactivated(self):
-        keeper = at("developer", "keeper@example.com", superuser=True)
-        gone = at("developer", "gone@example.com", superuser=True)
-        User.objects.filter(pk=gone.pk).update(is_active=False)  # inactive superusers do not count
-        for action in (lambda: team.set_access(gone, keeper, "developer"), lambda: team.remove_from_team(gone, keeper), lambda: team.set_active(gone, keeper, False)):
-            with mock.patch("common.levels.can_manage", return_value=True), mock.patch("common.levels.can_assign", return_value=True):  # the level guards are tested elsewhere
-                with self.assertRaises(team.ChangeRefused) as caught:
-                    action()
-            self.assertEqual(str(caught.exception), team.LAST_SUPERUSER)
-        keeper.refresh_from_db()
-        self.assertTrue(keeper.is_superuser and keeper.is_active)
-
-    def test_with_another_active_superuser_the_demotion_goes_through(self):
-        one, two = at("developer", "one@example.com", superuser=True), at("developer", "two@example.com", superuser=True)
-        self.assertTrue(team.set_access(one, two, "developer"))
