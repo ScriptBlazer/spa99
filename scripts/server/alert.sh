@@ -32,7 +32,7 @@ send() {
   reply="$(printf 'url = "https://api.telegram.org/bot%s/sendMessage"\n' "$TELEGRAM_BOT_TOKEN" |
     curl -sS -m 20 -K - \
       --data-urlencode "chat_id=$TELEGRAM_ADMIN_CHAT_ID" \
-      --data-urlencode "text=$1" 2>&1)" || { echo "alert.sh: Telegram send failed: $reply" >&2; return 1; }
+      --data-urlencode "text=$1" --data-urlencode "disable_web_page_preview=true" 2>&1)" || { echo "alert.sh: Telegram send failed: $reply" >&2; return 1; }
   if ! printf '%s' "$reply" | jq -e '.ok == true' >/dev/null 2>&1; then
     echo "alert.sh: Telegram refused: $(printf '%s' "$reply" | jq -r '.description // "unknown reply"' 2>/dev/null)" >&2
     return 1
