@@ -19,7 +19,7 @@
     {% else %}<a class="sys-btn" href="{% url 'system_sale_new' %}?copy={{ sale.pk }}">Copy</a>{% endif %}
   </div>{% endif %}</div>
 {% if sale and state != "ended" %}<p class="ss-hint">Only you see the preview, in this browser.</p>
-<div class="sys-actions" data-sale-extend aria-label="Change the end time"><span>Ends {{ sale.window_end|date:"j M Y, H:i" }}. Move it:</span>
+<div class="sys-actions ss-extend" role="group" data-sale-extend aria-label="Change the end time"><span>Ends {{ sale.window_end|date:"j M Y, H:i" }}. Move it:</span>
   {% for key, label in extend_choices %}<form method="post" action="{% url 'system_sale_extend' sale.pk %}">{% csrf_token %}<input type="hidden" name="by" value="{{ key }}"><button type="submit" class="sys-btn sm">{{ label }}</button></form>{% endfor %}</div>
 <p class="ss-hint" data-sale-edit-note>Changes apply to new sign-ups. People who already registered keep the price they were given.</p>{% endif %}
 {% include "system/_sale_link.html" %}

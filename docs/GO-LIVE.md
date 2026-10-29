@@ -34,28 +34,27 @@ None of these block the launch. Each has a safe default already in place.
    - Sender domain `spa99.uk`: add its **DKIM** and **Return-Path** records in Cloudflare (DNS only). Wait until both show green in Postmark.
    - Copy the **Server API token** (for `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD`).
 
-4. **Server: Docker and files.** From your Mac, in the project folder:
+4. **Server: setup script, then the files.** From your Mac, in the project folder (`ssh spa99` is the shortcut in `~/.ssh/config`):
    ```bash
-   ssh -i "/Users/moishe/Library/CloudStorage/OneDrive-Personal/Developer/Keys/spa99.pem" ubuntu@3.8.30.182 mkdir -p spa99
-   scp -i "/Users/moishe/Library/CloudStorage/OneDrive-Personal/Developer/Keys/spa99.pem" docker-compose.yml Caddyfile .env.example ubuntu@3.8.30.182:spa99/
-   ssh -i "/Users/moishe/Library/CloudStorage/OneDrive-Personal/Developer/Keys/spa99.pem" ubuntu@3.8.30.182
+   scp -r scripts/server spa99:~/server-setup
+   ssh spa99 'sudo bash ~/server-setup/bootstrap.sh'
+   ```
+   It installs updates, automatic security updates, 2 GB swap, Docker (official repo, logs capped), fail2ban, key-only SSH with no root login, `~/spa99` and `~/scripts` (health check and Telegram alerts), and the cron jobs. Safe to run again. Details in `scripts/server/README.md`.
+   Then copy the app files and log in again (so the docker group applies):
+   ```bash
+   scp docker-compose.yml Caddyfile .env.example spa99:spa99/
+   ssh spa99
    ```
    On the server:
-   ```bash
-   curl -fsSL https://get.docker.com | sudo sh
-   sudo usermod -aG docker ubuntu
-   exit
-   ```
-   Log back in (the ssh line above), then:
    ```bash
    docker compose version
    docker login -u scriptblazer
    cd ~/spa99
-   cp .env.example .env
+   cp .env.example .env && chmod 600 .env
    nano .env
    ```
-   - If the Docker script says Ubuntu 26.04 isn't supported yet, follow the apt repository steps at docs.docker.com/engine/install/ubuntu instead, then carry on from `sudo usermod`.
    - `docker login`: paste the **Read-only** token as the password. It stays logged in.
+   - **Alerts:** put the Telegram bot token and your chat id in `~/scripts/.alert.env` (the bot must have been started from that Telegram account; @userinfobot shows your id), then `~/scripts/alert.sh --test`. Fill it once the site is up, or you get "site down" until then.
    - **Every server command from here on runs in `~/spa99`.**
 
 5. **Server `.env`** (every line is explained in the file)
