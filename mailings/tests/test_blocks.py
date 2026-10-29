@@ -54,7 +54,7 @@ class ValidationTests(TestCase):
     def test_error_text_and_the_cleaned_list(self):
         cleaned, errors = blocks.clean(json.dumps(parts({"type": "button", "label": " Go ", "url": "x", "extra": 1})))
         self.assertEqual(blocks.flat_errors(errors)[0][:7], "Part 2:")
-        self.assertEqual(cleaned[1], {"type": "button", "label": "Go", "url": "x"})
+        self.assertEqual(cleaned[1], {"type": "button", "link": "url", "label": "Go", "url": "x"})
 
 
 class RenderTests(TestCase):

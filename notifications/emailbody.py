@@ -176,10 +176,11 @@ SPECS = {spec.key: spec for spec in [
         button_label="Go to my account", button_required=True, button_fallback=False, subject_placeholders=_FIRST),
     EmailSpec(
         "invite", "Invitation to register", {**_FIRST, **VALID_FOR, "address": "The spa address, from Settings"}, {"first_name": "James"},
-        "Hello {first_name},\n\nYou are invited to register for Spa 99, a men-only luxury spa at {address}.\n\n"
-        "Registering is free and there is nothing to pay. Use your personal link to start: your name and email are already filled in. The link works for {valid_for}."
-        "\n\n{button}\n\nIf you were not expecting this, you can ignore this email.",
-        button_label="Register for Spa 99", button_required=True, subject_placeholders=_FIRST, values=_invite_values),
+        "Hi {first_name},\n\nThanks for your interest in Spa 99, a men-only luxury spa at {address}.\n\n"
+        "Here's your personal link. A few quick questions show you the membership that suits you, then you can register free. "
+        "Your name and email are already filled in. Your link is valid for {valid_for}."
+        "\n\n{button}\n\nIf you weren't expecting this email, you can ignore it.",
+        button_label="Find my membership", button_required=True, subject_placeholders=_FIRST, values=_invite_values),
     EmailSpec(
         "payment_window_open", "Payments are open",
         {**_FIRST, "closes_on": "The last day of the window, e.g. 13 November (empty for someone who registered after payments opened)",
@@ -342,6 +343,18 @@ def _html_value(name, value):
 
 def _text_value(value):
     return value.text if isinstance(value, Rich) else ("" if value is None else str(value))
+
+
+INVITE_BUTTONS = {"journey": "Find my membership", "register": "Register for Spa 99"}
+
+
+def button_label_for(spec):
+    """The button text of an email. Fixed in the spec, except the invitation: it follows where the link lands (System > Defaults)."""
+    if spec is not None and spec.key == "invite":
+        from system import defaults
+
+        return INVITE_BUTTONS.get(defaults.get().invite_landing, spec.button_label)
+    return spec.button_label if spec is not None else ""
 
 
 def render(spec, body, values, button_url="", button_label=None):

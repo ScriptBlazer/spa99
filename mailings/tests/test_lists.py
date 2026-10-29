@@ -153,30 +153,80 @@ class InviteToListTests(ListFixtures):
         self.assertEqual((invite.status, invite.name, invite.created_by), (Invite.SENT, "Al Smith", self.admin))
         message = next(msg for msg in mail.outbox if msg.to == ["al@example.com"])
         self.assertIn(f"/invite/{invite.token}/", message.body)
-        self.assertIn("Hello Al,", message.body)
+        self.assertIn("Hi Al,", message.body)
+        self.assertIn("Find my membership", message.alternatives[0][0])  # the button follows where the link lands
         self.assertIn("List-Unsubscribe", message.extra_headers)
         self.assertEqual(Invite.objects.filter(batch_id=m.pk).count(), 2)  # one per person, none for the people left out
         sending.run_mailing(m.pk)  # a second run sends nothing more
         self.assertEqual(len(mail.outbox), 2)
 
-    def test_the_personal_link_marks_opened_and_registering_marks_registered(self):
+    def _sent_invite(self, email="al@example.com"):
         sending.start(self.mailing, self.admin)
-        invite = Invite.objects.get(email="al@example.com")
-        client = Client()
-        self.assertRedirects(client.get(f"/invite/{invite.token}/"), "/register/", fetch_redirect_response=False)
-        invite.refresh_from_db()
-        self.assertEqual(invite.status, Invite.SENT)  # a link scanner does not count as opened
-        page = client.get("/register/")
-        self.assertContains(page, 'value="al@example.com"')
-        invite.refresh_from_db()
-        self.assertEqual(invite.status, Invite.OPENED)
-        user = user_services.register_interest({
-            "first_name": "Al", "last_name": "Smith", "email": "al@example.com", "password": "a-long-test-password-1", "mobile": "+447912345678",
+        return Invite.objects.get(email=email)
+
+    def _register(self, email="al@example.com", mobile="+447912345678"):
+        return user_services.register_interest({
+            "first_name": "Al", "last_name": "Smith", "email": email, "password": "a-long-test-password-1", "mobile": mobile,
             "date_of_birth": datetime.date(1990, 1, 1), "plan": "tier-2"}).user
+
+    def test_the_setting_defaults_to_the_questionnaire(self):
+        from system.models import SiteDefaults
+
+        self.assertEqual(SiteDefaults.load().invite_landing, "journey")
+
+    def test_the_link_marks_opened_and_goes_to_the_questionnaire_or_register_by_the_setting(self):
+        from system.models import SiteDefaults
+
+        invite = self._sent_invite()
+        client = Client()
+        self.assertRedirects(client.get(f"/invite/{invite.token}/"), "/journey/", fetch_redirect_response=False)
+        invite.refresh_from_db()
+        self.assertEqual((invite.status, client.session[invites.SESSION_KEY]), (Invite.OPENED, invite.token))
+        opened_at = invite.opened_at
+        client.get(f"/invite/{invite.token}/")  # a second click changes nothing
+        invite.refresh_from_db()
+        self.assertEqual((invite.status, invite.opened_at), (Invite.OPENED, opened_at))
+        SiteDefaults.objects.update(invite_landing="register")
+        self.assertRedirects(Client().get(f"/invite/{invite.token}/"), "/register/", fetch_redirect_response=False)
+
+    def test_an_unknown_or_expired_link_goes_the_same_way_with_nothing_remembered(self):
+        invite = self._sent_invite()
+        Invite.objects.filter(pk=invite.pk).update(expires_at=timezone.now() - datetime.timedelta(days=1))
+        for token in ("nope", invite.token):
+            client = Client()
+            self.assertRedirects(client.get(f"/invite/{token}/"), "/journey/", fetch_redirect_response=False)
+            self.assertNotIn(invites.SESSION_KEY, client.session)
+        invite.refresh_from_db()
+        self.assertEqual(invite.status, Invite.SENT)
+
+    def test_the_email_step_starts_filled_in_and_register_still_pre_fills(self):
+        from plans.models import SiteSettings
+
+        invite = self._sent_invite()
+        client = Client()
+        client.get(f"/invite/{invite.token}/")
+        page = client.get("/journey/your-time/")
+        self.assertEqual(page.context["journey_config"]["inviteEmail"], "al@example.com")
+        self.assertContains(client.get("/register/"), 'value="al@example.com"')
+        SiteSettings.objects.update(journey_email_gate=False)  # no email step: the journey goes straight on, Register still pre-fills
+        self.assertFalse(client.get("/journey/your-time/").context["journey_config"]["emailGate"])
+        self.assertContains(client.get("/register/"), 'value="al@example.com"')
+        self.assertEqual(Client().get("/journey/your-time/").context["journey_config"]["inviteEmail"], "")  # no invite: normal journey
+
+    def test_the_full_path_marks_registered_and_a_different_email_leaves_it_opened(self):
+        invite = self._sent_invite()
+        client = Client()
+        client.get(f"/invite/{invite.token}/")
+        client.get("/journey/your-time/")
+        client.get("/register/")
+        user = self._register()
         invite.refresh_from_db()
         self.assertEqual((invite.status, invite.registered_user), (Invite.REGISTERED, user))
-        # he is a member now: another invitation to the list leaves him out, and the old pending invite for bo still blocks bo
-        self.assertEqual(segments.count("list", self.mailing.params, Mailing.INVITATION), 0)
+        other = Invite.objects.get(email="bo@example.com")
+        Client().get(f"/invite/{other.token}/")
+        self._register("someone-else@example.com", "+447912345699")
+        other.refresh_from_db()
+        self.assertEqual(other.status, Invite.OPENED)
 
     def test_cancelling_before_sending_leaves_no_waiting_invites(self):
         from unittest import mock

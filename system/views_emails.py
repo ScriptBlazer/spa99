@@ -244,7 +244,7 @@ def mailing_detail(request, pk):
     state = ses.ses_status()
     context = {
         "mailing": mailing, "progress": sending.progress(mailing), "ses": state, "blockers": blockers,
-        "live_count": segments.count(mailing.group, mailing.params, mailing.kind) if draft and mailing.group in segments.GROUPS else None,
+        "live_count": segments.count(mailing.group, mailing.params, mailing.kind, mailing.has_personal_links) if draft and mailing.group in segments.GROUPS else None,
         "group": segments.GROUPS.get(mailing.group), "can_send": draft and mailing.status == Mailing.DRAFT and state["allowed"] and not blockers,
         "recipients": logic.mailing_recipients(mailing, status, request.GET.get("page")), "status_filter": status,
         "progress_url": reverse("system_mailing_progress", args=[mailing.pk]),
@@ -287,7 +287,10 @@ def mailing_count(request):
         return JsonResponse({"count": None, "errors": errors or {"kind": ["Choose News or Service message."]}})
     if not segments.GROUPS[group].allows(kind):
         return JsonResponse({"count": None, "errors": {"group": [segments.GROUPS[group].kind_error()]}})
-    return JsonResponse({"count": segments.count(group, params, kind), "errors": {}})
+    personal = request.GET.get("personal") == "1"  # the parts have a personal-link button
+    if personal and segments.GROUPS[group].people not in ("list", "leads"):
+        return JsonResponse({"count": None, "errors": {"group": [sending.PERSONAL_REFUSED]}})
+    return JsonResponse({"count": segments.count(group, params, kind, personal), "errors": {}})
 
 
 @unlocked
@@ -333,7 +336,9 @@ def _send_test(request, back, subject, kind, group, body, parts, label, detail):
     if errors:
         return _respond(request, False, " ".join(m for ms in errors.values() for m in ms), back, extra={"errors": errors})
     context, headers = {"first_name": request.user.first_name, **logic.mailing_extra(kind, group)}, None
-    if kind == Mailing.NEWS:  # a real unsubscribe link for the developer's own address
+    if mailing_blocks.has_personal(parts):  # a test shows the sample link (it explains itself), not a real one
+        context["personal_links"] = mailing_blocks.sample_links()
+    if kind in Mailing.MARKETING:  # a real unsubscribe link for the developer's own address
         context["unsubscribe_url"] = tokens.unsubscribe_url(request.user.email)
         headers = tokens.list_unsubscribe_headers(context["unsubscribe_url"])
     log = send_templated("mailing", [request.user.email], "[Test] " + sending.subject_line(subject, request.user.first_name),
@@ -408,7 +413,7 @@ def _mailing_action(request, pk, action, done):
 def _counted(mailing):
     """The number of people who would get it now (None when the group itself is not valid: the send check says why)."""
     params, errors = segments.clean_params(mailing.group, mailing.params) if mailing.group in segments.GROUPS else ({}, True)
-    return None if errors else segments.count(mailing.group, params, mailing.kind)
+    return None if errors else segments.count(mailing.group, params, mailing.kind, mailing.has_personal_links)
 
 
 @unlocked

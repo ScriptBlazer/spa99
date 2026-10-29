@@ -14,7 +14,7 @@ GROUPS = [
     ("Website and journey", [("result_reasons", "reasons"), ("gold_nudge_high", ""), ("gold_nudge_medium", ""), ("gold_nudge_low", ""),
                              ("opener_lines", "lines"), ("chat_monthly_cap_gbp", "£ a month")]),
     ("Gold", [("gold_invite_days", "days"), ("gold_approval_days", "days")]),
-    ("Emails", [("register_invite_days", "days"), ("recent_mailings", "shown"), ("recent_batches", "shown")]),
+    ("Emails", [("register_invite_days", "days"), ("invite_landing", ""), ("recent_mailings", "shown"), ("recent_batches", "shown")]),
     ("Sign-in", [("office_session_days", "days"), ("email_confirm_hours", "hours")]),
     ("System", [("changelog_page_size", "rows"), ("audit_page_size", "rows"), ("dashboard_recent_changes", "shown")]),
     ("Payments", [("payment_window_days", "days"), ("payment_reminder_days_before", "days"), ("payment_staff_alert_days_before", "days"), ("payment_staff_alert_hour", "o'clock"), ("staff_alert_emails_on", ""), ("staff_alert_emails", "")]),
@@ -39,6 +39,7 @@ def choice_fields():
     return {"leads_range": pairs(leads.RANGES, RANGE_LABELS), "leads_show": pairs(leads.SHOWS, SHOW_LABELS),
             "leads_sort": pairs(leads.SORTS, SORT_LABELS), "dashboard_range": pairs(selectors.DASHBOARD_RANGES, RANGE_LABELS),
             "analytics_range": pairs(selectors.ANALYTICS_RANGES, RANGE_LABELS),
+            "invite_landing": SiteDefaults.INVITE_LANDINGS,
             **{name: SiteDefaults.GOLD_NUDGES for name in ("gold_nudge_high", "gold_nudge_medium", "gold_nudge_low")}}
 
 

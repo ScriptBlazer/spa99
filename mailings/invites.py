@@ -334,7 +334,7 @@ def good_invite(token):
     """The Invite when the link is good (it exists, was sent and has not expired), else None. Marks nothing: a link scanner opening
     the link must not count as opened. A link that does not exist and one that expired look the same to the caller."""
     invite = Invite.objects.filter(token=token or "").first()
-    if invite is None or invite.expired or invite.status in (Invite.SKIPPED, Invite.FAILED, Invite.QUEUED, Invite.SENDING):
+    if invite is None or invite.expired or invite.status not in (Invite.SENT, Invite.OPENED):  # registered, bounced, skipped, failed or unsent: not a live link
         return None
     return invite
 
@@ -346,7 +346,7 @@ def mark_opened(invite):
 
 
 def prefill(token):
-    """Called when the Register page renders with the invite in the session: marks the invite opened (a person really got here) and
+    """Called when the Register page renders with the invite in the session: marks it opened too (idempotent; the link click already did) and
     returns the form's starting values {first_name, last_name, email} (empty when it is not good). Only a convenience: the person
     confirms everything, and the address is verified by the confirm link as always."""
     invite = good_invite(token) if token else None

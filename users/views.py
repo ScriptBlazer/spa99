@@ -206,6 +206,7 @@ def register(request):
                 return _message(request, "Not open yet", "Registration is not open yet.", status=403)
             else:
                 request.session[PENDING_EMAIL_KEY] = result.user.email
+                request.session.pop("invite_token", None)  # done: a shared device must not pre-fill the next person
                 if as_json:
                     return JsonResponse({"ok": True, "redirect": reverse("register_sent")})
                 return redirect("register_sent")

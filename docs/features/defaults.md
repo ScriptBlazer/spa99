@@ -74,6 +74,7 @@ Referrers on the Analytics pages stay fixed at 10 (only Top pages is a default).
 | Default | Now |
 |---|---|
 | Register invite link valid | 30 days |
+| Invitation link goes to (`invite_landing`; hint "Where the button in 'Invitation to register' takes people.") | The questionnaire (or Register). Also picks the invitation button text: "Find my membership" / "Register for Spa 99" |
 | Recent mailings / invite batches shown | 5 / 5 |
 
 ### Sign-in

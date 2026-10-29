@@ -117,9 +117,10 @@ GROUPS = {g.key: g for g in [
     Group("list", "Uploaded list", "A list you uploaded in Groups. News or an invitation, always with unsubscribe.", REASON_LIST,
           ({"name": "list_id", "type": "choice", "label": "List", "required": True},), people="list", news_only=True,
           kinds=(Mailing.NEWS, Mailing.INVITATION)),
-    Group("leads", "Journey leads", "People who left their email at the journey and have no account. News only.", REASON_LEAD,
+    Group("leads", "Journey leads", "People who left their email at the journey and have no account. News or an invitation, never a service message.", REASON_LEAD,
           ({"name": "date_from", "type": "date", "label": "Given from", "required": False},
-           {"name": "date_to", "type": "date", "label": "Given to", "required": False}), people="leads", news_only=True),
+           {"name": "date_to", "type": "date", "label": "Given to", "required": False}), people="leads", news_only=True,
+          kinds=(Mailing.NEWS, Mailing.INVITATION)),
 ]}
 BUILDERS = {"everyone": _everyone, "tier": _tier, "gold": _gold, "opted_in": _opted_in, "unconfirmed": _unconfirmed,
             "between": _between, "applicants": _applicants, "leads": _leads, "list": lambda params: ContactListMember.objects.none()}
@@ -168,16 +169,19 @@ def clean_params(group_key, raw):
     return params, errors
 
 
-def queryset(group_key, params, kind):
+def queryset(group_key, params, kind, personal=False):
     """People in the group who may be emailed for this kind of mailing: suppressed and inactive people are out; News also
-    needs consent and leaves out people who unsubscribed without an account."""
+    needs consent and leaves out people who unsubscribed without an account. `personal`: the mailing has personal-link buttons, so people who
+    already have an account or a waiting invite are left out too (lists and journey leads only; other groups send nothing)."""
     group = GROUPS[group_key]
+    if personal and group.people not in ("list", "leads"):
+        return _empty(group)
     if not group.allows(kind):
         return _empty(group)
     if group.people == "leads":
-        return _lead_queryset(params or {}, kind == Mailing.NEWS)
+        return _lead_queryset(params or {}, kind in (Mailing.NEWS, Mailing.INVITATION), kind == Mailing.INVITATION or personal)
     if group.people == "list":
-        return _list_queryset(params or {}, kind)
+        return _list_queryset(params or {}, kind, personal)
     qs = BUILDERS[group_key](params or {}).annotate(r_email=Lower("email"), r_user_id=F("user_id") if group.people == "applicants" else F("pk"))
     qs = qs.exclude(Exists(EmailSuppression.objects.filter(email=OuterRef("r_email"))))
     if kind == Mailing.NEWS:
@@ -201,14 +205,14 @@ def _accounts():
     return User.objects.annotate(u_email=Lower("email"))
 
 
-def _list_queryset(params, kind):
+def _list_queryset(params, kind, personal=False):
     """Members of one uploaded list who may be emailed. Always out: suppressed (bounce or complaint) and unsubscribed (EmailOptOut).
     News: also anyone whose account switched news off. Invitation: also anyone who already has an account, and anyone already invited
     and still waiting (a pending invite that has not expired)."""
     qs = _list_base(params.get("list_id"))
     qs = qs.exclude(Exists(EmailSuppression.objects.filter(email=OuterRef("r_email"))))
     qs = qs.exclude(Exists(EmailOptOut.objects.filter(email=OuterRef("r_email"))))
-    if kind == Mailing.INVITATION:
+    if kind == Mailing.INVITATION or personal:
         qs = qs.exclude(Exists(_accounts().filter(u_email=OuterRef("r_email"))))
         return qs.exclude(Exists(Invite.objects.filter(email=OuterRef("r_email"), status__in=Invite.PENDING, expires_at__gt=timezone.now())))
     return qs.exclude(Exists(_accounts().filter(u_email=OuterRef("r_email"), marketing_consent=False)))
@@ -233,43 +237,50 @@ def _words(parts):
     return " or ".join(", ".join(parts).rsplit(", ", 1))
 
 
-def skipped_summary(group_key, params, kind):
+def skipped_summary(group_key, params, kind, personal=False):
     """(skipped, why in words) for the send pop-up: how many in the group will not get this, and the reasons. The count of people who
     do get it is `count()`. For an uploaded list the reasons are exact; for the other groups the figure is the people the group holds
     minus those who can be emailed (suppressed, unsubscribed, no news consent)."""
     group = GROUPS[group_key]
-    sendable = count(group_key, params, kind)
+    sendable = count(group_key, params, kind, personal)
+    invite_rules = kind == Mailing.INVITATION or personal
     if group.people == "list":
         info = list_breakdown((params or {}).get("list_id"))
         skipped = max(info["members"] - sendable, 0)
         parts = [label for key, label in (("opted_out", "unsubscribed"), ("suppressed", "bounced or complained")) if info[key]]
-        if kind == Mailing.INVITATION:
+        if invite_rules:
             parts += [label for key, label in (("accounts", "already members"), ("invited", "already invited")) if info[key]]
         elif skipped > info["opted_out"] + info["suppressed"]:
             parts.append("news switched off")
         return skipped, _words(parts) if skipped else ""
-    base = BUILDERS[group_key](params or {}).count() if group.people != "leads" else _leads(params or {}).count()
+    base = (BUILDERS[group_key](params or {}).count() if group.people != "leads"
+            else _leads(params or {}).order_by().values(email=Lower("lead_email")).distinct().count())
     skipped = max(base - sendable, 0)
+    if group.people == "leads" and invite_rules:
+        return skipped, "bounced or complained, unsubscribed, already members or already invited" if skipped else ""
     return skipped, ("suppressed, unsubscribed or not opted in" if kind == Mailing.NEWS else "suppressed") if skipped else ""
 
 
-def _lead_queryset(params, allowed):
+def _lead_queryset(params, allowed, invite_rules=False):
     qs = (_leads(params) if allowed else JourneySession.objects.none()).annotate(r_email=Lower("lead_email"), first_name=Value("", output_field=CharField()),
                                  r_user_id=Value(None, output_field=UUIDField()))
     qs = qs.exclude(Exists(User.objects.annotate(u_email=Lower("email")).filter(u_email=OuterRef("r_email"))))  # any account, staff included
     qs = qs.exclude(Exists(EmailSuppression.objects.filter(email=OuterRef("r_email"))))
-    return qs.exclude(Exists(EmailOptOut.objects.filter(email=OuterRef("r_email"))))
+    qs = qs.exclude(Exists(EmailOptOut.objects.filter(email=OuterRef("r_email"))))
+    if invite_rules:  # an invitation or a personal link: not twice to someone whose invite is still waiting
+        qs = qs.exclude(Exists(Invite.objects.filter(email=OuterRef("r_email"), status__in=Invite.PENDING, expires_at__gt=timezone.now())))
+    return qs
 
 
-def count(group_key, params, kind):
+def count(group_key, params, kind, personal=False):
     """How many different addresses would get it."""
-    return queryset(group_key, params, kind).order_by().values("r_email").distinct().count()
+    return queryset(group_key, params, kind, personal).order_by().values("r_email").distinct().count()
 
 
-def rows(group_key, params, kind):
+def rows(group_key, params, kind, personal=False):
     """(email, first_name, user_id or None) once per address, in address order. Streams: no big lists in memory."""
     seen = None
-    people = queryset(group_key, params, kind).order_by("r_email", "pk").values_list("r_email", "first_name", "r_user_id")
+    people = queryset(group_key, params, kind, personal).order_by("r_email", "pk").values_list("r_email", "first_name", "r_user_id")
     first_only = GROUPS[group_key].people == "list"
     for email, first_name, user_id in people.iterator(chunk_size=500):
         if email != seen:

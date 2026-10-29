@@ -38,6 +38,7 @@ MAX_ATTEMPTS = 5  # a throttled send is tried this often (30 s, 60 s, 120 s ... 
 TRANSIENT = ("Throttling", "MaxSendingRateExceeded", "TooManyRequests", "ServiceUnavailable", "InternalFailure", "InternalServerError",
              "RequestTimeout", "ConnectTimeout", "ReadTimeout", "EndpointConnectionError")
 NEWS_NOTICE = "You are receiving this because you opted in to news from Spa 99."
+PERSONAL_REFUSED = "Personal links are for people without an account. Use a web address for this group."
 INVITE_NOTICE = "You are receiving this because Spa 99 invited you to register."
 
 
@@ -180,11 +181,13 @@ def check_mailing(mailing):
         errors["kind"] = [f"This email is sent as: {automatic.SENDABLE[mailing.automatic_key]}."]
     if group_errors:
         errors.update(group_errors)
-    elif valid_kind and mailing.kind == Mailing.INVITATION and not mailing.automatic_key:
+    elif mailing.has_personal_links and segments.GROUPS[mailing.group].people not in ("list", "leads"):
+        errors["blocks"] = [PERSONAL_REFUSED]
+    elif valid_kind and mailing.kind == Mailing.INVITATION and not mailing.automatic_key and not mailing.has_personal_links:
         errors["kind"] = ["An invitation is sent from the Invitation to register email (Send to a group)."]
     elif valid_kind and not segments.GROUPS[mailing.group].allows(mailing.kind):
         errors["group"] = [segments.GROUPS[mailing.group].kind_error()]
-    elif valid_kind and not segments.count(mailing.group, params, mailing.kind):
+    elif valid_kind and not segments.count(mailing.group, params, mailing.kind, mailing.has_personal_links):
         errors["group"] = ["Nobody in this group can be emailed (suppressed, inactive, not opted in or already invited)."]
     return errors
 
@@ -245,16 +248,21 @@ def snapshot(mailing):
     """Write the recipient rows for this mailing once (a second call changes nothing). Returns the number of rows."""
     if not mailing.recipients.exists():
         batch = []
-        for email, first_name, user_id in segments.rows(mailing.group, mailing.params, mailing.kind):
+        for email, first_name, user_id in segments.rows(mailing.group, mailing.params, mailing.kind, mailing.has_personal_links):
             batch.append(MailingRecipient(mailing=mailing, email=email, first_name=first_name[:100], user_id=user_id))
             if len(batch) >= 500:
                 MailingRecipient.objects.bulk_create(batch, ignore_conflicts=True)
                 batch = []
         if batch:
             MailingRecipient.objects.bulk_create(batch, ignore_conflicts=True)
-    if mailing.automatic_key == "invite":
+    if _tracks_invites(mailing):
         _make_invites(mailing)
     return mailing.recipients.count()
+
+
+def _tracks_invites(mailing):
+    """Each person gets an Invite row (the personal link and its tracking): the Invitation email, or a mailing with a personal-link button."""
+    return mailing.automatic_key == "invite" or mailing.has_personal_links
 
 
 def _make_invites(mailing):
@@ -298,13 +306,13 @@ def schedule(mailing, when, user=None, request=None, confirmed=None):
     _event(SystemEvent.MAILING_SCHEDULED, user,
            f"{_who(user)} scheduled the mailing '{mailing.name}' for {timezone.localtime(when):%-d %b %Y %H:%M}",
            {"mailing": str(mailing.pk), "name": mailing.name, "kind": mailing.kind, "group": mailing.group,
-            "recipients_now": segments.count(mailing.group, mailing.params, mailing.kind), "scheduled_at": when.isoformat()}, request)
+            "recipients_now": segments.count(mailing.group, mailing.params, mailing.kind, mailing.has_personal_links), "scheduled_at": when.isoformat()}, request)
     return mailing
 
 
 def _counted_now(mailing):
     params, errors = segments.clean_params(mailing.group, mailing.params) if mailing.group in segments.GROUPS else ({}, True)
-    return 0 if errors else segments.count(mailing.group, params, mailing.kind)
+    return 0 if errors else segments.count(mailing.group, params, mailing.kind, mailing.has_personal_links)
 
 
 def _drop_schedule(mailing):
@@ -429,7 +437,7 @@ def _slice(mailing, budget):
 def _fail_stale(mailing):
     cutoff = timezone.now() - timedelta(seconds=STALE_SECONDS)
     stale = MailingRecipient.objects.filter(mailing=mailing, status=MailingRecipient.SENDING, updated_at__lt=cutoff)
-    if mailing.automatic_key:
+    if _tracks_invites(mailing):
         Invite.objects.filter(batch_id=mailing.pk, status=Invite.QUEUED, email__in=list(stale.values_list("email", flat=True))).update(
             status=Invite.FAILED, reason="Interrupted; not retried so nobody gets it twice", updated_at=timezone.now())
     stale.update(status=MailingRecipient.FAILED, reason="Interrupted; not retried so nobody gets it twice", updated_at=timezone.now())
@@ -439,6 +447,11 @@ def _skip_reason(mailing, recipient):
     """Checked again at send time: people can unsubscribe or be suppressed between the snapshot and their turn."""
     from users.models import User
 
+    if mailing.has_personal_links and mailing.kind != Mailing.INVITATION:  # a personal link follows the invitation rules, whatever the kind
+        if User.objects.filter(email__iexact=recipient.email).exists():
+            return "Already has an account"
+        if Invite.objects.filter(email=recipient.email, status__in=Invite.PENDING, expires_at__gt=timezone.now()).exclude(batch_id=mailing.pk).exists():
+            return "Already invited and waiting"
     if mailing.kind == Mailing.INVITATION:
         if User.objects.filter(email__iexact=recipient.email).exists():
             return "Already has an account"
@@ -471,7 +484,7 @@ def _send_one(mailing, group, recipient):
         return
     try:
         reason = _skip_reason(mailing, recipient)
-        invite = Invite.objects.filter(batch_id=mailing.pk, email=recipient.email).first() if mailing.automatic_key == "invite" else None
+        invite = Invite.objects.filter(batch_id=mailing.pk, email=recipient.email).first() if _tracks_invites(mailing) else None
         if not reason and invite is not None and invite.expired:
             reason = "The invite expired before it was sent"
         if reason:
@@ -484,7 +497,14 @@ def _send_one(mailing, group, recipient):
             headers = tokens.list_unsubscribe_headers(url)
         else:
             context["notice"] = f"You are receiving this message {group.reason}."
-        if mailing.automatic_key == "invite":
+        if mailing.has_personal_links:
+            if invite is None:
+                _finish_row(mailing, recipient, MailingRecipient.FAILED, "No invite row")
+                return
+            context["personal_links"] = blocks.personal_links(f"{settings.SITE_URL}/invite/{invite.token}/")
+            log = send_templated("mailing", [recipient.email], subject_line(mailing.subject, recipient.first_name), context,
+                                 headers=headers, body=mailing.body, blocks=mailing.blocks, subject_email=recipient.email)
+        elif mailing.automatic_key == "invite":
             if invite is None:
                 _finish_row(mailing, recipient, MailingRecipient.FAILED, "No invite row")
                 return
@@ -517,7 +537,7 @@ def _invite_context(invite):
 def _finish_row(mailing, recipient, status, reason, sent_at=None, message_id=""):
     """Record the result for one person; for an invitation the Invite row (the per-person tracking) gets the same result."""
     _mark(recipient, status, reason, sent_at=sent_at, message_id=message_id)
-    if mailing.automatic_key == "invite":
+    if _tracks_invites(mailing):
         Invite.objects.filter(batch_id=mailing.pk, email=recipient.email, status__in=(Invite.QUEUED, Invite.SENDING)).update(
             status={"sent": Invite.SENT, "skipped": Invite.SKIPPED, "failed": Invite.FAILED}[status], reason=reason[:200], sent_at=sent_at,
             message_id=(message_id or "")[:100], updated_at=timezone.now())
@@ -568,8 +588,8 @@ def confirm_details(mailing):
     "skipped_why", "from", "reply_to", "through", "kind"}."""
     params, errors = segments.clean_params(mailing.group, mailing.params)
     valid = not errors and mailing.kind in dict(Mailing.KIND_CHOICES) and segments.GROUPS[mailing.group].allows(mailing.kind)
-    people = segments.count(mailing.group, params, mailing.kind) if valid else 0
-    skipped, why = segments.skipped_summary(mailing.group, params, mailing.kind) if valid else (0, "")
+    people = segments.count(mailing.group, params, mailing.kind, mailing.has_personal_links) if valid else 0
+    skipped, why = segments.skipped_summary(mailing.group, params, mailing.kind, mailing.has_personal_links) if valid else (0, "")
     if mailing.automatic_key:
         spec = emailbody.SPECS.get(mailing.automatic_key)
         row = NotificationTemplate.objects.filter(key=mailing.automatic_key).first()

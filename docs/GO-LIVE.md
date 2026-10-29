@@ -110,6 +110,14 @@ Never edit or delete a migration that is already live.
 
 **Rollback:** set `APP_TAG` back to the previous version, then `docker compose pull && docker compose up -d`. If a migration damaged data, restore the RDS snapshot to a new instance and point `DATABASE_URL` at it.
 
+## 1.0.2 (invite link through the questionnaire, personal links in the builder)
+
+- **Migration `system.0021`** adds `SiteDefaults.invite_landing` (schema only, `db_default='journey'`). Take the RDS snapshot first. It runs on start.
+- **No backfill.** `backfill_site_data` is unchanged.
+- **After deploy**, Moishe updates his saved invite wording in System > Emails > Automatic > Invitation to register (the saved body says "link to register"; the subject is also the old one).
+- **The setting** is in System > Defaults > Emails, "Invitation link goes to" (the questionnaire by default, or Register).
+- **Rollback is safe:** the column has a database default, so 1.0.1 can still save Defaults without migrating back.
+
 ## What is kept, and for how long
 
 Nothing grows without limit on disk: every container's log is capped at 5 x 10 MB (`docker-compose.yml`), and the server holds no app data.

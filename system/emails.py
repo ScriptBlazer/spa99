@@ -53,7 +53,7 @@ def spec_info(spec):
     """One email's placeholders and samples, for the edit screen."""
     return {
         "key": spec.key, "title": spec.title, "editable": spec.editable, "has_button": bool(spec.button_label),
-        "button_required": spec.button_required, "button_label": spec.button_label,
+        "button_required": spec.button_required, "button_label": emailbody.button_label_for(spec),
         "placeholders": [{"name": n, "description": d, "sample": str(emailbody.sample_values(spec).get(n.strip(), ""))[:80]}
                          for n, d in spec.placeholders.items()],
         "subject_placeholders": [{"name": n, "description": d} for n, d in spec.subject_placeholders.items()],
@@ -147,8 +147,9 @@ class MailingForm(forms.ModelForm):
 
     def clean_kind(self):
         kind = self.cleaned_data["kind"]
-        if kind == Mailing.INVITATION and not (self.instance and self.instance.automatic_key):
-            raise forms.ValidationError("Choose News or Service message. An invitation is sent from the Invitation to register email.")
+        parts, _ = mailing_blocks._parse(self.data.get("blocks")) if "blocks" in self.data else (None, None)
+        if kind == Mailing.INVITATION and not (self.instance and self.instance.automatic_key) and not mailing_blocks.has_personal(parts):
+            raise forms.ValidationError("Choose News or Service message. An invitation is sent from the Invitation to register email, or from a mailing with a personal-link button.")
         return kind
 
     def clean(self):
