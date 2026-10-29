@@ -45,7 +45,7 @@ class SettingsLaunchTests(TestCase):
         group = html[html.index("<h3>Launch</h3>"):html.index("<h3>Wording and tax</h3>")]
         self.assertIn('Card payments are opened separately in <a href="/payments/">Payments</a>.', group)
         names = re.findall(r'data-system-field="(\w+)"', group)
-        self.assertEqual(names, ["opening_date", "opening_text", "register_interest_open", "journey_email_gate", "memberships_public", "subscribe_open", "booking_open"])
+        self.assertEqual(names, ["opening_date", "opening_text", "register_interest_open", "journey_email_gate", "memberships_public", "booking_open"])
         self.assertIn("People can register their interest.", group)
         self.assertIn("Shows the Memberships page and prices. Off for the soft launch.", group)
         self.assertIn("Ask for an email at the end of the questionnaire.", group)

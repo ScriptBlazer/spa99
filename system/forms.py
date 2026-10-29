@@ -118,7 +118,6 @@ LAUNCH_HELP = {
     "register_interest_open": "People can register their interest.",
     "journey_email_gate": "Ask for an email at the end of the questionnaire.",
     "memberships_public": "Shows the Memberships page and prices. Off for the soft launch.",
-    "subscribe_open": "Reserved for choosing and setting up a membership online. Nothing on the site reads it yet.",
     "booking_open": "Marks booking as live: hides the \"booking not open yet\" line and tells the assistant. The booking system itself comes later.",
 }
 
@@ -157,6 +156,6 @@ class SettingsForm(VersionedForm):
 
     class Meta:
         model = SiteSettings
-        fields = ["opening_date", "opening_text", "register_interest_open", "memberships_public", "journey_email_gate", "subscribe_open", "booking_open",
+        fields = ["opening_date", "opening_text", "register_interest_open", "memberships_public", "journey_email_gate", "booking_open",  # subscribe_open hidden until card payments (Moishe 2026-10-29)
                   "join_wording", "show_leil_shishi", "vat_rate", "discount_contact_url", "lock_idle_minutes", "max_sign_in_hours", "code_theme_default"]
         widgets = {"opening_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}

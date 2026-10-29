@@ -14,7 +14,7 @@ from .forms import DIGITS_MESSAGE, VersionedForm
 POINTS_LIMIT = 1000  # plan points and Gold points: -1000 to 1000
 
 RISKY = {
-    "settings": ["vat_rate", "opening_date", "register_interest_open", "memberships_public", "journey_email_gate", "subscribe_open", "booking_open", "lock_idle_minutes", "max_sign_in_hours"],
+    "settings": ["vat_rate", "opening_date", "register_interest_open", "memberships_public", "journey_email_gate", "booking_open", "lock_idle_minutes", "max_sign_in_hours"],
     "emails": ["gold_approver_cc", "contact_email"],
     "plans": ["price_ex_vat", "visits_per_month", "hours", "booking_window_days", "upcoming_limit", "cancel_hours", "guests_per_month", "annual_fee", "visible"],
     "hours": ["start_time", "end_time", "offset_minutes", "active", "starts_at", "ends_at", "capacity", "slot_length_minutes", "slot_step_minutes"],
