@@ -314,3 +314,14 @@ html.has-sale .menu::backdrop { background: transparent; }
 .plan-sale { margin-top: var(--space-3); color: var(--color-gold); }
 .m-sale { margin-top: var(--space-3); font-size: var(--text-body); color: var(--color-text); }
 .m-sale .mark-glyph { width: 0.9rem; margin-top: 0.2rem; }
+
+/* ---------- WhatsApp button (2026-10-29): the outline button with the WhatsApp mark, calm on light and dark (colour comes from --s-text) ---------- */
+.btn-whatsapp { gap: var(--space-2); }
+.btn-whatsapp .icon { width: 1.25rem; height: 1.25rem; }
+.whatsapp-slot { margin-top: var(--space-4); }
+.whatsapp-slot .btn { max-width: 100%; }
+.discount-line.whatsapp-rate { display: grid; justify-items: center; gap: var(--space-2); }
+.m-title .discount-line.whatsapp-rate { justify-items: start; }
+@media (max-width: 47.99em) { .whatsapp-slot .btn-whatsapp { width: 100%; } }
+.footer-whatsapp { margin-top: var(--space-3); justify-self: start; }
+@media (max-width: 47.99em) { .footer-whatsapp .btn-whatsapp { width: auto; } }

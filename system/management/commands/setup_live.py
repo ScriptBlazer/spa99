@@ -42,7 +42,9 @@ TEAM = [
 SITE_SETTINGS = {  # SiteSettings field -> value. Filled only while the field is empty.
     "contact_email": "hello@spa99.uk",
     "gold_approver_cc": "moishe@spa99.uk",
-    "discount_contact_url": "https://wa.me/447441919990",  # the spa WhatsApp (07441 919990)
+    "whatsapp_number": "447441919990",  # the spa WhatsApp (07441 919990)
+    "whatsapp_message": "Hi, I'd love to find out more about Spa 99.",
+    "whatsapp_rate_message": "Hi, I'd like to discuss better prices for Spa 99.",
 }
 STAFF_ALERT_EMAILS = INITIAL_STAFF_ALERT_EMAIL  # System > Defaults > Payment alert emails. Filled by seed_phase1, once only (kept there:
 #   the seed imports nothing from this command, so moving it here would be a circular import).

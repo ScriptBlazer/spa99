@@ -118,6 +118,14 @@ Never edit or delete a migration that is already live.
 - **The setting** is in System > Defaults > Emails, "Invitation link goes to" (the questionnaire by default, or Register).
 - **Rollback is safe:** the column has a database default, so 1.0.1 can still save Defaults without migrating back.
 
+## 1.0.3 (WhatsApp buttons, number and message settings, Gold wording)
+
+- **Migration `plans.0025`** adds three `SiteSettings` fields: `whatsapp_number` (empty), `whatsapp_message` ("Hi, I'd love to find out more about Spa 99.") and `whatsapp_rate_message` ("Hi, I'd like to discuss better prices for Spa 99."). Schema only; all three have a database default, so existing rows get the defaults. Take the RDS snapshot first. It runs on start.
+- **After deploy, run `python manage.py backfill_site_data`** (try `--dry-run` first). It copies the digits from the old `https://wa.me/447441919990` link into the WhatsApp number (live has the old link; the number stays empty otherwise) and moves the stored Gold wording to "For BML clients: past, present and future." (exact old wording only, so anything edited by hand is kept; includes the chat FAQ "What is the Gold Card?"). Safe to run twice.
+- **Check** System > Settings > "Wording, tax and WhatsApp": the number reads 447441919990, the message is "Hi, I'd love to find out more about Spa 99.", and "WhatsApp message (better prices)" is "Hi, I'd like to discuss better prices for Spa 99.". Open a better-rate button (Register, or a Memberships "Looking for a better rate?") and check WhatsApp opens with the better-prices text; the footer button opens with the general text.
+- `setup_live` fills the number, message and better-prices message (empty fields only) instead of the link. The column `discount_contact_url` stays, unused.
+- **Rollback is safe:** all three new columns have a database default, so 1.0.2 can still save Settings (checked: 1.0.2's code saves `SiteSettings` on the 0025 schema). The WhatsApp links on 1.0.2 use the old link, which 1.0.3 does not clear, so they keep working.
+
 ## What is kept, and for how long
 
 Nothing grows without limit on disk: every container's log is capped at 5 x 10 MB (`docker-compose.yml`), and the server holds no app data.

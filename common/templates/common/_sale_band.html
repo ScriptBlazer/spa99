@@ -1,4 +1,4 @@
-{% load static sale_tags membership_tags %}{% if sale_bar %}{% sale_bar_view sale_bar as sb %}{% memberships_shown as show_memberships %}{% memberships_url as mem_url %}
+{% load static sale_tags membership_tags content_tags %}{% if sale_bar %}{% sale_bar_view sale_bar as sb %}{% memberships_shown as show_memberships %}{% memberships_url as mem_url %}
 {# The sale band (docs/design/SYSTEM-SALES.md Round 2). Used on Home (tone="raised") and Memberships (tone="deep"); every other page keeps the slim strip. Not dismissible. #}
 <link rel="stylesheet" href="{% static 'common/css/sale-band.css' %}">
 <section class="sale-band on-dark sale-band--{{ tone|default:'raised' }}" aria-labelledby="sale-band-title" data-sale-band data-ends="{{ sale_bar.ends_at }}" data-now="{{ sb.now }}"{% if sb.upcoming %} data-upcoming{% endif %}{% if tone == "raised" %} data-scene="sale"{% endif %}>
@@ -17,6 +17,7 @@
       {% if tone == "deep" %}<a class="btn btn-primary btn-block-phone" href="#plans" data-sale-jump>Choose your membership</a>
       {% elif show_memberships %}<a class="btn btn-primary btn-block-phone" href="{{ mem_url }}#plans">See the memberships {% include "common/_icon.html" with name="arrow-right" %}</a>
       {% else %}<a class="btn btn-primary btn-block-phone" href="{{ mem_url }}">Find your membership {% include "common/_icon.html" with name="arrow-right" %}</a>{% endif %}
+      {% if tone == "raised" %}{% whatsapp_button "home_sale" label="WhatsApp us for custom prices" css_class="sale-band-whatsapp" msg="rates" %}{% endif %}
       {% if sale_bar.preview %}<a class="sale-band-end-preview" href="?sale_preview=end">End preview</a>{% endif %}
     </div>
   </div>

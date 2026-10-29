@@ -15,6 +15,7 @@
         <a class="btn-quiet" href="{% url 'spa' %}">See the spa</a>
         <a class="btn-quiet" href="{% url 'login' %}?next={% url 'account_book' %}" data-signin-link>Already registered? Sign in</a>
       </div>
+      {% whatsapp_slot "book" %}
     </div>
   </div>
 </section>

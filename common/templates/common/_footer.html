@@ -17,6 +17,7 @@
       {{ site_settings.address_one_line|default:"BML House, 99c Vale Road, London N4 1PR" }}<br>
       <a href="mailto:{{ site_settings.contact_address }}">{{ site_settings.contact_address }}</a><br>
       {% hours_note as hours_line %}{% if hours_line %}<span class="muted">{{ hours_line }}</span>{% endif %}
+      {% whatsapp_slot "footer" slot_class="footer-whatsapp" %}
     </address>
   </div>
   {% page_content "site" as site_copy %}

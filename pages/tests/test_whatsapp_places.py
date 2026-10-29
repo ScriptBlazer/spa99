@@ -25,7 +25,7 @@ class WhatsappPlacesTests(TestCase):
 
     def set_url(self, url):
         SiteSettings.load()
-        SiteSettings.objects.update(discount_contact_url=url)
+        SiteSettings.objects.update(whatsapp_number="447530117902" if url else "")
 
     def journey_config(self):
         html = self.client.get("/journey/").content.decode()
@@ -35,7 +35,9 @@ class WhatsappPlacesTests(TestCase):
         self.set_url(URL)
         html = self.client.get("/memberships/").content.decode()
         self.assertEqual(html.count(LINE), 1)
-        self.assertIn('href="/whatsapp/?from=memberships" target="_blank" rel="noopener noreferrer">WhatsApp us<span class="sr-only"> (opens in a new tab)</span>', html)
+        self.assertIn('href="/whatsapp/?from=memberships&amp;msg=rates" target="_blank" rel="noopener noreferrer">', html)
+        self.assertIn("btn btn-secondary btn-whatsapp", html)
+        self.assertIn("<span>WhatsApp us</span>", html)
         self.assertNotIn("wa.me", html)
 
     def test_memberships_hides_the_line_when_blank(self):
@@ -44,14 +46,15 @@ class WhatsappPlacesTests(TestCase):
 
     def test_the_journey_result_gets_the_short_link_or_nothing(self):
         self.set_url(URL)
-        self.assertEqual(self.journey_config()["whatsappUrl"], "/whatsapp/?from=journey")
+        self.assertEqual(self.journey_config()["whatsappUrl"], "/whatsapp/?from=journey&msg=rates")
         self.set_url("")
         self.assertEqual(self.journey_config()["whatsappUrl"], "")
 
     def test_visit_shows_whatsapp_next_to_the_email_when_set(self):
         self.set_url(URL)
         html = self.client.get("/visit/").content.decode()
-        self.assertIn('href="/whatsapp/?from=visit" target="_blank" rel="noopener noreferrer">WhatsApp<span class="sr-only"> (opens in a new tab)</span>', html)
+        self.assertIn('href="/whatsapp/?from=visit" target="_blank" rel="noopener noreferrer">', html)
+        self.assertIn("btn btn-secondary btn-whatsapp", html)
         self.set_url("")
         self.assertNotIn("/whatsapp/", self.client.get("/visit/").content.decode())
 

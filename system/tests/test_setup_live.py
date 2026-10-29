@@ -48,7 +48,7 @@ class SetupLiveTests(TestCase):
         self.assertEqual(mail.outbox, [])
         self.assertFalse(User.objects.filter(email__endswith="@spa99.uk").exists())
         self.assertEqual(SiteSettings.load().contact_email, "")
-        self.assertEqual(SiteSettings.load().discount_contact_url, "")
+        self.assertEqual(SiteSettings.load().whatsapp_number, "")
         self.assertFalse(SiteDefaults.load().staff_alert_seeded)
         self.assertIn("would create as", text)
         self.assertNotIn("set created", text)
@@ -63,8 +63,8 @@ class SetupLiveTests(TestCase):
         self.assertFalse(moishe.has_usable_password() or barry.has_usable_password())
         self.assertEqual(sorted(m.to[0] for m in mail.outbox), ["barry@spa99.uk", "moishe@spa99.uk"])
         site = SiteSettings.load()
-        self.assertEqual((site.contact_email, site.gold_approver_cc, site.discount_contact_url),
-                         ("hello@spa99.uk", "moishe@spa99.uk", "https://wa.me/447441919990"))
+        self.assertEqual((site.contact_email, site.gold_approver_cc, site.whatsapp_number, site.whatsapp_message),
+                         ("hello@spa99.uk", "moishe@spa99.uk", "447441919990", "Hi, I'd love to find out more about Spa 99."))
         self.assertFalse(site.final_approval_on)
         self.assertEqual(SiteDefaults.load().staff_alert_emails, "moishe@spa99.uk")
         self.assertNotIn("/reset/", text)  # no link is ever printed
@@ -87,7 +87,16 @@ class SetupLiveTests(TestCase):
         text = self.real_run()
         self.assertEqual(SiteSettings.load().contact_email, "info@elsewhere.test")
         self.assertIn("contact_email: already set (left alone)", text)
-        self.assertEqual(SiteSettings.load().discount_contact_url, "https://wa.me/447441919990")  # the others are still filled
+        self.assertEqual(SiteSettings.load().whatsapp_number, "447441919990")  # the others are still filled
+        SiteSettings.objects.update(whatsapp_number="", whatsapp_message="", whatsapp_rate_message="")  # empty fields only are filled
+        self.assertEqual(SiteSettings.load().whatsapp_rate_message, "")
+        self.real_run()
+        self.assertEqual((SiteSettings.load().whatsapp_number, SiteSettings.load().whatsapp_message), ("447441919990", "Hi, I'd love to find out more about Spa 99."))
+        self.assertEqual(SiteSettings.load().whatsapp_rate_message, "Hi, I'd like to discuss better prices for Spa 99.")
+        SiteSettings.objects.update(whatsapp_number="447000000000", whatsapp_message="Mine", whatsapp_rate_message="Mine too")
+        self.real_run()
+        self.assertEqual((SiteSettings.load().whatsapp_number, SiteSettings.load().whatsapp_message), ("447000000000", "Mine"))  # never overwritten
+        self.assertEqual(SiteSettings.load().whatsapp_rate_message, "Mine too")
 
     def test_an_existing_account_only_gains_and_never_loses(self):
         from plans.tests.helpers import make_team_member
@@ -100,11 +109,11 @@ class SetupLiveTests(TestCase):
         self.assertEqual([m.to[0] for m in mail.outbox], ["moishe@spa99.uk"])  # only the new account is invited
 
     def test_a_bad_value_is_reported_and_the_rest_carry_on(self):
-        with mock.patch.dict(setup_live.SITE_SETTINGS, {"discount_contact_url": "http://not-https.test"}):
+        with mock.patch.dict(setup_live.SITE_SETTINGS, {"whatsapp_number": "12"}):
             text = self.real_run()
-        self.assertIn("discount_contact_url: PROBLEM", text)
+        self.assertIn("whatsapp_number: PROBLEM", text)
         self.assertEqual(SiteSettings.load().contact_email, "hello@spa99.uk")
-        self.assertEqual(SiteSettings.load().discount_contact_url, "")
+        self.assertEqual(SiteSettings.load().whatsapp_number, "")
 
 
 def moishe_groups():

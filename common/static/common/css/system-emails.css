@@ -323,3 +323,8 @@ body.system {
 .se-problems ul { list-style: disc; padding-left: var(--sys-5); margin-top: var(--sys-2); }
 .se-problems { margin-bottom: var(--sys-3); }
 .se-fix-name { font-family: inherit; width: min(200px, 50vw); }
+
+/* list page: invite button, status chips (wrap at phone width) */
+.se-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-2); }
+.se-actions form { margin: 0; }
+@media (max-width: 48em) { .se-actions .sys-btn { white-space: normal; text-align: center; } .se-people td:nth-child(3) { white-space: nowrap; } }

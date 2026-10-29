@@ -372,35 +372,34 @@ class NoPaymentAndDiscountLineTests(TestCase):
         return client, user
 
     def test_register_says_registering_is_free_and_shows_no_whatsapp_line(self):
-        SiteSettings.objects.update(discount_contact_url="https://wa.me/447000000000")
+        SiteSettings.objects.update(whatsapp_number="447000000000")
         html = Client().get("/register/").content.decode()
         self.assertIn("No payment is taken now. When we open, you&rsquo;ll have 2 weeks to set up your membership.", html)
-        self.assertIn('href="/whatsapp/?from=register"', html)
-        self.assertIn("WhatsApp us", html)  # the special-discount line (the old "better rate" line is not on Register)
+        self.assertIn('href="/whatsapp/?from=register&amp;msg=rates"', html)
+        self.assertIn("<span>WhatsApp us</span>", html)  # a real button now (the old "better rate" line is not on Register)
+        self.assertIn("btn btn-secondary btn-whatsapp", html)
         self.assertNotIn("better rate", html)
 
     def test_whatsapp_line_is_on_the_signed_in_membership_page(self):
         url = "https://wa.me/447000000000"
-        SiteSettings.objects.update(discount_contact_url=url)
+        SiteSettings.objects.update(whatsapp_number="447000000000")
         client, _ = self._member_client()
         html = client.get("/account/membership/").content.decode()
-        self.assertIn("Message us on WhatsApp", html)
-        self.assertIn('href="/whatsapp/?from=membership" target="_blank" rel="noopener noreferrer"', html)  # the counted short link, not the raw URL
+        self.assertIn("Looking for a better rate?", html)
+        self.assertIn('class="btn btn-secondary btn-whatsapp" href="/whatsapp/?from=membership&amp;msg=rates" target="_blank" rel="noopener noreferrer"', html)  # the counted short link, not the raw URL
         self.assertNotIn(url, html)
         self.assertNotIn("Barry", html)
-        SiteSettings.objects.update(discount_contact_url="")
-        with override_settings(DEBUG=True):
-            self.assertContains(client.get("/account/membership/"), "WhatsApp link to come")
-        with override_settings(DEBUG=False):
-            self.assertNotContains(client.get("/account/membership/"), "better rate")
+        SiteSettings.objects.update(whatsapp_number="")
+        self.assertNotContains(client.get("/account/membership/"), "better rate")
+        self.assertNotContains(client.get("/account/membership/"), "btn-whatsapp")
 
     def test_welcome_email_carries_the_whatsapp_line_only_when_set(self):
         from users.tasks import send_welcome_email
         _, user = self._member_client()
-        SiteSettings.objects.update(discount_contact_url="https://wa.me/447000000000")
+        SiteSettings.objects.update(whatsapp_number="447000000000")
         send_welcome_email(user.pk)
         self.assertIn("/whatsapp/?from=email", mail.outbox[-1].body)
-        SiteSettings.objects.update(discount_contact_url="")
+        SiteSettings.objects.update(whatsapp_number="")
         send_welcome_email(user.pk)
         self.assertNotIn("WhatsApp", mail.outbox[-1].body)
 

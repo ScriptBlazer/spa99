@@ -11,27 +11,36 @@ def page_content(page_key):
     return services.page_content(page_key)
 
 
-@register.inclusion_tag("users/_discount_line.html", takes_context=True)
-def discount_line(context):
-    """{% discount_line %}: 'Looking for a better rate? Message us on WhatsApp.' with the Site settings link. Empty link:
-    a marked 'link to come' on dev, nothing on live (same rule as the legal fill-later rows)."""
-    from django.conf import settings
-
-    from plans.models import SiteSettings
-
-    site = context.get("site_settings") or SiteSettings.load()
+def _whatsapp_url(context, source, msg=None):
     from pages.links import short_url
 
-    return {"url": short_url("membership", site), "show_placeholder": settings.DEBUG}  # the short link counts the click, then forwards
+    return short_url(source, context.get("site_settings"), msg=msg)  # the counted short link; "" while no number is set
+
+
+@register.inclusion_tag("common/_whatsapp_slot.html", takes_context=True)
+def whatsapp_slot(context, source, label="WhatsApp us", slot_class=""):
+    """{% whatsapp_slot "home" %}: one calm outline "WhatsApp us" button on the counted short link (`/whatsapp/?from=<source>`), in its own
+    spacing wrapper. Nothing at all while no WhatsApp number is set in System > Settings."""
+    return {"url": _whatsapp_url(context, source), "label": label, "slot_class": slot_class}
+
+
+@register.inclusion_tag("common/_whatsapp_button.html", takes_context=True)
+def whatsapp_button(context, source, label="WhatsApp us", css_class="", msg=None):
+    """{% whatsapp_button "footer" %}: the bare button (no wrapper). Nothing while no number is set."""
+    return {"url": _whatsapp_url(context, source, msg), "label": label, "css_class": css_class}
+
+
+@register.inclusion_tag("users/_discount_line.html", takes_context=True)
+def discount_line(context):
+    """{% discount_line %}: 'Looking for a better rate?' and the WhatsApp button (membership). Nothing while no number is set."""
+    return {"url": _whatsapp_url(context, "membership", "rates")}
 
 
 @register.inclusion_tag("users/_whatsapp_rate_line.html", takes_context=True)
 def whatsapp_rate_line(context, source):
-    """{% whatsapp_rate_line "memberships" %}: one quiet 'Looking for a better rate? WhatsApp us.' line on the short link, counted under
-    `source`. Nothing at all while no WhatsApp link is set in System > Settings."""
-    from pages.links import short_url
-
-    return {"url": short_url(source, context.get("site_settings"))}
+    """{% whatsapp_rate_line "memberships" %}: 'Looking for a better rate?' and the WhatsApp button, counted under `source`.
+    Nothing at all while no WhatsApp number is set in System > Settings."""
+    return {"url": _whatsapp_url(context, source, "rates")}
 
 
 @register.inclusion_tag("content/_gold_fee_note.html")
@@ -87,7 +96,7 @@ def legal_text(context, text, doc=None):
 @register.inclusion_tag("users/_payment_note.html")
 def payment_note(whatsapp=True, css_class="no-payment", status="", source="register"):
     """{% payment_note %}: 'No payment is taken now. When we open, you'll have 2 weeks to set up your membership.' (the length is the
-    payment window in System > Defaults) and, for a special discount, a WhatsApp link from Site settings (the line is left out when no link is set)."""
+    payment window in System > Defaults) and, for a special discount, a WhatsApp button (left out when no number is set)."""
     from django.conf import settings
 
     from plans import payments

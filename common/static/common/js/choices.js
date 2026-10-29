@@ -55,13 +55,13 @@ export function segmentedEl({ name, options, labelledby, isChecked, dataset = {}
     }));
 }
 
-export function arrowIcon(spriteUrl) {
+export function arrowIcon(spriteUrl, name = 'arrow-right') {
   const ns = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('class', 'icon');
   svg.setAttribute('aria-hidden', 'true');
   const use = document.createElementNS(ns, 'use');
-  use.setAttribute('href', `${spriteUrl}#arrow-right`);
+  use.setAttribute('href', `${spriteUrl}#${name}`);
   svg.append(use);
   return svg;
 }

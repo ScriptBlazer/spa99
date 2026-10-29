@@ -111,14 +111,46 @@ class EnvLabelTests(TestCase):
         self.assertNotIn("system_env", public.context or {})
 
 
-class DiscountLinkSettingTests(TestCase):
+class WhatsappSettingTests(TestCase):
     def setUp(self):
         self.client = unlocked_client(make_user())
 
-    def test_only_https_is_accepted_and_the_change_is_logged(self):
-        bad = self.client.post("/settings/", SETTINGS_POST | {"discount_contact_url": "http://wa.me/447000000000"})
-        self.assertEqual(bad.status_code, 400)
-        self.assertEqual(SiteSettings.load().discount_contact_url, "")
-        self.client.post("/settings/", SETTINGS_POST | {"discount_contact_url": "https://wa.me/447000000000"})
-        self.assertEqual(SiteSettings.load().discount_contact_url, "https://wa.me/447000000000")
-        self.assertEqual(SystemChange.objects.get().field, "discount_contact_url")
+    def test_the_number_is_normalised_validated_and_logged(self):
+        for typed in ("+44 7441 919990", "07441 919990", "44 7441-919990", "00447441919990"):
+            self.client.post("/settings/", SETTINGS_POST | {"whatsapp_number": typed})
+            self.assertEqual(SiteSettings.load().whatsapp_number, "447441919990", typed)
+        for bad in ("12345", "abc", "+44 7441 91999x", "1" * 16):
+            response = self.client.post("/settings/", SETTINGS_POST | {"whatsapp_number": bad})
+            self.assertEqual(response.status_code, 400, bad)
+            self.assertEqual(SiteSettings.load().whatsapp_number, "447441919990")
+        self.assertEqual(SystemChange.objects.filter(field="whatsapp_number").count(), 1)
+
+    def test_the_message_is_saved_and_can_be_cleared(self):
+        self.client.post("/settings/", SETTINGS_POST | {"whatsapp_message": "Hello Spa 99"})
+        self.assertEqual(SiteSettings.load().whatsapp_message, "Hello Spa 99")
+        too_long = self.client.post("/settings/", SETTINGS_POST | {"whatsapp_message": "x" * 301})
+        self.assertEqual(too_long.status_code, 400)
+
+    def test_the_better_prices_message_is_saved(self):
+        self.client.post("/settings/", SETTINGS_POST | {"whatsapp_rate_message": "Better prices please"})
+        self.assertEqual(SiteSettings.load().whatsapp_rate_message, "Better prices please")
+        self.assertEqual(self.client.post("/settings/", SETTINGS_POST | {"whatsapp_rate_message": "x" * 301}).status_code, 400)
+        self.assertIn('name="whatsapp_rate_message"', self.client.get("/settings/").content.decode())
+
+    def test_the_form_shows_both_and_not_the_old_link(self):
+        html = self.client.get("/settings/").content.decode()
+        self.assertIn('name="whatsapp_number"', html)
+        self.assertIn('name="whatsapp_message"', html)
+        self.assertNotIn("discount_contact_url", html)
+
+    def test_number_normalisation(self):
+        from plans.models import normalise_whatsapp_number as n
+
+        self.assertEqual(n("+44 7441 919990"), "447441919990")
+        self.assertEqual(n("07441 919990"), "447441919990")
+        self.assertEqual(n("+44 (0)7441 919990"), "447441919990")
+        self.assertEqual(n("0044 (0) 7441 919990"), "447441919990")
+        self.assertEqual(n("(07441) 919990"), "447441919990")
+        self.assertEqual(n("  "), "")
+        self.assertEqual(n("call me"), "call me")  # left as typed so validation refuses it
+

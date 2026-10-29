@@ -48,7 +48,7 @@ Everything here is static; common/js/chat.js fills it. Without JavaScript the pi
     <div class="chat-block chat-handoff" data-chat-handoff>
       <p class="chat-block-line">Our team will gladly help.</p>
       <div class="chat-actions">
-        <a class="btn btn-primary" data-chat-whatsapp href="{{ chat_handoff.whatsapp_url }}" target="_blank" rel="noopener">WhatsApp us</a>
+        <a class="btn btn-primary btn-whatsapp" data-chat-whatsapp href="{{ chat_handoff.whatsapp_url }}" target="_blank" rel="noopener noreferrer">{% include "common/_icon.html" with name="whatsapp-logo" %}<span>WhatsApp us</span></a>
         <a class="btn btn-secondary" data-chat-mail href="{{ chat_handoff.mailto }}">Email us</a>
       </div>
       <p class="chat-block-address small" data-chat-address>{{ chat_handoff.email }}</p>

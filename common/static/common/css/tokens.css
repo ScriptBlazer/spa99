@@ -75,7 +75,7 @@
   --header-own-h: 4rem;                    /* the header bar itself */
   --sale-top: 0px;                         /* the sale bar above the header: html.has-sale sets it to --sale-h */
   --header-h: calc(var(--header-own-h) + var(--sale-top));   /* everything that clears the top of the page (bar + header) */
-  --sale-h: 2.75rem;                       /* height of the sale bar */
+  --sale-h: 3.5rem;                        /* height of the sale bar (phone; desktop below) */
   --control-h: 3.25rem;                    /* 52px buttons and fields */
   --control-h-compact: 2.5rem;             /* 40px, Control only */
   --tile-min-h: 4.5rem;
@@ -185,7 +185,7 @@ html[data-page="marketing"] {
 }
 
 @media (min-width: 64em) {
-  :root { --header-own-h: 4.5rem; --sale-h: 2.5rem; --gc-w: min(40rem, 44vw); --tier-num-size: 4.5rem; --tier-lift: -8px; }
+  :root { --header-own-h: 4.5rem; --sale-h: 4.25rem; --gc-w: min(40rem, 44vw); --tier-num-size: 4.5rem; --tier-lift: -8px; }
 }
 
 /* The sale bar is always on top while a sale is live (server sets html.has-sale), the header sits directly under it: --header-h includes it. */

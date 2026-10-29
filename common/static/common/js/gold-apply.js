@@ -32,6 +32,7 @@ const VISIT_KEYS = ['time', 'frequency', 'facilities', 'company'];
 const c = (key) => copy[key] || { heading: '', body: '', cta: '' };
 const jc = (key) => jcopy[key] || { heading: '', body: '', cta: '' };
 const arrowIcon = () => makeArrow(config.iconSprite);
+const whatsappIcon = () => makeArrow(config.iconSprite, 'whatsapp-logo');
 
 let options = null; // from /gold/options/
 let journey = null; // from /journey/state/
@@ -110,7 +111,8 @@ const whatsappUrl = () => config.urls.whatsappBusiness || ''; // '' while no Wha
 
 /** "Send us a quick WhatsApp": opens the short link (it counts the click and pre-fills the message) in a new tab. */
 function whatsappButton() {
-  return el('a', { class: 'btn btn-secondary', href: whatsappUrl(), target: '_blank', rel: 'noopener', 'data-business-whatsapp': '', text: 'Open WhatsApp' });
+  return el('a', { class: 'btn btn-secondary btn-whatsapp', href: whatsappUrl(), target: '_blank', rel: 'noopener noreferrer', 'data-business-whatsapp': '' },
+    whatsappIcon(), el('span', { text: 'WhatsApp us' }), el('span', { class: 'sr-only', text: ' (opens in a new tab)' }));
 }
 function businessNote() {
   return el('div', { class: 'question sub-question business-note', dataset: { sub: 'business_note' }, hidden: !(notWorking() && form.business_willing === 'yes' && whatsappUrl()) },

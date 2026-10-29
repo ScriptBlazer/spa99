@@ -57,3 +57,11 @@ html[data-page="marketing"] .sale-bar { position: fixed; inset: 0 0 auto 0; }
 @media (prefers-contrast: more) {
   .sale-mention-sep, .sale-mention-when { color: var(--color-text-inverse); }
 }
+
+/* A fuller bar (Moishe 2026-10-29): taller (tokens --sale-h 3.5rem phone, 4.25rem desktop) with larger, bolder text */
+.sale-bar { font-size: var(--text-base); }
+.sale-bar-name { font-weight: 600; }
+@media (min-width: 64em) {
+  .sale-bar { font-size: var(--text-lg); letter-spacing: 0.005em; }
+  .sale-bar-link .icon { width: 1.25rem; height: 1.25rem; }
+}

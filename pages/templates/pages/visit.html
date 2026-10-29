@@ -7,7 +7,7 @@
     <h1 id="visit-title">{{ v.address.heading }}</h1>
     <p class="statement visit-lines">{% for line in v.address.body|lines %}<span>{{ line }}</span>{% endfor %}</p>
     <p class="visit-email"><a class="big-link" href="mailto:{{ site_settings.contact_address }}">{{ site_settings.contact_address }}</a></p>
-    {% if whatsapp_url %}<p class="visit-email"><a class="big-link" href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer">WhatsApp<span class="sr-only"> (opens in a new tab)</span></a></p>{% endif %}
+    {% if whatsapp_url %}<div class="whatsapp-slot">{% include "common/_whatsapp_button.html" with url=whatsapp_url %}</div>{% endif %}
     {% if hours %}<dl class="hours visit-hours">{% for label, text in hours %}<dt>{{ label }}</dt><dd>{{ text }}</dd>{% endfor %}</dl>{% endif %}
     {% if v.getting_here.body %}<div class="visit-getting"><h2>{{ v.getting_here.heading|default:"Getting here" }}</h2><p>{{ v.getting_here.body }}</p></div>{% endif %}
     {% if v.men_only.body %}<p class="small muted visit-men">{{ v.men_only.body }}</p>{% endif %}

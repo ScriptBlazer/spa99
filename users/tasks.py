@@ -85,7 +85,7 @@ def send_welcome_email(user_id):
             "plan_name": interest.plan.name if interest and interest.plan else "",
             "account_id": user.public_id_display,
             "opening_text": f"and we plan to open in {opening}" if opening else "",
-            "discount_url": f"{settings.SITE_URL}{short_path('email')}" if SiteSettings.load().discount_contact_url else "",
+            "discount_url": f"{settings.SITE_URL}{short_path('email')}" if SiteSettings.load().whatsapp_number else "",
         },
         subject_email=user.email,
     )

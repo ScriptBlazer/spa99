@@ -598,8 +598,10 @@ def list_save(request):
         return _respond(request, False, str(error), reverse("system_list_add", args=[target.pk]) if target else back, extra={"errors": error.errors})
     if report.get("existing"):
         return done(lst, "This list was already saved.", True) if lst else _respond(request, False, "That list no longer exists.", back)
-    word = "added to" if target else "saved as"
-    return done(lst, f"{report['ok']} {'person' if report['ok'] == 1 else 'people'} {word} '{lst.name}'. Nothing was sent.")
+    if target:
+        have = report["exists"]
+        return done(lst, f"Added {report['ok']} new {'person' if report['ok'] == 1 else 'people'} ({have} {'was' if have == 1 else 'were'} already on the list). Nothing was sent.")
+    return done(lst, f"{report['ok']} {'person' if report['ok'] == 1 else 'people'} saved as '{lst.name}'. Nothing was sent.")
 
 
 @unlocked
@@ -607,8 +609,12 @@ def list_save(request):
 def list_detail(request, pk):
     lst = get_object_or_404(ContactList, pk=pk)
     info = segments.list_breakdown(lst.pk)
-    context = {"list": lst, "members": lists.members_page(lst, request.GET.get("q"), request.GET.get("page")), "q": request.GET.get("q", ""),
-               "info": info, "categories": lists.categories(), "ses": ses.ses_status()}
+    status = request.GET.get("status", "all")
+    status = status if status in lists.FILTERS else "all"
+    counts = lists.status_counts(lst, request.GET.get("q"))
+    chips = [(key, "All" if key == "all" else lists.STATUS_LABELS[key], counts[key]) for key in lists.FILTERS if key in ("all", "not_invited") or counts[key]]
+    context = {"list": lst, "members": lists.members_page(lst, request.GET.get("q"), request.GET.get("page"), status), "q": request.GET.get("q", ""),
+               "status": status, "chips": chips, "reach": lists.invite_reach(lst), "info": info, "categories": lists.categories(), "ses": ses.ses_status()}
     return page(request, "system/emails_list.html", "emails", context)
 
 
@@ -669,11 +675,23 @@ def email_to_group(request, key):
     if not auto_emails.can_send_to_group(key):
         raise Http404
     row = logic.template_row(key, create=True)
+    list_id = request.POST.get("list_id")
+    if list_id:
+        try:
+            uuid.UUID(list_id)
+        except ValueError:
+            raise Http404 from None  # not an id at all: not found, never a server error
+    lst = get_object_or_404(ContactList, pk=list_id) if list_id else None  # from a list page: Who is that list
+    group, params = ("", {}) if lst is None else (segments.LIST_KEY, {"list_id": str(lst.pk)})
     recent = Mailing.objects.filter(automatic_key=key, status=Mailing.DRAFT, created_by=request.user, created_at__gte=timezone.now() - timedelta(minutes=1)).first()
     if recent is not None:  # a double click: the draft just made is the answer
+        if lst is not None and recent.params != params:
+            recent.group, recent.params = group, params
+            recent.save(update_fields=["group", "params", "updated_at"])
         return _respond(request, True, "Draft ready. Choose who gets it.", reverse("system_mailing", args=[recent.pk]), extra={"id": str(recent.pk)})
-    mailing = Mailing.objects.create(name=spec.title, subject=row.subject, kind=auto_emails.SENDABLE[key], group="", automatic_key=key, created_by=request.user)
-    return _respond(request, True, "Draft ready. Choose who gets it.", reverse("system_mailing", args=[mailing.pk]), extra={"id": str(mailing.pk)})
+    mailing = Mailing.objects.create(name=spec.title, subject=row.subject, kind=auto_emails.SENDABLE[key], group=group, params=params, automatic_key=key, created_by=request.user)
+    return _respond(request, True, "Draft ready. Check who it goes to, send yourself a test, then send." if lst else "Draft ready. Choose who gets it.",
+                    reverse("system_mailing", args=[mailing.pk]), extra={"id": str(mailing.pk)})
 
 
 @unlocked

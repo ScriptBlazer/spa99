@@ -10,8 +10,7 @@ FAQ = [
     ("What is included in a membership?", "Every visit: every room and all areas, as long as you like. Free drinks and free ice lollies. Come with nothing: "
      "towels, robe, slippers, toiletries and trunks are supplied. Memberships differ in visits a month, when you can come, how far ahead you can book "
      "and guests.", True),
-    ("What is the Gold Card?", "The Gold Card is for people who own, build and manage property: owners and investors, developers, block, estate and portfolio "
-     "managers, people at property and management firms, agents and brokers, and property lawyers. Not in property? You are still welcome to apply. It holds "
+    ("What is the Gold Card?", "The Gold Card is for BML clients: past, present and future. Not a BML client yet? You are still welcome to apply. It holds "
      "the fullest membership, and a little more. It is by application: each application is read personally, and if it is a fit, we invite you.", True),
     ("Where are you?", "BML House, 99c Vale Road, London N4 1PR.", True),
     ("Who is Spa 99 for?", "Spa 99 is for men only, 18 and over.", False),

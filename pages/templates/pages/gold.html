@@ -90,6 +90,7 @@
         <p class="muted">{{ g.apply.body }}</p>
         <a class="btn btn-primary btn-block-phone" href="{% url 'gold_apply' %}">{{ g.hero.cta_label }} {% include "common/_icon.html" with name="arrow-right" %}</a>
         {% if g.apply_note.body %}<p class="muted small gh-note">{{ g.apply_note.body }}</p>{% endif %}
+        {% whatsapp_slot "gold_card" %}
       </div>
     </div>
   </div>

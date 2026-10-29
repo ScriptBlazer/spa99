@@ -57,7 +57,7 @@ One System section (`/assistant/`, Developer level, unlocked, audited), tabs:
 
 ### Template context (public pages, `chat.context.chat`)
 - `chat_enabled`: the key is set and this is the public site. `chat_button`: `chat_enabled` and the page may show the button (not `/journey/`, `/gold-card/apply/`, `/account/`, sign-in, register, verify, password and unsubscribe pages). Use `chat_button` to render the button.
-- `chat_handoff` (only when `chat_button`, read lazily): `{reason, whatsapp_url, email, mailto}`. `whatsapp_url` is "" when not set (it is `SiteSettings.discount_contact_url`, the WhatsApp link in System > Settings): then show Email alone as primary. `email` is `site_settings.contact_address`; `mailto` carries the subject "A question for Spa 99".
+- `chat_handoff` (only when `chat_button`, read lazily): `{reason, whatsapp_url, email, mailto}`. `whatsapp_url` is "" when no number is set (the counted short link with `msg=rates`, so the "better prices" message from System > Settings is ready to send; built from the WhatsApp number): then show Email alone as primary. `email` is `site_settings.contact_address`; `mailto` carries the subject "A question for Spa 99".
 - `chat_suggested`: the questions marked Suggested in System > FAQ (visible, first four in order); fewer than one means use the design's fallback chips.
 - No database query runs on pages where the button is hidden.
 

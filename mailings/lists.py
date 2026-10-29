@@ -14,12 +14,16 @@ from collections import Counter
 
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
-from django.db.models import Q
-from django.db.models.functions import Lower
+from django.db.models import Case, Count, Exists, OuterRef, Q, Subquery, Value, When, CharField
+from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone
 
 from . import invites
-from .models import ContactList, ContactListMember, InviteImport
+from notifications.models import EmailSuppression
+from users.models import User
+
+from . import segments
+from .models import ContactList, ContactListMember, EmailOptOut, Invite, InviteImport, Mailing
 
 NAME_MAX = 120
 CATEGORY_MAX = 60
@@ -242,12 +246,74 @@ def add_more(lst, raw, user, token_row=None, request=None):
     return report["ok"], report
 
 
-def members_page(lst, query="", page=1):
-    qs = lst.members.all()
+# Status of a person on a list, first match wins. Read from the Invite rows for his address in ANY batch (an invite is per person, not per
+# list), the accounts, the opt-out list and the suppression list. One query with subqueries: no per-person lookups.
+STATUS_LABELS = {
+    "member": "Already a member",
+    "unsubscribed": "Unsubscribed",
+    "bounced": "Bounced",
+    "registered": "Registered",
+    "opened": "Opened",
+    "invited": "Invited",
+    "expired": "Invite expired",
+    "not_invited": "Not invited yet",
+}
+FILTERS = ("all", *STATUS_LABELS)
+
+
+def with_status(qs):
+    """Members annotated with `status` (a key of STATUS_LABELS) and `invite_date` (when the latest invite was sent, else made)."""
+    now = timezone.now()
+    latest = Invite.objects.filter(email=OuterRef("r_email")).exclude(status__in=(Invite.SKIPPED, Invite.FAILED)).order_by("-created_at")
+    return qs.annotate(
+        r_email=Lower("email"),
+        is_member=Exists(User.objects.annotate(u_email=Lower("email")).filter(u_email=OuterRef("r_email"))),
+        is_opted_out=Exists(EmailOptOut.objects.filter(email=OuterRef("r_email"))),
+        is_suppressed=Exists(EmailSuppression.objects.filter(email=OuterRef("r_email"))),
+        inv_status=Subquery(latest.values("status")[:1]),
+        inv_expires=Subquery(latest.values("expires_at")[:1]),
+        invite_date=Subquery(latest.annotate(d=Coalesce("sent_at", "created_at")).values("d")[:1]),
+    ).annotate(status=Case(
+        When(is_member=True, then=Value("member")),
+        When(is_opted_out=True, then=Value("unsubscribed")),
+        When(Q(is_suppressed=True) | Q(inv_status=Invite.BOUNCED), then=Value("bounced")),
+        When(inv_status=Invite.REGISTERED, then=Value("registered")),
+        When(inv_status__in=Invite.PENDING, inv_expires__lte=now, then=Value("expired")),
+        When(inv_status=Invite.OPENED, then=Value("opened")),
+        When(inv_status__in=Invite.PENDING, then=Value("invited")),
+        default=Value("not_invited"), output_field=CharField()))
+
+
+def _search(qs, query):
     query = (query or "").strip()
-    if query:
-        qs = qs.filter(Q(email__icontains=query) | Q(name__icontains=query))
-    return Paginator(qs.order_by(Lower("email")), PAGE).get_page(page)
+    return qs.filter(Q(email__icontains=query) | Q(name__icontains=query)) if query else qs
+
+
+def status_counts(lst, query=""):
+    """{"all": n, "member": n, ...} for the filter chips (the search box applies)."""
+    rows = with_status(_search(lst.members.all(), query)).order_by().values("status").annotate(n=Count("pk"))
+    counts = {key: 0 for key in FILTERS}
+    for row in rows:
+        counts[row["status"]] = row["n"]
+    counts["all"] = sum(counts[k] for k in STATUS_LABELS)
+    return counts
+
+
+def invite_reach(lst):
+    """Who the invitation send to this list would actually reach: the very same count the send uses (segments.count with the Invitation
+    rules: no accounts, no unsubscribed or bounced, nobody with an invite still valid; expired invites are allowed again)."""
+    return segments.count(segments.LIST_KEY, {"list_id": str(lst.pk)}, Mailing.INVITATION)
+
+
+def members_page(lst, query="", page=1, status="all"):
+    qs = with_status(_search(lst.members.all(), query))
+    if status in STATUS_LABELS:
+        qs = qs.filter(status=status)
+    page = Paginator(qs.order_by(Lower("email")), PAGE).get_page(page)
+    page.object_list = list(page.object_list)  # one query; the template reads these twice
+    for person in page.object_list:
+        person.status_label = STATUS_LABELS[person.status]
+    return page
 
 
 def remove_member(lst, member_id, user, request=None):
