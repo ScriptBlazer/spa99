@@ -87,6 +87,25 @@ class OpenAndSendTests(PaymentCase):
         self.assertNotIn("launch price", by[plain.user.email].body)
         self.assertIn("/account/membership/", by[plain.user.email].body)
 
+    def test_a_scheduled_opening_holds_back_when_more_members_than_confirmed_and_opens_with_fewer(self):
+        from system.models import SystemEvent
+
+        self.member()
+        self.member()
+        when = timezone.now() + timedelta(hours=2)
+        payments.schedule(self.dev, when, confirmed=2)
+        self.member()  # a third registers before the time comes
+        payments.tick(now=when + timedelta(minutes=1))
+        window = PaymentWindow.objects.get()
+        self.assertEqual(window.status, "cancelled")
+        self.assertIn("3 members now, 2 confirmed", window.note)
+        self.assertEqual(len(self.mails()), 0)
+        self.assertTrue(SystemEvent.objects.filter(kind="payments_cancelled", detail__confirmed=2).exists())
+        payments.schedule(self.dev, when + timedelta(days=1), confirmed=5)  # fewer than confirmed is fine
+        payments.tick(now=when + timedelta(days=1, minutes=1))
+        self.assertEqual(PaymentWindow.objects.get(status="open").confirmed_count, 5)
+        self.assertEqual(len(self.mails()), 3)
+
     def test_scheduled_opening_happens_through_the_job_not_before(self):
         self.member()
         when = timezone.now() + timedelta(hours=2)
@@ -391,9 +410,13 @@ class ScreenTests(PaymentCase):
         client = self.dev_client()
         page = client.get("/payments/")
         self.assertEqual(page.status_code, 200)
-        self.assertContains(page, "This emails 1 member")
-        client.post("/payments/open/")
-        client.post("/payments/open/")
+        self.assertContains(page, "data-confirm-url")  # the pop-up asks the server who and how many
+        self.assertEqual(client.get("/payments/confirm/").json()["count"], 1)
+        client.post("/payments/open/")  # a stray POST with no confirmation sends nothing
+        client.post("/payments/open/", {"confirm": "yes", "expected_count": "9"})  # a number the pop-up did not show
+        self.assertEqual(len(self.mails()), 0)
+        client.post("/payments/open/", {"confirm": "yes", "expected_count": "1"})
+        client.post("/payments/open/", {"confirm": "yes", "expected_count": "1"})
         self.assertEqual(len(self.mails()), 1)
         self.assertEqual(client.get("/payments/").context["counts"]["invited"], 1)
         client.post("/payments/close/")

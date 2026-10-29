@@ -6,7 +6,7 @@
   <strong class="se-ses-name">{% if ses.mode == "provider" %}Email provider{% else %}Amazon SES{% endif %}</strong>
   {% if ses.mode == "production" %}<span class="sys-badge ok">Production</span><span class="se-ses-line">Approved.{% if ses.max_24h %} Up to {{ ses.max_24h|floatformat:"0g" }} a day, {{ ses.max_rate|floatformat:"0g" }} a second.{% endif %}</span>
   {% elif ses.mode == "sandbox" %}<span class="sys-badge warn">Sandbox</span><span class="se-ses-line">Only verified addresses{% if ses.max_24h %}, {{ ses.max_24h|floatformat:"0g" }} a day{% endif %}. Group sends and invites are off.</span>
-  {% elif ses.mode == "provider" %}<span class="sys-badge ok">Sending</span><span class="se-ses-line">{{ ses.provider }}</span>{% if ses.warning %}<span class="sys-badge warn">Check settings</span><span class="se-ses-line">{{ ses.warning }}</span>{% endif %}
+  {% elif ses.mode == "provider" %}<span class="se-ses-line">{{ ses.provider }}</span>{% if ses.warning %}<span class="sys-badge warn">Check settings</span><span class="se-ses-line">{{ ses.warning }}</span>{% endif %}
   {% elif ses.mode == "dev" %}<span class="sys-badge info">Printed only</span><span class="se-ses-line">Development: emails go to the server log.</span>
   {% else %}<span class="sys-badge">Unknown</span><span class="se-ses-line">{% if ses.problem %}{{ ses.problem }}{% else %}Could not reach Amazon. Group sends and invites stay off until it can be read.{% endif %}</span>{% endif %}
   {% if ses.mode != "dev" and ses.mode != "provider" %}<form class="se-ses-check" method="post" action="{% url 'system_ses_refresh' %}">{% csrf_token %}<button type="submit" class="sys-btn sm">Check now</button></form>{% endif %}
@@ -24,7 +24,7 @@
     <ul data-system-recent-mailings>{% for m in recent_mailings %}<li><a href="{% url 'system_mailing' m.pk %}">{{ m.subject|truncatechars:48 }}</a><span class="sys-muted">{{ m.get_status_display }}{% if m.total_count %}, {{ m.total_count|floatformat:"0g" }} people{% endif %}</span></li>{% empty %}<li class="sys-muted">No group sends yet.</li>{% endfor %}</ul>
   </section>
   <section class="sys-panel" aria-label="Recent invites">
-    <header><h2>Recent invites</h2><a href="{% url 'system_invites' %}">All invites</a></header>
+    <header><h2>Past invite batches</h2><a href="{% url 'system_groups' %}">Groups</a></header>
     <ul data-system-recent-invites>{% for b in recent_invite_batches %}<li><a href="{% url 'system_invite_batch' b.batch_id %}">{{ b.created|date:"j M Y, H:i" }}</a><span class="sys-muted">{{ b.total|floatformat:"0g" }} people, {{ b.registered|floatformat:"0g" }} registered</span></li>{% empty %}<li class="sys-muted">No invites yet.</li>{% endfor %}</ul>
   </section>
 </div>

@@ -1,20 +1,10 @@
 {% extends "system/emails_base.html" %}{% load system_ui %}
 {% block main %}
 {% with first=invites.object_list.0 %}
-<div class="sys-head se-head"><div><a class="se-back" href="{% url 'system_invites' %}">Invites</a><h1>Invites{% if first %} imported {{ first.created_at|date:"j M Y" }}{% endif %}</h1><p>{{ summary.total|floatformat:"0g" }} {{ summary.total|pluralize:"person,people" }} in this import.</p></div></div>
+<div class="sys-head se-head"><div><a class="se-back" href="{% url 'system_groups' %}">Groups</a><h1>Invites{% if first %} from {{ first.created_at|date:"j M Y" }}{% endif %}</h1><p>{{ summary.total|floatformat:"0g" }} {{ summary.total|pluralize:"person,people" }} in this batch. Read only{% if mailing %}. Sent as the group send <a href="{% url 'system_mailing' mailing.pk %}">{{ mailing.name }}</a>{% endif %}.</p></div></div>
 {% endwith %}
-{% include "system/_emails_tabs.html" with tab="invites" %}
-<div data-se-batch data-system-invite-batch-detail="{{ batch }}" data-progress-url="{{ progress_url }}" data-pending="{{ summary.queued|add:summary.sending }}" data-total="{{ summary.total }}">
-  {% if summary.queued or summary.sending %}
-  <section class="sys-panel se-sending" aria-label="Sending" data-se-sending>
-    <div class="se-sending-body">
-      <div class="se-progress" role="progressbar" aria-label="Sending progress" aria-valuemin="0" aria-valuemax="{{ summary.total }}" aria-valuenow="{{ summary.total|add:0 }}" data-se-bar><i style="width: 0%"></i></div>
-      <p class="se-sending-text mono" data-se-progress-text>Sending invites</p>
-      <form method="post" action="{% url 'system_invite_resume' batch %}" class="se-resume">{% csrf_token %}<button type="submit" class="sys-btn sm">Carry on sending</button><span class="sys-muted">Use this if sending looks stuck. Nobody gets it twice.</span></form>
-    </div>
-    <p class="sr" role="status" aria-live="polite" data-se-announce></p>
-  </section>
-  {% endif %}
+{% include "system/_emails_tabs.html" with tab="groups" %}
+<div data-se-batch-readonly>
   <p class="se-summary mono" data-system-invite-summary>{{ summary.total|minus:summary.skipped|floatformat:"0g" }} invited · {{ summary.opened|add:summary.registered|floatformat:"0g" }} opened · {{ summary.registered|floatformat:"0g" }} registered · {{ summary.bounced|floatformat:"0g" }} bounced{% if summary.skipped %} · {{ summary.skipped|floatformat:"0g" }} skipped{% endif %}</p>
   <div class="se-chips" role="group" aria-label="Show">
     <a class="sys-pill" href="?" {% if not status_filter %}aria-current="true"{% endif %}>All {{ summary.total }}</a>
@@ -25,8 +15,7 @@
     <tbody>{% for i in invites %}<tr><td>{{ i.name|default:"-" }}</td><td class="mono">{{ i.email }}</td><td>{% include "system/_invite_status.html" with status=i.status label=i.get_status_display %}</td><td>{{ i.sent_at|date:"j M, H:i" }}</td><td>{{ i.opened_at|date:"j M, H:i" }}</td><td>{{ i.registered_at|date:"j M, H:i" }}</td><td class="sys-muted">{{ i.reason }}</td></tr>
     {% empty %}<tr><td colspan="7" class="sys-empty">Nobody here.</td></tr>{% endfor %}</tbody>
   </table></div>
-  {% if invites.has_other_pages %}<div class="sys-more">{% if invites.has_previous %}<a href="?page={{ invites.previous_page_number }}&status={{ status_filter }}">Previous</a>{% endif %}{% if invites.has_next %}<a href="?page={{ invites.next_page_number }}&status={{ status_filter }}">Next</a>{% endif %}</div>{% endif %}
+{% include "system/_pager.html" with page=invites %}
   </section>
-  <p class="sys-muted se-foot">Send again for one person: coming soon.</p>
 </div>
 {% endblock %}

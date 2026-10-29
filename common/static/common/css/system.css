@@ -208,3 +208,15 @@ body.system.live { --sys-stripe: 3px; }
 .sys-more-grid { display: grid; gap: var(--sys-4); margin-top: var(--sys-3); }
 @media (min-width: 48em) { .sys-more-grid { grid-template-columns: 1fr 1fr; align-items: start; } }
 .sys-more caption { text-align: left; padding-bottom: var(--sys-2); }
+
+/* Pager (system/_pager.html): range text, First/Previous, numbers, Next/Last. Narrow: Previous, "Page n of N", Next only. */
+.sys-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sys-2) var(--sys-4); padding: var(--sys-3) var(--sys-4); border-top: 1px solid var(--sys-line); }
+.sys-pager-range { font-size: var(--sys-fs-sm); }
+.sys-pager-list { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-1); list-style: none; margin: 0; padding: 0; }
+.sys-pager-list [aria-disabled="true"] { opacity: .45; cursor: default; pointer-events: none; }
+.sys-pager-now { display: none; font-size: var(--sys-fs-sm); padding: 0 var(--sys-2); }
+@media (max-width: 40em) {
+  .sys-pager-edge, .sys-pager-num { display: none; }
+  .sys-pager-now { display: block; }
+  .sys-pager-list { flex-wrap: nowrap; width: 100%; justify-content: space-between; }
+}

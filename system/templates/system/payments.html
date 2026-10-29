@@ -1,5 +1,8 @@
-{% extends "system/base.html" %}
+{% extends "system/base.html" %}{% load static %}
 {# Context: window (latest or active, may be None), counts, warning, notices (status -> number), window_phrase, window_days, no_alert_email, invite_total. docs/features/payment-window.md #}
+{% block head_extra %}<link rel="stylesheet" href="{% static 'common/css/system-emails.css' %}">
+<script type="module" src="{% static 'common/js/system-emails.js' %}"></script>
+{% endblock %}
 {% block main %}
 {% include "system/_page_header.html" with title="Payments" description="Open payments when Spa 99 is ready. Members then have a set time to set up their membership. No card is taken here yet." %}
 {% if not online_live %}<p class="sys-note error" role="alert" data-payments-not-live>Card payments are not live yet. If you open payments now, members are told we will be in touch (or to WhatsApp or email us) and staff set their memberships up manually in the Office.</p>{% endif %}
@@ -23,14 +26,15 @@
     <form method="post" action="{% url 'system_payments_cancel_schedule' %}">{% csrf_token %}<button type="submit" class="sys-btn">Cancel the schedule</button></form>
   {% else %}
     <div class="sys-state"><span>Status</span><span class="sys-badge">{% if window %}Closed{% else %}Not opened yet{% endif %}</span></div>
+    {% if window and window.note %}<p class="sys-note error" role="alert" data-payments-held-back>{{ window.note }}</p>{% endif %}
     {% if window and window.closed_at %}<div class="sys-state"><span>Last window</span><span>{{ window.opened_at|date:"j M" }} to {{ window.closed_at|date:"j M Y, H:i" }}</span></div>{% endif %}
   {% endif %}
   {% if not window or window.status != "open" %}
   <div class="sys-actions">
-    <form method="post" action="{% url 'system_payments_open' %}" data-system-confirm="payments" data-confirm-title="Open payments now?" data-confirm-body="This emails {{ counts.registered }} member{{ counts.registered|pluralize }}. They get {{ window_phrase }} to set up." data-confirm-action="Open payments" data-line="">{% csrf_token %}<button type="submit" class="sys-btn primary" data-payments-open>Open payments now</button></form>
-    <form method="post" action="{% url 'system_payments_schedule' %}" class="sys-ctl">{% csrf_token %}
+    <form method="post" action="{% url 'system_payments_open' %}" data-se-confirm-send data-confirm-url="{% url 'system_payments_confirm' %}">{% csrf_token %}<input type="hidden" name="confirm" value="" autocomplete="off"><input type="hidden" name="expected_count" value="" autocomplete="off"><button type="submit" class="sys-btn primary" data-se-send data-payments-open>Open payments now</button></form>
+    <form method="post" action="{% url 'system_payments_schedule' %}" class="sys-ctl" data-se-confirm-send data-confirm-url="{% url 'system_payments_confirm' %}" data-when-input="#pay-when">{% csrf_token %}<input type="hidden" name="confirm" value="" autocomplete="off"><input type="hidden" name="expected_count" value="" autocomplete="off">
       <label class="sr-only" for="pay-when">Open on</label><input type="datetime-local" id="pay-when" name="when" required><span class="sys-unit">London time</span>
-      <button type="submit" class="sys-btn">Schedule for this time</button></form>
+      <button type="submit" class="sys-btn" data-se-send>Schedule for this time</button></form>
   </div>
   <p class="sys-muted">The window lasts {{ window_days }} days ({{ window_phrase }}); change it in <a href="{% url 'system_defaults' %}">Defaults</a>.</p>
   {% endif %}

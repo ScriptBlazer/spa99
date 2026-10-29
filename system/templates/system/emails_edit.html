@@ -3,6 +3,7 @@
 <div class="sys-head se-head"><div><a class="se-back" href="{% url 'system_email_list' %}">Automatic emails</a><h1>{{ spec.title }}</h1>{% if row.note %}<p>{{ row.note }}</p>{% endif %}</div>
   <div class="sys-actions se-actions">
     {% if spec.editable %}<span class="se-testnote" data-se-test-note aria-live="polite"></span><button type="button" class="sys-btn" data-se-test>Send me a test</button>{% endif %}
+    {% if can_send_to_group %}<form method="post" action="{% url 'system_email_to_group' spec.key %}" data-se-to-group>{% csrf_token %}<button type="submit" class="sys-btn" data-se-send-to-group>Send to a group</button></form>{% endif %}
     {% if not is_default %}<form method="post" action="{% url 'system_email_reset' spec.key %}" data-se-reset>{% csrf_token %}<button type="submit" class="sys-btn" data-confirm data-confirm-title="Reset {{ spec.title }} to the default wording?" data-confirm-body="Your subject and wording are replaced. Undo is in the audit log." data-confirm-label="Reset">Reset to default</button></form>{% endif %}
   </div>
 </div>

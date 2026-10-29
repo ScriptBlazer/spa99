@@ -129,3 +129,8 @@ Code: `mailings/blocks.py` (parts), `mailings/images.py` (pictures), `system/vie
 - A backend path that contains "ses" but is not `notifications.backends.SesBackend` is treated as a typo: mode `unknown`, group sends refused, with the message "EMAIL_BACKEND looks like a mistyped Amazon SES path". Counting it as "another provider" would silently skip the SES gate. A backend that cannot be imported is also `unknown` and refused. (`status["problem"]` carries the text.)
 - In `provider` mode, an empty or `localhost` EMAIL_HOST shows a warning ("Email settings look incomplete", `status["warning"]`); sending stays allowed.
 - Saving or renaming a template when the same name is taken at the same moment answers 409 like the normal clash; renaming records the person in history. `template_save` with a `mailing` that is not a valid id answers 404. "Send me a test" checks its rate limit before it validates the parts.
+
+
+## Uploaded lists and Invitation (2026-10-29)
+- The Who cards now include **Uploaded list** (option `list_id`, a select of the saved lists). A list gets News only from this composer: a Service message to a list is refused by the live count (`errors.group`) and by the server. `kind` also has the value `invitation` (max length 12 now, also on templates), used only by a group send of the "Invitation to register" email (`Mailing.automatic_key = "invite"`), never typed in the composer (the form refuses it).
+- **Send** on the composer saves the draft, then asks the server for the pop-up summary (`GET /emails/mailings/<id>/confirm/`) and posts `confirm=yes` with the `expected_count` it showed to `/send/` or `/schedule/`. The server refuses without them. See docs/features/system-emails.md.

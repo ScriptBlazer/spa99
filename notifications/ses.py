@@ -65,10 +65,26 @@ def provider_warning():
     return ""
 
 
+def provider_name():
+    """Postmark when the SMTP host is Postmark's, else the host itself (never the user name or password)."""
+    host = (getattr(settings, "EMAIL_HOST", "") or "").strip()
+    if "postmarkapp" in host.lower():
+        return "Postmark"
+    return host or "another provider"
+
+
 def provider_message():
-    """Plain words for the banner when another provider sends (the host only; never the user name or password)."""
-    host = getattr(settings, "EMAIL_HOST", "") or "another provider"
-    return f"Emails are sent for real through {host} (not Amazon SES)."
+    """The small, calm line when a provider other than SES sends: 'Sending through Postmark ✓' (or the host)."""
+    return f"Sending through {provider_name()} \u2713"
+
+
+def through_label():
+    """Who delivers the mail, for the send pop-up: Postmark, the host, Amazon SES, or the development printout."""
+    if is_ses():
+        return "Amazon SES"
+    if is_dev():
+        return "Development (printed in the server log, not sent)"
+    return provider_name()
 
 
 def _blank(mode):

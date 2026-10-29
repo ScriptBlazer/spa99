@@ -3,6 +3,7 @@ system/emails.py, mailings/sending.py and mailings/invites.py. A page that is a 
 JSON when the script asks for it (`Accept: application/json` or `X-Requested-With: fetch`)."""
 import csv
 import uuid
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
@@ -10,12 +11,13 @@ from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from common.ratelimit import hit
-from mailings import blocks as mailing_blocks, images, invites, segments, sending
+from mailings import automatic as auto_emails, blocks as mailing_blocks, images, invites, lists, segments, sending, tokens
 from mailings import saved as templates_store
-from mailings.models import Invite, Mailing, MailingTemplate
+from mailings.models import ContactList, Invite, Mailing, MailingTemplate
 from notifications import emailbody, ses
 from notifications.models import EmailLog
 from notifications.seed import DEFAULT_SUBJECTS
@@ -63,7 +65,7 @@ def _edit(request, key, form=None, status=200):
     spec = _spec(key)
     row = logic.template_row(key, create=True)
     form = form or logic.TemplateForm(instance=row, spec=spec)
-    return page(request, "system/emails_edit.html", "emails", {**logic.edit_context(spec, form, row), "ses": ses.ses_status()}, status=status)
+    return page(request, "system/emails_edit.html", "emails", {**logic.edit_context(spec, form, row), "ses": ses.ses_status(), "can_send_to_group": auto_emails.can_send_to_group(key)}, status=status)
 
 
 @unlocked
@@ -246,9 +248,21 @@ def mailing_detail(request, pk):
         "group": segments.GROUPS.get(mailing.group), "can_send": draft and mailing.status == Mailing.DRAFT and state["allowed"] and not blockers,
         "recipients": logic.mailing_recipients(mailing, status, request.GET.get("page")), "status_filter": status,
         "progress_url": reverse("system_mailing_progress", args=[mailing.pk]),
-        "preview": preview_email("mailing", mailing.subject, mailing.body, logic.mailing_extra(mailing.kind, mailing.group), blocks=mailing.blocks),
+        "preview": _mailing_preview(mailing), "lists": segments.param_choices("list_id") if mailing.automatic_key else [],
+        "invite_summary": invites.batch_summary(mailing.pk) if mailing.automatic_key and mailing.status != Mailing.DRAFT else None,
+        "confirm_url": reverse("system_mailing_confirm", args=[mailing.pk]), "send_url": reverse("system_mailing_send", args=[mailing.pk]),
+        "automatic_spec": emailbody.SPECS.get(mailing.automatic_key),
     }
     return page(request, "system/emails_mailing.html", "emails", context)
+
+
+def _mailing_preview(mailing):
+    """The email as it will look (sample name). An automatic email's wording is read from its own page, so edits there show here."""
+    extra = logic.mailing_extra(mailing.kind, mailing.group)
+    if mailing.automatic_key:
+        row = logic.template_row(mailing.automatic_key)
+        return preview_email(mailing.automatic_key, row.subject if row else DEFAULT_SUBJECTS[mailing.automatic_key][0], row.body if row else "", extra)
+    return preview_email("mailing", mailing.subject, mailing.body, extra, blocks=mailing.blocks)
 
 
 @unlocked
@@ -269,8 +283,10 @@ def mailing_count(request):
     kind = request.GET.get("kind", Mailing.NEWS)
     group = request.GET.get("group", "")
     params, errors = segments.clean_params(group, request.GET)
-    if errors or kind not in (Mailing.NEWS, Mailing.SERVICE):
+    if errors or kind not in dict(Mailing.KIND_CHOICES):
         return JsonResponse({"count": None, "errors": errors or {"kind": ["Choose News or Service message."]}})
+    if not segments.GROUPS[group].allows(kind):
+        return JsonResponse({"count": None, "errors": {"group": [segments.GROUPS[group].kind_error()]}})
     return JsonResponse({"count": segments.count(group, params, kind), "errors": {}})
 
 
@@ -313,8 +329,6 @@ def mailing_image_upload(request):
 def _send_test(request, back, subject, kind, group, body, parts, label, detail):
     """Send one mailing's wording to the signed-in developer only (their own first name; News tests carry a real unsubscribe link).
     Needs only a subject and wording that passes the checks: no Who, no saved mailing."""
-    from mailings import tokens
-
     errors = sending.wording_errors(subject, body, parts)
     if errors:
         return _respond(request, False, " ".join(m for ms in errors.values() for m in ms), back, extra={"errors": errors})
@@ -330,6 +344,25 @@ def _send_test(request, back, subject, kind, group, body, parts, label, detail):
     return _respond(request, ok, "A test is on its way to you." if ok else f"The test could not be sent ({log.get_status_display()}).", back)
 
 
+def _send_automatic_test(request, mailing):
+    """Test a draft of an automatic email: the email as it stands, with the sample link, to the signed-in developer only."""
+    key, back = mailing.automatic_key, reverse("system_mailing", args=[mailing.pk])
+    spec, row = _spec(key), logic.template_row(mailing.automatic_key)
+    context = {**emailbody.test_context_for(spec, f"{settings.SITE_URL}/example-link/"), **logic.mailing_extra(mailing.kind, mailing.group)}
+    headers = None
+    if mailing.kind in Mailing.MARKETING:  # a real unsubscribe link for the developer's own address
+        context["unsubscribe_url"] = tokens.unsubscribe_url(request.user.email)
+        headers = tokens.list_unsubscribe_headers(context["unsubscribe_url"])
+    subject = row.subject if row else DEFAULT_SUBJECTS[key][0]
+    log = send_templated(key, [request.user.email], "[Test] " + fill_subject(subject, emailbody.sample_values(spec)), context, headers=headers,
+                         subject_email=request.user.email)
+    ok = log.status == EmailLog.SENT
+    audit.log_event(SystemEvent.EMAIL_TEST, request, user=request.user, outcome=SystemEvent.OK if ok else SystemEvent.FAILED,
+                    detail={"mailing": str(mailing.pk), "template": key, "status": log.status},
+                    sentence=f"{request.user.email} sent themselves a test of the '{spec.title}' group send ({log.status})")
+    return _respond(request, ok, "A test is on its way to you." if ok else f"The test could not be sent ({log.get_status_display()}).", back)
+
+
 @unlocked
 @require_POST
 def mailing_test(request, pk):
@@ -337,6 +370,8 @@ def mailing_test(request, pk):
     mailing = get_object_or_404(Mailing, pk=pk)
     if _limited(request, "system-email-test", 5, 600):
         return _respond(request, False, "Too many test emails. Please wait a few minutes.", reverse("system_mailing", args=[mailing.pk]), status=429)
+    if mailing.automatic_key:
+        return _send_automatic_test(request, mailing)
     return _send_test(request, reverse("system_mailing", args=[mailing.pk]), mailing.subject, mailing.kind, mailing.group, mailing.body,
                       mailing.blocks, mailing.name, {"mailing": str(mailing.pk)})
 
@@ -370,19 +405,21 @@ def _mailing_action(request, pk, action, done):
     return _respond(request, True, done, back)
 
 
+def _counted(mailing):
+    """The number of people who would get it now (None when the group itself is not valid: the send check says why)."""
+    params, errors = segments.clean_params(mailing.group, mailing.params) if mailing.group in segments.GROUPS else ({}, True)
+    return None if errors else segments.count(mailing.group, params, mailing.kind)
+
+
 @unlocked
 @require_POST
 def mailing_send(request, pk):
-    """Send now. `expected_count` (the number the person saw) must still be right, else nothing is sent."""
+    """Send now. The POST must carry `confirm=yes` and the `expected_count` the pop-up showed; if the number changed, nothing is sent."""
     if _limited(request, "system-mailing-start", 6, 600):
         return _respond(request, False, "Too many sends. Please wait a few minutes.", reverse("system_mailing", args=[pk]), status=429)
 
     def run(mailing):
-        expected = request.POST.get("expected_count", "")
-        if expected.isdigit() and mailing.group in segments.GROUPS:
-            now = segments.count(mailing.group, mailing.params, mailing.kind)
-            if now != int(expected):
-                raise sending.MailingError(f"The group changed: it is now {now} people, not {expected}. Check it and send again.")
+        sending.require_confirmed(request.POST.get("confirm"), request.POST.get("expected_count"), _counted(mailing))
         sending.start(mailing, request.user, request)
     return _mailing_action(request, pk, run, "Sending has started.")
 
@@ -395,9 +432,10 @@ def mailing_schedule(request, pk):
     when = logic.parse_when(request.POST.get("scheduled_at"))
 
     def run(mailing):
+        sending.require_confirmed(request.POST.get("confirm"), request.POST.get("expected_count"), _counted(mailing))
         if when is None:
             raise sending.MailingError("Choose a date and time.")
-        sending.schedule(mailing, when, request.user, request)
+        sending.schedule(mailing, when, request.user, request, confirmed=int(request.POST["expected_count"]))
     return _mailing_action(request, pk, run, "Scheduled.")
 
 
@@ -410,7 +448,10 @@ def mailing_cancel(request, pk):
 @unlocked
 @require_POST
 def mailing_resume(request, pk):
-    return _mailing_action(request, pk, sending.resume, "Sending carries on.")
+    def run(mailing):
+        sending.require_confirmed(request.POST.get("confirm"), None)  # carries on a send that was confirmed: no count, but never by a stray POST
+        sending.resume(mailing)
+    return _mailing_action(request, pk, run, "Sending carries on.")
 
 
 @unlocked
@@ -423,18 +464,31 @@ def mailing_delete(request, pk):
     return _respond(request, True, "Draft deleted.", reverse("system_mailings"))
 
 
-# ---------- invites ----------
+# ---------- groups and uploaded lists ----------
 
 @unlocked
 @require_GET
-def invites_list(request):
-    return page(request, "system/emails_invites.html", "emails", {"batches": logic.invite_batches(), "ses": ses.ses_status()})
+def groups(request):
+    context = {"automatic_groups": segments.overview(), "lists": logic.lists_table(), "batches": logic.invite_batches(), "ses": ses.ses_status()}
+    return page(request, "system/emails_groups.html", "emails", context)
+
+
+def _list_form(request, target=None, error="", name="", category="", status=200, text="", problems=()):
+    context = {"target": target, "text": text, "problems": list(problems), "categories": lists.categories(), "max_rows": invites.MAX_ROWS, "max_bytes": invites.MAX_BYTES, "error": error,
+               "name": name, "category": category, "ses": ses.ses_status()}
+    return page(request, "system/emails_list_new.html", "emails", context, status=status)
 
 
 @unlocked
 @require_GET
-def invites_new(request):
-    return page(request, "system/emails_invites_new.html", "emails", {"max_rows": invites.MAX_ROWS, "max_bytes": invites.MAX_BYTES, "ses": ses.ses_status()})
+def list_new(request):
+    return _list_form(request)
+
+
+@unlocked
+@require_GET
+def list_add(request, pk):
+    return _list_form(request, target=get_object_or_404(ContactList, pk=pk))
 
 
 def _uploaded_text(request):
@@ -448,24 +502,52 @@ def _uploaded_text(request):
     return invites.canonical(request.POST.get("text", "")), ""
 
 
+def _target(request):
+    """The list being added to (POST `list`), or None for a new list. 404 for an id that does not exist."""
+    value = request.POST.get("list", "")
+    if not value:
+        return None
+    try:
+        return get_object_or_404(ContactList, pk=uuid.UUID(value))
+    except ValueError:
+        raise Http404 from None
+
+
 @unlocked
 @require_POST
-def invites_review(request):
-    """Check the list and show the report (nothing is written but a one-time token). The page sends `text` and `token` back with Import."""
+def list_review(request):
+    """Check the list and show the report (nothing is written but a one-time token). The page sends `text`, `token`, the name and category back with Save."""
+    target = _target(request)
     text, error = _uploaded_text(request)
-    report = invites.check(text) if not error else {**invites.check(""), "errors": [error]}
-    token = invites.issue_token(request.user, text) if report["can_import"] else ""
-    context = {"report": report, "text": text, "token": token, "ses": ses.ses_status(), "status_labels": invites.STATUS_LABELS}
-    return page(request, "system/emails_invites_review.html", "emails", context, status=400 if report["errors"] else 200)
+    if request.POST.get("edits") and not error:
+        text = lists.apply_edits(text, request.POST["edits"])  # the inline fixes, applied to the list as it was checked
+    report = lists.review(text, target) if not error else {**lists.review(""), "errors": [error]}
+    name, category = request.POST.get("name", ""), request.POST.get("category", "")
+    token = invites.issue_token(request.user, text, str(target.pk) if target else "") if report["can_save"] else ""
+    context = {"report": report, "text": text, "token": token, "target": target, "name": name, "category": category, "categories": lists.categories(),
+               "ses": ses.ses_status(), "status_labels": report["labels"]}
+    return page(request, "system/emails_list_review.html", "emails", context, status=400 if report["errors"] else 200)
 
 
 @unlocked
 @require_POST
-def invites_problems(request):
+def list_fix(request):
+    """Go back and fix: the paste form again with exactly the text that was checked, the name and the category, and the problems listed above it.
+    Posted back (nothing in the URL); nothing is written."""
+    target = _target(request)
+    text = invites.canonical(request.POST.get("text", ""))
+    report = invites.check(text) if text.strip() else {"rows": [], "errors": []}
+    return _list_form(request, target, name=request.POST.get("name", ""), category=request.POST.get("category", ""), text=text,
+                      problems=lists.problem_lines(report))
+
+
+@unlocked
+@require_POST
+def list_problems(request):
     """The rows that need fixing or have a heads-up, as a CSV download (cells starting with = + - @ are made safe for Excel)."""
     report = invites.check(invites.canonical(request.POST.get("text", "")))
     response = HttpResponse(content_type="text/csv; charset=utf-8")
-    response["Content-Disposition"] = 'attachment; filename="invite-problems.csv"'
+    response["Content-Disposition"] = 'attachment; filename="list-problems.csv"'
     response.write("\ufeff")
     writer = csv.writer(response)
     writer.writerow(["Row", "Level", "Name", "Email", "What to do"])
@@ -477,79 +559,140 @@ def invites_problems(request):
     return response
 
 
-def _import_response(request, batch_id, report, repeated=False):
-    ok = report.get("ok", 0)
-    waiting = Invite.objects.filter(batch_id=batch_id, status__in=(Invite.QUEUED, Invite.SENDING, Invite.SENT, Invite.OPENED)).count() if repeated else ok
-    message = "This list was already imported. Here is the batch." if repeated else f"Sending {ok} invite{'' if ok == 1 else 's'}."
-    return _respond(request, True, message, reverse("system_invite_batch", args=[batch_id]),
-                    extra={"batch": str(batch_id), "invites": waiting, "repeated": repeated})
+@unlocked
+@require_POST
+def list_save(request):
+    """Save the checked list (checked again here). Nothing is sent. Needs the review page's one-time `token` for exactly this list: a second
+    save with the same token (double click, lag, back, two tabs) returns the list that was saved and writes nothing."""
+    back = reverse("system_list_new")
+    if _limited(request, "system-list-save", 20, 600):
+        return _respond(request, False, "Too many saves. Please wait a few minutes.", back, status=429)
+    target = _target(request)
+    text = invites.canonical(request.POST.get("text", ""))
+    try:
+        row = invites.find_token(request.POST.get("token", ""), request.user, text, str(target.pk) if target else "")
+    except invites.TokenRefused as error:
+        return _respond(request, False, str(error), back)
+
+    def done(lst, message, repeated=False):
+        return _respond(request, True, message, reverse("system_list", args=[lst.pk]), extra={"list": str(lst.pk), "repeated": repeated})
+
+    if row.batch_id:  # already saved: answer with it, before anything is checked again
+        lst = lists.existing_for(row)
+        return done(lst, "This list was already saved.", True) if lst else _respond(request, False, "That list no longer exists.", back)
+    expected = request.POST.get("expected_ok", "")
+    try:
+        if target is None:
+            lst, report = lists.save_new(request.POST.get("name"), request.POST.get("category"), text, request.user, row, request)
+        else:
+            lst, preview = target, lists.review(text, target)
+            if expected.isdigit() and int(expected) != preview["ok"]:
+                raise lists.ListError(f"The list changed: {preview['ok']} can be saved now, not {expected}. Check it and save again.")
+            _, report = lists.add_more(target, text, request.user, row, request)
+    except lists.ListError as error:
+        return _respond(request, False, str(error), reverse("system_list_add", args=[target.pk]) if target else back, extra={"errors": error.errors})
+    if report.get("existing"):
+        return done(lst, "This list was already saved.", True) if lst else _respond(request, False, "That list no longer exists.", back)
+    word = "added to" if target else "saved as"
+    return done(lst, f"{report['ok']} {'person' if report['ok'] == 1 else 'people'} {word} '{lst.name}'. Nothing was sent.")
+
+
+@unlocked
+@require_GET
+def list_detail(request, pk):
+    lst = get_object_or_404(ContactList, pk=pk)
+    info = segments.list_breakdown(lst.pk)
+    context = {"list": lst, "members": lists.members_page(lst, request.GET.get("q"), request.GET.get("page")), "q": request.GET.get("q", ""),
+               "info": info, "categories": lists.categories(), "ses": ses.ses_status()}
+    return page(request, "system/emails_list.html", "emails", context)
 
 
 @unlocked
 @require_POST
-def invites_send(request):
-    """Make the batch from the checked list (checked again here) and queue the sending. Needs the review page's one-time `token` for exactly
-    this list: a second confirmation with the same token (double click, lag, back, two tabs) returns the existing batch and sends nothing."""
-    new = reverse("system_invites_new")
-    if _limited(request, "system-invites-start", 6, 600):
-        return _respond(request, False, "Too many sends. Please wait a few minutes.", new, status=429)
-    text = invites.canonical(request.POST.get("text", ""))
+def list_edit(request, pk):
+    lst = get_object_or_404(ContactList, pk=pk)
+    back = reverse("system_list", args=[lst.pk])
     try:
-        row = invites.find_token(request.POST.get("token", ""), request.user, text)
-    except invites.TokenRefused as error:
-        return _respond(request, False, str(error), new)
-    if row.batch_id:  # already done: answer with it, before anything is checked again (its people are now "invited")
-        return _import_response(request, row.batch_id, {}, repeated=True)
-    try:
-        ses.require_sending_allowed()
-    except ses.SendingRefused as error:
-        return _respond(request, False, str(error), new)
-    report = invites.check(text)
-    if report["errors"] or report["blocked"]:
-        return _respond(request, False, " ".join(report["errors"]) or f"{report['problems']} row(s) need fixing before the import.", new)
-    if not report["ok"]:
-        return _respond(request, False, "Nobody in this list can be invited.", new)
-    expected = request.POST.get("expected_ok", "")
-    if expected.isdigit() and int(expected) != report["ok"]:
-        return _respond(request, False, f"The list changed: {report['ok']} can be invited now, not {expected}. Check it and import again.", new)
-    batch_id, report = invites.create_batch(text, request.user, row)
-    if report.get("existing"):  # another request won the claim a moment ago
-        return _import_response(request, batch_id, report, repeated=True)
-    try:
-        sending.start_invites(batch_id, request.user, request)
-    except sending.MailingError as error:
-        return _respond(request, False, str(error), reverse("system_invite_batch", args=[batch_id]))
-    return _import_response(request, batch_id, report)
+        changed = lists.edit(lst, request.user, request.POST.get("name"), request.POST.get("category"), request)
+    except lists.ListError as error:
+        return _respond(request, False, str(error), back, extra={"errors": error.errors})
+    return _respond(request, True, "Saved." if changed else "Nothing changed.", back)
+
+
+@unlocked
+@require_POST
+def list_delete(request, pk):
+    lst = get_object_or_404(ContactList, pk=pk)
+    lists.delete(lst, request.user, request)
+    return _respond(request, True, "List deleted.", reverse("system_groups"))
+
+
+@unlocked
+@require_POST
+def list_member_remove(request, pk, member):
+    lst = get_object_or_404(ContactList, pk=pk)
+    removed = lists.remove_member(lst, member, request.user, request)
+    return _respond(request, removed, "Removed from the list." if removed else "He is not on this list.", reverse("system_list", args=[lst.pk]))
 
 
 @unlocked
 @require_GET
 def invite_batch(request, batch):
+    """A past invite batch (from the old Invites tab), read only."""
     if not Invite.objects.filter(batch_id=batch).exists():
         raise Http404
     status = request.GET.get("status", "")
+    mailing = Mailing.objects.filter(pk=batch).first()
     context = {"batch": batch, "summary": invites.batch_summary(batch), "invites": logic.invite_page(batch, status, request.GET.get("page")),
-               "status_filter": status, "status_choices": Invite.STATUS_CHOICES, "ses": ses.ses_status(),
-               "progress_url": reverse("system_invite_progress", args=[batch])}
+               "status_filter": status, "status_choices": Invite.STATUS_CHOICES, "mailing": mailing, "ses": ses.ses_status()}
     return page(request, "system/emails_invite_batch.html", "emails", context)
 
 
 @unlocked
-@require_GET
-def invite_progress(request, batch):
-    return JsonResponse(invites.batch_summary(batch))
+def invites_moved(request, **kwargs):
+    """Every address of the old Invites tab: on to Groups, for good (the past batches are read only there). Nothing is changed or sent."""
+    return redirect("system_groups", permanent=True)
+
+
+# ---------- send an automatic email to a group ----------
+
+@unlocked
+@require_POST
+def email_to_group(request, key):
+    """Start a group send draft pre-filled with this automatic email (its subject and wording are used as they are when it goes out)."""
+    spec = _spec(key)
+    if not auto_emails.can_send_to_group(key):
+        raise Http404
+    row = logic.template_row(key, create=True)
+    recent = Mailing.objects.filter(automatic_key=key, status=Mailing.DRAFT, created_by=request.user, created_at__gte=timezone.now() - timedelta(minutes=1)).first()
+    if recent is not None:  # a double click: the draft just made is the answer
+        return _respond(request, True, "Draft ready. Choose who gets it.", reverse("system_mailing", args=[recent.pk]), extra={"id": str(recent.pk)})
+    mailing = Mailing.objects.create(name=spec.title, subject=row.subject, kind=auto_emails.SENDABLE[key], group="", automatic_key=key, created_by=request.user)
+    return _respond(request, True, "Draft ready. Choose who gets it.", reverse("system_mailing", args=[mailing.pk]), extra={"id": str(mailing.pk)})
 
 
 @unlocked
 @require_POST
-def invite_resume(request, batch):
-    """Queue the worker again for a batch that still has invites waiting (it never sends one twice)."""
-    back = reverse("system_invite_batch", args=[batch])
-    try:
-        sending.start_invites_resume(batch)
-    except sending.MailingError as error:
-        return _respond(request, False, str(error), back)
-    return _respond(request, True, "Sending carries on.", back)
+def mailing_auto_save(request, pk):
+    """Choose the uploaded list for a draft of an automatic email."""
+    mailing = get_object_or_404(Mailing, pk=pk, status=Mailing.DRAFT)
+    back = reverse("system_mailing", args=[mailing.pk])
+    if not mailing.automatic_key:
+        raise Http404
+    params, errors = segments.clean_params(segments.LIST_KEY, request.POST)
+    if errors:
+        return _respond(request, False, " ".join(m for ms in errors.values() for m in ms), back)
+    mailing.group, mailing.params = segments.LIST_KEY, params
+    mailing.save(update_fields=["group", "params", "updated_at"])
+    return _respond(request, True, "Saved.", back)
+
+
+@unlocked
+@require_GET
+def mailing_confirm(request, pk):
+    """What the send pop-up shows, read now: the email, who, the exact count, skipped and why, From, Reply-To and the provider."""
+    mailing = get_object_or_404(Mailing, pk=pk)
+    return JsonResponse({"ok": True, **sending.confirm_details(mailing)})
 
 
 # ---------- saved templates ----------

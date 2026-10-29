@@ -27,7 +27,7 @@ DEFAULT_SUBJECTS = {
     "payment_window_open": ("Your Spa 99 membership can now be set up", "To every registered member when payments open (System > Payments)."),
     "payment_window_reminder": ("A gentle reminder about your Spa 99 membership", "Once, a few days before the payment window closes, to members who have not set up."),
     "payment_staff_alert": ("{count} member(s) are about to lose their launch price", "To the alert addresses in System > Defaults, once a day near the end of the window, while launch-price holders have not set up."),
-    "invite": ("You are invited to register for Spa 99", "To a person on an invite list (System > Emails > Invites): the personal register link."),
+    "invite": ("You are invited to register for Spa 99", "To a person on an uploaded list (System > Emails > Automatic > Send to a group): the personal register link."),
 }
 
 # Old row names kept working until `backfill_site_data` renames them.

@@ -288,6 +288,10 @@ def export_user_data(user):
             {"name": i.name, "status": i.status, "sent_at": _plain(i.sent_at), "opened_at": _plain(i.opened_at), "registered_at": _plain(i.registered_at)}
             for i in _invites(user.email).order_by("created_at")
         ],
+        "uploaded_lists": [
+            {"list": m.list.name, "name": m.name, "added_at": _plain(m.added_at)}
+            for m in _list_memberships(user.email).select_related("list").order_by("added_at")
+        ],
         "login_events": logins,
         "history": history,
     }
@@ -309,6 +313,12 @@ def _invites(email):
     from mailings.models import Invite
 
     return Invite.objects.filter(email__iexact=email)
+
+
+def _list_memberships(email):
+    from mailings.models import ContactListMember
+
+    return ContactListMember.objects.filter(email__iexact=email)
 
 
 def _plain(value):
