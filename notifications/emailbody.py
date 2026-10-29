@@ -103,7 +103,9 @@ def _gold_invite_values(ctx):
 def _invite_values(ctx):
     from system import defaults
 
-    return {"valid_for": _plural(_row_days(ctx, defaults.get().register_invite_days), "day")}
+    from plans.models import SiteSettings
+
+    return {"valid_for": _plural(_row_days(ctx, defaults.get().register_invite_days), "day"), "address": SiteSettings.load().address_one_line}
 
 
 def _payment_open_values(ctx):
@@ -173,8 +175,8 @@ SPECS = {spec.key: spec for spec in [
         "Hello {first_name},\n\nYour Spa 99 Gold Card is active on your account, from today.\n\nYou can see it when you sign in.\n\n{button}",
         button_label="Go to my account", button_required=True, button_fallback=False, subject_placeholders=_FIRST),
     EmailSpec(
-        "invite", "Invitation to register", {**_FIRST, **VALID_FOR}, {"first_name": "James"},
-        "Hello {first_name},\n\nYou are invited to register for Spa 99, a men-only luxury spa at 99 Vale Road, London N4.\n\n"
+        "invite", "Invitation to register", {**_FIRST, **VALID_FOR, "address": "The spa address, from Settings"}, {"first_name": "James"},
+        "Hello {first_name},\n\nYou are invited to register for Spa 99, a men-only luxury spa at {address}.\n\n"
         "Registering is free and there is nothing to pay. Use your personal link to start: your name and email are already filled in. The link works for {valid_for}."
         "\n\n{button}\n\nIf you were not expecting this, you can ignore this email.",
         button_label="Register for Spa 99", button_required=True, subject_placeholders=_FIRST, values=_invite_values),

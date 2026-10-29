@@ -67,6 +67,39 @@ function showFlash() {
   if (item?.text) setTimeout(() => toast(item.text, { kind: item.kind }), 150);
 }
 
+/* ---------- the send pop-up: nothing in Emails sends without it ---------- */
+
+/** Asks the server (not the page) who would get it, shows a small summary table in the shared confirm modal, and resolves { count } only when
+    the person confirms (else null). The count goes back to the server with `confirm=yes`; the server refuses a send without both, or when the number changed. */
+async function confirmSend({ url, opener, when = '' }) {
+  const result = await call(url, { method: 'GET' });
+  if (result.locked) { showLocked('System locked. Unlock it in another tab, then send again.'); return null; }
+  if (result.status === 0) { toast(NETWORK, { kind: 'error' }); return null; }
+  const d = result.data;
+  if (!result.ok || !d?.ok) { toast('Could not read who gets it. Please try again.', { kind: 'error' }); return null; }
+  const n = Number(d.count);
+  if (!n) { toast('Nobody in this group can be emailed.', { kind: 'error' }); return null; }
+  const people = `${fmt(n)}${d.skipped ? `, ${fmt(d.skipped)} skipped${d.skipped_why ? `: ${d.skipped_why}` : ''}` : ''}`;
+  const rows = [['Email', `${d.title}: ${d.subject}`], ['To', d.to || '-'], ['People', people]];
+  if (when) rows.push(['When', `${when}, London time`]);
+  rows.push(['From', d.from + (d.reply_to ? `. Replies go to ${d.reply_to}` : '')], ['Sent through', d.through]);
+  const table = document.createElement('table');
+  table.className = 'sys-table se-confirm';
+  table.dataset.seConfirmTable = '';
+  for (const [label, value] of rows) {
+    const tr = table.insertRow();
+    const th = document.createElement('th'); th.scope = 'row'; th.textContent = label;
+    const td = tr.insertCell(); td.textContent = value;
+    tr.prepend(th);
+  }
+  const ok = await confirmModal({
+    title: when ? `Schedule '${d.title}' to ${fmt(n)} ${plural(n, 'person', 'people')}?` : `Send '${d.title}' to ${fmt(n)} ${plural(n, 'person', 'people')}?`,
+    body: when ? 'You can cancel until then.' : 'This cannot be unsent.',
+    details: table, confirmLabel: when ? 'Schedule' : `Send to ${fmt(n)}`, tone: IS_LIVE ? 'danger' : 'neutral', opener,
+  });
+  return ok ? { count: n } : null;
+}
+
 const whenText = (date, time) => {
   if (!date) return '';
   const d = new Date(`${date}T${time || '09:00'}:00`);
@@ -443,7 +476,7 @@ function initComposer(form) {
     const p = document.createElement('p');
     const n = document.createElement('span');
     n.className = 'mono'; n.textContent = fmt(count);
-    p.append(n, ` ${plural(count, 'person', 'people')} will get this. ${kind() === 'news' ? 'Anyone who has not opted in to news, or is suppressed, is skipped.' : 'Suppressed addresses are skipped.'}`);
+    p.append(n, ` ${plural(count, 'person', 'people')} will get this. ${group() === 'list' ? 'Anyone who unsubscribed, bounced or switched news off is skipped.' : kind() === 'news' ? 'Anyone who has not opted in to news, or is suppressed, is skipped.' : 'Suppressed addresses are skipped.'}`);
     countBox.append(p);
   }
 
@@ -643,38 +676,66 @@ function initComposer(form) {
   tplName.addEventListener('input', () => { tplName.removeAttribute('aria-invalid'); tplError.hidden = true; tplExists.hidden = true; });
   tplName.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); saveTemplate(false); } else if (event.key === 'Escape') { event.preventDefault(); tplClose(); } });
 
+  let sendBusy = false; // a pop-up is open or the send is on its way: a second click does nothing
   send.addEventListener('click', async () => {
     if (send.getAttribute('aria-disabled') === 'true') { note.textContent = send.dataset.reason; return; }
-    const found = await problemList();
-    if (found.length) { await showProblems(form, found, { opener: send }); return; }
-    const scheduled = later();
-    const n = count;
-    const subject = fields.subject.value.trim();
-    const label = kind() === 'news' ? 'News' : 'Service message';
-    const when = whenText(date.value, time.value);
-    const ok = await confirmModal({
-      title: scheduled ? `Schedule for ${when}?` : `Send to ${fmt(n)} ${plural(n, 'person', 'people')}?`,
-      body: `${label}: ${subject}. ${kind() === 'news' ? 'People who are not opted in and suppressed addresses are skipped.' : 'Suppressed addresses are skipped.'} ${scheduled ? 'You can cancel until then.' : 'This cannot be unsent.'}`,
-      confirmLabel: scheduled ? `Schedule for ${when}` : `Send to ${fmt(n)}`,
-      tone: IS_LIVE ? 'danger' : 'neutral', opener: send,
-    });
-    if (!ok) return;
-    const id = await saveDraft({ quiet: true });
-    if (!id) return;
-    send.setAttribute('aria-disabled', 'true');
-    const body = scheduled ? { scheduled_at: whenIso() } : { expected_count: String(n) };
-    const result = await call(`${base}${id}/${scheduled ? 'schedule' : 'send'}/`, { body });
-    if (result.locked) { refreshBar(); return showLocked(`System locked. Unlock it in another tab, then ${scheduled ? 'schedule' : 'send'} again. Your draft is saved.`); }
-    if (result.status === 0) { refreshBar(); return toast(NETWORK, { kind: 'error' }); }
-    if (result.data?.ok) {
-      dirty = false;
-      flash(scheduled ? `Scheduled for ${when}.` : 'Sending has started.');
-      location.href = `${base}${id}/`;
-      return;
-    }
-    toast(result.data?.message || 'It could not be sent.', { kind: 'error' });
-    countAll();
-    refreshBar();
+    if (sendBusy) return;
+    sendBusy = true;
+    try {
+      const found = await problemList();
+      if (found.length) { await showProblems(form, found, { opener: send }); return; }
+      const scheduled = later();
+      const when = whenText(date.value, time.value);
+      const id = await saveDraft({ quiet: true }); // a saved draft sends nothing; the pop-up below asks the server who would get it
+      if (!id) return;
+      const decision = await confirmSend({ url: `${base}${id}/confirm/`, opener: send, when: scheduled ? when : '' });
+      if (!decision) return;
+      send.setAttribute('aria-disabled', 'true');
+      const body = { confirm: 'yes', expected_count: String(decision.count), ...(scheduled ? { scheduled_at: whenIso() } : {}) };
+      const result = await call(`${base}${id}/${scheduled ? 'schedule' : 'send'}/`, { body });
+      if (result.locked) { refreshBar(); return showLocked(`System locked. Unlock it in another tab, then ${scheduled ? 'schedule' : 'send'} again. Your draft is saved.`); }
+      if (result.status === 0) { refreshBar(); return toast(NETWORK, { kind: 'error' }); }
+      if (result.data?.ok) {
+        dirty = false;
+        flash(scheduled ? `Scheduled for ${when}.` : 'Sending has started.');
+        location.href = `${base}${id}/`;
+        return;
+      }
+      toast(result.data?.message || 'It could not be sent.', { kind: 'error' });
+      countAll();
+      refreshBar();
+    } finally { sendBusy = false; }
+  });
+}
+
+/** A draft's detail page (and the Payments page): Send asks first (the pop-up), then posts `confirm=yes` and the number it showed. */
+function initConfirmSend(form) {
+  const button = $('[data-se-send]', form);
+  const wasDisabled = button.getAttribute('aria-disabled') === 'true';
+  let busy = false;
+  const reset = () => { // the page came back from the back/forward cache as it was left: nothing stays confirmed
+    busy = false;
+    delete form.dataset.confirmed;
+    $$('[name=confirm], [name=expected_count]', form).forEach((input) => { input.value = ''; });
+    if (!wasDisabled) button.removeAttribute('aria-disabled');
+  };
+  window.addEventListener('pageshow', (event) => { if (event.persisted) reset(); });
+  form.addEventListener('submit', async (event) => {
+    if (button.getAttribute('aria-disabled') === 'true') { event.preventDefault(); return; } // first: a disabled Send never sends
+    if (form.dataset.confirmed === '1') { delete form.dataset.confirmed; button.setAttribute('aria-disabled', 'true'); return; } // the second pass, once only
+    event.preventDefault();
+    if (busy) return;
+    busy = true;
+    const picked = form.dataset.whenInput ? $(form.dataset.whenInput)?.value || '' : '';
+    if (form.dataset.whenInput && !picked) { busy = false; toast('Pick a date and time.', { kind: 'error' }); return; }
+    const when = picked ? whenText(...picked.split('T')) : '';
+    const decision = await confirmSend({ url: form.dataset.confirmUrl, opener: button, when });
+    busy = false;
+    if (!decision) return;
+    $('[name=confirm]', form).value = 'yes';
+    $('[name=expected_count]', form).value = String(decision.count);
+    form.dataset.confirmed = '1';
+    form.requestSubmit();
   });
 }
 
@@ -810,68 +871,66 @@ function initReview(root) {
     };
     chips.forEach((chip) => chip.addEventListener('click', () => apply(chip.dataset.filter)));
 
-    async function recheck(row) {
-      const input = $('[data-se-fix]', row);
-      const value = input.value.trim();
-      if (!value) { input.setAttribute('aria-invalid', 'true'); input.focus(); return; }
-      const lines = list.value.split(/\r\n|\n|\r/);
-      const at = Number(row.dataset.line) - 1;
-      const old = input.dataset.old;
-      if (lines[at] === undefined) return;
-      lines[at] = old && lines[at].includes(old) ? lines[at].replace(old, value) : `${row.cells[0].textContent.trim().replace(/^-$/, '')}, ${value}`.replace(/^, /, '');
+    /* Fix rows in place: name and address boxes on every row marked Fix. Only the changed rows are sent (as {line, name, email}); the server
+       applies them to the list as it was checked, checks everything again and answers with the fresh review. All other rows and the order stay. */
+    const errorRows = () => $$('[data-system-invite-rows] tbody tr[data-level="error"]', root);
+    const valuesOf = (row) => ({ line: Number(row.dataset.line), name: $('[data-se-fix-name]', row)?.value.trim() ?? '', email: $('[data-se-fix-email]', row)?.value.trim() ?? '' });
+    const changed = (row) => { const n = $('[data-se-fix-name]', row); const e = $('[data-se-fix-email]', row); return (n && n.value.trim() !== n.dataset.old) || (e && e.value.trim() !== e.dataset.old); };
+    // rows that are one problem together: an address on rows with different names is settled only when all of its rows agree
+    const together = (row) => (row.dataset.status === 'ambiguous' ? errorRows().filter((r) => r.dataset.status === 'ambiguous' && r.dataset.email === row.dataset.email) : [row]);
+
+    async function recheck(rows) {
+      const edits = rows.map(valuesOf);
+      const empty = edits.find((edit) => !edit.email);
+      if (empty) { const box = $('[data-se-fix-email]', rows.find((r) => Number(r.dataset.line) === empty.line)); box?.setAttribute('aria-invalid', 'true'); box?.focus(); return; }
       const kept = $$('[data-filter][aria-pressed="true"]', root)[0]?.dataset.filter || 'all';
-      input.disabled = true;
-      const result = await call(root.dataset.reviewUrl, { body: new URLSearchParams({ text: lines.join('\n') }), json: false });
-      if (result.locked) { input.disabled = false; return showLocked('System locked. Unlock it in another tab, then check the list again.'); }
-      if (result.status === 0) { input.disabled = false; return toast(NETWORK, { kind: 'error' }); }
+      rows.forEach((row) => $$('input', row).forEach((input) => { input.disabled = true; }));
+      const extra = {};
+      $$('[data-se-save-form] [name=name], [data-se-save-form] [name=category], [data-se-save-form] [name=list]', root).forEach((el) => { extra[el.name] = el.value; });
+      const result = await call(root.dataset.reviewUrl, { body: new URLSearchParams({ text: list.value, edits: JSON.stringify(edits), ...extra }), json: false });
+      const unlock = () => rows.forEach((row) => $$('input', row).forEach((input) => { input.disabled = false; }));
+      if (result.locked) { unlock(); return showLocked('System locked. Unlock it in another tab, then check the list again.'); }
+      if (result.status === 0) { unlock(); return toast(NETWORK, { kind: 'error' }); }
       const doc = new DOMParser().parseFromString(await result.response.text(), 'text/html');
       const fresh = $('[data-se-review-root]', doc);
-      if (!fresh) { input.disabled = false; return toast('Could not check the list. Please try again.', { kind: 'error' }); }
+      if (!fresh) { unlock(); return toast('Could not check the list. Please try again.', { kind: 'error' }); }
       root.innerHTML = fresh.innerHTML;
       wire();
       if ($(`[data-filter="${kept}"]`, root)) apply(kept);
-      ($$('[data-se-fix]', root)[0] || $('[data-se-send-invites]', root))?.focus();
+      ($$('[data-se-fix-email]', root)[0] || $('[data-se-save-list]', root))?.focus();
     }
-    $$('[data-se-fix]', root).forEach((input) => {
+    $$('[data-se-fix-name], [data-se-fix-email]', root).forEach((input) => {
       const row = input.closest('tr');
-      input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); recheck(row); } });
-      input.addEventListener('input', () => input.removeAttribute('aria-invalid'));
-    });
-    $$('[data-se-recheck]', root).forEach((button) => button.addEventListener('click', () => recheck(button.closest('tr'))));
-
-    const form = $('[data-se-send-form]', root);
-    const sendButton = $('[data-se-send-invites]', root);
-    let busy = false; // a confirm is open or the import is on its way: a second click does nothing
-    const progress = $('[data-se-progress]', root);
-    const lock = (on) => {
-      busy = on;
-      if (!on) delete form.dataset.submitted;
-      if (!sendButton) return;
-      sendButton.toggleAttribute('data-busy', on);
-      if (on) { sendButton.setAttribute('aria-disabled', 'true'); sendButton.dataset.label = sendButton.textContent; sendButton.textContent = 'Importing...'; }
-      else if (sendButton.dataset.label) { sendButton.textContent = sendButton.dataset.label; if (Number(form.dataset.ok) && form.dataset.allowed === '1' && !$('[data-se-blocked]', root)) sendButton.removeAttribute('aria-disabled'); }
-      if (progress) progress.hidden = !on;
-    };
-    // Coming back with the Back button shows the page as it was left (disabled): let the person act again; the server answers a repeat with the same batch.
-    window.addEventListener('pageshow', (event) => { if (event.persisted) lock(false); });
-    form?.addEventListener('submit', (event) => {
-      if (event.submitter && event.submitter.hasAttribute('data-se-problems-csv')) return; // the CSV download is a plain submit
-      if (busy && form.dataset.submitted) { event.preventDefault(); return; }
-      form.dataset.submitted = '1';
-      lock(true);
-    });
-    sendButton?.addEventListener('click', async () => {
-      if (busy || sendButton.getAttribute('aria-disabled') === 'true') return;
-      busy = true; // held while the confirm is open
-      const ok = Number(form.dataset.ok);
-      const skipped = Number(form.dataset.skipped || 0);
-      const yes = await confirmModal({
-        title: `Send ${fmt(ok)} ${plural(ok, 'invite', 'invites')}?`,
-        body: `${skipped ? `${fmt(skipped)} ${plural(skipped, 'is', 'are')} skipped. ` : ''}Each person gets a personal Register link.`,
-        confirmLabel: `Send ${fmt(ok)} ${plural(ok, 'invite', 'invites')}`, tone: IS_LIVE ? 'danger' : 'neutral', opener: sendButton,
+      input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); recheck(together(row)); } });
+      input.addEventListener('input', () => {
+        input.removeAttribute('aria-invalid');
+        if (input.matches('[data-se-fix-name]') && row.dataset.status === 'ambiguous') together(row).forEach((other) => { if (other !== row) $('[data-se-fix-name]', other).value = input.value; });
       });
-      busy = false;
-      if (yes && !form.dataset.submitted) form.requestSubmit();
+    });
+    $$('[data-se-recheck]', root).forEach((button) => button.addEventListener('click', () => recheck(together(button.closest('tr')))));
+    $('[data-se-fix-all]', root)?.addEventListener('click', () => {
+      const rows = errorRows().filter(changed);
+      if (!rows.length) { toast('Change a name or address in a row marked Fix first.', { kind: 'info' }); return; }
+      recheck([...new Set(rows.flatMap(together))]);
+    });
+
+    const form = $('[data-se-save-form]', root);
+    const saveButton = $('[data-se-save-list]', root);
+    const progress = $('[data-se-progress]', root);
+    let saving = false; // the save is on its way: a second click does nothing (the server also saves a token once)
+    // Coming back with the Back button shows the page as it was left (disabled): let the person act again; the server answers a repeat with the same list.
+    window.addEventListener('pageshow', (event) => {
+      if (!event.persisted) return;
+      saving = false;
+      if (progress) progress.hidden = true;
+      if (saveButton?.dataset.label) { saveButton.textContent = saveButton.dataset.label; if (Number(form.dataset.ok) && !$('[data-se-blocked]', root)) saveButton.removeAttribute('aria-disabled'); }
+    });
+    form?.addEventListener('submit', (event) => {
+      if (event.submitter && event.submitter.matches('[data-se-problems-csv], [data-se-go-back]')) return; // the CSV download and Go back are plain submits
+      if (saving || saveButton?.getAttribute('aria-disabled') === 'true') { event.preventDefault(); return; }
+      saving = true;
+      if (saveButton) { saveButton.setAttribute('aria-disabled', 'true'); saveButton.dataset.label = saveButton.textContent; saveButton.textContent = 'Saving...'; }
+      if (progress) progress.hidden = false;
     });
   };
   wire();
@@ -925,6 +984,7 @@ function init() {
   $$('[data-se-editor]').forEach(initEditor);
   $$('[data-se-composer]').forEach(initComposer);
   $$('[data-se-detail], [data-se-batch]').forEach(initSending);
+  $$('[data-se-confirm-send]').forEach(initConfirmSend);
   $$('[data-se-static-preview]').forEach(initStaticPreview);
   $$('[data-se-import]').forEach(initImport);
   $$('[data-se-review-root]').forEach(initReview);

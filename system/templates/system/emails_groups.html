@@ -1,0 +1,35 @@
+{% extends "system/emails_base.html" %}{% load system_ui %}
+{% block main %}
+<div class="sys-head se-head"><div><h1>Emails</h1><p>What the site sends, and what you send.</p></div>
+  <div class="sys-actions"><a class="sys-btn primary" href="{% url 'system_list_new' %}" data-system-new-list>New list</a></div></div>
+{% include "system/_emails_tabs.html" with tab="groups" %}
+{% include "system/_ses_state.html" %}
+<section class="sys-panel" aria-labelledby="groups-auto-h">
+  <header><h2 id="groups-auto-h">Automatic groups</h2><span class="sys-muted">Built from the site's data. They cannot be edited.</span></header>
+  <div class="sys-scroll"><table class="sys-table se-groups-table" data-system-automatic-groups>
+    <thead><tr><th scope="col">Group</th><th scope="col">Who</th><th scope="col" class="sys-num">People now</th></tr></thead>
+    <tbody>{% for g in automatic_groups %}<tr data-group="{{ g.key }}"><td class="se-name">{{ g.label }}</td>
+      <td>{{ g.description }}{% if g.detail %} <span class="sys-muted">{% for label, n in g.detail %}{{ label }} {{ n|floatformat:"0g" }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>{% endif %}</td>
+      <td class="sys-num" data-count>{{ g.count|floatformat:"0g" }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+<section class="sys-panel" aria-labelledby="groups-lists-h">
+  <header><h2 id="groups-lists-h">Uploaded lists</h2><a class="sys-btn sm" href="{% url 'system_list_new' %}">New list</a></header>
+  <div class="sys-scroll"><table class="sys-table se-lists" data-system-lists>
+    <thead><tr><th scope="col">Name</th><th scope="col">Category</th><th scope="col" class="sys-num">People</th><th scope="col">Added</th><th scope="col">By</th></tr></thead>
+    <tbody>{% for l in lists %}<tr data-system-list="{{ l.pk }}" data-se-row>
+      <td class="se-name"><a href="{% url 'system_list' l.pk %}">{{ l.name }}</a></td><td>{{ l.category|default:"-" }}</td><td class="sys-num">{{ l.people|floatformat:"0g" }}</td>
+      <td>{{ l.created_at|date:"j M Y" }}</td><td>{{ l.created_by.email|default:"-" }}</td></tr>
+    {% empty %}<tr><td colspan="5" class="sys-empty">No lists yet. <a class="sys-btn sm primary" href="{% url 'system_list_new' %}">New list</a></td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% if batches %}<section class="sys-panel" aria-labelledby="groups-past-h">
+  <header><h2 id="groups-past-h">Past invite batches</h2><span class="sys-muted">From the old Invites tab. Read only.</span></header>
+  <div class="sys-scroll"><table class="sys-table se-invites" data-system-invite-batches>
+    <thead><tr><th scope="col">Imported</th><th scope="col">By</th><th scope="col" class="sys-num">Invited</th><th scope="col" class="sys-num">Link opened</th><th scope="col" class="sys-num">Registered</th><th scope="col" class="sys-num">Bounced</th><th scope="col" class="sys-num">Skipped</th></tr></thead>
+    <tbody>{% for b in batches %}<tr data-system-invite-batch="{{ b.batch_id }}" data-se-row>
+      <td class="se-name"><a href="{% url 'system_invite_batch' b.batch_id %}">{{ b.created|date:"j M Y, H:i" }}</a></td><td>{{ b.by|default:"-" }}</td><td class="sys-num">{{ b.total|minus:b.skipped|floatformat:"0g" }}</td>
+      <td class="sys-num">{{ b.opened|add:b.registered|floatformat:"0g" }}</td><td class="sys-num">{{ b.registered|floatformat:"0g" }}</td><td class="sys-num">{{ b.bounced|floatformat:"0g" }}</td><td class="sys-num">{{ b.skipped|floatformat:"0g" }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>{% endif %}
+{% endblock %}

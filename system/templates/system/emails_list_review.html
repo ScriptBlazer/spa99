@@ -1,0 +1,62 @@
+{% extends "system/emails_base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Emails" description="What the site sends, and what you send." %}
+{% include "system/_emails_tabs.html" with tab="groups" %}
+<div class="se-title"><a class="se-back" href="{% if target %}{% url 'system_list_add' target.pk %}{% else %}{% url 'system_list_new' %}{% endif %}">Start again</a><h2>Check the list</h2></div>
+{% include "system/_ses_state.html" %}
+{% if report.errors %}<p class="sys-note error se-state" data-se-state="file-error"><strong>This file can't be saved.</strong> Fix it and upload it again.</p>{% endif %}
+{% for error in report.errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ error }}</p>{% endfor %}
+{% if report.errors %}
+<form method="post" action="{% url 'system_list_fix' %}" class="se-formbar" data-se-go-back-form>{% csrf_token %}
+  <textarea name="text" hidden>
+{{ text }}</textarea><input type="hidden" name="name" value="{{ name }}"><input type="hidden" name="category" value="{{ category }}">{% if target %}<input type="hidden" name="list" value="{{ target.pk }}">{% endif %}
+  <button type="submit" class="sys-btn primary" data-se-go-back>Go back and fix</button>
+  <a class="sys-btn" href="{% if target %}{% url 'system_list_add' target.pk %}{% else %}{% url 'system_list_new' %}{% endif %}">Start again</a>
+</form>{% else %}
+<div data-se-review-root data-review-url="{% url 'system_list_review' %}">
+{% if report.blocked %}<p class="sys-note error se-state" role="alert" data-se-state="blocked"><strong>Needs fixing.</strong> {{ report.problems }} row{{ report.problems|pluralize }} must be fixed before the list is saved{% if report.warnings %}, and {{ report.warnings }} heads-up{{ report.warnings|pluralize }} below{% endif %}.</p>
+{% elif not report.ok %}<p class="sys-note warning se-state" data-se-state="nobody"><strong>Nobody to save.</strong> {% if target %}Everyone is already on this list.{% else %}There is nobody in this list.{% endif %}</p>
+{% elif report.warnings %}<p class="sys-note warning se-state" data-se-state="warnings"><strong>Ready, with {{ report.warnings }} heads-up{{ report.warnings|pluralize }}.</strong> Read them below. You can save anyway. Nothing is sent.</p>
+{% else %}<p class="sys-note success se-state" data-se-state="ready"><strong>Ready.</strong> Every row checks out. Nothing is sent.</p>{% endif %}
+<section class="sys-panel se-review-panel" data-system-invite-report data-system-list-report data-ok="{{ report.ok }}" data-total="{{ report.total }}" data-problems-count="{{ report.problems }}">
+  <header><h2 data-se-summary>{{ report.summary }}</h2></header>
+  {% if report.blocked %}<p class="sys-note error se-fixnote" role="alert" data-se-blocked>The list is not saved until {{ report.problems }} row{{ report.problems|pluralize }} {{ report.problems|pluralize:"is,are" }} fixed. Change the name or address in the rows marked Fix and press Check again, or Go back and fix to edit the whole list.</p>{% endif %}
+  {% if report.groups %}<div class="se-groups" data-se-groups>{% for g in report.groups %}
+    <p class="se-group {{ g.level }}" data-group="{{ g.key }}" data-level="{{ g.level }}"><span class="sys-badge {% if g.level == 'error' %}danger{% else %}info{% endif %}">{% if g.level == 'error' %}Fix{% else %}Heads-up{% endif %}</span> <strong class="mono">{{ g.count }}</strong> {{ g.label }} <span class="sys-muted">Row{{ g.count|pluralize }} {{ g.lines }}.</span></p>
+  {% endfor %}</div>{% endif %}
+  <div class="se-chips" role="group" aria-label="Show" data-system-invite-counts>
+    <button type="button" class="sys-pill" aria-pressed="true" data-filter="all">All {{ report.total }}</button>
+    {% for key, label in status_labels.items %}{% for k, n in report.counts.items %}{% if k == key and n %}<button type="button" class="sys-pill" aria-pressed="false" data-filter="{{ key }}" data-count="{{ key }}">{{ label }} {{ n }}</button>{% endif %}{% endfor %}{% endfor %}
+  </div>
+  <div class="sys-scroll"><table class="sys-table se-review" data-system-invite-rows>
+    <thead><tr><th scope="col">Row</th><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Check</th></tr></thead>
+    <tbody>{% for r in report.rows %}<tr data-status="{{ r.status }}" data-level="{{ r.level }}" data-line="{{ r.line }}" data-email="{{ r.email }}">
+      <td class="mono sys-muted">{{ r.line }}</td>
+      <td>{% if r.level == "error" %}<input type="text" class="se-fix se-fix-name" value="{{ r.name }}" aria-label="Fix the name on row {{ r.line }}" data-se-fix-name data-old="{{ r.name }}" autocomplete="off"{% if r.choices %} list="se-names-{{ r.line }}"{% endif %}>{% if r.choices %}<datalist id="se-names-{{ r.line }}">{% for c in r.choices %}<option value="{{ c }}">{% endfor %}</datalist>{% endif %}{% else %}{{ r.name|default:"-" }}{% endif %}</td>
+      <td class="mono">{% if r.level == "error" %}<input type="text" class="se-fix" value="{{ r.email }}" aria-label="Fix the email address on row {{ r.line }}" data-se-fix-email data-old="{{ r.email }}" inputmode="email" autocomplete="off" spellcheck="false">{% else %}{{ r.email }}{% endif %}</td>
+      <td>{% if r.status == "ok" and not r.no_name %}<span class="sys-badge ok">Ready</span>{% elif r.no_name %}<span class="sys-badge ok">Ready</span> <span class="sys-muted">{{ r.message }}</span>{% elif r.level == "error" %}<span class="sys-badge danger">Fix</span> <span class="sys-muted">{{ r.message }}</span> <button type="button" class="sys-btn sm" data-se-recheck>Check again</button>{% elif r.status == "member" or r.status == "invited" or r.status == "suppressed" or r.status == "opted_out" %}<span class="sys-badge ok">Saved</span> <span class="sys-badge info">Flagged</span> <span class="sys-muted">{{ r.message }}</span>{% else %}<span class="sys-badge info">Not added</span> <span class="sys-muted">{{ r.message }}</span>{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  <p class="se-skipnote sys-muted" data-se-skipnote>{% if report.problems %}Nothing is saved until every row marked Fix is sorted out.{% elif report.total != report.ok %}Rows marked Flagged are saved but never emailed (or skipped by invitations). Repeats are merged.{% else %}Every row is ready.{% endif %}</p>
+</section>
+<form method="post" action="{% url 'system_list_save' %}" class="se-formbar se-sendbar" data-se-save-form data-ok="{{ report.ok }}">{% csrf_token %}
+  <input type="hidden" name="expected_ok" value="{{ report.ok }}"><input type="hidden" name="token" value="{{ token }}">{% if target %}<input type="hidden" name="list" value="{{ target.pk }}">{% endif %}
+  <textarea name="text" hidden data-se-list>
+{{ text }}</textarea>
+  {% if not target %}<div class="se-savefields">
+    <label class="se-opt">Name <input type="text" name="name" value="{{ name }}" maxlength="120" required autocomplete="off" data-se-list-name></label>
+    <label class="se-opt">Category <input type="text" name="category" value="{{ category }}" maxlength="60" list="list-categories" autocomplete="off"></label>
+    <datalist id="list-categories">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+  </div>{% endif %}
+  {% if report.blocked %}<button type="submit" class="sys-btn primary" formaction="{% url 'system_list_fix' %}" formnovalidate data-se-go-back>Go back and fix</button>
+  <button type="button" class="sys-btn" data-se-fix-all>Fix all and check again</button>{% endif %}
+  <button type="submit" class="sys-btn{% if not report.blocked %} primary{% endif %}" data-se-save-list{% if not report.can_save %} aria-disabled="true"{% endif %}>{% if target %}Add {{ report.ok }} {{ report.ok|pluralize:"person,people" }}{% else %}Save list ({{ report.ok }} {{ report.ok|pluralize:"person,people" }}){% endif %}</button>
+  {% if not report.blocked %}<button type="submit" class="sys-btn" formaction="{% url 'system_list_fix' %}" formnovalidate data-se-go-back>Go back and edit</button>{% endif %}
+  <a class="sys-btn link" href="{% if target %}{% url 'system_list_add' target.pk %}{% else %}{% url 'system_list_new' %}{% endif %}">Start again</a>
+  {% if report.groups %}<button type="submit" class="sys-btn" formaction="{% url 'system_list_problems' %}" formnovalidate data-se-problems-csv>Download problem rows (CSV)</button>{% endif %}
+  {% if report.blocked %}<span class="sys-muted se-reason">Fix the rows marked Fix first.</span>{% elif not report.ok %}<span class="sys-muted se-reason">Nobody to save.</span>{% else %}<span class="sys-muted se-reason">Saving sends nothing.</span>{% endif %}
+  <span class="sys-muted se-reason" data-se-progress hidden role="status">Saving, please wait. Do not press Back.</span>
+</form>
+</div>
+{% endif %}
+{% endblock %}

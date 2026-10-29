@@ -279,6 +279,10 @@ async function askCodeAndUndo(form, opener) {
 }
 
 function initSubmit() {
+  window.addEventListener('pageshow', (event) => { // back/forward cache: a restored page must ask again
+    if (!event.persisted) return;
+    $$('form').forEach((form) => { form._confirmed = false; form.querySelectorAll('input[data-confirm-yes]').forEach((input) => { input.value = ''; }); });
+  });
   document.addEventListener('submit', async (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || form.method !== 'post') return;
@@ -287,7 +291,7 @@ function initSubmit() {
     const spec = specFor(form);
     if (spec) {
       event.preventDefault();
-      if (await confirmDialog(spec)) { form._confirmed = true; form.requestSubmit(event.submitter || undefined); }
+      if (await confirmDialog(spec)) { form.querySelectorAll('input[data-confirm-yes]').forEach((input) => { input.value = 'yes'; }); form._confirmed = true; form.requestSubmit(event.submitter || undefined); }
       return;
     }
     begin(form);

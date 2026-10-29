@@ -281,3 +281,25 @@ def minus(value, other):
         return int(value) - int(other)
     except (TypeError, ValueError):
         return value
+
+
+@register.simple_tag(takes_context=True)
+def page_url(context, number):
+    """The current address with only `page` replaced (filters and search stay)."""
+    request = context["request"]
+    query = request.GET.copy()
+    query["page"] = number
+    return f"?{query.urlencode()}"
+
+
+@register.simple_tag
+def page_window(page, around=1):
+    """Page numbers to show with None for a gap: 1 ... 4 5 6 ... 12."""
+    last, here = page.paginator.num_pages, page.number
+    wanted = sorted({1, last, *range(max(1, here - around), min(last, here + around) + 1)})
+    out = []
+    for number in wanted:
+        if out and number - out[-1] > 1:
+            out.append(None)
+        out.append(number)
+    return out

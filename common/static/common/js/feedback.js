@@ -486,6 +486,7 @@ export function initConfirm(root = document) {
     });
     if (!accepted) return;
     trigger.dataset.confirmed = 'true';
+    trigger.form?.querySelectorAll('input[data-confirm-yes]').forEach((input) => { input.value = 'yes'; }); // the server refuses a send without this
     try {
       if (trigger.form) trigger.form.requestSubmit(trigger);
       else if (trigger.href) window.location.assign(trigger.href);
@@ -497,6 +498,7 @@ export function initConfirm(root = document) {
   // Back button (bfcache) can restore the page as it was: make sure nothing stays pre-confirmed.
   window.addEventListener('pageshow', () => {
     root.querySelectorAll?.('[data-confirmed]').forEach((node) => delete node.dataset.confirmed);
+    root.querySelectorAll?.('input[data-confirm-yes]').forEach((input) => { input.value = ''; }); // a restored page must ask again
   });
 }
 

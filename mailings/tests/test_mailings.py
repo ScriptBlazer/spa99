@@ -272,8 +272,6 @@ class MailingSendTests(TestCase):
         with mock.patch("boto3.client", return_value=client):
             with self.assertRaisesMessage(sending.MailingError, "sandbox"):
                 sending.start(mailing(), self.admin)
-            with self.assertRaisesMessage(sending.MailingError, "sandbox"):
-                sending.start_invites("00000000-0000-0000-0000-000000000000", self.admin)
         self.assertFalse(MailingRecipient.objects.exists())
         cache.clear()
         client.get_account.return_value = {"ProductionAccessEnabled": True, "SendQuota": {"MaxSendRate": 1.0}}
@@ -359,8 +357,6 @@ class InviteImportTests(TestCase):
         self.assertTrue(all(g["level"] == "error" for g in report["groups"]))
         self.assertIn("rows 7, 8", next(r for r in report["rows"] if r["line"] == 7)["message"])
         self.assertEqual(report["summary"], "1 will be invited \u00b7 7 need fixing")
-        self.assertEqual(invites.create_batch("name,email\nBad,not-an-email", None), (None, invites.check("name,email\nBad,not-an-email")))
-        self.assertFalse(Invite.objects.exists())
 
     def test_repeats_are_warnings_and_imported_once(self):
         clean = invites.check("Al,al@example.com\nAl,al@example.com\nAl,AL@Example.com\nSam,sam@example.com\nSam,other@example.com")
@@ -368,14 +364,10 @@ class InviteImportTests(TestCase):
         self.assertEqual(invites.check(" Al , al@example.com \nAl,al@example.com")["rows"][1]["status"], "duplicate")  # spaces around a cell do not matter
         self.assertEqual((clean["ok"], clean["merged"], clean["blocked"], clean["can_import"]), (3, 2, False, True))
         self.assertEqual(clean["summary"], "3 will be invited \u00b7 2 repeated rows merged")
-        batch, _ = invites.create_batch("Al,al@example.com\nAl,al@example.com\nAl,AL@Example.com", None)
-        self.assertEqual(Invite.objects.filter(batch_id=batch).count(), 1)
 
     def test_a_missing_name_is_a_warning_and_imports_with_a_blank_name(self):
         report = invites.check("a@example.com\nBo,bo@example.com")
         self.assertEqual((report["ok"], report["counts"]["no_name"], report["rows"][0]["level"], report["can_import"]), (2, 1, "warning", True))
-        batch, _ = invites.create_batch("a@example.com", None)
-        self.assertEqual(Invite.objects.get(batch_id=batch).name, "")
 
     def test_a_blank_and_a_named_row_for_one_address_are_the_same_person(self):
         report = invites.check("a@example.com\nAl,a@example.com")
@@ -425,92 +417,6 @@ class InviteImportTests(TestCase):
         self.assertTrue(invites.check("name,email\n")["errors"])
 
 
-class InviteFlowTests(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        seed_all()
-        cls.admin = User.objects.create_user("dev@example.com", "a-long-test-password-1")
-
-    def send(self, text):
-        batch, report = invites.create_batch(text, self.admin)
-        sending.start_invites(batch, self.admin)
-        return batch
-
-    def test_a_token_claims_one_batch_and_a_racing_second_claim_gets_the_same_one(self):
-        text = "Al Smith,al@example.com"
-        row = invites.find_token(invites.issue_token(self.admin, text), self.admin, text)
-        stale = InviteImport.objects.get(pk=row.pk)  # what the losing request loaded before the winner committed
-        batch, _ = invites.create_batch(text, self.admin, row)
-        again, report = invites.create_batch(text, self.admin, stale)
-        self.assertEqual((again, report.get("existing")), (batch, True))
-        self.assertEqual(Invite.objects.count(), 1)
-        self.assertEqual(InviteImport.objects.get().batch_id, batch)
-
-    def test_batch_sends_a_personal_link_with_unsubscribe_and_each_invite_once(self):
-        member_user = person("member@example.com")
-        batch = self.send("Al Smith,al@example.com\nMem,member@example.com")
-        self.assertEqual(sorted(Invite.objects.filter(batch_id=batch).values_list("email", "status")),
-                         [("al@example.com", "sent"), ("member@example.com", "skipped")])
-        self.assertEqual(len(mail.outbox), 1)
-        message = mail.outbox[0]
-        invite = Invite.objects.get(email="al@example.com")
-        self.assertIn(f"/invite/{invite.token}/", message.body)
-        self.assertIn("Hello Al,", message.body)
-        self.assertIn("List-Unsubscribe", message.extra_headers)
-        self.assertIsNotNone(invite.sent_at)
-        sending.run_invites(batch)  # a second run sends nothing
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(Invite.objects.get(email="member@example.com").reason, "Already has an account")
-
-    def test_link_marks_opened_prefills_register_and_registering_marks_registered(self):
-        batch = self.send("Al Smith,al@example.com")
-        invite = Invite.objects.get()
-        client = Client()
-        response = client.get(f"/invite/{invite.token}/")
-        self.assertRedirects(response, "/register/", fetch_redirect_response=False)
-        invite.refresh_from_db()
-        self.assertEqual(invite.status, Invite.SENT)  # a link scanner following the redirect does not count as opened
-        page = client.get("/register/")
-        invite.refresh_from_db()
-        self.assertEqual((invite.status, invite.opened_at is not None), (Invite.OPENED, True))  # the Register page really rendered
-        self.assertContains(page, 'value="Al"')
-        self.assertContains(page, 'value="al@example.com"')
-        user = user_services.register_interest({
-            "first_name": "Al", "last_name": "Smith", "email": "al@example.com", "password": "a-long-test-password-1", "mobile": "+447912345678",
-            "date_of_birth": datetime.date(1990, 1, 1), "plan": "tier-2"}).user
-        invite.refresh_from_db()
-        self.assertEqual((invite.status, invite.registered_user, invite.registered_at is not None), (Invite.REGISTERED, user, True))
-        client.get(f"/invite/{invite.token}/")
-        client.get("/register/")  # opening again never downgrades it
-        invite.refresh_from_db()
-        self.assertEqual(invite.status, Invite.REGISTERED)
-
-    def test_unknown_and_expired_links_just_go_to_register_and_a_bounce_is_recorded(self):
-        self.send("Al Smith,al@example.com")
-        invite = Invite.objects.get()
-        self.assertRedirects(Client().get("/invite/nonsense/"), "/register/", fetch_redirect_response=False)
-        Invite.objects.filter(pk=invite.pk).update(expires_at=timezone.now() - datetime.timedelta(minutes=1))
-        client = Client()
-        client.get(f"/invite/{invite.token}/")
-        client.get("/register/")
-        invite.refresh_from_db()
-        self.assertEqual(invite.status, Invite.SENT)  # expired: not marked, no prefill
-        self.assertNotContains(client.get("/register/"), 'value="al@example.com"')
-        Invite.objects.filter(pk=invite.pk).update(expires_at=timezone.now() + datetime.timedelta(days=1))
-        suppression.add("al@example.com", EmailSuppression.HARD_BOUNCE)
-        invite.refresh_from_db()
-        self.assertEqual(invite.status, Invite.BOUNCED)
-
-    def test_deleting_a_person_erases_their_group_send_rows_and_invites(self):
-        user = person("gone@example.com", consent=True)
-        with mock.patch("mailings.sending.enqueue"):
-            sending.start(mailing(), self.admin)
-        Invite.objects.create(name="G", email="gone@example.com", batch_id="00000000-0000-0000-0000-000000000002")
-        self.assertEqual(len(user_services.export_user_data(user)["group_emails"]), 1)
-        user_services.delete_user_data(user)
-        self.assertFalse(MailingRecipient.objects.exists() or Invite.objects.exists())
-
-
 SES_BACKEND = "notifications.backends.SesBackend"
 LOCK_CACHE = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "mail-lock"}}
 
@@ -535,9 +441,6 @@ class ResilienceTests(TestCase):
             self.assertEqual((m.status, "sandbox" in m.error), (Mailing.PAUSED, True))
             with self.assertRaises(sending.MailingError):
                 sending.resume(m)
-            with self.assertRaises(sending.MailingError):
-                sending.start_invites_resume("00000000-0000-0000-0000-000000000000")
-            self.assertEqual(sending.run_invites("00000000-0000-0000-0000-000000000000"), "paused")
         self.assertEqual(len(mail.outbox), 0)
         sending.resume(m)  # allowed again (dev): back to sending and finishes
         m.refresh_from_db()

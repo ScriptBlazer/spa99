@@ -3,6 +3,7 @@
 {% include "system/_page_header.html" with title="Approval" description="Who approves Gold applications, and who gives the final approval to the ones that need it. Team only shows these roles; they are set here." %}
 <form method="post" data-problems data-system-form="approval">{% csrf_token %}
   <section class="sys-panel" data-system-final-switch>
+  <div class="sys-group">
     {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
     {{ form.row_token }}
     {% include "system/_field_row.html" with field=form.final_approval_on %}
@@ -14,6 +15,7 @@
     <p class="sys-muted" data-system-final-explain>Off: approvals go straight through. On: approvals for the ticked potentials wait for a final approver (Low by default).</p>
     {% if final_nothing_ticked %}<p class="sys-note warn" role="status" data-final-nothing-waits><strong>Nothing waits:</strong> final approval is on, but no potential is ticked, so every approval goes straight through.</p>{% endif %}
     {% if not final_on and awaiting_final_count %}<p class="sys-note" role="status" data-final-still-waiting>{{ awaiting_final_count }} application{{ awaiting_final_count|pluralize }} already waiting for final approval stay{{ awaiting_final_count|pluralize:"s," }} as {{ awaiting_final_count|pluralize:"it is,they are" }}. A final approver can still confirm or send {{ awaiting_final_count|pluralize:"it,them" }} back.</p>{% endif %}
+  </div>
   </section>
   <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>
 </form>

@@ -26,7 +26,7 @@ from system import defaults as system_defaults
 
 from . import config, knowledge, llm
 from .models import Conversation, FaqItem, Message
-from .prompt import KNOWLEDGE_HEADER, MESSAGES, SYSTEM_RULES, personality
+from .prompt import KNOWLEDGE_HEADER, MESSAGES, personality, system_rules
 
 logger = logging.getLogger("spa99.chat")
 abuse_logger = logging.getLogger("spa99.chat.abuse")
@@ -325,10 +325,10 @@ def _reply(request, conversation):
     emitted, suppressed, final = [], False, None
     history = api_history(conversation)
     voice = personality(config.get(request))
-    chars = len(SYSTEM_RULES) + len(voice) + len(KNOWLEDGE_HEADER) + len(text) + sum(len(m["content"]) for m in history)
+    chars = len(system_rules()) + len(voice) + len(KNOWLEDGE_HEADER) + len(text) + sum(len(m["content"]) for m in history)
     conversation._billing = {"emitted": emitted, "usage": None, "chars": chars}  # from here the model call is billed, whatever happens
     try:
-        for kind, payload in llm.stream_reply(SYSTEM_RULES, KNOWLEDGE_HEADER + text, history, voice):
+        for kind, payload in llm.stream_reply(system_rules(), KNOWLEDGE_HEADER + text, history, voice):
             if kind == "final":
                 final = payload
                 conversation._billing["usage"] = payload["usage"]

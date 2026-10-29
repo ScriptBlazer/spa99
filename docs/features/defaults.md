@@ -113,3 +113,5 @@ Validation lengths, duplicate-submit windows, queue and retry internals, UI timi
 
 ## Payments group (2026-10-29)
 `payment_window_days` (14, 3 to 60), `payment_reminder_days_before` (3, 1 to 30), `payment_staff_alert_days_before` (7, 1 to 60), `staff_alert_emails` (comma separated, up to 5, empty in code; `seed_phase1` fills it once while empty; empty shows "No alert email set" here and on System > Payments). Reset to default restores the code values.
+
+`payment_staff_alert_hour` (9, 0 to 23; added 2026-10-29): the earliest London hour the daily staff warning goes out (was a code constant `ALERT_HOUR`).

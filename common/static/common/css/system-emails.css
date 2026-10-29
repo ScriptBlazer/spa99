@@ -310,3 +310,16 @@ body.system {
 .se-review tr[data-level="error"] td { background: color-mix(in srgb, var(--sys-danger) 6%, transparent); }
 .se-review td.sys-muted { width: 3.5em; }
 .sys-btn[data-busy] { opacity: .65; cursor: progress; }
+
+/* Groups, uploaded lists and the send pop-up summary (tokens only; tables sit in .sys-scroll, the pop-up table wraps) */
+.system .se-confirm { width: 100%; font-size: var(--sys-fs-sm); }
+.system .se-confirm th { text-align: left; font-weight: 600; color: var(--sys-text-2); white-space: nowrap; padding: var(--sys-1) var(--sys-3) var(--sys-1) 0; vertical-align: top; }
+.system .se-confirm td { padding: var(--sys-1) 0; overflow-wrap: anywhere; }
+.se-savefields { display: flex; flex-wrap: wrap; gap: var(--sys-3); flex: 1 1 100%; }
+.se-savefields .se-opt { min-width: 0; }
+.se-search { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-2); border-bottom: 1px solid var(--sys-line); }
+.se-search input[type="search"] { flex: 1 1 12em; min-width: 0; }
+.se-lists td, .se-groups-table td { overflow-wrap: anywhere; }
+.se-problems ul { list-style: disc; padding-left: var(--sys-5); margin-top: var(--sys-2); }
+.se-problems { margin-bottom: var(--sys-3); }
+.se-fix-name { font-family: inherit; width: min(200px, 50vw); }

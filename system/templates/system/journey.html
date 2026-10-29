@@ -3,7 +3,7 @@
 {% block title %}Journey{% endblock %}
 {% block main %}
 {% include "system/_page_header.html" with title="Journey" description="Questions, options and suggestion rules. Changes apply at once." %}
-<p class="sys-muted" style="margin:-8px 0 16px">Plan slugs: <span class="mono">{{ plan_slugs|join:", " }}</span></p>
+<p class="sys-muted sys-sub">Plan slugs: <span class="mono">{{ plan_slugs|join:", " }}</span></p>
 <ul hidden data-system-risky-fields>{% for name in risky_fields %}<li>{{ name }}</li>{% endfor %}</ul>
 {% for q in questions %}
 <section class="sys-panel" data-system-question="{{ q.obj.key }}" aria-labelledby="q-{{ q.obj.pk }}">

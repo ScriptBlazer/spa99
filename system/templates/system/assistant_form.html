@@ -9,8 +9,10 @@
     {% if item.title %}<header><h2>{{ item.title }}</h2></header>{% endif %}
     {% if item.form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ item.form.non_field_errors|join:" " }}</p>{% endif %}
     {{ item.form.row_token }}
+    <div class="sys-group">
     {% for field in item.form.visible_fields %}{% include "system/_field_row.html" %}{% endfor %}
     {% if item.note %}<p class="sys-muted">{{ item.note }}</p>{% endif %}
+    </div>
   </section>
   <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>
 </form>

@@ -113,7 +113,7 @@ class SesGateTests(SimpleTestCase):
             ses.require_sending_allowed()
         client.assert_not_called()
         self.assertEqual((status["mode"], status["allowed"], status["max_24h"]), ("provider", True, None))
-        self.assertEqual(status["provider"], "Emails are sent for real through smtp.postmarkapp.com (not Amazon SES).")
+        self.assertEqual(status["provider"], "Sending through Postmark \u2713")
         self.assertNotIn("secret-token", str(status))
 
     @override_settings(DEBUG=True)
