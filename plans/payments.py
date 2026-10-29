@@ -27,7 +27,6 @@ from users.models import InterestRegistration
 logger = logging.getLogger("spa99.payments")
 
 BATCH = 500
-ALERT_HOUR = 9
 SLICE_SECONDS = 50
 STALE_SECONDS = 600
 
@@ -552,7 +551,7 @@ def run_staff_alert(now=None):
     from notifications.services import send_templated, subject_for
 
     now = now or timezone.now()
-    if timezone.localtime(now).hour < ALERT_HOUR:  # a sensible hour: from 09:00 London time, once a day
+    if timezone.localtime(now).hour < _defaults().payment_staff_alert_hour:  # System > Defaults (09:00 London time by default), once a day
         return None
     warning = staff_warning(now)
     if warning is None:

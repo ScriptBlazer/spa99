@@ -13,7 +13,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from chat import config, knowledge, services as chat_services
 from chat.models import AssistantSettings, Conversation, KnowledgeNote, Message
-from chat.prompt import SYSTEM_RULES, personality
+from chat.prompt import personality, system_rules
 
 from . import defaults, services
 from .forms_faq import CapForm, LimitsForm, NoteForm, PersonalityForm
@@ -80,7 +80,7 @@ def assistant_test(request):
         name, data = block.split("\n", 1)
         events.append([name[7:], json.loads(data[6:])])
     knowledge_text, digest = knowledge.build(prices)
-    sent = "\n\n".join([SYSTEM_RULES, personality(config.get()), knowledge_text])
+    sent = "\n\n".join([system_rules(), personality(config.get()), knowledge_text])
     reply = "".join(d.get("text") or d.get("message", "") for name, d in events if name in ("delta", "error"))
     return JsonResponse({"conversation_id": str(conversation.pk), "text": reply, "events": events, "system": sent, "digest": digest, "prices": prices})
 

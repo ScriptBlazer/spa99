@@ -314,6 +314,8 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
     payment_reminder_days_before = _number("Payment reminder: days before it closes", 3, 1, 30, "One gentle reminder email to members who have not set up yet.")
     payment_staff_alert_days_before = _number("Staff warning: days before it closes", 7, 1, 60, "From then until it closes, staff are warned once a day about launch-price holders who have not set up.")
 
+    payment_staff_alert_hour = _number("Staff warning: earliest hour (London time)", 9, 0, 23, "The daily staff warning is sent from this hour (24-hour clock), once a day.")
+
     staff_alert_emails_on = models.BooleanField("Payment alert emails on", default=True, help_text="Untick to stop the alert emails without clearing the addresses. The notice in the Office and System still shows.")
     staff_alert_seeded = models.BooleanField(default=False, editable=False)
     staff_alert_emails = models.CharField(

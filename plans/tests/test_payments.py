@@ -293,6 +293,9 @@ class ReviewFixTests(PaymentCase):
         InterestRegistration.objects.filter(pk=reg.pk).update(payment_status="invited", payment_due_at=timezone.now() + 3 * DAY, sale_percent_off=20, sale_months=1)
         early_morning = timezone.make_aware(__import__("datetime").datetime.combine(timezone.localdate(), __import__("datetime").time(8, 0)))
         self.assertIsNone(payments.run_staff_alert(early_morning))
+        SiteDefaults.objects.update(payment_staff_alert_hour=10)  # the hour is a System default
+        self.assertIsNone(payments.run_staff_alert(early_morning.replace(hour=9, minute=5)))
+        SiteDefaults.objects.update(payment_staff_alert_hour=9)
         self.assertIsNotNone(payments.run_staff_alert(early_morning.replace(hour=9, minute=5)))
 
     def test_member_page_copy_for_set_up_members_and_before_stripe(self):
