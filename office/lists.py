@@ -222,7 +222,7 @@ def gold_row(application):
     return {"id": str(application.pk), "reference": application.reference, "name": application.full_name, "email": application.email,
             "potential": application.potential_level, "score": application.potential_score, "status": application.status,
             "can_approve": application.status in WAITING, "awaiting_final": application.status == GoldApplication.AWAITING_FINAL,
-            "sent_back": application.sent_back_at is not None, "invite": invite_state(application), "applied": application.created_at.isoformat()}
+            "sent_back": application.sent_back_at is not None, "business_willing": application.business_willing, "invite": invite_state(application), "applied": application.created_at.isoformat()}
 
 
 def gold_page(filters, page, size=None):
@@ -298,7 +298,7 @@ def gold_detail(application):
     decided = next((h for h in reversed(history) if h["status"] == application.status and h["text"] != "Applied"), None)
     return {
         "id": str(application.pk), "reference": application.reference, "name": application.full_name, "status": application.status,
-        "potential": application.potential_level, "invite": state, "sections": sections, "history": history,
+        "potential": application.potential_level, "business_willing": application.business_willing, "invite": state, "sections": sections, "history": history,
         "decided_at": decided["at"] if decided else "", "decided_by": decided["who"] if decided else "",
         "approved_at": application.approved_at.isoformat() if application.approved_at else "",
         "approved_by": (application.approved_by.get_full_name() or application.approved_by.email) if application.approved_by_id else "",
@@ -322,7 +322,7 @@ def gold_confirm(application):
     """What the one-tap approve page shows: who, potential, one property line and the applied date."""
     sections = {t["title"]: dict(t["rows"]) for t in gold_services.application_sections(application)}
     about = sections.get("About him", {})
-    line = [about.get("What he does", ""), about.get("Link to property", ""), about.get("Size", ""), about.get("Where", "")]
+    line = [about.get("Industry", ""), about.get("Link to property", ""), about.get("Size", ""), about.get("Where", "")]
     return {"id": str(application.pk), "name": application.full_name, "first_name": application.first_name, "status": application.status,
             "potential": application.potential_level, "property_line": " · ".join(p for p in line if p and p != "Not given"),
             "applied": application.created_at, "can_approve": application.status in WAITING,

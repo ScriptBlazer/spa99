@@ -21,7 +21,7 @@ from plans import services as plan_services
 from plans.models import SiteSettings
 
 from . import clicks, services
-from .links import short_url
+from .links import short_url, with_message
 from .access import memberships_visible
 
 JOURNEY_SLUGS = {1: "your-time", 2: "what-draws-you", 3: "company", 4: "about-you"}
@@ -199,6 +199,7 @@ def gold_apply(request, slug=""):
         "journeyCopy": _copy("journey", ["continue", "skip", "back", "prefer_not", "screen_1", "screen_2", "screen_3"]),
         "facilityImages": services.journey_facility_images(), "iconSprite": static("common/img/icons.svg"),
         "urls": {"home": reverse("home"), "privacy": reverse("privacy"), "terms": reverse("terms"),
+                 "whatsappBusiness": short_url("gold", msg="gold_business"),  # '' while no WhatsApp link is set: the note and button are hidden
                  "journey": reverse("journey_page", args=[JOURNEY_SLUGS[1]])},
     }
     return _page(request, "pages/gold_apply.html", "gold-apply", gold_config=config)
@@ -209,7 +210,8 @@ def gold_apply(request, slug=""):
 @never_cache
 def whatsapp(request):
     clicks.record(request)
-    target = SiteSettings.load().discount_contact_url or reverse("visit")  # no link set: the Visit page (it holds our contact details)
+    link = SiteSettings.load().discount_contact_url
+    target = with_message(link, request.GET.get("msg")) if link else reverse("visit")  # no link set: the Visit page (it holds our contact details)
     return HttpResponseRedirect(target)
 
 

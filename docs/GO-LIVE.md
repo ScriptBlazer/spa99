@@ -1,6 +1,6 @@
 # Go live
 
-Do these in order. Live starts with an empty database, so it needs no backfills. Server commands run in `~/spa99` (the folder that holds `docker-compose.yml`).
+Do these in order. Live started with an empty database, so the first launch needed no backfills. Later releases may: if the release notes say so, run `backfill_site_data` (see "Every release"). Server commands run in `~/spa99` (the folder that holds `docker-compose.yml`).
 
 ## Waiting for Moishe
 
@@ -104,7 +104,9 @@ None of these block the launch. Each has a safe default already in place.
 2. Before a release with migrations: take an RDS snapshot (RDS > Snapshots > Take snapshot).
 3. On the server: set `APP_TAG=1.0.1` in `.env`, then `docker compose pull && docker compose up -d`.
 4. Check `https://spa99.uk/health/` and `docker compose logs web | head`.
+5. If the release notes say so, run `docker compose exec web python manage.py backfill_site_data --dry-run`, then without `--dry-run`.
 
+**1.0.1** (Barry's Gold changes) needs that: it renames the industry question, "BML staff member", adds "Barry's status", turns Rest of London into Midlands and renames the Gold rating reason. It also has one migration (`business_willing`).
 Never edit or delete a migration that is already live.
 
 **Rollback:** set `APP_TAG` back to the previous version, then `docker compose pull && docker compose up -d`. If a migration damaged data, restore the RDS snapshot to a new instance and point `DATABASE_URL` at it.

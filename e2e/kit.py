@@ -317,8 +317,8 @@ def answer_journey(page, stop_before_result=False, email="journey-walker@example
     return page.locator("[data-flow-root] .result-tier").inner_text()
 
 
-def gold_to_last_screen(page):
-    """Open the Gold application, choose Finance, pass 'your visits', and wait on the last screen ('you')."""
+def gold_open_about(page):
+    """Open the Gold application and choose Finance (the first screen, 'about you'). Company and role are not filled."""
     page.goto(f"{SITE}/gold-card/apply/")
     page.wait_for_selector("[data-flow-root] .screen")
     # Industry is multi-select: a tile is a checkbox, and answers from an earlier journey or application can already be ticked
@@ -326,6 +326,14 @@ def gold_to_last_screen(page):
     page.locator("input[name=industry][value=finance]").wait_for(state="attached")
     if not page.locator("input[name=industry][value=finance]").is_checked():
         page.locator("label.tile:has(input[name=industry][value=finance])").click()
+
+
+def gold_to_last_screen(page):
+    """Open the Gold application, choose Finance, fill company and role (always required, 2026-10-29), pass 'your visits',
+    and wait on the last screen ('you')."""
+    gold_open_about(page)
+    page.locator("#g-company").fill("E2E Holdings")
+    page.locator("#g-role").fill("Director")
     page.locator("[data-primary]").click()           # screen 2: your visits (from the journey, or asked now)
     page.wait_for_selector("[data-flow-root] .screen-title")
     page.locator("[data-primary]").click()           # screen 3: you

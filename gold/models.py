@@ -150,8 +150,11 @@ class GoldApplication(BaseModel):
     company = models.CharField(max_length=150, blank=True)
     role = models.CharField(max_length=150, blank=True)
     bml_relationship = models.CharField(max_length=10, blank=True)
+    business_willing = models.BooleanField(
+        null=True, blank=True,
+        help_text="Asked only when bml_relationship is not_yet: happy to do business with BML? Empty = not asked. False shows a banner in the Office.")
     referred_by = models.CharField(max_length=150, blank=True)
-    note = models.TextField(blank=True)
+    note = models.TextField(blank=True, help_text="What benefits could he bring to BML? (optional)")
 
     spa_interest = models.JSONField(default=dict, blank=True, help_text="What the journey collected, as readable text, at the time of applying.")
     journey_session = models.ForeignKey(

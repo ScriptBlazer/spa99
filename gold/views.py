@@ -49,7 +49,7 @@ def _question_text(key, default):
 
 
 def _industry_question_text():
-    return _question_text(rating.INDUSTRY_QUESTION, "What do you do?")
+    return _question_text(rating.INDUSTRY_QUESTION, "What industry are you in?")
 
 
 def _industry_other_text():

@@ -22,20 +22,21 @@ Answers already given in the journey are reused, never asked twice.
 - First and last name, email, mobile
 
 **About you** (screen 1, 2026-10-23: "About you." / "A few taps, so we know you.")
-- What do you do? Property · Finance · Business owner · Law · Medical · Tech · Creative · Other (the options are the journey's `industry` question; Other has an optional short text). **Multi-select, at least one** (2026-10-26), prefilled from the journey. Nobody should feel "this isn't for me": the next two questions appear only when **Property is among his choices**, and the server drops them otherwise. The Other text shows when Other is chosen.
+- What industry are you in? (2026-10-29, was "What do you do?"; the key stays `industry`) Property · Finance · Business owner · Law · Medical · Tech · Creative · Other (the options are the journey's `industry` question; Other has an optional short text). **Multi-select, at least one** (2026-10-26), prefilled from the journey. Nobody should feel "this isn't for me": the next two questions appear only when **Property is among his choices**, and the server drops them otherwise. The Other text shows when Other is chosen.
 
 **Property profile** (only if Property: link and size; the rest is for everyone)
 - Your link to property: Owner / investor · Developer · Manager · Work at a property or management firm · Agent / broker · Property lawyer · None of these
 - Size: number of units or properties (ranges: 1–9, 10–49, 50–199, 200+) or portfolio value range
-- Where: North London · Rest of London · Nationwide · Abroad (2026-10-26: "Rest of the UK" is now **Nationwide**; the stored value stays `rest_of_uk`)
-- Company and role (short text, optional)
-- Are you BML staff? Yes · No (2026-10-26, Barry: anyone who works at BML; was "Do you work with BML?" with "Not yet"; the stored values `yes` / `not_yet` are unchanged, and the email row and rating reason read "BML staff")
+- Where: North London · Midlands · Nationwide · Abroad (2026-10-29: "Rest of London" is now **Midlands**, stored value `midlands`; live rows and applications are converted by `backfill_site_data`. 2026-10-26: "Rest of the UK" is now **Nationwide**; the stored value stays `rest_of_uk`)
+- Company and role (short text, **always required**, 2026-10-29: no "(optional)"; the server refuses an empty one, and the form lists it in the shared problems dialog)
+- Are you working with BML? Yes · No (2026-10-29, Barry; before that "Are you BML staff?" and "Do you work with BML?"; the stored values `yes` / `not_yet` and the rating points are unchanged; the email row reads "Working with BML" and the rating reason "Working with BML")
+- **Only when No:** Are you happy to do business with BML? Yes · No (segmented; hidden otherwise; **required when No**). Stored as `GoldApplication.business_willing` (nullable boolean, history on; empty = not asked). **Yes** shows under it: "Great, after you apply, send us a quick WhatsApp so we can talk business." with an Open WhatsApp button to `/whatsapp/?from=gold&msg=gold_business` (new tab); he carries on with the form. The same button is on the "application sent" page when the answer was Yes. Both are hidden while no WhatsApp link is set in System. **No** just continues. No points: the rating ignores the answer. In the Office a No shows a red banner at the top of the application, "Said NO to doing business with BML", and a "No to business" badge on the Gold list (Yes: "Happy to do business"); Barry can still approve. The approver email adds "Happy to do business with BML: Yes / No / \u2013".
 - Referred by (optional)
 
 **Spa interest** (from the journey if done, otherwise a short version)
 - When, how often, facilities, alone or with a friend
 
-**Anything else** (optional note)
+**What benefits could you bring to BML?** (optional note; 2026-10-29, was "Anything else?"; the Office and email label read the same; stored in `note`)
 
 Privacy notice link and marketing opt-in as in sign-up.
 
@@ -53,7 +54,7 @@ Automatic **High / Medium / Low**, points-based, weights editable in Control.
 | None of these | Low |
 | Size 50–199 / 200+ | + / ++ |
 | North London | + |
-| BML staff | ++ |
+| Working with BML | ++ |
 | Referred by someone | + |
 
 Thresholds for High/Medium/Low are settings. The rating and its reasons are stored with the application.
@@ -82,7 +83,7 @@ Clean, branded, readable on a phone. Applicant receives a short, calm acknowledg
 
 | Model | Holds |
 |---|---|
-| `GoldApplication` | UUID, `reference` (GC-XXXXXX), personal details, `industries` (list, multi-select) + `industry` (the first of them, kept for older rows and filters; read all with `industry_values`) + `industry_other`, `property_link` and `size_range` (empty unless the industry is Property), `location` (the "where"), company, role, `bml_relationship`, referred by, note, `spa_interest` (journey answers as readable text), linked journey session (and `user` if the same email registers), potential level + score + reasons, status (new / contacted / approved / declined, by hand in Control), internal notes, `email_sent_at` + `email_error`, `repeat_of`, marketing + privacy consent |
+| `GoldApplication` | UUID, `reference` (GC-XXXXXX), personal details, `industries` (list, multi-select) + `industry` (the first of them, kept for older rows and filters; read all with `industry_values`) + `industry_other`, `property_link` and `size_range` (empty unless the industry is Property), `location` (the "where"), company, role, `bml_relationship`, `business_willing` (null / true / false), referred by, note, `spa_interest` (journey answers as readable text), linked journey session (and `user` if the same email registers), potential level + score + reasons, status (new / contacted / approved / declined, by hand in Control), internal notes, `email_sent_at` + `email_error`, `repeat_of`, marketing + privacy consent |
 | `GoldChoice` | The answers offered on the form and in the journey: group (property_link, size, where, bml), stable value, label, order, active. Retire by unticking; old applications keep their value and label |
 | `GoldSignalSource` | Which journey question feeds which Gold signal: signal, journey question key, optional answer value, the value it gives (e.g. `property_law` = `yes` gives `property_lawyer`), order, active |
 | `GoldRule` | One row per weight: group (property_link, size, where, bml, referred, threshold), match value, points, `is_property`. Thresholds are rows with group `threshold` and value `high` / `medium` |

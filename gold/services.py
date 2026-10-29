@@ -48,7 +48,7 @@ JOURNEY_SUMMARY = [
     ("frequency", "How often"),
     ("facilities", "Facilities he wants"),
     ("company", "Alone or with a friend"),
-    ("industry", "What he does"),
+    ("industry", "Industry"),
     ("heard_via", "How he heard about us"),
 ]
 
@@ -81,6 +81,10 @@ def _journey_sentence(info):
     return text + (f", visited {visits} times before applying" if visits > 1 else ", one visit")
 
 
+def _yes_no(value):
+    return "Yes" if value is True else "No" if value is False else "\u2013"
+
+
 def application_sections(application):
     """The three sections of the email to Barry, as [{'title', 'rows': [(label, value)]}]. Control shows the same."""
     created = timezone.localtime(application.created_at).strftime("%d/%m/%Y, %H:%M")
@@ -94,7 +98,7 @@ def application_sections(application):
     what = ", ".join(rating.industry_labels(application.industry_values)) or "Not given"
     if application.industry_other:
         what += f" ({application.industry_other})"
-    prop = [("What he does", what)]
+    prop = [("Industry", what)]
     if application.property_link:  # only people in Property are asked
         prop.append(("Link to property", rating.label_for(PROPERTY_LINK, application.property_link)))
     prop += [
@@ -105,13 +109,14 @@ def application_sections(application):
         prop.append(("Size", rating.label_for(SIZE, application.size_range) or "Not given"))
     prop += [
         ("Where", rating.label_for(WHERE, application.location) or "Not given"),
-        ("BML staff", rating.label_for(BML, application.bml_relationship) or "Not given"),
+        ("Working with BML", rating.label_for(BML, application.bml_relationship) or "Not given"),
+        ("Happy to do business with BML", _yes_no(application.business_willing)),
         ("Referred by", application.referred_by or "Nobody named"),
         ("Potential", f"{POTENTIAL_LABELS.get(application.potential_level, '')} ({application.potential_score} points)"),
         ("Why", "\n".join(application.potential_reasons) or "No scoring signals"),
     ]
     if application.note:
-        prop.append(("Note from applicant", application.note))
+        prop.append(("What benefits could he bring to BML?", application.note))
     info = application.spa_interest or {}
     collected = []
     for key, label in JOURNEY_SUMMARY:
@@ -177,6 +182,7 @@ def submit_application(data, session=None):
             industry=industries[0] if industries else "", industries=industries, industry_other=data.get("industry_other", ""),
             property_link=data.get("property_link", ""), size_range=data.get("size_range", ""), location=data.get("location", ""),
             company=data.get("company", ""), role=data.get("role", ""), bml_relationship=data.get("bml_relationship", ""),
+            business_willing=data.get("business_willing"),
             referred_by=data.get("referred_by", ""), note=data.get("note", ""),
             journey_session=session, user=person, repeat_of=previous,
             spa_interest=interest_snapshot(session),
@@ -253,7 +259,7 @@ def export_applications(email):
         {
             "reference": a.reference, "created_at": a.created_at.isoformat(), "name": a.full_name, "email": a.email,
             "mobile": a.mobile, "industry": a.industry_values, "industry_other": a.industry_other, "property_link": a.property_link, "size_range": a.size_range, "where": a.location,
-            "company": a.company, "role": a.role, "bml_relationship": a.bml_relationship,
+            "company": a.company, "role": a.role, "bml_relationship": a.bml_relationship, "business_willing": a.business_willing,
             "referred_by": a.referred_by, "note": a.note, "potential": a.potential_level, "status": a.status,
             "potential_score": a.potential_score, "potential_reasons": a.potential_reasons,
             "marketing_consent": a.marketing_consent, "privacy_accepted_version": a.privacy_accepted_version,

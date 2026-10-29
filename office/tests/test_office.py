@@ -380,3 +380,23 @@ class TeamPasswordTests(OfficeTestCase):
         self.assertEqual((response.status_code, response["Location"]), (302, "/password/"))
         user.refresh_from_db()
         self.assertTrue(user.check_password("another-long-password-2"))
+
+
+class BusinessWillingTests(OfficeTestCase):
+    """Barry's changes (2026-10-29): 'Said NO to doing business with BML' is the loudest thing on the application; Yes and No are badged on the list."""
+
+    def application(self, answer, email):
+        return gold_services.submit_application(application_data(
+            email=email, mobile=f"+447911{GoldApplication.objects.count() + 100000:06d}", bml_relationship="not_yet" if answer is not None else "yes", business_willing=answer))[0]
+
+    def test_banner_on_the_detail_and_badges_on_the_list(self):
+        owner = staff("Owner")
+        no, yes, none = self.application(False, "no@example.com"), self.application(True, "yes@example.com"), self.application(None, "none@example.com")
+        self.assertContains(get(owner, f"/gold/{no.pk}/"), "Said NO to doing business with BML")
+        self.assertNotContains(get(owner, f"/gold/{yes.pk}/"), "Said NO to doing business with BML")
+        self.assertNotContains(get(owner, f"/gold/{none.pk}/"), "Said NO to doing business with BML")
+        rows = get(owner, "/gold/").content.decode()
+        self.assertEqual(rows.count("No to business"), 1)
+        self.assertEqual(rows.count("Happy to do business"), 1)
+        self.assertEqual(post(staff("Approver", email="appr@example.com"), f"/gold/{no.pk}/approve/").status_code, 302)  # no blocking
+        self.assertEqual(GoldApplication.objects.get(pk=no.pk).status, "approved")

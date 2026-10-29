@@ -7,8 +7,9 @@
 {% with a=application %}
 <header class="o-detail-head">
   <h1>{{ a.name }}</h1>
-  <p class="o-badges" data-region="gold-head">{% include "office/_badge.html" with status=a.status %} {% include "office/_badge.html" with potential=a.potential %}</p>
+  <p class="o-badges" data-region="gold-head">{% include "office/_badge.html" with status=a.status %} {% include "office/_badge.html" with potential=a.potential %}{% include "office/_business_badge.html" with value=a.business_willing %}</p>
 </header>
+{% if a.business_willing is False %}<div class="o-alert" role="alert" data-business-no><p class="o-alert-title">Said NO to doing business with BML</p><p class="o-alert-sub">He is not working with BML and said no when asked if he is happy to do business with BML. You can still approve him.</p></div>{% endif %}
 <div class="o-detail">
   <div class="o-detail-main">
     {% for section in a.sections %}

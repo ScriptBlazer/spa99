@@ -325,3 +325,9 @@ html:has(.gold-apply) { scroll-padding-top: calc(var(--header-h) + var(--space-4
   .gold-apply-stage { position: sticky; top: var(--header-h); height: calc(100svh - var(--header-h)); align-self: start; }
 }
 @media (prefers-reduced-motion: reduce) { .gl-1::after, .gold-apply .gl-2::after { transition: none; } }
+
+/* Gold: the WhatsApp note under "Are you happy to do business with BML?" and on the sent page (2026-10-29) */
+.business-note { display: grid; gap: var(--space-3); justify-items: start; }
+.business-note[hidden] { display: none; }
+.business-note p { margin: 0; }
+.gold-sent .business-note { justify-items: center; margin-top: var(--space-4); }

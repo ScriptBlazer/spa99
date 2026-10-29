@@ -44,6 +44,11 @@ written by hand:
   rule names); the journey result label "Your membership" becomes "Based on your answers". Exact old wording only, so
   hand edits are kept; saved one by one so the change is in the history
 
+- (Barry's changes, 2026-10-29) "What do you do?" becomes "What industry are you in?"; the heard_via option "BML member" becomes
+  "BML staff member" and "Barry's status" (`barry_status`) is added before Other; Location "Rest of London" becomes "Midlands"
+  (the Gold choice row, any rating row and any existing application go from `rest_of_london` to `midlands`); the rating reason
+  "BML staff" becomes "Working with BML". Exact old wording only, so a row you edited is left alone.
+
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 from collections import Counter
 
@@ -151,6 +156,77 @@ def backfill():
     changed.update(_gold_bml_no_off())
     changed.update(_industry_gold_points())
     changed.update(_legal_pages())
+    changed.update(_barry_changes_2026_10_29())
+    return changed
+
+
+OLD_INDUSTRY_TEXT, NEW_INDUSTRY_TEXT = "What do you do?", "What industry are you in?"
+OLD_BML_OPTION, NEW_BML_OPTION = "BML member", "BML staff member"
+OLD_BML_REASON, NEW_BML_REASON = "BML staff", "Working with BML"
+OLD_LOCATION, NEW_LOCATION = ("rest_of_london", "Rest of London"), ("midlands", "Midlands")
+
+
+def _midlands(changed):
+    """Rest of London becomes Midlands, only while the choice row still has its exact old label (or there is no row). Applications
+    are saved one by one so the change is in their history."""
+    from gold.models import GoldApplication, GoldChoice, GoldRule
+
+    old_value, old_label = OLD_LOCATION
+    new_value, new_label = NEW_LOCATION
+    row = GoldChoice.objects.filter(group="where", value=old_value).first()
+    # Edge case: if the Rest of London row was deleted by hand (there is no row), applications and any rating row are still converted,
+    # and the Midlands choice comes from the seed (a missing choice is never created here).
+    if row is not None and row.label != old_label:
+        return  # edited in Control: left alone, with its applications
+    if row is not None:
+        if GoldChoice.objects.filter(group="where", value=new_value).exists():  # the seed already made Midlands: retire the old row
+            if row.active:
+                row.active = False
+                row.save()
+                changed["gold.GoldChoice (Rest of London retired)"] += 1
+        else:
+            row.value, row.label = new_value, new_label
+            row.save()
+            changed["gold.GoldChoice (Rest of London becomes Midlands)"] += 1
+    for rule in GoldRule.objects.filter(group="where", match_value=old_value, label__in=[old_label, ""]):
+        if GoldRule.objects.filter(group="where", match_value=new_value).exists():
+            continue  # a Midlands rule exists: the old one is left as it is
+        rule.match_value, rule.label = new_value, new_label
+        rule.save()
+        changed["gold.GoldRule (Rest of London becomes Midlands)"] += 1
+    for application in GoldApplication.objects.filter(location=old_value):
+        application.location = new_value
+        application.save()
+        changed["gold.GoldApplication (location Rest of London becomes Midlands)"] += 1
+
+
+def _barry_changes_2026_10_29():
+    """Barry's questionnaire changes (2026-10-29). New installs get them from the seeds; this updates live rows by exact old value."""
+    from gold.models import GoldRule
+
+    changed = Counter()
+    for question in Question.objects.filter(key="industry", text=OLD_INDUSTRY_TEXT):
+        question.text = NEW_INDUSTRY_TEXT
+        question.save()
+        changed["journey.Question (What industry are you in?)"] += 1
+    for option in Option.objects.filter(question__key="heard_via", value="bml", label=OLD_BML_OPTION):
+        option.label = NEW_BML_OPTION
+        option.save()
+        changed["journey.Option (BML staff member)"] += 1
+    heard = Question.objects.filter(key="heard_via").first()
+    if heard is not None and not Option.objects.filter(question=heard, value="barry_status").exists():
+        other = Option.objects.filter(question=heard, value="other").first()
+        order = other.order if other is not None else Option.objects.filter(question=heard).count() + 1
+        if other is not None:  # the new option takes Other's place and Other moves down one (an edited order keeps its gap)
+            other.order += 1
+            other.save()
+        Option.objects.create(question=heard, value="barry_status", label="Barry's status", order=order)
+        changed["journey.Option (Barry's status added)"] += 1
+    for rule in GoldRule.objects.filter(group="bml", match_value="yes", label=OLD_BML_REASON):
+        rule.label = NEW_BML_REASON
+        rule.save()
+        changed["gold.GoldRule (Working with BML)"] += 1
+    _midlands(changed)
     return changed
 
 
