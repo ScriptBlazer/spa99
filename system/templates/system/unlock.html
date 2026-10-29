@@ -8,7 +8,7 @@
 <form method="post" action="{% url 'system_unlock' %}" data-problems data-system-unlock style="display:grid;gap:12px">
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ next }}">
-  {% if code_required %}<label>Lock code <input type="password" name="code" inputmode="numeric" pattern="[0-9]{6,12}" autocomplete="one-time-code" minlength="6" maxlength="12" required{% if not locked_seconds %} autofocus{% endif %}{% if locked_seconds %} disabled{% endif %}{% if error %} aria-invalid="true" aria-describedby="unlock-error"{% endif %}></label>{% endif %}
+  {% if code_required %}<label>Lock code <input type="password" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="64" required{% if not locked_seconds %} autofocus{% endif %}{% if locked_seconds %} disabled{% endif %}{% if error %} aria-invalid="true" aria-describedby="unlock-error"{% endif %}></label>{% endif %}
   {% if error %}<p class="sys-error" id="unlock-error" data-system-error data-problem data-problem-label="" data-problem-field="code" role="alert">{{ error }}</p>{% endif %}
   <button type="submit" class="sys-btn primary"{% if locked_seconds %} disabled{% endif %}>Unlock</button>
 </form>
