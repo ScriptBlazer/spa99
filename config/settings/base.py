@@ -237,9 +237,10 @@ STORAGES = {
 Q_CLUSTER = {
     "name": "spa99",
     "orm": "default",
-    "workers": 2,
-    "timeout": 120,
-    "retry": 180,
+    "workers": 4,  # one worker container; 4 processes suit a small EC2 (2 vCPU / 2 GB) next to 3 gunicorn processes
+    "timeout": 120,  # long jobs (group sends, invites) work in 60 s slices and queue the next, so none is ever killed
+    "retry": 180,  # must stay above timeout, or a slow job is handed out twice
+    "save_limit": 250,  # successful job results kept (oldest dropped); failures are cleared after 30 days by housekeeping
     "max_attempts": 3,  # a task that keeps dying is not retried forever (django-q2's default 0 = forever)
     "queue_limit": 50,
     "bulk": 5,
