@@ -68,3 +68,8 @@
 }
 
 .system .sys-note[data-system-sale-readonly] { margin-bottom: var(--sys-4); }
+
+/* "Move it: +1 hour · +1 day · +1 week · Stop now" sits on one line as buttons (wraps on narrow screens) */
+.ss-extend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-2); margin: var(--sys-3) 0; }
+.ss-extend > span { margin-right: var(--sys-1); }
+.ss-extend form { margin: 0; }
