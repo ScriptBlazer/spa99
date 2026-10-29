@@ -88,7 +88,7 @@ class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
         if done[invites.ACTIVATED]:
             self.message_user(request, f"Approved, Gold added to their existing account: {done[invites.ACTIVATED]}.", messages.SUCCESS)
         if done[approval.AWAITING]:
-            self.message_user(request, f"Sent for final approval (Low potential): {done[approval.AWAITING]}.", messages.SUCCESS)
+            self.message_user(request, f"Sent for final approval: {done[approval.AWAITING]}.", messages.SUCCESS)
         if done[invites.SKIPPED]:
             self.message_user(request, f"Skipped (declined, already approved or awaiting final approval): {done[invites.SKIPPED]}.", messages.WARNING)
 

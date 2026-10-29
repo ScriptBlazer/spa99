@@ -375,6 +375,7 @@ class NoPaymentAndDiscountLineTests(TestCase):
         SiteSettings.objects.update(discount_contact_url="https://wa.me/447000000000")
         html = Client().get("/register/").content.decode()
         self.assertIn("No payment is taken now. When we open, you&rsquo;ll have 2 weeks to set up your membership.", html)
+        self.assertIn('href="/whatsapp/?from=register"', html)
         self.assertIn("WhatsApp us", html)  # the special-discount line (the old "better rate" line is not on Register)
         self.assertNotIn("better rate", html)
 
@@ -384,7 +385,8 @@ class NoPaymentAndDiscountLineTests(TestCase):
         client, _ = self._member_client()
         html = client.get("/account/membership/").content.decode()
         self.assertIn("Message us on WhatsApp", html)
-        self.assertIn(f'href="{url}" target="_blank" rel="noopener noreferrer"', html)
+        self.assertIn('href="/whatsapp/?from=membership" target="_blank" rel="noopener noreferrer"', html)  # the counted short link, not the raw URL
+        self.assertNotIn(url, html)
         self.assertNotIn("Barry", html)
         SiteSettings.objects.update(discount_contact_url="")
         with override_settings(DEBUG=True):
@@ -397,7 +399,7 @@ class NoPaymentAndDiscountLineTests(TestCase):
         _, user = self._member_client()
         SiteSettings.objects.update(discount_contact_url="https://wa.me/447000000000")
         send_welcome_email(user.pk)
-        self.assertIn("Message us on WhatsApp: https://wa.me/447000000000", mail.outbox[-1].body)
+        self.assertIn("/whatsapp/?from=email", mail.outbox[-1].body)
         SiteSettings.objects.update(discount_contact_url="")
         send_welcome_email(user.pk)
         self.assertNotIn("WhatsApp", mail.outbox[-1].body)

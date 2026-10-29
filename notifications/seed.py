@@ -14,10 +14,10 @@ DEFAULT_SUBJECTS = {
         "Gold Card application: {name} ({potential} potential) - repeat application",
         "To the approver when the same person applies again.",
     ),
-    "gold_final": ("Final approval: {name} (Low potential)", "To every final approver when an approver approves a Low potential application."),
+    "gold_final": ("Final approval: {name} ({potential} potential)", "To every final approver when an approver approves an application that needs final approval."),
     "gold_sent_back": (
-        "{name} was approved, but the potential is Low. Are you sure?",
-        "To every approver when a final approver sends a Low potential application back.",
+        "{name} was approved, but the potential is {potential}. Are you sure?",
+        "To every approver when a final approver sends an application back.",
     ),
     "gold_invite": ("Your Spa 99 Gold Card is approved", "To the applicant when Barry approves: the link to set up the account."),
     "gold_active": ("Your Spa 99 Gold Card is active", "To an existing member when Barry approves their Gold application."),

@@ -356,7 +356,7 @@ def gold(request):
     rows, has_next = lists.gold_page(filters, page, defaults.get(request).list_page_size)
     stored = selectors.counters(K.GOLD_APPLICATIONS, K.GOLD_BY_STATUS)
     context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "section": "gold",
-               "final_approver_missing": not approval.final_approver_exists(),
+               "final_approver_missing": approval.final_approver_missing(),
                "total_applications": stored.get((K.GOLD_APPLICATIONS, ""), 0), "waiting": selectors.waiting_count(stored),
                "awaiting_final_count": stored.get((K.GOLD_BY_STATUS, "awaiting_final"), 0)}
     return _varied(render(request, _fragment(request, "office/gold.html", "office/_gold_rows.html"), context))
@@ -381,7 +381,8 @@ def _gold_page(request, application, status=200, open_form="", form=None):
         opened = open_form if _can_open(application, open_form) else ""
         if not opened:
             messages.info(request, "This application has already been decided, so that is not available now.")
-    context = {"application": lists.gold_detail(application), "section": "gold", "final_approver_missing": not approval.final_approver_exists(),
+    context = {"application": lists.gold_detail(application), "section": "gold", "final_approver_missing": approval.final_approver_missing(),
+               "final_potentials": approval.final_potentials(), "final_waits": approval.final_waits(),
                "open_form": opened, "decline_prefill": gold_services.declined_prefill(application) if acts else "",
                "form_errors": {field: [str(m) for m in found] for field, found in form.errors.items()} if form is not None else {},
                "form_values": form.data if form is not None else {},

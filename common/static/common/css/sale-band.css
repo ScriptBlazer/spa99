@@ -22,6 +22,7 @@
 .sale-band-end-preview { display: flex; align-items: center; min-height: var(--chip-h, 2.75rem); margin-top: var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted-inverse); }
 .sale-band a:focus-visible { outline: 2px solid var(--color-focus-inverse); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) { .sale-band-end-preview:hover { color: var(--color-text-inverse); } }
+@media (max-width: 22em) { .sale-band-count { flex-wrap: wrap; row-gap: var(--space-3); } }
 @media (min-width: 48em) {
   .sale-band-actions { display: flex; align-items: center; }
   .sale-band-end-preview { margin: 0 0 0 var(--space-4); }

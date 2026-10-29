@@ -97,6 +97,16 @@ class Plan(BaseModel):
         return None
 
 
+FINAL_POTENTIAL_CHOICES = [("low", "Low"), ("medium", "Medium"), ("high", "High")]
+
+
+def validate_final_potentials(value):
+    """A comma separated list of low / medium / high (each at most once); empty = none."""
+    parts = [p for p in (value or "").split(",") if p]
+    if any(p not in dict(FINAL_POTENTIAL_CHOICES) for p in parts) or len(set(parts)) != len(parts):
+        raise ValidationError("Use only low, medium and high, each once.")
+
+
 class SiteSettings(BaseModel):
     """One row for the whole site (singleton). Use SiteSettings.load()."""
 
@@ -177,6 +187,13 @@ class SiteSettings(BaseModel):
         help_text="Barry's personal WhatsApp link (https only), shown as 'Looking for a better rate?' on the sign-up and "
                   "choose-membership screens. Empty = the line is hidden on live (dev shows a 'link to come' marker).")
 
+    final_approval_on = models.BooleanField(
+        "final approval", default=False,
+        help_text="Off: approvals go straight through. On: approvals for the ticked potentials wait for a final approver.")
+    final_approval_potentials = models.CharField(
+        "potentials that wait for final approval", max_length=20, blank=True, default="low", validators=[validate_final_potentials],
+        help_text="Comma separated: low, medium, high. Only used while final approval is on.")
+
     history = HistoricalRecords()
 
     class Meta:
@@ -204,6 +221,12 @@ class SiteSettings(BaseModel):
         from django.conf import settings
 
         return (split_emails(self.contact_email) or [parseaddr(settings.DEFAULT_FROM_EMAIL)[1]])[0]
+
+    @property
+    def final_potential_list(self):
+        """The potentials that wait for final approval (only meaningful while final_approval_on), in low/medium/high order."""
+        chosen = set((self.final_approval_potentials or "").split(","))
+        return [value for value, _ in FINAL_POTENTIAL_CHOICES if value in chosen]
 
     @property
     def approver_cc_list(self):

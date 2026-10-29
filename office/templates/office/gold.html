@@ -3,7 +3,7 @@
 {% block title %}Gold | Spa 99 Office{% endblock %}
 {% block main %}
 <h1 class="sr-only">Gold</h1>
-{% if final_approver_missing and office_can.can_act %}<p class="o-callout o-callout--calm" role="status" data-final-approver-missing><strong>No final approver is set.</strong> Low-potential approvals go straight through.</p>{% endif %}
+{% if final_approver_missing and office_can.can_act %}<p class="o-callout o-callout--calm" role="status" data-final-approver-missing><strong>No final approver is set.</strong> Approvals that should wait for a final check go straight through.</p>{% endif %}
 <form class="o-filters" method="get" action="{% url 'office_gold' %}" data-filter-form data-list="gold" role="search" aria-label="Find applications">
   <div class="o-filters-bar">
     <div class="o-search">

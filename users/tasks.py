@@ -5,6 +5,7 @@ their data."""
 from django.conf import settings
 
 from notifications.services import send_templated, subject_for
+from pages.links import short_path
 from plans.models import SiteSettings
 
 from . import tokens
@@ -84,7 +85,7 @@ def send_welcome_email(user_id):
             "plan_name": interest.plan.name if interest and interest.plan else "",
             "account_id": user.public_id_display,
             "opening_text": f"and we plan to open in {opening}" if opening else "",
-            "discount_url": SiteSettings.load().discount_contact_url,
+            "discount_url": f"{settings.SITE_URL}{short_path('email')}" if SiteSettings.load().discount_contact_url else "",
         },
         subject_email=user.email,
     )

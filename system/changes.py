@@ -33,6 +33,8 @@ MODEL_SECTIONS = {
 }
 FIELD_SECTIONS = {
     ("system.sitedefaults", "chat_monthly_cap_gbp"): "assistant",
+    ("plans.sitesettings", "final_approval_on"): "approval",
+    ("plans.sitesettings", "final_approval_potentials"): "approval",
     ("plans.sitesettings", "gold_approver_emails"): "emails",
     ("plans.sitesettings", "gold_approver_cc"): "emails",
     ("plans.sitesettings", "contact_email"): "emails",

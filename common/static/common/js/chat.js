@@ -112,8 +112,7 @@ function start() {
   window.addEventListener('offline', updateOffline);
 
   /* ---------- light markdown, as nodes ---------- */
-  /** Only our own pages, mail to our own address, and the WhatsApp link we gave the panel. Anything else is shown as plain text. */
-  const WHATSAPP_HOSTS = new Set(['wa.me', 'api.whatsapp.com']);
+  /** Only our own pages (the WhatsApp link is our own /whatsapp/ address) and mail to our own address. Anything else is shown as plain text. */
   function safeLink(raw) {
     if (/^\/(?!\/)/.test(raw)) return { href: raw, external: false };
     try {
@@ -125,8 +124,6 @@ function start() {
       }
       if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
       if (url.origin === location.origin) return { href: url.href, external: false };
-      const given = [st.handoff.whatsapp_url, baseHandoff.whatsapp_url].filter(Boolean).map((u) => { try { return new URL(u).host; } catch { return ''; } });
-      if (url.protocol === 'https:' && WHATSAPP_HOSTS.has(url.host) && given.some((h) => WHATSAPP_HOSTS.has(h) && h === url.host)) return { href: url.href, external: true };
     } catch { /* not a URL */ }
     return null;
   }

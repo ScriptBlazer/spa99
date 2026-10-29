@@ -20,7 +20,9 @@ def discount_line(context):
     from plans.models import SiteSettings
 
     site = context.get("site_settings") or SiteSettings.load()
-    return {"url": site.discount_contact_url, "show_placeholder": settings.DEBUG}
+    from pages.links import short_url
+
+    return {"url": short_url("membership", site), "show_placeholder": settings.DEBUG}  # the short link counts the click, then forwards
 
 
 @register.inclusion_tag("content/_gold_fee_note.html")
@@ -74,7 +76,7 @@ def legal_text(context, text, doc=None):
 
 
 @register.inclusion_tag("users/_payment_note.html")
-def payment_note(whatsapp=True, css_class="no-payment", status=""):
+def payment_note(whatsapp=True, css_class="no-payment", status="", source="register"):
     """{% payment_note %}: 'No payment is taken now. When we open, you'll have 2 weeks to set up your membership.' (the length is the
     payment window in System > Defaults) and, for a special discount, a WhatsApp link from Site settings (the line is left out when no link is set)."""
     from django.conf import settings
@@ -83,4 +85,4 @@ def payment_note(whatsapp=True, css_class="no-payment", status=""):
     from plans.models import SiteSettings
 
     return {"opened": payments.opened_ever(), "live": settings.ONLINE_PAYMENTS_LIVE, "paid": status == "paid", "window": payments.site_window_phrase(),
-            "url": payments.whatsapp_url() if whatsapp or payments.opened_ever() else "", "email": SiteSettings.load().contact_address, "css_class": css_class}
+            "url": payments.whatsapp_url(source) if whatsapp or payments.opened_ever() else "", "email": SiteSettings.load().contact_address, "css_class": css_class}

@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from common.jsonshape import has_non_ascii_digit
-from plans.models import SiteSettings
+from plans.models import FINAL_POTENTIAL_CHOICES, SiteSettings
 
 from . import services
 
@@ -90,6 +90,26 @@ class EmailsForm(VersionedForm):
         if len(split_emails(value)) > 1:
             raise forms.ValidationError({"contact_email": "Enter one address."})
         return value
+
+
+class ApprovalForm(VersionedForm):
+    """System > Approval: the final approval switch and which potentials wait for it. Ticks are stored as "low,medium"."""
+
+    final_approval_potentials = forms.MultipleChoiceField(
+        label="Potentials that wait", choices=FINAL_POTENTIAL_CHOICES, required=False, widget=forms.CheckboxSelectMultiple)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.initial["final_approval_potentials"] = self.instance.final_potential_list
+        self.fields["final_approval_on"].label = "Final approval"
+
+    def clean_final_approval_potentials(self):
+        chosen = set(self.cleaned_data["final_approval_potentials"])
+        return ",".join(value for value, _ in FINAL_POTENTIAL_CHOICES if value in chosen)
+
+    class Meta:
+        model = SiteSettings
+        fields = ["final_approval_on", "final_approval_potentials"]
 
 
 class SettingsForm(VersionedForm):

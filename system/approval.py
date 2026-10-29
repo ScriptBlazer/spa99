@@ -87,7 +87,9 @@ def context(actor):
         "approvers": [row(actor, u) for u in _holders(APPROVER)], "final_approvers": final_rows,
         "approver_candidates": candidates(actor, APPROVER), "final_candidates": candidates(actor, FINAL),
         "cc": site.approver_cc_list, "cc_text": site.gold_approver_cc,
-        "final_approver_missing": not final_rows,
+        "final_approver_missing": approval.final_approver_missing(),
+        "final_on": site.final_approval_on, "final_nothing_ticked": site.final_approval_on and not site.final_potential_list,
+        "awaiting_final_count": approval.awaiting_final_count(),
     }
 
 

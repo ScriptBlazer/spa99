@@ -67,10 +67,11 @@ def site_window_phrase():
     return window_phrase(_defaults().payment_window_days)
 
 
-def whatsapp_url():
-    from plans.models import SiteSettings
+def whatsapp_url(source="other"):
+    """The WhatsApp short link on our own domain (counted, then forwarded), or "" while no link is set in System > Settings."""
+    from pages.links import short_url
 
-    return SiteSettings.load().discount_contact_url or ""
+    return short_url(source)
 
 
 # ---------- the window ----------

@@ -156,3 +156,26 @@ System > **Assistant** (`/assistant/`, Developer level behind the unlock) holds 
 
 ## Payments (2026-10-29)
 New nav item **Payments** (`/payments/`, Developer + unlock, audited): open payments now (confirm), schedule, cancel the schedule, close early, status, dates and member counts (paid online, set up manually, at risk, lapsed). Sales: extend the end (+1h, +1d, +1w), edit % and months on a live sale (existing registrations keep theirs), Stop now. Defaults gains a Payments group. Spec: `docs/features/payment-window.md`.
+
+## WhatsApp short link and click counts (2026-10-29)
+Public route `/whatsapp/` on the main site host only (`pages.views.whatsapp`, GET/HEAD). It counts the click, then answers **302** to `SiteSettings.discount_contact_url`; with no link set it goes to the Visit page. Every place that showed the raw link now shows `/whatsapp/?from=<page>` (`pages.links.short_url`): Register and Register sent (`register`), the signed-in membership page (`membership`), the AI chat hand-off and the chat knowledge line (`chat`), the welcome email (`email`, absolute address). Allowlist: `register, membership, plans, chat, email, other`; anything else counts as `other`. The line stays hidden while no link is set.
+
+**Counting** (`pages.LinkClickDay`, `pages/clicks.py`): one row per link key (`whatsapp`), London day and source, with a `count`; unique on (key, day, source). Increment is an `F()` UPDATE, creating the row on the first click and falling back to the UPDATE if two first clicks race (works on SQLite and Postgres). Source: a valid `?from=` key; else, with no `from`, our own referring page if its path is a known public page (mapped to a short key such as `home`, `visit`; the Referer can be faked, so any other path is `other`, never stored as text); else `direct` (outside sites or no referrer). By source shows the top 20. Stored: no IP, no browser string, no person. Skipped (still redirected): an empty browser string, or one containing bot, crawler, spider, preview, facebookexternalhit, whatsapp/, curl or python-requests. robots.txt disallows /whatsapp/. A counting error never stops the redirect.
+
+**System Dashboard** shows a "WhatsApp clicks" panel: today, 7 days, 30 days, all time; the last 30 days by day; by source (all time).
+
+## Final approval switch (2026-10-29)
+System > Approval gets a switch (`SiteSettings.final_approval_on`, **off by default**, history on, Developer level behind the unlock, audited in section Approval) and tick boxes for **Low, Medium, High** (`SiteSettings.final_approval_potentials`, default `low`). Off: approvals go straight through. On: approvals for the ticked potentials wait for a final approver, but only while at least one final approver exists. Nothing ticked while on shows "Nothing waits". Applications already awaiting final approval when the switch goes off stay as they are (confirm or send back still work); the page notes how many. Details in `gold-final-approval.md`.
+
+## Live setup (2026-10-29)
+`manage.py setup_live` fills System with the real starting values so nothing is typed by hand. The values sit in one marked block at the top of `system/management/commands/setup_live.py` and nowhere else. It runs `seed_phase1` (`seed_all`), `setup_roles`, then:
+- **Team:** moishe@spa99.uk (Moishe Berkowitz, Developer, Final approver, not Approver) and barry@spa99.uk (Barry Lobenstein, Admin, Approver). A missing account is created with no password and gets the "choose your password" invite email (sent after the commit; no link is printed; one line per person says "invite sent" or "invite FAILED", and failures count in the summary). The link is the password reset link and **lasts 1 hour**: if it expires, use Resend in System > Team. An existing account only gains a missing level or role; nothing is removed, and name and password stay.
+- **Settings:** contact email `hello@spa99.uk`, Gold approver CC `moishe@spa99.uk`, WhatsApp `https://wa.me/447530117902`. Each is filled only while empty; an edited value is left alone.
+- **Defaults:** payment alert email `moishe@spa99.uk`, filled by `seed_phase1` (once only, and only while empty). The final approval switch is left at its default (off).
+
+`gold_final` and `gold_sent_back` email subjects that still equal the exact old default text ("... Low potential ...") are updated to the new {potential} wording; any other (custom) subject is left alone, and a subject saved earlier keeps the old text until this runs or it is edited.
+
+Each value prints one line: set, already set (left alone), or would set. A missing or invalid value is reported as a problem and the rest carry on; the exit code is non-zero only for a real error. Safe to run twice (the second run changes nothing and sends nothing). Run on live:
+
+    docker compose exec web python manage.py setup_live --dry-run   # changes nothing, sends nothing
+    docker compose exec web python manage.py setup_live

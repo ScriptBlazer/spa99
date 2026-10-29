@@ -73,7 +73,7 @@ def _send_to_group(template, application_id, people_addresses, context_builder, 
     if not recipients:
         logger.warning("No one to email for %s (%s): check System > Approval.", template, application.reference)
         return "no_recipients"
-    subject = subject_for(template, name=application.full_name)
+    subject = subject_for(template, name=application.full_name, potential=services.POTENTIAL_LABELS.get(application.potential_level, ""))
     log = send_templated(template, recipients, subject, context_builder(application),
                          cc=SiteSettings.load().approver_cc_list, subject_email=application.email)
     _log_email(application, log, template)

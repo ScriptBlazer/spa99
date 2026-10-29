@@ -8,7 +8,9 @@ from django.shortcuts import redirect, render
 from django.templatetags.static import static
 from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.http import require_GET
+from django.http import HttpResponseRedirect
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET, require_safe
 
 from content import services as content
 from journey import services as journey_services
@@ -18,7 +20,7 @@ from gold.models import GoldApplication
 from plans import services as plan_services
 from plans.models import SiteSettings
 
-from . import services
+from . import clicks, services
 from .access import memberships_visible
 
 JOURNEY_SLUGS = {1: "your-time", 2: "what-draws-you", 3: "company", 4: "about-you"}
@@ -200,10 +202,19 @@ def gold_apply(request, slug=""):
     return _page(request, "pages/gold_apply.html", "gold-apply", gold_config=config)
 
 
+@login_not_required  # PUBLIC: the WhatsApp short link, counted then forwarded (pages.clicks)
+@require_safe
+@never_cache
+def whatsapp(request):
+    clicks.record(request)
+    target = SiteSettings.load().discount_contact_url or reverse("visit")  # no link set: the Visit page (it holds our contact details)
+    return HttpResponseRedirect(target)
+
+
 @login_not_required  # PUBLIC
 @require_GET
 def robots(request):
-    lines = ["User-agent: *", "Allow: /", "Disallow: /account/", "Disallow: /journey/", "Disallow: /gold-card/apply/",
+    lines = ["User-agent: *", "Allow: /", "Disallow: /whatsapp/", "Disallow: /account/", "Disallow: /journey/", "Disallow: /gold-card/apply/",
              f"Sitemap: {request.build_absolute_uri(reverse('sitemap'))}"]
     return HttpResponse("\n".join(lines) + "\n", content_type="text/plain")
 

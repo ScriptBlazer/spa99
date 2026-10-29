@@ -15,6 +15,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from common.audit import client_ip
 from common.ratelimit import hit
 from notifications.models import EmailSuppression
+from pages import clicks
 from plans.models import SiteSettings
 from users.forms import SignInForm
 from users.views import LoginView, TeamPasswordView
@@ -23,7 +24,7 @@ from users.views import LoginView, TeamPasswordView
 from . import approval as approval_service
 from . import audit, changes, codeview, defaults, feed, services
 from . import team as team_service
-from .forms import EmailsForm, SettingsForm
+from .forms import ApprovalForm, EmailsForm, SettingsForm
 from .forms_rules import RISKY
 from .models import SystemChange, SystemEvent
 from .permissions import signed_in, unlocked
@@ -161,7 +162,8 @@ def sign_out(request):
 def dashboard(request):
     site = SiteSettings.load()
     context = {"health": services.health_report(), "recent": services.recent_changes(defaults.get(request).dashboard_recent_changes), "site": site,
-               "stages": [("Registration", site.register_interest_open), ("Subscribe", site.subscribe_open), ("Book", site.booking_open)]}
+               "stages": [("Registration", site.register_interest_open), ("Subscribe", site.subscribe_open), ("Book", site.booking_open)],
+               "whatsapp": clicks.summary()}
     return page(request, "system/dashboard.html", "dashboard", context)
 
 
@@ -415,9 +417,9 @@ def team_merge(request):
 # ---------- approval: who approves Gold, and who gives the final approval ----------
 
 @unlocked
-@require_GET
+@require_http_methods(["GET", "POST"])
 def approval(request):
-    return page(request, "system/approval.html", "approval", approval_service.context(request.user))
+    return _edit_site(request, ApprovalForm, "system/approval.html", "approval", extra=lambda: approval_service.context(request.user))
 
 
 def _approval_action(request, action, text="Saved.", nothing="Nothing changed."):

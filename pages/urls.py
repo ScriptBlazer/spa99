@@ -17,6 +17,7 @@ urlpatterns = [
     path("terms/", views.terms, name="terms"),
     path("journey/", views.journey, name="journey"),
     path("journey/<slug:slug>/", views.journey, name="journey_page"),
+    path("whatsapp/", views.whatsapp, name="whatsapp"),
     path("robots.txt", views.robots, name="robots"),
     path("sitemap.xml", views.sitemap, name="sitemap"),
 ]

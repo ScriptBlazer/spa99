@@ -3,7 +3,7 @@
 Final approval: {{ name }}
 {{ potential_label }} potential
 
-An approver has approved this Gold Card application, but the potential is Low, so it needs your final approval. The applicant has not been told anything yet.
+An approver has approved this Gold Card application, but the potential is {{ potential_label }}, so it needs your final approval. The applicant has not been told anything yet.
 
 Confirm approval: {{ confirm_url }}
 Send back: {{ send_back_url }}

@@ -15,6 +15,7 @@ from gold.admin import GoldApplicationAdmin
 from gold.models import AppendOnlyError, ApplicationEvent, GoldApplication
 from gold.tests.test_gold import application_data
 from plans.management.commands.seed_phase1 import seed_all
+from plans.models import SiteSettings
 from plans.tests.helpers import make_team_member, set_recipients
 
 User = get_user_model()
@@ -37,6 +38,7 @@ class ActionsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         seed_all()
+        SiteSettings.objects.filter(singleton_key="site").update(final_approval_on=True)  # final approval is off by default
         set_recipients()
         cls.approver = make_team_member("approver@example.test", levels.OFFICE, approver=True)
         cls.reader = make_team_member("reader@example.test", levels.OFFICE)
