@@ -30,7 +30,8 @@ class WhatsappBoxTests(TestCase):
         self.assertIn("Visit 2", box)
         self.assertNotIn("Chat 1", box)  # only the top three
         self.assertNotIn("data-whatsapp-by-day", box)
-        self.assertNotIn("<table", box)
+        self.assertNotIn("<table", box.split("<details")[0])  # the day list is only inside "More details"
+        self.assertIn("data-whatsapp-more", box)
 
     def test_empty_box_says_no_clicks_yet(self):
         html = self.client.get("/").content.decode()
