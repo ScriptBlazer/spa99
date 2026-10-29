@@ -2,6 +2,14 @@
 
 Do these in order. Live starts with an empty database, so it needs no backfills. Server commands run in the folder that holds `docker-compose.yml`.
 
+## Waiting for Moishe
+
+None of these block the launch. Each has a safe default already in place.
+
+1. **Background jobs: no Redis.** The jobs use the database as their queue (django-q2, ORM broker), with 4 job workers in one worker container. Reason: at this size Redis would add a container, memory and a failure point without a real gain. Override: say "add Redis" and it becomes one extra container plus a settings change.
+2. **Personal-data retention** (privacy notice proposals, `docs/features/legal.md`). Today these are kept forever: sign-in records, email records, journey emails with no account, change history and the System audit log. Needs your and the solicitor's yes on the periods, then clean-up jobs get built. The quick one: set `SYSTEM_AUDIT_RETENTION_DAYS=730` in `.env` and the daily housekeeping job prunes the audit log to 2 years.
+3. **RDS backup retention:** the privacy notice says backups are replaced within 35 days. Set RDS automatic backups to between 7 and 35 days (35 is RDS's maximum).
+
 **What lives on the server:** only `.env` and Caddy's certificates. The database is RDS (with its own backups), uploads are in S3, static files are inside the image, logs go to `docker compose logs`. Losing the server loses nothing but `.env`, so keep a copy of it in your private folder.
 
 ## Launch
@@ -13,7 +21,7 @@ Do these in order. Live starts with an empty database, so it needs no backfills.
    - Release: `git tag 1.0.0 && git push origin 1.0.0`. Actions runs the tests on Postgres and, only if green, pushes `<username>/spa99:1.0.0` and `:latest`. Check both appear on Docker Hub.
 
 2. **AWS** (region eu-west-2, London)
-   - **RDS PostgreSQL:** automatic backups **on, 7 days or more**. Security group: port 5432 from the server only. Copy the endpoint; it goes in `DATABASE_URL` (URL-encode symbols in the password).
+   - **RDS PostgreSQL:** automatic backups **on, 7 to 35 days**. Security group: port 5432 from the server only. Copy the endpoint; it goes in `DATABASE_URL` (URL-encode symbols in the password).
    - **S3:** a **private** bucket (Block all public access on). The site refuses to start without it.
    - **IAM role for the server** with `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` on `arn:aws:s3:::<bucket>/*` and `s3:ListBucket` on `arn:aws:s3:::<bucket>`. (Add `ses:SendRawEmail` and `ses:GetAccount` only when moving to SES.)
    - **EC2** (x86_64, e.g. t3.small, Ubuntu): attach the role. Security group: **80 and 443** open to all, 22 from your IP only. Set the instance metadata **hop limit to 2** (Actions > Instance settings > Modify instance metadata options), or the containers can't use the role and S3 fails. Install Docker with the compose plugin.
@@ -32,7 +40,7 @@ Do these in order. Live starts with an empty database, so it needs no backfills.
 
 5. **DNS** (Cloudflare, **grey cloud / DNS only** for now): A records for `spa99.uk`, `www`, `office`, `system` and `control` pointing at the server's IP (use an Elastic IP so it never changes).
 
-6. **Start:** `docker compose pull && docker compose up -d`. Web runs the migrations, then starts; the worker waits for it.
+6. **Start:** `docker compose pull && docker compose up -d`. No manual steps: web runs the migrations and creates the cache table, then starts gunicorn (static files are already in the image); the worker waits for web to be healthy, registers the recurring jobs and starts; Caddy gets the certificates once DNS points at the server (step 5) and 80/443 are open.
    - `docker compose logs web | head -30`: the startup line must say `settings=config.settings.prod`, `database=postgresql:...`, `media=s3:<bucket>/prod/`, `email=smtp:smtp.postmarkapp.com`.
    - `docker compose logs caddy`: it should say the certificates were obtained.
    - If web keeps restarting: `docker compose logs web` shows the list of missing or wrong `.env` values.
@@ -74,6 +82,24 @@ Do these in order. Live starts with an empty database, so it needs no backfills.
 Never edit or delete a migration that is already live.
 
 **Rollback:** set `APP_TAG` back to the previous version, then `docker compose pull && docker compose up -d`. If a migration damaged data, restore the RDS snapshot to a new instance and point `DATABASE_URL` at it.
+
+## What is kept, and for how long
+
+Nothing grows without limit on disk: every container's log is capped at 5 x 10 MB (`docker-compose.yml`), and the server holds no app data.
+
+| Data | Kept | Cleared by |
+|---|---|---|
+| Container logs | 50 MB per container | Docker (json-file, 5 x 10 MB) |
+| Ask us chats | 90 days | `chat-prune`, daily 03:30 |
+| Visitor counter hashes and salt | today only | `metrics-rollup`, hourly |
+| Sessions | until they expire | `housekeeping`, daily 04:15 |
+| Wrong-try counters (sign-in, unlock) | 24 hours after the last try | `housekeeping` (and on every try) |
+| Background job results | last 250 successes; failures 30 days | django-q `save_limit`; `housekeeping` |
+| Rate-limit cache | self-trimming (100,000 entries max) | Django's database cache |
+| System audit log | forever (`SYSTEM_AUDIT_RETENTION_DAYS=0`) | `housekeeping` once the setting is above 0 (see "Waiting for Moishe") |
+| Sign-in records, email records, change history, journey emails | forever for now | not yet: retention periods await the solicitor ("Waiting for Moishe") |
+| WhatsApp click counts (`LinkClickDay`) | forever (counts only, no personal data) | kept on purpose |
+| Database backups | RDS automatic backups, 7 to 35 days | RDS |
 
 ## After launch
 
