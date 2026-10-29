@@ -18,6 +18,7 @@ urlpatterns = [
     path("journey/", views.journey, name="journey"),
     path("journey/<slug:slug>/", views.journey, name="journey_page"),
     path("whatsapp/", views.whatsapp, name="whatsapp"),
+    path("example-link/", views.example_link, name="example_link"),  # the placeholder link in email previews
     path("robots.txt", views.robots, name="robots"),
     path("sitemap.xml", views.sitemap, name="sitemap"),
 ]

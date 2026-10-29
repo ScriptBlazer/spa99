@@ -216,6 +216,13 @@ def whatsapp(request):
 
 
 @login_not_required  # PUBLIC
+@require_safe
+def example_link(request):
+    """Email previews use /example-link/ as a stand-in for each person's own link: explain it instead of a 404."""
+    return render(request, "pages/example_link.html")
+
+
+@login_not_required  # PUBLIC
 @require_GET
 def robots(request):
     lines = ["User-agent: *", "Allow: /", "Disallow: /whatsapp/", "Disallow: /account/", "Disallow: /journey/", "Disallow: /gold-card/apply/",
