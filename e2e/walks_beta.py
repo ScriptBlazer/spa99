@@ -17,7 +17,7 @@ from . import mailbox
 from .kit import (
     CONTROL, OFFICE, PASSWORD, PORT, RESET_PASSWORD, SITE, STAFF, STRICT_CONTROL, STRICT_SITE, SYSTEM, UNLOCK_CODE,
     NEW_PASSWORD, apply_gold, answer_journey, dbtool, fill_date_of_birth, form_errors, gold_fill_you, gold_to_last_screen, manage,
-    close_problems, problems_modal, register_member, sign_in, sign_in_fails, strict_server_up, tick, verify_email_link,
+    close_problems, gold_open_about, problems_modal, register_member, sign_in, sign_in_fails, strict_server_up, tick, verify_email_link,
 )
 from .kit import approve_on_application_page
 from .walks import body_text, confirm_office_modal, wav_bytes
@@ -706,9 +706,25 @@ def beta_bad_input(w):
         assert "too long" in " ".join(form_errors(gold)).lower()
         assert dbtool("gold-total")["count"] == total, "A refused application was saved"
         assert gold.locator(".gold-sent").count() == 0, "A refused application shows the 'sent' screen"
+    with w.step("Gold apply: company and role are required (the problems dialog), and No to BML asks about doing business", gold):
+        gold.goto(f"{SITE}/gold-card/apply/")
+        gold.evaluate("sessionStorage.clear()")  # earlier steps left a filled form in this tab
+        gold_open_about(gold)
+        gold.locator("[data-primary]").click()
+        lines = " ".join(problems_modal(gold)).lower()
+        assert "company" in lines and "role" in lines, f"The dialog says: {lines}"
+        close_problems(gold)
+        assert gold.locator("[data-group=business_willing]").is_hidden(), "The business question shows before No is chosen"
+        gold.locator("label:has(input[name=bml_relationship][value=not_yet])").click()
+        assert gold.locator("[data-group=business_willing]").is_visible(), "The business question did not appear on No"
+        gold.fill("#g-company", "E2E Holdings")
+        gold.fill("#g-role", "Director")
+        gold.locator("[data-primary]").click()
+        assert any("business" in line.lower() for line in problems_modal(gold)), "No answer to the business question was accepted"
+        close_problems(gold)
     with w.step("Gold apply: straight to the server with bad data (no page): 400 with field errors, never a crash", gold):
         bad = post_direct(gold, SITE, "/gold/apply/", json_body={"first_name": "", "last_name": "x", "email": "bad", "mobile": "1", "privacy_accepted": False})
-        assert bad.status == 400 and {"first_name", "email", "mobile", "industry"} <= set(bad.json()["errors"]), f"{bad.status} {bad.text()[:200]}"
+        assert bad.status == 400 and {"first_name", "email", "mobile", "industry", "company", "role"} <= set(bad.json()["errors"]), f"{bad.status} {bad.text()[:200]}"
         assert post_direct(gold, SITE, "/gold/apply/", json_body=[1, 2, 3]).status == 400
         assert dbtool("gold-total")["count"] == total
     with w.step("Gold apply: a script tag as the last name and in the note is accepted as plain text", gold):
@@ -762,7 +778,7 @@ def beta_double_submit(w):
         racer = "beta-goldrace@example.com"
         gold_to_last_screen(gold_page)
         token = csrf_for(gold_page, SITE)
-        body = {"first_name": "Rory", "last_name": "Racer", "email": racer, "mobile": mobile(1004), "industry": "finance", "privacy_accepted": True}
+        body = {"first_name": "Rory", "last_name": "Racer", "email": racer, "mobile": mobile(1004), "industry": "finance", "company": "Racer Ltd", "role": "Owner", "privacy_accepted": True}
         results = gold_page.evaluate(
             """async ([token, body]) => { const send = () => fetch('/gold/apply/', {method: 'POST', credentials: 'same-origin',
                  headers: {'Content-Type': 'application/json', 'X-CSRFToken': token}, body: JSON.stringify(body)});

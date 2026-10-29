@@ -86,3 +86,31 @@ class WhatsappLinkTests(TestCase):
             LinkClickDay.objects.create(key="whatsapp", day=timezone.localdate(), source=f"s{i}", count=1)
         self.assertEqual(len(clicks.summary()["by_source"]), 20)
         self.assertContains(self.client.get("/robots.txt"), "Disallow: /whatsapp/")
+
+
+class WhatsappMessageTests(TestCase):
+    """?msg= pre-fills the message from an allowlist (2026-10-29): unknown keys are ignored, nothing typed is ever forwarded."""
+
+    def setUp(self):
+        SiteSettings.load()
+        SiteSettings.objects.update(discount_contact_url=URL)
+        self.client = Client(HTTP_USER_AGENT=BROWSER)
+
+    def test_gold_business_adds_the_encoded_text_and_counts_under_gold(self):
+        response = self.client.get("/whatsapp/?from=gold&msg=gold_business")
+        self.assertEqual(response["Location"], URL + "?text=Hi%2C%20I%27ve%20just%20applied%20for%20the%20Spa%2099%20Gold%20Card%20and%20I%27m%20happy%20to%20do%20business%20with%20BML.")
+        self.assertEqual(sum(LinkClickDay.objects.filter(source="gold").values_list("count", flat=True)), 1)
+
+    def test_unknown_keys_and_free_text_are_ignored(self):
+        for query in ("msg=nope", "msg=Hello%20there", "msg=", "msg=__class__"):
+            self.assertEqual(self.client.get(f"/whatsapp/?from=gold&{query}")["Location"], URL, query)
+
+    def test_an_existing_query_is_kept_and_a_text_of_its_own_wins(self):
+        SiteSettings.objects.update(discount_contact_url="https://api.whatsapp.com/send?phone=447530117902")
+        self.assertTrue(self.client.get("/whatsapp/?msg=gold_business")["Location"].startswith("https://api.whatsapp.com/send?phone=447530117902&text=Hi%2C"))
+        SiteSettings.objects.update(discount_contact_url=URL + "?text=Hello")
+        self.assertEqual(self.client.get("/whatsapp/?msg=gold_business")["Location"], URL + "?text=Hello")
+
+    def test_a_blank_link_still_goes_to_visit_without_a_message(self):
+        SiteSettings.objects.update(discount_contact_url="")
+        self.assertEqual(self.client.get("/whatsapp/?from=gold&msg=gold_business")["Location"], "/visit/")

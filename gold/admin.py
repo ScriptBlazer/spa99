@@ -57,7 +57,7 @@ class ApplicationEventInline(admin.TabularInline):
 @admin.register(GoldApplication)
 class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
     list_display = ("reference", "full_name", "email", "what_he_does", "potential_level", "potential_score", "status", "email_sent_at", "created_at")
-    list_filter = ("status", "potential_level", "industry", "property_link")
+    list_filter = ("status", "potential_level", "industry", "property_link", "business_willing")
     search_fields = ("reference", "first_name", "last_name", "email", "company")
     readonly_fields = ("reference", "created_at", "updated_at", "email_sent_at", "email_error", "approved_at", "approved_by",
                        "final_requested_at", "final_requested_by", "sent_back_at", "sent_back_by", "sent_back_note")
@@ -72,7 +72,7 @@ class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
             if change and before != obj.status:  # not form.changed_data: a history Revert posts a different "before"
                 audit.record(obj, ApplicationEvent.STATUS_CHANGED_ADMIN, actor=request.user, channel=audit.ADMIN, from_status=before, to_status=obj.status)
 
-    @admin.display(description="What he does")
+    @admin.display(description="Industry")
     def what_he_does(self, obj):
         return ", ".join(obj.industry_values)
 

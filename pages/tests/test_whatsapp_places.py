@@ -83,3 +83,11 @@ class SpaHeroButtonTests(TestCase):
         Section.objects.filter(page__key="spa", key="intro").update(cta_label="Find yours")
         call_command("backfill_site_data", stdout=StringIO())
         self.assertEqual(Section.objects.get(page__key="spa", key="intro").cta_label, "Find yours")
+
+
+class ExampleLinkTests(TestCase):
+    def test_the_email_preview_placeholder_link_explains_itself_instead_of_404(self):
+        response = self.client.get("/example-link/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This is a sample link.")
+        self.assertContains(response, 'name="robots" content="noindex"')

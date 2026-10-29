@@ -23,6 +23,7 @@ const progress = document.querySelector('[data-progress]');
 const fill = document.querySelector('[data-progress-fill]');
 const STORE = 'spa99.gold.form';
 const SENT = 'spa99.gold.sent';
+const SENT_BUSINESS = 'spa99.gold.sent.business';
 const STEPS = [1, 2, 3];
 const SENT_STEP = 4;
 const PROPERTY_KEYS = ['property_link', 'size_range'];
@@ -102,6 +103,19 @@ function choiceGroup(name, title, optionList, { kind = '', help = '', layout = '
 
 const isProperty = () => industries().some((v) => (options.property_when?.any_of || ['property']).includes(v));
 const isOther = () => industries().includes(options.industry.other_value || 'other');
+const NOT_WORKING = 'not_yet'; // the stored value of "No" on "Are you working with BML?"
+const BUSINESS_OPTIONS = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+const notWorking = () => form.bml_relationship === NOT_WORKING;
+const whatsappUrl = () => config.urls.whatsappBusiness || ''; // '' while no WhatsApp link is set: the note and button are hidden
+
+/** "Send us a quick WhatsApp": opens the short link (it counts the click and pre-fills the message) in a new tab. */
+function whatsappButton() {
+  return el('a', { class: 'btn btn-secondary', href: whatsappUrl(), target: '_blank', rel: 'noopener', 'data-business-whatsapp': '', text: 'Open WhatsApp' });
+}
+function businessNote() {
+  return el('div', { class: 'question sub-question business-note', dataset: { sub: 'business_note' }, hidden: !(notWorking() && form.business_willing === 'yes' && whatsappUrl()) },
+    el('p', { class: 'muted', text: 'Great, after you apply, send us a quick WhatsApp so we can talk business.' }), whatsappButton());
+}
 
 function screenAbout() {
   const ind = options.industry;
@@ -118,10 +132,12 @@ function screenAbout() {
     choiceGroup('property_link', 'Your link to property', options.property_link.filter((o) => o.value !== 'none'), { cls: 'tiles tiles--stack', sub: true, hidden: !isProperty() }),
     choiceGroup('size_range', 'How large?', options.size_range, { layout: 'segmented', help: 'Units or properties', sub: true, hidden: !isProperty() }),
     choiceGroup('location', 'Where?', options.location, { cls: 'tiles tiles--2' }),
-    choiceGroup('bml_relationship', 'Are you BML staff?', options.bml_relationship, { layout: 'segmented' }),
+    choiceGroup('bml_relationship', 'Are you working with BML?', options.bml_relationship, { layout: 'segmented' }),
+    choiceGroup('business_willing', 'Are you happy to do business with BML?', BUSINESS_OPTIONS, { layout: 'segmented', sub: true, hidden: !notWorking() }),
+    businessNote(),
     el('div', { class: 'question' },
       el('p', { class: 'question-title', text: 'Company and role' }),
-      el('div', { class: 'field-pair fieldset-gap' }, field('company', 'Company'), field('role', 'Role'))),
+      el('div', { class: 'field-pair fieldset-gap' }, field('company', 'Company', { optional: false }), field('role', 'Role', { optional: false }))),
     el('div', { class: 'question' }, field('referred_by', 'Referred by', { help: 'If someone suggested you apply.' })),
   ];
 }
@@ -135,6 +151,10 @@ function saveIndustryOther() {
 /** Show or hide the follow-ups to match the industry. Values stay in the form, so they come back if he switches back. */
 function syncAbout() {
   root.querySelectorAll('[data-group="property_link"], [data-group="size_range"]').forEach((block) => { block.hidden = !isProperty(); });
+  const business = root.querySelector('[data-group="business_willing"]');
+  if (business) business.hidden = !notWorking();
+  const businessHint = root.querySelector('[data-sub="business_note"]');
+  if (businessHint) businessHint.hidden = !(notWorking() && form.business_willing === 'yes' && whatsappUrl());
   const other = root.querySelector('[data-sub="industry_other"]');
   if (other) other.hidden = !isOther();
 }
@@ -193,7 +213,7 @@ function screenYou() {
     el('div', { class: 'field-pair' }, field('first_name', 'First name', { optional: false, rules: 'required name', autocomplete: 'given-name' }), field('last_name', 'Last name', { optional: false, rules: 'required name', autocomplete: 'family-name' })),
     el('div', { class: 'question' }, field('email', 'Email', { optional: false, type: 'email', rules: 'required email', autocomplete: 'email' })),
     el('div', { class: 'question' }, field('mobile', 'Mobile', { optional: false, type: 'tel', rules: 'required mobile', autocomplete: 'tel', hint: 'A UK mobile, like 07123 456789.' })),
-    el('div', { class: 'question field' }, el('label', { for: 'g-note' }, 'Anything else? ', el('span', { class: 'optional', text: '(optional)' })), note),
+    el('div', { class: 'question field' }, el('label', { for: 'g-note' }, 'What benefits could you bring to BML? ', el('span', { class: 'optional', text: '(optional)' })), note),
     el('div', { class: 'question' },
       el('div', { class: 'field' },
         el('label', { class: 'check' }, privacy, el('span', {}, 'Read how we use your details in our ', el('a', { href: config.urls.privacy, text: 'privacy notice' }), ', and tick to accept it.')),
@@ -220,11 +240,13 @@ function renderStep(step) {
 
 function renderSent(reference) {
   const sent = c('sent');
+  const business = sessionStorage.getItem(SENT_BUSINESS) === '1' && whatsappUrl(); // he said Yes to doing business: the same button again
   return el('section', { class: 'screen gold-sent', tabindex: '-1', 'data-reveal': 'hero' },
     el('span', { class: 'mark-glyph mark-glyph--lg', 'aria-hidden': 'true' }),
     el('h1', { class: 'statement', tabindex: '-1', text: sent.heading }),
     el('p', { class: 'lead', text: sent.body }),
     reference ? el('p', { class: 'reference', text: `Reference ${reference}` }) : null,
+    business ? el('div', { class: 'business-note', 'data-sent-business': '' }, el('p', { text: 'Send us a quick WhatsApp so we can talk business.' }), whatsappButton()) : null,
     el('div', { class: 'actions' }, el('a', { class: 'btn-quiet', href: config.urls.home, text: sent.cta || 'Back to home' })));
 }
 
@@ -280,11 +302,22 @@ function markChoice(name, message) {
   const legend = group?.querySelector('legend');
   return { field: name, control: root.querySelector(`input[name="${name}"]`), label: (legend?.textContent || '').trim(), message };
 }
+/** A required typed field left empty: the line under it, then the shared problems dialog focuses the input. */
+function markField(name, message) {
+  const slot = root.querySelector(`[data-error-for="${name}"]`);
+  if (slot) { slot.dataset.state = 'error'; slot.textContent = message; }
+  const input = root.querySelector(`[name="${name}"]`);
+  if (input) input.setAttribute('aria-invalid', 'true');
+  return { field: name, control: input, label: input ? fieldLabel(input) : name, message };
+}
 function next() {
   if (current === 1) {
     const missing = [];
     if (!industries().length) missing.push(markChoice('industry', 'Choose at least one.'));
     if (isProperty() && !form.property_link) missing.push(markChoice('property_link', 'Choose your link to property.'));
+    if (!(form.company || '').trim()) missing.push(markField('company', 'Enter your company.'));
+    if (!(form.role || '').trim()) missing.push(markField('role', 'Enter your role.'));
+    if (notWorking() && !['yes', 'no'].includes(form.business_willing)) missing.push(markChoice('business_willing', 'Say whether you are happy to do business with BML.'));
     if (missing.length) { showProblems(root, missing, { opener: root.querySelector('[data-primary]') }); return; }
   }
   go(current + 1);
@@ -295,8 +328,8 @@ function back() {
 
 /* ---------- submit ---------- */
 
-const FIELDS = ['first_name', 'last_name', 'email', 'mobile', 'industry', 'industry_other', 'property_link', 'size_range', 'location', 'company', 'role', 'bml_relationship', 'referred_by', 'note', 'privacy_accepted', 'marketing_opt_in'];
-const STEP_OF = { industry: 1, industry_other: 1, property_link: 1, size_range: 1, location: 1, company: 1, role: 1, bml_relationship: 1, referred_by: 1 };
+const FIELDS = ['first_name', 'last_name', 'email', 'mobile', 'industry', 'industry_other', 'property_link', 'size_range', 'location', 'company', 'role', 'bml_relationship', 'business_willing', 'referred_by', 'note', 'privacy_accepted', 'marketing_opt_in'];
+const STEP_OF = { industry: 1, industry_other: 1, property_link: 1, size_range: 1, location: 1, company: 1, role: 1, bml_relationship: 1, business_willing: 1, referred_by: 1 };
 
 let sending = false; // one application in flight at a time: a second click or Enter while it is sent does nothing
 
@@ -313,6 +346,7 @@ async function onSubmit(event) {
   // Follow-ups belong to their industry only: anything else is not sent (the server drops it anyway).
   if (!isProperty()) PROPERTY_KEYS.forEach((name) => delete body[name]);
   if (!isOther()) delete body.industry_other;
+  if (!notWorking()) delete body.business_willing; // only asked of people who are not working with BML
   body.privacy_accepted = Boolean(form.privacy_accepted);
   body.marketing_opt_in = Boolean(form.marketing_opt_in);
   let result;
@@ -322,6 +356,7 @@ async function onSubmit(event) {
     sessionStorage.removeItem(STORE);
     const reference = result.data?.reference || '';
     sessionStorage.setItem(SENT, reference);
+    if (notWorking() && form.business_willing === 'yes') sessionStorage.setItem(SENT_BUSINESS, '1'); else sessionStorage.removeItem(SENT_BUSINESS);
     go(SENT_STEP, { reference });
     return;
   }
@@ -333,7 +368,11 @@ async function onSubmit(event) {
       go(STEP_OF[early]);
       const missing = [];
       if (errors.industry) missing.push(markChoice('industry', errors.industry.join(' ')));
-      else if (errors.property_link) missing.push(markChoice('property_link', errors.property_link.join(' ')));
+      if (errors.location) missing.push(markChoice('location', errors.location.join(' ')));
+      if (errors.property_link) missing.push(markChoice('property_link', errors.property_link.join(' ')));
+      if (errors.company) missing.push(markField('company', errors.company.join(' ')));
+      if (errors.role) missing.push(markField('role', errors.role.join(' ')));
+      if (errors.business_willing) missing.push(markChoice('business_willing', errors.business_willing.join(' ')));
       if (missing.length) showProblems(root, missing);
       return;
     }
@@ -373,6 +412,7 @@ root.addEventListener('change', (event) => {
       syncAbout();
       revealFollowUp();
     }
+    if (input.dataset.g === 'bml_relationship' || input.dataset.g === 'business_willing') syncAbout();
     const slot = root.querySelector(`[data-error-slot="${input.dataset.g}"]`);
     if (slot) { slot.dataset.state = 'hint'; slot.textContent = ''; }
   } else if (input.dataset?.jq) {
@@ -400,6 +440,17 @@ window.addEventListener('popstate', (event) => {
 
 /* ---------- start ---------- */
 
+/** Saved values that are no longer offered (a renamed or retired choice) are forgotten, so the form never submits one the server refuses. */
+function dropRetiredChoices() {
+  const offered = (list) => (list || []).map((o) => o.value);
+  [['location', options.location], ['bml_relationship', options.bml_relationship], ['property_link', options.property_link], ['size_range', options.size_range]]
+    .forEach(([name, list]) => { if (form[name] && !offered(list).includes(form[name])) delete form[name]; });
+  if (Array.isArray(form.industry)) form.industry = form.industry.filter((v) => offered(options.industry.options).includes(v));
+  const heard = journey?.screens.flatMap((s) => s.questions).find((q) => q.key === 'heard_via');
+  if (heard && journeyAnswers.heard_via?.options?.some((v) => !offered(heard.options).includes(v))) delete journeyAnswers.heard_via;
+  saveForm();
+}
+
 async function boot() {
   loadForm();
   try {
@@ -408,6 +459,7 @@ async function boot() {
     root.replaceChildren(el('p', { class: 'lead' }, 'The application is not available just now. Please write to us and we will help.'));
     return;
   }
+  dropRetiredChoices(); // a form saved before a choice was renamed (rest_of_london) must not get stuck on it
   Object.entries(options.prefill || {}).forEach(([name, value]) => { if (form[name] === undefined || form[name] === '') form[name] = value; });
   journey.screens.flatMap((s) => s.questions).forEach((q) => {
     if (q.answer) journeyAnswers[q.key] = { options: q.answer.options || [], text: q.answer.text || undefined, skipped: Boolean(q.answer.skipped) };

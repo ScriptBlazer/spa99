@@ -172,7 +172,7 @@ class JourneyAndGoldBackfillTests(TestCase):
         self.assertEqual(Section.objects.get(page__key="spa", key="step_2").body, "Our own words.")
         sometimes = Option.objects.get(question__key="company", value="sometimes")
         self.assertEqual(sometimes.plan_points, {"tier-3": 3})
-        self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML member")
+        self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML staff member")  # BML, then BML member, then BML staff member
         self.assertTrue(Option.objects.filter(question__key="heard_via", value="social_media", active=True).exists())
         for value in ("often", "instagram"):  # retired, not deleted: old answers keep their label
             self.assertFalse(Option.objects.get(value=value).active)
@@ -221,3 +221,85 @@ class WithAFriendBackfillTests(TestCase):
         self.assertTrue(SuggestionRule.objects.filter(name="Sometimes with a friend: not Tier 1").exists())
         self.assertTrue(SuggestionRule.objects.filter(name="Our own tie rule").exists())
         self.assertEqual(Section.objects.get(page__key="journey", key="result_label").body, "Based on your answers")
+
+
+class BarryChangesBackfillTests(TestCase):
+    """2026-10-29: live has the old wording stored. The data fix changes exact old values only (dry run first), never what was edited."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def make_old(self):
+        from gold.models import GoldChoice, GoldRule
+        from journey.models import Option, Question
+        Question.objects.filter(key="industry").update(text="What do you do?")
+        Option.objects.filter(question__key="heard_via", value="bml").update(label="BML member")
+        Option.objects.filter(question__key="heard_via", value="barry_status").delete()
+        Option.objects.filter(question__key="heard_via", value="other").update(order=4)
+        GoldChoice.objects.filter(group="where", value="midlands").update(value="rest_of_london", label="Rest of London")
+        GoldRule.objects.filter(group="bml", match_value="yes").update(label="BML staff")
+        GoldRule.objects.create(group="where", match_value="rest_of_london", label="Rest of London", points=1)
+
+    def run_command(self, *args):
+        out = StringIO()
+        call_command("backfill_site_data", *args, stdout=out)
+        return out.getvalue()
+
+    def test_dry_run_saves_nothing_then_the_real_run_updates_the_old_wording(self):
+        from gold import services as gold_services
+        from gold.models import GoldApplication, GoldChoice, GoldRule
+        from gold.tests.test_gold import application_data
+        from journey.models import Option, Question
+        self.make_old()
+        application = gold_services.submit_application(application_data(location="north_london"))[0]
+        GoldApplication.objects.filter(pk=application.pk).update(location="rest_of_london")  # as saved before the change
+        text = self.run_command("--dry-run")
+        for expected in ("What industry are you in?", "BML staff member", "Barry's status", "Midlands", "Working with BML"):
+            self.assertIn(expected, text)
+        self.assertEqual(Question.objects.get(key="industry").text, "What do you do?")
+        self.assertEqual(GoldApplication.objects.get(pk=application.pk).location, "rest_of_london")
+        self.assertFalse(Option.objects.filter(value="barry_status").exists())
+
+        self.run_command()
+        self.assertEqual(Question.objects.get(key="industry").text, "What industry are you in?")
+        self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML staff member")
+        options = list(Option.objects.filter(question__key="heard_via", active=True).order_by("order", "value").values_list("value", flat=True))
+        self.assertEqual(options[-2:], ["barry_status", "other"])
+        self.assertEqual(GoldApplication.objects.get(pk=application.pk).location, "midlands")
+        self.assertEqual(GoldChoice.objects.get(group="where", value="midlands").label, "Midlands")
+        self.assertFalse(GoldChoice.objects.filter(value="rest_of_london").exists())
+        self.assertEqual(GoldRule.objects.get(group="where", match_value="midlands").points, 1)
+        self.assertEqual(GoldRule.objects.get(group="bml", match_value="yes").label, "Working with BML")
+        self.assertEqual(GoldRule.objects.get(group="bml", match_value="yes").points, 3)  # the points are untouched
+        self.assertIn("Nothing to change", self.run_command())
+
+    def test_edited_values_are_left_alone(self):
+        from gold.models import GoldApplication, GoldChoice, GoldRule
+        from journey.models import Option, Question
+        self.make_old()
+        Question.objects.filter(key="industry").update(text="Your line of work?")
+        Option.objects.filter(question__key="heard_via", value="bml").update(label="BML team")
+        Option.objects.filter(question__key="heard_via", value="other").update(order=7)
+        GoldChoice.objects.filter(group="where", value="rest_of_london").update(label="Greater London")
+        GoldRule.objects.filter(group="bml", match_value="yes").update(label="BML colleague")
+        self.run_command()
+        self.assertEqual(Question.objects.get(key="industry").text, "Your line of work?")
+        self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML team")
+        self.assertEqual(Option.objects.get(question__key="heard_via", value="other").order, 8)  # the new option takes its place, Other moves down one
+        self.assertEqual(Option.objects.get(question__key="heard_via", value="barry_status").order, 7)
+        self.assertEqual(GoldChoice.objects.get(group="where", value="rest_of_london").label, "Greater London")
+        self.assertEqual(GoldRule.objects.get(group="bml", match_value="yes").label, "BML colleague")
+        self.assertFalse(GoldApplication.objects.filter(location="midlands").exists())
+
+    def test_when_the_seed_already_made_midlands_the_old_row_is_retired_not_duplicated(self):
+        from gold.models import GoldChoice, GoldApplication
+        from gold.tests.test_gold import application_data
+        from gold import services as gold_services
+        GoldChoice.objects.create(group="where", value="rest_of_london", label="Rest of London", order=9)
+        application = gold_services.submit_application(application_data())[0]
+        GoldApplication.objects.filter(pk=application.pk).update(location="rest_of_london")
+        self.run_command()
+        self.assertFalse(GoldChoice.objects.get(group="where", value="rest_of_london").active)
+        self.assertEqual(GoldChoice.objects.filter(group="where", value="midlands").count(), 1)
+        self.assertEqual(GoldApplication.objects.get(pk=application.pk).location, "midlands")

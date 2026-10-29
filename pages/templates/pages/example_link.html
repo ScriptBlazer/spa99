@@ -1,0 +1,5 @@
+{% extends "base_reduced.html" %}
+{% block head_title %}{% include "common/_head.html" with title="Sample link | Spa 99" %}<meta name="robots" content="noindex">{% endblock %}
+{% block messages %}{% endblock %}
+{% block feedback %}{% include "common/_modal.html" %}{% endblock %}
+{% block main %}{% include "common/_error.html" with heading="This is a sample link." line="It comes from an email preview. Real emails link straight to the right page for each person." %}{% endblock %}

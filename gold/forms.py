@@ -11,6 +11,8 @@ from users.forms import SignUpForm
 from . import rating
 from .models import BML, PROPERTY_LINK, SIZE, WHERE
 
+NOT_WORKING_WITH_BML = "not_yet"  # the "No" of "Are you working with BML?" (the stored value is unchanged)
+
 
 class IndustryField(forms.MultipleChoiceField):
     """What he does: one or more journey `industry` options. A single value (older posts) counts as a list of one;
@@ -32,9 +34,10 @@ class GoldApplicationForm(forms.Form):
     property_link = forms.ChoiceField(choices=[], required=False)  # only for industry Property (see clean())
     size_range = forms.ChoiceField(choices=[], required=False)
     location = forms.ChoiceField(choices=[], required=False)
-    company = forms.CharField(max_length=150, required=False)
-    role = forms.CharField(max_length=150, required=False)
+    company = forms.CharField(max_length=150, error_messages={"required": "Enter your company."})  # always required (2026-10-29)
+    role = forms.CharField(max_length=150, error_messages={"required": "Enter your role."})
     bml_relationship = forms.ChoiceField(choices=[], required=False)
+    business_willing = forms.CharField(required=False)  # yes / no (or true / false); asked only when bml_relationship is not_yet
     referred_by = forms.CharField(max_length=150, required=False)
     note = forms.CharField(max_length=2000, required=False)
     privacy_accepted = forms.BooleanField(error_messages={"required": "Please accept the privacy notice."})
@@ -54,6 +57,7 @@ class GoldApplicationForm(forms.Form):
         """The property questions belong to people who chose Property (among others): for anyone else they are dropped,
         never required. The Other text only stays when Other is chosen."""
         data = super().clean()
+        self._clean_business(data)
         industry = data.get("industry")
         if industry is None:  # already reported as invalid
             return data
@@ -66,6 +70,22 @@ class GoldApplicationForm(forms.Form):
         if rating.OTHER_INDUSTRY not in industry:
             data["industry_other"] = ""
         return data
+
+    def clean_business_willing(self):
+        value = str(self.cleaned_data.get("business_willing", "")).strip().lower()
+        if value in ("yes", "true", "1"):
+            return True
+        if value in ("no", "false", "0"):
+            return False
+        return None  # empty or unreadable: only an error when the question applies (see _clean_business)
+
+    def _clean_business(self, data):
+        """Required only when he is not working with BML; for anyone else it is dropped (stored as empty)."""
+        if data.get("bml_relationship") == NOT_WORKING_WITH_BML:
+            if data.get("business_willing") not in (True, False):
+                self.add_error("business_willing", "Say whether you are happy to do business with BML.")
+        else:
+            data["business_willing"] = None
 
     def clean_first_name(self):
         return validate_person_name(self.cleaned_data["first_name"])

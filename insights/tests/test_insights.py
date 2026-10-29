@@ -158,3 +158,15 @@ class PermissionTests(TestCase):
         self.assertEqual(set(Group.objects.values_list("name", flat=True)), {"Office", "Admin", "Developer", "Approver", "Final approver"})
         call_command("setup_roles", stdout=StringIO())
         self.assertEqual(Group.objects.count(), 5)
+
+
+class BarrysStatusTests(TestCase):
+    """2026-10-29: the new 'Barry's status' answer to 'How did you hear about us?' is counted like the others."""
+
+    def test_it_is_counted_in_the_sources(self):
+        seed_all()
+        session_with({"heard_via": ["barry_status"]}, finish=False)
+        session_with({"heard_via": ["bml"]}, finish=False)
+        counts = {o["value"]: (o["label"], o["count"]) for o in services.sources(services.sessions())["heard_via"]}
+        self.assertEqual(counts["barry_status"], ("Barry's status", 1))
+        self.assertEqual(counts["bml"], ("BML staff member", 1))

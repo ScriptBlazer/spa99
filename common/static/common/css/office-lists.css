@@ -190,3 +190,12 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 .o-tl-change { font-weight: 400; font-size: var(--text-sm); color: var(--office-muted); }
 .o-tl-meta { font-size: var(--text-sm); color: var(--office-muted); }
 .o-tl-msg { margin-top: var(--space-1); padding: var(--space-2) var(--space-3); border-radius: var(--office-radius); background: var(--office-surface); overflow-wrap: anywhere; }
+
+/* Gold: "Said NO to doing business with BML" (2026-10-29, Barry). Danger red with cream text (8.07 contrast), the loudest thing on the page; it never blocks approval. */
+.o-alert { display: grid; gap: var(--space-1); margin-bottom: var(--space-4); padding: var(--space-4) var(--space-5); border-radius: var(--office-radius); background: var(--office-danger); color: var(--color-cream); }
+.o-alert > * { margin: 0; max-width: none; }
+.o-alert-title { font-size: var(--text-xl, 1.5rem); font-weight: 700; line-height: var(--leading-snug); }
+.o-alert-sub { font-size: var(--text-sm); }
+.o-badge--no-business { background: var(--office-danger); color: var(--color-cream); margin-left: var(--space-2); }
+.o-badge--yes-business { background: var(--office-caramel-tint); color: var(--office-text); margin-left: var(--space-2); }
+.o-badges .o-badge--no-business, .o-badges .o-badge--yes-business { margin-left: 0; }

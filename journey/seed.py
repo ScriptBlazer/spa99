@@ -43,7 +43,8 @@ PROPERTY_LINK = [
 PROPERTY_SIZE = [("1_9", "1 to 9"), ("10_49", "10 to 49"), ("50_199", "50 to 199"), ("200_plus", "200 or more")]
 YES_NO = [("yes", "Yes"), ("no", "No")]
 HEARD_VIA = [
-    ("friend", "A friend"), ("bml", "BML member"), ("social_media", "Social media"), ("other", "Other"),
+    ("friend", "A friend"), ("bml", "BML staff member"), ("social_media", "Social media"),
+    ("barry_status", "Barry's status"), ("other", "Other"),
 ]
 
 GUEST_COMPANY = ["sometimes", "often"]  # "often" was retired (2026-10-23); old sessions keep their points
@@ -65,7 +66,7 @@ QUESTIONS = [
     ("frequency", "How often?", "", Question.SCALE, 1, 2, {}, FREQUENCY),
     ("facilities", "What would you use?", "Choose at least one.", Question.MULTI, 2, 1, {}, FACILITIES),
     ("company", "Do you usually come alone?", "", Question.SINGLE, 3, 1, {}, COMPANY),
-    ("industry", "What do you do?", "Choose at least one.", Question.MULTI, 4, 1, {}, INDUSTRY),
+    ("industry", "What industry are you in?", "Choose at least one.", Question.MULTI, 4, 1, {}, INDUSTRY),
     ("property_link", "Your link to property", "", Question.SINGLE, 4, 2,
      {"question": "industry", "any_of": ["property"]}, PROPERTY_LINK),
     ("property_size", "How many properties or units?", "An approximate range is fine.", Question.SINGLE, 4, 3,

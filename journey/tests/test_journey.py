@@ -5,7 +5,7 @@ from django.test import Client, TestCase
 
 from gold.models import GoldRule
 from journey import engine, services
-from journey.models import Answer, JourneySession, Option, SuggestionRule
+from journey.models import Answer, JourneySession, Option, Question, SuggestionRule
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import Plan
 
@@ -65,8 +65,10 @@ class SuggestionTests(TestCase):
         state = services.build_state(make_session())
         options = {q["key"]: [o["value"] for o in q["options"]] for s in state["screens"] for q in s["questions"]}
         self.assertEqual(options["company"], ["alone", "sometimes"])
-        self.assertEqual(options["heard_via"], ["friend", "bml", "social_media", "other"])
-        self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML member")
+        self.assertEqual(options["heard_via"], ["friend", "bml", "social_media", "barry_status", "other"])
+        self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML staff member")
+        self.assertEqual(Option.objects.get(question__key="heard_via", value="barry_status").label, "Barry's status")
+        self.assertEqual(Question.objects.get(key="industry").text, "What industry are you in?")
 
     def test_three_reasons_from_answers_and_plan_facts(self):
         suggestion = engine.compute_suggestion(make_session(time=["evening"], frequency="two_three", company="alone"))
