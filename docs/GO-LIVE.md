@@ -22,7 +22,7 @@ Run these in order. Live starts with an empty database, so it needs no backfills
    - In Postmark, add the sending domain `spa99.uk` and put its DKIM and Return-Path records in Cloudflare. They sit alongside the SES records without clashing.
    - Copy the server token.
    - **Bounces:** make up a long random user and password (letters and digits only) and put them in the server `.env` as `POSTMARK_WEBHOOK_USER` and `POSTMARK_WEBHOOK_PASSWORD`, then `docker compose up -d`. In Postmark: Server, Webhooks, Add webhook. URL `https://<user>:<password>@spa99.uk/postmark/webhook/`. Tick **Bounce** and **Spam complaint** only. Press **Send test** next to each: it must show 200 (a 404 means the two env values are not set, 401 means they differ from the URL). Cloudflare Bot Fight Mode must stay off (see below) or it blocks Postmark.
-   - Ask Postmark to approve the account. Until it does, mail only reaches addresses at spa99.uk.
+   - Account approved by Postmark (done 2026-10-29, Basic plan, 10,000 emails a month).
    - **Switching to SES later** is a `.env` change only (and change the Postmark lines in the privacy notice, parts 6 and 7, back to Amazon SES in Control). Delete the five `EMAIL_*` lines, so the default (SES) applies again, then run `docker compose up -d`. Then do step 19 for the bounce subscription.
 
 ## C. Server
@@ -60,7 +60,7 @@ Run these in order. Live starts with an empty database, so it needs no backfills
 
 ## D. First data (once only, straight after step 12)
 
-**Before this step, email must work** (step 7 done, Postmark domain verified). In Postmark, check the domain shows as verified (DKIM and Return-Path green). Until Postmark approves the account, mail only reaches @spa99.uk addresses, which is fine for moishe@ and barry@.
+**Before this step, email must work** (step 7 done, Postmark domain verified). In Postmark, check the domain shows as verified (DKIM and Return-Path green).
 
 14. Preview: `docker compose run --rm web python manage.py setup_live --dry-run`. It lists everything it would set and sends nothing.
 15. Run it: `docker compose run --rm web python manage.py setup_live`. It loads the starting data (seed), the team levels, creates moishe@spa99.uk (Developer + Final approver) and barry@spa99.uk (Admin + Approver) with no password, and fills contact email, Gold CC, WhatsApp link and the payment alert address. It refuses to run if email is not set up (the invites would never arrive).
