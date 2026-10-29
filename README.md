@@ -78,7 +78,7 @@ Private folder (default `/Users/moishe/Library/CloudStorage/OneDrive-Personal/BM
 | `AWS_STORAGE_BUCKET_NAME` | S3 media bucket (`spa99-media`). Empty = local file storage, never a crash |
 | `AWS_S3_REGION_NAME` | Bucket region (`eu-west-2`) |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Local dev keys, allowed into `dev/` only. Never on the server (it uses its instance role) |
-| `EMAIL_BACKEND` | Dev: console (default). Live: `notifications.backends.SesBackend` (SES via the server IAM role) or the default SMTP backend |
+| `EMAIL_BACKEND` | Dev: console (default). Live: blank = SMTP (Postmark; needs `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`), or `notifications.backends.SesBackend` (SES via the server IAM role) |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` | SMTP settings (only with the SMTP backend) |
 | `DEFAULT_FROM_EMAIL` | From address of every email. Required in prod (no default). DKIM is signed by the mail provider/DNS |
 | `SERVER_EMAIL` | Server error From (default: the From address). The Gold approver list, CC and contact email are no longer env vars: developers set them in System > Emails (one-off copy: `manage.py import_email_settings_from_env --dry-run`) |
@@ -118,11 +118,11 @@ Live uses managed PostgreSQL: take an RDS snapshot before every deploy and backf
 
 Images are built by GitHub Actions on a version tag (`1.2.3`, no `v`) after the tests pass. The server holds
 `docker-compose.yml`, `Caddyfile` and `.env` only. Services: `caddy` (HTTPS), `web` (runs migrations, then gunicorn),
-`worker` (background jobs). Deploy by changing `APP_TAG` in the server `.env`, then `docker compose up -d`.
+`worker` (background jobs). Deploy by changing `APP_TAG` in the server `.env`, then `docker compose pull && docker compose up -d` (full steps: `docs/GO-LIVE.md`).
 Check `https://<domain>/health/` afterwards.
 Client IP: with Cloudflare in front, the `Caddyfile` trusts Cloudflare's ranges only (`trusted_proxies`), takes the visitor IP from
 `CF-Connecting-IP` (Cloudflare overwrites it, so a visitor cannot fake it) and passes it to the app as `X-Client-IP`. Without Cloudflare
-(DNS only) the same file still works: the IP is then the connection's. Re-check the range list at <https://www.cloudflare.com/ips/> now and then. GitHub Actions pushes the image to Docker Hub as `<user>/spa99:<tag>`; repo secrets `DOCKERHUB_USERNAME` and
+(DNS only) the same file still works: the IP is then the connection's. Re-check the range list at <https://www.cloudflare.com/ips/> now and then. GitHub Actions pushes the image to Docker Hub as `<user>/spa99:<tag>` and `:latest`; repo secrets `DOCKERHUB_USERNAME` and
 `DOCKERHUB_TOKEN` (Docker Hub access token). The server logs in once with `docker login` (a read-only token).
 
 ## Project layout

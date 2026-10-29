@@ -1,104 +1,88 @@
-# Go live (first launch)
+# Go live
 
-Run these in order. Live starts with an empty database, so it needs no backfills. Commands run on the server in the folder that holds `docker-compose.yml`.
+Do these in order. Live starts with an empty database, so it needs no backfills. Server commands run in the folder that holds `docker-compose.yml`.
 
-## A. Day before (code)
+**What lives on the server:** only `.env` and Caddy's certificates. The database is RDS (with its own backups), uploads are in S3, static files are inside the image, logs go to `docker compose logs`. Losing the server loses nothing but `.env`, so keep a copy of it in your private folder.
 
-1. Merge every open branch into `main` (now: `feature/compare-order`). Wait for the green tick on GitHub.
-2. **Docker Hub:** create a **private** repository called `spa99`. Make two access tokens (Account settings > Personal access tokens): one **Read & Write** for GitHub, one **Read-only** for the server.
-   In GitHub (repo > Settings > Secrets and variables > Actions) add the secrets `DOCKERHUB_USERNAME` (your Docker Hub username) and `DOCKERHUB_TOKEN` (the Read & Write token).
-3. Tag the release: `git tag 1.0.0 && git push origin 1.0.0`. GitHub Actions tests it and pushes `<username>/spa99:1.0.0` to Docker Hub. Check it appears there.
+## Launch
 
-## B. AWS
+1. **GitHub and Docker Hub**
+   - Docker Hub: create a **private** repository `spa99`. Make two access tokens (Account settings > Personal access tokens): **Read & Write** for GitHub, **Read-only** for the server.
+   - GitHub (repo > Settings > Secrets and variables > Actions): add `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (the Read & Write token).
+   - Merge `docker-live` (and anything else for launch) into `main`. Wait for the green tick.
+   - Release: `git tag 1.0.0 && git push origin 1.0.0`. Actions runs the tests on Postgres and, only if green, pushes `<username>/spa99:1.0.0` and `:latest`. Check both appear on Docker Hub.
 
-4. **Postgres (RDS):** create the database and turn on automatic daily backups (7 days or more). Allow connections from the server only (security group). Copy the connection string; it goes in `DATABASE_URL`. If the password has symbols, URL-encode it.
-5. **S3:** create a private bucket for uploaded files. The site refuses to start without one.
-6. **Server (EC2):** install Docker. In the security group, open ports 80 and 443 only.
-   - Set the instance metadata hop limit to **2**. Without this, the containers can't use the server's role, so S3 and SES fail.
-   - Give the server role a policy with:
-     - `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` and `s3:ListBucket` on the bucket
-     - `ses:SendRawEmail` and `ses:GetAccount`
-7. **Email: Postmark for launch** (2026-10-27; SES is still in sandbox).
-   - In Postmark, add the sending domain `spa99.uk` and put its DKIM and Return-Path records in Cloudflare. They sit alongside the SES records without clashing.
-   - Copy the server token.
-   - **Bounces:** make up a long random user and password (letters and digits only) and put them in the server `.env` as `POSTMARK_WEBHOOK_USER` and `POSTMARK_WEBHOOK_PASSWORD`, then `docker compose up -d`. In Postmark: Server, Webhooks, Add webhook. URL `https://<user>:<password>@spa99.uk/postmark/webhook/`. Tick **Bounce** and **Spam complaint** only. Press **Send test** next to each: it must show 200 (a 404 means the two env values are not set, 401 means they differ from the URL). Cloudflare Bot Fight Mode must stay off (see below) or it blocks Postmark.
-   - Account approved by Postmark (done 2026-10-29, Basic plan, 10,000 emails a month).
-   - **Switching to SES later** is a `.env` change only (and change the Postmark lines in the privacy notice, parts 6 and 7, back to Amazon SES in Control). Delete the five `EMAIL_*` lines, so the default (SES) applies again, then run `docker compose up -d`. Then do step 19 for the bounce subscription.
+2. **AWS** (region eu-west-2, London)
+   - **RDS PostgreSQL:** automatic backups **on, 7 days or more**. Security group: port 5432 from the server only. Copy the endpoint; it goes in `DATABASE_URL` (URL-encode symbols in the password).
+   - **S3:** a **private** bucket (Block all public access on). The site refuses to start without it.
+   - **IAM role for the server** with `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` on `arn:aws:s3:::<bucket>/*` and `s3:ListBucket` on `arn:aws:s3:::<bucket>`. (Add `ses:SendRawEmail` and `ses:GetAccount` only when moving to SES.)
+   - **EC2** (x86_64, e.g. t3.small, Ubuntu): attach the role. Security group: **80 and 443** open to all, 22 from your IP only. Set the instance metadata **hop limit to 2** (Actions > Instance settings > Modify instance metadata options), or the containers can't use the role and S3 fails. Install Docker with the compose plugin.
 
-## C. Server
+3. **Postmark** (approved 2026-10-29, Basic, 10,000 a month)
+   - Sender domain `spa99.uk`: add its **DKIM** and **Return-Path** records in Cloudflare (DNS only). Wait until both show green in Postmark.
+   - Copy the **Server API token** (for `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD`).
 
-8. **Log the server in to Docker Hub** (once; it stays logged in): `docker login -u <username>`, and paste the Read-only token as the password.
-9. Copy `docker-compose.yml` and `Caddyfile` to the server.
-10. Create the server's `.env` from `.env.example`. Wrap `SECRET_KEY` in single quotes (it may contain `$`).
+4. **Server `.env`**
+   - Log in to Docker Hub once: `docker login -u <username>` (password: the Read-only token).
+   - Copy `docker-compose.yml`, `Caddyfile` and `.env.example` to the server. Rename `.env.example` to `.env` and fill it in. Every line is explained there.
+   - Required (the site will not start without them, and the error lists what's wrong): `SECRET_KEY` (new, in single quotes), `DATABASE_URL`, `AWS_STORAGE_BUCKET_NAME`, `SYSTEM_UNLOCK_CODE`, `ADMIN_PATH`, `DEFAULT_FROM_EMAIL`, the four `*_DOMAIN`s, `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD` (the Postmark token).
+   - Also: `IMAGE=<username>/spa99`, `APP_TAG=1.0.0`, `SENTRY_DSN`, `ANTHROPIC_API_KEY` (blank = chat off), `POSTMARK_WEBHOOK_USER` / `_PASSWORD` (step 9).
+   - Leave out: `EMAIL_BACKEND` (blank = Postmark SMTP), `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (the server uses its role), `DEBUG`, `DJANGO_SETTINGS_MODULE`, `SPA99_PRIVATE_DIR`, `Q_SYNC`.
+   - Save a copy of the finished `.env` in your private folder.
 
-    These keys are required, and the site refuses to start without them:
-    - `SECRET_KEY`: a new random key. Never reuse the one from your Mac.
-    - `DATABASE_URL`: from step 4.
-    - `SYSTEM_UNLOCK_CODE`: 6 to 12 digits.
-    - `ADMIN_PATH`: your own value, not the example one.
-    - `DEFAULT_FROM_EMAIL=Spa 99 <hello@spa99.uk>`
-    - `AWS_STORAGE_BUCKET_NAME`
+5. **DNS** (Cloudflare, **grey cloud / DNS only** for now): A records for `spa99.uk`, `www`, `office`, `system` and `control` pointing at the server's IP (use an Elastic IP so it never changes).
 
-    Also set:
-    - `DOMAIN`, `OFFICE_DOMAIN`, `SYSTEM_DOMAIN`, `CONTROL_DOMAIN`
-    - Email through Postmark (both user and password are the server token):
-      ```
-      EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-      EMAIL_HOST=smtp.postmarkapp.com
-      EMAIL_PORT=587
-      EMAIL_HOST_USER=<postmark server token>
-      EMAIL_HOST_PASSWORD=<postmark server token>
-      ```
-    - `AWS_SES_REGION_NAME=eu-west-2` and `SES_SNS_TOPIC_ARN=arn:aws:sns:eu-west-2:137808120968:spa99-ses-feedback` (harmless now, ready for SES)
-    - `SENTRY_DSN`
-    - `IMAGE=<username>/spa99` and `APP_TAG=1.0.0`
+6. **Start:** `docker compose pull && docker compose up -d`. Web runs the migrations, then starts; the worker waits for it.
+   - `docker compose logs web | head -30`: the startup line must say `settings=config.settings.prod`, `database=postgresql:...`, `media=s3:<bucket>/prod/`, `email=smtp:smtp.postmarkapp.com`.
+   - `docker compose logs caddy`: it should say the certificates were obtained.
+   - If web keeps restarting: `docker compose logs web` shows the list of missing or wrong `.env` values.
 
-    Live always uses the prod settings, whatever the `.env` says. Email goes through SES unless `EMAIL_BACKEND` is set (as above for Postmark). No AWS keys: the server uses its role.
-11. **DNS, grey cloud first (DNS only):** point `spa99.uk`, `www.spa99.uk`, `office.spa99.uk`, `system.spa99.uk` and `control.spa99.uk` at the server.
-12. Start it: `docker compose up -d`. Migrations run by themselves.
-13. Check `docker compose logs web | head -30`: the startup line should name the prod settings, Postgres and S3. Check `docker compose logs caddy` too: it should say the certificates were obtained.
+7. **First data** (once; Postmark domain must be green first, or the invites never arrive)
+   - Preview: `docker compose run --rm web python manage.py setup_live --dry-run`. It lists everything and sends nothing.
+   - Run: `docker compose run --rm web python manage.py setup_live`. It loads the seed, the team levels, System values (contact email, Gold CC, WhatsApp, staff alerts), and creates moishe@spa99.uk (Developer + Final approver) and barry@spa99.uk (Admin + Approver), each invited by email. It refuses to run if email doesn't work.
+   - The output must end with "invite sent" for both. Open the invite and choose your password within 1 hour (expired: Forgot password on spa99.uk).
 
-## D. First data (once only, straight after step 12)
+8. **Checks**
+   - `https://spa99.uk/health/` answers OK.
+   - Sign in at `https://system.spa99.uk/dev-login/`, unlock with the lock code. Check the opening date, the email settings, and that Memberships is still hidden.
+   - Do it yourself, on a phone too: the journey and email, register and confirm, apply for Gold (the approver email arrives and "Review application" opens it in the Office).
+   - Upload a picture in System > Emails: it must show (proves S3 and the role work).
 
-**Before this step, email must work** (step 7 done, Postmark domain verified). In Postmark, check the domain shows as verified (DKIM and Return-Path green).
+9. **Postmark bounces:** in Postmark, Server > Webhooks > Add webhook, URL `https://<user>:<password>@spa99.uk/postmark/webhook/` (the two values from `.env`), tick **Bounce** and **Spam complaint** only, **Send test** for each: 200 is right (404 = the env values are missing, 401 = they differ from the URL).
 
-14. Preview: `docker compose run --rm web python manage.py setup_live --dry-run`. It lists everything it would set and sends nothing.
-15. Run it: `docker compose run --rm web python manage.py setup_live`. It loads the starting data (seed), the team levels, creates moishe@spa99.uk (Developer + Final approver) and barry@spa99.uk (Admin + Approver) with no password, and fills contact email, Gold CC, WhatsApp link and the payment alert address. It refuses to run if email is not set up (the invites would never arrive).
-16. Check the output ends with "invite sent" for both. Open the "You've been added to the Spa 99 team" email and choose your password within 1 hour (expired: use Forgot password on spa99.uk). Then sign in at `https://system.spa99.uk/dev-login/`. No `createsuperuser` needed.
+10. **Cloudflare on**
+    - SSL/TLS: **Full (strict)** ("Flexible" causes an endless redirect loop).
+    - Turn the records **orange** (proxied). Turn on "Always use HTTPS".
+    - Leave **Bot Fight Mode off**: it blocks Postmark webhooks and uptime checks.
+    - Check `/health/` and a sign-in again.
 
-## E. Checks, then switch Cloudflare on
+11. **Sentry:** `docker compose run --rm web python manage.py sentry_test`. The test error must appear in Sentry, tagged with the release (e.g. 1.0.0).
 
-17. Open `https://spa99.uk/health/`. It should answer OK.
-18. **Cloudflare:**
-    - Set SSL/TLS to **Full (strict)**. "Flexible" causes an endless redirect loop.
-    - Turn the records to orange (proxied).
-    - Leave **Bot Fight Mode off**: it can block Amazon SNS and uptime checks.
-19. **(Only once on SES.)** Run `curl -X POST -d '{}' https://spa99.uk/ses/notifications/`. It should answer 400 or 403, not 404. Then, in SNS, open the topic and create a subscription: HTTPS, endpoint `https://spa99.uk/ses/notifications/`. Its status should turn to Confirmed.
-20. **System** (`system.spa99.uk`):
-    - Add Barry in Team (Office level).
-    - Make him Approver in Approval.
-    - Check the opening date, the email settings and that Memberships is still hidden.
-21. Test it yourself:
-    - Do the journey and enter your email.
-    - Register, then confirm the email.
-    - Apply for the Gold Card. Check the approver email arrives, that "Review application" opens it in the Office, and that you can approve, decline or respond there.
-22. Run `docker compose run --rm web python manage.py sentry_test` and check the test error appears in Sentry.
+## Soft launch (decided)
 
-## F. Every deploy after launch
+- **Memberships stay hidden.** People get the journey and the email gate and can register.
+- **Payments closed.** No card payments yet; the payment window opens later from System.
+- Turn Memberships on only when prices are final.
 
-- Take an RDS snapshot first.
-- Never edit or delete a migration that is already live.
-- Tag the new version (for example `1.0.1`), wait for the green tick, set `APP_TAG` in `.env`, run `docker compose up -d`, then check `/health/`.
-- If something breaks, set `APP_TAG` back to the previous version and run `docker compose up -d` again. If a migration damaged data, restore the snapshot.
+## Every release
 
-## Suggestions (not blockers)
+1. `git tag 1.0.1 && git push origin 1.0.1`. Wait for the green tick and the new tag on Docker Hub.
+2. Before a release with migrations: take an RDS snapshot (RDS > Snapshots > Take snapshot).
+3. On the server: set `APP_TAG=1.0.1` in `.env`, then `docker compose pull && docker compose up -d`.
+4. Check `https://spa99.uk/health/` and `docker compose logs web | head`.
 
-- **Soft launch:** keep Memberships hidden. People get the journey and the email gate and can register. Turn Memberships on only when prices are final.
-- **Stay off the server for 2 days:** no new features or deploys for the first 48 hours. Only urgent fixes.
-- **Uptime alert:** add a free check (UptimeRobot or Better Stack) on `https://spa99.uk/health/` that emails you if the site goes down.
-- **Cloudflare:** turn on "Always use HTTPS". Keep Bot Fight Mode off (step 18).
-- **Real phone test:** do the journey, register and apply for Gold on an iPhone and an Android, not just your Mac.
+Never edit or delete a migration that is already live.
+
+**Rollback:** set `APP_TAG` back to the previous version, then `docker compose pull && docker compose up -d`. If a migration damaged data, restore the RDS snapshot to a new instance and point `DATABASE_URL` at it.
+
+## After launch
+
+- **Backups:** live uses RDS automatic backups (daily, kept 7+ days) plus a snapshot before risky releases. `scripts/backup_db.sh` is for your Mac's SQLite only.
+- **HSTS:** after a week of clean HTTPS, set `SECURE_HSTS_SECONDS=31536000` in `.env` and `docker compose up -d`.
+- **Uptime alert:** a free check (UptimeRobot or Better Stack) on `https://spa99.uk/health/`.
+- **Stay off the server for 2 days:** urgent fixes only.
 - **Tell Barry:** where the Office is and how Gold approvals arrive.
-- **Before the first marketing email:** add an unsubscribe link for journey leads. It's not needed for launch, because confirm and approval emails are transactional.
-- **Legal:** get the solicitor's sign-off on the men-only wording and the privacy notice.
-- **Later (Control is parked):** Cloudflare caps uploads at 100 MB, so big Control videos need `control.spa99.uk` on grey cloud.
+- **Before the first marketing email:** an unsubscribe link for journey leads (confirm and approval emails are transactional).
+- **Legal:** solicitor's sign-off on the men-only wording and the privacy notice.
+- **Moving to SES later:** in `.env` set `EMAIL_BACKEND=notifications.backends.SesBackend`, remove the `EMAIL_HOST*` lines, add the SES permissions to the role, `docker compose up -d`. Then subscribe `https://spa99.uk/ses/notifications/` to the SNS topic (set `SES_SNS_TOPIC_ARN`) and change the Postmark lines in the privacy notice back to Amazon SES.
+- **Control (parked):** Cloudflare caps uploads at 100 MB, so big Control videos need `control.spa99.uk` on grey cloud.
