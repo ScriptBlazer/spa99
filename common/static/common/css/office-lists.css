@@ -77,7 +77,7 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
   .o-tablecard .o-list .u-clamp-2 { max-width: 13rem; }
 }
 /* Laptop widths: the email sits under the name (same info, one column less); its own column is back from 90em. */
-.o-email-sub { display: none; }
+.o-list .o-email-sub { display: none; }   /* .o-list: beats .o-cell-sub (display: block) loaded later */
 @media (min-width: 64em) and (max-width: 89.99em) { .o-list .o-email-col { display: none; } .o-list .o-email-sub { display: block; } }
 /* Every column is shown on desktop (Moishe 2026-10-30: all the info, truncated only if it must be). Long text uses the shared
    truncate with a cap per column; the card scrolls sideways only as a last resort. */
