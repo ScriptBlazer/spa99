@@ -1,0 +1,43 @@
+{% extends "office/base.html" %}
+{% load office_tags %}
+{% block title %}Invited, not registered | Spa 99 Office{% endblock %}
+{% block main %}
+<h1 class="sr-only">Invited, not registered</h1>
+<form class="o-filters" method="get" action="{% url 'office_invited' %}" data-filter-form data-full data-list="invited" role="search" aria-label="Find invited people">
+  <div class="o-filters-bar">
+    <div class="o-search">
+      <label for="f-q" class="sr-only">Search name or email</label>
+      {% include "office/_icon.html" with name="search" %}
+      <input id="f-q" type="search" name="q" value="{{ filters.q }}" placeholder="Search name or email" autocomplete="off" enterkeyhint="search" data-search>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm o-filters-open" data-filters-open hidden>{% include "office/_icon.html" with name="sliders" %}Filters</button>
+    <div class="o-filters-slot" data-filters-slot>
+      <div class="o-filters-body" data-filter-body>
+        <div class="o-filter-group"><span class="o-filter-label" id="l-state">Show</span>
+          <fieldset class="o-seg" aria-labelledby="l-state" style="--n: 4; --i: {% if filters.state == "unclicked" %}0{% elif filters.state == "clicked" %}1{% elif filters.state == "expired" %}2{% else %}3{% endif %}" data-default="{{ default_state }}">
+            <span class="o-seg-thumb" aria-hidden="true"></span>
+            {% for value, label in states %}<label class="o-seg-item"><input type="radio" name="state" value="{{ value }}"{% if filters.state == value %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}
+          </fieldset></div>
+        {% if office_can.can_export %}<a class="btn btn-secondary btn-sm o-export o-export--sheet" href="{% url 'office_invited_csv' %}?{{ request.GET.urlencode }}" data-export-csv data-export-base="{% url 'office_invited_csv' %}">Export CSV</a>{% endif %}
+      </div>
+    </div>
+  </div>
+  <p class="o-totalline" data-region="invited-total">Invited by email, no account yet. <em>Clicked the link</em> means he clicked his personal link, not that he opened the email.
+    {% if filtered %}<a class="o-quiet" href="{% url 'office_invited' %}" data-clear>Clear</a>{% endif %}
+    <a class="o-quiet" href="{{ groups_url }}" data-invite-again>Invite again from System &gt; Groups</a>
+    <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button>
+    {% if office_can.can_export %}<a class="btn btn-secondary btn-sm o-export o-export--bar" href="{% url 'office_invited_csv' %}?{{ request.GET.urlencode }}" data-export-csv data-export-base="{% url 'office_invited_csv' %}">Export CSV</a>{% endif %}</p>
+  <dialog class="o-sheet" data-filter-sheet aria-labelledby="sheet-h">
+    <div class="o-sheet-head"><h2 id="sheet-h">Filters</h2></div>
+    <div data-sheet-slot></div>
+    <button type="button" class="btn btn-primary btn-block" data-sheet-close>Show results</button>
+  </dialog>
+</form>
+<div class="o-card o-tablecard" data-list-card>
+  <table class="o-list o-list--people">
+    <caption class="sr-only">Invited, not registered</caption>
+    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col" class="o-hide-md">Lists</th><th scope="col" class="num">Invited</th><th scope="col">Clicked the link</th><th scope="col">Invite expired</th></tr></thead>
+    <tbody data-region="list" data-office-list="invited">{% include "office/_invited_rows.html" %}</tbody>
+  </table>
+</div>
+{% endblock %}

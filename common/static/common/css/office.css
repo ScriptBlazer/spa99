@@ -114,6 +114,11 @@
 
 /* ---------- main ---------- */
 .o-main { padding: var(--space-3) var(--page-margin) var(--space-5); max-width: 80rem; }
+/* Big screens (Moishe 2026-10-30): use the width and scale everything up a little. office.css is only loaded by the Office,
+   so the html size step below never touches the website. Every size is in rem, so text, controls and tables grow together. */
+@media (min-width: 100em) { html { font-size: 106.25%; } .o-main { max-width: 100rem; } }
+@media (min-width: 120em) { html { font-size: 112.5%; } .o-main { max-width: 112rem; } }
+@media (min-width: 160em) { html { font-size: 125%; } .o-main { max-width: 120rem; } }
 .o-main:focus { outline: none; }
 @media (min-width: 64em) { .o-main { padding: var(--space-5); } }
 .o-main[aria-busy="true"] .o-dash, .o-main[aria-busy="true"] .o-chartbox, .o-main[aria-busy="true"] .o-ranked { opacity: 0.5; }

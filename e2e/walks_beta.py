@@ -708,8 +708,11 @@ def beta_bad_input(w):
         assert gold.locator(".gold-sent").count() == 0, "A refused application shows the 'sent' screen"
     with w.step("Gold apply: company and role are required (the problems dialog), and No to BML asks about doing business", gold):
         gold.goto(f"{SITE}/gold-card/apply/")
-        gold.evaluate("sessionStorage.clear()")  # earlier steps left a filled form in this tab
+        gold.evaluate("sessionStorage.clear()")  # earlier steps left a filled form in this tab...
+        gold.reload()  # ...and the page had already restored it on load, so start again from a clean store
         gold_open_about(gold)
+        gold.fill("#g-company", "")
+        gold.fill("#g-role", "")
         gold.locator("[data-primary]").click()
         lines = " ".join(problems_modal(gold)).lower()
         assert "company" in lines and "role" in lines, f"The dialog says: {lines}"

@@ -3,7 +3,9 @@ the existing services. Permissions are decorators on every view (see office.perm
 from datetime import datetime
 from urllib.parse import urlencode, urlparse
 
+from django.conf import settings
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -35,6 +37,7 @@ from system import defaults
 
 from . import lists, profile, selectors
 from .forms import ManualSetupForm
+from . import invited as invited_lists
 from . import leads as lead_lists
 from .permissions import admin, approver, final_approver, reader
 
@@ -154,6 +157,17 @@ def _person_extras(request, person):
             "gold_high_at": rating.thresholds()[rating.HIGH]}
 
 
+def _is_fragment(request):
+    """The timeline-only HTMX request (the same test that picks the template)."""
+    return bool(request.headers.get("HX-Request") and "tl" in request.GET)
+
+
+def _chats_context(person, user=None, email="", filter_key="", filter_id=""):
+    """The "Chats with the assistant" card and what the page shows near the top (how he heard about us)."""
+    return {"heard_via": profile.heard_via(person["journeys"]), "chats": profile.chats_card(user, email),
+            "chats_all_url": f"{reverse('office_chats')}?{urlencode({filter_key: filter_id})}"}
+
+
 @reader
 @require_GET
 def person(request, pk):
@@ -161,7 +175,9 @@ def person(request, pk):
     person = lists.person_detail(user)
     context = {"person": person, "section": "people", "setup_plans": ManualSetupForm().fields["plan"].queryset,
                **_timeline_context(request, person), **_person_extras(request, person)}
-    return render(request, "office/_timeline.html" if request.headers.get("HX-Request") and "tl" in request.GET else "office/person.html", context)
+    if not _is_fragment(request):
+        context.update(_chats_context(person, user=user, email=user.email, filter_key="user", filter_id=user.pk))
+    return render(request, "office/_timeline.html" if _is_fragment(request) else "office/person.html", context)
 
 
 def _setup_result(request, user, action):
@@ -293,7 +309,9 @@ def lead(request, pk):
     if kind == "account":
         return redirect("office_person", pk=data.pk)
     context = {"person": data, "section": "leads", **_timeline_context(request, data), **_person_extras(request, data)}
-    return render(request, "office/_timeline.html" if request.headers.get("HX-Request") and "tl" in request.GET else "office/lead.html", context)
+    if not _is_fragment(request):
+        context.update(_chats_context(data, email=data["email"], filter_key="lead", filter_id=pk))
+    return render(request, "office/_timeline.html" if _is_fragment(request) else "office/lead.html", context)
 
 
 @admin
@@ -324,6 +342,25 @@ def lead_delete(request, pk):
     return redirect("office_leads")
 
 
+# ---------- invited, not registered (a follow-up list; sending is done from System) ----------
+
+@admin
+@require_GET
+@never_cache
+def invited(request):
+    filters, number = invited_lists.filters_from(request), lists.page_number(request)
+    rows, has_next = invited_lists.page(filters, number, defaults.get(request).list_page_size)
+    context = {"rows": rows, "has_next": has_next, "page": number, "filters": filters, "filtered": invited_lists.is_filtered(filters),
+               "states": invited_lists.STATE_LABELS, "section": "invited", "groups_url": settings.SYSTEM_URL + reverse("system_groups", urlconf="config.urls_system"), "default_state": invited_lists.DEFAULT_STATE}
+    return _varied(render(request, _fragment(request, "office/invited.html", "office/_invited_rows.html"), context))
+
+
+@admin
+@require_GET
+def invited_csv(request):
+    return invited_lists.csv_response(invited_lists.filters_from(request), request.user.pk)
+
+
 # ---------- chats (Ask us) ----------
 
 @reader
@@ -333,17 +370,44 @@ def chats(request):
     """The Ask us conversations, newest first, a page at a time (one extra row instead of a count). View only."""
     first = Message.objects.filter(conversation=OuterRef("pk"), role=Message.USER).order_by("created_at").values("text")[:1]
     queryset = Conversation.objects.filter(staff_test=False).annotate(preview=Subquery(first)).select_related("user")
+    show_cost = levels.at_least(request.user, levels.DEVELOPER)  # chat spend: Developer level and up only; others never load it
+    if not show_cost:
+        queryset = queryset.defer("total_cost_pence")
+    person = _chats_person(request)
+    if person is not None:  # ?user=<account id> or ?lead=<lead id>: one person's chats (the card on his page links here)
+        queryset = queryset.filter(pk__in=chat_services.person_conversations(person["user"], person["email"]).values("pk"))
     page = lists.page_number(request)
     rows, has_next = lists.cut(queryset, page, defaults.get(request).list_page_size)
-    return render(request, "office/chats.html", {"rows": rows, "has_next": has_next, "page": page, "section": "chats"})
+    return render(request, "office/chats.html", {"rows": rows, "has_next": has_next, "page": page, "section": "chats", "person": person, "show_cost": show_cost})
+
+
+def _chats_person(request):
+    """Who the Chats list is narrowed to, from ?user= (account id) or ?lead= (a lead's opaque session id): {user, email, label, url} or None."""
+    try:
+        if request.GET.get("user"):
+            user = get_object_or_404(User, pk=request.GET["user"])
+            return {"user": user, "email": user.email, "label": user.email, "query": urlencode({"user": user.pk}), "url": reverse("office_person", args=[user.pk]) if hasattr(user, "interest") else ""}
+        if request.GET.get("lead"):
+            session = get_object_or_404(JourneySession, pk=request.GET["lead"])
+            if session.lead_email and not session.is_bot:
+                return {"user": None, "email": session.lead_email, "label": session.lead_email.lower(), "query": urlencode({"lead": session.pk}), "url": reverse("office_lead", args=[session.pk])}
+            raise Http404
+    except ValidationError:  # not a UUID
+        raise Http404
+    return None
 
 
 @reader
 @require_GET
 @never_cache
 def chat_detail(request, pk):
-    conversation = get_object_or_404(Conversation.objects.select_related("user"), pk=pk)
-    return render(request, "office/chat_detail.html", {"conversation": conversation, "messages_list": conversation.messages.all(), "section": "chats"})
+    show_cost = levels.at_least(request.user, levels.DEVELOPER)  # Developer level and up only
+    conversations = Conversation.objects.select_related("user")
+    thread = Message.objects.all()
+    if not show_cost:
+        conversations, thread = conversations.defer("total_cost_pence"), thread.defer("cost_pence")
+    conversation = get_object_or_404(conversations, pk=pk)
+    return render(request, "office/chat_detail.html", {"conversation": conversation, "messages_list": thread.filter(conversation=conversation), "section": "chats", "show_cost": show_cost})
 
 
 # ---------- gold ----------

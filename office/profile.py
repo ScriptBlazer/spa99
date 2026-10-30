@@ -235,3 +235,34 @@ def lead_profile(email, session_id):
         "consent": consent_block([email], sessions, None, applications),
         "timeline": timeline(sessions, applications=applications, email=email),
     }
+
+
+# ---------- what the person told us and asked ----------
+
+CHATS_SHOWN = 5
+
+
+def heard_via(journeys):
+    """How he said he heard about us (the answer to "How did you hear about us?", plus the typed "Where?"), newest journey first;
+    '' when never answered. `journeys` is the profile's list of journey_item dicts (oldest first)."""
+    for journey in reversed(journeys):
+        said = {a["key"]: a for a in journey["answers"]}
+        answer = said.get("heard_via")
+        if answer and not answer["skipped"] and answer["display"]:
+            other = said.get("heard_via_other")
+            return answer["display"] + (f" ({other['text']})" if other and other["text"] else "")
+    return ""
+
+
+def chats_card(user=None, email="", limit=CHATS_SHOWN):
+    """The assistant chats of one person for the card: {rows[{id, at, messages, first_question}], more}. The newest `limit`; two
+    queries (the page fetches one extra row to know if there are more). Same visibility as Office > Chats."""
+    from django.db.models import OuterRef, Subquery
+
+    from chat import services as chat_services
+    from chat.models import Message
+
+    first = Message.objects.filter(conversation=OuterRef("pk"), role=Message.USER).order_by("created_at").values("text")[:1]
+    found = list(chat_services.person_conversations(user, email).annotate(preview=Subquery(first)).order_by("-created_at")[:limit + 1])
+    return {"rows": [{"id": str(c.pk), "at": _iso(c.created_at), "messages": c.message_count, "first_question": c.preview or "", "href": _href("office_chat", c.pk)}
+                     for c in found[:limit]], "more": len(found) > limit}

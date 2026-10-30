@@ -1,0 +1,9 @@
+{% load office_tags %}{% comment %}The person's chats with the assistant: newest few, link to all (Office > Chats, same permission). Kept 90 days, so older ones are gone.{% endcomment %}
+<section class="o-card" data-person-chats aria-labelledby="p-chats"><h2 id="p-chats" class="o-h3">Chats with the assistant</h2>
+  {% if chats.rows %}
+  <ul class="o-rows" data-chat-list>
+    {% for c in chats.rows %}<li><a class="o-rowlink" href="{{ c.href }}">{{ c.at|dm }}</a> <span class="o-cell-sub">{{ c.messages }} message{{ c.messages|pluralize }}{% if c.first_question %} &middot; {{ c.first_question|truncatechars:80 }}{% endif %}</span></li>{% endfor %}
+  </ul>
+  <p><a class="o-quiet" href="{{ chats_all_url }}" data-chats-all>See all in Chats</a></p>
+  {% else %}<p class="o-empty-line">No chats kept. Chats are deleted after 90 days.</p>{% endif %}
+</section>

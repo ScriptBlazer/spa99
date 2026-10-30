@@ -126,6 +126,12 @@ Never edit or delete a migration that is already live.
 - `setup_live` fills the number, message and better-prices message (empty fields only) instead of the link. The column `discount_contact_url` stays, unused.
 - **Rollback is safe:** all three new columns have a database default, so 1.0.2 can still save Settings (checked: 1.0.2's code saves `SiteSettings` on the 0025 schema). The WhatsApp links on 1.0.2 use the old link, which 1.0.3 does not clear, so they keep working.
 
+## Next release (Office additions: heard via, chats card, Invited list)
+
+- **No migration, no backfill.**
+- **After deploy**, refresh the stored figures so Analytics shows "How people heard about us" (the hourly roll-up also does it): `docker compose exec web python manage.py shell -c "from office import snapshots; snapshots.build_everything()"`.
+- The Invited page (`/invited/`) is Admin and above only.
+
 ## What is kept, and for how long
 
 Nothing grows without limit on disk: every container's log is capped at 5 x 10 MB (`docker-compose.yml`), and the server holds no app data.

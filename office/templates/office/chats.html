@@ -3,11 +3,12 @@
 {% block title %}Chats | Spa 99 Office{% endblock %}
 {% block main %}
 <h1 class="sr-only">Chats</h1>
-<p class="o-totalline">Ask us conversations, newest first. Kept for 90 days, then deleted. View only.</p>
+<p class="o-totalline">{% if person %}Chats with {{ person.label }}{% else %}Ask us conversations{% endif %}, newest first. Kept for 90 days, then deleted. View only.
+  {% if person %}{% if person.url %}<a class="o-quiet" href="{{ person.url }}">Back to the page</a> {% endif %}<a class="o-quiet" href="{% url 'office_chats' %}" data-clear>All chats</a>{% endif %}</p>
 <div class="o-card o-tablecard">
   <table class="o-list">
     <caption class="sr-only">Ask us chats</caption>
-    <thead><tr><th scope="col">Started</th><th scope="col">First question</th><th scope="col">Who</th><th scope="col" class="num">Messages</th><th scope="col" class="num">Cost</th><th scope="col">Note</th></tr></thead>
+    <thead><tr><th scope="col">Started</th><th scope="col">First question</th><th scope="col">Who</th><th scope="col" class="num">Messages</th>{% if show_cost %}<th scope="col" class="num">Cost</th>{% endif %}<th scope="col">Note</th></tr></thead>
     <tbody>
     {% for c in rows %}
       <tr class="o-row">
@@ -15,11 +16,11 @@
         <td>{{ c.preview|default:""|truncatechars:80 }}</td>
         <td>{% if c.user %}{{ c.user.email }}{% elif c.lead_email %}{{ c.lead_email }}{% else %}Anonymous{% endif %}</td>
         <td class="num">{{ c.message_count }}</td>
-        <td class="num">{{ c.total_cost_pence|floatformat:2 }}p</td>
+        {% if show_cost %}<td class="num">{{ c.total_cost_pence|floatformat:2 }}p</td>{% endif %}
         <td>{% if c.ended_off_topic %}Closed: off-topic{% endif %}{% if c.ended_by_cap %} Stopped by the spending cap{% endif %}</td>
       </tr>
-    {% empty %}<tr class="o-empty-row"><td colspan="6"><p>No chats yet.</p></td></tr>{% endfor %}
-    {% if has_next %}<tr class="o-more-row"><td colspan="6"><a class="btn btn-secondary btn-sm" href="?page={{ page|add:1 }}">Older chats</a></td></tr>{% endif %}
+    {% empty %}<tr class="o-empty-row"><td colspan="{% if show_cost %}6{% else %}5{% endif %}"><p>No chats yet.</p></td></tr>{% endfor %}
+    {% if has_next %}<tr class="o-more-row"><td colspan="{% if show_cost %}6{% else %}5{% endif %}"><a class="btn btn-secondary btn-sm" href="?{% if person %}{{ person.query }}&amp;{% endif %}page={{ page|add:1 }}">Older chats</a></td></tr>{% endif %}
     </tbody>
   </table>
 </div>

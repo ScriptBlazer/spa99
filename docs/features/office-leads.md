@@ -45,3 +45,10 @@ One row per address, driven by that address's latest session (DB-side `Exists` a
 
 - No `Lead` table and no event table (the brief suggested them): the list and timeline read the existing tables. Trade-off: `Lower(lead_email)` is not indexed, so very large lead tables would want a stored lower-cased column or a `Lead` model later (that would need a backfill script with a dry run, never a migration).
 - No migration was needed (`OfficeSnapshot.page` is free text).
+
+## Office additions (2026-10-30)
+
+- **Heard about us** (journey answer `heard_via`, from the latest session that drives the row): Leads column (wide screens), filter `heard=<option value>` (options from the question), a CSV column `heard_via`. Person and lead pages show it under the name (`heard_via` in the context: the latest journey that answered, plus the typed "Where?").
+- **Gave email in chat**: filter `chat=1` = a real (not System test) `Conversation.lead_email` matches the address (any case, `Exists` over `Lower`). Rows get a "via chat" tag; CSV column `gave_email_in_chat`. Chats older than 90 days are pruned, so the tag goes with them.
+- **Chats with the assistant** card on person and lead pages (`office/_chats_card.html`, `profile.chats_card`): conversations by `Conversation.user`, the account's journey session, `lead_email`, or the chat's journey session having left that email; newest 5 (date, messages, first question, link to the chat page) and "See all in Chats" (`/chats/?user=<account id>` or `/chats/?lead=<lead id>`, ids never addresses; a bad id is 404). Same permission as Chats (Office level and up, view only). Not loaded for HTMX timeline fragments.
+- No migration.

@@ -8,6 +8,7 @@
 <header class="o-detail-head o-detail-head--person">
   <h1 class="o-person-name">{{ person.name|default:person.email }}</h1>
   <p class="o-lead" data-person-line>{% if person.kind == "lead" %}Lead since {{ person.first_seen|dmy }} &middot; last seen {{ person.last_seen|relative:True }}{% else %}{% if person.interest %}Registered {{ person.interest.registered|dmy }}{% endif %}{% with c=person.consent.lead.0 %}{% if c and person.interest %} &middot; lead since {{ c.at|dm }}{% endif %}{% endwith %}{% endif %}</p>
+  {% if heard_via %}<p class="o-lead" data-person-heard>Heard about us: {{ heard_via }}</p>{% endif %}
   <p class="o-badges" data-person-badges>
     {% include "office/_lead_status.html" with status=person_status %}
     {% if person.is_staff or person_status != "gold" %}<span class="o-badge o-badge--type">{% if person.is_staff %}Team{% elif person.kind == "lead" %}No account{% elif person.interest.plan %}Member, {{ person.interest.plan }}{% else %}Member{% endif %}</span>{% endif %}{# the status pill already says Gold member (Moishe, 2026-10-27) #}
@@ -20,6 +21,7 @@
     {% if person.unlinked_journeys %}<section class="o-card" data-person-unlinked><h2 class="o-h3">Left this email without signing in</h2><p class="o-sub">{{ person.unlinked_journeys|length }} journey{{ person.unlinked_journeys|length|pluralize }} left this address but {{ person.unlinked_journeys|length|pluralize:"is,are" }} not linked to this account.</p></section>{% endif %}
   </div>
   <aside class="o-detail-rail">
+    {% include "office/_chats_card.html" %}
     {% include "office/_profile_rail.html" %}
     {% if office_can.can_export or office_can.can_delete %}
     <section class="o-card" data-person-data aria-labelledby="p-data"><h2 id="p-data" class="o-h3">Data</h2>

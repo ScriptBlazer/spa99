@@ -63,6 +63,22 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 .o-empty-row tr:hover td, .o-empty-row:hover td, .o-more-row:hover td { background: none; }
 .o-empty-row p { color: var(--office-muted); margin-inline: auto; }
 
+/* ---------- no clipping on desktop (People, Invited, Leads): short values stay on one line, long names and emails get an
+   ellipsis (the cell has a title), the least important columns step aside by width, and a last-resort scroll in the narrow band ---------- */
+@media (min-width: 64em) {
+  .o-list td { white-space: nowrap; }
+  .o-list .c-name { max-width: 13rem; }
+  .o-list .c-name .o-rowlink { display: block; overflow: hidden; text-overflow: ellipsis; }
+  .o-list .c-email { max-width: 15rem; }
+  .o-list .c-lists { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
+}
+/* The table card has a max width, so columns are chosen by what always fits, not by screen size (Moishe 2026-10-30):
+   Marketing and Journey (o-hide-lg) are left out on every desktop width (they stay on the person page and in the filters);
+   Sale price and Lists (o-hide-md) leave below 90em. Phones are untouched (they have their own card layout). */
+@media (min-width: 64em) { .o-hide-lg { display: none; } }
+@media (min-width: 64em) and (max-width: 89.99em) { .o-hide-md { display: none; } }
+@media (min-width: 64em) { .o-tablecard { overflow-x: auto; } }   /* last resort at any width: reachable by scrolling, never cut off */
+
 /* ---------- the list: phone cards, one surface card per row ---------- */
 @media (max-width: 63.99em) {
   .o-tablecard { padding: 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; }
@@ -79,7 +95,8 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
   .o-row .c-invite span { display: inline; }
   .o-row .c-invite .o-sub { display: inline; margin-left: var(--space-2); }
   .o-row .c-potential, .o-row .c-status { color: inherit; }
-  .o-row .c-marketing, .o-row .c-action { display: none; }
+  .o-row .c-marketing, .o-row .c-action, .o-row .c-lists { display: none; }   /* Invited list: the lists are on wide screens only */
+  .o-row .c-clicked, .o-row .c-expired { order: 4; flex: none; font-size: var(--text-sm); color: var(--office-muted); }
   .o-empty-row, .o-more-row { display: block; }
   .o-empty-row td, .o-more-row td { text-align: center; padding: var(--space-3); }
   .o-list .o-badge-ctx { display: inline; }
