@@ -32,7 +32,7 @@
 /* ---------- filters on Leads: more controls, same bar ---------- */
 .o-filters-body .o-select { min-width: 9rem; }
 .o-filters .o-seg-item { padding: 0 var(--space-2); }
-.o-totalline .o-export { margin-left: auto; }
+.o-totalline .o-export { margin-left: var(--space-3); }   /* beside the count, not pinned to the far right: the table card is only as wide as its content (Moishe 2026-10-30) */
 .o-export--sheet { display: none; }
 @media (max-width: 63.99em) { .o-export--bar { display: none; } .o-export--sheet { display: inline-flex; } }
 .o-filter-group--chip { align-self: flex-end; }

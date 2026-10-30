@@ -18,7 +18,7 @@
 .o-filters-body { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); }
 .o-filter-label { display: block; margin-bottom: 4px; font-size: var(--office-text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--office-muted); }
 .o-filter-group .o-seg { min-width: 14rem; }
-.o-export { margin-left: auto; }
+.o-export { margin-left: var(--space-3); }
 .o-totalline { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); font-size: var(--text-sm); color: var(--office-muted); max-width: none; }
 .o-totalline .o-quiet { min-height: 2rem; }
 .o-noscript-apply { display: none; }
@@ -78,7 +78,7 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 }
 /* Laptop widths: the email sits under the name (same info, one column less); its own column is back from 90em. */
 .o-list .o-email-sub { display: none; }   /* .o-list: beats .o-cell-sub (display: block) loaded later */
-@media (min-width: 64em) and (max-width: 89.99em) { .o-list .o-email-col { display: none; } .o-list .o-email-sub { display: block; } }
+@media (min-width: 64em) and (max-width: 119.99em) { .o-list .o-email-col { display: none; } .o-list .o-email-sub { display: block; } }   /* email under the name up to big screens: one column less so every column fits */
 /* Every column is shown on desktop (Moishe 2026-10-30: all the info, truncated only if it must be). Long text uses the shared
    truncate with a cap per column; the card scrolls sideways only as a last resort. */
 /* Last resort at any width: reachable by scrolling, never cut off. The card is then a scroll box, so the sticky header would
