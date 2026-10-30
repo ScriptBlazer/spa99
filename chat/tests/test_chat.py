@@ -240,7 +240,9 @@ class ReplyTests(ChatTestCase):
         self.assertEqual((call["model"], call["output_config"]), ("claude-opus-5-5", {"effort": "low"}))
         for banned in ("thinking", "temperature", "top_p"):
             self.assertNotIn(banned, call)
-        self.assertEqual(call["system"][-1]["cache_control"], {"type": "ephemeral"})
+        self.assertEqual(call["system"][-2]["cache_control"], {"type": "ephemeral"})  # the knowledge block is cached
+        self.assertTrue(call["system"][-1]["text"].startswith("NOW: it is "))  # the time comes after it, uncached
+        self.assertNotIn("cache_control", call["system"][-1])
         self.assertEqual([t["name"] for t in call["tools"]], ["show_handoff", "offer_email", "off_topic", "suggest_next_steps"])
 
     def test_handoff_tool_and_empty_text_fallback(self):
@@ -609,3 +611,15 @@ class OfficeChatsTests(OfficeTestCase):
         self.assertEqual(Client(HTTP_HOST=OFFICE).post("/chats/").status_code, 302)
         Conversation.objects.create(staff_test=True, message_count=1)
         self.assertEqual(len(get(viewer, "/chats/").context["rows"]), 1)  # staff tests are left out
+
+
+class NowNoteTests(TestCase):
+    def test_the_assistant_is_told_the_london_time_of_day(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from chat.services import now_note
+        london = ZoneInfo("Europe/London")
+        for hour, part in [(8, "morning"), (13, "afternoon"), (19, "evening"), (23, "night"), (2, "night"), (5, "morning")]:
+            note = now_note(datetime(2026, 10, 30, hour, 15, tzinfo=london))
+            self.assertIn(f"({part})", note, hour)
+        self.assertIn("Friday 30 October 2026, 08:15", now_note(datetime(2026, 10, 30, 8, 15, tzinfo=london)))

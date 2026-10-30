@@ -36,6 +36,15 @@ NEXT_STEPS = {"journey": ("Tailor your membership", "/journey/"), "register": ("
 
 # ---------- config the panel needs ----------
 
+
+def now_note(now=None):
+    """The current London time for the assistant, so greetings fit ("Good morning" at 8am, not "Good evening")."""
+    local = timezone.localtime(now or timezone.now())
+    hour = local.hour
+    part = "night" if hour < 5 or hour >= 22 else "morning" if hour < 12 else "afternoon" if hour < 17 else "evening"
+    return (f"NOW: it is {local:%A %-d %B %Y, %H:%M} in London ({part}). If you greet by time of day, it must match this; "
+            "otherwise just say hello.")
+
 def handoff_links(reason=""):
     site = SiteSettings.load()
     email = site.contact_address
@@ -328,7 +337,7 @@ def _reply(request, conversation):
     chars = len(system_rules()) + len(voice) + len(KNOWLEDGE_HEADER) + len(text) + sum(len(m["content"]) for m in history)
     conversation._billing = {"emitted": emitted, "usage": None, "chars": chars}  # from here the model call is billed, whatever happens
     try:
-        for kind, payload in llm.stream_reply(system_rules(), KNOWLEDGE_HEADER + text, history, voice):
+        for kind, payload in llm.stream_reply(system_rules(), KNOWLEDGE_HEADER + text, history, voice, now_note()):
             if kind == "final":
                 final = payload
                 conversation._billing["usage"] = payload["usage"]
