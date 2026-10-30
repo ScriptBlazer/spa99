@@ -261,7 +261,7 @@ function start() {
         const narrow = (charts.get('funnel')?.box || root.querySelector('[data-chart="funnel"]')).clientWidth < 520;
         return {
           type: 'bar',
-          data: { labels: names, datasets: [{ data: steps.map((s) => [-s.value / 2, s.value / 2]), backgroundColor: colours, borderRadius: 999, borderSkipped: false, barPercentage: 0.6, categoryPercentage: 1, minBarLength: 10 }] },
+          data: { labels: names, datasets: [{ data: steps.map((s) => [-s.value / 2, s.value / 2]), backgroundColor: colours, borderRadius: 999, borderSkipped: false, barPercentage: narrow ? 0.5 : 0.6, categoryPercentage: 1, minBarLength: narrow ? 24 : 10, ...(narrow ? { maxBarThickness: 24 } : {}) }] },
           options: base('funnel', {
             indexAxis: 'y', layout: { padding: { top: 0, left: narrow ? 84 : 170, right: 0 } },
             interaction: { mode: 'nearest', intersect: true },

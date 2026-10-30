@@ -41,6 +41,8 @@ Our own counter, no cookies, no personal data:
 
 Premium, calm and light (see `docs/design/OFFICE.md`: warm surfaces, soft shadows, no ruled boxes, a muted data palette), with an Apple Health feel: activity rings for goals, crisp sparklines, smooth animated charts, big numbers in the brand numerals. One self-hosted chart library (chosen in the design brief, pinned version), plus SVG rings. Mobile usable (Barry will look on his phone).
 
+**On the phone (below 64em, brief `docs/features/office-mobile.md`, 2026-10-30):** the tab bar has at most five slots: Home, Leads, People, Gold and More; More opens a sheet with Analytics, Chats and Invited (only those the person may see; the same `office_can` flags as the desktop rail). List pages show each row as one surface card on the page (title, second line, badges, meta line with the date last; the row link is the only target; no outer card). The filter sheet turns segmented controls into wrapping chips and scrolls (Export CSV lives in it on People, Leads and Invited). Every page has a header title, detail pages a back link. Cards use 16px side padding below 48em.
+
 ## Acceptance checks
 
 - `office.localhost:8000` requires staff sign-in; members and the public get no access; the public site has no link to it.

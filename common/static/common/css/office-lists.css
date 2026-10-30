@@ -18,18 +18,20 @@
 .o-filters-body { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); }
 .o-filter-label { display: block; margin-bottom: 4px; font-size: var(--office-text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--office-muted); }
 .o-filter-group .o-seg { min-width: 14rem; }
-.o-export { margin-left: auto; }
+.o-export { margin-left: var(--space-3); }
 .o-totalline { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); font-size: var(--text-sm); color: var(--office-muted); max-width: none; }
 .o-totalline .o-quiet { min-height: 2rem; }
+@media (pointer: coarse) { .o-totalline .o-quiet { min-height: 2.75rem; } }
 .o-noscript-apply { display: none; }
 html:not(.js) .o-noscript-apply { display: inline-flex; }
 .o-filters-open { gap: var(--space-2); }
 .o-filters-open .o-icon { width: 1rem; height: 1rem; }
 
 /* the phone's filter sheet */
-.o-sheet { position: fixed; inset: auto 0 0 0; margin: 0; width: 100%; max-width: none; padding: var(--space-4) var(--page-margin) calc(var(--space-4) + env(safe-area-inset-bottom)); border: 0; border-radius: var(--office-radius-lg) var(--office-radius-lg) 0 0; background: var(--office-surface); color: var(--office-text); box-shadow: var(--office-shadow-3); }
+.o-sheet { position: fixed; inset: auto 0 0 0; margin: 0; width: 100%; max-width: none; padding: var(--space-4) var(--page-margin) calc(var(--space-4) + env(safe-area-inset-bottom)); border: 0; border-radius: var(--office-radius-lg) var(--office-radius-lg) 0 0; background: var(--office-surface); color: var(--office-text); box-shadow: var(--office-shadow-3); max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; }
 .o-sheet::backdrop { background: var(--office-overlay); }
 .o-sheet[open] { animation: modal-in var(--office-dur-swap) var(--ease-soft); }
+.o-sheet .btn-block[data-sheet-close] { position: sticky; bottom: 0; box-shadow: 0 var(--space-3) 0 var(--space-3) var(--office-surface); }   /* the surface behind keeps the filters from showing through */
 .o-sheet-head h2 { font-size: var(--text-xl); margin-bottom: var(--space-3); }
 .o-sheet .o-filters-body { display: grid; gap: var(--space-4); margin-bottom: var(--space-4); }
 .o-sheet .o-filter-group .o-seg { min-width: 0; }
@@ -77,8 +79,8 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
   .o-tablecard .o-list .u-clamp-2 { max-width: 13rem; }
 }
 /* Laptop widths: the email sits under the name (same info, one column less); its own column is back from 90em. */
-.o-email-sub { display: none; }
-@media (min-width: 64em) and (max-width: 89.99em) { .o-list .o-email-col { display: none; } .o-list .o-email-sub { display: block; } }
+.o-list .o-email-sub { display: none; }   /* .o-list: beats .o-cell-sub (display: block) loaded later */
+@media (min-width: 64em) and (max-width: 119.99em) { .o-list .o-email-col { display: none; } .o-list .o-email-sub { display: block; } }   /* email under the name up to big screens: one column less so every column fits */
 /* Every column is shown on desktop (Moishe 2026-10-30: all the info, truncated only if it must be). Long text uses the shared
    truncate with a cap per column; the card scrolls sideways only as a last resort. */
 /* Last resort at any width: reachable by scrolling, never cut off. The card is then a scroll box, so the sticky header would
@@ -99,34 +101,63 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 @media (hover: hover) and (pointer: fine) { .o-row:hover .o-row-go { color: var(--office-text); } .o-row:hover .o-row-go svg { transform: translateX(3px); } }
 @media (prefers-reduced-motion: reduce) { .o-row-go svg { transition: none; } }
 
-/* ---------- the list: phone cards, one surface card per row ---------- */
+/* ---------- the list: phone cards (docs/features/office-mobile.md). One surface card per row, straight on the page.
+   Anatomy: title, second line, badges, meta line with the date last. The row link covers the card; nothing else inside is a target. ---------- */
 @media (max-width: 63.99em) {
-  .o-tablecard { padding: 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; }
+  .o-card.o-tablecard { padding: 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; }   /* .o-card is loaded later: same specificity would lose */
   .o-list, .o-list tbody { display: block; }
   .o-list tbody::before { display: none; }
   .o-list thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .o-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); margin-bottom: var(--space-2); padding: var(--space-3); background: var(--office-surface); border-radius: var(--office-radius-lg); box-shadow: var(--office-shadow-1); }
-  .o-list td, .o-list tbody tr:nth-child(even) td { display: block; height: auto; padding: 0; background: none; border-radius: 0; }
-  .o-row .c-name { order: 1; flex: 1 1 0; min-width: 0; max-width: none; }
-  .o-row .c-date { order: 2; flex: none; font-size: var(--text-sm); color: var(--office-muted); }
-  .o-row .c-email { order: 3; flex: 0 0 100%; max-width: none; }
-  .o-row .c-plan, .o-row .c-verified, .o-row .c-journey, .o-row .c-gold, .o-row .c-potential, .o-row .c-status { order: 4; flex: none; color: var(--office-muted); }
-  .o-row .c-invite { order: 5; flex: 0 0 100%; color: var(--office-muted); }
+  .o-list td, .o-list td:first-child, .o-list td:last-child { display: block; height: auto; padding: 0; border-radius: 0; }
+  .o-list tbody tr:nth-child(even) td { background: none; }   /* background only: display must not come back on even rows */
+  .o-rowlink::after { border-radius: var(--office-radius-lg); }
+  .o-list .o-row .u-truncate, .o-list .o-row .u-clamp-2, .o-list .o-row .c-email .u-truncate, .o-list .o-row .c-question .u-clamp-2 { max-width: none; }
+  .o-row .c-name { order: 1; flex: 0 0 100%; min-width: 0; max-width: none; font-weight: 600; }
+  .o-row .c-email { order: 2; flex: 0 0 100%; max-width: none; }
+  .o-row .c-plan, .o-row .c-verified, .o-row .c-payment, .o-row .c-who, .o-row .c-count, .o-row .c-cost,
+  .o-row .c-clicked, .o-row .c-opened, .o-row .c-expired { flex: none; color: var(--office-muted); }
+  .o-row .c-plan, .o-row .c-clicked, .o-row .c-potential, .o-row .c-status { order: 3; }
+  .o-row .c-verified, .o-row .c-opened { order: 4; }
+  .o-row .c-payment, .o-row .c-expired, .o-row .c-invite { order: 5; }
+  .o-row .c-gold { order: 6; flex: none; }
+  .o-row .c-potential, .o-row .c-status { flex: none; }
+  .o-row .c-invite { flex: 0 0 100%; color: var(--office-muted); }
   .o-row .c-invite span { display: inline; }
   .o-row .c-invite .o-sub { display: inline; margin-left: var(--space-2); }
-  .o-row .c-potential, .o-row .c-status { color: inherit; }
-  .o-row .c-marketing, .o-row .c-action, .o-row .c-lists { display: none; }   /* Invited list: the lists are on wide screens only */
-  .o-row .c-opened, .o-row .c-clicked, .o-row .c-expired { order: 4; flex: none; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-row .c-date { order: 9; flex: none; margin-left: auto; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-list .o-row td.c-marketing, .o-list .o-row td.c-sale, .o-list .o-row td.c-journey, .o-list .o-row td.c-action, .o-list .o-row td.c-lists { display: none; }   /* beats the zebra rule's display: block */
+  /* People: "Gold" is a plain pill here, so the card has one target; the application is one tap away on the person page */
+  .o-goldlink { display: inline-flex; align-items: center; height: 1.375rem; padding: 0 10px; border-radius: var(--office-pill); background: var(--color-gold); color: var(--office-text); font-size: var(--office-text-xs); font-weight: 600; text-decoration: none; pointer-events: none; }
+  /* Chats: the question is the title, two lines at most */
+  .o-row .c-question { order: 1; flex: 0 0 100%; font-size: var(--text-base); font-weight: 600; }
+  .o-row .c-who { order: 2; min-width: 0; max-width: 100%; }
+  .o-row .c-count { order: 3; }
+  .o-row .c-cost { order: 4; }
+  .o-row td.c-note { order: 5; flex: none; height: 1.375rem; padding: 0 10px; border-radius: var(--office-pill); background: var(--office-sunken); color: var(--office-muted); font-size: var(--office-text-xs); font-weight: 600; line-height: 1.375rem; white-space: nowrap; }
+  .o-list .o-row td.c-note:empty { display: none; }
+  .o-row .num { text-align: left; }
   .o-empty-row, .o-more-row { display: block; }
-  .o-empty-row td, .o-more-row td { text-align: center; padding: var(--space-3); }
+  .o-list .o-empty-row td, .o-list .o-more-row td { text-align: center; padding: var(--space-3); }
   .o-list .o-badge-ctx { display: inline; }
 }
+@media (max-width: 63.99em) and (prefers-reduced-motion: no-preference) {
+  .o-row { transition: transform var(--office-dur-lift) var(--ease-soft); }
+  .o-row:active { transform: scale(0.99); }
+}
+.o-hint summary { list-style: none; cursor: pointer; }
+.o-hint summary::-webkit-details-marker { display: none; }
+.o-hint .o-sub { margin-bottom: var(--space-2); }
+.o-main > .o-sub { margin-bottom: var(--space-3); }
+.o-chat { margin: 0; padding: var(--space-4) var(--space-3); list-style: none; }
+.o-chat li + li { margin-top: var(--space-4); }
+.o-chat-text { white-space: pre-wrap; overflow-wrap: break-word; }
 @media (min-width: 64em) { .o-list .o-badge-ctx { display: none; } }
 @media (min-width: 48em) and (max-width: 63.99em) { .o-search { flex-basis: 16rem; } }
 
 /* ---------- details: label and value rows separated by space ---------- */
 .o-detail-head { margin-bottom: var(--space-4); }
-.o-detail-head h1 { font-size: var(--text-xl); }
+.o-detail-head h1 { font-size: var(--text-xl); overflow-wrap: break-word; }
 @media (min-width: 64em) { .o-detail-head h1 { font-size: var(--text-2xl); } }
 .o-detail-head .o-lead { margin-top: var(--space-2); }
 .o-detail-head .o-badges { margin-top: var(--space-3); }
@@ -164,9 +195,9 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 /* the phone's decision bar replaces the tab bar: tone, blur and an upward shadow, no line */
 .o-bar { display: none; }
 @media (max-width: 63.99em) {
-  .o-bar { position: fixed; inset: auto 0 0 0; z-index: 20; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--page-margin) calc(var(--space-3) + env(safe-area-inset-bottom)); background: var(--office-bar-strong); -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); box-shadow: var(--office-shadow-bar); }
-  .o-bar .o-state { flex: 1; margin: 0; }
-  .o-bar-actions { display: flex; flex: 2; gap: var(--space-3); }
+  .o-bar { position: fixed; inset: auto 0 0 0; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--page-margin) calc(var(--space-3) + env(safe-area-inset-bottom)); background: var(--office-bar-strong); -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); box-shadow: var(--office-shadow-bar); }
+  .o-bar .o-state { flex: 1 1 auto; margin: 0; }   /* wraps onto its own line above the buttons when they need the room */
+  .o-bar-actions { display: flex; flex: 2 1 14rem; gap: var(--space-3); }
   .o-bar-actions:has(.o-act--resend) { flex: none; }
   .o-bar .o-act { margin: 0; }
   .o-bar .o-act--decline { flex: 1; }
@@ -231,6 +262,7 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 /* Gold: "Said NO to doing business with BML" (2026-10-29, Barry). Danger red with cream text (8.07 contrast), the loudest thing on the page; it never blocks approval. */
 .o-alert { display: grid; gap: var(--space-1); margin-bottom: var(--space-4); padding: var(--space-4) var(--space-5); border-radius: var(--office-radius); background: var(--office-danger); color: var(--color-cream); }
 .o-alert > * { margin: 0; max-width: none; }
+@media (max-width: 47.99em) { .o-alert { padding: var(--space-3) var(--space-4); } .o-detail-rail .o-card > .o-state--approved { margin-inline: calc(var(--space-3) * -1); padding-inline: var(--space-3); } }
 .o-alert-title { font-size: var(--text-xl, 1.5rem); font-weight: 700; line-height: var(--leading-snug); }
 .o-alert-sub { font-size: var(--text-sm); }
 .o-badge--no-business { background: var(--office-danger); color: var(--color-cream); margin-left: var(--space-2); }
@@ -247,3 +279,7 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
   .o-tablecard:not(:has(.o-list--leads)) { width: fit-content; max-width: 100%; }   /* Leads keeps its fixed column plan */
   .o-tablecard .o-list:not(.o-list--leads) { width: auto; }
 }
+
+/* the person page's chats card: each link's overlay is held inside its own row (it used to cover the whole card) */
+[data-chat-list] li { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-2); min-height: 2.75rem; padding-block: var(--space-1); }
+[data-chat-list] .o-cell-sub { flex: 1 1 100%; }

@@ -4,10 +4,10 @@
   <td class="c-email o-email-col" data-col="email">{% truncated p.email %}</td>
   <td class="c-plan" data-col="plan">{{ p.plan }}</td>
   <td class="c-verified" data-col="verified">{% if p.verified %}Verified{% else %}Not yet{% endif %}</td>
-  <td class="c-marketing o-hide-lg" data-col="marketing"><span class="o-only-wide">{% if p.marketing %}Yes{% else %}No{% endif %}</span></td>
-  <td class="c-sale o-hide-md" data-col="sale">{{ p.sale }}</td>
+  <td class="c-marketing" data-col="marketing"><span class="o-only-wide">{% if p.marketing %}Yes{% else %}No{% endif %}</span></td>
+  <td class="c-sale" data-col="sale">{{ p.sale }}</td>
   <td class="c-payment" data-col="payment">{{ p.payment }}</td>
-  <td class="c-journey o-hide-lg" data-col="journey">{{ p.journey|journey_label }}</td>
+  <td class="c-journey" data-col="journey">{{ p.journey|journey_label }}</td>
   <td class="c-date num" data-col="registered"><span class="o-only-wide">{{ p.registered|dt }}</span><span class="o-only-narrow">{{ p.registered|relative }}</span></td>
   <td class="c-gold" data-col="gold">{% if p.gold_application_id %}<a class="o-goldlink" href="{% url 'office_gold_application' p.gold_application_id %}">Gold</a>{% endif %}</td>
 </tr>
