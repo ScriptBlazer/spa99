@@ -87,7 +87,7 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 
 /* ---------- widths: the action column hugs its content at the right, the rest share the card; long text gets the shared
    truncate (common text_tags) with a sensible cap per column so nothing pushes the table wide ---------- */
-.o-list th:last-child:has(.sr-only), .o-list td.c-action { width: 1%; white-space: nowrap; text-align: right; }
+.o-list th:last-child:has(.sr-only), .o-list td.c-action { width: 1px; white-space: nowrap; text-align: right; }   /* 1px, not 1%: a percentage makes an auto table stretch to the full width */
 .o-list .u-truncate { max-width: 14rem; }
 .o-list .c-email .u-truncate { max-width: 14rem; }
 .o-list .u-clamp-2 { max-width: 16rem; }
@@ -240,3 +240,10 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 /* Gold list: the Invite column only shows when a row on screen has an invite (approved people). Waiting and Declined views
    have none, so the column steps aside (Moishe 2026-10-30). Pure CSS, so it follows the filters as rows are swapped in. */
 .o-list--gold:not(:has(td.c-invite:not([data-invite-state=""]))) .c-invite { display: none; }
+
+/* Desktop: the table card is as wide as its content needs, up to the page width, so a short list is not stretched across a
+   big screen with empty gaps between columns (Moishe 2026-10-30). Many columns still fill the width and wrap or truncate. */
+@media (min-width: 64em) {
+  .o-tablecard:not(:has(.o-list--leads)) { width: fit-content; max-width: 100%; }   /* Leads keeps its fixed column plan */
+  .o-tablecard .o-list:not(.o-list--leads) { width: auto; }
+}
