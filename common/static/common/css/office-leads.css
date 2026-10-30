@@ -41,6 +41,8 @@
 .o-filters-bar .o-search { flex: 1 1 14rem; max-width: 20rem; }
 .o-filter-group .o-seg[style*="--n: 4"] { min-width: 16rem; }
 .o-filter-group .o-seg[style*="--n: 3"] { min-width: 17rem; }
+.o-filter-group .o-seg[style*="--n: 5"] { min-width: 28rem; }
+.o-sheet .o-seg[style*="--n: 5"] .o-seg-item { padding: 0 var(--space-1); white-space: normal; font-size: var(--office-text-xs); }   /* five options fit a phone: tighter, may wrap to two lines */
 .o-sheet .o-filter-group .o-seg, .o-sheet .o-select { min-width: 0; }
 .o-sheet .o-filters-body .o-export--sheet { margin-left: 0; align-self: stretch; width: 100%; }
 .o-sheet .o-filter-group--chip { align-self: start; }

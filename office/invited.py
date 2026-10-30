@@ -20,7 +20,7 @@ logger = logging.getLogger("spa99.office")
 
 QUALIFYING = (Invite.SENT, Invite.OPENED)
 STATES = ("unclicked", "opened", "clicked", "expired", "all")
-STATE_LABELS = [("unclicked", "Not clicked"), ("opened", "Opened, not clicked"), ("clicked", "Clicked the link"), ("expired", "Expired"), ("all", "All")]
+STATE_LABELS = [("unclicked", "Not clicked"), ("opened", "Opened"), ("clicked", "Clicked the link"), ("expired", "Expired"), ("all", "All")]
 DEFAULT_STATE = "unclicked"  # the people to chase: invited and never clicked or registered
 CSV_CHUNK = 200
 

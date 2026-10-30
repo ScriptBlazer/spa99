@@ -60,6 +60,13 @@ class BounceLogTests(PostmarkBase):
         self.assertEqual(EmailBounce.objects.get(email="soft@x.com").received_at.isoformat(), "2026-10-29T10:00:00+00:00")
         self.assertEqual(sorted(EmailSuppression.objects.values_list("email", flat=True)), ["hard@x.com", "spam@x.com"])
 
+    def test_a_broken_bounce_log_never_stops_suppression(self):
+        from unittest import mock
+        with mock.patch("notifications.bouncelog.record", side_effect=RuntimeError("boom")):
+            response = self.post({"RecordType": "Bounce", "Type": "HardBounce", "ID": 9, "Email": "dead@x.com"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(EmailSuppression.objects.filter(email="dead@x.com").exists())
+
     def test_the_same_postmark_record_is_stored_once(self):
         record = {"RecordType": "Bounce", "Type": "HardBounce", "ID": 9, "Email": "a@x.com"}
         self.post(record)

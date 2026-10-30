@@ -205,7 +205,7 @@ class InvitedTests(OfficeTestCase):
         self.invite("d@x.com", email_opened_at=now, expires_at=now - timedelta(days=1))  # opened, but expired
         self.assertEqual(self.emails("state=opened"), ["a@x.com"])
         self.assertEqual(self.emails("state=all"), ["a@x.com", "b@x.com", "c@x.com", "d@x.com"])
-        self.assertIn("Opened, not clicked", get(self.admin, "/invited/").content.decode())
+        self.assertIn("Opened email", get(self.admin, "/invited/").content.decode())
         with CaptureQueriesContext(connection) as small:
             get(self.admin, "/invited/?state=all")
         self.invite("e@x.com", email_opened_at=now)

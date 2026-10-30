@@ -96,7 +96,7 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
   .o-row .c-invite .o-sub { display: inline; margin-left: var(--space-2); }
   .o-row .c-potential, .o-row .c-status { color: inherit; }
   .o-row .c-marketing, .o-row .c-action, .o-row .c-lists { display: none; }   /* Invited list: the lists are on wide screens only */
-  .o-row .c-clicked, .o-row .c-expired { order: 4; flex: none; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-row .c-opened, .o-row .c-clicked, .o-row .c-expired { order: 4; flex: none; font-size: var(--text-sm); color: var(--office-muted); }
   .o-empty-row, .o-more-row { display: block; }
   .o-empty-row td, .o-more-row td { text-align: center; padding: var(--space-3); }
   .o-list .o-badge-ctx { display: inline; }
