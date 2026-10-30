@@ -80,7 +80,7 @@ class ChatsCardTests(OfficeTestCase):
 
     def test_lead_page_lists_only_his_chats_newest_five_and_filters_chats(self):
         session = lead("hugo@example.com")
-        mine = [chat("Hugo@Example.com", question=f"Q{i}") for i in range(6)]
+        mine = [chat("Hugo@Example.com", question=f"Hugo question {i}.") for i in range(6)]  # spaces: a random CSRF token can never match
         chat("other@example.com", question="Not his")
         chat("hugo@example.com", question="Staff test", staff_test=True)
         page = get(self.office, f"/leads/{session.pk}/")
@@ -88,11 +88,11 @@ class ChatsCardTests(OfficeTestCase):
         self.assertNotContains(page, "Not his")
         self.assertNotContains(page, "Staff test")
         self.assertContains(page, "data-chats-all")
-        self.assertContains(page, "Q5")
-        self.assertNotContains(page, "Q0")  # the sixth, oldest one is behind the link
+        self.assertContains(page, "Hugo question 5.")
+        self.assertNotContains(page, "Hugo question 0.")  # the sixth, oldest one is behind the link
         self.assertContains(page, f"/chats/{mine[5].pk}/")
         full = get(self.office, f"/chats/?lead={session.pk}")
-        self.assertContains(full, "Q0")
+        self.assertContains(full, "Hugo question 0.")
         self.assertNotContains(full, "Not his")
         self.assertEqual(get(self.office, "/chats/?lead=not-a-uuid").status_code, 404)
         self.assertEqual(get(self.office, f"/chats/?lead={uuid4()}").status_code, 404)
