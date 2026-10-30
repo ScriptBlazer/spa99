@@ -114,6 +114,11 @@
 
 /* ---------- main ---------- */
 .o-main { padding: var(--space-3) var(--page-margin) var(--space-5); max-width: 80rem; }
+/* Big screens (Moishe 2026-10-30): only the list pages (People, Leads, Invited, Gold, Chats) get more width, so every column
+   fits without being cut off. Dashboard, Analytics and the rest grow only a little (88rem) at the normal text size (full width looked too big). */
+@media (min-width: 100em) { .o-main { max-width: 88rem; } }
+@media (min-width: 100em) { :is([data-office-section="people"], [data-office-section="leads"], [data-office-section="invited"], [data-office-section="gold"], [data-office-section="chats"]) .o-main { max-width: 100rem; } }
+@media (min-width: 120em) { :is([data-office-section="people"], [data-office-section="leads"], [data-office-section="invited"], [data-office-section="gold"], [data-office-section="chats"]) .o-main { max-width: 112rem; } }
 .o-main:focus { outline: none; }
 @media (min-width: 64em) { .o-main { padding: var(--space-5); } }
 .o-main[aria-busy="true"] .o-dash, .o-main[aria-busy="true"] .o-chartbox, .o-main[aria-busy="true"] .o-ranked { opacity: 0.5; }

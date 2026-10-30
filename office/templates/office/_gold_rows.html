@@ -1,12 +1,12 @@
-{% load office_tags %}{% for g in rows %}
+{% load office_tags text_tags %}{% for g in rows %}
 <tr class="o-row" data-gold-row data-status="{{ g.status }}" data-potential="{{ g.potential }}">
-  <td class="c-name" data-col="name"><a class="o-rowlink" href="{% url 'office_gold_application' g.id %}">{{ g.name }}</a>{% include "office/_business_badge.html" with value=g.business_willing %}</td>
+  <td class="c-name" data-col="name"><a class="o-rowlink" href="{% url 'office_gold_application' g.id %}">{% truncated g.name %}</a>{% include "office/_business_badge.html" with value=g.business_willing %}</td>
   <td class="c-potential" data-col="potential">{% include "office/_badge.html" with potential=g.potential %}</td>
   <td class="c-status" data-col="status">{% include "office/_badge.html" with status=g.status %}{% if g.sent_back %} <span class="o-badge o-badge--s-sent-back" data-sent-back>Sent back</span>{% endif %}</td>
   <td class="c-invite" data-col="invite" data-invite-state="{{ g.invite.state }}">{% include "office/_invite_state.html" with invite=g.invite %}</td>
   <td class="c-date num" data-col="applied"><span class="o-only-wide">{{ g.applied|dt }}</span><span class="o-only-narrow">{{ g.applied|relative }}</span></td>
   <td class="c-action" data-col="action">{# no quick approve here: decisions are made on the application page (Moishe, 2026-10-26) #}
-    <a class="btn btn-secondary btn-sm" href="{% url 'office_gold_application' g.id %}" data-view-application>View application<span class="sr-only"> {{ g.name }}</span></a></td>
+    <span class="o-row-go" aria-hidden="true">View application{% include "office/_icon.html" with name="chevron-right" %}</span></td>
 </tr>
 {% empty %}<tr class="o-empty-row" data-empty><td colspan="6"><p>No applications here.</p></td></tr>{% endfor %}
 {% if has_next %}<tr class="o-more-row" data-more-row><td colspan="6"><a class="btn btn-secondary btn-sm" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}

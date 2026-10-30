@@ -57,13 +57,15 @@
           </fieldset></div>
         <div class="o-filter-group"><label class="o-filter-label" for="f-industry">Industry</label>
           <select id="f-industry" name="industry" class="o-select"><option value="">All industries</option>{% for i in choices.industries %}<option value="{{ i.value }}"{% if filters.industry == i.value %} selected{% endif %}>{{ i.label }}</option>{% endfor %}</select></div>
+        <div class="o-filter-group"><label class="o-filter-label" for="f-heard">Heard about us</label>
+          <select id="f-heard" name="heard" class="o-select"><option value="">Any answer</option>{% for h in choices.heard %}<option value="{{ h.value }}"{% if filters.heard == h.value %} selected{% endif %}>{{ h.label }}</option>{% endfor %}</select></div>
         <div class="o-filter-group"><label class="o-filter-label" for="f-sort">Sort by</label>
           <select id="f-sort" name="sort" class="o-select" data-default="{{ site_defaults.leads_sort }}">
             <option value="last_seen"{% if filters.sort == "last_seen" %} selected{% endif %}>Last seen</option>
             <option value="first_seen"{% if filters.sort == "first_seen" %} selected{% endif %}>First seen</option>
             <option value="potential"{% if filters.sort == "potential" %} selected{% endif %}>Highest potential</option>
             <option value="visits"{% if filters.sort == "visits" %} selected{% endif %}>Most visits</option></select></div>
-        <div class="o-filter-group o-filter-group--chip"><label class="o-chip"><input type="checkbox" name="gold" value="yes"{% if filters.gold %} checked{% endif %}><span>Applied for Gold</span></label></div>
+        <div class="o-filter-group o-filter-group--chip"><label class="o-chip"><input type="checkbox" name="gold" value="yes"{% if filters.gold %} checked{% endif %}><span>Applied for Gold</span></label><label class="o-chip"><input type="checkbox" name="chat" value="1"{% if filters.chat %} checked{% endif %}><span>Gave email in chat</span></label></div>
         {% if office_can.can_export %}<a class="btn btn-secondary btn-sm o-export o-export--sheet" href="{% url 'office_leads_csv' %}?{{ request.GET.urlencode }}" data-export-csv data-export-base="{% url 'office_leads_csv' %}">Export CSV</a>{% endif %}
       </div>
     </div>
@@ -81,7 +83,7 @@
 <div class="o-card o-tablecard" data-list-card>
   <table class="o-list o-list--leads">
     <caption class="sr-only">Leads</caption>
-    <thead><tr><th scope="col">Lead</th><th scope="col">Wants</th><th scope="col">Suggested</th><th scope="col">Potential</th><th scope="col" class="o-wide-xl">Industry</th><th scope="col">Source</th><th scope="col" class="num o-wide-xl">Visits</th><th scope="col">Status</th><th scope="col" class="num">Last seen</th></tr></thead>
+    <thead><tr><th scope="col">Lead</th><th scope="col">Wants</th><th scope="col">Suggested</th><th scope="col">Potential</th><th scope="col" class="o-wide-xl">Industry</th><th scope="col">Source</th><th scope="col" class="o-wide-xl">Heard via</th><th scope="col" class="num o-wide-xl">Visits</th><th scope="col">Status</th><th scope="col" class="num">Last seen</th></tr></thead>
     <tbody data-region="list" data-office-list="leads">{% include "office/_leads_rows.html" %}</tbody>
   </table>
 </div>

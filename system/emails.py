@@ -10,7 +10,7 @@ from django.utils import timezone
 from mailings import blocks as mailing_blocks, segments
 from mailings.models import ContactList, EmailOptOut, Invite, Mailing
 from notifications import emailbody, ses
-from notifications.models import EmailLog, EmailSuppression, NotificationTemplate
+from notifications.models import EmailBounce, EmailLog, EmailSuppression, NotificationTemplate
 from notifications.seed import DEFAULT_SUBJECTS
 
 from . import defaults
@@ -45,6 +45,25 @@ def overview(request=None):
         "recent_mailings": list(Mailing.objects.all()[:d.recent_mailings]),
         "recent_invite_batches": invite_batches()[:d.recent_batches],
     }
+
+
+# ---------- bounces ----------
+
+def bounces_week():
+    """Bounces and complaints logged in the last 7 days (indexed on received_at)."""
+    return EmailBounce.objects.filter(received_at__gte=timezone.now() - datetime.timedelta(days=7)).count()
+
+
+def bounce_rows(kind=""):
+    """The latest 500 bounce records (optionally one kind), each with `suppressed` (the address is on the suppression list; one query)."""
+    found = EmailBounce.objects.all()
+    if kind in dict(EmailBounce.KIND_CHOICES):
+        found = found.filter(kind=kind)
+    rows = list(found[:500])
+    suppressed = set(EmailSuppression.objects.filter(email__in={r.email for r in rows}).values_list("email", flat=True))
+    for row in rows:
+        row.suppressed = row.email in suppressed
+    return rows
 
 
 # ---------- automatic emails ----------

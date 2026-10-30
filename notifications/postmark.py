@@ -1,8 +1,9 @@
-"""Postmark bounce and spam-complaint webhooks (the launch mail provider; SES feedback is in notifications/sns.py).
+"""Postmark webhooks (the launch mail provider; SES feedback is in notifications/sns.py).
 
-Postmark POSTs JSON to /postmark/webhook/ with HTTP Basic credentials taken from the webhook URL. A permanent bounce or a
-spam complaint puts the address on the same suppression list as SES feedback (notifications.suppression). Soft and
-transient bounces are not stored."""
+Postmark POSTs JSON to /postmark/webhook/ with HTTP Basic credentials taken from the webhook URL. Every Bounce and
+SpamComplaint record goes in the System bounce log (notifications.bouncelog, soft ones too). A permanent bounce or a spam
+complaint also puts the address on the same suppression list as SES feedback (notifications.suppression); soft and transient
+bounces never suppress. An Open record marks the invite email as opened (the invite's metadata token; first open only)."""
 import base64
 import binascii
 import hmac
@@ -11,7 +12,7 @@ import logging
 
 from django.conf import settings
 
-from . import suppression
+from . import bouncelog, suppression
 from .models import EmailSuppression
 
 logger = logging.getLogger("spa99.email")
@@ -49,6 +50,10 @@ def apply(record):
     kind = _text(record.get("RecordType"))
     email = _text(record.get("Email"))
     feedback_id = str(record.get("ID") or record.get("MessageID") or "")
+    if kind == "Open":
+        return _opened(record)
+    if kind in ("Bounce", "SpamComplaint"):
+        _log_bounce(record, kind)
     if kind == "SpamComplaint":
         return int(suppression.add(email, EmailSuppression.COMPLAINT, feedback_id, _detail(record)))
     if kind == "Bounce":
@@ -61,6 +66,23 @@ def apply(record):
         return 0
     logger.debug("Postmark feedback: %s ignored", kind)
     return 0
+
+
+def _log_bounce(record, kind):
+    """The bounce log is a side record: it must never stop the suppression below, so a failure is logged and swallowed."""
+    try:
+        bouncelog.record(record, kind)
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not store the Postmark bounce record")
+
+
+def _opened(record):
+    """An invite email was opened. The invite comes from the Metadata we put on it; no metadata means no match (never by address)."""
+    from mailings import invites
+
+    metadata = record.get("Metadata")
+    token = metadata.get("invite") if isinstance(metadata, dict) else None
+    return invites.mark_email_opened(token, bouncelog.when(record, "ReceivedAt"))
 
 
 def _text(value):

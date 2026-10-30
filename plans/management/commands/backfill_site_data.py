@@ -55,6 +55,9 @@ written by hand:
   `whatsapp_number` is empty and the old `discount_contact_url` is a `https://wa.me/<digits>` link, the digits are copied into it
   (the saved message keeps the default from the migration). Never overwrites a number or message that is already set.
 
+- (invite email opens, 2026-10-30) the Privacy notice "Emails" part gets the line about the tracking pixel in invitation emails,
+  and "Last updated" goes to 30 October 2026: each only while it still has exactly the previous wording.
+
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 import re
 from collections import Counter
@@ -165,6 +168,7 @@ def backfill():
     changed.update(_legal_pages())
     changed.update(_barry_changes_2026_10_29())
     changed.update(_whatsapp_and_gold_2026_10_29())
+    changed.update(_invite_open_privacy_2026_10_30())
     return changed
 
 
@@ -342,6 +346,27 @@ def _legal_pages():
         site.privacy_version = legal.PRIVACY_VERSION
         site.save()
         changed["plans.SiteSettings (privacy version)"] += 1
+    return changed
+
+
+def _invite_open_privacy_2026_10_30():
+    """2026-10-30: invitation emails carry an open-tracking pixel, so the privacy notice says so. Exact old wording only."""
+    from content import legal
+
+    changed = Counter()
+    page = Page.objects.filter(key="privacy").first()
+    if page is None:
+        return changed
+    new_body = dict((key, body) for key, _, body, _, _ in content_seed.PAGES["privacy"][2])["part_2"]
+    old_body = new_body.replace(legal.INVITE_OPEN_LINE + "\n", "")
+    for section in Section.objects.filter(page=page, key="part_2", body=old_body):
+        section.body = new_body
+        section.save()
+        changed["content.Section (privacy notice: invite email opens)"] += 1
+    for section in Section.objects.filter(page=page, key="updated", body="28 October 2026"):
+        section.body = legal.PRIVACY_UPDATED
+        section.save()
+        changed["content.Section (privacy notice: last updated)"] += 1
     return changed
 
 

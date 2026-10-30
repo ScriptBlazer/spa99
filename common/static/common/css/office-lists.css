@@ -63,6 +63,42 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 .o-empty-row tr:hover td, .o-empty-row:hover td, .o-more-row:hover td { background: none; }
 .o-empty-row p { color: var(--office-muted); margin-inline: auto; }
 
+/* ---------- no clipping on desktop: every column shown (Moishe 2026-10-30), so cells may wrap to two lines and long names,
+   emails and lists use the shared truncate (common text_tags, full text on hover). Headers wrap too. Padding tightens on
+   laptop widths; the card scrolls sideways only as a last resort. ---------- */
+@media (min-width: 64em) {
+  .o-list thead th { white-space: normal; line-height: 1.2; }
+  .o-list td { white-space: normal; }
+  .o-list td.num:not(.c-date) { white-space: nowrap; }
+}
+@media (min-width: 64em) and (max-width: 89.99em) {
+  .o-list thead th, .o-list td { padding-inline: var(--space-2); }
+  .o-tablecard .o-list .u-truncate { max-width: 11rem; }   /* beats the wide caps further down */
+  .o-tablecard .o-list .u-clamp-2 { max-width: 13rem; }
+}
+/* Laptop widths: the email sits under the name (same info, one column less); its own column is back from 90em. */
+.o-email-sub { display: none; }
+@media (min-width: 64em) and (max-width: 89.99em) { .o-list .o-email-col { display: none; } .o-list .o-email-sub { display: block; } }
+/* Every column is shown on desktop (Moishe 2026-10-30: all the info, truncated only if it must be). Long text uses the shared
+   truncate with a cap per column; the card scrolls sideways only as a last resort. */
+/* Last resort at any width: reachable by scrolling, never cut off. The card is then a scroll box, so the sticky header would
+   offset by the page header height inside it and cover the first row: inside the card the header sits at the top (top: 0). */
+@media (min-width: 64em) { .o-tablecard { overflow-x: auto; } .o-tablecard .o-list thead th { top: 0; } }
+
+/* ---------- widths: the action column hugs its content at the right, the rest share the card; long text gets the shared
+   truncate (common text_tags) with a sensible cap per column so nothing pushes the table wide ---------- */
+.o-list th:last-child:has(.sr-only), .o-list td.c-action { width: 1px; white-space: nowrap; text-align: right; }   /* 1px, not 1%: a percentage makes an auto table stretch to the full width */
+.o-list .u-truncate { max-width: 14rem; }
+.o-list .c-email .u-truncate { max-width: 14rem; }
+.o-list .u-clamp-2 { max-width: 16rem; }
+.o-list .c-question .u-clamp-2 { max-width: 36rem; }
+/* The whole row is the link (Moishe 2026-10-30: a button inside a highlighted row read as broken). The end of the row reads
+   "View application >"; on hover it turns full colour and the arrow nudges right, like the Dashboard. */
+.o-row-go { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--office-muted); font-size: var(--text-sm); font-weight: 500; white-space: nowrap; }
+.o-row-go svg { transition: transform var(--office-dur-lift) var(--ease-soft); }
+@media (hover: hover) and (pointer: fine) { .o-row:hover .o-row-go { color: var(--office-text); } .o-row:hover .o-row-go svg { transform: translateX(3px); } }
+@media (prefers-reduced-motion: reduce) { .o-row-go svg { transition: none; } }
+
 /* ---------- the list: phone cards, one surface card per row ---------- */
 @media (max-width: 63.99em) {
   .o-tablecard { padding: 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; }
@@ -79,7 +115,8 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
   .o-row .c-invite span { display: inline; }
   .o-row .c-invite .o-sub { display: inline; margin-left: var(--space-2); }
   .o-row .c-potential, .o-row .c-status { color: inherit; }
-  .o-row .c-marketing, .o-row .c-action { display: none; }
+  .o-row .c-marketing, .o-row .c-action, .o-row .c-lists { display: none; }   /* Invited list: the lists are on wide screens only */
+  .o-row .c-opened, .o-row .c-clicked, .o-row .c-expired { order: 4; flex: none; font-size: var(--text-sm); color: var(--office-muted); }
   .o-empty-row, .o-more-row { display: block; }
   .o-empty-row td, .o-more-row td { text-align: center; padding: var(--space-3); }
   .o-list .o-badge-ctx { display: inline; }
@@ -199,3 +236,14 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 .o-badge--no-business { background: var(--office-danger); color: var(--color-cream); margin-left: var(--space-2); }
 .o-badge--yes-business { background: var(--office-caramel-tint); color: var(--office-text); margin-left: var(--space-2); }
 .o-badges .o-badge--no-business, .o-badges .o-badge--yes-business { margin-left: 0; }
+
+/* Gold list: the Invite column only shows when a row on screen has an invite (approved people). Waiting and Declined views
+   have none, so the column steps aside (Moishe 2026-10-30). Pure CSS, so it follows the filters as rows are swapped in. */
+.o-list--gold:not(:has(td.c-invite:not([data-invite-state=""]))) .c-invite { display: none; }
+
+/* Desktop: the table card is as wide as its content needs, up to the page width, so a short list is not stretched across a
+   big screen with empty gaps between columns (Moishe 2026-10-30). Many columns still fill the width and wrap or truncate. */
+@media (min-width: 64em) {
+  .o-tablecard:not(:has(.o-list--leads)) { width: fit-content; max-width: 100%; }   /* Leads keeps its fixed column plan */
+  .o-tablecard .o-list:not(.o-list--leads) { width: auto; }
+}

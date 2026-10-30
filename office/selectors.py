@@ -17,7 +17,7 @@ from system import defaults
 DASHBOARD_RANGES = ("today", "7d", "30d", "all")
 ANALYTICS_RANGES = ("7d", "30d", "90d", "all")
 WEEKLY_AFTER_DAYS = 120  # 'all' sends weekly points once history is longer than this
-JOURNEY_QUESTIONS = ("time", "frequency", "facilities", "company")
+JOURNEY_QUESTIONS = ("time", "frequency", "facilities", "company", "heard_via")
 
 
 def counters(*keys):

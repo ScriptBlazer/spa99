@@ -126,6 +126,16 @@ Never edit or delete a migration that is already live.
 - `setup_live` fills the number, message and better-prices message (empty fields only) instead of the link. The column `discount_contact_url` stays, unused.
 - **Rollback is safe:** all three new columns have a database default, so 1.0.2 can still save Settings (checked: 1.0.2's code saves `SiteSettings` on the 0025 schema). The WhatsApp links on 1.0.2 use the old link, which 1.0.3 does not clear, so they keep working.
 
+## Next release (Office additions: heard via, chats card, Invited list)
+
+- **No migration, no backfill.**
+- **After deploy**, refresh the stored figures so Analytics shows "How people heard about us" (the hourly roll-up also does it): `docker compose exec web python manage.py shell -c "from office import snapshots; snapshots.build_everything()"`.
+- The Invited page (`/invited/`) is Admin and above only.
+- **Invite email opens and the Bounces log:** migrations `mailings.0008` (adds nullable `Invite.email_opened_at`; rollback safe) and `notifications.0006` (new `EmailBounce` table; a rollback just leaves it unused). Take the RDS snapshot first. They run on start.
+- **In Postmark**, on the webhook for the Default Transactional Stream, also tick the **Open** event (Bounce and Spam Complaint stay ticked). Open tracking is switched on per email by the site, for invite emails only; opens are known only for invites sent after this release.
+- **Privacy notice changed** (a line about the tracking pixel in invitation emails, date 30 October 2026). Run `docker compose exec web python manage.py backfill_site_data --dry-run`, then without `--dry-run`: it updates the "Emails" part and "Last updated" only while they still have exactly the old wording (a part you edited by hand is left; add the line yourself in Control). Live may still hold the 27 October text (the 28 October chat line had no backfill); if the dry-run says "Nothing to change", add both the Ask us chat line and the tracking-pixel line by hand in Control.
+- System > Emails has a new **Bounces** tab and the Dashboard a "Bounces" tile. Old bounces before this release are not in the log (only new ones).
+
 ## What is kept, and for how long
 
 Nothing grows without limit on disk: every container's log is capped at 5 x 10 MB (`docker-compose.yml`), and the server holds no app data.

@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from simple_history.models import HistoricalRecords
 
 from common.models import BaseModel
@@ -77,3 +78,28 @@ class EmailSuppression(BaseModel):
 
     def __str__(self):
         return f"{self.email} ({self.reason})"
+
+
+class EmailBounce(BaseModel):
+    """One Postmark bounce or spam-complaint record, every one (soft bounces too), so System can show what is happening to our
+    mail. A log only: who may be emailed is still decided by EmailSuppression. Deduped by Postmark's record id. Pruned after a year
+    (common.tasks.housekeeping)."""
+
+    HARD, SOFT, COMPLAINT, OTHER = "hard", "soft", "complaint", "other"
+    KIND_CHOICES = [(HARD, "Hard"), (SOFT, "Soft"), (COMPLAINT, "Complaint"), (OTHER, "Other")]
+
+    email = models.EmailField(db_index=True, help_text="Lower case.")
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES)
+    postmark_type = models.CharField(max_length=60, blank=True, help_text="Postmark's Type, e.g. HardBounce, SoftBounce, SpamComplaint.")
+    detail = models.CharField(max_length=300, blank=True)
+    record_id = models.CharField(max_length=100, blank=True, help_text="Postmark's record ID; a repeat of it is ignored.")
+    message_id = models.CharField(max_length=100, blank=True)
+    received_at = models.DateTimeField(help_text="When Postmark says it happened (else when we received it).")
+
+    class Meta:
+        ordering = ["-received_at"]
+        indexes = [models.Index(fields=["-received_at"])]
+        constraints = [models.UniqueConstraint(fields=["record_id"], condition=~Q(record_id=""), name="notifications_bounce_record_unique")]
+
+    def __str__(self):
+        return f"{self.email} ({self.kind})"

@@ -200,6 +200,18 @@
     </details>
   </section>
 
+  {# 5b How people heard about us: the journey answer heard_via, one vote per person, stored with the other answers (same range) #}
+  <section class="o-card o-span-12" id="heard-via" data-reveal aria-labelledby="h-heard-via">
+    <header class="o-card-head"><h2 id="h-heard-via">How people heard about us</h2></header>
+    <div data-region="heard-via" data-fade>
+      {% has_data data.journey_answers.heard_via "count" as hv %}
+      {% if hv %}<div class="o-table-wrap"><table><caption class="sr-only">How people heard about us, {{ data.range|range_label }}</caption>
+        <thead><tr><th scope="col">Answer</th><th scope="col">People</th><th scope="col">Share</th></tr></thead>
+        <tbody>{% for a in data.journey_answers.heard_via %}<tr><th scope="row">{{ a.label }}</th><td>{{ a.count|num }}</td><td>{{ a.share_bp|bp_rate }}</td></tr>{% endfor %}</tbody></table></div>
+      {% else %}<p class="o-empty-line">No answers in this range yet.</p>{% endif %}
+    </div>
+  </section>
+
   {# 6 Where people stop #}
   <section class="o-card o-chartcard o-span-8" id="dropoff" data-reveal data-chart-card="dropoff" aria-labelledby="h-dropoff">
     <header class="o-card-head"><h2 id="h-dropoff">Where people stop</h2></header>

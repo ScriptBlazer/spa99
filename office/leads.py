@@ -57,6 +57,25 @@ def _applications():
     return GoldApplication.objects.annotate(application_key=Lower("email")).filter(application_key=OuterRef("email_key"))
 
 
+def _chats_with_email():
+    """Real (not staff test) conversations whose lead_email matches the row's address, any case."""
+    from chat.models import Conversation
+
+    return Conversation.objects.filter(staff_test=False).exclude(lead_email="").annotate(chat_key=Lower("lead_email")).filter(chat_key=OuterRef("email_key"))
+
+
+def _heard_answers():
+    from journey.models import Answer
+
+    return (Answer.objects.filter(question__key="heard_via", skipped=False, options__isnull=False, session__is_bot=False)
+            .exclude(session__lead_email="").annotate(ak=Lower("session__lead_email")))
+
+
+def _newer_heard():
+    """A later journey of the same address that also answered heard_via (so the older answer is no longer his)."""
+    return _heard_answers().filter(ak=OuterRef("ak"), session__created_at__gt=OuterRef("session__created_at"))
+
+
 def lead_queryset(show="lead", range_name="all", today=None):
     """One session per address (its latest), annotated with `has_account`, `has_application` and `journeys_n`. `show`:
     lead (no account, the default), registered (former leads who now have an account) or all. Staff addresses never appear
@@ -86,7 +105,7 @@ def filters_from(request):
     show, sort, range_name = get.get("show", d.leads_show), get.get("sort", d.leads_sort), get.get("range", d.leads_range)
     return {"q": get.get("q", "").strip(), "range": range_name if range_name in RANGES else d.leads_range, "show": show if show in SHOWS else d.leads_show,
             "tier": get.get("tier", ""), "potential": get.get("potential", "") if get.get("potential") in POTENTIALS else "",
-            "industry": get.get("industry", ""), "gold": "yes" if get.get("gold") in ("yes", "1", "on") else "", "hot": "1" if get.get("hot") == "1" else "",
+            "industry": get.get("industry", ""), "heard": get.get("heard", ""), "chat": "1" if get.get("chat") == "1" else "", "gold": "yes" if get.get("gold") in ("yes", "1", "on") else "", "hot": "1" if get.get("hot") == "1" else "",
             "sort": sort if sort in SORTS else d.leads_sort}
 
 
@@ -94,7 +113,7 @@ def is_filtered(filters, request=None):
     """True when anything narrows the list beyond the defaults (System > Defaults). The page shows no count then (counting rule C5).
     Reads the same values as filters_from."""
     d = defaults.get(request)
-    return bool(filters["q"] or filters["tier"] or filters["potential"] or filters["industry"] or filters["gold"] or filters["hot"]
+    return bool(filters["q"] or filters["tier"] or filters["potential"] or filters["industry"] or filters["heard"] or filters["chat"] or filters["gold"] or filters["hot"]
                 or filters["show"] != d.leads_show or filters["range"] != d.leads_range)
 
 
@@ -108,6 +127,10 @@ def filtered_queryset(filters):
         queryset = queryset.filter(gold_potential=filters["potential"])
     if filters["industry"]:
         queryset = queryset.filter(answers__question__key="industry", answers__options__value=filters["industry"])
+    if filters["heard"]:  # "How did you hear about us?" (journey answer heard_via), the newest journey of that address that answered it
+        queryset = queryset.filter(Exists(_heard_answers().filter(ak=OuterRef("email_key"), options__value=filters["heard"]).filter(~Exists(_newer_heard()))))
+    if filters["chat"]:  # the address was given to the assistant in a chat (Conversation.lead_email)
+        queryset = queryset.filter(Exists(_chats_with_email()))
     if filters["gold"]:
         queryset = queryset.filter(has_application=True)
     if filters["hot"]:  # exactly the Hot leads count: High potential, no account, no Gold application
@@ -123,7 +146,8 @@ def filter_choices():
     from plans.models import Plan
 
     return {"tiers": list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order").values("slug", "name")),
-            "industries": list(Option.objects.filter(question__key="industry", active=True).order_by("order").values("value", "label"))}
+            "industries": list(Option.objects.filter(question__key="industry", active=True).order_by("order").values("value", "label")),
+            "heard": list(Option.objects.filter(question__key="heard_via", active=True).order_by("order").values("value", "label"))}
 
 
 # ---------- rows ----------
@@ -163,6 +187,12 @@ def build_rows(page_sessions):
     for key, referrer, utm, medium, campaign, device in (_gate_sessions().filter(email_key__in=emails).order_by("-created_at")
                                                          .values_list("email_key", "referrer", "utm_source", "utm_medium", "utm_campaign", "device_type")):
         firsts[key] = (referrer, utm, medium, campaign, device)  # oldest wins: iterated newest first
+    from chat.models import Conversation
+
+    chatted = {k for k in Conversation.objects.filter(staff_test=False).annotate(k=Lower("lead_email")).filter(k__in=emails).values_list("k", flat=True)}
+    heard = {}
+    for key, label in _heard_answers().filter(ak__in=emails).order_by("session__created_at").values_list("ak", "options__label"):
+        heard[key] = label  # the newest answering journey wins
     out = []
     for page_row in page_sessions:
         session = loaded[page_row.pk]
@@ -174,7 +204,8 @@ def build_rows(page_sessions):
             "last_seen": lists_iso(session.last_seen_at), "journeys": page_row.journeys_n or 1, "finished": session.completed,
             "tier": session.suggested_plan.name if session.suggested_plan_id else "", "tier_slug": session.suggested_plan.slug if session.suggested_plan_id else "",
             "potential": session.gold_potential, "score": session.gold_score, "industries": labels.get("industry", []),
-            "answers": labels, "summary": summary_lines(labels),
+            "answers": labels, "summary": summary_lines(labels), "heard_via": heard.get(page_row.email_key, ""),
+            "via_chat": page_row.email_key in chatted,
             "source": {"host": host, "utm_source": utm, "utm_medium": medium, "utm_campaign": campaign, "device": device,
                        "label": utm or host or "Direct", "campaign": campaign},
             "registered": page_row.has_account, "account_id": str(accounts[page_row.email_key]) if page_row.email_key in accounts else "",
@@ -214,7 +245,7 @@ def csv_response(filters, user_id=None):
     response["Content-Disposition"] = 'attachment; filename="spa99-leads.csv"'
     writer = csv.writer(response)
     writer.writerow(["email", "status", "first_seen", "last_seen", "journeys", "suggested_tier", "gold_potential", "gold_score", "industries",
-                     "when", "how_often", "facilities", "company", "source", "campaign", "device", "applied_for_gold",
+                     "when", "how_often", "facilities", "company", "heard_via", "gave_email_in_chat", "source", "campaign", "device", "applied_for_gold",
                      "consent_given_at", "consent_privacy_version"])
     queryset = filtered_queryset(filters)
     offset = 0
@@ -229,7 +260,7 @@ def csv_response(filters, user_id=None):
             writer.writerow([lists.safe_cell(x) for x in (
                 row["email"], row["status"], row["first_seen"], row["last_seen"], row["journeys"], row["tier"], row["potential"], row["score"] or "",
                 "; ".join(row["industries"]), "; ".join(a.get("time", [])), "; ".join(a.get("frequency", [])), "; ".join(a.get("facilities", [])),
-                "; ".join(a.get("company", [])), row["source"]["label"], row["source"]["campaign"], row["source"]["device"],
+                "; ".join(a.get("company", [])), row["heard_via"], "yes" if row["via_chat"] else "no", row["source"]["label"], row["source"]["campaign"], row["source"]["device"],
                 "yes" if row["gold_applied"] else "no", lists_iso(s.lead_at), s.lead_privacy_version)])
     return response
 

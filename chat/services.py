@@ -417,8 +417,14 @@ def _person_filter(user=None, email=None):
     if user is not None:
         query |= Q(user=user) | Q(session__user=user)
     if email:
-        query |= Q(lead_email__iexact=email)
+        query |= Q(lead_email__iexact=email) | Q(session__lead_email__iexact=email)  # typed in the chat, or the chat's journey left it
     return query
+
+
+def person_conversations(user=None, email=None):
+    """A person's real chats (not the System test console): by account, by the account's journey session, or by the email given in the
+    chat. Only what the 90-day prune has left. A queryset, newest first."""
+    return Conversation.objects.filter(_person_filter(user, email), staff_test=False)
 
 
 def export_conversations(user=None, email=None):
