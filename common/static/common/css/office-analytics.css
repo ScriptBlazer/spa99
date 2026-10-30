@@ -59,9 +59,10 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 .o-legend-line { width: 1.25rem; height: 0; border-top: 2px dashed var(--office-taupe); }
 
 /* ---------- 2 the four tinted KPI tiles: the tint is the surface, no shadow ---------- */
-.o-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.o-kpis { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+@media (min-width: 22.5em) { .o-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 64em) { .o-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gutter); } }
-.o-kpi { --c: var(--office-slate); display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding: var(--space-4); border-radius: var(--office-radius-lg); background: var(--office-slate-tint); color: inherit; text-decoration: none; transition: transform var(--office-dur-lift) var(--ease-soft); }
+.o-kpi { --c: var(--office-slate); display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding: var(--space-3); border-radius: var(--office-radius-lg); background: var(--office-slate-tint); color: inherit; text-decoration: none; transition: transform var(--office-dur-lift) var(--ease-soft); }
 .o-kpi--sage { --c: var(--office-sage); background: var(--office-sage-tint); }
 .o-kpi--clay { --c: var(--office-clay); background: var(--office-clay-tint); }
 .o-kpi--ochre { --c: var(--office-ochre); background: var(--office-ochre-tint); }
@@ -71,6 +72,7 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 .o-kpi-body { display: grid; gap: var(--space-1); }
 .o-kpi-value { font-family: var(--font-display); font-weight: 500; font-size: var(--office-stat); line-height: var(--leading-display); letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; color: var(--office-text); }
 .o-spark--kpi { height: 2.5rem; }
+@media (min-width: 48em) { .o-kpi { padding: var(--space-4); } }
 .o-kpi .o-spark-top { stop-opacity: 0.18; }
 .js .o-kpi.is-visible:not(.is-settled) .o-spark svg { animation: o-wipe var(--office-dur-spark) var(--ease-soft) backwards; }
 .js .o-kpi.is-visible:not(.is-settled) .o-spark-area { animation: o-fade var(--office-dur-spark) var(--ease-soft) backwards; }

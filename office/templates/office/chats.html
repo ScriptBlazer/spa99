@@ -3,8 +3,8 @@
 {% block title %}Chats | Spa 99 Office{% endblock %}
 {% block main %}
 <h1 class="sr-only">Chats</h1>
-<p class="o-totalline">{% if person %}Chats with {{ person.label }}{% else %}Ask us conversations{% endif %}, newest first. Kept for 90 days, then deleted. View only.
-  {% if person %}{% if person.url %}<a class="o-quiet" href="{{ person.url }}">Back to the page</a> {% endif %}<a class="o-quiet" href="{% url 'office_chats' %}" data-clear>All chats</a>{% endif %}</p>
+<p class="o-sub">{% if person %}Chats with {{ person.label }}{% else %}Chats with the assistant{% endif %}, newest first. Kept for 90 days.</p>
+{% if person %}<p class="o-totalline">{% if person.url %}<a class="o-quiet" href="{{ person.url }}">Back to the page</a> {% endif %}<a class="o-quiet" href="{% url 'office_chats' %}" data-clear>All chats</a></p>{% endif %}
 <div class="o-card o-tablecard">
   <table class="o-list">
     <caption class="sr-only">Ask us chats</caption>
@@ -12,12 +12,12 @@
     <tbody>
     {% for c in rows %}
       <tr class="o-row">
-        <td class="c-date"><a class="o-rowlink" href="{% url 'office_chat' c.pk %}">{{ c.created_at|dt }}</a></td>
-        <td class="c-question">{% truncated c.preview lines=2 %}</td>
+        <td class="c-date"><span class="o-only-wide">{{ c.created_at|dt }}</span><span class="o-only-narrow">{{ c.created_at|dm }}, {{ c.created_at|date:"H:i" }}</span></td>
+        <td class="c-question"><a class="o-rowlink" href="{% url 'office_chat' c.pk %}">{% truncated c.preview lines=2 %}</a></td>
         <td class="c-who">{% if c.user %}{% truncated c.user.email %}{% elif c.lead_email %}{% truncated c.lead_email %}{% else %}Anonymous{% endif %}</td>
-        <td class="num">{{ c.message_count }}</td>
-        {% if show_cost %}<td class="num">{{ c.total_cost_pence|floatformat:2 }}p</td>{% endif %}
-        <td>{% if c.ended_off_topic %}Closed: off-topic{% endif %}{% if c.ended_by_cap %} Stopped by the spending cap{% endif %}</td>
+        <td class="c-count num">{{ c.message_count }}<span class="o-only-narrow"> message{{ c.message_count|pluralize }}</span></td>
+        {% if show_cost %}<td class="c-cost num">{{ c.total_cost_pence|floatformat:2 }}p</td>{% endif %}
+        <td class="c-note">{% if c.ended_off_topic %}Closed: off-topic{% endif %}{% if c.ended_by_cap %} Stopped by the spending cap{% endif %}</td>
       </tr>
     {% empty %}<tr class="o-empty-row"><td colspan="{% if show_cost %}6{% else %}5{% endif %}"><p>No chats yet.</p></td></tr>{% endfor %}
     {% if has_next %}<tr class="o-more-row"><td colspan="{% if show_cost %}6{% else %}5{% endif %}"><a class="btn btn-secondary btn-sm" href="?{% if person %}{{ person.query }}&amp;{% endif %}page={{ page|add:1 }}">Older chats</a></td></tr>{% endif %}

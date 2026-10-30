@@ -51,6 +51,7 @@
 .o-nav-list a[aria-current="page"] { color: var(--office-text); }
 .o-badge-count { display: inline-flex; align-items: center; justify-content: center; min-width: 1.25rem; height: 1.25rem; padding: 0 6px; border-radius: var(--office-pill); background: var(--color-gold); color: var(--office-text); font-size: var(--office-text-xs); font-weight: 600; line-height: 1; }
 .o-badge-count:empty { display: none; }
+.o-nav-more { display: none; }
 .o-brand, .o-nav-foot { display: none; }
 
 @media (max-width: 63.99em) {
@@ -59,7 +60,18 @@
   .o-nav-list a { flex-direction: column; justify-content: center; gap: 2px; height: var(--office-tabbar-h); font-size: var(--office-text-xs); font-weight: 600; }
   .o-nav-list .o-icon { box-sizing: content-box; width: 1.5rem; height: 1.5rem; padding: 4px 16px; border-radius: var(--office-pill); transition: background-color var(--office-dur-lift) var(--ease-soft); }
   .o-nav-list a[aria-current="page"] .o-icon { background: var(--office-sunken); }
-  .o-nav-list .o-badge-count { position: absolute; top: 0.5rem; left: calc(50% + 0.75rem); min-width: 1.125rem; height: 1.125rem; padding: 0 5px; border: 2px solid var(--office-surface); box-sizing: content-box; }
+  .o-nav-list .o-badge-count { position: absolute; top: 0.375rem; left: calc(50% + 0.5rem); min-width: 1.125rem; height: 1.125rem; padding: 0 5px; border: 2px solid var(--office-surface); box-sizing: content-box; }
+  /* five slots at most: Home, Leads, People, Gold, More (Analytics, Chats and Invited live in the More sheet) */
+  .o-nav-list li { min-width: 0; }
+  .o-nav-list li:has([data-office-nav-item="leads"]) { order: 1; }
+  .o-nav-list li:has([data-office-nav-item="people"]) { order: 2; }
+  .o-nav-list li:has([data-office-nav-item="gold"]) { order: 3; }
+  .o-nav-more { display: block; order: 4; }
+  .o-nav-list:has(.o-nav-more) li[data-nav-overflow] { display: none; }
+  .o-nav-list a > span:not(.o-badge-count), .o-nav-more button > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .o-nav-more button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 100%; height: var(--office-tabbar-h); padding: 0; border: 0; background: none; color: var(--office-muted); font: inherit; font-size: var(--office-text-xs); font-weight: 600; }
+  .o-nav-more button.is-current { color: var(--office-text); }
+  .o-nav-more button.is-current .o-icon, .o-nav-more button[aria-expanded="true"] .o-icon { background: var(--office-sunken); }
   body[data-office-detail] .o-nav { display: none; }
   .o-main { padding-bottom: calc(var(--office-tabbar-h) + env(safe-area-inset-bottom) + var(--space-4)); }
   body[data-office-detail] .o-main { padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom)); }
@@ -87,7 +99,7 @@
 @media (min-width: 64em) { .o-disc { width: 2.5rem; height: 2.5rem; } }
 
 /* ---------- header: tone and blur, no line; a soft shadow appears once the page has scrolled ---------- */
-.o-header { position: sticky; top: 0; z-index: 15; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); height: var(--office-header-h); padding-inline: var(--page-margin); background: var(--office-header); -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); }
+.o-header { position: sticky; top: 0; z-index: 15; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); height: var(--office-header-h); padding-inline: max(var(--page-margin), env(safe-area-inset-left)) max(var(--page-margin), env(safe-area-inset-right)); background: var(--office-header); -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); }
 .o-header::after { content: ""; position: absolute; inset: auto 0 0 0; height: 1px; box-shadow: var(--office-shadow-scrolled); opacity: 0; pointer-events: none; transition: opacity var(--office-dur-lift) var(--ease-soft); }
 .o-header[data-scrolled]::after { opacity: 1; }
 .o-header-left { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
@@ -110,7 +122,7 @@
 .o-menu-role { font-size: var(--text-sm); color: var(--office-muted); }
 .o-menu form { margin-top: var(--space-2); }
 .o-menu-item { display: flex; align-items: center; width: 100%; min-height: 2.75rem; padding: 0; border: 0; background: none; color: var(--office-text); font-weight: 500; text-align: left; }
-.o-menu-item:hover { text-decoration: underline; text-underline-offset: 0.25em; }
+@media (hover: hover) and (pointer: fine) { .o-menu-item:hover { text-decoration: underline; text-underline-offset: 0.25em; } }
 
 /* ---------- main ---------- */
 .o-main { padding: var(--space-3) var(--page-margin) var(--space-5); max-width: 80rem; }
@@ -126,6 +138,7 @@
 
 /* ---------- card: surface tone, soft shadow, no border, no rule inside ---------- */
 .o-card { background: var(--office-surface); border-radius: var(--office-radius-lg); box-shadow: var(--office-shadow-1); padding: var(--space-4); min-width: 0; }
+@media (max-width: 47.99em) { .o-card { padding: var(--space-4) var(--space-3); } }
 @media (min-width: 64em) { .o-card { padding: var(--space-5); } }
 .o-card h2 { font-size: var(--text-lg); }
 .o-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 2.5rem; }
@@ -146,6 +159,7 @@
 .o-seg-item:has(input:checked) { color: var(--office-text); }
 .o-seg-item:has(input:focus-visible) { outline: 2px solid var(--office-text); outline-offset: -2px; border-radius: var(--office-pill); }
 .o-seg--sm .o-seg-item { min-height: 2rem; padding: 0 var(--space-3); font-size: var(--office-text-xs); }
+@media (pointer: coarse) { .o-seg--sm .o-seg-item, .o-error .o-quiet { min-height: 2.75rem; } }
 .o-range { margin: 0; }
 .o-range--page { margin-bottom: var(--space-3); }
 .o-range--header { display: none; }
@@ -181,3 +195,11 @@
   .o-nav-list a[aria-current="page"] { outline: 2px solid Highlight; }
   .o-card { border: 1px solid CanvasText; }
 }
+
+/* ---------- the More sheet: the tabs that do not fit five slots ---------- */
+.o-sheet-links { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.o-sheet-links a { display: flex; align-items: center; gap: var(--space-3); min-height: 3.5rem; padding-inline: var(--space-3); border-radius: var(--office-radius); color: var(--office-text); font-size: var(--text-base); font-weight: 500; text-decoration: none; }
+.o-sheet-links a > span { flex: 1; }
+.o-sheet-links a > .o-icon:last-child { color: var(--office-muted); }
+.o-sheet-links a[aria-current="page"] { background: var(--office-sunken); }
+@media (min-width: 64em) { .o-navsheet { display: none; } }

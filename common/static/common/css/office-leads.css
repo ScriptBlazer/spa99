@@ -23,6 +23,7 @@
 .o-leadsum-num { font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); line-height: var(--leading-tight); letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; }
 .o-leadsum-line { display: none; font-size: var(--text-sm); color: var(--office-muted); }
 @media (hover: hover) and (pointer: fine) { .o-leadsum-tile--link:hover { background: var(--office-taupe-track); } }
+@media (max-width: 23.99em) { .o-leadsum-tile { padding: var(--space-2) var(--space-3); } .o-leadsum-label { font-size: var(--office-text-xs); } }
 @media (min-width: 64em) {
   .o-leadsum { gap: var(--space-3); margin-bottom: var(--space-4); }
   .o-leadsum-tile { padding: var(--space-3) var(--space-4); }
@@ -42,7 +43,11 @@
 .o-filter-group .o-seg[style*="--n: 4"] { min-width: 16rem; }
 .o-filter-group .o-seg[style*="--n: 3"] { min-width: 17rem; }
 .o-filter-group .o-seg[style*="--n: 5"] { min-width: 28rem; }
-.o-sheet .o-seg[style*="--n: 5"] .o-seg-item { padding: 0 var(--space-1); white-space: normal; font-size: var(--office-text-xs); }   /* five options fit a phone: tighter, may wrap to two lines */
+/* In the sheet every segmented control is a set of wrapping chips (choosing, not filling in), so five options never overflow */
+.o-sheet .o-seg { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 0; background: none; }
+.o-sheet .o-seg .o-seg-thumb { display: none; }
+.o-sheet .o-seg .o-seg-item { min-height: 2.75rem; padding-inline: var(--space-3); border-radius: var(--office-pill); background: var(--office-sunken); }
+.o-sheet .o-seg .o-seg-item:has(input:checked) { background: var(--office-text); color: var(--color-cream); }
 .o-sheet .o-filter-group .o-seg, .o-sheet .o-select { min-width: 0; }
 .o-sheet .o-filters-body .o-export--sheet { margin-left: 0; align-self: stretch; width: 100%; }
 .o-sheet .o-filter-group--chip { align-self: start; }
@@ -86,6 +91,7 @@
 .o-list--leads th { letter-spacing: 0.04em; }
 .o-tag { display: inline-block; padding: 0 var(--space-1); border: 1px solid var(--office-line, currentColor); border-radius: 999px; font-size: var(--text-xs, 0.75rem); line-height: 1.4; }
 .o-list--leads .c-source .o-cell-sub { display: block; }
+.o-list--leads .o-row td.c-source .u-truncate { display: inline; }   /* phone: "Seen yesterday · localhost" on one line (u-truncate is display: block) */
 
 /* phone: one surface card per lead (3.5): email and pill, potential and tier, the two answer lines, seen and source */
 @media (max-width: 63.99em) {
@@ -108,7 +114,7 @@
 
 /* ---------- the person page ---------- */
 .o-detail-head--person .o-badges { display: flex; }
-.o-person-name { overflow-wrap: anywhere; }
+.o-person-name { overflow-wrap: break-word; }
 .o-count-muted { margin-left: var(--space-1); font-family: var(--font-body); font-size: var(--text-sm); font-weight: 500; color: var(--office-muted); letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .o-card-sub { margin: calc(var(--space-2) * -1) 0 var(--space-3); max-width: none; }
 .o-panels { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); margin-bottom: var(--space-4); }
@@ -158,6 +164,7 @@
   .o-detail--person [data-person-consent] { order: 6; }
   .o-detail--person [data-person-journeys] { order: 7; }
   .o-detail--person [data-person-unlinked] { order: 8; }
+  .o-detail--person [data-person-chats] { order: 8; }
   .o-detail--person [data-person-data] { order: 9; }
 }
 @media (prefers-reduced-motion: reduce) { .o-leadsum-tile, .o-tile-link, .o-jrny { transition: none; } .o-jrny[open] .o-jrny-body { animation: none; } }

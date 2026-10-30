@@ -49,6 +49,7 @@
 .o-ring-text { display: grid; gap: 2px; max-width: 11rem; }
 .o-ring-label { font-size: var(--text-sm); font-weight: 500; color: var(--office-text); text-wrap: balance; }
 .o-ring-line { font-size: var(--text-sm); line-height: 1.3; color: var(--office-muted); text-wrap: balance; }
+@media (max-width: 63.99em) { .o-ring-row { align-items: start; } .o-ring-text { align-content: start; } .o-ring-label, .o-ring-line { line-height: 1.25; } }   /* phone: labels and sub-lines share one tight line height, columns top-aligned */
 
 /* ---------- Gold waiting: a tinted tile, no shadow (the tint is the surface) ---------- */
 .o-gold-tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--space-1); min-width: 0; padding: var(--space-4); border-radius: var(--office-radius-lg); background: var(--office-ochre-tint); }
@@ -204,6 +205,14 @@
 .o-feed-row .o-latest-when { flex: none; text-align: right; }
 @media (min-width: 64em) { .o-feed-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; } }
 @media (hover: hover) and (pointer: fine) { .o-feed-row[href]:hover { background: var(--office-sunken); } }
+/* phone: the time goes under the text, so an email is never squeezed into a sliver */
+@media (max-width: 47.99em) {
+  .o-feed-row { display: grid; grid-template-columns: var(--office-feed-dot) minmax(0, 1fr); grid-template-areas: "dot text" ". when"; column-gap: var(--space-3); align-items: start; }
+  .o-feed-dot { grid-area: dot; }
+  .o-feed-text { grid-area: text; overflow-wrap: break-word; }
+  .o-feed-row .o-latest-when { grid-area: when; text-align: left; }
+  .o-feed-who { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 .o-feed-row:focus-visible { outline-offset: -2px; }
 .o-feed-row:not([href]) { cursor: default; }
 
@@ -212,7 +221,9 @@
 .o-wants .o-wants-head .o-h3 { flex: 1 1 8rem; margin: 0; padding: 0; }
 .o-wants .o-wants-head .o-wants-scope { flex: 0 0 auto; width: 12rem; max-width: 100%; margin: 0; }
 .o-wants .o-wants-head .o-wants-scope .o-seg-item { min-height: calc(2.5rem - 6px); }
-@media (max-width: 40em) { .o-wants .o-wants-head .o-wants-scope { flex-basis: 100%; width: 100%; order: 2; } }
+@media (max-width: 40em) { .o-wants .o-wants-head .o-wants-scope { flex-basis: 100%; width: 100%; order: 2; }
+  .o-wants .o-wants-head { padding-right: 0; }   /* the plus button reserves room beside the title only; the toggle spans the card */
+  .o-wants .o-wants-head .o-h3 { padding-right: calc(2.75rem + var(--space-2)); } }
 .o-wants:has(input[name="wants-scope"][value="leads"]:checked) [data-scope="everyone"],
 .o-wants:not(:has(input[name="wants-scope"][value="leads"]:checked)) [data-scope="leads"] { display: none; }
 
