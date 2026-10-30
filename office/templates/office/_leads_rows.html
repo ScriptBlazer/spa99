@@ -1,13 +1,13 @@
-{% load office_tags %}{% for l in rows %}
+{% load office_tags text_tags %}{% for l in rows %}
 <tr class="o-row" data-lead-row data-status="{{ l.status }}">
-  <td class="c-name" data-col="email"><a class="o-rowlink" href="{{ l.href }}">{{ l.email }}</a>{% if l.via_chat %} <span class="o-tag" data-via-chat>via chat</span>{% endif %}
+  <td class="c-name" data-col="email"><a class="o-rowlink" href="{{ l.href }}">{% truncated l.email %}</a>{% if l.via_chat %} <span class="o-tag" data-via-chat>via chat</span>{% endif %}
     <span class="o-cell-sub">First seen {{ l.first_seen|dm }}{% if l.unsubscribed %} &middot; <span data-unsubscribed>Unsubscribed</span>{% endif %}<span class="o-mid-only"> &middot; {{ l.journeys }} visit{{ l.journeys|pluralize }}</span></span></td>
   <td class="c-wants" data-col="wants">{% for line in l.summary %}<span class="o-line o-line--{{ forloop.counter }}">{{ line }}</span>{% endfor %}</td>
   <td class="c-tier" data-col="tier">{% if l.tier %}<span class="o-only-narrow">Suggested </span>{{ l.tier }}{% else %}<span class="o-unrated">None yet</span>{% endif %}</td>
   <td class="c-potential" data-col="potential">{% include "office/_lead_potential.html" with potential=l.potential %}</td>
   <td class="c-industry o-wide-xl" data-col="industry">{% if l.industries %}{{ l.industries.0 }}{% if l.industries|length > 1 %}<span class="o-cell-sub">{{ l.industries|slice:"1:"|join:", " }}</span>{% endif %}{% else %}<span class="o-unrated">None given</span>{% endif %}</td>
-  <td class="c-source" data-col="source"><span class="o-only-narrow">&middot; </span>{{ l.source.label }}{% if l.source.campaign %}<span class="o-cell-sub">{{ l.source.campaign }}</span>{% endif %}</td>
-  <td class="c-heard o-wide-xl" data-col="heard_via">{% if l.heard_via %}{{ l.heard_via }}{% else %}<span class="o-unrated">Not answered</span>{% endif %}</td>
+  <td class="c-source" data-col="source"><span class="o-only-narrow">&middot; </span>{% truncated l.source.label %}{% if l.source.campaign %}<span class="o-cell-sub">{% truncated l.source.campaign %}</span>{% endif %}</td>
+  <td class="c-heard o-wide-xl" data-col="heard_via">{% if l.heard_via %}{% truncated l.heard_via lines=2 %}{% else %}<span class="o-unrated">Not answered</span>{% endif %}</td>
   <td class="num c-visits o-wide-xl" data-col="visits">{{ l.journeys }}</td>
   <td class="c-status" data-col="status">{% include "office/_lead_status.html" with status=l.status %}</td>
   <td class="num c-date" data-col="last_seen"><span class="o-only-wide">{{ l.last_seen|relative }}</span><span class="o-only-narrow">Seen {{ l.last_seen|relative:True }}</span></td>

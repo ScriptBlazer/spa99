@@ -54,7 +54,7 @@
 .o-line--2 { color: var(--office-muted); }
 .o-wide-xl { display: none; }
 .o-mid-only { display: inline; }
-@media (min-width: 80em) { .o-wide-xl { display: table-cell; } .o-mid-only { display: none; } }
+@media (min-width: 64em) { .o-wide-xl { display: table-cell; } .o-mid-only { display: none; } }   /* all columns on desktop (Moishe 2026-10-30) */
 @media (min-width: 64em) {
   .o-list--leads { table-layout: fixed; }
   .o-list--leads td { height: var(--office-row-h-2); padding-inline: var(--space-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -1,5 +1,5 @@
 {% extends "office/base.html" %}
-{% load office_tags %}
+{% load office_tags text_tags %}
 {% block title %}Chats | Spa 99 Office{% endblock %}
 {% block main %}
 <h1 class="sr-only">Chats</h1>
@@ -13,8 +13,8 @@
     {% for c in rows %}
       <tr class="o-row">
         <td class="c-date"><a class="o-rowlink" href="{% url 'office_chat' c.pk %}">{{ c.created_at|dt }}</a></td>
-        <td>{{ c.preview|default:""|truncatechars:80 }}</td>
-        <td>{% if c.user %}{{ c.user.email }}{% elif c.lead_email %}{{ c.lead_email }}{% else %}Anonymous{% endif %}</td>
+        <td class="c-question">{% truncated c.preview lines=2 %}</td>
+        <td class="c-who">{% if c.user %}{% truncated c.user.email %}{% elif c.lead_email %}{% truncated c.lead_email %}{% else %}Anonymous{% endif %}</td>
         <td class="num">{{ c.message_count }}</td>
         {% if show_cost %}<td class="num">{{ c.total_cost_pence|floatformat:2 }}p</td>{% endif %}
         <td>{% if c.ended_off_topic %}Closed: off-topic{% endif %}{% if c.ended_by_cap %} Stopped by the spending cap{% endif %}</td>

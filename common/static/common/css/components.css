@@ -325,3 +325,10 @@ html.has-sale .menu::backdrop { background: transparent; }
 @media (max-width: 47.99em) { .whatsapp-slot .btn-whatsapp { width: 100%; } }
 .footer-whatsapp { margin-top: var(--space-3); justify-self: start; }
 @media (max-width: 47.99em) { .footer-whatsapp .btn-whatsapp { width: auto; } }
+
+/* ---------- long text (common/templatetags/text_tags.py `truncated`): never cut off silently, the full text is in the title.
+   One line with an ellipsis, or two / three lines then an ellipsis. Set the width on the parent (e.g. a table column). ---------- */
+.u-truncate { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u-clamp-2, .u-clamp-3 { display: -webkit-box; min-width: 0; max-width: 100%; overflow: hidden; -webkit-box-orient: vertical; white-space: normal; overflow-wrap: anywhere; }
+.u-clamp-2 { -webkit-line-clamp: 2; line-clamp: 2; }
+.u-clamp-3 { -webkit-line-clamp: 3; line-clamp: 3; }
