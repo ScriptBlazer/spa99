@@ -236,3 +236,7 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 .o-badge--no-business { background: var(--office-danger); color: var(--color-cream); margin-left: var(--space-2); }
 .o-badge--yes-business { background: var(--office-caramel-tint); color: var(--office-text); margin-left: var(--space-2); }
 .o-badges .o-badge--no-business, .o-badges .o-badge--yes-business { margin-left: 0; }
+
+/* Gold list: the Invite column only shows when a row on screen has an invite (approved people). Waiting and Declined views
+   have none, so the column steps aside (Moishe 2026-10-30). Pure CSS, so it follows the filters as rows are swapped in. */
+.o-list--gold:not(:has(td.c-invite:not([data-invite-state=""]))) .c-invite { display: none; }
