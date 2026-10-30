@@ -150,7 +150,7 @@
 .o-wait-when { font-size: var(--text-sm); color: var(--office-muted); }
 .o-wait-go { margin-left: auto; color: var(--office-muted); }
 .o-wait-action { display: none; }
-@media (min-width: 64em) { .o-wait-action { display: block; } .o-wait-go { margin-left: 0; order: 9; } .o-wait-link { flex-wrap: nowrap; } .o-wait-name { flex: 1; } }
+@media (min-width: 64em) { .o-wait-action { display: inline-flex; align-items: center; flex: none; } .o-wait-go { margin-left: 0; order: 9; } .o-wait-link { flex-wrap: nowrap; } .o-wait-name { flex: 1; } }
 .o-more { margin-top: var(--space-2); padding-inline: var(--space-3); }
 .o-latest-row { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "name when" "plan when"; align-items: center; gap: 0 var(--space-3); min-height: 4rem; padding: var(--space-2) var(--space-3); border-radius: var(--office-radius); color: inherit; text-decoration: none; transition: background-color var(--office-dur-lift) var(--ease-soft); }
 .o-latest-name { grid-area: name; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

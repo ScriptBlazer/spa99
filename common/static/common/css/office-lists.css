@@ -77,7 +77,9 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
    Sale price and Lists (o-hide-md) leave below 90em. Phones are untouched (they have their own card layout). */
 @media (min-width: 64em) { .o-hide-lg { display: none; } }
 @media (min-width: 64em) and (max-width: 89.99em) { .o-hide-md { display: none; } }
-@media (min-width: 64em) { .o-tablecard { overflow-x: auto; } }   /* last resort at any width: reachable by scrolling, never cut off */
+/* Last resort at any width: reachable by scrolling, never cut off. The card is then a scroll box, so the sticky header would
+   offset by the page header height inside it and cover the first row: inside the card the header sits at the top (top: 0). */
+@media (min-width: 64em) { .o-tablecard { overflow-x: auto; } .o-tablecard .o-list thead th { top: 0; } }
 
 /* ---------- the list: phone cards, one surface card per row ---------- */
 @media (max-width: 63.99em) {
