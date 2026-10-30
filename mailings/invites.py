@@ -339,6 +339,21 @@ def good_invite(token):
     return invite
 
 
+def open_tracking_headers(invite):
+    """Mail headers that make Postmark track opens of THIS email (invites only; every other email is sent without them) and say which
+    invite it was, so the Open webhook can find it. Other backends (console, locmem, SES) just carry them as unused headers."""
+    return {"X-PM-TrackOpens": "true", "X-PM-Tag": "invite", "X-PM-Metadata-invite": invite.token}
+
+
+def mark_email_opened(token, when=None):
+    """Postmark says the invite email was opened. Records the first open only; unknown or bad tokens change nothing.
+    (Not the link click: that is `opened_at` / status OPENED.) Returns the number of invites changed."""
+    if not isinstance(token, str) or not 8 <= len(token) <= 40:
+        return 0
+    when = when or timezone.now()
+    return Invite.objects.filter(token=token, email_opened_at__isnull=True).update(email_opened_at=when)
+
+
 def mark_opened(invite):
     """First time only; never downgrades a registered one."""
     if invite.status == Invite.SENT:

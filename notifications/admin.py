@@ -4,7 +4,7 @@ from simple_history.admin import SimpleHistoryAdmin
 
 from common.admin import ExportCsvMixin
 
-from .models import EmailLog, EmailSuppression, NotificationTemplate
+from .models import EmailBounce, EmailLog, EmailSuppression, NotificationTemplate
 
 
 @admin.register(EmailLog)
@@ -46,4 +46,19 @@ class EmailSuppressionAdmin(ExportCsvMixin, admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(EmailBounce)
+class EmailBounceAdmin(ExportCsvMixin, admin.ModelAdmin):
+    """Read-only log of Postmark bounces and complaints (also shown in System > Emails > Bounces)."""
+
+    list_display = ("received_at", "email", "kind", "postmark_type")
+    list_filter = ("kind",)
+    search_fields = ("email",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False

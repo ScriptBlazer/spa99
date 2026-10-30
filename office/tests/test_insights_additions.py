@@ -197,6 +197,26 @@ class InvitedTests(OfficeTestCase):
         self.assertNotIn(">Old<", body)
         self.assertIn("Invite again from System", body)
 
+    def test_opened_but_not_clicked_state_column_and_csv(self):
+        now = timezone.now()
+        self.invite("a@x.com", email_opened_at=now)  # opened the email only
+        self.invite("b@x.com", Invite.OPENED, opened_at=now, email_opened_at=now)  # opened and clicked
+        self.invite("c@x.com")  # nothing
+        self.invite("d@x.com", email_opened_at=now, expires_at=now - timedelta(days=1))  # opened, but expired
+        self.assertEqual(self.emails("state=opened"), ["a@x.com"])
+        self.assertEqual(self.emails("state=all"), ["a@x.com", "b@x.com", "c@x.com", "d@x.com"])
+        self.assertIn("Opened, not clicked", get(self.admin, "/invited/").content.decode())
+        with CaptureQueriesContext(connection) as small:
+            get(self.admin, "/invited/?state=all")
+        self.invite("e@x.com", email_opened_at=now)
+        with CaptureQueriesContext(connection) as big:
+            get(self.admin, "/invited/?state=all")
+        self.assertEqual(len(small), len(big))
+        csv_text = get(self.admin, "/invited/export.csv?state=opened").content.decode()
+        self.assertIn("opened_email", csv_text.splitlines()[0])
+        self.assertIn("a@x.com", csv_text)
+        self.assertNotIn("c@x.com", csv_text)
+
     def test_lists_and_link_to_the_lead_page(self):
         self.invite("a@x.com")
         group = ContactList.objects.create(name="Gym members")

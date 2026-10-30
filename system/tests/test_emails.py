@@ -25,7 +25,7 @@ from plans.models import Plan
 User = get_user_model()
 LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "emails-tests"}}
 UUID = "00000000-0000-0000-0000-000000000000"
-PATHS = ["/emails/", "/emails/suppressions/", "/emails/automatic/", "/emails/automatic/verify/", "/emails/mailings/", "/emails/mailings/new/",
+PATHS = ["/emails/", "/emails/suppressions/", "/emails/bounces/", "/emails/automatic/", "/emails/automatic/verify/", "/emails/mailings/", "/emails/mailings/new/",
          "/emails/groups/", "/emails/groups/new/", f"/emails/mailings/{UUID}/", f"/emails/mailings/{UUID}/confirm/", f"/emails/groups/{UUID}/",
          f"/emails/groups/{UUID}/add/", f"/emails/groups/past-invites/{UUID}/", "/emails/invites/", f"/emails/invites/{UUID}/"]
 POSTS = ["/emails/automatic/verify/save/", "/emails/automatic/verify/preview/", "/emails/automatic/verify/test/", "/emails/automatic/verify/reset/",

@@ -12,7 +12,7 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from notifications.models import EmailSuppression
+from notifications.models import EmailBounce, EmailSuppression
 from pages import clicks
 from plans.models import SiteSettings
 from users.forms import SignInForm
@@ -180,10 +180,12 @@ def sign_out(request):
 @unlocked
 @require_GET
 def dashboard(request):
+    from . import emails as emails_logic
+
     site = SiteSettings.load()
     context = {"health": services.health_report(), "recent": services.recent_changes(defaults.get(request).dashboard_recent_changes), "site": site,
                "stages": [("Registration", site.register_interest_open), ("Book", site.booking_open)],
-               "whatsapp": clicks.summary()}
+               "whatsapp": clicks.summary(), "bounces_week": emails_logic.bounces_week()}
     return page(request, "system/dashboard.html", "dashboard", context)
 
 
@@ -207,6 +209,16 @@ def change_log(request):
                "active_filters": sum(bool(v) for v in (params["user"], params["section"], params["category"], params["range"] or params["date_from"] or params["date_to"])),
                "chain": audit.stored_status()}  # the stored result only: a full verify per page load is too costly
     return page(request, "system/changes.html", "changes", context)
+
+
+@unlocked
+@require_GET
+def bounces(request):
+    from . import emails as emails_logic
+
+    kind = request.GET.get("kind", "")
+    context = {"rows": emails_logic.bounce_rows(kind), "kind": kind, "kinds": EmailBounce.KIND_CHOICES}
+    return page(request, "system/emails_bounces.html", "emails", context)
 
 
 @unlocked

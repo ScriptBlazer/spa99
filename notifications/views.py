@@ -39,8 +39,9 @@ def ses_notifications(request):
 @require_POST
 @rate_limited_json("postmark-webhook", 300, 60)
 def postmark_webhook(request):
-    """Postmark bounce and spam-complaint feedback. 404 unless POSTMARK_WEBHOOK_USER and _PASSWORD are both set.
-    Valid records we ignore (soft bounces, other types) still answer 200, because Postmark retries anything else."""
+    """Postmark feedback: bounces and spam complaints (logged, and suppressed when permanent) and invite email opens. 404 unless
+    POSTMARK_WEBHOOK_USER and _PASSWORD are both set. Valid records we ignore (other types, opens without a known invite) still
+    answer 200, because Postmark retries anything else."""
     if not postmark.configured():
         raise Http404
     if not postmark.authorised(request.META.get("HTTP_AUTHORIZATION")):

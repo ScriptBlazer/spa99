@@ -14,6 +14,7 @@
     <div class="f"><form method="post" action="{% url 'system_job_run' 'snapshot' %}" data-system-run="snapshot">{% csrf_token %}<button type="submit" class="sys-btn sm">Run now</button></form></div></div>
   <div class="sys-tile" data-system-tile="people"><div class="l">People</div><div class="v" data-system-count="registrations">{{ health.people_total }}</div><div class="m">registered</div></div>
   <div class="sys-tile" data-system-tile="failed"><div class="l">Failed jobs {% if health.failed_tasks_24h %}<span class="sys-badge danger">Check</span>{% endif %}</div><div class="v" data-system-failed-tasks>{{ health.failed_tasks_24h|default_if_none:"Unknown" }}</div><div class="m">last 24 hours</div></div>
+  <div class="sys-tile" data-system-tile="bounces"><div class="l">Bounces {% if bounces_week %}<span class="sys-badge warn">Check</span>{% endif %}</div><div class="v" data-system-bounces><a href="{% url 'system_bounces' %}">{{ bounces_week }}</a></div><div class="m">last 7 days</div></div>
   <div class="sys-tile" data-system-tile="gold-waiting"><div class="l">Gold waiting</div><div class="v" data-system-gold-waiting>{{ health.gold_waiting }}</div><div class="m">new or contacted</div></div>
   <div class="sys-tile" data-system-tile="gold"><div class="l">Gold applications</div><div class="v" data-system-count="gold_applications">{{ health.counts.gold_applications|default:0 }}</div><div class="m">all time</div></div>
 </section>

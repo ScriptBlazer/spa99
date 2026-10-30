@@ -84,6 +84,7 @@ urlpatterns = [
     path("sales/<uuid:pk>/extend/", sl.sale_extend, name="system_sale_extend"),
     path("sales/<uuid:pk>/end/", sl.sale_end, name="system_sale_end"),
     path("sales/<uuid:pk>/preview/", sl.sale_preview, name="system_sale_preview"),
+    path("emails/bounces/", views.bounces, name="system_bounces"),
     path("emails/suppressions/", views.suppressions, name="system_suppressions"),
     path("emails/suppressions/<uuid:pk>/remove/", views.suppression_remove, name="system_suppression_remove"),
     path("suppressions/", RedirectView.as_view(pattern_name="system_suppressions", permanent=True)),  # moved into Emails (2026-10-27)

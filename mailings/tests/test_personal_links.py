@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from mailings import blocks, invites, lists, segments, sending
 from mailings.models import ContactList, ContactListMember, EmailOptOut, Invite, Mailing, MailingRecipient
-from mailings.tests.test_mailings import lead, person
+from mailings.tests.test_mailings import lead, mailing, person
 from notifications.services import preview_email
 from plans.management.commands.seed_phase1 import seed_all
 from users import services as user_services
@@ -81,6 +81,17 @@ class PersonalSendTests(PersonalBase):
         sending.run_mailing(m.pk)  # a second run, or building the list again, adds nothing
         sending.snapshot(m)
         self.assertEqual((len(mail.outbox), Invite.objects.filter(batch_id=m.pk).count()), (2, 2))
+
+    def test_only_invite_emails_ask_postmark_to_track_opens(self):
+        m = sending.start(self.make(), self.admin)
+        invite = Invite.objects.get(batch_id=m.pk, email="al@example.com")
+        headers = next(msg for msg in mail.outbox if msg.to == ["al@example.com"]).extra_headers
+        self.assertEqual((headers["X-PM-TrackOpens"], headers["X-PM-Tag"], headers["X-PM-Metadata-invite"]), ("true", "invite", invite.token))
+        mail.outbox.clear()
+        person("news@example.com", consent=True)
+        sending.start(mailing(), self.admin)  # an ordinary news send: no tracking headers
+        self.assertTrue(mail.outbox)
+        self.assertFalse([k for msg in mail.outbox for k in msg.extra_headers if k.startswith("X-PM-")])
 
     def test_the_pop_up_counts_members_and_invited_people_as_skipped(self):
         m = self.make()

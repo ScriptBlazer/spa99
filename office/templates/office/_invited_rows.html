@@ -4,8 +4,9 @@
   <td class="c-email" data-col="email" title="{{ r.email }}">{{ r.email }}</td>
   <td class="c-lists o-hide-md" data-col="lists" title="{{ r.lists|join:", " }}">{{ r.lists|join:", "|default:"None" }}</td>
   <td class="c-date num" data-col="invited">{{ r.invited_at|dt }}</td>
+  <td class="c-opened" data-col="opened"><span class="o-only-narrow">Opened email: </span>{% if r.opened %}{% if r.opened_at %}{{ r.opened_at|dt }}{% else %}Yes{% endif %}{% else %}&mdash;{% endif %}</td>
   <td class="c-clicked" data-col="clicked"><span class="o-only-narrow">Clicked the link: </span>{% if r.clicked %}Yes{% else %}No{% endif %}</td>
   <td class="c-expired" data-col="expired"><span class="o-only-narrow">Expired: </span>{% if r.expired %}Yes{% else %}No{% endif %}</td>
 </tr>
-{% empty %}<tr class="o-empty-row" data-empty><td colspan="6"><p>{% if filtered %}No one matches that. Try another view.{% else %}No one is waiting: every invited person has registered or clicked the link.{% endif %}</p></td></tr>{% endfor %}
-{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="6"><a class="btn btn-secondary btn-sm" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}
+{% empty %}<tr class="o-empty-row" data-empty><td colspan="7"><p>{% if filtered %}No one matches that. Try another view.{% else %}No one is waiting: every invited person has registered or clicked the link.{% endif %}</p></td></tr>{% endfor %}
+{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="7"><a class="btn btn-secondary btn-sm" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}

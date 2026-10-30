@@ -24,7 +24,7 @@ from notifications.seed import DEFAULT_SUBJECTS
 from notifications.services import send_templated, subject_for
 from system.models import SystemEvent
 
-from . import automatic, blocks, segments, tokens
+from . import automatic, blocks, invites, segments, tokens
 from .models import ContactListMember, EmailOptOut, Invite, Mailing, MailingRecipient
 
 logger = logging.getLogger("spa99.email")
@@ -502,6 +502,7 @@ def _send_one(mailing, group, recipient):
                 _finish_row(mailing, recipient, MailingRecipient.FAILED, "No invite row")
                 return
             context["personal_links"] = blocks.personal_links(f"{settings.SITE_URL}/invite/{invite.token}/")
+            headers = {**(headers or {}), **invites.open_tracking_headers(invite)}
             log = send_templated("mailing", [recipient.email], subject_line(mailing.subject, recipient.first_name), context,
                                  headers=headers, body=mailing.body, blocks=mailing.blocks, subject_email=recipient.email)
         elif mailing.automatic_key == "invite":
@@ -509,6 +510,7 @@ def _send_one(mailing, group, recipient):
                 _finish_row(mailing, recipient, MailingRecipient.FAILED, "No invite row")
                 return
             context.update(_invite_context(invite))
+            headers = {**(headers or {}), **invites.open_tracking_headers(invite)}
             log = send_templated("invite", [recipient.email], subject_for("invite", first_name=context["first_name"] or "there"), context,
                                  headers=headers, subject_email=recipient.email)
         else:

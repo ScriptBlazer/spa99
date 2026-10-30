@@ -1,0 +1,28 @@
+{% extends "system/emails_base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Emails" description="What the site sends, and what you send." %}
+{% include "system/_emails_tabs.html" with tab="bounces" %}
+<p class="sys-muted se-summary">Every bounce and spam complaint Postmark reports, soft ones too (the latest 500, kept for a year). Only hard bounces and complaints stop us emailing an address: see Suppressions.</p>
+<p class="se-summary" data-system-bounce-filter>Show:
+  <a href="{% url 'system_bounces' %}"{% if not kind %} aria-current="page"{% endif %}>All</a>
+  {% for value, label in kinds %}<a href="?kind={{ value }}"{% if kind == value %} aria-current="page"{% endif %}>{{ label }}</a> {% endfor %}</p>
+<section class="sys-panel" aria-label="Email bounces">
+  <div class="sys-scroll"><table class="sys-table" data-system-bounces-table>
+    <thead><tr><th scope="col">Date</th><th scope="col">Email</th><th scope="col">Kind</th><th scope="col">Postmark type</th><th scope="col">Detail</th><th scope="col">Suppressed</th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+      <tr data-system-bounce="{{ row.pk }}">
+        <td>{{ row.received_at|date:"j M Y H:i" }}</td>
+        <td><span class="mono">{{ row.email }}</span></td>
+        <td><span class="sys-badge {% if row.kind == "hard" or row.kind == "complaint" %}danger{% elif row.kind == "soft" %}warn{% endif %}">{{ row.get_kind_display }}</span></td>
+        <td>{{ row.postmark_type }}</td>
+        <td>{{ row.detail }}</td>
+        <td>{% if row.suppressed %}<span class="sys-badge danger">Suppressed</span>{% else %}<span class="sys-muted">No</span>{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="sys-muted">No bounces logged.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

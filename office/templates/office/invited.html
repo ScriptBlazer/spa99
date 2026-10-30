@@ -14,7 +14,7 @@
     <div class="o-filters-slot" data-filters-slot>
       <div class="o-filters-body" data-filter-body>
         <div class="o-filter-group"><span class="o-filter-label" id="l-state">Show</span>
-          <fieldset class="o-seg" aria-labelledby="l-state" style="--n: 4; --i: {% if filters.state == "unclicked" %}0{% elif filters.state == "clicked" %}1{% elif filters.state == "expired" %}2{% else %}3{% endif %}" data-default="{{ default_state }}">
+          <fieldset class="o-seg" aria-labelledby="l-state" style="--n: 5; --i: {% if filters.state == "unclicked" %}0{% elif filters.state == "opened" %}1{% elif filters.state == "clicked" %}2{% elif filters.state == "expired" %}3{% else %}4{% endif %}" data-default="{{ default_state }}">
             <span class="o-seg-thumb" aria-hidden="true"></span>
             {% for value, label in states %}<label class="o-seg-item"><input type="radio" name="state" value="{{ value }}"{% if filters.state == value %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}
           </fieldset></div>
@@ -23,6 +23,7 @@
     </div>
   </div>
   <p class="o-totalline" data-region="invited-total">Invited by email, no account yet. <em>Clicked the link</em> means he clicked his personal link, not that he opened the email.
+    <span class="o-muted">Opened email is known only for invites sent after open tracking was switched on, and some mail apps hide opens (Apple Mail marks everything as opened).</span>
     {% if filtered %}<a class="o-quiet" href="{% url 'office_invited' %}" data-clear>Clear</a>{% endif %}
     <a class="o-quiet" href="{{ groups_url }}" data-invite-again>Invite again from System &gt; Groups</a>
     <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button>
@@ -36,7 +37,7 @@
 <div class="o-card o-tablecard" data-list-card>
   <table class="o-list o-list--people">
     <caption class="sr-only">Invited, not registered</caption>
-    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col" class="o-hide-md">Lists</th><th scope="col" class="num">Invited</th><th scope="col">Clicked the link</th><th scope="col">Invite expired</th></tr></thead>
+    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col" class="o-hide-md">Lists</th><th scope="col" class="num">Invited</th><th scope="col">Opened email</th><th scope="col">Clicked the link</th><th scope="col">Invite expired</th></tr></thead>
     <tbody data-region="list" data-office-list="invited">{% include "office/_invited_rows.html" %}</tbody>
   </table>
 </div>

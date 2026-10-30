@@ -131,6 +131,10 @@ Never edit or delete a migration that is already live.
 - **No migration, no backfill.**
 - **After deploy**, refresh the stored figures so Analytics shows "How people heard about us" (the hourly roll-up also does it): `docker compose exec web python manage.py shell -c "from office import snapshots; snapshots.build_everything()"`.
 - The Invited page (`/invited/`) is Admin and above only.
+- **Invite email opens and the Bounces log:** migrations `mailings.0008` (adds nullable `Invite.email_opened_at`; rollback safe) and `notifications.0006` (new `EmailBounce` table; a rollback just leaves it unused). Take the RDS snapshot first. They run on start.
+- **In Postmark**, on the webhook for the Default Transactional Stream, also tick the **Open** event (Bounce and Spam Complaint stay ticked). Open tracking is switched on per email by the site, for invite emails only; opens are known only for invites sent after this release.
+- **Privacy notice changed** (a line about the tracking pixel in invitation emails, date 30 October 2026). Run `docker compose exec web python manage.py backfill_site_data --dry-run`, then without `--dry-run`: it updates the "Emails" part and "Last updated" only while they still have exactly the old wording (a part you edited by hand is left; add the line yourself in Control).
+- System > Emails has a new **Bounces** tab and the Dashboard a "Bounces" tile. Old bounces before this release are not in the log (only new ones).
 
 ## What is kept, and for how long
 
