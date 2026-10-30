@@ -340,7 +340,7 @@ def office_levels(w):
         sign_in(admin, OFFICE, admin_user["email"], PASSWORD)
         admin.goto(f"{OFFICE}/people/")
         with admin.expect_download() as download:
-            admin.locator("[data-export-csv]").click()
+            admin.locator("[data-export-csv]:visible").click()
         content = Path(download.value.path()).read_text()
         assert members[0][0] in content and members[1][0] in content, "The CSV is missing the new members"
         assert content.splitlines()[0].startswith("account_id,"), "Unexpected CSV header"

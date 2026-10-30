@@ -91,7 +91,7 @@
 .o-list--leads th { letter-spacing: 0.04em; }
 .o-tag { display: inline-block; padding: 0 var(--space-1); border: 1px solid var(--office-line, currentColor); border-radius: 999px; font-size: var(--text-xs, 0.75rem); line-height: 1.4; }
 .o-list--leads .c-source .o-cell-sub { display: block; }
-.o-list--leads .o-row td.c-source .u-truncate { display: inline; }   /* phone: "Seen yesterday · localhost" on one line (u-truncate is display: block) */
+@media (max-width: 63.99em) { .o-list--leads .o-row td.c-source .u-truncate { display: inline; } }   /* phone: "Seen yesterday · localhost" on one line (u-truncate is display: block) */
 
 /* phone: one surface card per lead (3.5): email and pill, potential and tier, the two answer lines, seen and source */
 @media (max-width: 63.99em) {

@@ -69,6 +69,8 @@ function navSheet() {
   button.addEventListener('click', () => { sheet.showModal(); button.setAttribute('aria-expanded', 'true'); });
   sheet.addEventListener('click', (event) => { if (event.target === sheet || event.target.closest('a')) sheet.close(); });
   sheet.addEventListener('close', () => { button.setAttribute('aria-expanded', 'false'); button.focus({ preventScroll: true }); });
+  // rotating to a wide screen hides the sheet by CSS: close it so the page is not left behind an invisible modal
+  window.matchMedia('(max-width: 63.99em)').addEventListener('change', (event) => { if (!event.matches && sheet.open) sheet.close(); });
 }
 
 /** Dashboard "What people want": the plus is a <details> summary (works without JS); this keeps aria-expanded true and animates the card's height. */
