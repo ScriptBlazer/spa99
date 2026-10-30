@@ -70,9 +70,8 @@
           <span class="o-wait-name">{{ item.name }}</span>
           {% include "office/_badge.html" with potential=item.potential %}
           <span class="o-wait-when">Applied {{ item.applied|relative:True }}</span>
-          <span class="o-wait-go" aria-hidden="true">{% include "office/_icon.html" with name="chevron-right" %}</span>
+          <span class="o-wait-go"><span class="o-wait-cta">View application</span>{% include "office/_icon.html" with name="chevron-right" %}</span>
         </a>
-        <a class="btn btn-secondary btn-sm o-wait-action" href="{% url 'office_gold_application' item.id %}" data-view-application>View application<span class="sr-only"> {{ item.name }}</span></a>
       </div>
       {% empty %}<p class="o-empty-line">Nothing waiting for you.</p>{% endfor %}
       {% if data.waiting.count > 5 %}<a class="o-quiet o-more" href="{% url 'office_gold' %}">See all {{ data.waiting.count|num }}</a>{% endif %}
