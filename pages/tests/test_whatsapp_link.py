@@ -8,14 +8,17 @@ from pages import clicks
 from pages.models import LinkClickDay
 from plans.models import SiteSettings
 
-URL = "https://wa.me/447530117902"
+NUMBER = "447530117902"
+MESSAGE = "Hi, I'd love to find out more about Spa 99."
+BASE = f"https://wa.me/{NUMBER}"
+URL = BASE + "?text=Hi%2C%20I%27d%20love%20to%20find%20out%20more%20about%20Spa%2099."  # the saved message, encoded
 BROWSER = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) AppleWebKit/605.1.15 Safari/604.1"
 
 
 class WhatsappLinkTests(TestCase):
     def setUp(self):
         SiteSettings.load()
-        SiteSettings.objects.update(discount_contact_url=URL)
+        SiteSettings.objects.update(whatsapp_number=NUMBER, whatsapp_message=MESSAGE)
         self.client = Client(HTTP_USER_AGENT=BROWSER)
 
     def total(self, **filters):
@@ -27,7 +30,7 @@ class WhatsappLinkTests(TestCase):
         self.assertEqual(self.total(key="whatsapp", source="register", day=timezone.localdate()), 1)
 
     def test_a_blank_link_falls_back_to_the_visit_page_and_still_counts(self):
-        SiteSettings.objects.update(discount_contact_url="")
+        SiteSettings.objects.update(whatsapp_number="")
         response = self.client.get("/whatsapp/")
         self.assertEqual((response.status_code, response["Location"]), (302, "/visit/"))
         self.assertEqual(self.total(), 1)
@@ -78,7 +81,7 @@ class WhatsappLinkTests(TestCase):
 
         self.assertEqual(short_url("chat"), "/whatsapp/?from=chat")
         self.assertEqual(short_url("anything"), "/whatsapp/?from=other")
-        SiteSettings.objects.update(discount_contact_url="")
+        SiteSettings.objects.update(whatsapp_number="")
         self.assertEqual(short_url("chat"), "")
 
     def test_by_source_is_capped_and_robots_hides_the_link(self):
@@ -93,24 +96,34 @@ class WhatsappMessageTests(TestCase):
 
     def setUp(self):
         SiteSettings.load()
-        SiteSettings.objects.update(discount_contact_url=URL)
+        SiteSettings.objects.update(whatsapp_number=NUMBER, whatsapp_message=MESSAGE)
         self.client = Client(HTTP_USER_AGENT=BROWSER)
 
     def test_gold_business_adds_the_encoded_text_and_counts_under_gold(self):
         response = self.client.get("/whatsapp/?from=gold&msg=gold_business")
-        self.assertEqual(response["Location"], URL + "?text=Hi%2C%20I%27ve%20just%20applied%20for%20the%20Spa%2099%20Gold%20Card%20and%20I%27m%20happy%20to%20do%20business%20with%20BML.")
+        self.assertEqual(response["Location"], BASE + "?text=Hi%2C%20I%27ve%20just%20applied%20for%20the%20Spa%2099%20Gold%20Card%20and%20I%27m%20happy%20to%20do%20business%20with%20BML.")
         self.assertEqual(sum(LinkClickDay.objects.filter(source="gold").values_list("count", flat=True)), 1)
 
     def test_unknown_keys_and_free_text_are_ignored(self):
         for query in ("msg=nope", "msg=Hello%20there", "msg=", "msg=__class__"):
             self.assertEqual(self.client.get(f"/whatsapp/?from=gold&{query}")["Location"], URL, query)
 
-    def test_an_existing_query_is_kept_and_a_text_of_its_own_wins(self):
-        SiteSettings.objects.update(discount_contact_url="https://api.whatsapp.com/send?phone=447530117902")
-        self.assertTrue(self.client.get("/whatsapp/?msg=gold_business")["Location"].startswith("https://api.whatsapp.com/send?phone=447530117902&text=Hi%2C"))
-        SiteSettings.objects.update(discount_contact_url=URL + "?text=Hello")
-        self.assertEqual(self.client.get("/whatsapp/?msg=gold_business")["Location"], URL + "?text=Hello")
+    def test_the_saved_message_is_encoded_and_a_known_key_replaces_it(self):
+        self.assertEqual(self.client.get("/whatsapp/?from=home")["Location"], URL)
+        SiteSettings.objects.update(whatsapp_message="Hello & welcome? 100%")
+        self.assertEqual(self.client.get("/whatsapp/")["Location"], BASE + "?text=Hello%20%26%20welcome%3F%20100%25")
+        self.assertIn("Gold%20Card", self.client.get("/whatsapp/?msg=gold_business")["Location"])  # the key wins over the saved message
+
+    def test_no_saved_message_gives_the_bare_number_link(self):
+        SiteSettings.objects.update(whatsapp_message="")
+        self.assertEqual(self.client.get("/whatsapp/")["Location"], BASE)
+
+    def test_the_new_page_keys_are_in_the_allowlist(self):
+        from pages.links import short_path
+
+        for key in ("footer", "home", "spa", "tour", "gold_card", "book"):
+            self.assertEqual(short_path(key), f"/whatsapp/?from={key}")
 
     def test_a_blank_link_still_goes_to_visit_without_a_message(self):
-        SiteSettings.objects.update(discount_contact_url="")
+        SiteSettings.objects.update(whatsapp_number="")
         self.assertEqual(self.client.get("/whatsapp/?from=gold&msg=gold_business")["Location"], "/visit/")

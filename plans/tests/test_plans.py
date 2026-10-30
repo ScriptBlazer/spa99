@@ -132,13 +132,13 @@ class MembershipsPageDataTests(TestCase):
             return Template("{% load content_tags %}{% gold_fee_note %}").render(Context()).strip()
 
         gold_cta = page_content("memberships")["gold_cta"].body
-        self.assertIn("free*, by application", gold_cta)
+        self.assertIn("a free membership* for BML clients", gold_cta)
         self.assertIn("*An annual admin fee of £199 + VAT applies.", render())
         Plan.objects.filter(slug="gold").update(annual_fee=Decimal("150.50"))
         self.assertIn("£150.50 + VAT", render())
         Plan.objects.filter(slug="gold").update(annual_fee=None)  # no fee: plain "free", no note
         self.assertEqual(render(), "")
-        self.assertIn("free, by application", page_content("memberships")["gold_cta"].body)
+        self.assertIn("a free membership for BML clients", page_content("memberships")["gold_cta"].body)
         self.assertNotIn("*", services.gold_star() + page_content("home")["gold_teaser"].body)
         self.assertEqual(services.gold_fee_note(), "")
 

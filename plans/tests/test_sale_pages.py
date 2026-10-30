@@ -35,6 +35,21 @@ class SalePageTests(TestCase):
             for gone in ("data-sale-close", "sale-bar-close", "Hide the sale bar", "spa99.sale.dismissed", "sale-off"):
                 self.assertNotIn(gone, html, (path, gone))
 
+    def test_home_sale_band_has_a_whatsapp_button_with_the_rates_message_only_while_a_sale_and_a_number(self):
+        from plans.models import SiteSettings
+
+        SiteSettings.objects.update(whatsapp_number="447441919990")
+        link = 'href="/whatsapp/?from=home_sale&amp;msg=rates"'
+        self.assertNotIn("home_sale", self.client.get("/").content.decode())  # no sale
+        make_sale(start=-1, end=80)
+        html = self.client.get("/").content.decode()
+        self.assertIn(link, html)
+        self.assertIn("WhatsApp us for custom prices", html)
+        self.assertIn("btn btn-secondary btn-whatsapp", html[html.index(link) - 120:html.index(link)])
+        self.assertNotIn("home_sale", self.client.get("/memberships/").content.decode())  # the Memberships band is not Home
+        SiteSettings.objects.update(whatsapp_number="")  # sale but no number
+        self.assertNotIn("home_sale", self.client.get("/").content.decode())
+
     def test_bar_and_band_together_on_home_and_memberships(self):
         make_sale(start=-1, end=80)
         for path in ("/", "/memberships/"):

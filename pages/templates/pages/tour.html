@@ -25,6 +25,7 @@
       {% if room.line %}<p class="tour-line" id="tour-line">{{ room.line }}</p>{% endif %}
       {% if copy.impression_note.body %}<p class="tour-note" id="tour-note">{{ copy.impression_note.body }}</p>{% endif %}
       <a class="tour-spa-link btn-quiet" id="tour-spa-link" href="{{ room.spa_url }}"><span>{{ room.spa_label }}</span>{% include "common/_icon.html" with name="arrow-right" %}</a>
+      {% whatsapp_slot "tour" slot_class="tour-whatsapp" %}
     </div>
     <nav class="tour-rooms" id="tour-rooms" aria-label="Rooms">
       {% for r in rooms %}<a href="{{ r.tour_url }}" data-room-link="{{ r.slug }}"{% if r.slug == room.slug %} aria-current="page"{% endif %}>{{ r.name }}</a>{% endfor %}

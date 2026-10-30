@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from common.jsonshape import has_non_ascii_digit
-from plans.models import FINAL_POTENTIAL_CHOICES, SiteSettings
+from plans.models import FINAL_POTENTIAL_CHOICES, SiteSettings, normalise_whatsapp_number
 
 from . import services
 
@@ -122,6 +122,13 @@ LAUNCH_HELP = {
 }
 
 
+class WhatsappNumberField(forms.CharField):
+    """Accepts '+44 7441 919990' or '07441 919990' and keeps 447441919990 (the model's 8 to 15 digits rule then applies)."""
+
+    def to_python(self, value):
+        return normalise_whatsapp_number(super().to_python(value))
+
+
 class SettingsForm(VersionedForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -131,8 +138,11 @@ class SettingsForm(VersionedForm):
         # One-line help for the Launch group, set here so the model's own help_text (and so a migration) stays as it is.
         for name, help_text in LAUNCH_HELP.items():
             self.fields[name].help_text = help_text
-        self.fields["discount_contact_url"].assume_scheme = "https"
-        self.fields["discount_contact_url"].widget.attrs.update({"placeholder": "https://wa.me/..."})
+        self.fields["whatsapp_number"].widget.attrs.update({"placeholder": "447441919990", "inputmode": "tel", "autocomplete": "off"})
+        self.fields["whatsapp_number"].help_text = ("Digits only, starting with the country code and no +, e.g. 447441919990 (UK 07441 919990). "
+                                                     "If you type +44 or a leading 0 it is tidied for you. Empty = the WhatsApp buttons are hidden.")
+        self.fields["whatsapp_message"].required = False  # empty = the link opens the chat with no message ready
+        self.fields["whatsapp_rate_message"].required = False  # empty = the general message is used
         self.fields["code_theme_default"].required = False  # a post without it (older forms, scripts) keeps the saved theme
         for name, low, high in (("lock_idle_minutes", 1, 240), ("max_sign_in_hours", 1, 72)):
             self.fields[name].widget.attrs.update({"min": low, "max": high})
@@ -157,5 +167,6 @@ class SettingsForm(VersionedForm):
     class Meta:
         model = SiteSettings
         fields = ["opening_date", "opening_text", "register_interest_open", "memberships_public", "journey_email_gate", "booking_open",  # subscribe_open hidden until card payments (Moishe 2026-10-29)
-                  "join_wording", "show_leil_shishi", "vat_rate", "discount_contact_url", "lock_idle_minutes", "max_sign_in_hours", "code_theme_default"]
+                  "join_wording", "show_leil_shishi", "vat_rate", "whatsapp_number", "whatsapp_message", "whatsapp_rate_message", "lock_idle_minutes", "max_sign_in_hours", "code_theme_default"]
         widgets = {"opening_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}
+        field_classes = {"whatsapp_number": WhatsappNumberField}

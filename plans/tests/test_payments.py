@@ -462,5 +462,5 @@ class ScreenTests(PaymentCase):
         self.assertContains(page, "No payment is taken now")
         self.assertContains(page, "2 weeks")
         self.assertNotContains(page, "WhatsApp us")
-        SiteSettings.objects.update(discount_contact_url="https://wa.me/447000000000")
+        SiteSettings.objects.update(whatsapp_number="447000000000")
         self.assertContains(Client(HTTP_HOST="localhost").get("/register/"), "WhatsApp us")

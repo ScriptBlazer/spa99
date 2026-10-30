@@ -38,3 +38,7 @@
   .sale-band--raised, .sale-band--deep { background: var(--color-espresso); }
   .sale-band-keep, .sale-band-label { color: var(--color-text-inverse); }
 }
+/* Home sale band: "WhatsApp us for custom prices" beside (desktop) or under (phone) the main button; colour comes from the dark section */
+.sale-band-whatsapp { margin-top: var(--space-3); }
+@media (max-width: 47.99em) { .sale-band-whatsapp { width: 100%; } }
+@media (min-width: 48em) { .sale-band-whatsapp { margin: 0 0 0 var(--space-3); } }

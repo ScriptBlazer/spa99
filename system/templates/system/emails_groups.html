@@ -16,11 +16,12 @@
 <section class="sys-panel" aria-labelledby="groups-lists-h">
   <header><h2 id="groups-lists-h">Uploaded lists</h2><a class="sys-btn sm" href="{% url 'system_list_new' %}">New list</a></header>
   <div class="sys-scroll"><table class="sys-table se-lists" data-system-lists>
-    <thead><tr><th scope="col">Name</th><th scope="col">Category</th><th scope="col" class="sys-num">People</th><th scope="col">Added</th><th scope="col">By</th></tr></thead>
+    <thead><tr><th scope="col">Name</th><th scope="col">Category</th><th scope="col" class="sys-num">People</th><th scope="col">Added</th><th scope="col">By</th><th scope="col"><span class="sr-only">Add people</span></th></tr></thead>
     <tbody>{% for l in lists %}<tr data-system-list="{{ l.pk }}" data-se-row>
       <td class="se-name"><a href="{% url 'system_list' l.pk %}">{{ l.name }}</a></td><td>{{ l.category|default:"-" }}</td><td class="sys-num">{{ l.people|floatformat:"0g" }}</td>
-      <td>{{ l.created_at|date:"j M Y" }}</td><td>{{ l.created_by.email|default:"-" }}</td></tr>
-    {% empty %}<tr><td colspan="5" class="sys-empty">No lists yet. <a class="sys-btn sm primary" href="{% url 'system_list_new' %}">New list</a></td></tr>{% endfor %}</tbody>
+      <td>{{ l.created_at|date:"j M Y" }}</td><td>{{ l.created_by.email|default:"-" }}</td>
+      <td><a class="sys-btn sm" href="{% url 'system_list_add' l.pk %}" data-system-list-add-people>Add people<span class="sr-only"> to {{ l.name }}</span></a></td></tr>
+    {% empty %}<tr><td colspan="6" class="sys-empty">No lists yet. <a class="sys-btn sm primary" href="{% url 'system_list_new' %}">New list</a></td></tr>{% endfor %}</tbody>
   </table></div>
 </section>
 {% if batches %}<section class="sys-panel" aria-labelledby="groups-past-h">

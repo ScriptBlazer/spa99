@@ -257,6 +257,7 @@ function nudge() {
 }
 
 const arrowIcon = () => makeArrow(config.iconSprite);
+const whatsappIcon = () => makeArrow(config.iconSprite, 'whatsapp-logo');
 
 function renderQuestionScreen(number) {
   const screen = state.screens.find((s) => s.number === number);
@@ -311,8 +312,9 @@ function renderResult(data) {
       el('a', { class: 'btn btn-primary btn-block-phone', href: registerUrl(s.slug) }, ctaText, ' ', arrowIcon()),
       el('button', { type: 'button', class: 'btn-quiet', 'data-restart': '', text: copyOf('start_again').cta })),
     config.whatsappUrl
-      ? el('p', { class: 'whatsapp-rate small muted' }, 'Looking for a better rate? ',
-        el('a', { class: 'btn-quiet small', href: config.whatsappUrl, target: '_blank', rel: 'noopener noreferrer' }, 'WhatsApp us', el('span', { class: 'sr-only', text: ' (opens in a new tab)' })), '.')
+      ? el('div', { class: 'whatsapp-rate' }, el('p', { class: 'small muted', text: 'Looking for a better rate?' }),
+        el('a', { class: 'btn btn-secondary btn-whatsapp', href: config.whatsappUrl, target: '_blank', rel: 'noopener noreferrer', 'data-journey-whatsapp': '' },
+          whatsappIcon(), el('span', { text: 'WhatsApp us' }), el('span', { class: 'sr-only', text: ' (opens in a new tab)' })))
       : null,
     presentation === 'line'
       ? el('p', { class: 'gold-line-note' }, `${goldLineCopy.body} `, el('a', { href: config.urls.goldApply, text: goldLineCopy.cta }))

@@ -21,7 +21,7 @@ from plans import services as plan_services
 from plans.models import SiteSettings
 
 from . import clicks, services
-from .links import short_url, with_message
+from .links import short_url, target_url
 from .access import memberships_visible
 
 JOURNEY_SLUGS = {1: "your-time", 2: "what-draws-you", 3: "company", 4: "about-you"}
@@ -181,7 +181,7 @@ def journey(request, slug=""):
                  "memberships": reverse("memberships") if shown else reverse("journey"),
                  "membershipsPage": reverse("memberships")},  # the result link: he has passed the gate by then
         "membershipsHidden": not shown,
-        "whatsappUrl": short_url("journey"),  # '' while no WhatsApp link is set: the result then shows no line
+        "whatsappUrl": short_url("journey", msg="rates"),  # '' while no WhatsApp link is set: the result then shows no line
         "emailGate": SiteSettings.load().journey_email_gate,
         "inviteEmail": _invite_email(request),  # from a personal invite link: starts the email step filled in (still editable)
         "signedIn": request.user.is_authenticated,  # "Not you?" is for shared devices, never for a known person
@@ -221,8 +221,7 @@ def gold_apply(request, slug=""):
 @never_cache
 def whatsapp(request):
     clicks.record(request)
-    link = SiteSettings.load().discount_contact_url
-    target = with_message(link, request.GET.get("msg")) if link else reverse("visit")  # no link set: the Visit page (it holds our contact details)
+    target = target_url(SiteSettings.load(), request.GET.get("msg")) or reverse("visit")  # no number set: the Visit page (it holds our contact details)
     return HttpResponseRedirect(target)
 
 

@@ -43,7 +43,7 @@ class SettingsLaunchTests(TestCase):
         html = unlocked_client(make_user()).get("/settings/").content.decode()
         self.assertIn("<h3>Launch</h3>", html)
         self.assertNotIn("<h3>Stages</h3>", html)
-        group = html[html.index("<h3>Launch</h3>"):html.index("<h3>Wording and tax</h3>")]
+        group = html[html.index("<h3>Launch</h3>"):html.index("<h3>Wording, tax and WhatsApp</h3>")]
         self.assertIn('Card payments are opened separately in <a href="/payments/">Payments</a>.', group)
         names = re.findall(r'data-system-field="(\w+)"', group)
         self.assertEqual(names, ["opening_date", "opening_text", "register_interest_open", "journey_email_gate", "memberships_public", "booking_open"])

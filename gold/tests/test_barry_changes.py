@@ -89,8 +89,8 @@ class WordingAndLocationTests(TestCase):
 
     def test_the_gold_page_gets_the_whatsapp_link_only_while_one_is_set(self):
         SiteSettings.load()
-        SiteSettings.objects.update(discount_contact_url="https://wa.me/447530117902")
+        SiteSettings.objects.update(whatsapp_number="447530117902")
         page = Client().get("/gold-card/apply/").content.decode()
         self.assertIn("/whatsapp/?from=gold&amp;msg=gold_business", page.replace("\\u0026", "&amp;"))
-        SiteSettings.objects.update(discount_contact_url="")
+        SiteSettings.objects.update(whatsapp_number="")
         self.assertIn('"whatsappBusiness": ""', Client().get("/gold-card/apply/").content.decode())

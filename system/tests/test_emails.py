@@ -2,6 +2,7 @@
 events. Mocked: in-memory outbox, SES is the dev/locmem path or a patched boto3."""
 import csv
 import io
+from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -11,9 +12,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from mailings import invites as invites_module, sending
+from mailings import invites as invites_module, lists, sending
 from mailings.models import ContactList, ContactListMember, EmailOptOut, Invite, Mailing, MailingRecipient, MailingTemplate
-from notifications.models import EmailLog, NotificationTemplate
+from notifications import suppression
+from notifications.models import EmailLog, EmailSuppression, NotificationTemplate
 from plans.management.commands.seed_phase1 import seed_all
 from system.models import SystemChange, SystemEvent
 from system.tests.test_system import PASSWORD, make_user, sign_in, unlocked_client
@@ -598,3 +600,106 @@ class PagerTests(TestCase):
             self.assertEqual(page.status_code, 200, value)
         self.assertEqual(self.client.get(f"/emails/groups/{self.lst.pk}/", {"page": "999"}).context["members"].number, 3)
         self.assertEqual(self.client.get(f"/emails/groups/{self.lst.pk}/", {"page": "abc"}).context["members"].number, 1)
+
+
+class ListStatusTests(TestCase):
+    """Status per person on an uploaded list, the filter chips, the invite button and Add more."""
+
+    def setUp(self):
+        seed_all()
+        self.dev = make_user()
+        self.client = unlocked_client(self.dev)
+        self.lst = ContactList.objects.create(name="Gym")
+        self.other = ContactList.objects.create(name="Other")
+        now = timezone.now()
+        batch = "00000000-0000-0000-0000-000000000009"
+
+        def invite(email, status, days_ago=1, expires_in=10, **kw):
+            row = Invite.objects.create(email=email, batch_id=batch, status=status, sent_at=now - timedelta(days=days_ago), **kw)
+            Invite.objects.filter(pk=row.pk).update(expires_at=now + timedelta(days=expires_in), created_at=now - timedelta(days=days_ago))
+            return row
+
+        for email in ("new@example.com", "sent@example.com", "opened@example.com", "reg@example.com", "expired@example.com", "unsub@example.com",
+                      "bounce@example.com", "mem@example.com", "memunsub@example.com", "oldreg@example.com"):
+            ContactListMember.objects.create(list=self.lst, email=email, name=email.split("@")[0])
+        ContactListMember.objects.create(list=self.other, email="sent@example.com")
+        invite("sent@example.com", Invite.SENT)  # from another list's send: still counts here
+        invite("opened@example.com", Invite.OPENED)
+        invite("reg@example.com", Invite.REGISTERED)
+        invite("expired@example.com", Invite.SENT, days_ago=40, expires_in=-5)
+        invite("oldreg@example.com", Invite.REGISTERED, days_ago=60)
+        invite("oldreg@example.com", Invite.SENT, days_ago=1)  # the latest wins: waiting again
+        EmailOptOut.objects.create(email="unsub@example.com")
+        EmailOptOut.objects.create(email="memunsub@example.com")
+        suppression.add("bounce@example.com", EmailSuppression.HARD_BOUNCE)
+        member("mem@example.com")
+        member("memunsub@example.com")  # an account wins over unsubscribed
+
+    def statuses(self, **params):
+        page = lists.members_page(self.lst, **params)
+        return {m.email.split("@")[0]: m.status for m in page}
+
+    def test_status_precedence_and_the_latest_invite_from_any_batch(self):
+        self.assertEqual(self.statuses(), {"new": "not_invited", "sent": "invited", "opened": "opened", "reg": "registered", "expired": "expired",
+                                           "unsub": "unsubscribed", "bounce": "bounced", "mem": "member", "memunsub": "member", "oldreg": "invited"})
+        with self.assertNumQueries(2):  # the page and its count, not one per person
+            lists.members_page(self.lst)
+
+    def test_filter_counts_and_the_filter_with_search(self):
+        counts = lists.status_counts(self.lst)
+        self.assertEqual(counts, {"all": 10, "member": 2, "unsubscribed": 1, "bounced": 1, "registered": 1, "opened": 1, "invited": 2, "expired": 1, "not_invited": 1})
+        self.assertEqual(set(self.statuses(status="invited")), {"sent", "oldreg"})
+        self.assertEqual(set(self.statuses(status="invited", query="sent")), {"sent"})
+        self.assertEqual(lists.status_counts(self.lst, "sent")["all"], 1)
+        page = self.client.get(f"/emails/groups/{self.lst.pk}/?status=invited&q=e")
+        self.assertContains(page, "Invited 2")
+        self.assertContains(page, "Invite expired 1")
+
+    def test_pager_links_keep_the_filter_and_search(self):
+        for n in range(60):
+            ContactListMember.objects.create(list=self.lst, email=f"bulk{n}@example.com")
+        page = self.client.get(f"/emails/groups/{self.lst.pk}/?status=not_invited&q=bulk")
+        self.assertContains(page, "status=not_invited")
+        self.assertContains(page, "page=2")
+        self.assertEqual(len(page.context["members"].object_list), 50)
+
+    def test_the_number_on_the_button_is_the_number_the_send_reaches(self):
+        page = self.client.get(f"/emails/groups/{self.lst.pk}/")
+        reach = page.context["reach"]
+        self.assertEqual(reach, 3)  # new, expired, and reg (its account is gone, so the send rules let him be invited again); members, waiting, opened, unsubscribed, bounced are out
+        self.assertContains(page, "Invite 3 people (new, or their invite expired)")
+        draft = Mailing.objects.create(name="x", subject="s", kind=Mailing.INVITATION, group="list", params={"list_id": str(self.lst.pk)}, automatic_key="invite", created_by=self.dev)
+        self.assertEqual(len(list(sending.segments.rows("list", draft.params, draft.kind, draft.has_personal_links))), reach)
+        ContactListMember.objects.filter(list=self.lst).exclude(email__in=("new@example.com", "expired@example.com")).delete()  # reg goes too
+        Invite.objects.filter(email="expired@example.com").update(expires_at=timezone.now() + timedelta(days=3))
+        Invite.objects.create(email="new@example.com", batch_id=UUID, status=Invite.QUEUED)
+        page = self.client.get(f"/emails/groups/{self.lst.pk}/")
+        self.assertNotContains(page, "Invite the")
+        self.assertContains(page, "Everyone on this list has been invited")
+
+    def test_the_button_makes_a_draft_for_the_list_and_sends_nothing(self):
+        response = self.client.post("/emails/automatic/invite/to-group/", {"list_id": str(self.lst.pk)})
+        mailing = Mailing.objects.get()
+        self.assertRedirects(response, f"/emails/mailings/{mailing.pk}/", fetch_redirect_response=False)
+        self.assertEqual((mailing.status, mailing.kind, mailing.group, mailing.params), ("draft", "invitation", "list", {"list_id": str(self.lst.pk)}))
+        self.assertEqual((len(mail.outbox), Invite.objects.count(), MailingRecipient.objects.count()), (0, 6, 0))  # the six made in setUp
+        bare = self.client.post(f"/emails/mailings/{mailing.pk}/send/", HTTP_ACCEPT="application/json")  # no confirm: refused
+        self.assertEqual(bare.status_code, 400)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(self.client.get(f"/emails/mailings/{mailing.pk}/confirm/").json()["count"], 3)
+        self.assertEqual(self.client.post("/emails/automatic/invite/to-group/", {"list_id": UUID}).status_code, 404)
+        for bad in ("not-a-uuid", "123", "<script>"):
+            self.assertEqual(self.client.post("/emails/automatic/invite/to-group/", {"list_id": bad}).status_code, 404, bad)
+
+    def test_add_people_from_the_groups_row_and_add_more_only_adds_new_addresses(self):
+        self.assertContains(self.client.get("/emails/groups/"), f'href="/emails/groups/{self.lst.pk}/add/"')
+        text = "name,email\nNew One,new@example.com\nFresh,fresh@example.com\nFresh Two,fresh2@example.com"
+        row = invites_module.find_token(invites_module.issue_token(self.dev, text, str(self.lst.pk)), self.dev, text, str(self.lst.pk))
+        response = self.client.post("/emails/groups/save/", {"text": text, "token": row.token, "list": str(self.lst.pk)}, follow=True)
+        self.assertRedirects(response, f"/emails/groups/{self.lst.pk}/")
+        self.assertContains(response, "Added 2 new people (1 was already on the list)")
+        self.assertEqual(self.lst.members.count(), 12)
+        self.assertEqual(self.lst.members.filter(email="new@example.com").count(), 1)
+        again = invites_module.find_token(invites_module.issue_token(self.dev, text, str(self.lst.pk)), self.dev, text, str(self.lst.pk))
+        self.client.post("/emails/groups/save/", {"text": text, "token": again.token, "list": str(self.lst.pk)})  # nobody new: refused, nothing doubled
+        self.assertEqual(self.lst.members.count(), 12)

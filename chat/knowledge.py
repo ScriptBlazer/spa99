@@ -38,7 +38,7 @@ def _about(site):
         _line("Opening", site.opening_label),
         "Booking is open." if site.booking_open else "Booking is not open yet. Visitors can register now and we write before the doors open.",
         _line("Contact email", contact),
-        _line("WhatsApp link", short_path('chat') if site.discount_contact_url else ""),
+        _line("WhatsApp link", short_path('chat', 'rates') if site.whatsapp_number else ""),
     )]
 
 
@@ -129,7 +129,7 @@ def _rooms():
 def _gold():
     facts = page_services.gold_facts()
     out = ["THE GOLD CARD",
-           "By application, for people in property (others may apply too). Each application is read by a person, and only the team decides. "
+           "By approval: a free membership for BML clients, past, present and future (others may apply too). Each application is read by a person, and only the team decides. "
            "Never say whether someone will be accepted. Apply at /gold-card/apply/."]
     if facts:
         out.append("- " + "; ".join(f"{f['value']} {f['label']}" for f in facts["figures"]) + ".")

@@ -1,9 +1,10 @@
 """Plans, site settings, opening hours and facilities. Everything here is data edited in Spa 99 Control.
 Nothing in this file is a rule: values come from rows (see docs/SPA99_RULES.md "Rules will change")."""
+import re
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator, URLValidator
 from django.db import models
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
@@ -107,6 +108,28 @@ def validate_final_potentials(value):
         raise ValidationError("Use only low, medium and high, each once.")
 
 
+DEFAULT_WHATSAPP_MESSAGE = "Hi, I'd love to find out more about Spa 99."
+DEFAULT_WHATSAPP_RATE_MESSAGE = "Hi, I'd like to discuss better prices for Spa 99."
+
+
+def normalise_whatsapp_number(value):
+    """'+44 7441 919990' or '07441 919990' becomes '447441919990' (digits, international, no '+'). A UK leading 0 becomes 44; a leading
+    00 is dropped. Anything with letters or other symbols is returned as typed, so validation refuses it."""
+    text = (value or "").strip()
+    if re.search(r"[^\d\s()+.\-]", text):
+        return text
+    text = re.sub(r"^(\+|00)?\s*(\d{1,3})\s*\(0\)", r"\1\2", text)  # "+44 (0)7441 ..." : the (0) after the country code is not dialled
+    digits = re.sub(r"\D", "", text)
+    if digits.startswith("00"):
+        digits = digits[2:]
+    elif digits.startswith("0"):
+        digits = "44" + digits[1:]
+    return digits
+
+
+validate_whatsapp_number = RegexValidator(r"^\d{8,15}$", "Enter 8 to 15 digits, with the country code (for example 447441919990).")
+
+
 class SiteSettings(BaseModel):
     """One row for the whole site (singleton). Use SiteSettings.load()."""
 
@@ -184,8 +207,16 @@ class SiteSettings(BaseModel):
 
     discount_contact_url = models.URLField(
         "Discount contact link (WhatsApp)", max_length=300, blank=True, validators=[URLValidator(schemes=["https"])],
-        help_text="The spa's WhatsApp link (https only), shown as 'Looking for a better rate?' on the sign-up and "
-                  "choose-membership screens. Empty = the line is hidden on live (dev shows a 'link to come' marker).")
+        help_text="Deprecated: no longer used. The WhatsApp number and message below build the link.")
+    whatsapp_number = models.CharField(
+        "WhatsApp number", max_length=15, blank=True, default="", db_default="", validators=[validate_whatsapp_number],
+        help_text="The spa's WhatsApp number with the country code, e.g. +44 7441 919990. Empty = the WhatsApp buttons are hidden.")
+    whatsapp_message = models.CharField(
+        "WhatsApp message", max_length=300, blank=True, default=DEFAULT_WHATSAPP_MESSAGE, db_default=DEFAULT_WHATSAPP_MESSAGE,
+        help_text="The message that is ready to send when someone taps a WhatsApp button.")
+    whatsapp_rate_message = models.CharField(
+        "WhatsApp message (better prices)", max_length=300, blank=True, default=DEFAULT_WHATSAPP_RATE_MESSAGE, db_default=DEFAULT_WHATSAPP_RATE_MESSAGE,
+        help_text="Used on sign-up and membership 'better rate' buttons and when the assistant offers WhatsApp.")
 
     final_approval_on = models.BooleanField(
         "final approval", default=False,

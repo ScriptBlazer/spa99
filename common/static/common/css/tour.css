@@ -118,3 +118,6 @@ html[data-page="marketing"] body.page-tour .site-header::before { opacity: 0; }
   .tour-canvas, .tour-caption, .tour-marker, .tour-ring, .tour-hint { transition: none; }
   .tour-caption.is-in { animation: none; }
 }
+/* the calm WhatsApp button in the caption (2026-10-29): compact, never full width over the picture */
+.tour-whatsapp { margin-top: var(--space-3); }
+.tour-whatsapp .btn-whatsapp { min-height: var(--control-h-compact); padding: 0 var(--space-4); width: auto; }

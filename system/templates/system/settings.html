@@ -14,8 +14,8 @@
       {% include "system/_field_row.html" with field=form.memberships_public %}
       {% include "system/_field_row.html" with field=form.booking_open %}
     </div>
-    <div class="sys-group"><h3>Wording and tax</h3>
-      {% for field in form %}{% if field.name == "join_wording" or field.name == "show_leil_shishi" or field.name == "discount_contact_url" %}{% include "system/_field_row.html" %}{% elif field.name == "vat_rate" %}{% include "system/_field_row.html" with unit="%" %}{% endif %}{% endfor %}
+    <div class="sys-group"><h3>Wording, tax and WhatsApp</h3>
+      {% for field in form %}{% if field.name == "join_wording" or field.name == "show_leil_shishi" or field.name == "whatsapp_number" or field.name == "whatsapp_message" or field.name == "whatsapp_rate_message" %}{% include "system/_field_row.html" %}{% elif field.name == "vat_rate" %}{% include "system/_field_row.html" with unit="%" %}{% endif %}{% endfor %}
     </div>
     <div class="sys-group" data-system-security><h3>Security</h3>
       {% for field in form %}{% if field.name == "lock_idle_minutes" %}{% include "system/_field_row.html" with unit="minutes" %}{% elif field.name == "max_sign_in_hours" %}{% include "system/_field_row.html" with unit="hours" %}{% endif %}{% endfor %}

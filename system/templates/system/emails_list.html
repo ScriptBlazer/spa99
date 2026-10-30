@@ -3,7 +3,9 @@
 <div class="sys-head se-head"><div><a class="se-back" href="{% url 'system_groups' %}">Groups</a><h1>{{ list.name }}</h1>
   <p>{% if list.category %}{{ list.category }} · {% endif %}{{ info.members|floatformat:"0g" }} {{ info.members|pluralize:"person,people" }}. Added {{ list.created_at|date:"j M Y" }}{% if list.created_by %} by {{ list.created_by.email }}{% endif %}.</p></div>
   <div class="sys-actions se-actions">
-    <a class="sys-btn primary" href="{% url 'system_list_add' list.pk %}" data-system-list-add>Add more</a>
+    {% if reach %}<form method="post" action="{% url 'system_email_to_group' 'invite' %}">{% csrf_token %}<input type="hidden" name="list_id" value="{{ list.pk }}"><button type="submit" class="sys-btn primary" data-system-list-invite>Invite {{ reach|floatformat:"0g" }} {{ reach|pluralize:"person,people" }} (new, or their invite expired)</button></form>
+    {% elif info.members %}<span class="sys-muted" data-system-list-all-invited>Everyone on this list has been invited</span>{% endif %}
+    <a class="sys-btn" href="{% url 'system_list_add' list.pk %}" data-system-list-add>Add more</a>
     <form method="post" action="{% url 'system_list_delete' list.pk %}">{% csrf_token %}<button type="submit" class="sys-btn" data-confirm data-confirm-danger data-confirm-title="Delete '{{ list.name }}'?" data-confirm-body="The list and its {{ info.members }} {{ info.members|pluralize:'person,people' }} are removed from Spa 99. Their accounts and anything already sent are not touched. This cannot be undone." data-confirm-label="Delete list">Delete list</button></form>
   </div>
 </div>
@@ -20,12 +22,13 @@
 </section>
 <section class="sys-panel" aria-labelledby="list-people-h">
   <header><h2 id="list-people-h">People</h2><span class="sys-muted mono">{{ members.paginator.count|floatformat:"0g" }}</span></header>
-  <form method="get" class="sys-pad se-search" role="search"><label class="sr-only" for="list-q">Search this list</label><input type="search" id="list-q" name="q" value="{{ q }}" placeholder="Search name or email" autocomplete="off"> <button type="submit" class="sys-btn sm">Search</button>{% if q %} <a class="sys-btn sm link" href="?">Clear</a>{% endif %}</form>
+  <form method="get" class="sys-pad se-search" role="search">{% if status != "all" %}<input type="hidden" name="status" value="{{ status }}">{% endif %}<label class="sr-only" for="list-q">Search this list</label><input type="search" id="list-q" name="q" value="{{ q }}" placeholder="Search name or email" autocomplete="off"> <button type="submit" class="sys-btn sm">Search</button>{% if q %} <a class="sys-btn sm link" href="?{% if status != 'all' %}status={{ status }}{% endif %}">Clear</a>{% endif %}</form>
+  <div class="se-chips" role="group" aria-label="Show" data-system-list-chips>{% for key, label, n in chips %}<a class="sys-pill" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}status={{ key }}"{% if key == status %} aria-current="true"{% endif %} data-filter="{{ key }}">{{ label }} {{ n|floatformat:"0g" }}</a>{% endfor %}</div>
   <div class="sys-scroll"><table class="sys-table se-people" data-system-list-members>
-    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Added</th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead>
-    <tbody>{% for m in members %}<tr><td>{{ m.name|default:"-" }}</td><td class="mono">{{ m.email }}</td><td>{{ m.added_at|date:"j M Y" }}</td>
+    <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Status</th><th scope="col">Added</th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead>
+    <tbody>{% for m in members %}<tr><td>{{ m.name|default:"-" }}</td><td class="mono">{{ m.email }}</td><td data-status="{{ m.status }}">{{ m.status_label }}{% if m.status == "invited" or m.status == "opened" %} <span class="sys-muted">{{ m.invite_date|date:"j M" }}</span>{% endif %}</td><td>{{ m.added_at|date:"j M Y" }}</td>
       <td><form method="post" action="{% url 'system_list_member_remove' list.pk m.pk %}">{% csrf_token %}<button type="submit" class="sys-btn sm" data-confirm data-confirm-danger data-confirm-title="Remove this person from the list?" data-confirm-body="{{ m.email }} is taken off '{{ list.name }}'. Nothing is sent to him." data-confirm-label="Remove">Remove</button></form></td></tr>
-    {% empty %}<tr><td colspan="4" class="sys-empty">{% if q %}Nobody matches.{% else %}Nobody on this list.{% endif %}</td></tr>{% endfor %}</tbody>
+    {% empty %}<tr><td colspan="5" class="sys-empty">{% if q or status != "all" %}Nobody matches.{% else %}Nobody on this list.{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div>
 {% include "system/_pager.html" with page=members %}
 </section>
