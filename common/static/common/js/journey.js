@@ -320,7 +320,7 @@ function renderResult(data) {
       ? el('p', { class: 'gold-line-note' }, `${goldLineCopy.body} `, el('a', { href: config.urls.goldApply, text: goldLineCopy.cta }))
       : null,
     config.signedIn || !config.emailGate || !state.session.has_lead_email ? null : el('p', { class: 'not-you' },
-      el('button', { type: 'button', class: 'btn-quiet', 'data-restart': '', 'data-new-person': '', text: copyOf('not_you').cta || 'Not you? Use another email' })));
+      el('button', { type: 'button', class: 'btn-quiet', 'data-restart': '', 'data-new-person': '', text: copyOf('not_you').cta || 'Not you? Start again' })));
 
   const others = (data.others || []).length
     ? el('div', { class: 'others', 'data-reveal': '' }, el('h2', { text: copyOf('others').heading }),
@@ -355,11 +355,19 @@ function renderGate() {
   };
   const first = field('first-name', 'first_name', g.first_name_label || 'First name', { type: 'text', autocomplete: 'given-name', inputmode: 'text', autocapitalize: 'words', spellcheck: 'false', enterkeyhint: 'next' });
   const email = field('email', 'email', g.email_label || 'Email', { type: 'email', autocomplete: 'email', inputmode: 'email', autocapitalize: 'none', spellcheck: 'false', enterkeyhint: 'next' });
-  // two parts: a country select (default +44 UK) and the number; the server stores a correct E.164 number (a leading 0 is dropped)
+  // two parts: a country select (default +44 UK) and the number; the server stores a correct E.164 number (a leading 0 is dropped).
+  // The select shows only its dial code ("+44") in the box; the full names are in its list.
+  const dialOf = (iso) => (g.countries || []).find((c) => c.iso === iso)?.dial || '';
   const country = el('select', { id: 'lead-mobile-country', name: 'mobile_country', class: 'input', 'aria-label': g.mobile_country_label || 'Country code', autocomplete: 'tel-country-code' },
     ...(g.countries || []).map((c) => el('option', { value: c.iso, text: `${c.name} (${c.dial})`, ...(c.iso === 'GB' ? { selected: '' } : {}) })));
-  const mobile = field('mobile', 'mobile', g.mobile_label || 'Mobile', { type: 'tel', autocomplete: 'tel-national', inputmode: 'tel', enterkeyhint: 'done' },
-    el('div', { class: 'mobile-parts' }, country), g.mobile_hint ? el('p', { class: 'hint muted', text: g.mobile_hint }) : null);
+  const dial = el('span', { class: 'dial', 'aria-hidden': 'true', text: dialOf('GB') });
+  country.addEventListener('change', () => { dial.textContent = dialOf(country.value); });
+  const mobile = field('mobile', 'mobile', g.mobile_label || 'Mobile', { type: 'tel', autocomplete: 'tel-national', inputmode: 'tel', enterkeyhint: 'done' });
+  mobile.node.classList.add('field--number');
+  const mobileRow = el('div', { class: 'mobile-row' },
+    el('div', { class: 'field field--country' }, el('label', { for: 'lead-mobile-country' }, g.country_label || 'Country'), country, dial), mobile.node);
+  mobile.msg.remove(); // the message sits under the whole row, not inside the narrow number box
+  const mobileGroup = el('div', { class: 'field mobile-group' }, mobileRow, mobile.msg);
   if (config.inviteEmail) email.input.value = config.inviteEmail; // from a personal invite link; he can change it. The consent box is never ticked for him.
   const consent = el('input', { type: 'checkbox', id: 'lead-consent', name: 'consent', 'aria-describedby': 'lead-consent-msg' });
   const consentMsg = el('p', { class: 'feedback', id: 'lead-consent-msg', 'aria-live': 'polite', 'data-state': 'hint' });
@@ -368,13 +376,15 @@ function renderGate() {
   const form = el('form', { class: 'screen lead-gate', novalidate: '', 'aria-label': g.heading || '', 'data-reveal': 'hero' },
     el('div', { class: 'screen-head' }, el('h1', { class: 'screen-title', tabindex: '-1', text: g.heading || '' }), g.body ? el('p', { class: 'lead muted', text: g.body }) : null),
     el('div', { class: 'screen-body' },
-      el('div', { class: 'question' }, first.node, email.node, mobile.node),
+      el('div', { class: 'question' }, first.node, email.node, mobileGroup),
       el('div', { class: 'question' }, el('div', { class: 'field' },
         el('label', { class: 'check' }, consent, el('span', {}, `${g.consent || ''} `, el('a', { href: config.urls.privacy, text: g.privacy_label || 'Privacy' }))), consentMsg)),
       el('div', { class: 'hp', 'aria-hidden': 'true' }, el('label', {}, 'Website ', el('input', { name: 'website', tabindex: '-1', autocomplete: 'off' })))),
     el('div', { class: 'action-bar' }, back, primary));
   const mark = (slot, message) => { slot.textContent = message || ''; slot.dataset.state = message ? 'error' : 'hint'; };
   const fields = { first_name: first, email, mobile };
+  // Enter on the first two fields goes to the next one; it never sends half a form
+  [[first, email], [email, mobile]].forEach(([from, to]) => from.input.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); to.input.focus(); } }));
   for (const [name, f] of Object.entries(fields)) f.input.addEventListener('input', () => { mark(f.msg, ''); f.input.removeAttribute('aria-invalid'); });
   consent.addEventListener('change', () => mark(consentMsg, ''));
   form.addEventListener('submit', async (event) => {

@@ -79,8 +79,19 @@ export function normaliseUkMobile(value) {
   return /^7([1-57-9]\d{8}|624\d{6})$/.test(digits) ? `+44${digits}` : null;
 }
 
-export function validateMobile(value) {
-  return normaliseUkMobile(value) ? null : MESSAGES.mobileInvalid;
+/** A UK-only form (Gold) keeps the UK rules. A form with a country select (Register) is checked lightly here, because the server's
+ *  `phonenumbers` rules are the real ones for every country: a number typed with +44 or 00 44, or with the UK selected, still gets the UK
+ *  rules; anything else just needs 6 to 15 digits (and only digits, spaces, dots, dashes, brackets and a leading +). */
+const ANY_MOBILE = "That doesn't look like a valid mobile number."; // the server's own words for a number from any country (common/phone.py)
+export function validateMobile(value, country) {
+  if (!country) return normaliseUkMobile(value) ? null : MESSAGES.mobileInvalid;
+  const raw = (value || '').trim();
+  const typedCode = /^(\+|00)/.test(raw);
+  const ukTyped = /^(\+|00)\s*44/.test(raw);
+  if (ukTyped || (country === 'GB' && !typedCode)) return normaliseUkMobile(raw.replace(/^0044/, '+44').replace(/^\+\s*44/, '+44')) ? null : ANY_MOBILE;
+  if (!/^\+?[\d\s().-]+$/.test(raw)) return ANY_MOBILE;
+  const digits = raw.replace(/\D/g, '');
+  return digits.length >= 6 && digits.length <= 15 ? null : ANY_MOBILE;
 }
 
 export function validateName(value) {
@@ -203,7 +214,7 @@ function localMessages(field, form) {
   }
   if (!value.trim()) return messages; // optional and empty: fine
   if (rules.includes('email')) { const m = validateEmail(value); if (m) messages.push(m); }
-  if (rules.includes('mobile')) { const m = validateMobile(value); if (m) messages.push(m); }
+  if (rules.includes('mobile')) { const m = validateMobile(value, form?.elements?.mobile_country?.tagName === 'SELECT' ? form.elements.mobile_country.value : ''); if (m) messages.push(m); }
   if (rules.includes('name')) { const m = validateName(value); if (m) messages.push(m); }
   if (rules.includes('dob')) { const m = validateDateOfBirth(value); if (m) messages.push(m); }
   if (rules.includes('password')) {
@@ -221,26 +232,27 @@ const REMOTE_DELAY_MS = 450;
 
 /** Live checks are POSTs (never GET) so an email or mobile number does not end up in a URL or an access log. The CSRF
  *  token is the one already on the page's forms. Returns the parsed JSON, or null if the check could not be made. */
-async function postCheck(url, field, value) {
+async function postCheck(url, field, value, extra = {}) {
   // the token on the page's forms, else the csrftoken cookie (the Gold application form is built in JS and has no hidden input)
   const token = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || csrfToken();
   if (!token) return null; // no token at all: the server checks again on submit
   const response = await fetch(url, {
     method: 'POST', credentials: 'same-origin',
     headers: { Accept: 'application/json', 'X-CSRFToken': token, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ [field]: value.trim() }),
+    body: new URLSearchParams({ [field]: value.trim(), ...extra }),
   });
   return response.ok ? response.json() : null; // busy or offline
 }
 
 /** The mobile number is checked by the server too (debounced like the email check): it uses the same phone number
  *  library as the sign-up, so the page and the server cannot disagree. Returns the server's message if not valid. */
-function mobileCheck() {
+function mobileCheck(form) {
   const url = config.urls?.mobile;
   if (!url) return {};
   return {
     mobile: async (value) => {
-      const data = await postCheck(url, 'mobile', value);
+      const select = form?.elements?.mobile_country;
+      const data = await postCheck(url, 'mobile', value, select?.tagName === 'SELECT' ? { mobile_country: select.value } : {});
       if (!data) return null; // the server checks again on submit
       return data.valid ? null : (data.message || MESSAGES.mobileInvalid);
     },
@@ -249,7 +261,7 @@ function mobileCheck() {
 
 /** Attach live validation to a form. Returns { validateAll, validateField } for custom flows. */
 export function attachValidation(form, { remote: extraRemote = {} } = {}) {
-  const remote = { ...mobileCheck(), ...extraRemote };
+  const remote = { ...mobileCheck(form), ...extraRemote };
   const fields = () => [...form.querySelectorAll('[data-validate]')];
   const latest = new Map();
   const timers = new Map();

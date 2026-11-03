@@ -53,7 +53,7 @@
       {% if office_can.can_act and a.can_approve %}<p class="o-sub">He gets an email to set up his account. The link lasts 14 days.{% if a.potential in final_waits and not a.sent_back %} The potential is {{ a.potential|capfirst }}, so a final approver confirms first.{% endif %}</p>{% endif %}
       {% if a.person_id and office_can.can_see_all %}<a class="o-quiet" href="{% url 'office_person' a.person_id %}">Open his account</a>{% endif %}
       {% if office_can.can_edit %}<div class="o-actions-more" data-gold-more>
-        {% if whatsapp.has_mobile %}<a class="btn btn-secondary" href="{{ whatsapp.contact_url }}" data-whatsapp-open>WhatsApp{% if whatsapp.unread %} <span class="o-badge-count">{{ whatsapp.unread }}<span class="sr-only"> unread</span></span>{% endif %}</a>{% endif %}
+        {% if whatsapp.has_mobile %}{% include "office/_wa_button.html" with wa=whatsapp secondary=True %}{% else %}{% include "office/_wa_button.html" with wa=whatsapp %}{% endif %}
         {% if guide_available %}<button type="button" class="btn btn-secondary" data-gold-open="guide" aria-haspopup="dialog" data-send-guide>{% include "office/_icon.html" with name="paper-plane" %}Send guide</button>
         {% else %}<button type="button" class="btn btn-secondary o-btn-off" aria-disabled="true" aria-describedby="guide-hint" data-send-guide>{% include "office/_icon.html" with name="paper-plane" %}Send guide</button>{% endif %}
       </div>

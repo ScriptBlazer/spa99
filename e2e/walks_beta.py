@@ -640,7 +640,7 @@ def beta_bad_input(w):
         assert dbtool("registrations")["count"] == baseline["registrations"]
     for label, overrides, expected in (
         ("a bad email", {"email": "not-an-email"}, "valid email"),
-        ("a bad UK mobile", {"mob": "12345"}, "valid uk mobile"),
+        ("a bad mobile", {"mob": "12345"}, "valid mobile number"),  # Register has a country select now: the words are not UK only
         ("a 300 character first name", {"first": "A" * 300}, "too long"),
     ):
         with w.step(f"Register: {label} is refused with a clear message", page):

@@ -2,7 +2,7 @@
 staff media link, and the push controls. Short views: they check, call whatsapp.services, answer. `reader` sees chats, `editor`
 (approver or Admin and up) sends. The send endpoints answer JSON {ok, message?, error?} so the chat page can show a failure in place."""
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -39,13 +39,11 @@ def _ok(message):
 
 # ---------- the inbox ----------
 
-@reader
-@require_GET
-@never_cache
-def inbox(request):
-    """Context: rows[{id, name, phone, preview, preview_kind, direction, last_message_at, unread, opted_out, window_open, url}], has_next, page,
-    q, unread_only, unread_total, more_url, can_send, configured, section. HTMX returns only the rows."""
-    q, only_unread = request.GET.get("q", "").strip(), request.GET.get("unread") == "1"
+def _list_context(request):
+    """The chat list: rows[{id, name, has_name, gold, phone, preview, preview_kind, direction, status, no_reply, last_message_at, unread, opted_out, window_open, url}],
+    has_next, page, q, filter ("", "unread" or "noreply"), unread_total, more_url, can_send, configured."""
+    q = request.GET.get("q", "").strip()
+    only = "unread" if request.GET.get("unread") == "1" else ("noreply" if request.GET.get("noreply") == "1" else "")
     try:
         page = max(int(request.GET.get("page", "1")), 1)
     except ValueError:
@@ -55,14 +53,24 @@ def inbox(request):
         digits = "".join(ch for ch in word if ch.isdigit())
         query = Q(name__icontains=word) | Q(profile_name__icontains=word) | Q(lead_email__icontains=word)
         contacts = contacts.filter(query | (Q(phone__contains=digits) if digits else Q(pk__in=[])))
-    if only_unread:
+    if only == "unread":
         contacts = contacts.annotate(ra=services._read_after(request.user, "pk")).filter(
             Exists(Message.objects.filter(contact=OuterRef("pk"), direction=Message.IN, created_at__gt=OuterRef("ra"))))
+    elif only == "noreply":
+        contacts = contacts.filter(last_direction=Message.OUT, last_inbound_at__isnull=True, last_message_at__lt=timezone.now() - timedelta(days=services.NO_REPLY_DAYS))
     found = list(contacts.order_by(F("last_message_at").desc(nulls_last=True), "-created_at", "-pk")[(page - 1) * INBOX_PAGE:page * INBOX_PAGE + 1])
-    more = urlencode({k: v for k, v in {"q": q, "unread": "1" if only_unread else "", "page": page + 1}.items() if v})
-    context = {"rows": services.inbox_rows(found[:INBOX_PAGE], request.user), "has_next": len(found) > INBOX_PAGE, "page": page, "q": q, "unread_only": only_unread,
-               "unread_total": services.unread_total(request.user), "more_url": f"{request.path}?{more}", "can_send": can_edit(request.user), "configured": services.configured(),
-               "section": "whatsapp"}
+    more = urlencode({k: v for k, v in {"q": q, "unread": "1" if only == "unread" else "", "noreply": "1" if only == "noreply" else "", "page": page + 1}.items() if v})
+    return {"rows": services.inbox_rows(found[:INBOX_PAGE], request.user), "has_next": len(found) > INBOX_PAGE, "page": page, "q": q, "filter": only, "unread_only": only == "unread",
+            "unread_total": services.unread_total(request.user), "more_url": f"{reverse('office_whatsapp')}?{more}", "can_send": can_edit(request.user), "configured": services.configured(),
+            "section": "whatsapp"}
+
+
+@reader
+@require_GET
+@never_cache
+def inbox(request):
+    """The inbox (see _list_context). ?q= (name, profile name, number, lead address), ?unread=1, ?noreply=1, ?page=. HTMX-style requests (HX-Request header) get the rows only."""
+    context = _list_context(request)
     response = render(request, "whatsapp/_rows.html" if request.headers.get("HX-Request") else "whatsapp/inbox.html", context)
     patch_vary_headers(response, ["HX-Request"])
     return response
@@ -91,7 +99,7 @@ def _page_of_messages(contact, before=None):
 @never_cache
 def thread(request, pk):
     """Context: contact {id, name, phone, profile_name, labels, page_url, opted_out, window{state, open, ends_at}, can_send, url, limits{body, image_bytes,
-    file_bytes}}, messages (the newest 30, oldest first, see services.message_dict), has_older, older_url, unread{count, first_id}, last_id, cursor
+    file_bytes}}, chat_messages (NOT `messages`: that name is Django's own, which the toasts read) (the newest 30, oldest first, see services.message_dict), has_older, older_url, unread{count, first_id}, last_id, cursor
     (server time for the poll), templates (approved, with variables), gold {id, reference, status} when ?gold=<application id>, open_picker, urls{...}."""
     contact = _contact(pk)
     found, older = _page_of_messages(contact)
@@ -100,13 +108,16 @@ def thread(request, pk):
     if request.GET.get("gold") and contact.application_id and str(contact.application_id) == request.GET["gold"]:
         gold = {"id": str(contact.application_id), "reference": contact.application.reference, "status": contact.application.status}
     context = {
-        "contact": services.contact_dict(contact, request.user, can_send=can_edit(request.user)), "messages": [services.message_dict(m) for m in found],
+        "contact": services.contact_dict(contact, request.user, can_send=can_edit(request.user)), "chat_messages": [services.message_dict(m) for m in found],
         "has_older": older, "older_url": reverse("office_whatsapp_messages", args=[contact.pk]) + (f"?before={found[0].pk}" if found else ""),
         "unread": {"count": count, "first_id": first_id}, "last_id": found[-1].pk if found else 0, "cursor": timezone.now().isoformat(),
         "templates": services.template_dicts(contact), "gold": gold, "open_picker": request.GET.get("picker") == "1", "section": "whatsapp", "configured": services.configured(),
         "urls": {"poll": reverse("office_whatsapp_poll", args=[contact.pk]), "send": reverse("office_whatsapp_send", args=[contact.pk]),
                  "send_media": reverse("office_whatsapp_send_media", args=[contact.pk]), "send_template": reverse("office_whatsapp_send_template", args=[contact.pk]),
                  "read": reverse("office_whatsapp_read", args=[contact.pk]), "inbox": reverse("office_whatsapp"), "templates": reverse("office_whatsapp_templates") + f"?contact={contact.pk}"}}
+    context.update({k: v for k, v in _list_context(request).items() if k not in context and k not in ("page", "q", "filter", "unread_only", "more_url")})
+    context.update({"page": 1, "q": "", "filter": "", "more_url": reverse("office_whatsapp") + "?page=2", "selected": str(contact.pk)})
+    context["wa"] = {"messages": context["chat_messages"], **{k: context[k] for k in ("contact", "has_older", "older_url", "unread", "last_id", "cursor", "templates", "gold", "open_picker", "urls", "configured")}}
     return render(request, "whatsapp/thread.html", context)
 
 
@@ -288,7 +299,8 @@ def _contact_reply(request, target, result, errors):
 
     ok = result in (outreach.DONE, outreach.UNCHANGED)
     if request.headers.get("accept", "").startswith("application/json") or request.headers.get("x-requested-with") == "fetch":
-        return JsonResponse({"ok": ok, "result": result, "errors": errors}, status=200 if ok else 400)
+        # the page's own dialog (X-Requested-With: fetch) gets 200 with ok false, so a wrong number never shows as a failed request in the browser console
+        return JsonResponse({"ok": ok, "result": result, "errors": errors}, status=200 if ok or request.headers.get("x-requested-with") == "fetch" else 400)
     if ok:
         messages.success(request, "Saved." if result == outreach.DONE else "Nothing changed.")
     else:

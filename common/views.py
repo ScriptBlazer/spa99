@@ -8,6 +8,7 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
+from . import phone
 from .ratelimit import rate_limited_json
 from .validators import normalise_uk_mobile
 
@@ -36,7 +37,10 @@ def check_mobile(request):
     """Is this a UK mobile number the server would accept? The browser asks (debounced) so it never disagrees with
     common.validators.normalise_uk_mobile. {"valid": true} or {"valid": false, "message": "..."}."""
     try:
-        normalise_uk_mobile(request.POST.get("mobile", ""))
+        if "mobile_country" in request.POST:  # Register: any country, by the same rules the server saves with (common.phone)
+            phone.normalise(request.POST.get("mobile", ""), request.POST.get("mobile_country"))
+        else:  # the Gold application form is UK only
+            normalise_uk_mobile(request.POST.get("mobile", ""))
     except ValidationError as error:
         return JsonResponse({"valid": False, "message": error.messages[0]})
     return JsonResponse({"valid": True})

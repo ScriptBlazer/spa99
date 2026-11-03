@@ -4,10 +4,10 @@ Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, what
 {% with who=person.name|default:person.email|first_word %}
 <section class="o-card o-reach" data-person-reach aria-labelledby="reach-h"><h2 id="reach-h" class="o-h3">Reach out</h2>
   <div class="o-reach-actions">
-    {% if whatsapp.has_mobile %}{% if whatsapp.configured %}<a class="btn btn-primary btn-block" href="{{ whatsapp.contact_url }}" data-whatsapp-open>WhatsApp{% if whatsapp.unread %} <span class="o-badge-count">{{ whatsapp.unread }}<span class="sr-only"> unread</span></span>{% endif %}</a>{% if whatsapp.opted_out %}<p class="o-hint-line">He replied STOP.</p>{% endif %}{% endif %}
-    {% elif whatsapp.can_edit and whatsapp.edit_url %}<button type="button" class="btn btn-secondary btn-block" data-dialog-open="mobile" aria-haspopup="dialog" data-add-mobile>Add a mobile to WhatsApp him</button>{% endif %}
+    {% include "office/_wa_button.html" with wa=whatsapp %}
     {% if outreach.can_add %}{% if outreach.on_list %}{% include "office/_onlist.html" %}{% else %}<button type="button" class="btn btn-secondary btn-block" data-dialog-open="outreach" aria-haspopup="dialog">{% include "office/_icon.html" with name="list-checks" %}<span class="o-only-wide">Add to {{ outreach.title }}</span><span class="o-only-narrow">Add to list</span></button>{% endif %}{% endif %}
   </div>
+  {% if archive and whatsapp.has_mobile and whatsapp.can_edit and whatsapp.edit_url %}<div class="o-mobile-row" data-mobile-row><span class="o-sub">Mobile <span data-mobile-value>{{ whatsapp.mobile }}</span></span><button type="button" class="o-quiet" data-dialog-open="mobile" aria-haspopup="dialog" data-change-mobile>Change</button></div>{% endif %}
   {% if archive %}{% if archive.archived %}
   <div class="o-archived-state" data-lead-archived>
     <p class="o-onlist o-onlist--archived">{% include "office/_icon.html" with name="archive" %}<span class="o-onlist-text">Archived{% if archive.by %} by {{ archive.by|first_word }}{% endif %}, {{ archive.at|dm }}</span></p>
@@ -18,12 +18,14 @@ Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, what
 </section>
 {% if whatsapp.can_edit and whatsapp.edit_url %}
 <dialog class="fb-modal o-dialog" data-dialog="mobile" aria-labelledby="od-mobile-h">
-  <form method="post" action="{{ whatsapp.edit_url }}" class="fb-modal-wrap" data-problems data-mobile-form>{% csrf_token %}
-    <h2 class="fb-modal-title" id="od-mobile-h">Add a mobile</h2>
+  <form method="post" action="{{ whatsapp.edit_url }}" class="fb-modal-wrap" data-mobile-form data-start-url="{{ whatsapp.start_url }}" novalidate>{% csrf_token %}
+    <h2 class="fb-modal-title" id="od-mobile-h">{% if whatsapp.has_mobile %}Change the mobile{% else %}Add a mobile{% endif %}</h2>
     <p class="fb-modal-body">So the team can WhatsApp him.</p>
-    {% if archive %}<label class="fb-modal-field"><span>First name</span><input class="fb-modal-input" type="text" name="first_name" value="{{ whatsapp.first_name }}" maxlength="100" autocomplete="off" autocapitalize="words"></label>{% endif %}
-    <label class="fb-modal-field"><span>Country</span><select class="fb-modal-input" name="mobile_country">{% for c in mobile_countries %}<option value="{{ c.iso }}"{% if c.iso == "GB" %} selected{% endif %}>{{ c.name }} ({{ c.dial }})</option>{% endfor %}</select></label>
-    <label class="fb-modal-field"><span>Mobile</span><input class="fb-modal-input" type="tel" inputmode="tel" name="mobile" value="{{ whatsapp.mobile }}" autocomplete="off" data-label="Mobile"></label>
+    {% if archive %}<label class="fb-modal-field"><span>First name</span><input class="fb-modal-input" type="text" name="first_name" value="{{ whatsapp.first_name }}" maxlength="100" autocomplete="off" autocapitalize="words" enterkeyhint="next"></label>{% endif %}
+    <label class="fb-modal-field"><span>Country</span><select class="fb-modal-input" name="mobile_country" autocomplete="off">{% for c in mobile_countries %}<option value="{{ c.iso }}"{% if c.iso == "GB" %} selected{% endif %}>{{ c.name }} ({{ c.dial }})</option>{% endfor %}</select></label>
+    <label class="fb-modal-field"><span>Mobile</span><input class="fb-modal-input" type="tel" inputmode="tel" name="mobile" value="" autocomplete="off" enterkeyhint="done" aria-describedby="od-mobile-hint od-mobile-err" data-label="Mobile"></label>
+    <p class="o-mobile-hint" id="od-mobile-hint">Choose the country, then the number. A leading 0 is fine.{% if whatsapp.has_mobile %} Now: {{ whatsapp.mobile }}.{% endif %}</p>
+    <p class="o-field-error--inline" id="od-mobile-err" data-mobile-error role="alert" hidden></p>
     <div class="fb-modal-actions">
       <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
       <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Saving">Save</button>

@@ -3,7 +3,7 @@
 <section class="o-card" data-person-details aria-labelledby="p-details"><h2 id="p-details" class="o-h3">Details</h2>
   <dl class="o-rows">
     <div><dt>Email</dt><dd>{{ person.email }}</dd></div>
-    <div><dt>Mobile</dt><dd>{{ person.mobile|default:"None given" }}</dd></div>
+    <div data-mobile-row><dt>Mobile</dt><dd class="o-mobile-dd"><span data-mobile-value>{{ person.mobile|default:"None given" }}</span>{% if whatsapp.can_edit and whatsapp.edit_url %} <button type="button" class="o-quiet" data-dialog-open="mobile" aria-haspopup="dialog" data-change-mobile>{% if person.mobile %}Change{% else %}Add{% endif %}</button>{% endif %}</dd></div>
     <div><dt>Account ID</dt><dd class="num">{{ person.public_id }}</dd></div>
     <div><dt>Verified</dt><dd>{% if person.verified_at %}{{ person.verified_at|dt }}{% else %}Not yet{% endif %}</dd></div>
     {% if person.last_login %}<div><dt>Last signed in</dt><dd>{{ person.last_login|dt }}</dd></div>{% endif %}

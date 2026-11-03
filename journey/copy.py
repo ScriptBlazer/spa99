@@ -10,7 +10,7 @@ GATE = {
     "first_name_label": "First name",
     "email_label": "Email",
     "mobile_label": "Mobile",
-    "mobile_hint": "Choose your country, then your number. A leading 0 is fine.",
+    "country_label": "Country",
     "mobile_country_label": "Country code",
     "consent": "Yes, Spa 99 may email and WhatsApp me about opening. I can stop at any time.",
     "privacy_label": "How we use your details",
@@ -20,7 +20,7 @@ GATE = {
     "errors": {
         "first_name": "Please add your first name.",
         "email": "That email does not look right.",
-        "mobile": "That doesn't look like a valid mobile number.",
+        "mobile": "That mobile does not look right. Check the country and the number.",
         "consent": "Please tick the box to carry on.",
     },
 }

@@ -153,3 +153,22 @@ Person delete, lead delete and the GDPR exports include the chats (found by his 
 
 ## Not done, on purpose
 Unknown numbers that write first make a contact only (no lead row: a lead needs an email). One file per message (WhatsApp sends one per message). Template approval labels come from code defaults (`spa99_lead_follow_up`: First name) or the admin; Twilio does not hold them.
+
+---
+
+# Built, UI (2026-11-03)
+
+Design brief: `whatsapp-design.md`. Files: `whatsapp/templates/whatsapp/` (`inbox.html`, `thread.html`, `_list.html`, `_rows.html`, `_cards.html`, `_thread.html`, `_who.html`, `_notify_sheet.html`, `sw.js`), `office/templates/office/_wa_button.html`, `common/static/common/css/office-whatsapp.css`, JS `wa-thread.js` (one chat), `office-whatsapp.js` (list, swap, title), `office-push.js` (service worker, notifications sheet, install hints), `wa-badge.js` (unread count), `office-mobile.js` (Add a mobile dialog).
+
+- **Safety:** no HTML is built from message text in JS. Bubbles use `createElement` and `textContent`; the only `innerHTML` is the server's `body_html` (and a template's `body_html` for the preview). An unsent bubble shows plain text until the server answers.
+- **The thread page** embeds its data (`#wa-data`, from context `wa`); the thread view's message list is `chat_messages` (not `messages`, which is Django's own name and made the toasts print every message). The list pane beside it comes from the same list context as the inbox.
+- **Inbox rows** gained `status` (the tick of our latest message), `gold`, `has_name`, `no_reply`; the list takes `?noreply=1` (we wrote last, he never replied, more than 3 days ago).
+- **Polling:** `poll` every 4 s while visible, 30 s hidden, back off when offline, ticks through `updates`. Sends are optimistic (temporary bubble, replaced by the server's message); polling pauses while a send is in flight.
+- **Window slots:** one `data-state` on the chat (`open`, `closed`, `template_waiting`, `empty`, `opted_out`, `viewonly`, `unconfigured`) decides which bar or composer shows; the "closes in" line is recalculated every 30 s.
+- **Phone keyboard:** `visualViewport` sets `--wa-vh` and `--wa-top` on the chat and `data-keyboard` when the viewport shrank by more than 120 px; `interactive-widget=resizes-content` is in the Office viewport meta.
+- **Pages:** `_wa_button.html` is the one WhatsApp button (states in the brief); the Add a mobile dialog posts with `X-Requested-With: fetch` and gets 200 with `ok: false` for a wrong or taken number (a plain `Accept: application/json` caller still gets 400); on success the Reach out card is swapped from the server.
+- **Web app (Office host only):** `base.html` has the apple meta tags, `apple-touch-icon` and the manifest link; `pwa.ICONS` lists the three manifest icons; the worker shows push (icon and badge, "3 new messages" from the third, nothing for a chat he has open and can see), focuses or opens the chat on tap, has no fetch handler and caches nothing.
+- **Mobile numbers:** the email step and Register show a country select (only its dial code in the box) beside the number. `validate.js` checks lightly when a form has a country select (UK rules for +44, otherwise 6 to 15 digits); `POST /validate/mobile/` takes `mobile_country` and uses `common.phone`; the Gold form stays UK only.
+
+Departures from the brief: see the build report in PROJECT.md; the main ones are the Moishe calls above, the country select in place of the "Outside the UK?" hint, no side link to System on the empty template message, and the page note under the email step hidden on a phone so the step fits 375 by 667.
+

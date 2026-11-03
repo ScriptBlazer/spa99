@@ -1,0 +1,9 @@
+{% comment %}The WhatsApp button (docs/features/whatsapp-design.md section 6). One partial for the lead, person and Gold pages; `wa` is the page's `whatsapp` context.
+`secondary=True` (Gold) makes it a secondary button so Approve stays the one primary. States: a chat (unread count), a mobile but no chat, opted out, no mobile, view only.{% endcomment %}
+{% if wa.has_mobile %}{% if wa.configured and wa.can_edit or wa.has_chat %}
+<div class="o-wa-btn-wrap" data-wa-button>
+  <a class="btn {% if secondary or wa.opted_out or not wa.can_edit %}btn-secondary{% else %}btn-primary{% endif %} btn-block o-wa-btn" href="{{ wa.contact_url }}" data-whatsapp-open>{% include "office/_icon.html" with name="whatsapp" %}<span>WhatsApp</span>{% if wa.unread %}<span class="o-badge-count">{{ wa.unread }}<span class="sr-only"> unread</span></span>{% endif %}</a>
+  {% if wa.opted_out %}<p class="o-hint-line">He replied STOP.</p>{% elif not wa.has_chat and wa.can_edit %}<p class="o-hint-line">No messages yet.</p>{% endif %}
+</div>
+{% endif %}
+{% elif wa.can_edit and wa.edit_url %}<button type="button" class="btn btn-secondary btn-block o-wa-btn o-wa-btn--add o-wa-full" data-dialog-open="mobile" aria-haspopup="dialog" data-add-mobile>{% include "office/_icon.html" with name="plus" %}<span>Add a mobile to WhatsApp him</span></button>{% endif %}

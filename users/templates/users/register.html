@@ -70,7 +70,12 @@
       <fieldset class="form-group">
         <legend>How we reach you</legend>
         {% include "common/_field.html" with field=form.email hint="We'll send a link to confirm it." good="Looks right" %}
-        {% include "common/_field.html" with field=form.mobile hint="A UK mobile, like 07123 456789." good="Looks right" %}
+        <div class="mobile-row">
+          <div class="field field--country"><label for="id_mobile_country">Country</label>
+            <select id="id_mobile_country" name="mobile_country" aria-label="Country code" autocomplete="tel-country-code" data-country-select>{% for c in mobile_countries %}<option value="{{ c.iso }}"{% if c.iso == form.mobile_country.value|default:"GB" %} selected{% endif %}>{{ c.name }} ({{ c.dial }})</option>{% endfor %}</select>
+            <span class="dial" aria-hidden="true" data-dial>{% for c in mobile_countries %}{% if c.iso == form.mobile_country.value|default:"GB" %}{{ c.dial }}{% endif %}{% endfor %}</span></div>
+          {% include "common/_field.html" with field=form.mobile hint="UK numbers can start with 07." good="Looks right" %}
+        </div>
       </fieldset>
 
       <fieldset class="form-group">

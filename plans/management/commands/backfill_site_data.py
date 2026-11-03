@@ -61,6 +61,9 @@ written by hand:
 - (WhatsApp, 2026-11-03) the Privacy notice "What we collect" part gets the WhatsApp lines and "Last updated" goes to 3 November 2026: each
   only while it still has exactly the previous wording.
 
+- (WhatsApp, 2026-11-03) the journey "Not you? Use another email" button (`journey` page, `not_you` row) becomes "Not you? Start again" (it now
+  clears name, email and mobile): only while it still has exactly the old wording.
+
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 import re
 from collections import Counter
@@ -173,6 +176,7 @@ def backfill():
     changed.update(_whatsapp_and_gold_2026_10_29())
     changed.update(_invite_open_privacy_2026_10_30())
     changed.update(_whatsapp_privacy_2026_11_03())
+    changed.update(_not_you_start_again_2026_11_03())
     return changed
 
 
@@ -395,6 +399,16 @@ def _whatsapp_privacy_2026_11_03():
         section.body = legal.PRIVACY_UPDATED
         section.save()
         changed["content.Section (privacy notice: last updated, WhatsApp)"] += 1
+    return changed
+
+
+def _not_you_start_again_2026_11_03():
+    """2026-11-03: "Not you? Use another email" becomes "Not you? Start again", exact old wording only (a row edited by hand is left alone)."""
+    changed = Counter()
+    for section in Section.objects.filter(page__key="journey", key="not_you", cta_label="Not you? Use another email"):
+        section.cta_label = "Not you? Start again"
+        section.save()
+        changed["content.Section (journey: Not you? Start again)"] += 1
     return changed
 
 

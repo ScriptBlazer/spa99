@@ -345,7 +345,7 @@ class OfficeViewTests(Base):
             Message.objects.create(contact=self.contact, direction="in", status="received", body=f"m{i}")
         page = office(self.approver, "get", f"/whatsapp/{self.contact.pk}/")
         ctx = page.context
-        self.assertEqual((len(ctx["messages"]), ctx["has_older"], ctx["messages"][-1]["body"]), (30, True, "m34"))
+        self.assertEqual((len(ctx["chat_messages"]), ctx["has_older"], ctx["chat_messages"][-1]["body"]), (30, True, "m34"))  # not "messages": that is Django's own name, which the toasts read
         older = json.loads(office(self.approver, "get", ctx["older_url"]).content)
         self.assertEqual((len(older["messages"]), older["has_older"]), (6, False))
         last, cursor = ctx["last_id"], ctx["cursor"]
@@ -448,6 +448,37 @@ class PagesAndGoldTests(Base):
         self.assertIn("WhatsApp: 2 from him, 1 from us", labels)
         self.assertIn("He replied STOP", labels)
         self.assertTrue(any(l.startswith("Mobile changed by") for l in labels))
+
+
+class UiSupportTests(Base):
+    """What the chat page needs on top of the first backend: inbox row extras, the no-reply filter, the manifest icons, any-country live mobile check."""
+
+    def test_inbox_rows_carry_the_tick_gold_and_no_reply_and_the_filter_finds_them(self):
+        old = services.get_or_create_contact("+447400123811")
+        Message.objects.create(contact=old, direction="out", status="delivered", body="Hi", created_at=timezone.now() - timedelta(days=5))
+        Contact.objects.filter(pk=old.pk).update(last_message_at=timezone.now() - timedelta(days=5), last_direction="out", last_preview="Hi", last_kind="text")
+        rows = office(self.reader, "get", "/whatsapp/").context["rows"]
+        row = next(r for r in rows if r["id"] == str(old.pk))
+        self.assertEqual((row["status"], row["no_reply"], row["gold"]), ("delivered", True, False))
+        found = office(self.reader, "get", "/whatsapp/?noreply=1").context["rows"]
+        self.assertEqual([r["id"] for r in found], [str(old.pk)])
+
+    def test_the_thread_page_does_not_put_chat_messages_where_the_toasts_read(self):
+        self.open_window()
+        Message.objects.create(contact=self.contact, direction="in", status="received", body="Secret text")
+        page = office(self.reader, "get", f"/whatsapp/{self.contact.pk}/")
+        self.assertNotIn("data-server-messages", page.content.decode())
+        self.assertEqual(page.context["wa"]["messages"][-1]["body"], "Secret text")
+
+    def test_the_manifest_lists_the_app_icons(self):
+        icons = json.loads(Client(HTTP_HOST=OFFICE).get("/manifest.webmanifest").content)["icons"]
+        self.assertEqual({(i["sizes"], i["purpose"]) for i in icons}, {("192x192", "any"), ("512x512", "any"), ("512x512", "maskable")})
+        self.assertTrue(all(i["src"].startswith("/static/") and i["src"].endswith(".png") for i in icons))
+
+    def test_the_live_mobile_check_takes_a_country_and_gold_stays_uk_only(self):
+        client = Client(HTTP_HOST=PUBLIC)
+        self.assertTrue(json.loads(client.post("/validate/mobile/", {"mobile": "6 12 34 56 78", "mobile_country": "FR"}).content)["valid"])
+        self.assertFalse(json.loads(client.post("/validate/mobile/", {"mobile": "6 12 34 56 78"}).content)["valid"])  # no country: the UK rules, as Gold uses
 
 
 class PushAndPwaTests(Base):

@@ -1,9 +1,14 @@
 {% extends "office/base.html" %}
-{% block title %}WhatsApp | Spa 99 Office{% endblock %}
+{% block title %}{% if unread_total %}({{ unread_total }}) {% endif %}WhatsApp | Spa 99 Office{% endblock %}
 {% block main %}
-{# Minimal working page: the frontend builds the real chat list from docs/features/whatsapp-design.md. Context: rows, has_next, page, q, unread_only, unread_total, more_url, can_send, configured. #}
-<h1>WhatsApp</h1>
-{% if not configured %}<p>WhatsApp is not set up yet.</p>{% endif %}
-<form method="get" action="{% url 'office_whatsapp' %}"><input type="search" name="q" value="{{ q }}" aria-label="Search chats"><label><input type="checkbox" name="unread" value="1"{% if unread_only %} checked{% endif %}> Unread</label><button type="submit">Search</button></form>
-<ul data-wa-list>{% include "whatsapp/_rows.html" %}</ul>
+{% comment %}The inbox (docs/features/whatsapp-design.md section 1). Desktop: list left, chat right. Phone: the list; a chat is its own page. Context: see views._list_context.{% endcomment %}
+<div class="o-wa" data-wa-app data-title="WhatsApp | Spa 99 Office" data-configured="{{ configured|yesno:'1,0' }}">
+  {% include "whatsapp/_list.html" %}
+  <section class="o-wa-pane" data-wa-pane aria-label="Chat">
+    <div class="o-wa-blank" data-wa-blank>
+      <div class="o-wa-blank-mark" aria-hidden="true">{% include "common/_mark.html" %}</div>
+      <p class="o-wa-pill">Choose a chat.</p>
+    </div>
+  </section>
+</div>
 {% endblock %}

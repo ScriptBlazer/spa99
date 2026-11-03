@@ -152,3 +152,9 @@ if (form?.hasAttribute('data-register-fetch')) { // only the register page (the 
   // Back button after a successful register (bfcache): the button must work again.
   window.addEventListener('pageshow', () => { delete form.dataset.sending; if (button?.disabled) setWorking(false); });
 }
+
+/* the country select shows only its dial code ("+44") in the box; its list has the full names */
+document.querySelectorAll('[data-country-select]').forEach((select) => {
+  const dial = select.parentElement.querySelector('[data-dial]');
+  select.addEventListener('change', () => { dial.textContent = /\((\+\d+)\)$/.exec(select.selectedOptions[0].textContent)?.[1] || ''; });
+});

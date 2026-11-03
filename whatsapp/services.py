@@ -12,7 +12,7 @@ from django.core import signing
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Exists, F, OuterRef, Q, Subquery, Value
+from django.db.models import Count, Exists, F, Max, OuterRef, Q, Subquery, Value
 from django.db.models.functions import Coalesce
 from django.urls import reverse
 from django.utils import timezone
@@ -594,10 +594,25 @@ def contact_dict(contact, user=None, can_send=False):
             "limits": {"body": settings.WHATSAPP_MAX_BODY, "image_bytes": settings.WHATSAPP_MAX_IMAGE_BYTES, "file_bytes": settings.WHATSAPP_MAX_FILE_BYTES}}
 
 
+NO_REPLY_DAYS = 3
+
+
+def no_reply(contact, at=None):
+    """We wrote last, he has never written, and it was more than three days ago (the list's quiet "No reply" badge and chip)."""
+    return bool(contact.last_direction == Message.OUT and contact.last_inbound_at is None and contact.last_message_at
+                and contact.last_message_at < (at or now()) - timedelta(days=NO_REPLY_DAYS))
+
+
 def inbox_rows(contacts, user):
+    """One dict per chat for the list. `status` is the tick of the latest message when it is ours, `gold` is true for a Gold applicant, `no_reply` for the quiet badge."""
     contacts = list(contacts)
-    unread = unread_counts(user, [c.pk for c in contacts])
-    return [{"id": str(c.pk), "name": c.display_name, "phone": c.phone, "preview": c.last_preview, "preview_kind": c.last_kind, "direction": c.last_direction,
+    ids = [c.pk for c in contacts]
+    unread = unread_counts(user, ids)
+    newest = [r["m"] for r in Message.objects.filter(contact_id__in=ids).values("contact_id").annotate(m=Max("id"))]
+    status = dict(Message.objects.filter(pk__in=newest).values_list("contact_id", "status"))
+    at = now()
+    return [{"id": str(c.pk), "name": c.display_name, "has_name": bool(c.name or c.profile_name), "gold": bool(c.application_id), "phone": c.phone, "preview": c.last_preview,
+             "preview_kind": c.last_kind, "direction": c.last_direction, "status": status.get(c.pk, ""), "no_reply": no_reply(c, at),
              "last_message_at": c.last_message_at.isoformat() if c.last_message_at else "", "unread": unread.get(c.pk, 0), "opted_out": c.opted_out,
              "window_open": window_open(c), "url": _office("office_whatsapp_thread", c.pk)} for c in contacts]
 
