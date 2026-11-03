@@ -10,6 +10,16 @@ The number is a **Twilio** number and the WhatsApp side is already verified at M
 - **Secrets** in the server `.env`: Account SID, Auth Token (or an API key + secret), the WhatsApp sender number, optionally a Messaging Service SID. Never in chat or git.
 - Twilio's Python SDK or plain HTTPS; tests mock Twilio entirely.
 
+## Twilio account facts (checked by the dev team, 2026-11-03)
+- Sender **+44 20 4538 4999**, display name **Spa 99**, status **Online**, 80 messages a second. Quality rating "Unavailable" is normal until it has sent messages.
+- **Shared account:** the same Twilio account and WhatsApp Business Account also hold **BML Group** (+44 20 7101 4800, quality High) and 5 approved BML property templates. So:
+  - Webhooks go on the **Spa 99 sender only** (never account-wide), so BML is untouched. No Messaging Service: send with `From=whatsapp:+442045384999`.
+  - **Templates are shared across both numbers.** Spa 99 templates are named `spa99_...`; the system only lists and sends that prefix, so a BML template can never go out from Spa 99.
+  - A separate **API key** for sending (revocable without touching BML). Checking `X-Twilio-Signature` needs the account **Auth Token**, stored in the server `.env`; if BML rotates it, ours must change too.
+  - A poor Spa 99 quality rating could affect the shared business account, so stick to people who ticked consent.
+- **Balance is shared and low (£16.19):** sending stops if it runs out, for BML too. Top up and turn on auto-recharge before launch.
+- **Webhook URLs** (public site host, same pattern as Postmark): `https://spa99.uk/twilio/whatsapp/incoming/` and `https://spa99.uk/twilio/whatsapp/status/`. Cloudflare must let them through (Bot Fight Mode stays off).
+
 ## Goal
 A new number on **WhatsApp (through Twilio)** becomes a full staff to lead chat in the Office, as close to WhatsApp as we like, with push notifications (PWA). The AI assistant chat stays separate. Email Message stays.
 
@@ -30,7 +40,7 @@ A new number on **WhatsApp (through Twilio)** becomes a full staff to lead chat 
 ## Open points
 - Launch turns the email step off once; Moishe can switch "Journey asks for an email" back on in System > Settings after launch (decided 2026-11-03).
 - Consent: one required tick, "Yes, Spa 99 may email and WhatsApp me about opening. I can stop at any time." (decided 2026-11-03).
-- **To confirm:** the WhatsApp sender is set up in Twilio (Messaging > Senders > WhatsApp senders, Online).
+- First Spa 99 templates to write and submit (none exist yet); drafts in the chat 2026-11-03.
 - Templates text (3 to 5, written together, submitted by Moishe).
 
 ## What Moishe does (walkthrough, no code)
