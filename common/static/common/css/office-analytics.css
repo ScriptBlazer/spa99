@@ -94,7 +94,7 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 @media (min-width: 64em) { .o-multiples { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gutter); } }
 .o-multiple { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); min-width: 0; padding: var(--space-4); border-radius: var(--office-radius); background: var(--office-teal-tint); }
 .o-multiple h3 { align-self: flex-start; font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; letter-spacing: 0; color: var(--office-text); }
-.o-multiple .o-note { align-self: flex-start; margin-top: calc(var(--space-2) * -1); }
+.o-multiple .o-footnote { align-self: flex-start; margin-top: calc(var(--space-2) * -1); }
 .o-multiple .o-bars { width: 100%; }
 
 /* the stored top answer above a chart: "Dry sauna  4 of 5" */

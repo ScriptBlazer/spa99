@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "mailings",
     "insights",
     "office",
+    "outreach",
     "system",
     "control",
     "pages",

@@ -119,13 +119,15 @@ def fill_subject(text, values):
     return text
 
 
-def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None, plain_body=None, blocks=None):
+def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None, plain_body=None, blocks=None, attachments=None, from_email=None, reply_to=None):
     """Render the email, send, and log. Returns the EmailLog. Editable emails (notifications/emailbody.py) use the shared
     layout `_body` and the stored or default wording; the Gold approver emails render their own template files.
     `to` and `cc` are lists of addresses. `subject_email` is the person the message is about when it goes to
     someone else (Barry's Gold email), so deleting that person's data finds the log row.
     `headers` are extra mail headers (List-Unsubscribe); `body` replaces the stored wording (a group mailing); `plain_body` is
-    text a person typed, sent as typed in the shared layout; `blocks` are a group mailing's parts (used instead of `body`)."""
+    text a person typed, sent as typed in the shared layout; `blocks` are a group mailing's parts (used instead of `body`);
+    `attachments` is a list of (filename, bytes, mimetype); `from_email` and `reply_to` (a list) replace the site sender and the
+    contact address for an email that comes from a person (the next-morning email to new leads)."""
     to, cc = list(to or []), list(cc or [])
     try:
         blocked = suppression.suppressed_set(to + cc)  # THE guard: every email goes through here
@@ -159,13 +161,15 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
         message = EmailMultiAlternatives(
             subject=subject,
             body=text,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=from_email or settings.DEFAULT_FROM_EMAIL,
             to=to,
             cc=cc,
-            reply_to=[ctx["contact_email"]],
+            reply_to=list(reply_to) if reply_to else [ctx["contact_email"]],
             headers=headers or None,
         )
         message.attach_alternative(html, "text/html")
+        for name, content, mimetype in attachments or ():
+            message.attach(name, content, mimetype)
         message.send(fail_silently=False)
         log.status, log.sent_at = EmailLog.SENT, timezone.now()
         log.message_id = str(getattr(message, "ses_message_id", ""))[:100]

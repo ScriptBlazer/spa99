@@ -12,6 +12,7 @@ from plans.management.commands import backfill_site_data as backfill
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import Plan, SiteSettings
 from plans.tests.helpers import open_memberships
+from users.tests.test_register import with_journey
 
 BUTTON = "btn btn-secondary btn-whatsapp"
 
@@ -159,6 +160,7 @@ class RateMessageTests(TestCase):
         self.assertIn("find%20out%20more", self.client.get("/whatsapp/?msg=rates")["Location"])
 
     def test_every_better_rate_button_uses_rates_and_the_others_do_not(self):
+        with_journey(self.client)
         page = lambda path: self.client.get(path).content.decode()
         for path, source in (("/register/", "register"), ("/memberships/", "memberships")):
             self.assertIn(f'href="/whatsapp/?from={source}&amp;msg=rates"', page(path), path)

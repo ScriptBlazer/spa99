@@ -18,6 +18,9 @@
   --office-overlay: rgb(73 46 33 / 0.32);        /* modal and sheet backdrop */
   --office-toast-edge: rgb(73 46 33 / 0.08);     /* approved 2026-10-25, FEEDBACK: 1px edge of a toast, decoration only */
   --office-caramel-tint: #F3E8DB;                /* caramel at 18%: "Medium" badge, espresso 10.25 */
+  --office-note: var(--color-cream);             /* office outreach (2026-11-03, proposed): the paper of a sticky note, an alias, no new colour. Espresso 10.95, muted 5.81, danger 8.07 */
+  --office-note-tilt: 0.6deg;                    /* the most a note leans (static, so reduced motion needs no override) */
+  --office-note-min-w: 13rem;                    /* grid column minimum of the notes board */
 
   --office-shadow-1: 0 1px 2px rgb(73 46 33 / 0.04), 0 8px 24px -12px rgb(73 46 33 / 0.10);   /* every card at rest */
   --office-shadow-2: 0 2px 4px rgb(73 46 33 / 0.05), 0 18px 40px -16px rgb(73 46 33 / 0.16);  /* hover on clickable cards, menus, tooltip */

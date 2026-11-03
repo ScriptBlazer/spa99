@@ -7,7 +7,7 @@ from .models import SiteDefaults
 
 # (group title, [(field, unit shown after the control)]) in page order.
 GROUPS = [
-    ("Office", [("leads_range", ""), ("leads_show", ""), ("leads_sort", ""), ("leads_page_size", "rows"), ("list_page_size", "rows"),
+    ("Office", [("leads_range", ""), ("leads_sort", ""), ("leads_page_size", "rows"), ("list_page_size", "rows"),
                 ("dashboard_range", ""), ("analytics_range", ""), ("dashboard_hot_leads", "shown"), ("dashboard_activity", "shown"),
                 ("dashboard_gold_waiting", "shown"), ("dashboard_latest", "shown"), ("analytics_options", "shown"), ("top_pages", "shown"),
                 ("timeline_page_size", "events"), ("person_emails_shown", "emails")]),
@@ -25,7 +25,6 @@ UNITS = {name: unit for _title, rows in GROUPS for name, unit in rows}
 RISKY = ["gold_invite_days", "gold_approval_days", "register_invite_days", "office_session_days", "email_confirm_hours"]
 
 RANGE_LABELS = {"today": "Today", "7d": "7 days", "30d": "30 days", "90d": "90 days", "all": "All time"}
-SHOW_LABELS = {"lead": "Not registered", "registered": "Registered", "all": "All"}
 SORT_LABELS = {"last_seen": "Last seen", "first_seen": "First seen", "potential": "Highest potential", "visits": "Most visits"}
 
 
@@ -36,7 +35,7 @@ def choice_fields():
     def pairs(values, labels):
         return [(v, labels.get(v, v)) for v in values]
 
-    return {"leads_range": pairs(leads.RANGES, RANGE_LABELS), "leads_show": pairs(leads.SHOWS, SHOW_LABELS),
+    return {"leads_range": pairs(leads.RANGES, RANGE_LABELS),
             "leads_sort": pairs(leads.SORTS, SORT_LABELS), "dashboard_range": pairs(selectors.DASHBOARD_RANGES, RANGE_LABELS),
             "analytics_range": pairs(selectors.ANALYTICS_RANGES, RANGE_LABELS),
             "invite_landing": SiteDefaults.INVITE_LANDINGS,

@@ -14,13 +14,16 @@
     {% if person.is_staff or person_status != "gold" %}<span class="o-badge o-badge--type">{% if person.is_staff %}Team{% elif person.kind == "lead" %}No account{% elif person.interest.plan %}Member, {{ person.interest.plan }}{% else %}Member{% endif %}</span>{% endif %}{# the status pill already says Gold member (Moishe, 2026-10-27) #}
     {% if person.kind == "account" %}{% if person.verified_at %}<span class="o-badge o-badge--s-approved">Verified</span>{% else %}<span class="o-badge o-badge--s-waiting">Not verified</span>{% endif %}{% endif %}
     {% if person.gold.potential %}{% include "office/_badge.html" with potential=person.gold.potential %}{% endif %}
+    {% if archive.archived %}<span class="o-badge o-badge--archived" data-archived-badge>{% include "office/_icon.html" with name="archive" %}Archived {{ archive.at|dm }}</span>{% endif %}
   </p>
+  {% include "office/_notes_open.html" %}
 </header>
 <div class="o-detail o-detail--person">
-  <div class="o-detail-main">{% include "office/_profile.html" %}
+  <div class="o-detail-main">{% include "office/_notes.html" %}{% include "office/_profile.html" %}
     {% if person.unlinked_journeys %}<section class="o-card" data-person-unlinked><h2 class="o-h3">Left this email without signing in</h2><p class="o-sub">{{ person.unlinked_journeys|length }} journey{{ person.unlinked_journeys|length|pluralize }} left this address but {{ person.unlinked_journeys|length|pluralize:"is,are" }} not linked to this account.</p></section>{% endif %}
   </div>
   <aside class="o-detail-rail">
+    {% include "office/_person_tools.html" %}
     {% include "office/_chats_card.html" %}
     {% include "office/_profile_rail.html" %}
     {% if office_can.can_export or office_can.can_delete %}
@@ -41,5 +44,6 @@
       {% endif %}
     </section>{% endif %}
   </aside>
+  {% if archive.can_edit and not archive.archived %}<div class="o-endzone o-endzone--phone"><button type="button" class="o-quiet o-archive-btn" data-dialog-open="archive" aria-haspopup="dialog">{% include "office/_icon.html" with name="archive" %}Archive lead</button></div>{% endif %}
 </div>
 {% endblock %}

@@ -1,0 +1,1 @@
+{% load office_tags %}{% sort_ui columns dir_value as su %}<button type="button" class="o-quiet o-sortbtn" data-sort-open aria-haspopup="dialog" data-dir="{{ su.dir }}">{% include "office/_icon.html" with name="arrow-up" %}Sort: <span data-sort-label>{{ su.label }}</span></button>

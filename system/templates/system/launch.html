@@ -1,0 +1,43 @@
+{% extends "system/base.html" %}
+{# Context: site, steps [{key,label,now,after,effect,already_done}], checks [{key,ok,text}], word, launched_text, launched_by, changed, payments_left. docs/features/office-outreach.md, Launch button #}
+{% block main %}
+{% include "system/_page_header.html" with title="Launch" description="Opens Spa 99 in one go: the public Memberships page, the questions, the wording and payments. Every change is listed first." %}
+
+{% if site.launched_at %}
+<section class="sys-panel" aria-labelledby="launch-done-h" data-launch-state="launched">
+  <header><h2 id="launch-done-h">Launched</h2></header>
+  <div class="sys-pad">
+    <p class="sys-note success" role="status" data-launched>Launched on {{ launched_text }}{% if launched_by %} by {{ launched_by.get_full_name|default:launched_by.email }}{% endif %}.</p>
+    <div class="sys-state"><span>What changed</span><span data-launch-changed>{% if changed %}{{ changed|join:", " }}{% else %}Nothing needed changing{% endif %}</span></div>
+    <div class="sys-state"><span>Payments</span><span>{% if payments_left %}Left as they were{% else %}Opened by Launch{% endif %}</span></div>
+    <p class="sys-muted sys-hint">There is no undo for the launch. Each switch can still be changed on its own page, in <a href="{% url 'system_settings' %}">Settings</a>. Payments cannot be unsent: the emails have gone, and you can only close the window in <a href="{% url 'system_payments' %}">Payments</a>.</p>
+  </div>
+</section>
+{% else %}
+{% for check in checks %}<p class="sys-note{% if not check.ok %} {% if check.key == 'online' %}error{% else %}warn{% endif %}{% endif %}" role="{% if check.ok %}status{% else %}alert{% endif %}" data-launch-check="{{ check.key }}">{{ check.text }}</p>
+{% endfor %}
+{% endif %}
+
+{% if not site.launched_at %}<section class="sys-panel" aria-labelledby="launch-steps-h" data-launch-steps>
+  <header><h2 id="launch-steps-h">What Launch changes</h2></header>
+  <div class="sys-pad">
+    {% for step in steps %}<div data-launch-step="{{ step.key }}"{% if step.already_done %} data-done{% endif %}>
+      <div class="sys-state"><span><strong>{{ step.label }}</strong></span><span class="mono">{{ step.now }} &rarr; {% if step.already_done %}<span class="sys-badge ok">{% if step.key == "payments" %}Already open or scheduled{% else %}Already on{% endif %}</span>{% else %}{{ step.after }}{% endif %}</span></div>
+      <p class="sys-muted sys-hint">{{ step.effect }}</p></div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="sys-panel" aria-labelledby="launch-go-h">
+  <header><h2 id="launch-go-h">Launch Spa 99</h2></header>
+  <div class="sys-pad">
+    <p>Payments cannot be unsent. Once the emails go out they are out.</p>
+    <form method="post" action="{% url 'system_launch' %}" data-system-confirm="launch" data-confirm-title="Launch Spa 99?" data-confirm-body="The Memberships page goes public, the questions stop asking for an email, the wording changes to Join and payments open: every registered member is emailed. Payments cannot be unsent." data-confirm-action="Launch Spa 99" data-confirm-guard="{{ word }}" data-line="">{% csrf_token %}
+      <input type="hidden" name="confirm" value="" autocomplete="off" data-confirm-word="{{ word }}">
+      <noscript><p><label for="launch-word">Type <strong>{{ word }}</strong> to confirm</label> <input type="text" id="launch-word" name="confirm" autocomplete="off" spellcheck="false"></p></noscript>
+      <div class="sys-actions"><button type="submit" class="sys-btn primary" data-launch-button>Launch Spa 99</button></div>
+    </form>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

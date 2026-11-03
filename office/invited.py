@@ -10,6 +10,8 @@ from django.db.models.functions import Lower
 from django.http import HttpResponse
 from django.utils import timezone
 
+from common import sorting
+from common.sorting import Column
 from journey.models import JourneySession
 from mailings.models import ContactListMember, Invite
 from users.models import User
@@ -25,9 +27,28 @@ DEFAULT_STATE = "unclicked"  # the people to chase: invited and never clicked or
 CSV_CHUNK = 200
 
 
+# Sortable headers (R1). Lists is a set of names: a plain header. `opened` and `clicked` are the annotations of `queryset`.
+COLUMNS = [
+    Column("name", "Name", Lower("name")),
+    Column("email", "Email", "email_key", css="o-email-col"),
+    Column("lists", "Lists"),
+    Column("invited", "Invited", "created_at", first=sorting.DESC, css="num"),
+    Column("opened", "Opened email", "opened", first=sorting.DESC),
+    Column("clicked", "Clicked the link", "clicked", first=sorting.DESC),
+    Column("expired", "Invite expired", "expires_at"),
+]
+TIEBREAK = ("-created_at", "-id")
+
+
 def filters_from(request):
     state = request.GET.get("state", DEFAULT_STATE)
-    return {"q": request.GET.get("q", "").strip(), "state": state if state in STATES else DEFAULT_STATE}
+    key, direction, _ = sorting.resolve(COLUMNS, request.GET, "invited", sorting.DESC)
+    return {"q": request.GET.get("q", "").strip(), "state": state if state in STATES else DEFAULT_STATE, "sort": key, "dir": direction}
+
+
+def columns_for(filters, request):
+    """The `columns` context for the table header (see common.sorting)."""
+    return sorting.header_columns(COLUMNS, filters["sort"], filters["dir"], request.path, request.GET)
 
 
 def is_filtered(filters):
@@ -54,7 +75,7 @@ def queryset(filters, now=None):
         found = found.filter(clicked=True)
     elif filters["state"] == "expired":
         found = found.filter(expires_at__lte=now)
-    return found.order_by("-created_at", "-id")
+    return found.order_by(*sorting.ordering_from(COLUMNS, filters, "invited", TIEBREAK))
 
 
 def build_rows(invites, now=None):

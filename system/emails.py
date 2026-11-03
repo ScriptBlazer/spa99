@@ -7,11 +7,13 @@ from django import forms
 from django.core.paginator import Paginator
 from django.utils import timezone
 
+from common.validators import sending_domain
 from mailings import blocks as mailing_blocks, segments
 from mailings.models import ContactList, EmailOptOut, Invite, Mailing
 from notifications import emailbody, ses
 from notifications.models import EmailBounce, EmailLog, EmailSuppression, NotificationTemplate
 from notifications.seed import DEFAULT_SUBJECTS
+from plans.models import SiteSettings
 
 from . import defaults
 from .forms import VersionedForm
@@ -33,6 +35,7 @@ def overview(request=None):
     d = defaults.get(request)
     return {
         "ses": ses.ses_status(),
+        "sending_domain": sending_domain(),
         "stats": {
             "sent_today": sent.filter(created_at__gte=today).count(),
             "sent_week": sent.filter(created_at__gte=week).count(),
@@ -95,12 +98,14 @@ def automatic_list():
     last = {}
     for change in SystemChange.objects.filter(model_label=EMAIL_MODEL, object_pk__in=[str(r.pk) for r in rows.values()]).order_by("-created_at")[:200]:
         last.setdefault(change.object_pk, change)
+    switched_on = SiteSettings.load().lead_next_morning_on
     result = []
     for spec in specs:
         row = rows.get(spec.key)
         default_subject, note = DEFAULT_SUBJECTS[spec.key]
         change = last.get(str(row.pk)) if row else None
         result.append({
+            "off": spec.key == "lead_next_morning" and not switched_on,
             "key": spec.key, "title": spec.title, "when": (row.note if row and row.note else note), "editable": spec.editable,
             "subject": row.subject if row else default_subject, "default_subject": default_subject,
             "subject_changed": bool(row and row.subject != default_subject), "body_changed": bool(row and row.body.strip()),

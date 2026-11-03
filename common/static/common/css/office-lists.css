@@ -283,3 +283,53 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 /* the person page's chats card: each link's overlay is held inside its own row (it used to cover the whole card) */
 [data-chat-list] li { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-2); min-height: 2.75rem; padding-block: var(--space-1); }
 [data-chat-list] .o-cell-sub { flex: 1 1 100%; }
+
+/* ---------- Round 2 R1: sortable headers (docs/features/office-outreach-design.md). The head is a link, so it works without script. ---------- */
+.o-sort { display: inline-flex; align-items: center; gap: 0.25rem; height: 100%; min-height: 2.75rem; color: inherit; text-decoration: none; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.o-sort-icon { width: 0.875rem; height: 0.875rem; stroke-width: 2; opacity: 0; }   /* always drawn, so a label never shifts and the Leads widths hold */
+.o-sort[data-next="desc"]:not(.is-active) .o-sort-icon { rotate: 180deg; }          /* the arrow shows the order a click gives */
+th[aria-sort] .o-sort, .o-sort.is-active { color: var(--office-text); }               /* 10.13 on the sunken head */
+th[aria-sort] .o-sort-icon { opacity: 1; }
+th[aria-sort="descending"] .o-sort-icon { rotate: 180deg; }
+th.num .o-sort { flex-direction: row-reverse; }                                         /* the arrow sits left: the label lines up with the numbers */
+.o-sort:focus-visible { outline: 2px solid var(--office-text); outline-offset: -2px; border-radius: var(--radius-sm); }   /* inset: the Leads heads clip overflow */
+@media (hover: hover) and (pointer: fine) {
+  .o-sort { transition: color var(--office-dur-lift) var(--ease-soft); }
+  .o-sort .o-sort-icon { transition: opacity var(--office-dur-lift) var(--ease-soft); }
+  .o-sort:hover { color: var(--office-text); }
+  .o-sort:hover .o-sort-icon { opacity: 0.45; }
+  th[aria-sort] .o-sort:hover .o-sort-icon { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .o-sort, .o-sort .o-sort-icon { transition: none; } }
+
+/* the phone's Sort group: the heads do it from 64em, the radios stay in the form so a filter change keeps the order */
+.o-filter-group--sort { display: none; }
+@media (max-width: 63.99em) { .o-filter-group--sort { display: block; } }
+.o-sortfields { display: grid; gap: var(--space-4); }
+.o-sortfield { min-width: 0; margin: 0; padding: 0; border: 0; }
+.o-sortfield legend { padding: 0; }
+.o-sortfield .o-chips { margin-top: var(--space-2); }
+.o-sortfields:is([data-kind="date"], [data-kind="number"]) .o-order [data-order="desc"] { order: -1; }   /* Newest first before Oldest first */
+.o-sortbtn { gap: var(--space-1); margin-left: auto; }
+.o-sortbtn .o-icon { width: 1rem; height: 1rem; }
+.o-sortbtn[data-dir="desc"] .o-icon { rotate: 180deg; }
+@media (min-width: 64em) { .o-quiet.o-sortbtn { display: none; } }   /* .o-quiet is declared later in office.css: the extra class wins */
+.o-sortsheet .o-filters-body { display: grid; gap: var(--space-4); margin-bottom: var(--space-4); }
+
+/* ---------- Round 2 R4 and R6: the quiet end of a page (Gold delete, Archive lead) ---------- */
+.o-endzone { margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--color-control-line); }   /* a full-width rule, not an accent */
+.o-endzone form { margin: 0; }
+.o-endzone-note { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--office-muted); max-width: none; }
+.o-quiet--danger { gap: var(--space-2); color: var(--office-danger); }   /* 8.15 */
+.o-quiet--danger .o-icon { width: 1rem; height: 1rem; }
+.o-archive-btn { gap: var(--space-2); }
+.o-archive-btn .o-icon { width: 1rem; height: 1rem; }
+.o-quiet.o-archive-btn--rail { display: none; }
+@media (min-width: 64em) { .o-quiet.o-archive-btn--rail { display: inline-flex; margin-top: var(--space-2); } .o-endzone--phone { display: none; } }
+@media (max-width: 63.99em) { .o-endzone--phone { order: 10; margin-top: var(--space-4); } }
+.o-badge--archived { background: var(--office-sunken); color: var(--office-muted); gap: var(--space-1); }   /* 5.38 */
+.o-badge--archived .o-icon { width: 0.875rem; height: 0.875rem; }
+.o-tl-restore { margin-top: var(--space-2); justify-self: start; }
+.o-tl-restore .btn { min-height: 2.25rem; }
+@media (pointer: coarse) { .o-tl-restore .btn { min-height: 2.75rem; } }
+.o-tl-msg .o-clamp-more { margin-top: var(--space-1); }

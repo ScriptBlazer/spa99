@@ -78,6 +78,18 @@ Plus `--office-grid: rgb(73 46 33 / 0.06)` (gridlines, decoration) and `--office
 
 If Moishe wants more colour after seeing it, raise chroma on one token at a time and re-run the validator; the structure stays.
 
+### 2.2b Office outreach tokens (2026-11-03, proposed, approved for the build)
+
+For the sticky notes board (`docs/features/office-outreach-design.md`). In `office-tokens.css` under `.office`:
+
+```css
+--office-note: var(--color-cream);   /* the paper of a note: an alias, no new colour. espresso 10.95, muted 5.81, danger 8.07 */
+--office-note-tilt: 0.6deg;          /* the most a note leans; static, so reduced motion needs no override */
+--office-note-min-w: 13rem;          /* grid column minimum of the notes board */
+```
+
+New icons in `_icons.html` (24 grid, 1.5 stroke, redrawn, no library): `list-checks`, `note`, `plus`, `x`, `paperclip`, `paper-plane`. Note that brand cream is a pale yellow-green (`#F5F2D8`), so a note reads as pale yellow paper; a one-line change to `--office-note` recolours the board.
+
 ### 2.3 Type and layout
 
 ```css

@@ -196,7 +196,14 @@ def load():
 
     registrations = [
         (metrics.day(created), slug or "none", source)
-        for created, slug, source in InterestRegistration.objects.filter(user__is_staff=False).values_list("created_at", "plan__slug", "source")
+        for created, slug, source in InterestRegistration.objects.filter(user__is_staff=False).exclude(plan__slug="gold")  # Gold Card members are not registrations (Moishe, 2026-11-03)
+        .values_list("created_at", "plan__slug", "source")
     ]
     registered_emails = {e.lower() for e in User.objects.filter(is_staff=False, email_verified_at__isnull=False).values_list("email", flat=True)}  # verified only: the Leads list agrees
+    from outreach.models import ArchivedLead
+
+    archived = {e.lower() for e in ArchivedLead.objects.values_list("email", flat=True)} - registered_emails  # an archived lead who registered is a registered person again
+    if archived:  # put-away leads leave the lead figures (new leads, answers); their journeys still count as people
+        leads = {e: day for e, day in leads.items() if e not in archived}
+        lead_votes = [v for v in lead_votes if v[0] not in archived]
     return Figures(dict(started), dict(finished), registrations, votes, leads, lead_votes, registered_emails)

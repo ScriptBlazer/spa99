@@ -76,7 +76,19 @@ class VersionedForm(forms.ModelForm):
 class EmailsForm(VersionedForm):
     class Meta:
         model = SiteSettings
-        fields = ["gold_approver_cc", "contact_email"]
+        fields = ["gold_approver_cc", "contact_email", "auto_email_from_name", "auto_email_from_address", "lead_next_morning_on", "lead_next_morning_at", "lead_next_morning_min_hours"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name in ("lead_next_morning_at", "lead_next_morning_min_hours"):
+            self.fields[name].required = False  # a post without them (older forms, scripts) keeps the saved value
+
+    def clean_lead_next_morning_at(self):
+        return self.cleaned_data.get("lead_next_morning_at") or self.instance.lead_next_morning_at
+
+    def clean_lead_next_morning_min_hours(self):
+        value = self.cleaned_data.get("lead_next_morning_min_hours")
+        return self.instance.lead_next_morning_min_hours if value is None else value
 
     def clean(self):
         data = super().clean()
@@ -167,6 +179,6 @@ class SettingsForm(VersionedForm):
     class Meta:
         model = SiteSettings
         fields = ["opening_date", "opening_text", "register_interest_open", "memberships_public", "journey_email_gate", "booking_open",  # subscribe_open hidden until card payments (Moishe 2026-10-29)
-                  "join_wording", "show_leil_shishi", "vat_rate", "whatsapp_number", "whatsapp_message", "whatsapp_rate_message", "lock_idle_minutes", "max_sign_in_hours", "code_theme_default"]
+                  "join_wording", "show_leil_shishi", "vat_rate", "whatsapp_number", "whatsapp_message", "whatsapp_rate_message", "outreach_list_name", "lock_idle_minutes", "max_sign_in_hours", "code_theme_default"]
         widgets = {"opening_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}
         field_classes = {"whatsapp_number": WhatsappNumberField}

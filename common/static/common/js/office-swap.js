@@ -2,7 +2,8 @@
  *
  *   Range picker      change a radio: fetch the page for that range, swap [data-region] parts in place (cross-fade), morph
  *                     [data-morph] parts (rings, sparkline paths, funnel bars) from their old values, push the URL, Back works.
- *   Filters           search (300ms) and filters fetch the rows partial (HX-Request header) into the table (Leads fetches the whole page, so its tiles and total follow).
+ *   Filters           search (300ms) and filters fetch the page and put its rows and its sortable head into the table (and, where the form says data-full, its tiles and total line).
+ *   Sorting           a click on a table head (a plain link) does the same for that URL; the phone's Sort radios sit in the same form and keep step with it.
  *   Show more         appends the next page of rows; Show earlier (a person's timeline) adds the next 20 events.
  *   Actions           Approve, Decline, Resend post in the background, show the server's message as a toast and refresh the page parts.
  * If anything fails the plain link or form still works. The chart script listens for 'office:series'. */
@@ -16,6 +17,7 @@ const LABELS = { today: 'Today', '7d': '7 days', '30d': '30 days', '90d': '90 da
 let seq = 0;
 let shown = null; // the range currently on screen
 let failedUrl = '';
+let loadList = null;   // the list's own loader (set by lists()): a click on a sortable head goes through it
 
 const main = () => document.getElementById('office-main');
 const forms = () => [...document.querySelectorAll('[data-range-form]')];
@@ -117,6 +119,26 @@ function setRows(tbody, html, append) {
   if (append) { tbody.querySelector('[data-more-row]')?.remove(); tbody.append(template.content); } else tbody.replaceChildren(template.content);
 }
 
+/** The table head again from a fetched page: aria-sort and the links follow the order that was asked for. */
+function swapHead(doc) {
+  const fresh = doc.querySelector('[data-list-card] thead');
+  const old = document.querySelector('[data-list-card] thead');
+  if (fresh && old) old.replaceWith(document.importNode(fresh, true));
+}
+
+/** The phone's Sort radios and the quiet "Sort: X" button show what the fetched page is sorted by (the order may have come from a table head). */
+function syncSortControls(doc) {
+  doc.querySelectorAll('[data-sort-group]').forEach((group, at) => {
+    const mine = document.querySelectorAll('[data-sort-group]')[at];
+    if (!mine) return;
+    const sort = group.querySelector('input[name="sort"]:checked');
+    const dir = group.querySelector('input[name="dir"]:checked');
+    mine.querySelectorAll('input[name="sort"]').forEach((input) => { input.checked = input.value === sort?.value; });
+    mine.querySelectorAll('input[name="dir"]').forEach((input) => { input.checked = input.value === dir?.value; });
+    document.dispatchEvent(new CustomEvent('office:sort', { detail: { group: mine } }));
+  });
+}
+
 function lists() {
   const form = document.querySelector('[data-filter-form]');
   const tbody = document.querySelector('[data-office-list]');
@@ -124,19 +146,23 @@ function lists() {
   const card = document.querySelector('[data-list-card]');
   const full = form.hasAttribute('data-full');
   let timer; let run = 0;
-  const refresh = async () => {
+  const refresh = async (asked) => {   // `asked`: a URL to load as it is (a click on a table head), else the form says
     const params = new URLSearchParams();
     new FormData(form).forEach((value, key) => { if (value) params.append(key, value); });
-    const query = params.toString();
-    const url = location.pathname + (query ? `?${query}` : '');
+    const target = typeof asked === 'string' ? new URL(asked, location.href) : null;
+    const query = target ? target.search.slice(1) : params.toString();
+    const url = target ? target.pathname + target.search : location.pathname + (query ? `?${query}` : '');
     const mine = ++run;
     const busy = setTimeout(() => card?.setAttribute('aria-busy', 'true'), BUSY_AFTER_MS);
     try {
-      const { text } = await fetchDoc(url, full ? {} : { 'HX-Request': 'true' });
+      const { text } = await fetchDoc(url);   // the whole page: its rows, its sortable head and (data-full) its other parts
       if (mine !== run) return;
-      if (full) {   // the whole page: the rows go into the table, every other [data-region] (summary tiles, the total line) is replaced in place
-        const doc = parse(text);
-        setRows(tbody, doc.querySelector('[data-office-list]').innerHTML, false);
+      const doc = parse(text);
+      const fresh = doc.querySelector('[data-office-list]');
+      if (!fresh) throw new Error('no list in the answer');
+      swapHead(doc);
+      setRows(tbody, fresh.innerHTML, false);
+      if (full) {   // every other [data-region] (summary tiles, the total line) is replaced in place
         doc.querySelectorAll('[data-region]:not([data-office-list])').forEach((next) => {
           const old = document.querySelector(`[data-region="${next.dataset.region}"]`);
           if (!old) return;
@@ -145,7 +171,8 @@ function lists() {
           old.replaceWith(clone);
         });
         document.title = doc.title;
-      } else setRows(tbody, text, false);
+      }
+      syncSortControls(doc);
       history.replaceState({ office: true }, '', url);
       document.querySelectorAll('[data-export-csv]').forEach((link) => { link.href = `${link.dataset.exportBase}${query ? `?${query}` : ''}`; });
       const clear = full ? null : form.querySelector('[data-clear]');
@@ -167,6 +194,7 @@ function lists() {
   });
   form.addEventListener('change', (event) => { if (!event.target.matches('[data-search]')) refresh(); });
   form.addEventListener('submit', (event) => { event.preventDefault(); clearTimeout(timer); refresh(); });
+  loadList = refresh;
   document.addEventListener('click', (event) => {
     if (!event.target.closest?.('[data-clear]')) return;
     event.preventDefault();
@@ -196,6 +224,18 @@ function lists() {
       const { text } = await fetchDoc(more.href, { 'HX-Request': 'true' });
       setRows(tbody, text, true);
     } catch { more.textContent = label; more.removeAttribute('aria-busy'); }
+  });
+}
+
+// ---------- sorting: a click on a table head is a plain link (works without script); with script the list is swapped in place ----------
+
+function sorting() {
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest?.('a.o-sort');
+    if (!link || event.defaultPrevented || event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (!loadList || !link.closest('[data-list-card]')) return;   // no list on this page: follow the link
+    event.preventDefault();
+    loadList(link.href);
   });
 }
 
@@ -262,6 +302,7 @@ export function initSwap() {
   document.addEventListener('click', (event) => { if (event.target.closest?.('[data-retry]')) go(failedUrl || location.href, false); });
   window.addEventListener('popstate', () => { if (forms().length) go(location.pathname + location.search, false); });
   lists();
+  sorting();
   timeline();
   actions();
 }

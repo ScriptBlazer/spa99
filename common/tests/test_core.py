@@ -16,6 +16,7 @@ from common.models import LoginEvent
 from common.spa_day import spa_day_bounds, spa_day_for
 from common.tasks import enqueue
 from common.validators import MESSAGES, client_config, normalise_email, normalise_uk_mobile, password_problems
+from users.tests.test_register import with_journey
 
 LONDON = ZoneInfo("Europe/London")
 UTC = ZoneInfo("UTC")
@@ -220,7 +221,7 @@ class SharedValidationTests(TestCase):
         # The password wording is read from the real validators, so it is exactly what the server would say.
         self.assertEqual(config["messages"]["password_short"], password_problems("a")[0])
         self.assertIn("{what}", config["messages"]["password_similar"])
-        html = self.client.get("/register/").content.decode()
+        html = with_journey(self.client).get("/register/").content.decode()
         self.assertIn('id="validation-config"', html)
         with override_settings(MINIMUM_AGE=21):
             self.assertEqual(client_config()["messages"]["dob_under_age"], "You must be 21 or over.")

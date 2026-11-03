@@ -160,7 +160,7 @@ function confirmDialog(spec) {
     body: spec.line || '',
     confirmLabel: spec.action,
     tone: IS_LIVE || spec.danger ? 'danger' : 'neutral',
-    guard: spec.guard ? 'LIVE' : undefined,
+    guard: spec.guard ? (typeof spec.guard === 'string' ? spec.guard : 'LIVE') : undefined,
   });
 }
 
@@ -205,7 +205,7 @@ function specFor(form) {
   }
   if (form.matches('[data-system-confirm][data-confirm-title]')) { // End now / Delete on Sales: the page words the whole question
     const d = form.dataset;
-    return { title: d.confirmTitle, rows: [], line: d.confirmBody, action: d.confirmAction, danger: true };
+    return { title: d.confirmTitle, rows: [], line: d.confirmBody, action: d.confirmAction, danger: true, guard: d.confirmGuard || undefined }; // data-confirm-guard: a word to type (Launch)
   }
   if (form.matches('[data-system-confirm]')) {
     const d = form.dataset;
@@ -281,7 +281,7 @@ async function askCodeAndUndo(form, opener) {
 function initSubmit() {
   window.addEventListener('pageshow', (event) => { // back/forward cache: a restored page must ask again
     if (!event.persisted) return;
-    $$('form').forEach((form) => { form._confirmed = false; form.querySelectorAll('input[data-confirm-yes]').forEach((input) => { input.value = ''; }); });
+    $$('form').forEach((form) => { form._confirmed = false; form.querySelectorAll('input[data-confirm-yes], input[data-confirm-word]').forEach((input) => { input.value = ''; }); });
   });
   document.addEventListener('submit', async (event) => {
     const form = event.target;
@@ -291,7 +291,7 @@ function initSubmit() {
     const spec = specFor(form);
     if (spec) {
       event.preventDefault();
-      if (await confirmDialog(spec)) { form.querySelectorAll('input[data-confirm-yes]').forEach((input) => { input.value = 'yes'; }); form._confirmed = true; form.requestSubmit(event.submitter || undefined); }
+      if (await confirmDialog(spec)) { form.querySelectorAll('input[data-confirm-yes]').forEach((input) => { input.value = 'yes'; }); form.querySelectorAll('input[data-confirm-word]').forEach((input) => { input.value = input.dataset.confirmWord; }); form._confirmed = true; form.requestSubmit(event.submitter || undefined); }
       return;
     }
     begin(form);

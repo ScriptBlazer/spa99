@@ -158,3 +158,24 @@ def send_gold_applicant_email(application_id, event_id):
                          context, subject_email=application.email, plain_body=plain)
     _log_email(application, log, template, event=str(event.pk))
     return log.status
+
+
+def send_gold_guide_email(application_id, event_id):
+    """The Gold Card guide email: the PDF from System is attached, Postmark tag `gold-guide`. Takes ids only. The result is a new
+    trail line. Returns a status string."""
+    event = ApplicationEvent.objects.select_related("application").filter(pk=event_id, application_id=application_id, action=ApplicationEvent.GUIDE_SENT).first()
+    guide = SiteSettings.load().gold_guide
+    if event is None or not guide:
+        return None
+    application = event.application
+    try:
+        with guide.open("rb") as handle:
+            attachment = [(guide.name.rsplit("/", 1)[-1], handle.read(), "application/pdf")]
+    except Exception:  # noqa: BLE001 - a missing file is a failed send on the trail, never a crash
+        logger.exception("Could not read the Gold guide for %s", application.reference)
+        audit.record(application, ApplicationEvent.EMAIL_FAILED, channel=audit.SYSTEM, meta={"template": "gold_guide", "recipient": application.email, "error": "The guide file could not be read."})
+        return "failed"
+    log = send_templated("gold_guide", [application.email], subject_for("gold_guide", first_name=application.first_name),
+                         {"first_name": application.first_name}, subject_email=application.email, headers={"X-PM-Tag": "gold-guide"}, attachments=attachment)
+    _log_email(application, log, "gold_guide", event=str(event.pk))
+    return log.status

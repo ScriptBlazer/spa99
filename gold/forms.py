@@ -202,6 +202,3 @@ class DeclineForm(forms.Form):
 class RespondForm(forms.Form):
     message = _text("Message", 5, MESSAGE_MAX, "Write the message for the applicant.")
 
-
-class NoteForm(forms.Form):
-    note = _text("Note", 0, MESSAGE_MAX, "Write the note.")

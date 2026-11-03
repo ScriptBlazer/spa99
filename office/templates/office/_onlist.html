@@ -1,0 +1,2 @@
+{% load office_tags %}{% comment %}The state that replaces the Add to list button. Keys: outreach{title,added_by,added_at}.{% endcomment %}
+<p class="o-onlist" data-on-outreach>{% include "office/_icon.html" with name="check" %}<span class="o-onlist-text">On the {{ outreach.title }}{% if outreach.added_by %}<span class="o-onlist-meta">{{ outreach.added_by|first_word }}, {{ outreach.added_at|dm }}</span>{% endif %}</span><a class="o-quiet" href="{% url 'office_outreach' %}">View</a></p>

@@ -1,0 +1,31 @@
+{% extends "office/base.html" %}
+{% load office_tags %}
+{% block title %}{{ title }} | Spa 99 Office{% endblock %}
+{% block main %}
+<h1 class="sr-only">{{ title }}</h1>
+<p class="o-sub o-outreach-sub">People to approach.</p>
+{# Open and Done: two options do not need a filter sheet, so the same control sits in the bar on phone and desktop. #}
+<form class="o-filters o-filters--outreach" method="get" action="{% url 'office_outreach' %}" data-filter-form data-full data-list="outreach" aria-label="Show open or done">
+  <div class="o-filters-bar">
+    <fieldset class="o-seg" style="--n: 3; --i: {% if state == 'registered' %}1{% elif state == 'done' %}2{% else %}0{% endif %}" data-default="open">
+      <legend class="sr-only">Show</legend>
+      <span class="o-seg-thumb" aria-hidden="true"></span>
+      <label class="o-seg-item"><input type="radio" name="state" value="open"{% if state == "open" %} checked{% endif %}><span>Open <span class="o-seg-count" data-region="outreach-open">{{ open_count|num }}</span></span></label>
+      <label class="o-seg-item"><input type="radio" name="state" value="registered"{% if state == "registered" %} checked{% endif %}><span>Registered <span class="o-seg-count" data-region="outreach-registered">{{ registered_count|num }}</span></span></label>
+      <label class="o-seg-item"><input type="radio" name="state" value="done"{% if state == "done" %} checked{% endif %}><span>Done <span class="o-seg-count" data-region="outreach-done">{{ done_count|num }}</span></span></label>
+    </fieldset>
+    <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button>
+  </div>
+  {# One line under the tabs: how many on this tab, and (phone only: the heads sort from 64em) the quiet Sort button with its small sheet. #}
+  <p class="o-totalline" data-region="outreach-total"><span data-total>{% for name, n in counts.items %}{% if name == state %}{{ n|num }} {{ name }}{% endif %}{% endfor %}</span>
+    {% include "office/_sort_button.html" with dir_value=dir %}</p>
+  {% include "office/_sort_sheet.html" with dir_value=dir %}
+</form>
+<div class="o-card o-tablecard" data-list-card>
+  <table class="o-list o-list--outreach">
+    <caption class="sr-only">{{ title }}</caption>
+    <thead data-region="outreach-head"><tr>{% include "office/_sort_head.html" %}<th scope="col" class="c-action"><span class="sr-only">Actions</span></th></tr></thead>
+    <tbody data-region="list" data-office-list="outreach">{% include "office/_outreach_rows.html" %}</tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,9 +1,12 @@
 """Office template helpers. Formatting only (British numbers, London dates) and drawing geometry (ring arcs,
 sparkline paths, bar lengths): every figure shown is a stored figure from the selectors, never calculated here."""
+import re
 from datetime import date, datetime
 
 from django import template
 from django.utils import timezone
+from django.utils.html import conditional_escape
+from django.utils.safestring import mark_safe
 
 register = template.Library()
 
@@ -165,6 +168,26 @@ def expires_in(value):
 @register.filter
 def first_word(value):
     return str(value or "").split(" ")[0]
+
+
+@register.filter
+def note_author(value):
+    """A short name for a sticky note: the first name from 'Name (email)', else the email's first part ('moishe.berkowitz@...' -> 'Moishe')."""
+    text = str(value or "").strip()
+    if not text:
+        return "The team"
+    if "@" not in text.split(" ")[0]:
+        return text.split(" ")[0]
+    local = text.split("@")[0]
+    return re.split(r"[._+-]", local)[0].capitalize() or local
+
+
+@register.filter
+def short_by(value):
+    """A timeline label with a short name: 'Archived by Adam Test (admin@example.com)' -> 'Archived by Adam'."""
+    text = str(value or "")
+    head, sep, who = text.partition(" by ")
+    return f"{head} by {note_author(who)}" if sep and who.strip() else text
 
 
 @register.filter
@@ -393,3 +416,75 @@ def insight_of(insights, key):
 def has_data(items, key="value"):
     """True when any item has a figure above zero (decides between a chart and its empty line)."""
     return any(_int(item.get(key)) > 0 for item in (items or []))
+
+
+# ---------- long text (R3) ----------
+
+@register.filter
+def soft_email(value):
+    """An address that may break at sensible places first: a <wbr> after the @ and before each dot (the text is escaped first)."""
+    text = conditional_escape(str(value or ""))
+    return mark_safe(str(text).replace("@", "@<wbr>").replace(".", "<wbr>."))
+
+
+# ---------- sorting on the phone (R1): "Sort by" and "Order" ----------
+
+# What a column holds decides the words of the Order pills: dates run newest first, numbers highest first, text A to Z.
+SORT_DATES = {"last_seen", "first_seen", "registered", "verified", "invited", "opened", "clicked", "expired", "applied", "started", "added", "done", "archived"}
+SORT_NUMBERS = {"potential", "visits", "messages", "cost"}
+SORT_OTHER = {"status", "marketing"}
+SORT_WORDS = {"date": ("Oldest first", "Newest first"), "number": ("Lowest first", "Highest first"), "text": ("Z to A", "A to Z"), "other": ("Descending", "Ascending")}
+
+
+def _kind(key):
+    if key in SORT_DATES:
+        return "date"
+    if key in SORT_NUMBERS:
+        return "number"
+    return "other" if key in SORT_OTHER else "text"
+
+
+def _labels(kind):
+    """(label for asc, label for desc). Text reads A to Z when ascending."""
+    low, high = SORT_WORDS[kind]
+    return ("A to Z", "Z to A") if kind == "text" else ((high, low) if kind == "other" else (low, high))
+
+
+@register.simple_tag
+def sort_ui(columns, direction="desc"):
+    """What the phone's Sort group needs, from a list's `columns`: options (key, label, active, kind, first, asc, desc), the current dir,
+    the active column's label and kind, and the two Order labels that follow its field. A column such as First seen, that has no head, can be
+    the sort: then nothing is active and the Order words are the date ones."""
+    options, active = [], None
+    for c in columns or []:
+        if not c.get("sortable"):
+            continue
+        kind = _kind(c["key"])
+        asc, desc = _labels(kind)
+        option = {"key": c["key"], "label": c["label"], "active": bool(c.get("active")), "kind": kind, "first": "asc" if kind == "text" else "desc", "asc": asc, "desc": desc}
+        options.append(option)
+        if option["active"]:
+            active = option
+    kind = active["kind"] if active else "date"
+    asc, desc = _labels(kind)
+    chosen = (active and next((c["dir"] for c in columns if c.get("active")), "")) or (direction if direction in ("asc", "desc") else "desc")
+    return {"options": options, "dir": chosen, "kind": kind, "asc": asc, "desc": desc, "label": active["label"] if active else "", "active": active}
+
+
+@register.simple_tag
+def pick_columns(columns, spec=""):
+    """A table head built from a list's `columns`: spec is 'key', 'key=Label' pairs, comma separated, in the order to show. A key the list
+    has keeps its sorting; any other key is a plain header (css c-<key>). An empty spec returns the columns as they are."""
+    if not spec:
+        return columns
+    by_key = {c["key"]: c for c in columns or []}
+    picked = []
+    for part in spec.split(","):
+        key, _, label = part.partition("=")
+        key = key.strip()
+        found = by_key.get(key)
+        if found is not None:
+            picked.append({**found, "label": label or found["label"]})
+        else:
+            picked.append({"key": key, "label": label or key.replace("_", " ").capitalize(), "css": f"c-{key}", "sortable": False, "active": False, "dir": "", "aria_sort": "none", "url": ""})
+    return picked

@@ -242,7 +242,9 @@ class ChooseTierTests(TestCase):
         self.assertContains(self.client.get("/account/membership/"), "Choose your membership")
 
     def test_signed_out_choice_goes_to_register_with_the_plan(self):
-        response = self.client.get("/register/?plan=tier-3")
+        from users.tests.test_register import with_journey
+
+        response = with_journey(self.client).get("/register/?plan=tier-3")
         self.assertEqual(response.context["selected_plan"], "tier-3")
 
 

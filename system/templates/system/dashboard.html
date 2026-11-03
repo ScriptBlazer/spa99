@@ -27,6 +27,7 @@
     <header><h2 id="dash-stages">Stage switches</h2></header>
     <div class="sys-pad">
       {% for label, on in stages %}<div class="sys-state" data-system-stage="{{ label }}"><span>{{ label }}</span><span class="sys-badge {% if on %}ok{% endif %}">{{ on|yesno:"On,Off" }}</span></div>{% endfor %}
+      <div class="sys-state" data-system-launch><span>Launch</span><span>{% if launched_text %}Launched {{ launched_text }}{% else %}Not yet{% endif %} <a href="{% url 'system_launch' %}">Open</a></span></div>
       {% if site.opening_date %}<div class="sys-state"><span>Opening date</span><span class="mono">{{ site.opening_date|date:"j M Y" }}</span></div>{% endif %}
       <p class="sys-muted sys-hint"><a href="{% url 'system_settings' %}">Change in Settings</a>. Switches change only there, behind a confirm.</p>
     </div>

@@ -20,6 +20,7 @@ from common.audit import client_ip
 from common.ratelimit import hit, rate_limited_json
 from common.validators import normalise_email
 from journey import services as journey_services
+from mailings import invites as invite_services
 from pages import services as pages_services
 from pages.access import memberships_visible
 from plans import sales as sale_services
@@ -175,11 +176,17 @@ def register(request):
     if request.user.is_authenticated:  # every "choose this tier" link ends here (compare page, journey result, Gold page): save it
         return _confirm_tier(request, request.GET.get("plan", ""))
     as_json = request.method == "POST" and _wants_json(request)
-    if not SiteSettings.load().register_interest_open:
+    site = SiteSettings.load()
+    if not site.register_interest_open:
         if as_json:
             return _register_json_failure("Registration is not open yet.", 403)
         return _message(request, "Not open yet", "Registration is not open yet.", status=403)
     session = journey_services.session_from_cookies(request.COOKIES, request.user)
+    if (request.method == "GET" and not site.memberships_public and not (session and (session.completed_at or session.lead_email))
+            and not request.session.get(invite_services.SESSION_KEY)):
+        # Questions first while the Memberships page is closed (Moishe, 2026-11-03): the journey is the way in. Invited people
+        # (email invitation) and signed-in people skip this; once Memberships is public, anyone may register from it.
+        return redirect("journey")
     suggested = session.suggested_plan.slug if session and session.suggested_plan_id else ""
     plan_slug = services.interest_plan_slug(request.GET.get("plan")) or services.interest_plan_slug(suggested)
     plans = services.interest_plans()

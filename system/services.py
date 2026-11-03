@@ -268,6 +268,16 @@ def record_direct(user, section, model_label, obj, field, old, new, sentence=Non
         user=user, user_label=changes.current_user_label(user), **changes.current_info())
 
 
+def record_deleted(user, section, model_label, object_pk, object_repr, sentence, request=None):
+    """A row deleted somewhere outside System (the Office deleting a Gold application). One DELETED change row: who, when, what.
+    Not undoable. Pass `request` so the IP, browser and path are kept."""
+    from . import audit
+
+    return SystemChange.objects.create(
+        section=section, model_label=model_label, object_pk=str(object_pk), object_repr=str(object_repr)[:200], kind=SystemChange.DELETED,
+        sentence=sentence, user=user if getattr(user, "pk", None) else None, user_label=changes.current_user_label(user), **audit.request_info(request))
+
+
 # ---------- the change list ----------
 
 def change_list(params, page=1, size=None):

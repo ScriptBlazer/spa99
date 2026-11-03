@@ -11,6 +11,7 @@
 @import "office-analytics.css";
 @import "office-lists.css";
 @import "office-leads.css";
+@import "office-outreach.css";
 
 /* The site-wide cross-document view transition is off in the Office (it threw "Transition was skipped"). */
 @view-transition { navigation: none; }
@@ -31,7 +32,7 @@
 @media (hover: hover) and (pointer: fine) { .o-quiet:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.25em; } }
 .o-quiet:focus-visible { text-decoration: underline; text-underline-offset: 0.25em; }
 .o-lead { font-size: var(--text-base); line-height: var(--leading-snug); color: var(--office-muted); max-width: var(--measure); }
-.o-sub, .o-note { font-size: var(--text-sm); color: var(--office-muted); }
+.o-sub, .o-footnote { font-size: var(--text-sm); color: var(--office-muted); }
 .o-empty-line { color: var(--office-muted); font-size: var(--text-sm); padding-block: var(--space-3); }
 .o-danger { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--office-danger); }
 .o-danger .o-icon { width: 1rem; height: 1rem; }
@@ -203,3 +204,19 @@
 .o-sheet-links a > .o-icon:last-child { color: var(--office-muted); }
 .o-sheet-links a[aria-current="page"] { background: var(--office-sunken); }
 @media (min-width: 64em) { .o-navsheet { display: none; } }
+
+/* ---------- Round 2 R3: long text wraps inside its box, and long messages show a few lines with Read more ---------- */
+/* One rule for free text in cards, dialogs and the cells that hold it (a reason, a message, a history line, an address). Names break at spaces first.
+   Short cells (a status, a date) keep their words whole: inside a table only the free-text cells may break anywhere. */
+.o-card, .o-rows dd, .o-sub, .o-tl, .o-tl-msg, .o-history, .o-callout, .o-dialog { min-width: 0; overflow-wrap: anywhere; }
+.o-tablecard, .o-list thead th { overflow-wrap: normal; }
+.o-row td { min-width: 0; }
+.o-list td.c-reason, .o-list td.c-question, .o-list td.c-who, .o-list .o-cell-sub, .o-list .o-clamp { overflow-wrap: anywhere; }
+.o-list .c-name, .o-list .o-rowname { overflow-wrap: break-word; }
+.o-clamp { min-width: 0; overflow-wrap: anywhere; }
+.o-clamp:not([data-open]) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--lines, 3); line-clamp: var(--lines, 3); overflow: hidden; }
+html:not(.js) .o-clamp { display: block; overflow: visible; -webkit-line-clamp: none; line-clamp: none; }   /* no script, no clamp, no button */
+.o-clamp-more { min-height: 2rem; margin-top: var(--space-1); }
+.o-clamp-more[hidden] { display: none; }
+@media (pointer: coarse) { .o-clamp-more { min-height: 2.75rem; } }
+.o-row .o-clamp-more { position: relative; z-index: 1; }   /* above the row link that covers the row */

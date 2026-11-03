@@ -22,6 +22,7 @@ RISKY = {
     "capacity": ("capacity", "capacities", "Booking availability changes at once."),
     "gold_approver_emails": ("recipient list", "recipient lists", "Gold applications go to the new list at once."),
     "gold_approver_cc": ("recipient list", "recipient lists", "Copies go to the new list at once."),
+    "lead_next_morning_on": ("switch", "switches", "New leads are emailed from the next morning on. Real people get this email."),
     "contact_email": ("contact address", "contact addresses", "The site shows and replies from the new address at once."),
     "lock_idle_minutes": ("lock setting", "lock settings", "System locks after the new idle time at once."),
     "max_sign_in_hours": ("lock setting", "lock settings", "Every System sign-in ends after the new limit."),
@@ -181,6 +182,12 @@ def cell(field, pk, label=""):
 def token(field, pk):
     """The row's version token (hidden), tied to the row's own `<form id="f-<pk>">` like `cell`. Empty when the form has none."""
     return field.as_widget(attrs={"form": f"f-{pk}"}) if field is not None and field != "" else ""
+
+
+@register.simple_tag
+def field_with(field, placeholder=""):
+    """The field's own control with a placeholder (the model and the form stay as they are)."""
+    return field.as_widget(attrs={"placeholder": placeholder}) if placeholder else field
 
 
 @register.simple_tag

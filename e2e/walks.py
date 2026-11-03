@@ -11,7 +11,7 @@ from pathlib import Path
 from . import mailbox
 from .kit import (
     CONTROL, NEW_PASSWORD, OFFICE, PASSWORD, RESET_PASSWORD, SITE, STAFF, SYSTEM, UNLOCK_CODE, WORKSPACE_DIR, answer_journey,
-    apply_gold, approve_on_application_page, confirm_office_modal, dbtool, fill_date_of_birth, form_errors, manage, no_horizontal_overflow, register_member,
+    apply_gold, approve_on_application_page, confirm_office_modal, dbtool, fill_date_of_birth, form_errors, manage, no_horizontal_overflow, open_register, register_member,
     problems_modal, sign_in, sign_in_fails, tick, verify_email_link,
 )
 
@@ -545,7 +545,7 @@ def phone(w):
         page.wait_for_selector("[data-flow-root] .screen")
         check(page, "Journey start")
     with w.step("Phone: register page", page):
-        page.goto(f"{SITE}/register/")
+        open_register(page)
         check(page, "Register")
     email = "phone@example.com"
     with w.step("Phone: register, confirm and open /account/", page):

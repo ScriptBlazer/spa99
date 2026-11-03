@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import views, views_tools as t
 
 urlpatterns = [
     path("", views.dashboard, name="office_dashboard"),
@@ -37,5 +37,33 @@ urlpatterns = [
     path("gold/<uuid:pk>/resend/", views.gold_resend, name="office_gold_resend"),
     path("gold/<uuid:pk>/decline/", views.gold_decline, name="office_gold_decline"),
     path("gold/<uuid:pk>/respond/", views.gold_respond, name="office_gold_respond"),
-    path("gold/<uuid:pk>/note/", views.gold_note, name="office_gold_note"),
+    path("gold/<uuid:pk>/note/", t.note_add, {"kind": "gold"}, name="office_gold_note"),  # the old Add note URL: now adds a sticky note
+    path("gold/<uuid:pk>/send-guide/", t.gold_send_guide, name="office_gold_send_guide"),
+    # sticky notes: one set per person, on the person, lead and Gold pages
+    path("people/<uuid:pk>/notes/add/", t.note_add, {"kind": "person"}, name="office_person_note_add"),
+    path("people/<uuid:pk>/notes/<uuid:note>/delete/", t.note_delete, {"kind": "person"}, name="office_person_note_delete"),
+    path("people/<uuid:pk>/notes/<uuid:note>/edit/", t.note_edit, {"kind": "person"}, name="office_person_note_edit"),
+    path("people/<uuid:pk>/notes/<uuid:note>/restore/", t.note_restore, {"kind": "person"}, name="office_person_note_restore"),
+    path("leads/<uuid:pk>/notes/add/", t.note_add, {"kind": "lead"}, name="office_lead_note_add"),
+    path("leads/<uuid:pk>/notes/<uuid:note>/delete/", t.note_delete, {"kind": "lead"}, name="office_lead_note_delete"),
+    path("leads/<uuid:pk>/notes/<uuid:note>/edit/", t.note_edit, {"kind": "lead"}, name="office_lead_note_edit"),
+    path("leads/<uuid:pk>/notes/<uuid:note>/restore/", t.note_restore, {"kind": "lead"}, name="office_lead_note_restore"),
+    path("gold/<uuid:pk>/notes/add/", t.note_add, {"kind": "gold"}, name="office_gold_note_add"),
+    path("gold/<uuid:pk>/notes/<uuid:note>/delete/", t.note_delete, {"kind": "gold"}, name="office_gold_note_delete"),
+    path("gold/<uuid:pk>/notes/<uuid:note>/edit/", t.note_edit, {"kind": "gold"}, name="office_gold_note_edit"),
+    path("gold/<uuid:pk>/notes/<uuid:note>/restore/", t.note_restore, {"kind": "gold"}, name="office_gold_note_restore"),
+    # the approach list ("Barry's list")
+    path("outreach/", t.outreach_page, name="office_outreach"),
+    path("outreach/<uuid:pk>/done/", t.outreach_done, name="office_outreach_done"),
+    path("outreach/<uuid:pk>/remove/", t.outreach_remove, name="office_outreach_remove"),
+    path("people/<uuid:pk>/outreach/", t.outreach_add, {"kind": "person"}, name="office_person_outreach_add"),
+    path("leads/<uuid:pk>/outreach/", t.outreach_add, {"kind": "lead"}, name="office_lead_outreach_add"),
+    path("gold/<uuid:pk>/outreach/", t.outreach_add, {"kind": "gold"}, name="office_gold_outreach_add"),
+    # message a person or a lead
+    path("people/<uuid:pk>/message/", t.message_send, {"kind": "person"}, name="office_person_message"),
+    path("leads/<uuid:pk>/message/", t.message_send, {"kind": "lead"}, name="office_lead_message"),
+    # archive a lead / move him back (R6)
+    path("leads/<uuid:pk>/archive/", t.lead_archive, name="office_lead_archive"),
+    path("leads/<uuid:pk>/unarchive/", t.lead_unarchive, name="office_lead_unarchive"),
+    path("gold/<uuid:pk>/delete/", t.gold_delete, name="office_gold_delete"),
 ]

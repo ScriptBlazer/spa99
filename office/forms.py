@@ -13,3 +13,33 @@ class ManualSetupForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["plan"].queryset = Plan.objects.exclude(kind=Plan.ONE_OFF).order_by("order")  # memberships, Gold included
+
+
+class CappedText(forms.CharField):
+    """Text with a hard limit that is refused, never cut, and says how many characters were typed ("keep it to 300 characters
+    (you typed 412)"). No `maxlength` on the input: the page shows its own counter."""
+
+    def __init__(self, noun, limit, **kwargs):
+        super().__init__(strip=True, **kwargs)
+        self.noun, self.limit = noun, limit
+
+    def validate(self, value):
+        super().validate(value)
+        if value and len(value) > self.limit:
+            raise forms.ValidationError(f"{self.noun}: keep it to {self.limit} characters (you typed {len(value)}).", code="max_length")
+
+
+class StickyNoteForm(forms.Form):
+    note = CappedText("Note", 1000, error_messages={"required": "Write the note."})
+
+
+class MessageForm(forms.Form):
+    message = CappedText("Message", 5000, min_length=5, error_messages={"required": "Write the message.", "min_length": "Message: write at least 5 characters."})
+
+
+class OutreachAddForm(forms.Form):
+    reason = CappedText("Reason", 300, required=False)
+
+
+class ArchiveForm(forms.Form):
+    reason = CappedText("Reason", 300, required=False)

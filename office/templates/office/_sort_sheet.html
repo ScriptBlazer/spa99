@@ -1,0 +1,6 @@
+{% comment %}Lists without a filter sheet (Approach list, Chats): the small sheet behind the quiet "Sort: Added" button (_sort_button.html, in the total line; both phone only). Needs `columns`, `dir_value`. Put inside the list's form.{% endcomment %}
+<dialog class="o-sheet o-sortsheet" data-sort-sheet aria-labelledby="sortsheet-h">
+  <div class="o-sheet-head"><h2 id="sortsheet-h">Sort</h2></div>
+  <div class="o-filters-body">{% include "office/_sort_fields.html" %}</div>
+  <button type="button" class="btn btn-primary btn-block" data-sort-close>Show results</button>
+</dialog>

@@ -30,6 +30,7 @@
             <label class="o-seg-item"><input type="radio" name="potential" value="medium"{% if filters.potential == "medium" %} checked{% endif %}><span>Medium</span></label>
             <label class="o-seg-item"><input type="radio" name="potential" value="low"{% if filters.potential == "low" %} checked{% endif %}><span>Low</span></label>
           </fieldset></div>
+        {% include "office/_sort_group.html" with dir_value=filters.dir %}
       </div>
     </div>
   </div>
@@ -46,7 +47,7 @@
 <div class="o-card o-tablecard" data-list-card>
   <table class="o-list o-list--gold">
     <caption class="sr-only">Gold applications</caption>
-    <thead><tr><th scope="col">Name</th><th scope="col">Potential</th><th scope="col">Status</th><th scope="col" class="c-invite">Invite</th><th scope="col" class="num">Applied</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead>
+    <thead><tr>{% include "office/_sort_head.html" %}<th scope="col"><span class="sr-only">Action</span></th></tr></thead>
     <tbody data-region="list" data-office-list="gold">{% include "office/_gold_rows.html" %}</tbody>
   </table>
 </div>

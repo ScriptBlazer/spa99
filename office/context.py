@@ -22,5 +22,8 @@ def office(request):
         return {}
     from .permissions import abilities
 
-    return {"office_waiting": selectors.waiting_count(selectors.counters(K.GOLD_BY_STATUS)), "office_can": abilities(request.user),
+    from plans.models import SiteSettings
+
+    name = (SiteSettings.objects.values_list("outreach_list_name", flat=True).first() or "").strip()  # one light read; no row = the default
+    return {"office_outreach_title": name or "Approach list", "office_waiting": selectors.waiting_count(selectors.counters(K.GOLD_BY_STATUS)), "office_can": abilities(request.user),
             "office_person": _person(request.user)}

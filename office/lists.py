@@ -2,13 +2,16 @@
 are stored counters)."""
 import csv
 
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, Value, When
+from django.db.models.functions import Lower
 from django.http import HttpResponse
 from django.utils import timezone
 
+from common import sorting
+from common.sorting import Column
 from system import defaults
 from gold import services as gold_services
-from gold.models import GoldApplication
+from gold.models import ApplicationEvent, GoldApplication
 from users.models import InterestRegistration, User
 
 _FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
@@ -36,14 +39,37 @@ SALE_OPTIONS = [("yes", "Holds a sale price"), ("no", "No sale price"), ("expire
 PAYMENT_OPTIONS = [("not_started", "Not started"), ("invited", "Invited"), ("paid", "Set up"), ("manual", "Set up manually"), ("lapsed", "Lapsed")]
 
 
+# Sortable headers (R1). Sale price, Journey and Gold come from several rows each: plain headers.
+PEOPLE_COLUMNS = [
+    Column("name", "Name", (Lower("first_name"), Lower("last_name"), Lower("email"))),
+    Column("email", "Email", Lower("email"), css="o-email-col"),
+    Column("plan", "Membership", ("interest__plan__order", "interest__plan__name")),
+    Column("verified", "Verified", "email_verified_at", first=sorting.DESC),
+    Column("marketing", "Marketing", "marketing_consent", first=sorting.DESC),
+    Column("sale", "Sale price"),
+    Column("payment", "Payment", "interest__payment_status"),
+    Column("journey", "Journey"),
+    Column("registered", "Registered", "interest__created_at", first=sorting.DESC, css="num"),
+    Column("gold", "Gold"),
+]
+PEOPLE_TIEBREAK = ("email", "pk")
+
+
 def people_filters(request):
+    key, direction, _ = sorting.resolve(PEOPLE_COLUMNS, request.GET, "registered", sorting.DESC)
     return {"q": request.GET.get("q", "").strip(), "plan": request.GET.get("plan", ""),
             "verified": request.GET.get("verified", ""), "marketing": request.GET.get("marketing", ""),
-            "sale": request.GET.get("sale", ""), "payment": request.GET.get("payment", "")}
+            "sale": request.GET.get("sale", ""), "payment": request.GET.get("payment", ""), "sort": key, "dir": direction}
+
+
+def people_columns(filters, request):
+    """The `columns` context for the Registered table header (see common.sorting)."""
+    return sorting.header_columns(PEOPLE_COLUMNS, filters["sort"], filters["dir"], request.path, request.GET)
 
 
 def people_queryset(filters):
-    people = User.objects.filter(interest__isnull=False).select_related("interest__plan").order_by("-interest__created_at", "email")
+    people = User.objects.filter(interest__isnull=False).select_related("interest__plan").order_by(
+        *sorting.ordering_from(PEOPLE_COLUMNS, filters, "registered", PEOPLE_TIEBREAK))
     if filters["q"]:
         for word in filters["q"].split():
             people = people.filter(Q(email__icontains=word) | Q(first_name__icontains=word) | Q(last_name__icontains=word)
@@ -184,14 +210,32 @@ WAITING = list(GoldApplication.WAITING)  # the approvers' queue
 UNDECIDED = [*WAITING, GoldApplication.AWAITING_FINAL]  # the "waiting" list also shows what is waiting for a final approver
 
 
+_STATUS_RANK = Case(*(When(status=status, then=Value(rank)) for rank, status in enumerate(
+    (GoldApplication.NEW, GoldApplication.CONTACTED, GoldApplication.AWAITING_FINAL, GoldApplication.APPROVED, GoldApplication.DECLINED))),
+    default=Value(9), output_field=IntegerField())
+GOLD_COLUMNS = [
+    Column("name", "Name", (Lower("first_name"), Lower("last_name"))),
+    Column("potential", "Potential", "potential_score", first=sorting.DESC),
+    Column("status", "Status", _STATUS_RANK),
+    Column("invite", "Invite", css="c-invite"),
+    Column("applied", "Applied", "created_at", first=sorting.DESC, css="num"),
+]
+
+
 def gold_filters(request):
     status = request.GET.get("status", "waiting")
+    key, direction, _ = sorting.resolve(GOLD_COLUMNS, request.GET, "applied", sorting.DESC)
     return {"q": request.GET.get("q", "").strip(), "status": status if status in ("waiting", "awaiting_final", "approved", "declined", "all") else "waiting",
-            "potential": request.GET.get("potential", "")}
+            "potential": request.GET.get("potential", ""), "sort": key, "dir": direction}
+
+
+def gold_columns(filters, request):
+    """The `columns` context for the Gold table header (see common.sorting)."""
+    return sorting.header_columns(GOLD_COLUMNS, filters["sort"], filters["dir"], request.path, request.GET)
 
 
 def gold_queryset(filters):
-    applications = GoldApplication.objects.prefetch_related("invites").order_by("-created_at")
+    applications = GoldApplication.objects.prefetch_related("invites").order_by(*sorting.ordering_from(GOLD_COLUMNS, filters, "applied", ("-created_at", "-pk")))
     if filters["status"] == "waiting":
         applications = applications.filter(status__in=UNDECIDED)
     elif filters["status"] != "all":
@@ -256,7 +300,7 @@ def _name(user):
 
 STATUS_NAMES = dict(GoldApplication.STATUS_CHOICES)
 EMAIL_NAMES = {"gold_approver": "Approver email", "gold_invite": "Invite email", "gold_active": "Gold-added email",
-               "gold_respond": "Response email", "gold_ack": "Thank-you email", "gold_final": "Final approval email", "gold_sent_back": "Sent-back email", "gold_declined": "Decline email"}
+               "gold_respond": "Response email", "gold_ack": "Thank-you email", "gold_final": "Final approval email", "gold_sent_back": "Sent-back email", "gold_declined": "Decline email", "gold_guide": "Guide email"}
 
 
 def _event_detail(event):
@@ -276,20 +320,35 @@ def _event_detail(event):
     return ""
 
 
-def gold_events(application):
-    """The audit trail, newest first, as plain rows for the History card."""
+def gold_events(application, can_restore=False):
+    """The audit trail, newest first, as plain rows for the History card. Each row has `restore_url`: set only on the newest "Note
+    deleted" line of a note that is still deleted, and only when `can_restore` (the page's can_edit); '' otherwise."""
     rows = []
-    for event in application.events.select_related("actor"):
+    from django.urls import reverse
+    from outreach.models import StickyNote
+
+    deleted_now, newest = set(), {}
+    if can_restore:
+        events = list(application.events.filter(action=ApplicationEvent.NOTE_DELETED))
+        ids = {e.meta.get("note") for e in events if (e.meta or {}).get("note")}
+        deleted_now = {str(pk) for pk in StickyNote.objects.filter(pk__in=ids, deleted_at__isnull=False).values_list("pk", flat=True)}
+        for e in events:  # newest first (Meta ordering)
+            newest.setdefault((e.meta or {}).get("note"), e.pk)
+
+    copied = StickyNote.objects.filter(source_event__in=application.events.filter(action=ApplicationEvent.NOTE_ADDED).values("pk")).values("source_event")
+    for event in application.events.select_related("actor").exclude(action=ApplicationEvent.NOTE_ADDED, pk__in=copied):  # old notes already copied into sticky notes are not shown twice
         rows.append({
             "id": str(event.pk), "at": event.at.isoformat(), "action": event.action, "label": event.get_action_display(),
             "who": event.actor_label, "channel": event.channel, "channel_label": event.get_channel_display(),
             "from": STATUS_NAMES.get(event.from_status, ""), "to": STATUS_NAMES.get(event.to_status, ""), "message": event.message,
             "detail": _event_detail(event),
+            "restore_url": reverse("office_gold_note_restore", args=[application.pk, event.meta["note"]])
+            if can_restore and event.action == ApplicationEvent.NOTE_DELETED and (event.meta or {}).get("note") in deleted_now and newest.get(event.meta["note"]) == event.pk else "",
         })
     return rows
 
 
-def gold_detail(application):
+def gold_detail(application, can_restore=False):
     sections = [{"title": s["title"], "rows": [{"label": label, "value": value} for label, value in s["rows"]]}
                 for s in gold_services.application_sections(application)]
     application = GoldApplication.objects.select_related("approved_by", "final_requested_by", "sent_back_by").prefetch_related("invites").get(pk=application.pk)
@@ -306,7 +365,7 @@ def gold_detail(application):
         "can_approve": application.status in WAITING,
         "can_decline": application.status in WAITING,
         "can_respond": application.status in (*WAITING, GoldApplication.AWAITING_FINAL),
-        "events": gold_events(application),
+        "events": gold_events(application, can_restore),
         "awaiting_final": application.status == GoldApplication.AWAITING_FINAL,
         "can_final": application.status == GoldApplication.AWAITING_FINAL,
         "final_requested_at": application.final_requested_at.isoformat() if application.final_requested_at else "",
@@ -328,3 +387,21 @@ def gold_confirm(application):
             "applied": application.created_at, "can_approve": application.status in WAITING,
             "awaiting_final": application.status == GoldApplication.AWAITING_FINAL, "sent_back": application.sent_back_at is not None,
             "final_requested_by": _name(application.final_requested_by), "final_requested_at": application.final_requested_at.isoformat() if application.final_requested_at else ""}
+
+
+# ---------- chats ----------
+
+def chat_columns(show_cost):
+    """Sortable headers of Office > Chats (R1). First question and Note are plain headers. Cost exists only for Developer level and
+    up: for everyone else it is not on the whitelist, so `sort=cost` can never reveal an order."""
+    from django.db.models.functions import Coalesce, NullIf
+
+    return [Column("started", "Started", "created_at", first=sorting.DESC),
+            Column("first_question", "First question"),
+            Column("who", "Who", Lower(Coalesce("user__email", NullIf("lead_email", Value(""))))),
+            Column("messages", "Messages", "message_count", first=sorting.DESC, css="num"),
+            *([Column("cost", "Cost", "total_cost_pence", first=sorting.DESC, css="num")] if show_cost else []),
+            Column("note", "Note")]
+
+
+CHAT_TIEBREAK = ("-created_at", "-pk")

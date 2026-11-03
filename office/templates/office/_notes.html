@@ -1,0 +1,28 @@
+{% comment %}Sticky notes of one person (docs/features/office-outreach-design.md section 2). Desktop: a board of paper notes at the top of the page.
+Phone: the same notes in a sheet behind the Notes button (_notes_open.html). Keys: notes[{id,text,author,created_at,delete_url}], notes_count,
+note_max, can_note, note_add_url, notes_errors. The script swaps #person-notes after an add or a delete.{% endcomment %}
+<section id="person-notes" class="o-notes" data-notes data-count="{{ notes_count }}" aria-label="Notes">
+  <div class="o-notes-errors" data-note-errors>{% for e in notes_errors %}<p class="o-field-error" role="alert">{{ e }}</p>{% endfor %}</div>
+  {% if notes_count or can_note %}
+  <div class="o-notes-board" data-notes-board>
+    <div class="o-notes-head">
+      <h2 class="o-h3">Notes</h2>{% if notes_count %}<span class="o-notes-count" aria-label="{{ notes_count }} note{{ notes_count|pluralize }}">{{ notes_count }}</span>{% endif %}
+      {% if can_note %}<button type="button" class="btn btn-secondary btn-sm o-notes-add" data-note-compose>{% include "office/_icon.html" with name="plus" %}Add note</button>{% endif %}
+    </div>
+    <div class="o-notes-grid" data-notes-grid>
+      {% if can_note %}{% include "office/_note_composer.html" with where="board" %}{% endif %}
+      {% for n in notes %}{% if forloop.counter > 3 %}{% include "office/_note.html" with n=n extra=True %}{% else %}{% include "office/_note.html" with n=n extra="" %}{% endif %}{% empty %}<p class="o-empty-line">No notes yet.</p>{% endfor %}
+    </div>
+    {% if notes_count > 3 %}<button type="button" class="o-quiet o-notes-all" data-note-all data-all-label="Show all {{ notes_count }}" aria-expanded="false">Show all {{ notes_count }}</button>{% endif %}
+  </div>
+  {% endif %}
+  <dialog class="o-sheet o-notesheet" data-note-sheet aria-labelledby="notesheet-h">
+    <div class="o-notesheet-head"><h2 id="notesheet-h">Notes</h2>
+      {% if can_note %}<button type="button" class="btn btn-secondary btn-sm o-notes-add" data-note-compose>{% include "office/_icon.html" with name="plus" %}Add note</button>{% endif %}</div>
+    <div class="o-notesheet-list" data-notes-grid>
+      {% if can_note %}{% include "office/_note_composer.html" with where="sheet" %}{% endif %}
+      {% for n in notes %}{% include "office/_note.html" with n=n extra="" %}{% empty %}<p class="o-empty-line">No notes yet.</p>{% endfor %}
+    </div>
+    <button type="button" class="btn btn-primary btn-block" data-note-sheet-close>Done</button>
+  </dialog>
+</section>

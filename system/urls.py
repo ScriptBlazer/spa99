@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import views, views_code as c, views_defaults as d, views_faq as fq, views_assistant as asst, views_emails as e, views_rules as r, views_sales as sl, views_payments as pay
+from . import views, views_code as c, views_defaults as d, views_faq as fq, views_assistant as asst, views_emails as e, views_rules as r, views_sales as sl, views_payments as pay, views_launch as lc
 from .permissions import unlocked
 
 urlpatterns = [
@@ -78,6 +78,7 @@ urlpatterns = [
     path("payments/schedule/", pay.payments_schedule, name="system_payments_schedule"),
     path("payments/schedule/cancel/", pay.payments_cancel_schedule, name="system_payments_cancel_schedule"),
     path("payments/close/", pay.payments_close, name="system_payments_close"),
+    path("launch/", lc.launch_page, name="system_launch"),
     path("sales/", sl.sale_list, name="system_sales"),
     path("sales/new/", sl.sale_edit, name="system_sale_new"),
     path("sales/<uuid:pk>/", sl.sale_edit, name="system_sale_edit"),
@@ -128,6 +129,7 @@ urlpatterns = [
     path("hours/closures/<uuid:pk>/delete/", r.closure_delete, name="system_closure_delete"),
     path("hours/capacity/", r.capacity_save, name="system_capacity"),
     path("gold/", r.gold, name="system_gold"),
+    path("gold/guide/", r.gold_guide_save, name="system_gold_guide"),
     path("gold/add/", r.gold_save, name="system_gold_add"),
     path("gold/<uuid:pk>/", r.gold_save, name="system_gold_save"),
     path("journey/", r.journey, name="system_journey"),

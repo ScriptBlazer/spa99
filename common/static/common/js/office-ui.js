@@ -9,6 +9,7 @@ export function initOfficeUi() {
   personMenu();
   segmented();
   filterSheet();
+  sortControls();
   navSheet();
   wants();
   wantsScope();
@@ -59,6 +60,52 @@ function filterSheet() {
   sheet.querySelector('[data-sheet-close]').addEventListener('click', () => sheet.close());
   sheet.addEventListener('click', (event) => { if (event.target === sheet) sheet.close(); }); // the backdrop
   sheet.addEventListener('close', () => open.focus());
+}
+
+/** The phone's Sort controls (R1): picking a field puts the Order on that field's natural direction and words the two Order pills for it
+ *  (Newest first / Oldest first, A to Z / Z to A, Highest first / Lowest first); the quiet "Sort: Added" button names the field. The small sort
+ *  sheet (Approach list, Chats) opens from that button. The radios sit in the list's form, so the list's own change handler fetches the order. */
+function sortControls() {
+  const apply = (group) => {
+    const sort = group.querySelector('input[name="sort"]:checked');
+    const dir = group.querySelector('input[name="dir"]:checked')?.value;
+    if (sort) {
+      group.dataset.kind = sort.dataset.kind || group.dataset.kind;
+      group.querySelectorAll('[data-order-label]').forEach((el) => { el.textContent = sort.dataset[el.dataset.orderLabel] || el.textContent; });
+    }
+    const form = group.closest('form');
+    (form || document).querySelectorAll('[data-sort-open]').forEach((button) => {
+      const name = button.querySelector('[data-sort-label]');
+      if (name && sort?.dataset.label) name.textContent = sort.dataset.label;
+      if (dir) button.dataset.dir = dir;
+    });
+  };
+  // capture: before the list's own change handler reads the form
+  document.addEventListener('change', (event) => {
+    const input = event.target;
+    const group = input.closest?.('[data-sort-group]');
+    if (!group || !input.matches?.('input[name="sort"], input[name="dir"]')) return;
+    if (input.name === 'sort') {
+      const natural = group.querySelector(`input[name="dir"][value="${input.dataset.first}"]`);
+      if (natural) natural.checked = true;
+    }
+    apply(group);
+  }, true);
+  document.addEventListener('office:sort', (event) => apply(event.detail.group));
+  const sheetOf = (node) => node.closest('form')?.querySelector('[data-sort-sheet]');
+  document.addEventListener('click', (event) => {
+    const open = event.target.closest?.('[data-sort-open]');
+    if (open) { const sheet = sheetOf(open); if (sheet) { sheet.sortOpener = open; sheet.showModal(); } return; }
+    const close = event.target.closest?.('[data-sort-close]');
+    if (close) { close.closest('dialog')?.close(); return; }
+    if (event.target.matches?.('dialog[data-sort-sheet]')) event.target.close();   // the backdrop
+  });
+  document.querySelectorAll('dialog[data-sort-sheet]').forEach((sheet) => {
+    sheet.addEventListener('close', () => sheet.sortOpener?.focus({ preventScroll: true }));
+  });
+  window.matchMedia('(max-width: 63.99em)').addEventListener('change', (event) => {
+    if (!event.matches) document.querySelectorAll('dialog[data-sort-sheet][open]').forEach((sheet) => sheet.close());
+  });
 }
 
 /** The tab bar's "More" button opens a sheet with the tabs that do not fit five slots. Esc closes it (native), so does a tap on the backdrop or a link; focus goes back to the button. */
@@ -121,14 +168,15 @@ function sendBack() {
   });
 }
 
-/** The Gold application's Decline, Respond and Add note forms: each is a <dialog> in the page (shared modal look). A button with
- *  data-gold-open="decline|respond|note" opens it; one with data-gold-close closes it; the server opens one on load after a
+/** The Gold application's Decline, Respond and Send guide forms, and Message / Add to the approach list on person and lead pages
+ *  (data-dialog="message|outreach"): each is a <dialog> in the page (shared modal look). A button with
+ *  data-gold-open="decline|respond|guide" (or data-dialog-open) opens it; one with data-gold-close closes it; the server opens one on load after a
  *  mistake (data-open, text kept) or from the approver email (?do=). The decline form shows its email message only while
  *  "Email the applicant" is ticked. */
 function goldDialogs() {
-  const dialogs = [...document.querySelectorAll('dialog[data-gold-dialog]')];
+  const dialogs = [...document.querySelectorAll('dialog[data-gold-dialog], dialog[data-dialog]')];
   if (!dialogs.length) return;
-  const find = (name) => dialogs.find((dialog) => dialog.dataset.goldDialog === name);
+  const find = (name) => dialogs.find((dialog) => (dialog.dataset.goldDialog || dialog.dataset.dialog) === name);
   const show = (dialog, opener) => {
     if (!dialog || dialog.open) return;
     dialog.goldOpener = opener || null;
@@ -136,8 +184,8 @@ function goldDialogs() {
     (dialog.querySelector('textarea[aria-invalid="true"]') || dialog.querySelector('textarea'))?.focus({ preventScroll: true });
   };
   document.addEventListener('click', (event) => {
-    const opener = event.target.closest?.('[data-gold-open]');
-    if (opener) { event.preventDefault(); show(find(opener.dataset.goldOpen), opener); return; }
+    const opener = event.target.closest?.('[data-gold-open], [data-dialog-open]');
+    if (opener) { event.preventDefault(); show(find(opener.dataset.goldOpen || opener.dataset.dialogOpen), opener); return; }
     const closer = event.target.closest?.('[data-gold-close]');
     if (closer) { event.preventDefault(); closer.closest('dialog')?.close(); }
   });

@@ -8,16 +8,24 @@
 <header class="o-detail-head">
   <h1>{{ a.name }}</h1>
   <p class="o-badges" data-region="gold-head">{% include "office/_badge.html" with status=a.status %} {% include "office/_badge.html" with potential=a.potential %}{% include "office/_business_badge.html" with value=a.business_willing %}</p>
+  {% include "office/_notes_open.html" %}
 </header>
 {% if a.business_willing is False %}<div class="o-alert" role="alert" data-business-no><p class="o-alert-title">Said NO to doing business with BML</p><p class="o-alert-sub">He is not working with BML and said no when asked if he is happy to do business with BML. You can still approve him.</p></div>{% endif %}
 <div class="o-detail">
   <div class="o-detail-main">
+    {% include "office/_notes.html" %}
     {% for section in a.sections %}
     <section class="o-card" data-gold-section="{{ section.title }}" aria-labelledby="gs-{{ forloop.counter }}"><h2 id="gs-{{ forloop.counter }}" class="o-h3">{{ section.title }}</h2>
       <dl class="o-rows">{% for row in section.rows %}<div><dt>{{ row.label }}</dt><dd>{{ row.value|linebreaksbr }}</dd></div>{% endfor %}</dl>
     </section>
     {% endfor %}
     {% include "office/_gold_history.html" %}
+    {% if can_delete_gold %}<div class="o-endzone" data-gold-endzone>
+      <form method="post" action="{{ delete_url }}" data-gold-delete>{% csrf_token %}
+        <button type="submit" class="o-quiet o-quiet--danger" data-working-text="Deleting" data-confirm data-confirm-danger data-confirm-title="Delete {{ a.reference }}?" data-confirm-body="This removes the application, its history and its Approach list entry. Notes stay with the person. It cannot be undone." data-confirm-label="Delete application" data-confirm-cancel="Keep">{% include "office/_icon.html" with name="trash" %}Delete application</button>
+      </form>
+      <p class="o-endzone-note">For tests and junk. Notes stay with his email.</p>
+    </div>{% endif %}
   </div>
   <aside class="o-detail-rail o-detail-rail--sticky" data-gold-decision data-invite-state="{{ a.invite.state }}">
     <section class="o-card" aria-labelledby="decision-h" data-region="decision" data-fade>
@@ -44,10 +52,13 @@
       <div class="o-actions-rail">{% include "office/_gold_actions.html" %}</div>
       {% if office_can.can_act and a.can_approve %}<p class="o-sub">He gets an email to set up his account. The link lasts 14 days.{% if a.potential in final_waits and not a.sent_back %} The potential is {{ a.potential|capfirst }}, so a final approver confirms first.{% endif %}</p>{% endif %}
       {% if a.person_id and office_can.can_see_all %}<a class="o-quiet" href="{% url 'office_person' a.person_id %}">Open his account</a>{% endif %}
-      {% if office_can.can_act %}<div class="o-actions-more" data-gold-more>
-        {% if a.can_respond %}<button type="button" class="btn btn-secondary" data-gold-open="respond" aria-haspopup="dialog">Respond</button>{% endif %}
-        <button type="button" class="btn btn-secondary" data-gold-open="note" aria-haspopup="dialog">Add note</button>
-      </div>{% endif %}
+      {% if office_can.can_edit %}<div class="o-actions-more" data-gold-more>
+        {% if office_can.can_act and a.can_respond %}<button type="button" class="btn btn-secondary" data-gold-open="respond" aria-haspopup="dialog">Respond</button>{% endif %}
+        {% if guide_available %}<button type="button" class="btn btn-secondary" data-gold-open="guide" aria-haspopup="dialog" data-send-guide>{% include "office/_icon.html" with name="paper-plane" %}Send guide</button>
+        {% else %}<button type="button" class="btn btn-secondary o-btn-off" aria-disabled="true" aria-describedby="guide-hint" data-send-guide>{% include "office/_icon.html" with name="paper-plane" %}Send guide</button>{% endif %}
+      </div>
+      {% if not guide_available and office_can.can_edit %}<p class="o-hint-line" id="guide-hint">{% if system_guide_url %}Upload the guide in <a href="{{ system_guide_url }}">System</a>{% else %}Upload the guide in System{% endif %}</p>{% endif %}
+      {% if outreach.can_add %}{% if outreach.on_list %}{% include "office/_onlist.html" %}{% else %}<button type="button" class="o-quiet o-addlist" data-dialog-open="outreach" aria-haspopup="dialog">{% include "office/_icon.html" with name="list-checks" %}Add to {{ outreach.title }}</button>{% endif %}{% endif %}{% endif %}
     </section>
   </aside>
 </div>
@@ -59,6 +70,6 @@
   <div class="o-bar-actions">{% include "office/_gold_actions.html" with bar=True %}</div>
 </div>
 {% endif %}
-{% if office_can.can_act %}{% include "office/_gold_dialogs.html" %}{% endif %}
+{% if office_can.can_edit %}{% include "office/_gold_dialogs.html" %}{% if outreach.can_add and not outreach.on_list %}{% include "office/_outreach_dialog.html" with who=a.name|first_word %}{% endif %}{% endif %}
 {% endwith %}
 {% endblock %}
