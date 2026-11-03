@@ -1,0 +1,54 @@
+{% load office_tags %}{% comment %}"Reach out" card of a person or lead page: Message and Add to the approach list, with their two dialogs (docs/features/office-outreach-design.md sections 3 and 4).
+Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, message{url,to,max,can_send,unsubscribed}. Hidden for read-only people.{% endcomment %}
+{% if message.can_send or outreach.can_add %}
+{% with who=person.name|default:person.email|first_word %}
+<section class="o-card o-reach" data-person-reach aria-labelledby="reach-h"><h2 id="reach-h" class="o-h3">Reach out</h2>
+  <div class="o-reach-actions">
+    {% if message.can_send %}<button type="button" class="btn btn-secondary btn-block" data-dialog-open="message" aria-haspopup="dialog">{% include "office/_icon.html" with name="paper-plane" %}Message</button>{% endif %}
+    {% if outreach.can_add %}{% if outreach.on_list %}{% include "office/_onlist.html" %}{% else %}<button type="button" class="btn btn-secondary btn-block" data-dialog-open="outreach" aria-haspopup="dialog">{% include "office/_icon.html" with name="list-checks" %}<span class="o-only-wide">Add to {{ outreach.title }}</span><span class="o-only-narrow">Add to list</span></button>{% endif %}{% endif %}
+  </div>
+  {% if archive %}{% if archive.archived %}
+  <div class="o-archived-state" data-lead-archived>
+    <p class="o-onlist o-onlist--archived">{% include "office/_icon.html" with name="archive" %}<span class="o-onlist-text">Archived{% if archive.by %} by {{ archive.by|first_word }}{% endif %}, {{ archive.at|dm }}</span></p>
+    {% if archive.reason %}<div class="o-clamp o-archived-reason" style="--lines: 3" data-clamp data-archive-reason>{{ archive.reason }}</div><button type="button" class="o-quiet o-clamp-more" data-clamp-more hidden>Read more</button>{% endif %}
+    {% if archive.can_edit %}<form method="post" action="{{ archive.unarchive_url }}" data-lead-unarchive>{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="btn btn-secondary btn-sm" data-working-text="Moving">Move back</button></form>{% endif %}
+  </div>
+  {% elif archive.can_edit %}<button type="button" class="o-quiet o-archive-btn o-archive-btn--rail" data-dialog-open="archive" aria-haspopup="dialog">{% include "office/_icon.html" with name="archive" %}Archive lead</button>{% endif %}{% endif %}
+</section>
+{% if message.can_send %}
+<dialog class="fb-modal o-dialog" data-dialog="message" aria-labelledby="od-message-h">
+  <form method="post" action="{{ message.url }}" class="fb-modal-wrap" data-problems data-message>{% csrf_token %}
+    <h2 class="fb-modal-title" id="od-message-h">Message {{ person.name|default:person.email }}</h2>
+    <p class="fb-modal-body">From hello@spa99.uk. His reply comes to the team. Kept in his timeline.</p>
+    {% if message.unsubscribed %}<p class="o-warn" data-unsubscribed-warning>{% include "office/_icon.html" with name="warning" %}Unsubscribed from news. This is a one-to-one message, so it still goes.</p>{% endif %}
+    <label class="fb-modal-field"><span>Message</span>
+      <textarea class="fb-modal-textarea" name="message" rows="6" required minlength="5" maxlength="{{ message.max }}" data-label="Message"></textarea></label>
+    <div class="fb-modal-actions">
+      <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
+      <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Sending">Send message</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% if outreach.can_add and not outreach.on_list %}{% include "office/_outreach_dialog.html" with who=who %}{% endif %}
+{% if archive.can_edit and not archive.archived %}
+<dialog class="fb-modal o-dialog" data-dialog="archive" aria-labelledby="od-archive-h">
+  <form method="post" action="{{ archive.archive_url }}" class="fb-modal-wrap" data-problems data-lead-archive>{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <h2 class="fb-modal-title" id="od-archive-h">Archive {{ who }}?</h2>
+    <p class="fb-modal-body">He leaves Leads and the counts. If the next-morning email has not gone, it will not go. You can move him back.</p>
+    <div class="o-chips" role="group" aria-label="Quick reasons">
+      <button type="button" class="o-chip" data-reason-chip aria-pressed="false">Test</button>
+      <button type="button" class="o-chip" data-reason-chip aria-pressed="false">Duplicate</button>
+      <button type="button" class="o-chip" data-reason-chip aria-pressed="false">Not a fit</button>
+    </div>
+    <label class="fb-modal-field"><span>Reason (optional)</span>
+      <input class="fb-modal-input" type="text" name="reason" maxlength="120" autocomplete="off" data-label="Reason" data-reason-input></label>
+    <div class="fb-modal-actions">
+      <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
+      <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Archiving">Archive</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% endwith %}
+{% endif %}

@@ -1,0 +1,12 @@
+{% comment %}The blank note: the first cell of the board (and the top of the phone sheet). Hidden until Add note is pressed; without JS it is shown. Keys: note_add_url, note_max; where (board|sheet).{% endcomment %}
+<form class="o-note o-note--draft" method="post" action="{{ note_add_url }}" data-note-add data-note-draft hidden aria-label="New note">{% csrf_token %}
+  <div class="o-note-body">
+    <label class="sr-only" for="note-text-{{ where }}">Note</label>
+    <textarea id="note-text-{{ where }}" name="note" rows="4" maxlength="{{ note_max }}" placeholder="Write a note" required data-note-input></textarea>
+    <p class="o-note-counter" data-note-counter hidden aria-live="polite"></p>
+  </div>
+  <div class="o-note-actions">
+    <button type="button" class="o-quiet" data-note-cancel>Cancel</button>
+    <button type="submit" class="btn btn-primary btn-sm" data-working-text="Saving">Add note</button>
+  </div>
+</form>

@@ -230,6 +230,7 @@ function previewPane(root, { url, params, onResult = () => {}, sample, nothing =
   const note = $('[data-se-preview-note]', root);
   const subjectLine = $('[data-se-subject-line]', root);
   const sampleLine = $('[data-se-sample]', root);
+  const fromLine = $('[data-se-from]', root);
   if (sampleLine && sample) sampleLine.textContent = sample;
   let seq = 0;
   let controller = null;
@@ -270,7 +271,8 @@ function previewPane(root, { url, params, onResult = () => {}, sample, nothing =
       note.hidden = true;
       frame.hidden = false;
       frame.srcdoc = data.html;
-      if (subjectLine) subjectLine.textContent = `Subject: ${data.subject}`;
+      if (subjectLine && data.subject) subjectLine.textContent = `Subject: ${data.subject}`;
+      if (fromLine && data.from) fromLine.textContent = `From: ${data.from}`;
       onResult({});
     } else {
       const first = Object.values(data.errors || {}).flat()[0];
@@ -310,6 +312,17 @@ function paneSwitch(form, onPreview = () => {}) {
   }));
 }
 
+/** Problems the server found in the settings beside the wording (heading, button text, footer lines): shown under their field. */
+function showSettingProblems(form, errors) {
+  $$('[data-se-live]', form).forEach((el) => {
+    const name = el.dataset.seLive;
+    if (name === 'subject' || name === 'body') return;
+    const message = (errors?.[name] || [])[0] || '';
+    el.textContent = message;
+    el.hidden = !message;
+  });
+}
+
 /* ---------- automatic email editor ---------- */
 
 function initEditor(form) {
@@ -326,8 +339,18 @@ function initEditor(form) {
     known, needButton: spec.button_required,
     onChange: () => { refreshTest(); preview.soon(); },
   });
-  const params = () => new URLSearchParams({ subject: fields.subject.value, body: fields.body ? fields.body.value : '' });
-  preview = previewPane(form, { url: form.dataset.previewUrl, params, onResult: (errors) => { fields.setServer(errors); refreshTest(); }, sample: sampleValue ? `Sample name in the preview: ${sampleValue}` : '' });
+  // The settings beside the wording (footer, sender, heading, button text) ride along with the subject and body.
+  const params = () => {
+    const body = new URLSearchParams({ subject: fields.subject.value, body: fields.body ? fields.body.value : '' });
+    $$('[data-se-setting]', form).forEach((input) => { if (input.type !== 'radio' || input.checked) body.set(input.name, input.value); });
+    return body;
+  };
+  const customFooter = $('[data-se-custom-footer]', form);
+  $$('[data-se-setting]', form).forEach((input) => input.addEventListener(input.type === 'radio' ? 'change' : 'input', () => {
+    if (customFooter) customFooter.hidden = $('[data-se-footer-mode]:checked', form)?.value !== 'custom';
+    preview.soon();
+  }));
+  preview = previewPane(form, { url: form.dataset.previewUrl, params, onResult: (errors) => { fields.setServer(errors); showSettingProblems(form, errors); refreshTest(); }, sample: sampleValue ? `Sample name in the preview: ${sampleValue}` : '' });
   widthToggle(form);
   paneSwitch(form, () => preview.refresh());
 
@@ -365,6 +388,22 @@ function initEditor(form) {
     const ok = await confirmModal({ title: 'Load the latest wording?', body: 'Your edits will be lost.', confirmLabel: 'Load the latest', cancelLabel: 'Keep editing', tone: 'danger', opener: event.currentTarget });
     if (ok) { document.dispatchEvent(new CustomEvent('spa99:leaving')); location.href = url; }
   });
+}
+
+/* ---------- shared footer ---------- */
+
+function initFooter(form) {
+  const params = () => new URLSearchParams($$('[data-se-setting]', form).map((input) => [input.name, input.value]));
+  const preview = previewPane(form, { url: form.dataset.previewUrl, params, onResult: (errors) => showSettingProblems(form, errors) });
+  widthToggle(form);
+  paneSwitch(form, () => preview.refresh());
+  $$('[data-se-setting]', form).forEach((input) => input.addEventListener('input', () => { input.closest('.sys-row')?.classList.remove('invalid'); preview.soon(); }));
+  $$('[data-se-line-reset]', form).forEach((button) => button.addEventListener('click', () => {
+    const input = $(`[name="${button.dataset.seLineReset}"]`, form);
+    input.value = button.dataset.default;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }));
+  preview.refresh();
 }
 
 /* ---------- group composer ---------- */
@@ -988,6 +1027,7 @@ function init() {
   showFlash();
   initRows();
   $$('[data-se-editor]').forEach(initEditor);
+  $$('[data-se-footer]').forEach(initFooter);
   $$('[data-se-composer]').forEach(initComposer);
   $$('[data-se-detail], [data-se-batch]').forEach(initSending);
   $$('[data-se-confirm-send]').forEach(initConfirmSend);

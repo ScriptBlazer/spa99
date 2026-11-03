@@ -296,12 +296,14 @@ class ApplicationEvent(UUIDModel):
     SUBMITTED, APPROVED, SENT_FOR_FINAL, FINAL_CONFIRMED, SENT_BACK = "submitted", "approved", "sent_for_final", "final_confirmed", "sent_back"
     DECLINED, RESPONDED, NOTE_ADDED = "declined", "responded", "note_added"
     INVITE_SENT, INVITE_RESENT, EMAIL_SENT, EMAIL_FAILED, STATUS_CHANGED_ADMIN = "invite_sent", "invite_resent", "email_sent", "email_failed", "status_changed_admin"
+    GUIDE_SENT, NOTE_DELETED, NOTE_RESTORED = "guide_sent", "note_deleted", "note_restored"
+    NOTE_EDITED = "note_edited"
     ACTION_CHOICES = [
         (SUBMITTED, "Applied"), (APPROVED, "Approved"), (SENT_FOR_FINAL, "Sent for final approval"),
         (FINAL_CONFIRMED, "Final approval confirmed"), (SENT_BACK, "Sent back for review"), (DECLINED, "Declined"),
         (RESPONDED, "Responded to the applicant"), (NOTE_ADDED, "Note added"), (INVITE_SENT, "Invite emailed"),
         (INVITE_RESENT, "New invite requested"), (EMAIL_SENT, "Email sent"), (EMAIL_FAILED, "Email failed"),
-        (STATUS_CHANGED_ADMIN, "Status changed in the admin"),
+        (STATUS_CHANGED_ADMIN, "Status changed in the admin"), (GUIDE_SENT, "Guide sent"), (NOTE_DELETED, "Note deleted"), (NOTE_RESTORED, "Note restored"), (NOTE_EDITED, "Note edited"),
     ]
     OFFICE, EMAIL_LINK, ADMIN, SYSTEM, SHELL = "office", "email_link", "admin", "system", "shell"
     CHANNEL_CHOICES = [(OFFICE, "Office"), (EMAIL_LINK, "Email link"), (ADMIN, "Django admin"), (SYSTEM, "System"), (SHELL, "Command line")]

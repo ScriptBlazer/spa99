@@ -190,6 +190,7 @@ class SystemEvent(AuditRow):
     PAYMENTS_OPENED, PAYMENTS_SCHEDULED, PAYMENTS_CLOSED = "payments_opened", "payments_scheduled", "payments_closed"
     PAYMENTS_CANCELLED, SETUP_MANUAL, SETUP_CANCELLED = "payments_cancelled", "setup_manual", "setup_cancelled"
     SALE_RESTORED, SETUP_EDITED = "sale_restored", "setup_edited"
+    LAUNCHED = "launched"
     KIND_CHOICES = [
         (SIGN_IN, "Signed in"), (SIGN_IN_FAILED, "Sign-in failed"), (UNLOCK, "Unlocked"), (UNLOCK_FAILED, "Unlock failed"),
         (UNLOCK_RATE_LIMITED, "Unlock blocked (too many tries)"), (LOCK_MANUAL, "Locked"), (LOCK_IDLE, "Locked (idle)"),
@@ -206,6 +207,7 @@ class SystemEvent(AuditRow):
         (PAYMENTS_OPENED, "Payments opened"), (PAYMENTS_SCHEDULED, "Payments scheduled"), (PAYMENTS_CLOSED, "Payments closed"),
         (PAYMENTS_CANCELLED, "Payments schedule cancelled"), (SETUP_MANUAL, "Membership set up manually"), (SETUP_CANCELLED, "Manual membership cancelled"),
         (SALE_RESTORED, "Sale price restored"), (SETUP_EDITED, "Manual membership edited"),
+        (LAUNCHED, "Launched Spa 99"),
     ]
     OK, FAILED, BLOCKED = "ok", "failed", "blocked"
     OUTCOME_CHOICES = [(OK, "OK"), (FAILED, "Failed"), (BLOCKED, "Blocked")]
@@ -268,7 +270,6 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
 
     # Office
     leads_range = models.CharField("Leads: last seen range", max_length=5, default="30d")
-    leads_show = models.CharField("Leads: show", max_length=12, default="all")
     leads_sort = models.CharField("Leads: sort", max_length=12, default="last_seen")
     leads_page_size = _number("Leads: rows per page", 25, 5, 200)
     list_page_size = _number("People and Gold lists: rows per page", 50, 5, 200)
@@ -358,7 +359,7 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
     def clean(self):
         from office import leads, selectors
 
-        allowed = {"leads_range": leads.RANGES, "leads_show": leads.SHOWS, "leads_sort": leads.SORTS,
+        allowed = {"leads_range": leads.RANGES, "leads_sort": leads.SORTS,
                    "dashboard_range": selectors.DASHBOARD_RANGES, "analytics_range": selectors.ANALYTICS_RANGES}
         errors = {name: "Pick one of the choices." for name, choices in allowed.items() if getattr(self, name) not in choices}
         if errors:

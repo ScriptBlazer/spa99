@@ -261,9 +261,18 @@ def fill_date_of_birth(page, day="14", month="03", year="1985"):
     page.locator("#dob-year").fill(year)
 
 
+def open_register(page, email="journey-walker@example.test"):
+    """Open /register/. While Memberships is not public the page opens only after the questions (2026-11-03), so a browser without a
+    finished journey is sent to /journey/: answer it (leaving `email` at the gate), then open Register again."""
+    page.goto(f"{SITE}/register/")
+    if "/journey/" in page.url:
+        answer_journey(page, email=email)
+        page.goto(f"{SITE}/register/")
+
+
 def register_member(page, email, first, last, mobile, plan_name="Tier 2", password=PASSWORD):
     """Register for a tier through the real form, then wait for the 'check your email' screen."""
-    page.goto(f"{SITE}/register/")
+    open_register(page, email)
     page.locator("label.plan-chip", has_text=plan_name).first.click()
     page.locator("#id_first_name").fill(first)
     page.locator("#id_last_name").fill(last)

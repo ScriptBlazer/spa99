@@ -1,0 +1,21 @@
+{% load office_tags %}{% comment %}One sticky note. Keys: n{id,text,author,created_at,edited_at,edited_by,delete_url,edit_url}; extra (past the first three on the board); where (board|sheet). Board and phone sheet both use it.
+The x deletes at once with no question (R8): the toast says "Note deleted" and the history line has a Restore button.
+Clicking the text (or Enter on it) opens the hidden edit form below in its place (R9); only when edit_url is set. Read all and the x are outside the text, so they never start an edit.{% endcomment %}
+<article class="o-note" data-note="{{ n.id }}" tabindex="-1"{% if extra %} data-extra{% endif %}>
+  <div class="o-note-body">
+    <p class="o-note-text o-clamp" style="--lines: 6" data-clamp data-note-text{% if n.edit_url %} data-note-edit role="button" tabindex="0"{% endif %}>{% if n.edit_url %}<span class="sr-only">Edit note: </span>{% endif %}{{ n.text|linebreaksbr }}</p>
+    <button type="button" class="o-quiet o-clamp-more o-note-more" data-clamp-more data-more-label="Read all" hidden>Read all</button>
+  </div>
+  <p class="o-note-meta"><time datetime="{{ n.created_at }}" title="{{ n.created_at|dt }}">{{ n.author|note_author }}, {{ n.created_at|dm }}</time>{% if n.edited_at %} &middot; <span title="Edited by {{ n.edited_by|note_author }}, {{ n.edited_at|dt }}">edited</span>{% endif %}</p>
+  {% if n.delete_url %}<form method="post" action="{{ n.delete_url }}" data-note-delete>{% csrf_token %}
+    <button type="submit" class="o-note-x" aria-label="Delete note by {{ n.author|note_author }}, {{ n.created_at|dm }}">{% include "office/_icon.html" with name="x" %}</button>
+  </form>{% endif %}
+  {% if n.edit_url %}<form class="o-note-editform" method="post" action="{{ n.edit_url }}" data-note-edit-form hidden aria-label="Edit note">{% csrf_token %}
+    <textarea name="note" rows="4" data-max="{{ note_max }}" required aria-label="Note text" data-note-input>{{ n.text }}</textarea>
+    <p class="o-note-counter" data-note-counter hidden aria-live="polite"></p>
+    <div class="o-note-actions">
+      <button type="button" class="o-quiet" data-note-edit-cancel>Cancel</button>
+      <button type="submit" class="btn btn-primary btn-sm" data-working-text="Saving">Save</button>
+    </div>
+  </form>{% endif %}
+</article>

@@ -407,6 +407,11 @@ def delete_user_data(user):
     Erasure overrides the "history is never deleted" rule because history holds personal data."""
     pk, email = user.pk, user.email
     chat_services.erase_conversations(user=user)  # before the sessions are unlinked (chats are also found through the account's sessions)
+    from outreach import people as outreach_people
+    from outreach.services import erase_email
+
+    for address in outreach_people.resolve(user=user)[1] | {email.lower()}:  # notes, messages and list entries on all his addresses (resolve() merges journey addresses only when verified)
+        erase_email(address)
     anonymised = _anonymise_sessions(user)
     proven = bool(user.email_verified_at)  # rows found only by email are his only once the address is proven (an unverified account may carry someone else's address)
     if proven:

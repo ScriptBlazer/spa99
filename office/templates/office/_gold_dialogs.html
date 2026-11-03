@@ -1,6 +1,6 @@
-{% comment %}The three forms an approver fills in (Decline, Respond, Add note), each in a dialog in the shared modal look. They are posted as ordinary forms; the server checks everything. A mistake comes back as this page with the dialog open, the typed text kept and the errors listed by the shared form-problems dialog. ?do= (the approver email) opens one on load.{% endcomment %}
+{% load office_tags %}{% comment %}The forms on the Gold page (Decline and Respond for an approver, Send guide for an editor), each in a dialog in the shared modal look. They are posted as ordinary forms; the server checks everything. A mistake comes back as this page with the dialog open, the typed text kept and the errors listed by the shared form-problems dialog. ?do= (the approver email) opens one on load.{% endcomment %}
 {% with posted=form_values errors=form_errors %}
-{% if a.can_decline %}
+{% if office_can.can_act and a.can_decline %}
 <dialog class="fb-modal o-dialog" data-gold-dialog="decline" {% if open_form == "decline" %}data-open {% endif %}aria-labelledby="gd-decline-h">
   <form method="post" action="{% url 'office_gold_decline' a.id %}" class="fb-modal-wrap" data-problems data-gold-form="decline">{% csrf_token %}
     <h2 class="fb-modal-title" id="gd-decline-h">Decline {{ a.name }}?</h2>
@@ -21,7 +21,7 @@
   </form>
 </dialog>
 {% endif %}
-{% if a.can_respond %}
+{% if office_can.can_act and a.can_respond %}
 <dialog class="fb-modal o-dialog" data-gold-dialog="respond" {% if open_form == "respond" %}data-open {% endif %}aria-labelledby="gd-respond-h">
   <form method="post" action="{% url 'office_gold_respond' a.id %}" class="fb-modal-wrap" data-problems data-gold-form="respond">{% csrf_token %}
     <h2 class="fb-modal-title" id="gd-respond-h">Respond to {{ a.name }}</h2>
@@ -36,17 +36,17 @@
   </form>
 </dialog>
 {% endif %}
-<dialog class="fb-modal o-dialog" data-gold-dialog="note" {% if open_form == "note" %}data-open {% endif %}aria-labelledby="gd-note-h">
-  <form method="post" action="{% url 'office_gold_note' a.id %}" class="fb-modal-wrap" data-problems data-gold-form="note">{% csrf_token %}
-    <h2 class="fb-modal-title" id="gd-note-h">Add a note</h2>
-    <p class="fb-modal-body">Only the team sees it. Use it to record anything, for example that he replied by phone. It goes in the history and cannot be changed.</p>
-    <label class="fb-modal-field"><span>Note</span>
-      <textarea class="fb-modal-textarea" name="note" rows="4" required maxlength="2000" data-label="Note">{{ posted.note }}</textarea></label>
-    {% for m in errors.note %}<p class="o-field-error" data-problem data-problem-field="note" data-problem-label="Note">{{ m }}</p>{% endfor %}
+{% if guide_available %}
+<dialog class="fb-modal o-dialog" data-gold-dialog="guide" aria-labelledby="gd-guide-h">
+  <form method="post" action="{% url 'office_gold_send_guide' a.id %}" class="fb-modal-wrap" data-problems data-gold-form="guide">{% csrf_token %}
+    <h2 class="fb-modal-title" id="gd-guide-h">Send the guide to {{ a.name|first_word }}?</h2>
+    <p class="fb-modal-body">To {{ guide_to }}, from hello@spa99.uk. His reply comes to the team. It is kept in the history.</p>
+    {% if guide_name %}<p class="o-attach" data-guide-file>{% include "office/_icon.html" with name="paperclip" %}<span class="o-attach-name">{{ guide_name }}</span></p>{% endif %}
     <div class="fb-modal-actions">
       <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
-      <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Saving">Add note</button>
+      <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Sending">Send guide</button>
     </div>
   </form>
 </dialog>
+{% endif %}
 {% endwith %}

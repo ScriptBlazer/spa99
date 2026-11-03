@@ -162,3 +162,44 @@ def client_config(urls=None):
         "messages": messages, "minimum_age": minimum, "password_min_length": min_length,
         "name_max_length": NAME_MAX_LENGTH, "urls": urls or {},
     }
+
+
+MAX_PDF_BYTES = 5 * 1024 * 1024  # Caddy body limit is 5 MB (Postmark allows 10 MB after base64)
+
+
+def validate_pdf(file):
+    """A .pdf name, a real PDF header and at most 5 MB (the Gold Card guide)."""
+    name = (getattr(file, "name", "") or "").lower()
+    if not name.endswith(".pdf"):
+        raise ValidationError("Upload a PDF file (.pdf).", code="not_pdf")
+    if getattr(file, "_committed", False):  # already stored (a later full_clean of the row): do not read it back from storage
+        return
+    if getattr(file, "size", 0) > MAX_PDF_BYTES:
+        raise ValidationError("The PDF is too big: the limit is 5 MB.", code="too_big")
+    try:
+        file.seek(0)
+        head = file.read(5)
+        file.seek(0)
+    except (OSError, ValueError):  # a stored file that cannot be read again is judged by its name and size alone
+        return
+    if head and head != b"%PDF-":
+        raise ValidationError("That file is not a PDF.", code="not_pdf")
+
+
+def sending_domain():
+    """The domain of DEFAULT_FROM_EMAIL (the site's sending domain), lower case, or ''."""
+    from email.utils import parseaddr
+
+    address = parseaddr(getattr(settings, "DEFAULT_FROM_EMAIL", "") or "")[1]
+    return address.rsplit("@", 1)[1].lower() if "@" in address else ""
+
+
+def validate_sender_domain(value):
+    """An address that automatic emails may be sent From: on the same domain as DEFAULT_FROM_EMAIL (an address on any other
+    domain would fail SPF/DKIM and the provider would refuse it). Empty is allowed (the field is optional)."""
+    value = (value or "").strip()
+    if not value:
+        return
+    domain, wanted = value.rsplit("@", 1)[-1].lower(), sending_domain()
+    if wanted and domain != wanted:
+        raise ValidationError(f"Use an address on {wanted}, the site's sending domain.", code="wrong_domain")

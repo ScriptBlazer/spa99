@@ -20,7 +20,7 @@ from users.views import LoginView, TeamPasswordView
 
 
 from . import approval as approval_service
-from . import audit, changes, codeview, defaults, feed, services, throttle
+from . import audit, changes, codeview, defaults, feed, launch, services, throttle
 from . import team as team_service
 from .forms import ApprovalForm, EmailsForm, SettingsForm
 from .forms_rules import RISKY
@@ -28,7 +28,7 @@ from .models import SystemChange, SystemEvent
 from .permissions import signed_in, unlocked
 
 NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", "system_plans"), ("hours", "Hours and closures", "system_hours"),
-       ("gold", "Gold rules", "system_gold"), ("approval", "Approval", "system_approval"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("sales", "Sales", "system_sales"), ("payments", "Payments", "system_payments"), ("assistant", "Assistant", "system_assistant"),
+       ("gold", "Gold rules", "system_gold"), ("approval", "Approval", "system_approval"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("sales", "Sales", "system_sales"), ("payments", "Payments", "system_payments"), ("launch", "Launch", "system_launch"), ("assistant", "Assistant", "system_assistant"),
        ("settings", "Settings", "system_settings"), ("defaults", "Defaults", "system_defaults"), ("team", "Team", "system_team"), ("changes", "Audit log", "system_changes")]
 
 
@@ -185,6 +185,7 @@ def dashboard(request):
     site = SiteSettings.load()
     context = {"health": services.health_report(), "recent": services.recent_changes(defaults.get(request).dashboard_recent_changes), "site": site,
                "stages": [("Registration", site.register_interest_open), ("Book", site.booking_open)],
+               "launched_text": launch.short_when(site.launched_at) if site.launched_at else "",
                "whatsapp": clicks.summary(), "bounces_week": emails_logic.bounces_week()}
     return page(request, "system/dashboard.html", "dashboard", context)
 

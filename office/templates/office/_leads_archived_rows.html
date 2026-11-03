@@ -1,0 +1,11 @@
+{% load office_tags text_tags %}{% comment %}The Archived view of Leads (R6). Columns: Lead, Best fit, Potential, Reason, Archived, Move back. Move back has no confirm: the row fades and a toast says "Moved back to Leads." (office-tools.js).{% endcomment %}{% for l in rows %}
+<tr class="o-row" data-lead-row data-archived-row data-status="{{ l.status }}">
+  <td class="c-name" data-col="email"><a class="o-rowlink" href="{{ l.href }}">{% truncated l.email %}</a></td>
+  <td class="c-tier" data-col="tier">{% if l.tier %}<span class="o-only-narrow">Best fit </span>{{ l.tier }}{% else %}<span class="o-unrated">None yet</span>{% endif %}</td>
+  <td class="c-potential" data-col="potential">{% include "office/_lead_potential.html" with potential=l.potential %}</td>
+  <td class="c-reason" data-col="reason">{% if l.archived.reason %}<div class="o-clamp" style="--lines: 2" data-clamp>{{ l.archived.reason }}</div><button type="button" class="o-quiet o-clamp-more" data-clamp-more hidden>Read more</button>{% endif %}</td>
+  <td class="num c-archived" data-col="archived"><span class="o-only-narrow">Archived by </span>{{ l.archived.by|first_word|default:"the team" }}, {{ l.archived.at|dm }}</td>
+  <td class="c-action" data-col="action">{% if office_can.can_edit %}<form method="post" action="{{ l.unarchive_url }}" data-row-act="unarchive">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="btn btn-secondary btn-sm o-row-move" data-working-text="Moving">Move back</button></form>{% endif %}</td>
+</tr>
+{% empty %}<tr class="o-empty-row" data-empty><td colspan="6"><p>{% if filters.q %}No archived lead matches that.{% else %}Nobody is archived. Archive a lead from his page and he waits here.{% endif %}</p> <a class="o-quiet" href="{% url 'office_leads' %}" data-back-to-leads>Back to Leads</a></td></tr>{% endfor %}
+{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="6"><a class="btn btn-secondary btn-sm" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}

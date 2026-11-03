@@ -33,7 +33,7 @@ class CodeValueTests(TestCase):
     def test_no_row_means_todays_values_and_the_row_is_made_on_first_read(self):
         self.assertFalse(SiteDefaults.objects.exists())
         d = defaults.get()
-        self.assertEqual((d.leads_range, d.leads_show, d.leads_sort, d.leads_page_size, d.list_page_size), ("30d", "all", "last_seen", 25, 50))
+        self.assertEqual((d.leads_range, d.leads_sort, d.leads_page_size, d.list_page_size), ("30d", "last_seen", 25, 50))
         self.assertEqual((d.dashboard_range, d.analytics_range, d.result_reasons, d.toast_seconds, d.toast_long_seconds), ("7d", "30d", 3, 4, 6))
         self.assertEqual((d.gold_invite_days, d.gold_approval_days, d.register_invite_days, d.office_session_days, d.email_confirm_hours),
                          (14, 14, 30, 30, 24))

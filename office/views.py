@@ -21,21 +21,22 @@ from django.db.models import OuterRef, Subquery
 from gold import actions as gold_actions
 from gold import approval, audit, invites
 from gold import services as gold_services
-from gold.forms import DeclineForm, NoteForm, RespondForm
+from gold.forms import DeclineForm, RespondForm
 from gold.models import GoldApplication
 from insights.metrics import K
 from journey import services as journey_services
 from journey.models import JourneySession
+from outreach.models import ArchivedLead
 from plans import payments
-from plans.models import Plan
-from common import levels
+from plans.models import Plan, SiteSettings
+from common import levels, sorting
 from users import services as user_services
 from users import views as user_views
 from users.models import User
 
 from system import defaults
 
-from . import lists, profile, selectors
+from . import lists, profile, selectors, tools
 from .forms import ManualSetupForm
 from . import invited as invited_lists
 from . import leads as lead_lists
@@ -115,7 +116,7 @@ def people(request):
     filters, page = lists.people_filters(request), lists.page_number(request)
     rows, has_next = lists.people_page(filters, page, defaults.get(request).list_page_size)
     total = selectors.counters(K.REGISTRATIONS).get((K.REGISTRATIONS, ""), 0)
-    context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "total_registered": total,
+    context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "columns": lists.people_columns(filters, request), "total_registered": total,
                "plans": list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order").values("slug", "name")), "section": "people",
                "sale_options": lists.SALE_OPTIONS, "payment_options": lists.PAYMENT_OPTIONS}
     return _varied(render(request, _fragment(request, "office/people.html", "office/_people_rows.html"), context))
@@ -127,7 +128,7 @@ def people_csv(request):
     return lists.people_csv(lists.people_filters(request))
 
 
-def _timeline_context(request, person):
+def _timeline_context(request, person, restore=None):
     """The timeline for the page: the default number of events, grouped by day; ?tl=2 (HTMX 'Show earlier') asks for the next page."""
     try:
         number = max(int(request.GET.get("tl", "1")), 1)
@@ -137,6 +138,8 @@ def _timeline_context(request, person):
     for day in days:
         for item in day["items"]:
             item["time"] = f"{timezone.localtime(datetime.fromisoformat(item['at'])):%H:%M}" if item["at"] else ""  # the day is the heading above
+            # a "Note deleted by X" line carries `restore_url` (POST) while the note is still deleted and the person may edit; else ''
+            item["restore_url"] = restore(item["note"]) if restore and item.get("note") and tools.can_edit(request.user) else ""
     return {"timeline_days": days, "timeline_more": more, "timeline_next": number + 1}
 
 
@@ -150,8 +153,8 @@ def _person_extras(request, person):
     latest = max(finished, key=lambda j: j["completed_at"] or j["started"]) if finished else (journeys[-1] if journeys else None)
     status = lead_lists.status_of(person["kind"] == "account", [a["status"] for a in person["gold"]["applications"]])
     referer = urlparse(request.META.get("HTTP_REFERER", ""))
-    came = {"/leads/": ("Leads", "office_leads"), "/people/": ("People", "office_people")}.get(referer.path)
-    label, name = came or (("Leads", "office_leads") if person["kind"] == "lead" else ("People", "office_people"))
+    came = {"/leads/": ("Leads", "office_leads"), "/people/": ("Registered", "office_people")}.get(referer.path)
+    label, name = came or (("Leads", "office_leads") if person["kind"] == "lead" else ("Registered", "office_people"))
     back = reverse(name) + (f"?{referer.query}" if came and referer.query and referer.netloc == request.get_host() else "")
     return {"person_status": status, "latest_journey": latest, "latest_finished": bool(finished), "back": {"label": label, "url": back},
             "gold_high_at": rating.thresholds()[rating.HIGH]}
@@ -174,9 +177,10 @@ def person(request, pk):
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
     person = lists.person_detail(user)
     context = {"person": person, "section": "people", "setup_plans": ManualSetupForm().fields["plan"].queryset,
-               **_timeline_context(request, person), **_person_extras(request, person)}
+               **_timeline_context(request, person, lambda n: reverse("office_person_note_restore", args=[user.pk, n])), **_person_extras(request, person)}
     if not _is_fragment(request):
         context.update(_chats_context(person, user=user, email=user.email, filter_key="user", filter_id=user.pk))
+        context.update(tools.tools_context(tools.Target("person", user.pk, user=user), request.user))
     return render(request, "office/_timeline.html" if _is_fragment(request) else "office/person.html", context)
 
 
@@ -279,7 +283,8 @@ def leads(request):
     rows, has_next = lead_lists.page(filters, number, defaults.get(request).leads_page_size)
     filtered = lead_lists.is_filtered(filters, request)
     summary = selectors.leads_summary(filters["range"], request)
-    context = {"rows": rows, "has_next": has_next, "page": number, "filters": filters, "filtered": filtered, "summary": summary,
+    context = {"rows": rows, "has_next": has_next, "page": number, "filters": filters, "columns": lead_lists.columns_for(filters, request), "filtered": filtered, "summary": summary,
+               "archived_view": filters["view"] == "archived", "archived_count": ArchivedLead.objects.count(),
                "total_leads": None if filtered else summary.get("leads_total"), "choices": lead_lists.filter_choices(), "section": "leads",
                "site_defaults": defaults.get(request)}
     return _varied(render(request, _fragment(request, "office/leads.html", "office/_leads_rows.html"), context))
@@ -308,9 +313,10 @@ def lead(request, pk):
     session, (kind, data) = _lead_session(pk)
     if kind == "account":
         return redirect("office_person", pk=data.pk)
-    context = {"person": data, "section": "leads", **_timeline_context(request, data), **_person_extras(request, data)}
+    context = {"person": data, "section": "leads", **_timeline_context(request, data, lambda n: reverse("office_lead_note_restore", args=[pk, n])), **_person_extras(request, data)}
     if not _is_fragment(request):
         context.update(_chats_context(data, email=data["email"], filter_key="lead", filter_id=pk))
+        context.update(tools.tools_context(tools.Target("lead", pk, email=data["email"]), request.user))
     return render(request, "office/_timeline.html" if _is_fragment(request) else "office/lead.html", context)
 
 
@@ -338,6 +344,9 @@ def lead_delete(request, pk):
     if kind == "account":
         return redirect("office_person", pk=data.pk)
     cleared = journey_services.erase_lead_data(data["email"])
+    from outreach.services import erase_email
+
+    erase_email(data["email"])  # his notes, messages, list entries, archive and next-morning rows go with him
     messages.success(request, f"The email was cleared from {cleared} journey{'s' if cleared != 1 else ''}. The answers stay, without it.")
     return redirect("office_leads")
 
@@ -350,7 +359,7 @@ def lead_delete(request, pk):
 def invited(request):
     filters, number = invited_lists.filters_from(request), lists.page_number(request)
     rows, has_next = invited_lists.page(filters, number, defaults.get(request).list_page_size)
-    context = {"rows": rows, "has_next": has_next, "page": number, "filters": filters, "filtered": invited_lists.is_filtered(filters),
+    context = {"rows": rows, "has_next": has_next, "page": number, "filters": filters, "columns": invited_lists.columns_for(filters, request), "filtered": invited_lists.is_filtered(filters),
                "states": invited_lists.STATE_LABELS, "section": "invited", "groups_url": settings.SYSTEM_URL + reverse("system_groups", urlconf="config.urls_system"), "default_state": invited_lists.DEFAULT_STATE}
     return _varied(render(request, _fragment(request, "office/invited.html", "office/_invited_rows.html"), context))
 
@@ -373,12 +382,18 @@ def chats(request):
     show_cost = levels.at_least(request.user, levels.DEVELOPER)  # chat spend: Developer level and up only; others never load it
     if not show_cost:
         queryset = queryset.defer("total_cost_pence")
+    columns = lists.chat_columns(show_cost)
+    sort, direction, _ = sorting.resolve(columns, request.GET, "started", sorting.DESC)
+    queryset = queryset.order_by(*sorting.ordering_from(columns, {"sort": sort, "dir": direction}, "started", lists.CHAT_TIEBREAK))
     person = _chats_person(request)
     if person is not None:  # ?user=<account id> or ?lead=<lead id>: one person's chats (the card on his page links here)
         queryset = queryset.filter(pk__in=chat_services.person_conversations(person["user"], person["email"]).values("pk"))
     page = lists.page_number(request)
     rows, has_next = lists.cut(queryset, page, defaults.get(request).list_page_size)
-    return render(request, "office/chats.html", {"rows": rows, "has_next": has_next, "page": page, "section": "chats", "person": person, "show_cost": show_cost})
+    more = urlencode({**({k: v for k, v in (request.GET.items()) if k in ("user", "lead")}), "sort": sort, "dir": direction, "page": page + 1})
+    return render(request, "office/chats.html", {"rows": rows, "has_next": has_next, "page": page, "section": "chats", "person": person, "show_cost": show_cost,
+                                                 "columns": sorting.header_columns(columns, sort, direction, request.path, request.GET), "sort": sort, "dir": direction,
+                                                 "more_url": f"{request.path}?{more}"})
 
 
 def _chats_person(request):
@@ -419,7 +434,7 @@ def gold(request):
     filters, page = lists.gold_filters(request), lists.page_number(request)
     rows, has_next = lists.gold_page(filters, page, defaults.get(request).list_page_size)
     stored = selectors.counters(K.GOLD_APPLICATIONS, K.GOLD_BY_STATUS)
-    context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "section": "gold",
+    context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "columns": lists.gold_columns(filters, request), "section": "gold",
                "final_approver_missing": approval.final_approver_missing(),
                "total_applications": stored.get((K.GOLD_APPLICATIONS, ""), 0), "waiting": selectors.waiting_count(stored),
                "awaiting_final_count": stored.get((K.GOLD_BY_STATUS, "awaiting_final"), 0)}
@@ -445,13 +460,17 @@ def _gold_page(request, application, status=200, open_form="", form=None):
         opened = open_form if _can_open(application, open_form) else ""
         if not opened:
             messages.info(request, "This application has already been decided, so that is not available now.")
-    context = {"application": lists.gold_detail(application), "section": "gold", "final_approver_missing": approval.final_approver_missing(),
+    guide = SiteSettings.load().gold_guide
+    context = {"application": lists.gold_detail(application, can_restore=tools.can_edit(request.user)), "section": "gold", "final_approver_missing": approval.final_approver_missing(),
                "final_potentials": approval.final_potentials(), "final_waits": approval.final_waits(),
                "open_form": opened, "decline_prefill": gold_services.declined_prefill(application) if acts else "",
                "form_errors": {field: [str(m) for m in found] for field, found in form.errors.items()} if form is not None else {},
                "form_values": form.data if form is not None else {},
                # the approver email's signed token rides along so the audit says the approval came from the email link
-               "approve_token": _email_token(request, application) if acts else ""}
+               "approve_token": _email_token(request, application) if acts else "",
+               "can_delete_gold": levels.at_least(request.user, levels.ADMIN), "delete_url": reverse("office_gold_delete", args=[application.pk]),
+               "guide_available": bool(guide), "guide_to": application.email, "guide_name": (guide.name or "").rsplit("/", 1)[-1],
+               "system_guide_url": settings.SYSTEM_URL + reverse("system_gold", urlconf="config.urls_system") if levels.at_least(request.user, levels.DEVELOPER) else "", **tools.tools_context(tools.Target("gold", application.pk, application=application), request.user)}
     return render(request, "office/gold_detail.html", context, status=status)
 
 
@@ -615,15 +634,6 @@ def gold_respond(request, pk):
         else:
             messages.warning(request, "Nothing sent: this application was already decided.")
     return _form_act(request, pk, "respond", RespondForm, run)
-
-
-@approver
-@require_POST
-def gold_note(request, pk):
-    def run(application, data):
-        result, _ = gold_actions.add_note(application, request.user, data["note"], channel=audit.OFFICE)
-        messages.success(request, "Note added to the history.") if result == gold_actions.DONE else messages.info(request, "That note was already added.")
-    return _form_act(request, pk, "note", NoteForm, run)
 
 
 # ---------- change password (team members; the member area is for members only) ----------

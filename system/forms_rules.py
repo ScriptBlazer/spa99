@@ -15,7 +15,7 @@ POINTS_LIMIT = 1000  # plan points and Gold points: -1000 to 1000
 
 RISKY = {
     "settings": ["vat_rate", "opening_date", "register_interest_open", "memberships_public", "journey_email_gate", "booking_open", "lock_idle_minutes", "max_sign_in_hours"],
-    "emails": ["gold_approver_cc", "contact_email"],
+    "emails": ["gold_approver_cc", "contact_email", "lead_next_morning_on"],
     "plans": ["price_ex_vat", "visits_per_month", "hours", "booking_window_days", "upcoming_limit", "cancel_hours", "guests_per_month", "annual_fee", "visible"],
     "hours": ["start_time", "end_time", "offset_minutes", "active", "starts_at", "ends_at", "capacity", "slot_length_minutes", "slot_step_minutes"],
     "gold": ["points", "active", "is_property"],
@@ -242,3 +242,11 @@ class SuggestionRuleForm(VersionedForm):
         if unknown:
             raise ValidationError(f"Not a plan: {', '.join(unknown)}.")
         return slugs
+
+
+class GoldGuideForm(VersionedForm):
+    """System > Gold: upload or replace the Gold Card guide PDF (.pdf, up to 5 MB; the model validator checks it)."""
+
+    class Meta:
+        model = SiteSettings
+        fields = ["gold_guide"]

@@ -1,0 +1,16 @@
+{% load office_tags text_tags %}{% for r in rows %}
+<tr class="o-row" data-outreach-row="{{ r.id }}" data-source="{{ r.source|lower }}">
+  <td class="c-name" data-col="name">{% if r.href %}<a class="o-rowlink" href="{{ r.href }}">{% truncated r.name %}</a>{% else %}<span class="o-rowname">{% truncated r.name %}</span>{% endif %}{% if r.email and r.email != r.name %}<span class="o-cell-sub">{% truncated r.email %}</span>{% endif %}{% if r.registered_at and state != "registered" %}<span class="o-badge o-badge--st-registered o-reg-tag" data-registered-tag title="Registered {{ r.registered_at|dt }}">Registered {{ r.registered_at|dm }}</span>{% endif %}</td>
+  <td class="c-contact" data-col="mobile">{% if r.mobile %}{{ r.mobile }}{% endif %}</td>
+  <td class="c-from" data-col="from"><span class="o-badge o-badge--type">{{ r.source }}</span>{% if r.registered_at %}<span class="o-badge o-badge--st-registered o-reg-tag" data-registered-tag title="Registered {{ r.registered_at|dt }}">Registered {{ r.registered_at|dm }}</span>{% endif %}</td>
+  <td class="c-reason" data-col="reason">{% if r.reason %}<div class="o-clamp" style="--lines: 2" data-clamp>{{ r.reason }}</div><button type="button" class="o-quiet o-clamp-more" data-clamp-more hidden>Read more</button>{% endif %}</td>
+  {% if state == "done" %}<td class="c-added c-done" data-col="done"><span class="o-only-narrow">Done by </span>{{ r.done_by|first_word }}, {{ r.done_at|dm }}</td>
+  {% else %}<td class="c-added" data-col="added"><span class="o-only-narrow">Added by </span>{{ r.added_by|first_word }}, {{ r.added_at|dm }}</td>{% endif %}
+  {% if state == "registered" %}<td class="num c-registered" data-col="registered">{{ r.registered_at|dm }}</td>{% endif %}
+  <td class="c-action" data-col="action">{% if can_edit %}<div class="o-row-actions">
+    {% if not r.done_at %}<form method="post" action="{{ r.done_url }}" data-outreach-act="done">{% csrf_token %}<button type="submit" class="btn btn-secondary btn-sm o-row-done" data-working-text="Saving">{% include "office/_icon.html" with name="check" %}Mark done</button></form>{% endif %}
+    <form method="post" action="{{ r.remove_url }}" data-outreach-act="remove">{% csrf_token %}<button type="submit" class="o-quiet o-row-remove" data-confirm data-confirm-title="Take {{ r.name|first_word }} off the list?" data-confirm-body="Nothing is sent to him." data-confirm-label="Remove" data-confirm-cancel="Keep">Remove</button></form>
+  </div>{% endif %}</td>
+</tr>
+{% empty %}<tr class="o-empty-row" data-empty><td colspan="{% if state == "registered" %}7{% else %}6{% endif %}"><p>{% if state == "done" %}Nothing marked done yet.{% elif state == "registered" %}Nobody on the list has registered yet.{% else %}Nobody to approach. Add people from a lead, person or Gold application.{% endif %}</p></td></tr>{% endfor %}
+{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="{% if state == "registered" %}7{% else %}6{% endif %}"><a class="btn btn-secondary btn-sm" href="{{ more_url }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}

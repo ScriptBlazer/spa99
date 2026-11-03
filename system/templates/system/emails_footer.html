@@ -1,0 +1,46 @@
+{% extends "system/emails_base.html" %}
+{% block main %}
+{% include "system/_page_header.html" with title="Emails" description="What the site sends, and what you send." %}
+{% include "system/_emails_tabs.html" with tab="footer" %}
+<form method="post" data-problems data-system-form="emails" class="se-form" data-view="write" data-se-footer data-preview-url="{% url 'system_email_footer_preview' %}" novalidate>{% csrf_token %}
+  <div class="se-switch sys-seg" role="group" aria-label="Show">
+    <button type="button" aria-pressed="true" data-se-show="write">Write</button><button type="button" aria-pressed="false" data-se-show="preview">Preview</button>
+  </div>
+  <div class="se-compose">
+    <section class="sys-panel se-wording" aria-label="Footer" data-se-pane="write">
+      <header><h2>Footer under every email</h2></header>
+      <div class="se-body">
+        {% if form.non_field_errors and not form.stale %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
+        {% for name, label, default in line_fields %}{% for field in form.visible_fields %}{% if field.name == name %}
+        <div class="sys-row se-field{% if field.errors %} invalid{% endif %}" data-system-field="{{ name }}">
+          <label for="{{ field.id_for_label }}">{{ label }}</label>
+          <div>
+            <div class="sys-ctl"><input type="text" name="{{ name }}" id="{{ field.id_for_label }}" value="{{ field.value|default:'' }}" maxlength="300" autocomplete="off" data-se-setting>
+              <button type="button" class="sys-btn sm" data-se-line-reset="{{ name }}" data-default="{{ default }}">Reset to default</button></div>
+            {% if field.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="{{ name }}" data-problem-label="{{ label }}">{{ field.errors|join:" " }}</p>{% endif %}
+            <p class="se-live-error" data-se-live="{{ name }}" hidden></p>
+          </div>
+        </div>{% endif %}{% endfor %}{% endfor %}
+        {{ form.row_token }}
+        <p class="sys-muted se-help">Empty line = left out. You can use {% for p in placeholders %}<code>{{ "{" }}{{ p.name }}{{ "}" }}</code> ({{ p.description }}){% if not forloop.last %}, {% endif %}{% endfor %}.</p>
+        <p class="sys-muted se-help">The unsubscribe link and the line saying why someone gets an email cannot be changed or removed. Each email can use this footer, this footer without the contact line, or its own lines: see its page under <a href="{% url 'system_email_list' %}">Automatic emails</a>.</p>
+        <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>
+      </div>
+    </section>
+    <section class="sys-panel se-preview" aria-label="Preview" data-se-pane="preview">
+      <header><h2>Preview</h2>
+        <div class="sys-seg se-width" role="group" aria-label="Preview width"><button type="button" aria-pressed="true" data-se-width="desktop">Desktop</button><button type="button" aria-pressed="false" data-se-width="phone">Phone</button></div>
+      </header>
+      <div class="se-stage">
+        <p class="se-meta"><span data-se-subject-line></span><br><span data-se-sample>Shown on the Welcome email, with an example unsubscribe line.</span></p>
+        <p class="se-preview-error" data-se-preview-error hidden>Could not draw the preview. Your wording is safe. <button type="button" class="sys-btn sm" data-se-retry>Retry</button></p>
+        <p class="se-preview-note" data-se-preview-note hidden></p>
+        <div class="se-frame-wrap" data-se-frame-wrap data-width="desktop">
+          <div class="se-frame-first" data-se-frame-first aria-hidden="true"></div>
+          <iframe class="se-frame" title="Email preview, desktop width" sandbox="allow-same-origin" hidden data-se-frame></iframe>
+        </div>
+      </div>
+    </section>
+  </div>
+</form>
+{% endblock %}

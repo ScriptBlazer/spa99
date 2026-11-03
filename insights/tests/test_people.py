@@ -29,6 +29,18 @@ class PeopleTests(TestCase):
     def setUpTestData(cls):
         seed_all()
 
+    def test_gold_card_members_are_not_counted_as_registered(self):
+        from plans.models import Plan
+        from users.models import InterestRegistration
+
+        member = User.objects.create_user("member@example.com", "a-long-password-1")
+        gold = User.objects.create_user("gold@example.com", "a-long-password-1")
+        InterestRegistration.objects.create(user=member, plan=Plan.objects.get(slug="tier-2"))
+        InterestRegistration.objects.create(user=gold, plan=Plan.objects.get(slug="gold"))
+        figures = people.load()
+        self.assertEqual(figures.registered(None, today()), 1)
+        self.assertNotIn("gold", figures.registered_by(None, today(), 1))
+
     def test_restart_in_the_same_browser_is_one_person(self):
         first = journey.create_session("Mozilla/5.0 (iPhone) Safari/604.1")
         again = journey.create_session("Mozilla/5.0 (iPhone) Safari/604.1", previous=first)

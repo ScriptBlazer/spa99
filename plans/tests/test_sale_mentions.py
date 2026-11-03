@@ -11,6 +11,7 @@ from plans import sales
 from plans.management.commands.seed_phase1 import seed_all
 from plans.tests.helpers import open_memberships
 from plans.tests.test_sales import make_sale
+from users.tests.test_register import with_journey
 
 LONDON = ZoneInfo("Europe/London")
 
@@ -170,5 +171,5 @@ class JourneyResultLineTests(TestCase):
         self.assertIn("a month for your first month.", line)
         visit = sales.register_line(offer, "single-visit")
         self.assertIn(" a visit for your first month.", visit)
-        page = self.client.get("/register/").content.decode()
+        page = with_journey(self.client).get("/register/").content.decode()
         self.assertIn(line, page)  # the Register plan card says the same words

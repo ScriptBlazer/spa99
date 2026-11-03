@@ -2,6 +2,7 @@ from django.db import models
 from django.db.models import Q
 from simple_history.models import HistoricalRecords
 
+from common import emaildefaults
 from common.models import BaseModel
 
 
@@ -16,6 +17,24 @@ class NotificationTemplate(BaseModel):
         blank=True,
         help_text="The wording: paragraphs separated by a blank line, {placeholders}, {button} for the main link. Blank = the built-in default (notifications/emailbody.py).",
     )
+
+    # Email flexibility (docs/features/office-outreach.md E2). "" = this email's built-in default (EmailSpec.default_footer / default_sender).
+    footer_mode = models.CharField(
+        max_length=12, blank=True, default="", db_default="", choices=emaildefaults.FOOTER_MODES,
+        help_text="Which footer: shared, shared without the contact line, or custom (the three lines below). Blank = this email's default.")
+    footer_brand_line = models.CharField("Custom footer: brand line", max_length=emaildefaults.FOOTER_LINE_MAX, blank=True,
+                                         default=emaildefaults.FOOTER_BRAND, db_default=emaildefaults.FOOTER_BRAND)
+    footer_address_line = models.CharField("Custom footer: address line", max_length=emaildefaults.FOOTER_LINE_MAX, blank=True,
+                                           default=emaildefaults.FOOTER_ADDRESS, db_default=emaildefaults.FOOTER_ADDRESS)
+    footer_contact_line = models.CharField("Custom footer: contact line", max_length=emaildefaults.FOOTER_LINE_MAX, blank=True,
+                                           default=emaildefaults.FOOTER_CONTACT, db_default=emaildefaults.FOOTER_CONTACT)
+    sender = models.CharField(
+        max_length=10, blank=True, default="", db_default="", choices=emaildefaults.SENDERS,
+        help_text="Site sender (hello@) or the person sender set in System > Emails. Blank = this email's default.")
+    heading = models.CharField(max_length=emaildefaults.HEADING_MAX, blank=True, default="", db_default="",
+                               help_text="The big line at the top. Blank = the subject.")
+    button_text = models.CharField(max_length=emaildefaults.BUTTON_TEXT_MAX, blank=True, default="", db_default="",
+                                   help_text="The text on the button (emails that have one). Blank = the built-in text.")
 
     history = HistoricalRecords()
 

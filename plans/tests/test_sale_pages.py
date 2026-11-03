@@ -9,6 +9,7 @@ from plans import sales
 from plans.management.commands.seed_phase1 import seed_all
 from plans.tests.helpers import open_memberships
 from plans.tests.test_sales import make_sale
+from users.tests.test_register import with_journey
 
 
 PUBLIC_PAGES = ("/", "/the-spa/", "/tour/", "/memberships/", "/gold-card/", "/book/", "/visit/", "/register/", "/login/", "/privacy/", "/terms/")
@@ -26,6 +27,7 @@ class SalePageTests(TestCase):
 
     def test_bar_is_on_top_of_every_public_page_and_cannot_be_dismissed(self):
         make_sale(start=-1, end=80)
+        with_journey(self.client)
         for path in PUBLIC_PAGES:
             html = self.client.get(path).content.decode()
             self.assertIn("data-sale-bar", html, path)
@@ -141,7 +143,7 @@ class PreviewFlowTests(TestCase):
         self.assertIn("data-sale-bar", real.get("/visit/").content.decode())
 
     def test_post_starts_the_preview_for_that_browser_on_every_public_page(self):
-        browser = Client()
+        browser = with_journey(Client())
         for path in PUBLIC_PAGES:
             self.assertNotIn("data-sale-bar", browser.get(path).content.decode(), path)
         response = self.start(browser)

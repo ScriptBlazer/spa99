@@ -1,0 +1,2 @@
+{% comment %}Phone only: the Notes button in the page header, with the count. Opens the notes sheet.{% endcomment %}
+{% if notes_count or can_note %}<p class="o-detail-tools"><button type="button" class="btn btn-secondary btn-sm o-notes-open" data-note-sheet-open aria-haspopup="dialog">{% include "office/_icon.html" with name="note" %}Notes{% if notes_count %} <span class="o-notes-pill" data-notes-pill>{{ notes_count }}<span class="sr-only"> note{{ notes_count|pluralize }}</span></span>{% endif %}</button></p>{% endif %}

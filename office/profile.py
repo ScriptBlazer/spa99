@@ -15,6 +15,8 @@ from users.models import InterestRegistration, User
 
 from system import defaults
 
+from outreach import people
+
 from . import lists
 
 
@@ -141,7 +143,7 @@ def _entry(at, kind, label, detail="", href=""):
     return {"_at": at, "at": _iso(at), "kind": kind, "label": label, "detail": detail, "href": href}
 
 
-def timeline(sessions, user=None, interest=None, applications=(), email=""):
+def timeline(sessions, user=None, interest=None, applications=(), email="", addresses=()):
     """Everything that happened to this person, newest first: journey started, email given, journey finished, registered,
     verified, membership choice changed, news opt in or out, Gold steps and emails sent (when recorded)."""
     out, given = [], set()
@@ -175,11 +177,14 @@ def timeline(sessions, user=None, interest=None, applications=(), email=""):
             previous = row.marketing_consent
     for a in applications:
         events = list(a.events.all())
+        from outreach.models import StickyNote
+
+        copied = set(StickyNote.objects.filter(source_event__in=[e.pk for e in events if e.action == ApplicationEvent.NOTE_ADDED]).values_list("source_event", flat=True))
         if not any(e.action == ApplicationEvent.SUBMITTED for e in events):
             out.append(_entry(a.created_at, "gold_applied", "Applied for Gold", a.reference, _href("office_gold_application", a.pk)))
         for e in events:
-            if e.action in (ApplicationEvent.EMAIL_SENT, ApplicationEvent.EMAIL_FAILED):
-                continue  # the email rows below and the Gold page hold these
+            if e.action in (ApplicationEvent.EMAIL_SENT, ApplicationEvent.EMAIL_FAILED, ApplicationEvent.NOTE_DELETED, ApplicationEvent.NOTE_RESTORED, ApplicationEvent.NOTE_EDITED) or e.pk in copied:
+                continue  # the email rows below and the Gold page hold these; notes are sticky notes (their deletion is added from the notes)
             text = e.get_action_display()
             out.append(_entry(e.at, "gold_applied" if e.action == ApplicationEvent.SUBMITTED else "gold_event",
                               "Applied for Gold" if e.action == ApplicationEvent.SUBMITTED else f"Gold: {text}",
@@ -187,6 +192,11 @@ def timeline(sessions, user=None, interest=None, applications=(), email=""):
     if email:
         for log in EmailLog.objects.filter(to__iexact=email).order_by("-created_at")[:defaults.get().person_emails_shown]:
             out.append(_entry(log.sent_at or log.created_at, "email", f"Email: {log.subject}", log.get_status_display()))
+    if addresses:
+        from outreach import services as outreach_services
+
+        for at, kind, label, detail, note in outreach_services.timeline_entries(addresses):  # deleted and restored notes, messages, archive
+            out.append({**_entry(at, kind, label, detail), "note": note})
     out.sort(key=lambda e: e["_at"], reverse=True)
     for e in out:
         del e["_at"]
@@ -210,7 +220,7 @@ def account_profile(user, interest=None):
         "gold": gold_block(sessions, applications),
         "source": {**(source_of(first) if first else {}), "registered_via": interest.source if interest is not None else ""},
         "consent": consent_block([user.email], [*sessions, *pending], user, applications),
-        "timeline": timeline(sessions, user, interest, applications, user.email),
+        "timeline": timeline(sessions, user, interest, applications, user.email, addresses=people.resolve(user=user)[1]),
     }
 
 
@@ -233,7 +243,7 @@ def lead_profile(email, session_id):
         "gold": gold_block(sessions, applications),
         "source": source_of(first) if first else {},
         "consent": consent_block([email], sessions, None, applications),
-        "timeline": timeline(sessions, applications=applications, email=email),
+        "timeline": timeline(sessions, applications=applications, email=email, addresses=people.resolve(email=email)[1]),
     }
 
 

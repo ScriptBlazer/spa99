@@ -8,7 +8,8 @@
       <p class="o-tl-line"><span class="o-tl-what">{{ e.label }}</span>{% if e.from or e.to %}<span class="o-tl-change">{% if e.from %}{{ e.from }} to {% endif %}{{ e.to }}</span>{% endif %}</p>
       <p class="o-tl-meta">{{ e.at|dt }} &middot; {% if e.who %}{{ e.who }} &middot; {% endif %}{{ e.channel_label }}</p>
       {% if e.detail %}<p class="o-tl-meta" data-event-detail>{{ e.detail }}</p>{% endif %}
-      {% if e.message %}<p class="o-tl-msg" data-event-message>{{ e.message|linebreaksbr }}</p>{% endif %}
+      {% if e.message %}<div class="o-tl-msg" data-event-message><div class="o-clamp" style="--lines: 3" data-clamp>{{ e.message|linebreaksbr }}</div><button type="button" class="o-quiet o-clamp-more" data-clamp-more hidden>Read more</button></div>{% endif %}
+      {% if e.restore_url %}<form class="o-tl-restore" method="post" action="{{ e.restore_url }}" data-note-restore>{% csrf_token %}<button type="submit" class="btn btn-secondary btn-sm" data-working-text="Restoring">Restore</button></form>{% endif %}
     </li>
     {% endfor %}
   </ol>

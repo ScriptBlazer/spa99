@@ -1,0 +1,187 @@
+/* Office outreach (docs/features/office-outreach-design.md): sticky notes, Send guide, the Approach list, Reach out.
+   Tokens only: the three note tokens live in office-tokens.css. No tape, pin, stripe or coloured edge on a note; no yellow. */
+
+/* ---------- sticky notes: paper on the page, not a card ---------- */
+.o-notes { min-width: 0; }
+@media (max-width: 63.99em) { .o-notes { display: contents; } }   /* the phone has only the sheet: no empty grid cell and no gap for it */
+.o-notes-errors:empty { display: none; }
+.o-notes-board { display: none; }
+@media (min-width: 64em) { .o-notes-board { display: block; } }
+.o-notes-head { display: flex; align-items: center; gap: var(--space-2); min-height: 2.5rem; }
+.o-notes-head .o-h3 { margin: 0; }
+.o-notes-count { color: var(--office-muted); font-size: var(--text-base); font-variant-numeric: tabular-nums; }
+.o-notes-add { margin-left: auto; gap: var(--space-1); }
+.o-notes-add .o-icon, .o-notes-open .o-icon { width: 1rem; height: 1rem; }
+.o-notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--office-note-min-w), 1fr)); gap: var(--space-3); margin-top: var(--space-3); }
+.o-notes-grid > .o-empty-line { grid-column: 1 / -1; padding-block: 0; }
+.o-notes-all { margin-top: var(--space-2); }
+.js .o-notes-board:not([data-all]) .o-note[data-extra] { display: none; }
+html:not(.js) .o-notes-all { display: none; }
+
+.o-note {
+  position: relative; display: grid; grid-template-rows: 1fr auto; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); min-width: 0; min-height: 8rem;
+  padding: calc(var(--space-3) + 0.5rem) var(--space-3) var(--space-3);
+  /* Stuck on at the top, the bottom lifting off: a faint adhesive band, a shade towards the lifted corner, a bent lower edge and a deep soft shadow underneath. */
+  border-radius: 2px 2px 3px 3px / 2px 2px 3px 3px; border-bottom-right-radius: 60% 0.6rem; color: var(--office-text);
+  background:
+    linear-gradient(180deg, rgb(73 46 33 / 0.05) 0 0.9rem, transparent 0.9rem),
+    linear-gradient(172deg, transparent 62%, rgb(73 46 33 / 0.07) 100%),
+    var(--office-note);
+  box-shadow: 0 1px 1px rgb(73 46 33 / 0.08), 0 1.4rem 1.6rem -0.8rem rgb(73 46 33 / 0.4), 0.5rem 1.8rem 1.8rem -1rem rgb(73 46 33 / 0.32), inset 0 0 0 1px rgb(73 46 33 / 0.06);
+}
+.o-note:focus { outline: none; }
+.o-note:focus-visible { box-shadow: 0 0 0 2px var(--office-note), 0 0 0 3px rgb(73 46 33 / 0.35); }
+.o-note-body { min-width: 0; }
+.o-note[data-note] .o-note-body { padding-right: 1.25rem; }   /* the text never runs under the delete x */
+@media (pointer: coarse) { .o-note[data-note] .o-note-body { padding-right: 2rem; } }
+.o-note-text { font-family: "Caveat", "Figtree", cursive; font-weight: 500; font-size: 1.625rem; line-height: 1.15; overflow-wrap: anywhere; word-break: break-word; max-width: none; }
+.o-note-meta { font-family: "Caveat", "Figtree", cursive; font-weight: 500; font-size: 1.125rem; line-height: 1.2; color: var(--office-muted); max-width: none; padding-right: 2rem; overflow-wrap: anywhere; }
+.o-note-meta time { cursor: default; }
+
+/* the lean: three angles in turn, never more than the token (articles only, so the open composer does not shift them) */
+@media (min-width: 64em) {
+  .o-notes-grid > .o-note:nth-of-type(3n+1) { rotate: calc(var(--office-note-tilt) * -1); }
+  .o-notes-grid > .o-note:nth-of-type(3n+2) { rotate: calc(var(--office-note-tilt) * 0.6); }
+  .o-notes-grid > .o-note:nth-of-type(3n) { rotate: calc(var(--office-note-tilt) * -0.3); }
+}
+@media (min-width: 64em) and (prefers-reduced-motion: no-preference) {
+  .o-notes-grid > .o-note { transition: rotate var(--office-dur-lift) var(--ease-soft), translate var(--office-dur-lift) var(--ease-soft), box-shadow var(--office-dur-lift) var(--ease-soft), opacity var(--office-dur-swap) var(--ease-soft), scale var(--office-dur-swap) var(--ease-soft); }
+}
+@media (min-width: 64em) {
+  .o-notes-grid > .o-note:hover, .o-notes-grid > .o-note:focus-within { rotate: 0deg; translate: 0 -2px; box-shadow: 0 1px 1px rgb(73 46 33 / 0.08), 0 1.25rem 1.5rem -0.75rem rgb(73 46 33 / 0.38), 0.4rem 1.6rem 1.75rem -1rem rgb(73 46 33 / 0.32), inset 0 0 0 1px rgb(73 46 33 / 0.06); }
+}
+.o-note.is-leaving { opacity: 0; scale: 0.96; pointer-events: none; transition: opacity var(--office-dur-swap) var(--ease-soft), scale var(--office-dur-swap) var(--ease-soft); }
+
+/* delete x: out of sight until the note is hovered or reached by keyboard; always there on touch */
+.o-note-x {
+  position: absolute; top: var(--space-1); right: var(--space-1); display: grid; place-items: center; width: 2rem; height: 2rem; padding: 0; border: 0; border-radius: 50%;
+  background: none; color: var(--office-muted); cursor: pointer; transition: opacity var(--office-dur-lift) var(--ease-soft), background-color var(--office-dur-lift) var(--ease-soft);
+}
+.o-note-x .o-icon { width: 1rem; height: 1rem; }
+@media (pointer: coarse) { .o-note-x { width: 2.75rem; height: 2.75rem; top: 0; right: 0; } }
+@media (hover: hover) and (pointer: fine) {
+  .o-note-x { opacity: 0; }
+  .o-note:hover .o-note-x, .o-note:focus-within .o-note-x, .o-note-x:focus-visible { opacity: 1; }
+  .o-note-x:hover { background: var(--office-sunken); color: var(--office-text); }
+}
+@media (hover: none) { .o-note-x { opacity: 1; } }
+.o-note-x:focus-visible { opacity: 1; background: var(--office-sunken); color: var(--office-text); }
+
+/* the blank note: first cell of the board */
+.o-note--draft { rotate: 0deg; gap: var(--space-2); }
+.o-note--draft[hidden] { display: none; }
+html:not(.js) .o-note--draft[hidden] { display: grid; }
+html:not(.js) [data-note-compose], html:not(.js) .o-notes-open { display: none; }
+.o-note--draft:focus-within { outline: 2px solid var(--color-espresso); outline-offset: 2px; }
+.o-note-text[data-note-edit] { cursor: text; border-radius: 2px; }
+.o-note-text[data-note-edit]:focus-visible { outline: 2px solid var(--color-espresso); outline-offset: 2px; }
+.o-note-meta span[title] { cursor: default; }
+/* edit by clicking (R9): the form takes the place of the text, meta and x while it is open */
+.o-note-editform { display: grid; gap: var(--space-2); grid-row: 1 / -1; grid-column: 1; min-width: 0; }
+.o-note-editform[hidden] { display: none; }
+.o-note.is-editing { outline: 2px solid var(--color-espresso); outline-offset: 2px; }
+.o-note.is-editing > .o-note-body, .o-note.is-editing > .o-note-meta, .o-note.is-editing > [data-note-delete] { display: none; }
+.o-note-editform .o-field-error { margin: 0; }
+.o-note-editform textarea, .o-note--draft textarea {
+  display: block; box-sizing: border-box; width: 100%; min-height: 6rem; padding: 0; border: 0; background: none; color: var(--office-text); outline: none; resize: none;
+  font: inherit; font-size: var(--text-base); line-height: var(--leading-snug);
+}
+.o-note--draft textarea:focus-visible, .o-note-editform textarea:focus-visible { outline: none; }
+.o-note--draft textarea::placeholder { color: var(--office-muted); opacity: 1; }
+.o-note-counter { font-size: var(--text-sm); color: var(--office-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.o-note-counter[hidden] { display: none; }
+.o-note-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); }
+.o-note--draft .o-field-error { margin: 0; }
+
+/* ---------- phone: the Notes button and the sheet ---------- */
+.o-detail-tools { margin-top: var(--space-3); max-width: none; }
+@media (min-width: 64em) { .o-detail-tools { display: none; } }
+.o-notes-open { gap: var(--space-2); min-height: 2.75rem; }
+.o-notes-pill { display: inline-grid; place-items: center; min-width: 1.25rem; height: 1.25rem; padding: 0 6px; border-radius: var(--office-pill); background: var(--office-sunken); color: var(--office-text); font-size: var(--office-text-xs); font-weight: 600; line-height: 1; }
+.o-notesheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); }
+.o-notesheet-head h2 { font-size: var(--text-xl); }
+.o-notesheet-list { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); }
+.o-notesheet-list .o-note { min-height: 0; }
+.o-notesheet .o-note-x { opacity: 1; }
+.o-notesheet .o-note--draft textarea, .o-notesheet .o-note-editform textarea { min-height: 5rem; }
+.o-notesheet .btn-block[data-note-sheet-close] { position: sticky; bottom: 0; box-shadow: 0 var(--space-3) 0 var(--space-3) var(--office-surface); }
+
+/* ---------- Gold decision card: Respond | Send guide ---------- */
+.o-actions-more { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.o-actions-more .btn { flex: none; min-height: var(--control-h); gap: var(--space-2); padding-inline: var(--space-3); }
+.o-actions-more .btn:only-child { grid-column: 1 / -1; }
+.o-actions-more .o-icon { width: 1.125rem; height: 1.125rem; }
+.office .btn.o-btn-off, .office .btn.o-btn-off:hover { background: var(--office-sunken); color: var(--office-muted); box-shadow: none; cursor: not-allowed; }
+.o-hint-line { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--office-muted); max-width: none; }
+.o-hint-line a { color: inherit; text-underline-offset: 0.25em; }
+.o-addlist { gap: var(--space-2); }
+.o-addlist .o-icon { width: 1.125rem; height: 1.125rem; }
+.o-attach { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--office-radius); background: var(--office-sunken); color: var(--office-text); font-size: var(--text-sm); max-width: none; }
+.o-attach .o-icon { width: 1.125rem; height: 1.125rem; color: var(--office-muted); }
+.o-attach-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+
+/* ---------- Reach out card and the on-the-list state ---------- */
+.o-reach-actions { display: grid; gap: var(--space-2); }
+.o-reach .btn { gap: var(--space-2); }
+.o-reach .btn .o-icon { width: 1.125rem; height: 1.125rem; }
+@media (max-width: 63.99em) {
+  .o-reach-actions { grid-template-columns: 1fr 1fr; }
+  .o-detail--person .o-reach { order: 0; }
+  .o-reach .btn { padding-inline: var(--space-2); }
+}
+.o-onlist { display: flex; align-items: center; gap: var(--space-2); min-height: 2.75rem; font-size: var(--text-sm); font-weight: 500; max-width: none; }
+.o-onlist .o-icon { width: 1.125rem; height: 1.125rem; flex: none; }
+.o-onlist-text { display: grid; flex: 1; min-width: 0; line-height: 1.3; }
+.o-onlist-meta { font-weight: 400; color: var(--office-muted); }
+.o-reach-actions .o-onlist { grid-column: 1 / -1; }
+.o-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+button.o-chip { border: 0; font-family: inherit; }
+.o-chip[aria-pressed="true"] { background: var(--office-text); color: var(--color-cream); box-shadow: none; }
+.o-chip:focus-visible { outline: 2px solid var(--office-text); outline-offset: 2px; }
+.o-dialog .o-warn { display: flex; align-items: flex-start; gap: var(--space-2); }
+.o-dialog .o-warn .o-icon { width: 1rem; height: 1rem; margin-top: 0.2em; }
+
+/* ---------- the Approach list page ---------- */
+.o-outreach-sub { margin-bottom: var(--space-3); }
+.o-seg-count { color: var(--office-muted); font-variant-numeric: tabular-nums; margin-left: 0.25em; }
+.o-filters--outreach .o-seg { min-width: 21rem; }   /* Open / Registered / Done */
+@media (max-width: 63.99em) { .o-filters--outreach .o-seg { width: 100%; min-width: 0; } }
+@media (max-width: 23.99em) { .o-filters--outreach .o-seg-item { padding-inline: var(--space-1); font-size: var(--text-sm); } }
+.o-list--outreach .c-reason { max-width: 18rem; color: var(--office-text); }
+.o-list--outreach .o-reg-tag { vertical-align: middle; }
+.o-list--outreach .c-name .o-reg-tag { margin-left: var(--space-2); }     /* desktop: Registered 4 Nov, on the name line after the name */
+.o-list--outreach .c-from .o-reg-tag { display: none; margin-left: var(--space-1); }   /* phone: in the badges line, after the From pill */
+@media (max-width: 63.99em) { .o-list--outreach .c-name .o-reg-tag { display: none; } .o-list--outreach .c-from .o-reg-tag { display: inline-flex; } }
+.o-list--outreach .c-registered { white-space: nowrap; color: var(--office-muted); }
+.o-list--outreach .c-added { white-space: nowrap; color: var(--office-muted); }
+.o-list--outreach .c-contact { white-space: nowrap; }
+.o-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); }
+.o-row-actions form { position: relative; z-index: 1; margin: 0; }
+.o-row-done { gap: var(--space-1); }
+.o-row-done .o-icon { width: 1rem; height: 1rem; }
+.o-row.is-leaving { opacity: 0; scale: 0.96; pointer-events: none; transition: opacity var(--office-dur-swap) var(--ease-soft), scale var(--office-dur-swap) var(--ease-soft); }
+.o-list--outreach .o-rowname { font-weight: 600; }
+@media (max-width: 63.99em) {
+  .o-list--outreach .o-row td.c-action { display: block; order: 8; flex: 0 0 100%; width: auto; margin-top: var(--space-2); text-align: left; }
+  .o-list--outreach .o-row-actions { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2); }
+  .o-list--outreach .o-row-actions:has(form:only-child) { grid-template-columns: auto; justify-content: end; }
+  .o-list--outreach .o-row-done { width: 100%; min-height: 2.75rem; }
+  .o-list--outreach .o-row-remove { padding-inline: var(--space-2); }
+  .o-list--outreach .o-row td.c-name { position: relative; order: 1; flex: 0 0 100%; }   /* the row link covers the title and the email only */
+  .o-list--outreach .c-name .o-cell-sub { display: block; font-weight: 400; }
+  .o-list--outreach .o-row td.c-from { order: 3; flex: none; }
+  .o-list--outreach .o-row td.c-contact { order: 4; flex: none; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-list--outreach .o-row td.c-contact:empty { display: none; }
+  .o-list--outreach .o-row td.c-reason { order: 5; flex: 0 0 100%; max-width: none; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-list--outreach .o-row td.c-reason:empty { display: none; }
+  .o-list--outreach .o-row td.c-added { order: 6; flex: 0 0 100%; margin-left: 0; font-size: var(--text-sm); }
+  .o-list--outreach .o-rowlink::after { border-radius: var(--office-radius-lg); }
+  .o-list--outreach thead th { display: none; }
+  .o-list--outreach .o-row td.c-registered { display: none; }   /* the tag in the badges line says it */
+}
+@media (min-width: 64em) { .o-list--outreach .c-action { padding-right: var(--space-4); } }
+
+/* the rail names can be long: ellipsis at the rail width */
+@media (min-width: 64em) { .o-nav-list a > span:not(.o-badge-count) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+
+@media (prefers-reduced-motion: reduce) { .o-note, .o-note-x, .o-row.is-leaving { transition: none; } }

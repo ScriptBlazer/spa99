@@ -4,6 +4,18 @@
 {% block main %}
 {% include "system/_page_header.html" with title="Gold rules" description="Points per answer, the High and Medium thresholds, and which answers count as property." %}
 <ul hidden data-system-risky-fields>{% for name in risky_fields %}<li>{{ name }}</li>{% endfor %}</ul>
+<section class="sys-panel" aria-labelledby="guide-h" data-system-guide><header><h2 id="guide-h">Gold Card guide (PDF)</h2></header>
+  <form method="post" action="{% url 'system_gold_guide' %}" enctype="multipart/form-data" data-problems class="sys-group">{% csrf_token %}{{ guide_form.row_token }}
+    <div class="sys-row{% if guide_form.errors %} invalid{% endif %}" data-system-field="gold_guide">
+      <label for="guide-file">Guide file<small>Emailed to a Gold applicant by Send guide in the Office. A new file replaces the old one. PDF, up to 5 MB.</small></label>
+      <div>
+        <div class="sys-ctl">{% if guide %}<span>Current file: <a href="{{ guide.url }}">{{ guide_name }}</a></span>{% else %}<span class="sys-muted">No guide uploaded yet. Send guide is switched off in the Office.</span>{% endif %}</div>
+        <div class="sys-ctl"><input type="file" id="guide-file" name="{{ guide_form.gold_guide.html_name }}" accept="application/pdf,.pdf" required><button type="submit" class="sys-btn primary">Upload</button></div>
+        {% if guide_form.errors %}<p class="sys-error" role="alert">{{ guide_form.errors.as_text }}</p>{% endif %}
+      </div>
+    </div>
+  </form>
+</section>
 <section class="sys-panel" aria-labelledby="gold-h"><header><h2 id="gold-h">Rules</h2></header>
   <div class="sys-scroll"><table class="sys-table">
     <thead><tr><th scope="col">Rule</th><th scope="col">Label</th><th scope="col" class="sys-num">Points</th><th scope="col">Property</th><th scope="col">Active</th><th scope="col"><span class="sr">Save</span></th></tr></thead>

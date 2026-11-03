@@ -305,12 +305,24 @@ class PersonDataTests(TestCase):
         self.assertEqual(session.history.filter(user__isnull=False).count(), 0)
 
 
+def with_journey(client):
+    """Register opens only after the questions (2026-11-03): give the browser a finished journey."""
+    from django.utils import timezone as tz
+    from journey import services as journey_services
+    from journey.models import JourneySession
+
+    session = JourneySession.objects.create(completed_at=tz.now())
+    client.cookies[journey_services.COOKIE_NAME] = session.key
+    return client
+
+
 class AccountTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         seed_all()
 
     def test_a_plan_link_for_a_non_interest_plan_is_ignored_not_silently_posted(self):
+        with_journey(self.client)
         response = self.client.get("/register/?plan=single-visit")
         self.assertEqual(response.context["selected_plan"], "")
         self.assertEqual(self.client.get("/register/?plan=tier-3").context["selected_plan"], "tier-3")
@@ -373,7 +385,7 @@ class NoPaymentAndDiscountLineTests(TestCase):
 
     def test_register_says_registering_is_free_and_shows_no_whatsapp_line(self):
         SiteSettings.objects.update(whatsapp_number="447000000000")
-        html = Client().get("/register/").content.decode()
+        html = with_journey(Client()).get("/register/").content.decode()
         self.assertIn("No payment is taken now. When we open, you&rsquo;ll have 2 weeks to set up your membership.", html)
         self.assertIn('href="/whatsapp/?from=register&amp;msg=rates"', html)
         self.assertIn("<span>WhatsApp us</span>", html)  # a real button now (the old "better rate" line is not on Register)
@@ -402,6 +414,29 @@ class NoPaymentAndDiscountLineTests(TestCase):
         SiteSettings.objects.update(whatsapp_number="")
         send_welcome_email(user.pk)
         self.assertNotIn("WhatsApp", mail.outbox[-1].body)
+
+
+class RegisterNeedsTheQuestionsTests(TestCase):
+    """2026-11-03: Register sends a browser with no finished journey (and no email given) to the questions first."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_a_cold_visit_goes_to_the_questions(self):
+        response = self.client.get("/register/?plan=tier-2")
+        self.assertEqual(response.status_code, 302)
+        from django.urls import reverse
+
+        self.assertEqual(response.url, reverse("journey"))
+
+    def test_a_finished_journey_or_an_email_invitation_opens_register(self):
+        self.assertEqual(with_journey(Client()).get("/register/").status_code, 200)
+        invited = Client()
+        store = invited.session
+        store["invite_token"] = "x"
+        store.save()
+        self.assertEqual(invited.get("/register/").status_code, 200)
 
 
 class RegisterPrefillTests(TestCase):

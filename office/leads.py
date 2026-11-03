@@ -7,15 +7,18 @@ import csv
 import logging
 from datetime import datetime, time, timedelta
 
-from django.db.models import Count, Exists, F, OuterRef, Q, Subquery
+from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Q, Subquery, Value, When
 from django.db.models.functions import Lower
 from django.http import HttpResponse
 from django.utils import timezone
 
+from common import sorting
+from common.sorting import Column
 from gold.models import ApplicationEvent, GoldApplication
 from insights import reader
 from journey.models import JourneySession, Option
 from mailings.models import EmailOptOut
+from outreach.models import ArchivedLead
 from users.models import InterestRegistration, User
 
 from system import defaults
@@ -24,8 +27,26 @@ from . import lists, profile
 
 logger = logging.getLogger("spa99.office")
 
-SHOWS = ("lead", "registered", "all")
-SORTS = ("last_seen", "first_seen", "potential", "visits")
+# The sortable headers (R1). Keys are also the System default `leads_sort` values (last_seen, first_seen, potential, visits).
+# Source, Wants, Industry and Heard via are built from several values (or from the address's first journey, not this row's), so
+# they are plain headers.
+COLUMNS = [
+    Column("email", "Lead", "email_key"),
+    Column("wants", "Wants"),
+    Column("best_fit", "Best fit", ("suggested_plan__order", "suggested_plan__name")),
+    Column("potential", "Potential", "gold_score", first=sorting.DESC),
+    Column("industry", "Industry", css="o-wide-xl"),
+    Column("source", "Source"),
+    Column("heard_via", "Heard via", css="o-wide-xl"),
+    Column("visits", "Visits", "journeys_n", first=sorting.DESC, css="num o-wide-xl"),
+    Column("status", "Status", "status_rank", first=sorting.DESC),
+    Column("last_seen", "Last seen", "last_seen_at", first=sorting.DESC, css="num"),
+    Column("first_seen", "First seen", "lead_at", first=sorting.DESC, hidden=True),
+]
+ARCHIVED_COLUMN = Column("archived", "Archived", "archived_at", first=sorting.DESC, css="num")
+SORTS = tuple(c.key for c in COLUMNS if c.sortable)
+VIEWS = ("", "archived")
+TIEBREAK = ("-last_seen_at", "-created_at", "-id")
 RANGES = ("7d", "30d", "90d", "all")
 POTENTIALS = ("high", "medium", "low")
 CSV_CHUNK = 200
@@ -76,19 +97,22 @@ def _newer_heard():
     return _heard_answers().filter(ak=OuterRef("ak"), session__created_at__gt=OuterRef("session__created_at"))
 
 
-def lead_queryset(show="lead", range_name="all", today=None):
-    """One session per address (its latest), annotated with `has_account`, `has_application` and `journeys_n`. `show`:
-    lead (no account, the default), registered (former leads who now have an account) or all. Staff addresses never appear
-    (counting rule C2). `range_name` is by last seen (7d, 30d, 90d, all)."""
+def _archived():
+    """The archive row of the address (ArchivedLead.email is lower case, like email_key)."""
+    return ArchivedLead.objects.filter(email=OuterRef("email_key"))
+
+
+def lead_queryset(range_name="all", today=None, archived=False):
+    """One session per address (its latest), annotated with `has_account`, `has_application` and `journeys_n`. Only addresses
+    with NO account: a registered person is not a lead (they are in People). Staff addresses never appear either (counting
+    rule C2). `range_name` is by last seen (7d, 30d, 90d, all). Archived addresses are left out (they are in the Archived view:
+    `archived=True` lists only them); everything that counts leads (list, CSV, tiles, hot leads, snapshots) goes through here."""
     newer = (_gate_sessions().filter(email_key=OuterRef("email_key"))
              .filter(Q(created_at__gt=OuterRef("created_at")) | Q(created_at=OuterRef("created_at"), id__gt=OuterRef("id"))))
     same = _gate_sessions().filter(email_key=OuterRef("email_key")).order_by().values("email_key").annotate(n=Count("id")).values("n")
     queryset = (_gate_sessions().filter(~Exists(newer)).filter(~Exists(_accounts(staff=True)))
-                .annotate(has_account=Exists(_accounts()), has_application=Exists(_applications()), journeys_n=Subquery(same)))
-    if show == "lead":
-        queryset = queryset.filter(has_account=False)
-    elif show == "registered":
-        queryset = queryset.filter(has_account=True)
+                .annotate(has_account=Exists(_accounts()), has_application=Exists(_applications()), journeys_n=Subquery(same))
+                .filter(has_account=False).filter(Exists(_archived()) if archived else ~Exists(_archived())))
     start, _ = reader.range_dates(range_name if range_name in RANGES else "all", today)
     if start is not None:
         queryset = queryset.filter(last_seen_at__gte=timezone.make_aware(datetime.combine(start, time.min)))
@@ -97,16 +121,30 @@ def lead_queryset(show="lead", range_name="all", today=None):
 
 def hot_leads_queryset():
     """High Gold potential, no account, no Gold application (declined or not: he has applied)."""
-    return lead_queryset(show="lead").filter(gold_potential="high", has_application=False)
+    return lead_queryset().filter(gold_potential="high", has_application=False)
 
 
 def filters_from(request):
+    """The list's filters from the request. `sort` is always a valid key (the System default when none asked), `dir` its direction
+    (default descending), `view` is "" or "archived"."""
     get, d = request.GET, defaults.get(request)
-    show, sort, range_name = get.get("show", d.leads_show), get.get("sort", d.leads_sort), get.get("range", d.leads_range)
-    return {"q": get.get("q", "").strip(), "range": range_name if range_name in RANGES else d.leads_range, "show": show if show in SHOWS else d.leads_show,
-            "tier": get.get("tier", ""), "potential": get.get("potential", "") if get.get("potential") in POTENTIALS else "",
+    range_name = get.get("range", d.leads_range)
+    view = "archived" if get.get("view") == "archived" else ""
+    default_key = "archived" if view else (d.leads_sort if d.leads_sort in SORTS else "last_seen")   # the archive reads newest put away first
+    sort, direction, _ = sorting.resolve(_columns(view), get, default_key, sorting.DESC)
+    return {"q": get.get("q", "").strip(), "range": range_name if range_name in RANGES else d.leads_range, "tier": get.get("tier", ""), "potential": get.get("potential", "") if get.get("potential") in POTENTIALS else "",
             "industry": get.get("industry", ""), "heard": get.get("heard", ""), "chat": "1" if get.get("chat") == "1" else "", "gold": "yes" if get.get("gold") in ("yes", "1", "on") else "", "hot": "1" if get.get("hot") == "1" else "",
-            "sort": sort if sort in SORTS else d.leads_sort}
+            "view": view, "sort": sort, "dir": direction}
+
+
+def _columns(view):
+    return COLUMNS + ([ARCHIVED_COLUMN] if view == "archived" else [])
+
+
+def columns_for(filters, request):
+    """The `columns` context for the table header (see common.sorting): one dict per column with key, label, sortable, active, dir,
+    aria_sort and url. The Archived view adds an Archived column."""
+    return sorting.header_columns(_columns(filters["view"]), filters["sort"], filters["dir"], request.path, request.GET)
 
 
 def is_filtered(filters, request=None):
@@ -114,11 +152,23 @@ def is_filtered(filters, request=None):
     Reads the same values as filters_from."""
     d = defaults.get(request)
     return bool(filters["q"] or filters["tier"] or filters["potential"] or filters["industry"] or filters["heard"] or filters["chat"] or filters["gold"] or filters["hot"]
-                or filters["show"] != d.leads_show or filters["range"] != d.leads_range)
+                or filters.get("view") or filters["range"] != d.leads_range)
+
+
+def _status_rank():
+    """0 lead, 1 applied (an open Gold application), 2 gold (an approved one): the order of the Status column."""
+    return Case(When(Exists(_applications().filter(status=GoldApplication.APPROVED)), then=Value(2)),
+                When(Exists(_applications().filter(status__in=OPEN_GOLD)), then=Value(1)), default=Value(0), output_field=IntegerField())
 
 
 def filtered_queryset(filters):
-    queryset = lead_queryset(filters["show"], filters["range"])
+    archived = filters.get("view") == "archived"
+    columns = _columns(filters.get("view", ""))
+    queryset = lead_queryset("all" if archived else filters["range"], archived=archived)  # the archive is everyone put away, whenever last seen
+    if archived:
+        queryset = queryset.annotate(archived_at=Subquery(_archived().values("archived_at")[:1]))
+    if filters.get("sort") == "status":
+        queryset = queryset.annotate(status_rank=_status_rank())
     for word in filters["q"].lower().split():
         queryset = queryset.filter(email_key__contains=word)
     if filters["tier"]:
@@ -134,11 +184,9 @@ def filtered_queryset(filters):
     if filters["gold"]:
         queryset = queryset.filter(has_application=True)
     if filters["hot"]:  # exactly the Hot leads count: High potential, no account, no Gold application
-        queryset = queryset.filter(gold_potential="high", has_account=False, has_application=False)
-    order = {"last_seen": [F("last_seen_at").desc()], "first_seen": [F("lead_at").desc(nulls_last=True)],
-             "potential": [F("gold_score").desc(nulls_last=True), F("last_seen_at").desc()],
-             "visits": [F("journeys_n").desc(nulls_last=True), F("last_seen_at").desc()]}[filters["sort"]]
-    return queryset.order_by(*order, "-created_at", "-id")
+        queryset = queryset.filter(gold_potential="high", has_application=False)
+    key = filters.get("sort") if filters.get("sort") in {c.key for c in columns if c.sortable} else "last_seen"
+    return queryset.order_by(*sorting.order_by(columns, key, filters.get("dir") or sorting.DESC, TIEBREAK))
 
 
 def filter_choices():
@@ -193,9 +241,11 @@ def build_rows(page_sessions):
     heard = {}
     for key, label in _heard_answers().filter(ak__in=emails).order_by("session__created_at").values_list("ak", "options__label"):
         heard[key] = label  # the newest answering journey wins
+    archived = {a.email: a for a in ArchivedLead.objects.filter(email__in=emails)}
     out = []
     for page_row in page_sessions:
         session = loaded[page_row.pk]
+        put_away = archived.get(page_row.email_key)
         labels = profile.answer_labels(session)
         referrer, utm, medium, campaign, device = firsts.get(page_row.email_key, ("", "", "", "", ""))
         host = profile.referrer_host(referrer)
@@ -211,6 +261,8 @@ def build_rows(page_sessions):
             "registered": page_row.has_account, "account_id": str(accounts[page_row.email_key]) if page_row.email_key in accounts else "",
             "gold_applied": page_row.has_application, "status": status_of(page_row.has_account, statuses.get(page_row.email_key, [])),
             "href": _url("office_lead", session.pk), "unsubscribed": page_row.email_key in unsubscribed,
+            "archived": {"at": lists_iso(put_away.archived_at), "by": put_away.archived_by_label, "reason": put_away.reason} if put_away else None,
+            "archive_url": _url("office_lead_archive", session.pk), "unarchive_url": _url("office_lead_unarchive", session.pk),
         })
     return out
 
@@ -244,7 +296,7 @@ def csv_response(filters, user_id=None):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="spa99-leads.csv"'
     writer = csv.writer(response)
-    writer.writerow(["email", "status", "first_seen", "last_seen", "journeys", "suggested_tier", "gold_potential", "gold_score", "industries",
+    writer.writerow(["email", "status", "first_seen", "last_seen", "journeys", "best_fit", "gold_potential", "gold_score", "industries",
                      "when", "how_often", "facilities", "company", "heard_via", "gave_email_in_chat", "source", "campaign", "device", "applied_for_gold",
                      "consent_given_at", "consent_privacy_version"])
     queryset = filtered_queryset(filters)

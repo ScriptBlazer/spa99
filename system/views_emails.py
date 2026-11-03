@@ -18,7 +18,7 @@ from common.ratelimit import hit
 from mailings import automatic as auto_emails, blocks as mailing_blocks, images, invites, lists, segments, sending, tokens
 from mailings import saved as templates_store
 from mailings.models import ContactList, Invite, Mailing, MailingTemplate
-from notifications import emailbody, ses
+from notifications import emailbody, emailsettings, ses
 from notifications.models import EmailLog
 from notifications.seed import DEFAULT_SUBJECTS
 from notifications.services import fill_subject, preview_email, send_templated
@@ -26,7 +26,8 @@ from notifications.services import fill_subject, preview_email, send_templated
 from . import audit, emails as logic, services
 from .models import SystemEvent
 from .permissions import unlocked
-from .views import form_status, page, saved
+from .forms import FooterForm
+from .views import _edit_site, form_status, page, saved
 
 
 def _wants_json(request):
@@ -97,7 +98,13 @@ def _posted_text(request, spec):
     subject = request.POST.get("subject", DEFAULT_SUBJECTS[spec.key][0])
     body = request.POST.get("body") if spec.editable else ""
     body = (body or "").replace("\r\n", "\n")
-    return subject, body, emailbody.validate(spec, subject=subject, body=body if spec.editable else None)
+    errors = emailbody.validate(spec, subject=subject, body=body if spec.editable else None)
+    if spec.editable:  # footer, sender, heading and button text typed on the screen
+        typed = {name: request.POST[name] for name in logic.SETTING_FIELDS if name in request.POST}
+        typed["footer_mode"] = typed.get("footer_mode") or spec.default_footer
+        for name, messages in emailsettings.validate_options(spec, typed).items():
+            errors.setdefault(name, []).extend(messages)
+    return subject, body, errors
 
 
 @unlocked
@@ -109,7 +116,7 @@ def automatic_preview(request, key):
     subject, body, errors = _posted_text(request, spec)
     if errors:
         return JsonResponse({"ok": False, "errors": errors, "subject": "", "html": "", "text": ""})
-    return JsonResponse({"ok": True, "errors": {}, **preview_email(key, subject, body)})
+    return JsonResponse({"ok": True, "errors": {}, **preview_email(key, subject, body, posted=request.POST if spec.editable else None)})
 
 
 @unlocked
@@ -122,17 +129,19 @@ def automatic_test(request, key):
         return _respond(request, False, "This email has no test send: its layout is a real application.", back)
     if _limited(request, "system-email-test", 5, 600):
         return _respond(request, False, "Too many test emails. Please wait a few minutes.", back, status=429)
+    options = None
     if "subject" in request.POST or "body" in request.POST:
         subject, body, errors = _posted_text(request, spec)
         if errors:
             return _respond(request, False, " ".join(m for ms in errors.values() for m in ms), back, extra={"errors": errors})
         body = body if body.strip() else spec.default_body
+        options = emailsettings.options_for(key, request.POST)
     else:
         row = logic.template_row(key)
         subject, body = (row.subject if row else DEFAULT_SUBJECTS[key][0]), None
     context = emailbody.test_context_for(spec, f"{settings.SITE_URL}/example-link/")
     log = send_templated(key, [request.user.email], "[Test] " + fill_subject(subject, emailbody.sample_values(spec)), context, body=body,
-                         subject_email=request.user.email)
+                         subject_email=request.user.email, options=options)
     ok = log.status == EmailLog.SENT
     audit.log_event(SystemEvent.EMAIL_TEST, request, user=request.user, outcome=SystemEvent.OK if ok else SystemEvent.FAILED,
                     detail={"template": key, "status": log.status},
@@ -143,20 +152,45 @@ def automatic_test(request, key):
 @unlocked
 @require_POST
 def automatic_reset(request, key):
-    """Reset to default: the subject and the wording go back to the built-in text, as one logged (undoable) change."""
-    _spec(key)
+    """Reset to default: the subject, the wording, the footer, sender, heading and button text go back to the built-in ones, as one logged
+    (undoable) change."""
+    spec = _spec(key)
     row = logic.template_row(key)
     default_subject = DEFAULT_SUBJECTS[key][0]
     back = reverse("system_email_edit", args=[key])
-    fields = [name for name, default in (("subject", default_subject), ("body", "")) if row is not None and getattr(row, name) != default]
+    defaults = {"subject": default_subject, "body": "", **(logic.SETTING_DEFAULTS if spec.editable else {})}
+    fields = [name for name, default in defaults.items() if row is not None and getattr(row, name) != default]
     if not fields:
         return _respond(request, True, "Already the default.", back)
-    row.subject, row.body = default_subject, ""
+    for name in fields:
+        setattr(row, name, defaults[name])
     services.save_logged(row, request.user, fields=fields)
     if _wants_json(request):
         return JsonResponse({"ok": True, "message": "Back to the default."})
     saved(request, "Back to the default.")
     return redirect(back)
+
+
+# ---------- the shared footer ----------
+
+@unlocked
+@require_http_methods(["GET", "POST"])
+def footer(request):
+    """System > Emails > Footer: the three lines under every email, with a live preview."""
+    return _edit_site(request, FooterForm, "system/emails_footer.html", "emails", extra=lambda: {**logic.footer_context(), "ses": ses.ses_status()})
+
+
+@unlocked
+@require_POST
+def footer_preview(request):
+    """Live preview of the footer as typed: {"ok", "errors", "subject", "html", "text"}. A News-style unsubscribe line is added so it is
+    clear that part stays."""
+    errors = emailsettings.validate_lines(request.POST)
+    if errors:
+        return JsonResponse({"ok": False, "errors": errors, "subject": "", "html": "", "text": ""})
+    shared = tuple(request.POST.get(name, "").strip() for name in emailsettings.LINE_FIELDS)
+    extra = logic.mailing_extra(Mailing.NEWS, "")
+    return JsonResponse({"ok": True, "errors": {}, **preview_email("welcome", fill_subject(DEFAULT_SUBJECTS["welcome"][0], emailbody.sample_values(emailbody.SPECS["welcome"])), "", extra, shared=shared)})
 
 
 # ---------- SES ----------

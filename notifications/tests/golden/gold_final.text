@@ -1,0 +1,25 @@
+SPA 99
+
+Final approval: James Smith
+Low potential
+
+An approver has approved this Gold Card application, but the potential is Low, so it needs your final approval. The applicant has not been told anything yet.
+
+Confirm approval: http://localhost:8000/example-link/
+Send back: http://localhost:8000/example-link/
+View the whole application: http://localhost:8000/example-link/
+(Both open a page in the Office. Nothing happens until you tap the button there. Sending it back asks the approvers whether they are sure, and you can add a note.)
+
+1. CONTACT
+Name: James Smith
+Email: james.smith@example.com
+Mobile: +44 7700 900123
+
+2. PROPERTY
+Where: London
+Size: 10 to 50 units
+
+-- 
+Spa 99, BML House, 99c Vale Road, London N4 1PR
+Questions? Reply to this email or write to from@example.test.
+Beyond Luxury

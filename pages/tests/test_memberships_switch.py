@@ -6,6 +6,7 @@ from plans.management.commands.seed_phase1 import seed_all
 from plans.models import SiteSettings
 from plans.tests.helpers import make_team_member, open_memberships
 from plans.tests.test_sales import make_sale
+from users.tests.test_register import with_journey
 
 
 class MembershipsSwitchTests(TestCase):
@@ -45,8 +46,14 @@ class MembershipsSwitchTests(TestCase):
         self.assertEqual(self.client.get("/memberships/").status_code, 200)
         self.assertIn('href="/memberships/"', self.client.get("/visit/").content.decode())
 
+    def test_register_is_open_to_everyone_once_memberships_is_public(self):
+        from plans.models import SiteSettings
+
+        SiteSettings.objects.update(memberships_public=True)
+        self.assertEqual(self.client.get("/register/").status_code, 200)  # cold browser, no journey
+
     def test_register_still_works_for_someone_who_came_through_the_journey(self):
-        self.assertEqual(self.client.get("/register/?plan=tier-2").status_code, 200)
+        self.assertEqual(with_journey(self.client).get("/register/?plan=tier-2").status_code, 200)
 
 
 class NoPricesBeforeTheGateTests(TestCase):

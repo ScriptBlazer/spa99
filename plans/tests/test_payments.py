@@ -20,6 +20,7 @@ from system.models import SiteDefaults, SystemEvent
 from users import services
 from users.models import InterestRegistration, User
 from users.tests.test_register import cleaned
+from users.tests.test_register import with_journey
 
 DAY = timedelta(days=1)
 
@@ -458,9 +459,10 @@ class ScreenTests(PaymentCase):
     def test_registration_copy_says_no_payment_now_and_hides_whatsapp_when_blank(self):
         from plans.models import SiteSettings
 
-        page = Client(HTTP_HOST="localhost").get("/register/")
+        browser = with_journey(Client(HTTP_HOST="localhost"))
+        page = browser.get("/register/")
         self.assertContains(page, "No payment is taken now")
         self.assertContains(page, "2 weeks")
         self.assertNotContains(page, "WhatsApp us")
         SiteSettings.objects.update(whatsapp_number="447000000000")
-        self.assertContains(Client(HTTP_HOST="localhost").get("/register/"), "WhatsApp us")
+        self.assertContains(browser.get("/register/"), "WhatsApp us")

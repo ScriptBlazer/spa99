@@ -113,7 +113,8 @@ def capacity_save(request):
 def _gold(request, bound=None, status=200):
     bound = bound or {}
     context = {"rows": _rows(GoldRule.objects.all(), f.GoldRuleForm, bound), "add_form": _add(f.GoldRuleAddForm, bound),
-               "risky_fields": f.RISKY["gold"]}
+               "risky_fields": f.RISKY["gold"], "guide_form": bound.get("guide") or f.GoldGuideForm(instance=SiteSettings.load(), prefix="guide"),
+               "guide": SiteSettings.load().gold_guide, "guide_name": (SiteSettings.load().gold_guide.name or "").rsplit("/", 1)[-1]}
     return page(request, "system/gold.html", "gold", context, status)
 
 
@@ -127,6 +128,24 @@ def gold(request):
 @require_POST
 def gold_save(request, pk=None):
     return _save(request, GoldRule, f.GoldRuleAddForm if pk is None else f.GoldRuleForm, pk, "new" if pk is None else str(pk), "system_gold", _gold)
+
+
+@unlocked
+@require_POST
+def gold_guide_save(request):
+    """Upload or replace the Gold Card guide PDF (logged in the change log like any System change)."""
+    site = SiteSettings.load()
+    form = f.GoldGuideForm(request.POST, request.FILES, instance=site, prefix="guide")
+    if form.is_valid():
+        try:
+            if services.save_form(form, request.user):
+                saved(request)
+            else:
+                messages.info(request, "Nothing changed.")
+            return redirect("system_gold")
+        except ValidationError as error:
+            form.add_error(None, error)
+    return _gold(request, {"guide": form}, form_status(form))
 
 
 # ---------- journey ----------

@@ -105,6 +105,8 @@ body.system.live { --sys-stripe: 3px; }
 .sys-row small { display: block; font-weight: 400; color: var(--sys-text-3); font-size: var(--sys-fs-sm); }
 .sys-row .sys-ctl { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sys-2); min-height: var(--sys-ctl); }
 .sys-row .sys-ctl.stack { align-items: flex-start; flex-direction: column; }
+.sys-row > div { min-width: 0; }
+.sys-row input[type=file] { max-width: 100%; min-width: 0; }
 .sys-row input[type=number] { width: 112px; } .sys-row input[type=date] { width: 148px; }
 .sys-row input[type=text], .sys-row input[type=email], .sys-row input:not([type]) { width: 320px; }
 .sys-row[data-wide] input[type=text] { width: 480px; }

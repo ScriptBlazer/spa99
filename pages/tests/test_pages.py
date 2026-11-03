@@ -10,6 +10,7 @@ from plans.management.commands.seed_phase1 import seed_all
 from plans.models import Facility, Plan
 from plans.tests.helpers import open_memberships
 from users.models import InterestRegistration
+from users.tests.test_register import with_journey
 
 PUBLIC_PAGES = [
     "/", "/the-spa/", "/memberships/", "/gold-card/", "/gold-card/apply/", "/gold-card/apply/about-you/", "/book/", "/visit/",
@@ -25,6 +26,7 @@ class PageTests(TestCase):
         open_memberships()
 
     def test_every_public_page_renders(self):
+        with_journey(self.client)
         for path in PUBLIC_PAGES:
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 200)
@@ -182,7 +184,7 @@ class PageTests(TestCase):
         self.assertIn("/gold/options/", source)
 
     def test_register_form_wires_the_shared_validation(self):
-        html = self.client.get("/register/?plan=tier-2").content.decode()
+        html = with_journey(self.client).get("/register/?plan=tier-2").content.decode()
         self.assertIn("data-live-validate", html)
         self.assertIn('data-check-email-url="/register/check-email/"', html)
         self.assertIn("common/js/register.js", html)
@@ -192,7 +194,7 @@ class PageTests(TestCase):
         self.assertIn("initValidation", open(finders.find("common/js/app.js")).read())
 
     def test_register_marketing_opt_in_is_not_ticked_and_men_only_is_asked(self):
-        html = self.client.get("/register/").content.decode()
+        html = with_journey(self.client).get("/register/").content.decode()
         self.assertNotRegex(html, r'name="marketing_opt_in"[^>]*checked')
         self.assertIn("men-only spa", html)
 

@@ -14,6 +14,13 @@
   font-display: swap;
 }
 @font-face {
+  font-family: "Caveat";
+  src: url("../fonts/caveat-latin-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}  /* Office sticky notes only (Moishe, 2026-11-03); OFL, see OFL-Caveat.txt */
+@font-face {
   font-family: "Signika Fallback";
   src: local("Arial");
   size-adjust: 96%;

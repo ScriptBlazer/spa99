@@ -63,6 +63,8 @@ class EmailSpec:
     subject_placeholders: dict = field(default_factory=dict)
     values: object = None  # callable(context) -> dict of computed placeholder values
     test_context: object = None  # the raw context a real send gets, for "send me a test" (default: the samples)
+    default_footer: str = "shared"  # "shared" or "no_contact" (replies reach a person, so no "write to hello@" line); System can change it per email
+    default_sender: str = "site"  # "site" (hello@) or "person" (the automatic emails sender set in System > Emails)
 
 
 def _welcome_values(ctx):
@@ -213,6 +215,25 @@ SPECS = {spec.key: spec for spec in [
         {"first_name": "James", "message": "Thank you for applying. Could you tell us a little more about the properties you own?"},
         "Hello {first_name},\n\n{message}\n\nYou can reply to this email and it will reach the team.",
         subject_placeholders=_FIRST),
+    EmailSpec(
+        "gold_guide", "Gold Card guide (the PDF is attached)", {**_FIRST},
+        {"first_name": "James"},
+        "Hello {first_name},\n\nThank you for your interest in the Spa 99 Gold Card. The guide is attached to this email: it explains how the "
+        "card works and how it is earned.\n\nIf you have any questions, reply to this email and it will reach the team.",
+        subject_placeholders=_FIRST),
+    EmailSpec(
+        "office_message", "A message from the team (to a lead or a member)", {**_FIRST, "message": "What the team member wrote (line breaks kept)"},
+        {"first_name": "James", "message": "Thank you for your interest in Spa 99. We would love to tell you more about the membership."},
+        "Hello {first_name},\n\n{message}\n\nYou can reply to this email and it will reach the team.",
+        subject_placeholders=_FIRST),
+    EmailSpec(
+        "lead_next_morning", "Next-morning email to a new lead (from the sender set above, replies reach them)",
+        {**_FIRST, "sender_name": "The name of the automatic emails sender (set in System > Emails)"},
+        {"first_name": "James", "sender_name": "Barry"},
+        "Hello {first_name},\n\nThank you for your interest in Spa 99, the men-only luxury spa at 99 Vale Road, London N4.\n\n"
+        "I wanted to say hello personally. If there is anything you would like to know about the memberships or when we open, "
+        "just reply to this email and it will reach me.\n\nBest wishes,\n{sender_name}",
+        subject_placeholders=_FIRST, default_footer="no_contact", default_sender="person"),
     EmailSpec(
         "gold_declined", "Gold declined (only sent if the approver ticks Email the applicant)",
         {**_FIRST, "name": "The applicant's full name", "reference": "The application reference"},

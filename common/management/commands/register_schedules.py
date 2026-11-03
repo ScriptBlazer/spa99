@@ -11,6 +11,7 @@ SCHEDULES = [
     {"name": "chat-prune", "func": "chat.tasks.prune_scheduled", "schedule_type": Schedule.DAILY, "at": (3, 30)},  # Ask us chats older than 90 days
     {"name": "housekeeping", "func": "common.tasks.housekeeping", "schedule_type": Schedule.DAILY, "at": (4, 15)},  # sessions, failed jobs, wrong tries, audit retention
     {"name": "payments-tick", "func": "plans.tasks.tick", "schedule_type": Schedule.MINUTES, "minutes": 5},  # opens, reminds, warns staff, closes the payment window
+    {"name": "lead-next-morning", "func": "outreach.nextmorning.scheduled", "schedule_type": Schedule.MINUTES, "minutes": 15},  # every 15 minutes: finds new leads and sends the next-morning emails that are due; while the System switch is off it finds nobody and only closes what was already due
     # Daily from the next 00:01 London (`at`): "today" starts empty and the Dashboard must not wait for the next hourly run
     {"name": "metrics-rollup-midnight", "func": "insights.rollup.scheduled", "schedule_type": Schedule.DAILY, "at": (0, 1)},
 ]

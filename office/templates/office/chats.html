@@ -3,13 +3,20 @@
 {% block title %}Chats | Spa 99 Office{% endblock %}
 {% block main %}
 <h1 class="sr-only">Chats</h1>
-<p class="o-sub">{% if person %}Chats with {{ person.label }}{% else %}Chats with the assistant{% endif %}, newest first. Kept for 90 days.</p>
-{% if person %}<p class="o-totalline">{% if person.url %}<a class="o-quiet" href="{{ person.url }}">Back to the page</a> {% endif %}<a class="o-quiet" href="{% url 'office_chats' %}" data-clear>All chats</a></p>{% endif %}
-<div class="o-card o-tablecard">
+<p class="o-sub">{% if person %}Chats with {{ person.label }}{% else %}Chats with the assistant{% endif %}. Kept for 90 days.</p>
+{# No filters here: the form only carries the order (the phone's small Sort sheet) and whose chats these are, so the same swap serves the table heads. #}
+<form class="o-filters" method="get" action="{% url 'office_chats' %}" data-filter-form data-full data-list="chats" aria-label="Order the chats">
+  {% if request.GET.user %}<input type="hidden" name="user" value="{{ request.GET.user }}">{% endif %}{% if request.GET.lead %}<input type="hidden" name="lead" value="{{ request.GET.lead }}">{% endif %}
+  <p class="o-totalline">{% if person %}{% if person.url %}<a class="o-quiet" href="{{ person.url }}">Back to the page</a> {% endif %}<a class="o-quiet" href="{% url 'office_chats' %}" data-clear-chats>All chats</a>{% endif %}
+    {% include "office/_sort_button.html" with dir_value=dir %}
+    <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button></p>
+  {% include "office/_sort_sheet.html" with dir_value=dir %}
+</form>
+<div class="o-card o-tablecard" data-list-card>
   <table class="o-list">
     <caption class="sr-only">Ask us chats</caption>
-    <thead><tr><th scope="col">Started</th><th scope="col">First question</th><th scope="col">Who</th><th scope="col" class="num">Messages</th>{% if show_cost %}<th scope="col" class="num">Cost</th>{% endif %}<th scope="col">Note</th></tr></thead>
-    <tbody>
+    <thead><tr>{% include "office/_sort_head.html" %}</tr></thead>
+    <tbody data-region="list" data-office-list="chats">
     {% for c in rows %}
       <tr class="o-row">
         <td class="c-date"><span class="o-only-wide">{{ c.created_at|dt }}</span><span class="o-only-narrow">{{ c.created_at|dm }}, {{ c.created_at|date:"H:i" }}</span></td>
@@ -20,7 +27,7 @@
         <td class="c-note">{% if c.ended_off_topic %}Closed: off-topic{% endif %}{% if c.ended_by_cap %} Stopped by the spending cap{% endif %}</td>
       </tr>
     {% empty %}<tr class="o-empty-row"><td colspan="{% if show_cost %}6{% else %}5{% endif %}"><p>No chats yet.</p></td></tr>{% endfor %}
-    {% if has_next %}<tr class="o-more-row"><td colspan="{% if show_cost %}6{% else %}5{% endif %}"><a class="btn btn-secondary btn-sm" href="?{% if person %}{{ person.query }}&amp;{% endif %}page={{ page|add:1 }}">Older chats</a></td></tr>{% endif %}
+    {% if has_next %}<tr class="o-more-row"><td colspan="{% if show_cost %}6{% else %}5{% endif %}"><a class="btn btn-secondary btn-sm" href="{{ more_url }}">Older chats</a></td></tr>{% endif %}
     </tbody>
   </table>
 </div>

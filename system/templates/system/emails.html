@@ -33,8 +33,23 @@
     <header><h2>Copies and contact</h2></header>
     <div class="sys-group">
       {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
-      {% for field in form.visible_fields %}{% include "system/_field_row.html" %}{% endfor %}{{ form.row_token }}
+      {% for field in form.visible_fields %}{% if field.name == "gold_approver_cc" or field.name == "contact_email" %}{% include "system/_field_row.html" %}{% endif %}{% endfor %}{{ form.row_token }}
       <p class="sys-muted" data-system-emails-pointer>Approvers are set in <a href="{% url 'system_approval' %}">Approval</a>.</p>
+    </div>
+    <div class="sys-group" data-system-next-morning>
+      <h3>Next-morning email to new leads</h3>
+      {% for field in form.visible_fields %}
+        {% if field.name == "auto_email_from_name" %}{% include "system/_field_row.html" with placeholder="Barry Lobenstein" help="The name the email comes from. Empty is Spa 99." %}
+        {% elif field.name == "auto_email_from_address" %}{% include "system/_field_row.html" with placeholder="barry@spa99.uk" help="Must be an @"|add:sending_domain|add:" address. Replies come here." %}
+        {% elif field.name == "lead_next_morning_on" %}{% include "system/_field_row.html" with help="Once per address. Only leads who give their email after it is turned on get it." %}
+        {% elif field.name == "lead_next_morning_at" %}{% include "system/_field_row.html" with placeholder="10:00" unit="London time" help="The time of day it goes out." %}
+        {% elif field.name == "lead_next_morning_min_hours" %}{% include "system/_field_row.html" with unit="hours" help="A lead who gives his email later than this before the send time is emailed the next day." %}
+        {% endif %}
+      {% endfor %}
+      <div class="sys-row" data-system-link="lead_next_morning">
+        <span class="sys-label">The email<small>The wording he receives. Saved separately from these settings.</small></span>
+        <div><div class="sys-ctl"><a class="sys-btn sm" href="{% url 'system_email_edit' 'lead_next_morning' %}" data-system-edit-next-morning>Edit the email</a></div></div>
+      </div>
     </div>
   </section>
   <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>

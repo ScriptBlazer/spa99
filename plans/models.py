@@ -1,16 +1,23 @@
 """Plans, site settings, opening hours and facilities. Everything here is data edited in Spa 99 Control.
 Nothing in this file is a rule: values come from rows (see docs/SPA99_RULES.md "Rules will change")."""
+import datetime
 import re
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator, URLValidator
 from django.db import models
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+from common import emaildefaults
 from common.models import BaseModel
-from common.validators import split_emails, validate_email_list
+from common.validators import split_emails, validate_email_list, validate_pdf, validate_sender_domain
+
+
+def gold_guide_path(instance, filename):
+    return f"gold/guide/{filename}"
 
 
 def plan_image_path(instance, filename):
@@ -225,6 +232,47 @@ class SiteSettings(BaseModel):
         "potentials that wait for final approval", max_length=20, blank=True, default="low", validators=[validate_final_potentials],
         help_text="Comma separated: low, medium, high. Only used while final approval is on.")
 
+    gold_guide = models.FileField(
+        "Gold Card guide (PDF)", upload_to=gold_guide_path, blank=True, max_length=200, db_default="", validators=[validate_pdf],
+        help_text="Emailed to a Gold applicant by Send guide in the Office. PDF, up to 5 MB. Replace it any time.")  # default storage: S3 on live
+    outreach_list_name = models.CharField(
+        "Approach list name", max_length=60, blank=True, default="", db_default="",
+        help_text='The name of the Office list of people to approach. Empty = "Approach list".')
+
+    # Round 2 of the office outreach (docs/features/office-outreach.md R7): the next-morning email to new leads, from a person.
+    auto_email_from_name = models.CharField(
+        "Automatic emails sender name", max_length=80, blank=True, default="", db_default="",
+        help_text="The name on automatic emails that come from a person, e.g. Barry Lobenstein. Empty = Spa 99.")
+    auto_email_from_address = models.EmailField(
+        "Automatic emails sender address", max_length=254, blank=True, default="", db_default="", validators=[validate_sender_domain],
+        help_text="e.g. barry@spa99.uk. Must be on the same domain as the site's sending address. Replies go to this address.")
+    lead_next_morning_on = models.BooleanField(
+        "Send the next-morning email to new leads", default=False, db_default=False,
+        help_text="Off by default. On: each new lead gets one email at 10:00 the next morning (London time), from the sender above. Only leads who give their email after this is turned on are emailed.")
+    lead_next_morning_at = models.TimeField(
+        "Next-morning email: send at", default=datetime.time(10, 0), db_default=datetime.time(10, 0),
+        help_text="The time of day (London time) the email goes out, e.g. 10:00.")
+    lead_next_morning_min_hours = models.PositiveSmallIntegerField(
+        "Next-morning email: at least this many hours after sign-up", default=8, db_default=8, validators=[MaxValueValidator(48)],
+        help_text="0 to 48. A lead who gives his email less than this long before the send time is emailed the next day instead.")
+    # System > Emails > Footer (docs/features/office-outreach.md, Email flexibility E1): the three lines under every email. Blank = left out.
+    footer_brand_line = models.CharField(
+        "Footer: brand line", max_length=emaildefaults.FOOTER_LINE_MAX, blank=True, default=emaildefaults.FOOTER_BRAND, db_default=emaildefaults.FOOTER_BRAND,
+        help_text="The first line under every email. Empty = left out.")
+    footer_address_line = models.CharField(
+        "Footer: address line", max_length=emaildefaults.FOOTER_LINE_MAX, blank=True, default=emaildefaults.FOOTER_ADDRESS, db_default=emaildefaults.FOOTER_ADDRESS,
+        help_text="May use {site_name}, {address} and {contact_email}. Empty = left out.")
+    footer_contact_line = models.CharField(
+        "Footer: contact line", max_length=emaildefaults.FOOTER_LINE_MAX, blank=True, default=emaildefaults.FOOTER_CONTACT, db_default=emaildefaults.FOOTER_CONTACT,
+        help_text="May use {site_name}, {address} and {contact_email}. Empty = left out.")
+    lead_next_morning_since = models.DateTimeField(null=True, blank=True, editable=False, help_text="When the switch was last turned on (set automatically).")
+
+    # System > Launch (docs/features/office-outreach.md, Launch button): set once by the Launch button, never edited by hand.
+    launched_at = models.DateTimeField(null=True, blank=True, editable=False, help_text="When Launch Spa 99 was pressed (set by System > Launch).")
+    launched_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, editable=False, on_delete=models.SET_NULL, related_name="+",
+        help_text="Who pressed Launch (set by System > Launch).")
+
     history = HistoricalRecords()
 
     class Meta:
@@ -234,15 +282,47 @@ class SiteSettings(BaseModel):
     def __str__(self):
         return "Site settings"
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._was_next_morning_on = instance.lead_next_morning_on if "lead_next_morning_on" in field_names else None
+        return instance
+
+    def save(self, *args, **kwargs):
+        """Turning the next-morning switch on stamps `lead_next_morning_since`: only leads who give their email after that are emailed
+        (the leads already on the list are never mass-emailed)."""
+        if self.lead_next_morning_on and getattr(self, "_was_next_morning_on", False) is not True:
+            self.lead_next_morning_since = timezone.now()
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = {*kwargs["update_fields"], "lead_next_morning_since"}
+        super().save(*args, **kwargs)
+        self._was_next_morning_on = self.lead_next_morning_on
+
     def clean(self):
-        """Cross-field rule (forms, undo and the code view all go through full_clean): a slot is at least as long as the step."""
+        """Cross-field rules (forms, undo and the code view all go through full_clean): a slot is at least as long as the step;
+        the next-morning email needs a sender address."""
         if self.slot_length_minutes and self.slot_step_minutes and self.slot_length_minutes < self.slot_step_minutes:
             raise ValidationError({"slot_length_minutes": "A slot cannot be shorter than the step between slots."})
+        if self.lead_next_morning_on and not (self.auto_email_from_address or "").strip():
+            raise ValidationError({"lead_next_morning_on": "Set the automatic emails sender address first."})
 
     @classmethod
     def load(cls):
         obj, _ = cls.objects.get_or_create(singleton_key="site")
         return obj
+
+    @property
+    def auto_sender(self):
+        """'Barry Lobenstein <barry@spa99.uk>' for automatic emails from a person, or '' while no address is set."""
+        from email.utils import formataddr
+
+        address = (self.auto_email_from_address or "").strip()
+        name = " ".join((self.auto_email_from_name or "").split())  # never a line break in a header
+        return formataddr((name or "Spa 99", address)) if address else ""
+
+    @property
+    def outreach_title(self):
+        return (self.outreach_list_name or "").strip() or "Approach list"
 
     @property
     def contact_address(self):

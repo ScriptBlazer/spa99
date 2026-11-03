@@ -4,14 +4,18 @@ Everything here reads stored rows or cheap counts (EmailLog has an index on crea
 import datetime
 
 from django import forms
+from django.conf import settings
 from django.core.paginator import Paginator
 from django.utils import timezone
 
+from common import emaildefaults as d
+from common.validators import sending_domain
 from mailings import blocks as mailing_blocks, segments
 from mailings.models import ContactList, EmailOptOut, Invite, Mailing
-from notifications import emailbody, ses
+from notifications import emailbody, emailsettings, ses
 from notifications.models import EmailBounce, EmailLog, EmailSuppression, NotificationTemplate
 from notifications.seed import DEFAULT_SUBJECTS
+from plans.models import SiteSettings
 
 from . import defaults
 from .forms import VersionedForm
@@ -33,6 +37,7 @@ def overview(request=None):
     d = defaults.get(request)
     return {
         "ses": ses.ses_status(),
+        "sending_domain": sending_domain(),
         "stats": {
             "sent_today": sent.filter(created_at__gte=today).count(),
             "sent_week": sent.filter(created_at__gte=week).count(),
@@ -95,12 +100,14 @@ def automatic_list():
     last = {}
     for change in SystemChange.objects.filter(model_label=EMAIL_MODEL, object_pk__in=[str(r.pk) for r in rows.values()]).order_by("-created_at")[:200]:
         last.setdefault(change.object_pk, change)
+    switched_on = SiteSettings.load().lead_next_morning_on
     result = []
     for spec in specs:
         row = rows.get(spec.key)
         default_subject, note = DEFAULT_SUBJECTS[spec.key]
         change = last.get(str(row.pk)) if row else None
         result.append({
+            "off": spec.key == "lead_next_morning" and not switched_on,
             "key": spec.key, "title": spec.title, "when": (row.note if row and row.note else note), "editable": spec.editable,
             "subject": row.subject if row else default_subject, "default_subject": default_subject,
             "subject_changed": bool(row and row.subject != default_subject), "body_changed": bool(row and row.body.strip()),
@@ -109,44 +116,93 @@ def automatic_list():
     return result
 
 
+SETTING_FIELDS = ("footer_mode", "sender", "heading", "button_text", *emailsettings.LINE_FIELDS)  # the per-email settings beside subject and body
+LINE_DEFAULTS = {"footer_brand_line": d.FOOTER_BRAND, "footer_address_line": d.FOOTER_ADDRESS, "footer_contact_line": d.FOOTER_CONTACT}
+SETTING_DEFAULTS = {"footer_mode": "", "sender": "", "heading": "", "button_text": "", **LINE_DEFAULTS}  # what Reset puts back
+
+
 class TemplateForm(VersionedForm):
-    """Subject and wording of one automatic email. Unknown placeholders and a missing {button} are field errors. A body equal to
-    the built-in default is stored blank, so the email keeps following the default."""
+    """Subject, wording and per-email settings of one automatic email (footer, sender, heading, button text). Unknown placeholders and a
+    missing {button} are field errors. A body, footer or sender equal to the email's built-in default is stored blank, so the email keeps
+    following the default."""
+
+    footer_mode = forms.ChoiceField(choices=d.FOOTER_MODES, required=False, widget=forms.RadioSelect)
+    sender = forms.ChoiceField(choices=d.SENDERS, required=False, widget=forms.RadioSelect)
 
     class Meta:
         model = NotificationTemplate
-        fields = ["subject", "body"]
+        fields = ["subject", "body", *SETTING_FIELDS]
 
     def __init__(self, *args, spec, **kwargs):
         self.spec = spec
         super().__init__(*args, **kwargs)
-        if not spec.editable:
-            del self.fields["body"]
-        else:
-            self.fields["body"].required = False
-            if not self.is_bound:
-                self.initial["body"] = self.instance.body or spec.default_body  # the editor shows what is sent
+        if not spec.editable:  # a real application layout: the subject only
+            for name in ("body", *SETTING_FIELDS):
+                del self.fields[name]
+            return
+        if not spec.button_label:
+            del self.fields["button_text"]
+        for name in ("body", *[n for n in SETTING_FIELDS if n in self.fields]):
+            self.fields[name].required = False
+        if not self.is_bound:
+            self.initial["body"] = self.instance.body or spec.default_body  # the editor shows what is sent
+            self.initial["footer_mode"] = self.instance.footer_mode or spec.default_footer
+            self.initial["sender"] = self.instance.sender or spec.default_sender
 
     def clean_body(self):
         text = (self.cleaned_data.get("body") or "").replace("\r\n", "\n").replace("\r", "\n").strip()
         return "" if text == self.spec.default_body.strip() else text
 
+    def clean_footer_mode(self):
+        mode = self.cleaned_data.get("footer_mode") or ""
+        return "" if mode == self.spec.default_footer else mode
+
+    def clean_sender(self):
+        sender = self.cleaned_data.get("sender") or ""
+        return "" if sender == self.spec.default_sender else sender
+
     def clean(self):
         data = super().clean()
         errors = emailbody.validate(self.spec, subject=data.get("subject"), body=data.get("body") if "body" in self.fields else None)
+        if self.spec.editable:
+            typed = {**data, "footer_mode": data.get("footer_mode") or self.spec.default_footer}
+            for name, messages in emailsettings.validate_options(self.spec, typed).items():
+                errors.setdefault(name, []).extend(messages)
         for name, messages in errors.items():
             for message in messages:
-                self.add_error(name, message)
+                self.add_error(name if name in self.fields else None, message)
         return data
+
+
+def settings_changed(row):
+    """True when the row's footer, sender, heading or button text differ from the defaults."""
+    return any(getattr(row, name) != default for name, default in SETTING_DEFAULTS.items())
 
 
 def edit_context(spec, form, row):
     default_subject = DEFAULT_SUBJECTS[spec.key][0]
+    site = SiteSettings.load()
     return {
         "spec": spec_info(spec), "form": form, "row": row, "default_subject": default_subject,
-        "default_body": spec.default_body, "is_default": not ((row.subject != default_subject) or row.body.strip()),
+        "default_body": spec.default_body, "is_default": not ((row.subject != default_subject) or row.body.strip() or (spec.editable and settings_changed(row))),
         "risky_fields": [],
+        "footer": {
+            "line_fields": [(name, emailsettings.LINE_LABELS[name], form[name]) for name in emailsettings.LINE_FIELDS] if spec.editable else [],
+            "placeholders": [{"name": n, "description": t} for n, t in d.FOOTER_PLACEHOLDERS.items()],
+            "default_mode": spec.default_footer, "default_sender": spec.default_sender,
+            "site_sender": settings.DEFAULT_FROM_EMAIL, "contact_email": site.contact_address,
+            "person_sender": site.auto_sender, "person_address": (site.auto_email_from_address or "").strip(),
+            "custom_open": spec.editable and form["footer_mode"].value() == d.FOOTER_CUSTOM,
+        },
     }
+
+
+# ---------- the shared footer (System > Emails > Footer) ----------
+
+def footer_context(form=None):
+    """The three lines (name, label, built-in text) and the placeholders, for the Footer tab."""
+    return {"line_fields": [(name, emailsettings.LINE_LABELS[name], LINE_DEFAULTS[name]) for name in emailsettings.LINE_FIELDS],
+            "placeholders": [{"name": n, "description": t} for n, t in d.FOOTER_PLACEHOLDERS.items()]}
 
 
 # ---------- mailings ----------

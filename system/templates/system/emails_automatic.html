@@ -6,7 +6,7 @@
   <thead><tr><th scope="col">Email</th><th scope="col" class="se-when">Sent when</th><th scope="col" class="se-subject">Subject</th><th scope="col" class="se-lastcol">Last edited</th></tr></thead>
   <tbody>{% for e in emails %}
     <tr data-system-email="{{ e.key }}" data-se-row>
-      <td class="se-name"><a href="{% url 'system_email_edit' e.key %}">{{ e.title }}</a>{% if e.subject_changed or e.body_changed %} <span class="sys-badge info" data-changed>Edited</span>{% endif %}<span class="se-when-sm">{{ e.when }}</span><span class="se-subject-sm">{{ e.subject }}</span></td>
+      <td class="se-name"><a href="{% url 'system_email_edit' e.key %}">{{ e.title }}</a>{% if e.off %} <span class="sys-badge" data-off>Off</span>{% endif %}{% if e.subject_changed or e.body_changed %} <span class="sys-badge info" data-changed>Edited</span>{% endif %}<span class="se-when-sm">{{ e.when }}</span><span class="se-subject-sm">{{ e.subject }}</span></td>
       <td class="se-when">{{ e.when }}</td>
       <td class="se-subject"><span class="se-ellipsis">{{ e.subject }}</span></td>
       <td class="se-lastcol">{% if e.last_edited_at %}{{ e.last_edited_at|date:"j M, H:i" }}{% if e.last_edited_by %} · {{ e.last_edited_by }}{% endif %}{% else %}<span class="sys-muted">Default</span>{% endif %}</td>

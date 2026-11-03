@@ -1,0 +1,10 @@
+{% load office_tags %}{% comment %}The phone's Sort controls (R1): "Sort by" (the list's sortable columns) and "Order" (two pills whose words follow the field: Newest first / Oldest first, A to Z / Z to A, Highest first / Lowest first).
+Plain radios named sort and dir inside the list's form, so a filter change keeps the order and the same swap fetches it. Needs `columns` and `dir_value` (the current direction).
+office-ui.js keeps the Order words and the natural order in step with the chosen field; the table heads do the same job from 64em up (these are hidden there but stay in the form).{% endcomment %}
+{% sort_ui columns dir_value as su %}
+<div class="o-sortfields" data-sort-group data-kind="{{ su.kind }}">
+  <fieldset class="o-sortfield"><legend class="o-filter-label">Sort by</legend>
+    <div class="o-chips">{% for o in su.options %}<label class="o-chip"><input type="radio" name="sort" value="{{ o.key }}" data-kind="{{ o.kind }}" data-first="{{ o.first }}" data-asc="{{ o.asc }}" data-desc="{{ o.desc }}" data-label="{{ o.label }}"{% if o.active %} checked{% endif %}><span>{{ o.label }}</span></label>{% endfor %}</div></fieldset>
+  <fieldset class="o-sortfield"><legend class="o-filter-label">Order</legend>
+    <div class="o-chips o-order"><label class="o-chip" data-order="asc"><input type="radio" name="dir" value="asc"{% if su.dir == "asc" %} checked{% endif %}><span data-order-label="asc">{{ su.asc }}</span></label><label class="o-chip" data-order="desc"><input type="radio" name="dir" value="desc"{% if su.dir == "desc" %} checked{% endif %}><span data-order-label="desc">{{ su.desc }}</span></label></div></fieldset>
+</div>

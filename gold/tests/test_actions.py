@@ -15,6 +15,8 @@ from gold.admin import GoldApplicationAdmin
 from gold.models import AppendOnlyError, ApplicationEvent, GoldApplication
 from gold.tests.test_gold import application_data
 from plans.management.commands.seed_phase1 import seed_all
+from outreach import services as outreach_services
+from outreach.models import StickyNote
 from plans.models import SiteSettings
 from plans.tests.helpers import make_team_member, set_recipients
 
@@ -155,13 +157,13 @@ class RespondAndNoteTests(ActionsTestCase):
     def test_a_note_is_internal_only_and_respond_is_closed_once_decided(self):
         application = self.application()
         office(self.approver, f"/gold/{application.pk}/note/", {"note": "He replied by phone: owns 12 flats"})
-        note = events(application, "note_added")[0]
-        self.assertEqual((note.message, note.from_status, note.to_status), ("He replied by phone: owns 12 flats", "", ""))
+        note = StickyNote.objects.get()  # a sticky note on the person, not a history line
+        self.assertEqual((note.text, note.email, events(application, "note_added")), ("He replied by phone: owns 12 flats", "dan@example.com", []))
         self.assertEqual((mail.outbox, GoldApplication.objects.get(pk=application.pk).status), ([], "new"))
-        self.assertEqual(office(self.approver, f"/gold/{application.pk}/note/", {"note": " "}).status_code, 400)
+        self.assertEqual(office(self.approver, f"/gold/{application.pk}/note/", {"note": " "}).status_code, 302)  # refused with a toast
         invites.decline_application(application, self.approver, REASON, channel="office")
         self.assertEqual(actions.respond(application, self.approver, "Hello again")[0], actions.CLOSED)
-        self.assertEqual(actions.add_note(application, self.approver, "Closed, noted for the file")[0], actions.DONE)  # notes any time
+        self.assertEqual(outreach_services.add_note("dan@example.com", self.approver, "Closed, noted for the file")[0], outreach_services.DONE)  # notes any time
 
 
 class PermissionAndLinkTests(ActionsTestCase):
@@ -171,10 +173,12 @@ class PermissionAndLinkTests(ActionsTestCase):
         for user in (self.reader, self.final):
             page = office(user, f"/gold/{application.pk}/")
             self.assertContains(page, "data-gold-timeline")
-            self.assertContains(page, "&lt;script&gt;alert(1)&lt;/script&gt;<br>second line")  # escaped, line breaks kept
+            self.assertContains(page, "&lt;script&gt;alert(1)&lt;/script&gt;<br>second line")  # escaped, line breaks kept (sticky note)
             self.assertNotContains(page, "data-gold-open")
             before = ApplicationEvent.objects.count()
             for action, data in (("decline", {"reason": REASON}), ("respond", {"message": "Hello there"}), ("note", {"note": "A note"})):
+                if action == "note" and user is self.final:
+                    continue  # an Admin-level final approver may add notes (office.permissions.can_edit)
                 self.assertEqual(office(user, f"/gold/{application.pk}/{action}/", data).status_code, 403)
             self.assertEqual(ApplicationEvent.objects.count(), before)
         self.assertContains(office(self.approver, f"/gold/{application.pk}/"), 'data-gold-open="respond"')
@@ -216,7 +220,7 @@ class ImmutabilityAndErasureTests(ActionsTestCase):
 
     def test_erasing_the_applicant_removes_the_trail_and_the_export_carries_it(self):
         application = self.application()
-        actions.add_note(application, self.approver, "Phone: 07700 900123")
+        audit.record(application, "note_added", actor=self.approver, channel="office", message="Phone: 07700 900123")
         exported = gold_services.export_applications("dan@example.com")[0]["history"]
         self.assertIn("Phone: 07700 900123", [e["message"] for e in exported])
         self.assertNotIn("approver@example.test", str(exported))

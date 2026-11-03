@@ -8,5 +8,8 @@ def erase_address(email, user=None):
     """Remove group-send rows, uploaded-list memberships, invites and the unsubscribe key for this address (and rows linked to `user`). Returns the number removed.
     EmailOptOut stays: it holds only the address and honours a request to stop."""
     email = (email or "").strip().lower()
+    from outreach.services import erase_email
+
+    erase_email(email)  # sticky notes, one-to-one messages and approach-list entries for the address
     rows = MailingRecipient.objects.filter(Q(email__iexact=email) | Q(user=user)) if user is not None else MailingRecipient.objects.filter(email__iexact=email)
     return rows.delete()[0] + Invite.objects.filter(email__iexact=email).delete()[0] + ContactListMember.objects.filter(email__iexact=email).delete()[0] + UnsubscribeKey.objects.filter(email=email).delete()[0]

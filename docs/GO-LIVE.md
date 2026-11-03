@@ -136,6 +136,19 @@ Never edit or delete a migration that is already live.
 - **Privacy notice changed** (a line about the tracking pixel in invitation emails, date 30 October 2026). Run `docker compose exec web python manage.py backfill_site_data --dry-run`, then without `--dry-run`: it updates the "Emails" part and "Last updated" only while they still have exactly the old wording (a part you edited by hand is left; add the line yourself in Control). Live may still hold the 27 October text (the 28 October chat line had no backfill); if the dry-run says "Nothing to change", add both the Ask us chat line and the tracking-pixel line by hand in Control.
 - System > Emails has a new **Bounces** tab and the Dashboard a "Bounces" tile. Old bounces before this release are not in the log (only new ones).
 
+## Next release (Office outreach: guide, sticky notes, Approach list, archive, next-morning email, Launch)
+
+- **Take the RDS snapshot first.** Migrations run on start (web).
+- **New migrations:** `outreach 0001` to `0003` (new tables only: notes, Approach list entries, messages, archived leads and their events, next-morning rows, note events); `plans 0026` (Gold guide file, Approach list name), `0027` (next-morning email sender, switch, time, hours), `0028` (Launch), `0029` (adds database defaults to every new `plans` column, see Rollback); `gold 0012` to `0014` (new event kinds, choices only); `system 0022` (**drops `leads_show`** from the Defaults), `0023` (Launch audit kind, choices only).
+- **After deploy, in this order:**
+  1. `docker compose exec web python manage.py backfill_sticky_notes --dry-run`, read the list, then without `--dry-run` (a re-run copies nothing).
+  2. `docker compose exec web python manage.py rebuild_metrics` so the Leads totals follow the new rules (registered people are not leads; archived leads are left out).
+  3. System > Gold: upload the Gold Card guide PDF (at most 5 MB).
+  4. Optional: System > Settings, set the Approach list name.
+  5. System > Emails: set the automatic emails sender (name and an address on the sending domain, for example barry@spa99.uk), check the send time (10:00) and minimum hours (8), read the "Next-morning email" wording under Automatic, and make sure Postmark accepts that From address. **Turn the switch on last.** Only leads who give their email after it is on are emailed; the worker registers the 15-minute job on start.
+  6. System > Launch exists. **Do not press it until opening.**
+- **Rollback.** The new `plans` columns have database defaults, so the previous image can still save Settings and its history rows. The new tables are simply ignored by the old code. The one thing the old code cannot live with is `system 0022` (the old Defaults model reads `leads_show`). So **before** setting `APP_TAG` back, with the NEW image still running, undo it: `docker compose exec web python manage.py migrate system 0021` (the reverse puts `leads_show` back with its default "all"). Then set `APP_TAG` to the previous version and `docker compose pull && docker compose up -d`. If data was damaged, restore the snapshot as in "Every release".
+
 ## What is kept, and for how long
 
 Nothing grows without limit on disk: every container's log is capped at 5 x 10 MB (`docker-compose.yml`), and the server holds no app data.

@@ -63,30 +63,43 @@
 @media (min-width: 64em) {
   .o-list--leads { table-layout: fixed; }
   .o-list--leads td { height: var(--office-row-h-2); padding-inline: var(--space-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .o-list--leads th { padding-inline: var(--space-2); overflow: hidden; text-overflow: ellipsis; }
-  .o-list--leads td:first-child, .o-list--leads th:first-child { padding-left: var(--space-3); }
-  .o-list--leads td:last-child, .o-list--leads th:last-child { padding-right: var(--space-3); }
+  .o-list--leads thead th { padding-inline: var(--space-2); overflow: hidden; text-overflow: ellipsis; }
+  .o-list--leads td:first-child, .o-list--leads thead th:first-child { padding-left: var(--space-3); }
+  .o-list--leads td:last-child, .o-list--leads thead th:last-child { padding-right: var(--space-3); }
   .o-list--leads .c-name { max-width: none; }
   .o-list--leads .c-source .o-cell-sub, .o-list--leads .c-industry .o-cell-sub, .o-list--leads .c-name .o-cell-sub { overflow: hidden; text-overflow: ellipsis; }
-  .o-list--leads th:nth-child(1) { width: 19%; }   /* Lead */
-  .o-list--leads th:nth-child(2) { width: 18%; }   /* Wants */
-  .o-list--leads th:nth-child(3) { width: 12%; }   /* Suggested */
-  .o-list--leads th:nth-child(4) { width: 12%; }   /* Potential */
-  .o-list--leads th:nth-child(6) { width: 11%; }   /* Source */
+  /* Round 2: every sortable head also carries its arrow (about 18px), so the plan is re-cut: label, arrow and 2 x 8px padding fit each head. */
+  .o-list--leads th:nth-child(1) { width: 15%; }   /* Lead */
+  .o-list--leads th:nth-child(2) { width: 14%; }   /* Wants */
+  .o-list--leads th:nth-child(3) { width: 12%; }   /* Best fit */
+  .o-list--leads th:nth-child(4) { width: 19%; }   /* Potential */
+  .o-list--leads th:nth-child(6) { width: 12%; }   /* Source */
   .o-list--leads th:nth-child(9) { width: 14%; }   /* Status */
   .o-list--leads th:nth-child(10) { width: 14%; }  /* Last seen */
 }
 @media (min-width: 80em) {
-  .o-list--leads th:nth-child(1) { width: 16%; }
-  .o-list--leads th:nth-child(2) { width: 15%; }
-  .o-list--leads th:nth-child(3) { width: 9%; }
-  .o-list--leads th:nth-child(4) { width: 10%; }
-  .o-list--leads th:nth-child(5) { width: 8%; }    /* Industry */
-  .o-list--leads th:nth-child(6) { width: 8%; }    /* Source */
-  .o-list--leads th:nth-child(7) { width: 10%; }   /* Heard via */
-  .o-list--leads th:nth-child(8) { width: 6%; }    /* Visits */
-  .o-list--leads th:nth-child(9) { width: 9%; }    /* Status */
-  .o-list--leads th:nth-child(10) { width: 9%; }   /* Last seen */
+  .o-list--leads th:nth-child(1) { width: 14%; }
+  .o-list--leads th:nth-child(2) { width: 8.5%; }
+  .o-list--leads th:nth-child(3) { width: 8.5%; }
+  .o-list--leads th:nth-child(4) { width: 13%; }
+  .o-list--leads th:nth-child(5) { width: 9%; }  /* Industry */
+  .o-list--leads th:nth-child(6) { width: 7.5%; }    /* Source */
+  .o-list--leads th:nth-child(7) { width: 8%; }  /* Heard via */
+  .o-list--leads th:nth-child(8) { width: 9.5%; }  /* Visits */
+  .o-list--leads th:nth-child(9) { width: 10.5%; } /* Status */
+  .o-list--leads th:nth-child(10) { width: 11.5%; }  /* Last seen */
+}
+@media (min-width: 90em) {
+  .o-list--leads th:nth-child(1) { width: 17%; }
+  .o-list--leads th:nth-child(2) { width: 13%; }
+  .o-list--leads th:nth-child(3) { width: 8.5%; }
+  .o-list--leads th:nth-child(4) { width: 11%; }
+  .o-list--leads th:nth-child(5) { width: 8%; }
+  .o-list--leads th:nth-child(6) { width: 7%; }
+  .o-list--leads th:nth-child(7) { width: 9%; }
+  .o-list--leads th:nth-child(8) { width: 8%; }
+  .o-list--leads th:nth-child(9) { width: 9%; }
+  .o-list--leads th:nth-child(10) { width: 9.5%; }
 }
 .o-list--leads th { letter-spacing: 0.04em; }
 .o-tag { display: inline-block; padding: 0 var(--space-1); border: 1px solid var(--office-line, currentColor); border-radius: 999px; font-size: var(--text-xs, 0.75rem); line-height: 1.4; }
@@ -168,3 +181,32 @@
   .o-detail--person [data-person-data] { order: 9; }
 }
 @media (prefers-reduced-motion: reduce) { .o-leadsum-tile, .o-tile-link, .o-jrny { transition: none; } .o-jrny[open] .o-jrny-body { animation: none; } }
+
+/* ---------- Round 2 R6: the Archived view of Leads. The link sits at the end of the total line; the table has its own six columns. ---------- */
+.o-archived-link { gap: var(--space-1); }
+.o-archived-link .o-icon { width: 1rem; height: 1rem; }
+.o-archived-count { color: var(--office-muted); font-variant-numeric: tabular-nums; }
+.o-totalline [data-back-to-leads] { gap: var(--space-1); }
+.o-totalline [data-back-to-leads] .o-icon { width: 1rem; height: 1rem; }
+.o-list--archived .c-name { max-width: 18rem; }
+.o-list--archived .c-reason { min-width: 12rem; max-width: 24rem; }
+.o-list--archived .c-tier { white-space: nowrap; }
+.o-list--archived .o-row-move { white-space: nowrap; }
+@media (min-width: 64em) { .o-list--archived .c-action { padding-right: var(--space-4); } }
+@media (max-width: 63.99em) {
+  .o-list--archived .o-row td.c-name { order: 1; flex: 0 0 100%; }
+  .o-list--archived .o-row td.c-potential { order: 3; flex: none; }
+  .o-list--archived .o-row td.c-tier { order: 4; flex: none; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-list--archived .o-row td.c-reason { order: 5; flex: 0 0 100%; max-width: none; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-list--archived .o-row td.c-reason:empty { display: none; }
+  .o-list--archived .o-row td.c-archived { order: 6; flex: 0 0 100%; margin-left: 0; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-list--archived .o-row td.c-action { display: block; order: 8; flex: 0 0 100%; width: auto; margin-top: var(--space-2); text-align: left; }
+  .o-list--archived .o-row-move { width: 100%; min-height: 2.75rem; }
+  .o-list--archived thead th { display: none; }
+}
+/* the archived state of a lead, in the Reach out card */
+.o-archived-state { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+.o-archived-state > * { margin: 0; }
+.o-archived-state .o-clamp-more { justify-self: start; margin-top: 0; }
+.o-archived-reason { font-size: var(--text-sm); color: var(--office-muted); }
+.o-archived-state form .btn { width: 100%; }
