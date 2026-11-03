@@ -43,6 +43,10 @@ A new number on **WhatsApp (through Twilio)** becomes a full staff to lead chat 
 - **The chat:** looks very like WhatsApp but themed to Spa 99 (brand colours and fonts, clear and calm). Designer brief first.
 - **WhatsApp text formatting works** in the composer and in the bubbles, the same as in the app: `*bold*`, `_italic_`, `~strikethrough~`, ` ```monospace``` `, `` `inline code` ``, `- ` and `* ` lists, `1. ` numbered lists, `> ` quotes. The text is sent as typed; WhatsApp formats it on his phone and the Office shows the same. Note: WhatsApp's bold is one star each side, not two. Escaped safely (no HTML from message text).
 
+- **No mobile:** the Message button says "Add a mobile to WhatsApp him"; staff cannot email from it. Send guide and automatic emails still reach him.
+- **Consent:** new leads tick at the email step. Moishe's call: **registered people count as agreed**, so staff can WhatsApp anyone with a mobile. The privacy notice gets a WhatsApp line (backfill with dry run). Every first template carries a way to stop: "STOP" in the reply marks him opted out and blocks further templates. Risk noted to Moishe: complaints affect the WhatsApp account shared with BML.
+- **Gold Respond** also goes by WhatsApp: opens his chat and marks the application Contacted when sent.
+
 ## Open points
 - Launch turns the email step off once; Moishe can switch "Journey asks for an email" back on in System > Settings after launch (decided 2026-11-03).
 - Consent: one required tick, "Yes, Spa 99 may email and WhatsApp me about opening. I can stop at any time." (decided 2026-11-03).
