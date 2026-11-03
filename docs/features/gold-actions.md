@@ -59,3 +59,8 @@ Two new editable emails (System > Emails > Automatic emails): `gold_respond` and
 - **Admin status changes** are recorded whenever the stored status differs after saving, including a history Revert.
 - A form error on an application someone else decided meanwhile redirects with "Already decided by someone else. Nothing was sent."
 - Export includes the text emailed on a decline. Email sent or failed is logged for the approver, final, sent-back, invite, Gold-added, thank-you, respond and decline emails.
+
+
+## Respond is WhatsApp (2026-11-03)
+
+Respond no longer emails. The Gold page's **WhatsApp** button opens the applicant's chat (`/gold/<id>/whatsapp/`); the first message sent from that chat turns New into Contacted with a `responded` event (`meta {"whatsapp": true}`). `/gold/<id>/respond/` and the approver email's `?do=respond` link redirect to the chat. Send guide is unchanged. See `whatsapp.md`.

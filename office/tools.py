@@ -8,7 +8,7 @@ from django.urls import reverse
 from gold.models import GoldApplication
 from journey.models import JourneySession
 from outreach import people, services
-from outreach.models import MESSAGE_MAX, NOTE_MAX, REASON_MAX, OutreachEntry
+from outreach.models import NOTE_MAX, REASON_MAX, OutreachEntry
 from plans.models import SiteSettings
 from users.models import User
 
@@ -77,11 +77,30 @@ def outreach_context(target, user):
                          "added_by": entry.added_by_label if entry else "", "added_at": entry.added_at.isoformat() if entry else ""}}
 
 
-def message_context(target, user):
-    if target.kind == "gold":
-        return {}
-    return {"message": {"url": target.url("message"), "to": target.main, "max": MESSAGE_MAX, "can_send": can_edit(user),
-                        "unsubscribed": services.is_unsubscribed(target.addresses, target.user)}}
+def mobile_and_name(target):
+    """(mobile, first name) known for this person: the account's, else the one given at the email step or typed by staff, else the Gold
+    application's. '' when there is none."""
+    if target.user is not None and target.user.mobile:
+        return target.user.mobile, target.user.first_name or ""
+    session = (JourneySession.objects.filter(is_bot=False).exclude(lead_mobile="").annotate(k=Lower("lead_email")).filter(k__in=list(target.addresses))
+               .order_by("-created_at").first()) if target.addresses else None
+    if session is not None:
+        return session.lead_mobile, session.lead_first_name
+    if target.application is not None and target.application.mobile:
+        return target.application.mobile, target.application.first_name or ""
+    return "", (target.user.first_name if target.user is not None else "")
+
+
+def whatsapp_context(target, user):
+    """`whatsapp` for the lead, person and Gold pages (design brief section 6): {configured, has_mobile, mobile, first_name, contact_url (opens his chat),
+    start_url, edit_url (POST first_name, mobile_country, mobile; empty on the Gold page), can_send, can_edit, has_chat, window_open, window_closes_at,
+    opted_out, unread, thread_url}, plus `mobile_countries` for the add-a-mobile dialog."""
+    from common import phone
+    from whatsapp import services as whatsapp
+
+    mobile, first = mobile_and_name(target)
+    edit = target.url("contact") if target.kind == "lead" else (target.url("mobile") if target.kind == "person" else "")
+    return {"whatsapp": whatsapp.page_context(mobile, user, can_edit(user), target.url("whatsapp"), edit, first), "mobile_countries": phone.countries()}
 
 
 def archive_context(target, user):
@@ -95,8 +114,8 @@ def archive_context(target, user):
 
 
 def tools_context(target, user):
-    """Everything the three pages add to their context: notes_*, outreach and message, and `archive` on the lead page."""
-    return {**notes_context(target, user), **outreach_context(target, user), **message_context(target, user), **archive_context(target, user)}
+    """Everything the three pages add to their context: notes_*, outreach and whatsapp, and `archive` on the lead page."""
+    return {**notes_context(target, user), **outreach_context(target, user), **whatsapp_context(target, user), **archive_context(target, user)}
 
 
 def outreach_rows(entries):

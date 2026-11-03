@@ -1,0 +1,3 @@
+{% for r in rows %}<li data-chat="{{ r.id }}"><a href="{{ r.url }}">{{ r.name }}</a> {% if r.unread %}<b>{{ r.unread }}</b>{% endif %} <span>{{ r.preview }}</span></li>
+{% empty %}<li>No chats yet.</li>{% endfor %}
+{% if has_next %}<li><a href="{{ more_url }}" hx-get="{{ more_url }}" hx-target="closest li" hx-swap="outerHTML">Show more</a></li>{% endif %}

@@ -33,8 +33,11 @@ class StickyNoteForm(forms.Form):
     note = CappedText("Note", 1000, error_messages={"required": "Write the note."})
 
 
-class MessageForm(forms.Form):
-    message = CappedText("Message", 5000, min_length=5, error_messages={"required": "Write the message.", "min_length": "Message: write at least 5 characters."})
+class ContactForm(forms.Form):
+    """Add or fix a lead's first name and mobile (a missing field is left as it is, an empty one clears it)."""
+    first_name = forms.CharField(required=False, strip=True, max_length=100)
+    mobile_country = forms.CharField(required=False, strip=True, max_length=2)  # ISO code, default GB
+    mobile = forms.CharField(required=False, strip=True, max_length=40)
 
 
 class OutreachAddForm(forms.Form):

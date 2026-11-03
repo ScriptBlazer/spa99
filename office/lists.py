@@ -118,13 +118,13 @@ def journey_state(sessions):
 def person_row(user):
     interest = user.interest
     sessions = list(user.journey_sessions.all())
-    gold = list(user.gold_applications.all())
+    live_gold = [a for a in user.gold_applications.all() if a.status != GoldApplication.DECLINED]
     return {
         "id": str(user.pk), "name": user.get_full_name() or user.email, "email": user.email, "public_id": user.public_id_display,
         "plan": interest.plan.name if interest.plan_id else "", "plan_slug": interest.plan.slug if interest.plan_id else "",
         "verified": bool(user.email_verified_at), "marketing": user.marketing_consent,
         "journey": journey_state(sessions), "registered": interest.created_at.isoformat(),
-        "gold_application_id": str(gold[0].pk) if gold else "",
+        "gold_application_id": str(live_gold[0].pk) if live_gold else "",  # a declined application drops off the list (Moishe, 2026-11-03)
         "sale": sale_label(interest), "sale_ended": bool(interest.sale_expired_at), "payment": payment_label(interest),
         "payment_status": interest.payment_status,
     }
@@ -316,7 +316,7 @@ def _event_detail(event):
     if event.action in ("approved", "final_confirmed"):
         return {"invited": "An invite to set up his account was queued.", "activated": "Gold was added to his existing account."}.get(meta.get("result"), "")
     if event.action == "responded":
-        return "Emailed to the applicant."
+        return "Marked Contacted: a WhatsApp went to the applicant." if meta.get("whatsapp") else "Emailed to the applicant."
     return ""
 
 

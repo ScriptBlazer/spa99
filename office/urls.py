@@ -59,9 +59,6 @@ urlpatterns = [
     path("people/<uuid:pk>/outreach/", t.outreach_add, {"kind": "person"}, name="office_person_outreach_add"),
     path("leads/<uuid:pk>/outreach/", t.outreach_add, {"kind": "lead"}, name="office_lead_outreach_add"),
     path("gold/<uuid:pk>/outreach/", t.outreach_add, {"kind": "gold"}, name="office_gold_outreach_add"),
-    # message a person or a lead
-    path("people/<uuid:pk>/message/", t.message_send, {"kind": "person"}, name="office_person_message"),
-    path("leads/<uuid:pk>/message/", t.message_send, {"kind": "lead"}, name="office_lead_message"),
     # archive a lead / move him back (R6)
     path("leads/<uuid:pk>/archive/", t.lead_archive, name="office_lead_archive"),
     path("leads/<uuid:pk>/unarchive/", t.lead_unarchive, name="office_lead_unarchive"),

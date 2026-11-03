@@ -21,7 +21,7 @@ from django.db.models import OuterRef, Subquery
 from gold import actions as gold_actions
 from gold import approval, audit, invites
 from gold import services as gold_services
-from gold.forms import DeclineForm, RespondForm
+from gold.forms import DeclineForm
 from gold.models import GoldApplication
 from insights.metrics import K
 from journey import services as journey_services
@@ -31,6 +31,7 @@ from plans import payments
 from plans.models import Plan, SiteSettings
 from common import levels, sorting
 from users import services as user_services
+from whatsapp import services as whatsapp_services
 from users import views as user_views
 from users.models import User
 
@@ -330,6 +331,7 @@ def lead_export(request, pk):
     body = {"email": data["email"], "sessions": journey_services.export_lead(data["email"]),
             "emails": journey_services.export_lead_emails(data["email"]),
             "chats": chat_services.export_conversations(email=data["email"]),
+            "whatsapp": whatsapp_services.export_for(whatsapp_services.contacts_for_person(None, {data["email"]}, whatsapp_services.person_phones(None, {data["email"]}))),
             "gold_applications": gold_services.export_applications(data["email"])}
     response = JsonResponse(body, json_dumps_params={"indent": 2})
     response["Content-Disposition"] = 'attachment; filename="spa99-lead.json"'
@@ -343,6 +345,7 @@ def lead_delete(request, pk):
     session, (kind, data) = _lead_session(pk)
     if kind == "account":
         return redirect("office_person", pk=data.pk)
+    whatsapp_services.erase_person(None, {data["email"]})  # his chats, messages and files (found by his number): before the journeys lose it
     cleared = journey_services.erase_lead_data(data["email"])
     from outreach.services import erase_email
 
@@ -441,12 +444,12 @@ def gold(request):
     return _varied(render(request, _fragment(request, "office/gold.html", "office/_gold_rows.html"), context))
 
 
-GOLD_FORMS = ("decline", "respond", "note")  # ?do= on the application page opens that form (the approver email's Decline and Respond links)
+GOLD_FORMS = ("decline", "note")  # ?do= on the application page opens that form (the approver email's Decline link); ?do=respond goes to his WhatsApp chat
 
 
 def _can_open(application, name):
-    """The forms offered right now: Decline while waiting, Respond while open, a note any time."""
-    return {"decline": application.status in GoldApplication.WAITING, "respond": application.status in gold_actions.OPEN, "note": True}.get(name, False)
+    """The forms offered right now: Decline while waiting, a note any time."""
+    return {"decline": application.status in GoldApplication.WAITING, "note": True}.get(name, False)
 
 
 def _gold_page(request, application, status=200, open_form="", form=None):
@@ -484,6 +487,8 @@ def _email_token(request, application):
 @never_cache
 def gold_application(request, pk):
     application = get_object_or_404(GoldApplication, pk=pk)
+    if request.GET.get("do") == "respond":  # the approver email's old Respond link: Respond is WhatsApp now
+        return redirect("office_gold_whatsapp", pk=application.pk)
     return _gold_page(request, application, open_form=request.GET.get("do", ""))
 
 
@@ -622,18 +627,10 @@ def gold_decline(request, pk):
     return _form_act(request, pk, "decline", DeclineForm, run)
 
 
-@approver
-@require_POST
+@reader
 def gold_respond(request, pk):
-    def run(application, data):
-        result, _ = gold_actions.respond(application, request.user, data["message"], channel=audit.OFFICE)
-        if result == gold_actions.DONE:
-            messages.success(request, f"Your message is on its way to {application.first_name or 'him'}. It is in the history.")
-        elif result == gold_actions.DUPLICATE:
-            messages.info(request, "That message was already sent.")
-        else:
-            messages.warning(request, "Nothing sent: this application was already decided.")
-    return _form_act(request, pk, "respond", RespondForm, run)
+    """The old Respond URL: Respond is WhatsApp now, so it opens his chat (any method)."""
+    return redirect("office_gold_whatsapp", pk=get_object_or_404(GoldApplication, pk=pk).pk)
 
 
 # ---------- change password (team members; the member area is for members only) ----------

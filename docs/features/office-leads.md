@@ -52,3 +52,11 @@ One row per address, driven by that address's latest session (DB-side `Exists` a
 - **Gave email in chat**: filter `chat=1` = a real (not System test) `Conversation.lead_email` matches the address (any case, `Exists` over `Lower`). Rows get a "via chat" tag; CSV column `gave_email_in_chat`. Chats older than 90 days are pruned, so the tag goes with them.
 - **Chats with the assistant** card on person and lead pages (`office/_chats_card.html`, `profile.chats_card`): conversations by `Conversation.user`, the account's journey session, `lead_email`, or the chat's journey session having left that email; newest 5 (date, messages, first question, link to the chat page) and "See all in Chats" (`/chats/?user=<account id>` or `/chats/?lead=<lead id>`, ids never addresses; a bad id is 404). Same permission as Chats (Office level and up, view only). Not loaded for HTMX timeline fragments.
 - No migration.
+
+
+## First name and mobile (2026-11-03, WhatsApp)
+
+- The email step now gives each lead a **first name** and a **mobile** (`JourneySession.lead_first_name`, `lead_mobile`); staff can add or fix both on the lead page (`POST /leads/<id>/contact/`, audited as "Mobile added by X" in the timeline) and a registered person's mobile on the person page (`POST /people/<id>/mobile/`).
+- Leads list rows carry `name` and `mobile` and show the name where known; the search `q` matches the address, the first name and the mobile (digits, a leading 0 ignored). CSV: `email, first_name, mobile, ...` and a `consent_wording_version` column at the end. Lead page `person` has `first_name`, `mobile`, `name`. Existing leads show blanks.
+- The next-morning email's `{first_name}` is the lead's first name when known (else his Gold application's).
+- The Message button is WhatsApp (see `whatsapp.md`); the email Message is gone from the lead and person pages.

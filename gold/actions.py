@@ -1,4 +1,4 @@
-"""The approver's Respond and Send guide (Approve, Decline and the final steps live in gold.approval and gold.invites). Every
+"""The approver's WhatsApp contact mark and Send guide (Approve, Decline and the final steps live in gold.approval and gold.invites). Every
 action writes the audit trail inside the transaction that changes the application (docs/features/gold-actions.md)."""
 import logging
 
@@ -16,29 +16,19 @@ DONE, CLOSED, DUPLICATE, NO_GUIDE = "done", "closed", "duplicate", "no_guide"  #
 OPEN = (GoldApplication.NEW, GoldApplication.CONTACTED, GoldApplication.AWAITING_FINAL)
 
 
-def respond(application, actor, message, channel=audit.OFFICE):
-    """Message the applicant (email, editable template `gold_respond`, Reply-To is the contact address). New becomes Contacted;
-    the application stays open. Awaiting final approval keeps its status. Returns (result, event)."""
-    message = audit.clean_text(message)
+def whatsapp_sent(application, actor, text="", channel=audit.OFFICE):
+    """A WhatsApp went to the applicant from his chat (it replaces Respond): New becomes Contacted, with an audit event. Only the
+    first message does anything; the application stays open and the text is in the chat, not repeated here. Returns True when the
+    status changed."""
     with transaction.atomic():
         fresh = GoldApplication.objects.select_for_update().get(pk=application.pk)
-        if fresh.status not in OPEN:
-            return CLOSED, None
-        if audit.is_repeat(fresh, ApplicationEvent.RESPONDED, actor, message):
-            return DUPLICATE, None
-        before = fresh.status
-        if before == GoldApplication.NEW:
-            fresh.status = GoldApplication.CONTACTED
-            fresh.save(update_fields=["status", "updated_at"])
-        event = audit.record(fresh, ApplicationEvent.RESPONDED, actor=actor, channel=channel, message=message,
-                             from_status=before if fresh.status != before else "", to_status=fresh.status if fresh.status != before else "",
-                             meta={"email_applicant": True})
+        if fresh.status != GoldApplication.NEW:
+            return False
+        fresh.status = GoldApplication.CONTACTED
+        fresh.save(update_fields=["status", "updated_at"])
+        audit.record(fresh, ApplicationEvent.RESPONDED, actor=actor, channel=channel, from_status=GoldApplication.NEW, to_status=GoldApplication.CONTACTED, meta={"whatsapp": True})
     application.refresh_from_db()
-    try:
-        enqueue("gold.tasks.send_gold_applicant_email", str(application.pk), str(event.pk))
-    except Exception:  # noqa: BLE001 - the response is recorded; a queue problem is shown as "email not sent" by the trail
-        logger.exception("Could not queue the Gold response email for %s", application.reference)
-    return DONE, event
+    return True
 
 
 def send_guide(application, actor, channel=audit.OFFICE):

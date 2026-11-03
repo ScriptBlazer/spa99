@@ -30,7 +30,7 @@ class LegalPageTests(TestCase):
                 self.assertContains(response, "16930909")
                 self.assertContains(response, "40 Wellington Avenue, London N15 6AS")
                 self.assertContains(response, 'href="mailto:desk@example.com"')
-                self.assertContains(response, "Last updated 30 October 2026" if path == "/privacy/" else "Last updated 26 October 2026")
+                self.assertContains(response, "Last updated 3 November 2026" if path == "/privacy/" else "Last updated 26 October 2026")
                 self.assertNotContains(response, "To be supplied")
                 self.assertNotContains(response, "{contact}")
 
@@ -155,7 +155,7 @@ class InviteOpenNoticeTests(TestCase):
     def test_backfill_adds_the_pixel_line_and_date_only_to_unedited_rows(self):
         seed_all()
         rows = Section.objects.filter(page__key="privacy")
-        old = rows.get(key="part_2").body.replace(legal.INVITE_OPEN_LINE + "\n", "")
+        old = rows.get(key="part_2").body.replace(legal.INVITE_OPEN_LINE + "\n", "").replace(legal.WHATSAPP_BLOCK + "\n", "")  # live as it was before both releases
         self.assertNotIn("tracking pixel", old)
         rows.filter(key="part_2").update(body=old)
         rows.filter(key="updated").update(body="28 October 2026")
@@ -163,7 +163,22 @@ class InviteOpenNoticeTests(TestCase):
         self.assertNotIn("tracking pixel", rows.get(key="part_2").body)
         call_command("backfill_site_data", stdout=StringIO())
         self.assertIn("tracking pixel", rows.get(key="part_2").body)
-        self.assertEqual(rows.get(key="updated").body, "30 October 2026")
+        self.assertIn("### WhatsApp", rows.get(key="part_2").body)
+        self.assertEqual(rows.get(key="updated").body, "3 November 2026")
         rows.filter(key="part_2").update(body="Edited by hand.")
         call_command("backfill_site_data", stdout=StringIO())
         self.assertEqual(rows.get(key="part_2").body, "Edited by hand.")
+
+    def test_backfill_adds_the_whatsapp_lines_only_to_the_exact_previous_wording_and_a_dry_run_changes_nothing(self):
+        seed_all()
+        rows = Section.objects.filter(page__key="privacy")
+        old = rows.get(key="part_2").body.replace(legal.WHATSAPP_BLOCK + "\n", "")
+        rows.filter(key="part_2").update(body=old)
+        rows.filter(key="updated").update(body="30 October 2026")
+        out = StringIO()
+        call_command("backfill_site_data", "--dry-run", stdout=out)
+        self.assertIn("privacy notice: WhatsApp", out.getvalue())
+        self.assertEqual(rows.get(key="part_2").body, old)
+        call_command("backfill_site_data", stdout=StringIO())
+        self.assertIn("Reply STOP", rows.get(key="part_2").body)
+        self.assertEqual(rows.get(key="updated").body, "3 November 2026")

@@ -16,9 +16,17 @@ How a legal body is written (one line per block, rendered by `content.legal_rend
 Keys: `body` (title and intro), `updated` (the date shown), `part_N` (the numbered parts, in order), `contact`."""
 
 UPDATED = "26 October 2026"
-PRIVACY_UPDATED = "30 October 2026"  # invitation emails track opens; earlier: Ask us chat (Anthropic) added, Postmark added as the email sender
+PRIVACY_UPDATED = "3 November 2026"  # WhatsApp added; earlier: invitation emails track opens, earlier: Ask us chat (Anthropic) added, Postmark added as the email sender
 INVITE_OPEN_LINE = ("- Invitation emails contain a tiny image (a tracking pixel), so we know whether the email was opened. "
                     "Other emails we send you do not.")
+WHATSAPP_BLOCK = "\n".join([
+    "### WhatsApp",
+    "- Your first name and mobile number, if you gave them before seeing your suggested membership, and that you agreed we may email and WhatsApp you about opening. "
+    "Registered people can also be WhatsApped on the mobile number on their account.",
+    "- Our WhatsApp messages with you: the text, photos and files, with the times and whether they were delivered and read, and your WhatsApp profile name. "
+    "They pass through Twilio, our messaging provider, and WhatsApp.",
+    "- Reply STOP to a message and we stop writing to you on WhatsApp.",
+])
 PRIVACY_VERSION = "2026-10-26"  # SiteSettings.privacy_version; recorded on everyone who accepts this notice
 
 COMPANY_LINE = ("Spa 99 is run by BML SPA 99 LIMITED, a company registered in England (company number 16930909). "
@@ -79,6 +87,7 @@ PRIVACY_PARTS = [
         "- A record of each email we send you: which email, when, and whether it went out.",
         INVITE_OPEN_LINE,
         "- Emails you send us, kept in our mailbox.",
+        WHATSAPP_BLOCK,
         "### Our team",
         "- When our team use our own tools, we record what they do, with their IP address and browser, to keep the "
         "system secure. This covers team accounts only.",

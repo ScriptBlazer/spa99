@@ -199,18 +199,10 @@ class ApproachListTests(Base):
 
 
 class MessageTests(Base):
-    def test_message_is_queued_recorded_in_the_timeline_and_warns_when_unsubscribed(self):
+    def test_message_is_whatsapp_now_and_old_email_messages_still_show_in_the_timeline(self):
         session = lead("hugo@example.com")
-        optout.unsubscribe("hugo@example.com")
-        page = call(self.reader, "get", f"/leads/{session.pk}/")
-        self.assertTrue(page.context["message"]["unsubscribed"])
-        self.assertEqual(call(self.reader, "post", f"/leads/{session.pk}/message/", {"message": "Hello there"}).status_code, 403)
-        call(self.approver, "post", f"/leads/{session.pk}/message/", {"message": "Hello there Hugo"})
-        call(self.approver, "post", f"/leads/{session.pk}/message/", {"message": "Hello there Hugo"})  # double submit
-        self.assertEqual(len(mail.outbox), 1)
-        sent = mail.outbox[0]
-        self.assertEqual((sent.to, sent.from_email), (["hugo@example.com"], "Spa 99 <from@example.test>"))
-        self.assertIn("Hello there Hugo", sent.body)
+        PersonMessage.objects.create(email="hugo@example.com", text="Hello there Hugo", author=self.approver, author_label="approver@example.test")
+        self.assertEqual(call(self.reader, "get", f"/leads/{session.pk}/").context["whatsapp"]["has_mobile"], False)
+        self.assertEqual(call(self.approver, "post", f"/leads/{session.pk}/message/", {"message": "x"}).status_code, 404)  # the email Message is gone
         timeline = call(self.reader, "get", f"/leads/{session.pk}/").context["person"]["timeline"]
         self.assertIn(("Message sent by approver@example.test", "Hello there Hugo"), [(t["label"], t["detail"]) for t in timeline])
-        self.assertEqual(PersonMessage.objects.count(), 1)

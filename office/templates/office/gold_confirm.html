@@ -21,7 +21,7 @@
   {% endif %}
   <p class="o-confirm-links">
     <a class="o-quiet" href="{% url 'office_gold_application' a.id %}">Open full application</a>
-    {% if a.can_approve %}<a class="o-quiet" href="{% url 'office_gold_application' a.id %}?do=decline" data-confirm-decline>Decline</a><a class="o-quiet" href="{% url 'office_gold_application' a.id %}?do=respond" data-confirm-respond>Respond</a>{% endif %}
+    {% if a.can_approve %}<a class="o-quiet" href="{% url 'office_gold_application' a.id %}?do=decline" data-confirm-decline>Decline</a><a class="o-quiet" href="{% url 'office_gold_whatsapp' a.id %}" data-confirm-respond>WhatsApp</a>{% endif %}
   </p>
 </section>
 {% endwith %}

@@ -11,6 +11,7 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
 <script>var d=document.documentElement;d.classList.add("js");setTimeout(function(){if(!d.dataset.reveal)d.classList.add("no-reveal")},4000)</script>
 <title>{% block title %}Spa 99 Office{% endblock %}</title>
 <link rel="icon" href="{% static 'common/img/mark-gold.svg' %}" type="image/svg+xml">
+<link rel="manifest" href="{% url 'office_manifest' %}">
 <link rel="preload" href="{% static 'common/fonts/signika-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{% static 'common/fonts/figtree-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="{% static 'common/css/office.css' %}">

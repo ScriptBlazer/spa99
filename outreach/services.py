@@ -6,17 +6,17 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from common.tasks import enqueue
 from gold import audit
 from gold.models import ApplicationEvent, GoldApplication
 
 from . import people
-from .models import (MESSAGE_MAX, NOTE_MAX, REASON_MAX, ArchivedLead, LeadArchiveEvent, NextMorningEmail, NoteEvent, OutreachEntry,
+from .models import (NOTE_MAX, REASON_MAX, ArchivedLead, LeadArchiveEvent, NextMorningEmail, NoteEvent, OutreachEntry, PersonEdit,
                      PersonMessage, StickyNote)
 
 logger = logging.getLogger("spa99.outreach")
 
 DONE, DUPLICATE, EMPTY, TOO_LONG, MISSING = "done", "duplicate", "empty", "too_long", "missing"
+INVALID = "invalid"
 ALREADY, UNCHANGED = "already", "unchanged"
 DUPLICATE_WINDOW = timedelta(seconds=60)
 
@@ -161,27 +161,7 @@ def remove_entry(entry):
     return DONE
 
 
-# ---------- messages ----------
-
-def send_message(actor, to_email, text):
-    """Record a one-to-one message and queue the email (template `office_message`, From the site sender, Reply-To the contact
-    address). An unsubscribed person still gets it: it is not marketing. Returns (result, message)."""
-    text, to_email = audit.clean_text(text), (to_email or "").strip().lower()
-    if not text or not to_email:
-        return EMPTY, None
-    if len(text) > MESSAGE_MAX:
-        return TOO_LONG, None
-    recent = PersonMessage.objects.filter(email=to_email, text=text, sent_at__gte=timezone.now() - DUPLICATE_WINDOW)
-    recent = recent.filter(author=actor) if getattr(actor, "pk", None) else recent.filter(author__isnull=True)
-    if recent.exists():
-        return DUPLICATE, None
-    message = PersonMessage.objects.create(email=to_email, text=text, author=_actor(actor), author_label=label(actor))
-    try:
-        enqueue("outreach.tasks.send_office_message", str(message.pk))
-    except Exception:  # noqa: BLE001 - the message is recorded; a queue problem is logged
-        logger.exception("Could not queue the Office message to a person")
-    return DONE, message
-
+# ---------- messages: staff now write by WhatsApp (whatsapp.services); old PersonMessage rows still show in timelines ----------
 
 def is_unsubscribed(addresses, user=None):
     from mailings.models import EmailOptOut
@@ -246,7 +226,8 @@ def erase_email(email):
         return 0
     return (StickyNote.objects.filter(email=email).delete()[0] + PersonMessage.objects.filter(email=email).delete()[0]
             + OutreachEntry.objects.filter(lead_email=email).delete()[0] + ArchivedLead.objects.filter(email=email).delete()[0]
-            + LeadArchiveEvent.objects.filter(email=email).delete()[0] + NextMorningEmail.objects.filter(email=email).delete()[0])
+            + LeadArchiveEvent.objects.filter(email=email).delete()[0] + NextMorningEmail.objects.filter(email=email).delete()[0]
+            + PersonEdit.objects.filter(email=email).delete()[0])
 
 
 def timeline_entries(addresses):
@@ -267,6 +248,10 @@ def timeline_entries(addresses):
         out.append((note.deleted_at, "note_deleted", f"Note deleted by {note.deleted_by_label or 'someone'}", note.text, str(note.pk)))
     for message in PersonMessage.objects.filter(email__in=addresses):
         out.append((message.sent_at, "message_sent", f"Message sent by {message.author_label or 'the team'}", message.text, ""))
+    for edit in PersonEdit.objects.filter(email__in=addresses):
+        noun = "Mobile" if edit.what == PersonEdit.MOBILE else "First name"
+        verb = "added" if not edit.before else ("removed" if not edit.after else "changed")
+        out.append((edit.at, "person_edit", f"{noun} {verb} by {edit.by_label or 'someone'}", edit.after or edit.before, ""))
     for event in LeadArchiveEvent.objects.filter(email__in=addresses):
         verb = "Archived" if event.kind == LeadArchiveEvent.ARCHIVED else "Moved back"
         out.append((event.at, f"lead_{event.kind}", f"{verb} by {event.by_label or 'someone'}", event.reason, ""))
@@ -276,3 +261,80 @@ def timeline_entries(addresses):
         elif row.skipped_at:
             out.append((row.skipped_at, "next_morning_skipped", f"Next-morning email skipped: {row.skip_reason}", "", ""))
     return out
+
+
+# ---------- first name and mobile typed by staff (lead page, person page) ----------
+
+def _edit(main, what, before, after, actor):
+    PersonEdit.objects.create(email=main, what=what, before=before or "", after=after or "", by=_actor(actor), by_label=label(actor))
+
+
+def set_lead_contact(email, actor, first_name=None, mobile=None, mobile_country=None):
+    """Add or fix a lead's first name and mobile (`None` = leave as it is, "" = clear it). Written on every journey that left this
+    address, so Leads, the chat and the next-morning email all see it; each change is a line in his timeline. Returns (result, errors):
+    DONE, UNCHANGED or INVALID (errors {field: message}; a mobile that belongs to someone else adds `owner` {name, url})."""
+    from django.core.exceptions import ValidationError
+
+    from common.validators import normalise_mobile
+    from journey.models import JourneySession
+    from whatsapp import services as whatsapp
+
+    main = (email or "").strip().lower()
+    sessions = list(JourneySession.objects.filter(lead_email__iexact=main, is_bot=False))
+    if not sessions:
+        return MISSING, {}
+    current_name = next((s.lead_first_name for s in sessions if s.lead_first_name), "")
+    current_mobile = next((s.lead_mobile for s in sessions if s.lead_mobile), "")
+    errors, new_name, new_mobile = {}, current_name, current_mobile
+    if first_name is not None:
+        new_name = " ".join(str(first_name).replace("\x00", "").split())
+        if len(new_name) > 100:
+            errors["first_name"], new_name = "First name: keep it to 100 characters.", current_name
+    if mobile is not None:
+        text = str(mobile).strip()
+        try:
+            new_mobile = normalise_mobile(text, mobile_country) if text else ""
+        except ValidationError as error:
+            errors["mobile"], new_mobile = error.messages[0], current_mobile
+        owner = whatsapp.owner_of_phone(new_mobile, exclude_email=main) if new_mobile and "mobile" not in errors else None
+        if owner:
+            errors["mobile"], errors["owner"] = f"This number is already on {owner['name']}.", owner
+    if errors:
+        return INVALID, errors
+    if (new_name, new_mobile) == (current_name, current_mobile):
+        return UNCHANGED, {}
+    with transaction.atomic():
+        for session in sessions:
+            session.lead_first_name, session.lead_mobile = new_name, new_mobile
+            session.save(update_fields=["lead_first_name", "lead_mobile", "updated_at"])
+        if new_name != current_name:
+            _edit(main, PersonEdit.FIRST_NAME, current_name, new_name, actor)
+        if new_mobile != current_mobile:
+            _edit(main, PersonEdit.MOBILE, current_mobile, new_mobile, actor)
+    whatsapp.relink(current_mobile, new_mobile)
+    return DONE, {}
+
+
+def set_person_mobile(user, actor, mobile, mobile_country=None):
+    """Add or fix a registered person's mobile (any country, E.164, unique). Returns (DONE | UNCHANGED | INVALID, errors)."""
+    from django.core.exceptions import ValidationError
+
+    from common.validators import normalise_mobile
+    from whatsapp import services as whatsapp
+
+    text = (mobile or "").strip()
+    try:
+        new = normalise_mobile(text, mobile_country) if text else ""
+    except ValidationError as error:
+        return INVALID, {"mobile": error.messages[0]}
+    owner = whatsapp.owner_of_phone(new, exclude_user=user) if new else None
+    if owner:
+        return INVALID, {"mobile": f"This number is already on {owner['name']}.", "owner": owner}
+    before = user.mobile or ""
+    if new == before:
+        return UNCHANGED, {}
+    user.mobile = new or None
+    user.save(update_fields=["mobile", "updated_at"])
+    _edit((user.email or "").lower(), PersonEdit.MOBILE, before, new, actor)
+    whatsapp.relink(before, new)
+    return DONE, {}

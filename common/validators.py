@@ -98,6 +98,13 @@ def normalise_uk_mobile(value):
     return phonenumbers.format_number(number, phonenumbers.PhoneNumberFormat.E164)
 
 
+def normalise_mobile(value, country=None):
+    """Any country's mobile -> E.164 (see common.phone). `country` is an ISO code, GB by default; a number typed with + wins."""
+    from . import phone
+
+    return phone.normalise(value, country)
+
+
 def validate_uk_mobile(value):
     """Model/form validator wrapper."""
     normalise_uk_mobile(value)

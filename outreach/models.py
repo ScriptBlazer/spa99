@@ -118,6 +118,28 @@ class PersonMessage(UUIDModel):
         return f"message to {self.email}"
 
 
+class PersonEdit(UUIDModel):
+    """Staff added or fixed a person's first name or mobile (lead page, person page): one line of the timeline, "Mobile added by X" /
+    "Mobile changed by X". Erased with the person (the values are personal data)."""
+
+    FIRST_NAME, MOBILE = "first_name", "mobile"
+    WHAT_CHOICES = [(FIRST_NAME, "First name"), (MOBILE, "Mobile")]
+
+    email = models.CharField(max_length=254, db_index=True, help_text="Lower case. The person's main address when it was changed.")
+    what = models.CharField(max_length=12, choices=WHAT_CHOICES)
+    before = models.CharField(max_length=100, blank=True)
+    after = models.CharField(max_length=100, blank=True)
+    by = _person()
+    by_label = models.CharField(max_length=254, blank=True)
+    at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["-at", "-id"]
+
+    def __str__(self):
+        return f"{self.what} edit on {self.email}"
+
+
 # ---------- archived leads (round 2, R6) ----------
 
 class ArchivedLead(UUIDModel):

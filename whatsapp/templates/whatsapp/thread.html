@@ -1,0 +1,9 @@
+{% extends "office/base.html" %}
+{% load whatsapp_tags %}
+{% block title %}{{ contact.name }} | WhatsApp | Spa 99 Office{% endblock %}
+{% block main %}
+{# Minimal working page: the frontend builds the real thread. Context: contact, messages, has_older, older_url, unread, last_id, cursor, templates, gold, open_picker, urls, configured. #}
+<h1>{{ contact.name }}</h1><p>{{ contact.phone }} · window: {{ contact.window.state }}</p>
+<ol data-wa-messages>{% for m in messages %}<li data-id="{{ m.id }}" data-direction="{{ m.direction }}" data-status="{{ m.status }}">{{ m.body|wa_format }}{% if m.error %} <em>{{ m.error.reason }}</em>{% endif %}</li>{% endfor %}</ol>
+{% if contact.can_send and contact.window.open %}<form method="post" action="{{ urls.send }}">{% csrf_token %}{% if gold %}<input type="hidden" name="gold" value="{{ gold.id }}">{% endif %}<textarea name="body" required></textarea><button type="submit">Send</button></form>{% endif %}
+{% endblock %}

@@ -275,6 +275,7 @@ def export_user_data(user):
         "interest": _export_interest(user),
         "journey_sessions": _export_sessions(user),
         "chats": chat_services.export_conversations(user=user, email=user.email if user.email_verified_at else None),
+        "whatsapp": _export_whatsapp(user),
         "gold_applications": gold_services.export_applications(user.email) if user.email_verified_at else [],  # by email only once the address is proven his
         "emails": [
             {"template": e.template, "subject": e.subject, "status": e.status, "sent_at": _plain(e.sent_at)}
@@ -295,6 +296,19 @@ def export_user_data(user):
         "login_events": logins,
         "history": history,
     }
+
+
+def _whatsapp_addresses(user):
+    from outreach import people as outreach_people
+
+    return outreach_people.resolve(user=user)[1] | {user.email.lower()}
+
+
+def _export_whatsapp(user):
+    from whatsapp import services as whatsapp
+
+    addresses = _whatsapp_addresses(user) if user.email_verified_at else set()
+    return whatsapp.export_for(whatsapp.contacts_for_person(user, addresses, whatsapp.person_phones(user, addresses)))
 
 
 def _email_logs(email):
@@ -359,7 +373,8 @@ def _export_sessions(user):
     result = []
     for session in sessions:
         if session.user_id != user.pk:  # matched only by the address he gave: his lead details, nothing more about that visit
-            result.append({"started_at": session.created_at.isoformat(), "lead_email": session.lead_email, "lead_at": _plain(session.lead_at)})
+            result.append({"started_at": session.created_at.isoformat(), "lead_email": session.lead_email, "lead_at": _plain(session.lead_at),
+                           "lead_first_name": session.lead_first_name, "lead_mobile": session.lead_mobile, "lead_consent_version": session.lead_consent_version})
             continue
         answers = [
             {
@@ -372,7 +387,8 @@ def _export_sessions(user):
             "started_at": session.created_at.isoformat(), "device": session.device_type, "referrer": session.referrer,
             "utm_source": session.utm_source, "utm_medium": session.utm_medium, "utm_campaign": session.utm_campaign,
             "utm_term": session.utm_term, "utm_content": session.utm_content,
-            "lead_email": session.lead_email, "lead_at": _plain(session.lead_at),  # the address given before the result
+            "lead_email": session.lead_email, "lead_at": _plain(session.lead_at),  # the details given before the result
+            "lead_first_name": session.lead_first_name, "lead_mobile": session.lead_mobile, "lead_consent_version": session.lead_consent_version,
             "completed": session.completed, "completed_at": _plain(session.completed_at),
             "suggested_plan": session.suggested_plan.name if session.suggested_plan else None,
             "suggestion_detail": session.suggestion_detail,
@@ -391,11 +407,9 @@ def _anonymise_sessions(user):
     replaced, person key cleared, referrer and any typed text removed (also in the history rows)."""
     ids = list(JourneySession.objects.filter(user=user).values_list("pk", flat=True))
     for session_id in ids:
-        JourneySession.objects.filter(pk=session_id).update(user=None, key=new_session_key(), person_key="", referrer="",
-                                                            lead_email="", lead_at=None, lead_privacy_version="")
+        JourneySession.objects.filter(pk=session_id).update(user=None, key=new_session_key(), person_key="", referrer="", **journey_services.LEAD_BLANKS)
     Answer.objects.filter(session_id__in=ids).update(text_value="")
-    JourneySession.history.model.objects.filter(id__in=ids).update(user=None, key="", person_key="", referrer="",
-                                                                   lead_email="", lead_at=None, lead_privacy_version="")
+    JourneySession.history.model.objects.filter(id__in=ids).update(user=None, key="", person_key="", referrer="", **journey_services.LEAD_BLANKS)
     Answer.history.model.objects.filter(session_id__in=ids).update(text_value="")
     return len(ids)
 
@@ -412,6 +426,9 @@ def delete_user_data(user):
 
     for address in outreach_people.resolve(user=user)[1] | {email.lower()}:  # notes, messages and list entries on all his addresses (resolve() merges journey addresses only when verified)
         erase_email(address)
+    from whatsapp import services as whatsapp
+
+    whatsapp.erase_person(user, _whatsapp_addresses(user) if user.email_verified_at else set())  # chats, messages and files, found by his numbers (before the sessions are cleared)
     anonymised = _anonymise_sessions(user)
     proven = bool(user.email_verified_at)  # rows found only by email are his only once the address is proven (an unverified account may carry someone else's address)
     if proven:

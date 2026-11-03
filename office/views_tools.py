@@ -1,4 +1,4 @@
-"""Views for the person tools: sticky notes, the approach list, Message and Send guide. Short: validate, call the service in
+"""Views for the person tools: sticky notes, the approach list and Send guide (Message is WhatsApp now: whatsapp.views). Short: validate, call the service in
 outreach.services (or gold.actions), answer. Notes answer an HTMX request with the notes partial."""
 from django.contrib import messages
 from urllib.parse import urlencode
@@ -19,7 +19,7 @@ from outreach.models import OutreachEntry, StickyNote
 from plans.models import SiteSettings
 
 from . import lists, tools
-from .forms import ArchiveForm, MessageForm, OutreachAddForm, StickyNoteForm
+from .forms import ArchiveForm, OutreachAddForm, StickyNoteForm
 from system import defaults
 from .permissions import admin, editor, reader
 
@@ -136,27 +136,6 @@ def outreach_add(request, pk, kind):
         messages.info(request, f"Already on {title}.")
     else:
         messages.error(request, "Could not add this person.")
-    return redirect(target.page_url)
-
-
-@editor
-@require_POST
-def message_send(request, pk, kind):
-    """Message a lead or a person: queued email from the site sender, Reply-To the contact address, kept for the timeline."""
-    if kind == "gold":
-        raise Http404
-    target = tools.target_for(kind, pk)
-    form = MessageForm(request.POST)
-    if not form.is_valid():
-        messages.error(request, " ".join(_errors(form)))
-        return redirect(target.page_url)
-    result, _ = services.send_message(request.user, target.main, form.cleaned_data["message"])
-    if result == services.DONE:
-        messages.success(request, "Your message is on its way. It is in the timeline.")
-    elif result == services.DUPLICATE:
-        messages.info(request, "That message was already sent.")
-    else:
-        messages.error(request, "The message could not be sent.")
     return redirect(target.page_url)
 
 

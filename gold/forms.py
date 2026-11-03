@@ -197,8 +197,3 @@ class DeclineForm(forms.Form):
         if data.get("email_applicant") and not data.get("email_message"):
             self.add_error("email_message", "Write the message to send, or untick Email the applicant.")
         return data
-
-
-class RespondForm(forms.Form):
-    message = _text("Message", 5, MESSAGE_MAX, "Write the message for the applicant.")
-

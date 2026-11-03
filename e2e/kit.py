@@ -306,7 +306,9 @@ def answer_journey(page, stop_before_result=False, email="journey-walker@example
         if page.locator("[data-flow-root] .result").count():
             break
         if page.locator("[data-flow-root] .lead-gate").count():  # the email gate before the result (2026-10-26)
+            page.locator("#lead-first-name").fill("Walker")
             page.locator("#lead-email").fill(email)
+            page.locator("#lead-mobile").fill("07400 123450")  # country select stays on UK (+44)
             tick(page, "consent")
             page.locator("[data-gate-primary]").click()
             # The gate stays in the page until the server has taken the address: wait for the result itself, or the next

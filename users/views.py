@@ -226,9 +226,18 @@ def register(request):
         initial = {"plan": plan_slug}
         if session and session.lead_email:  # he gave his email at the journey in this browser: pre-fill it, still editable
             initial["email"] = session.lead_email
+            if session.lead_first_name:  # and the first name and mobile from the same step
+                initial["first_name"] = session.lead_first_name
+            if session.lead_mobile:
+                from common import phone
+
+                parts = phone.split(session.lead_mobile)
+                initial["mobile"], initial["mobile_country"] = parts["national"], parts["country"]
         initial.update(invites.prefill(request.session.get(invites.SESSION_KEY)))  # a personal invite wins
         form, status = SignUpForm(initial=initial), 200
-    context = {"form": form, "plans": plans, "selected_plan": plan_slug, "suggested_plan": suggested, "from_journey": bool(session and session.completed),
+    from common import phone
+
+    context = {"form": form, "mobile_countries": phone.countries(), "plans": plans, "selected_plan": plan_slug, "suggested_plan": suggested, "from_journey": bool(session and session.completed),
                "register_sale": sale_services.register_offer(request=request)}
     return render(request, "users/register.html", context, status=status)
 

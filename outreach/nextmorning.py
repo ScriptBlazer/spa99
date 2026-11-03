@@ -133,7 +133,13 @@ def _skip(row, reason, now):
 
 
 def _first_name(email):
+    """The first name he gave at the email step (or staff typed), else his Gold application's, else ''."""
     from gold.models import GoldApplication
+    from journey.models import JourneySession
+
+    lead = JourneySession.objects.filter(lead_email__iexact=email, is_bot=False).exclude(lead_first_name="").order_by("-created_at").first()
+    if lead is not None:
+        return lead.lead_first_name
 
     application = GoldApplication.objects.filter(email__iexact=email).exclude(first_name="").order_by("created_at").first()
     return application.first_name if application else ""

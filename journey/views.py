@@ -155,8 +155,8 @@ def result(request):
 @require_POST
 @rate_limited_json("journey-lead", 20, 60)
 def lead(request):
-    """The email gate: {"email", "consent": true}. Stored on the journey session; shown to nobody publicly.
-    400 {"errors": {field: message}} for a bad address or a missing consent."""
+    """The email step: {"first_name", "email", "mobile_country" (ISO, default GB), "mobile", "consent": true}, all required. Stored on the journey session; shown to nobody
+    publicly. 400 {"errors": {first_name | email | mobile | consent: message}} (every problem at once)."""
     data = _body(request)
     if data is None:
         return _bad("Send JSON.")
@@ -165,7 +165,7 @@ def lead(request):
         type(session).objects.filter(pk=session.pk).update(is_bot=True)
         return _with_cookie(JsonResponse({"saved": True}), session)
     try:
-        services.save_lead(session, data.get("email"), data.get("consent"))
+        services.save_lead(session, data.get("email"), data.get("consent"), first_name=data.get("first_name"), mobile=data.get("mobile"), mobile_country=data.get("mobile_country"), require_details=True)
     except services.LeadError as error:
         return _with_cookie(JsonResponse({"errors": error.errors}, status=400), session)
     return _with_cookie(JsonResponse({"saved": True}), session)

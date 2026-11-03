@@ -3,7 +3,7 @@ from django.test import Client, TestCase, override_settings
 from django.template.loader import render_to_string
 
 from chat.models import FaqItem
-from journey.copy import GATE
+from journey.copy import CHAT_CONSENT, GATE
 from plans.management.commands.seed_phase1 import seed_all
 
 KEY = override_settings(ANTHROPIC_API_KEY="test-key-not-real")
@@ -52,7 +52,7 @@ class ChatButtonTests(TestCase):
                        'role="log"', 'aria-live="off"', 'aria-live="polite" data-chat-live', 'maxlength="500"', 'for="ask-us-input"',
                        "Your question", "Ask a question", "Ask us anything.", "Prefer a person?", "Message our team",
                        "AI assistant. Chats are kept for 90 days.", 'data-chat-tpl="handoff"', 'data-chat-tpl="email"',
-                       "WhatsApp us", "Email us", "Show prices", "Not now", GATE["consent"], GATE["privacy_label"], 'name="website"'):
+                       "WhatsApp us", "Email us", "Show prices", "Not now", CHAT_CONSENT, "How we use your email", 'name="website"'):
             self.assertIn(needle, html)
         self.assertNotIn("value=\"on\"", html[html.index('data-chat-tpl="email"'):][:2500].split("consent")[1][:80])  # not pre-ticked
 

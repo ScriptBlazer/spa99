@@ -1,6 +1,6 @@
 # WhatsApp in the Office (plan, 2026-11-03)
 
-Status: **planning**, not started. Branch `feature/whatsapp` (plan only for now). Build only when Moishe says go; ship in one go after testing. Decisions in PROJECT.md (2026-11-03 WhatsApp rows).
+Status: **server side built** (2026-11-03, branch `feature/whatsapp`); the chat UI follows from `whatsapp-design.md`. Ship in one go after testing. Decisions in PROJECT.md (2026-11-03 WhatsApp rows). The section "Built" at the end lists the endpoints, payloads and context keys as they are in the code.
 
 ## Provider: Twilio (Moishe, 2026-11-03)
 The number is a **Twilio** number and the WhatsApp side is already verified at Meta. We talk to **Twilio**, not to Meta directly:
@@ -44,8 +44,13 @@ A new number on **WhatsApp (through Twilio)** becomes a full staff to lead chat 
 - **WhatsApp text formatting works** in the composer and in the bubbles, the same as in the app: `*bold*`, `_italic_`, `~strikethrough~`, ` ```monospace``` `, `` `inline code` ``, `- ` and `* ` lists, `1. ` numbered lists, `> ` quotes. The text is sent as typed; WhatsApp formats it on his phone and the Office shows the same. Note: WhatsApp's bold is one star each side, not two. Escaped safely (no HTML from message text).
 
 - **No mobile:** the Message button says "Add a mobile to WhatsApp him"; staff cannot email from it. Send guide and automatic emails still reach him.
-- **Consent:** new leads tick at the email step. Moishe's call: **registered people count as agreed**, so staff can WhatsApp anyone with a mobile. The privacy notice gets a WhatsApp line (backfill with dry run). Every first template carries a way to stop: "STOP" in the reply marks him opted out and blocks further templates. Risk noted to Moishe: complaints affect the WhatsApp account shared with BML.
+- **Consent:** new leads tick at the email step. Moishe's call: **registered people count as agreed**, so staff can WhatsApp anyone with a mobile. The privacy notice gets a WhatsApp line (backfill with dry run). A "STOP" reply marks him opted out and blocks further templates (START clears it); the template text does not mention it (Moishe, 2026-11-03). Risk noted to Moishe: complaints affect the WhatsApp account shared with BML.
 - **Gold Respond** also goes by WhatsApp: opens his chat and marks the application Contacted when sent.
+
+- **PWA is the Office only** (Moishe, 2026-11-03): manifest and service worker are served only on the Office host (office.spa99.uk). The public website has no manifest or service worker, so it never offers an install. A website app may come later for booking.
+
+- **Older leads:** staff can add a mobile by hand and send a template with no extra confirm (Moishe, 2026-11-03).
+- **Notifications** show name and message on a locked phone, like WhatsApp (Moishe, 2026-11-03).
 
 ## Open points
 - Launch turns the email step off once; Moishe can switch "Journey asks for an email" back on in System > Settings after launch (decided 2026-11-03).
@@ -79,3 +84,72 @@ In **Twilio Console**:
 3. Templates + starting chats from lead pages.
 4. PWA and push notifications.
 All on one branch, tested with the Twilio WhatsApp sandbox (or the real number on a staff phone), shipped together.
+
+
+---
+
+# Built (server side, 2026-11-03)
+
+App `whatsapp` (models, `services.py` for all logic, `twilio_api.py` for Twilio over `httpx2`, `webhooks.py`, `views.py`, `push.py`, `pwa.py`, `formatting.py`, `errors.py`). No Twilio SDK: plain HTTPS with `httpx2` (already pinned through the Anthropic SDK). `pywebpush==2.5.0` added (with its pinned dependencies). Deviation: no `django-simple-history` on these models (messages are the log; copies would double what must be erased).
+
+## Settings (server `.env`, none required; blank = "not configured")
+`TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET` (send, fetch files, Content API), `TWILIO_AUTH_TOKEN` (only the webhook signature), `TWILIO_WHATSAPP_FROM` (+442045384999), `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. `python manage.py whatsapp_vapid_keys` prints a pair. Limits in `settings`: body 1600 characters (Twilio's Messages API limit; the WhatsApp-specific figure could not be confirmed in Twilio's pages), images 5 MB, PDFs, audio and video 16 MB (checked against Twilio's WhatsApp media page). Startup log line shows `whatsapp=on|off`.
+
+## Models
+`Contact` (phone E.164 unique, `profile_name`, resolved `name`, links `user` / `lead_email` / `application`, `opted_out_at`, `last_inbound_at` = the window, `last_message_at`, `last_preview`), `ContactRead` (per staff member: read time, unread = his messages after it), `Message` (integer id; direction in/out; kind text, image, document, audio, video, file, template, other; body; media key, type, filename, size, width, height; `twilio_sid` unique; status queued, sent, delivered, read, failed, undelivered, received; error code and message; author; template; `claimed_at`; created, updated, sent), `Template` (Twilio Content SID unique, name, language, category, approval status, body, variables, `variable_labels`), `PushSubscription`, `WhatsAppPrefs` (mute). `outreach.PersonEdit` records staff edits of a first name or mobile (timeline lines). `journey.JourneySession` gains `lead_first_name`, `lead_mobile`, `lead_consent_version` (with database defaults).
+
+## Webhooks (public site host, no sign-in, no CSRF, signature checked)
+- `POST /twilio/whatsapp/incoming/` and `POST /twilio/whatsapp/status/`. `X-Twilio-Signature` = HMAC-SHA1 with `TWILIO_AUTH_TOKEN` over `SITE_URL` + path (+ query) and the sorted POST parameters, constant-time compare. 404 until configured, 403 on a bad signature, 413 over 64 KB. Answer `<Response/>` at once. Only messages To our sender are stored (BML shares the account). Idempotent on `MessageSid`.
+- STOP, STOPALL, UNSUBSCRIBE, END, QUIT, CANCEL (whole message, any case) set `opted_out_at`. Only START or UNSTOP clears it: any other message from him is stored and shown but he stays opted out, and nothing at all is sent to him until then (texts and templates).
+- His file is copied from Twilio by the worker (`whatsapp.tasks.process_inbound`) into the default storage (over 16 MB: not kept, the bubble says so). Voice notes, video and other files are kept with kind `audio`, `video`, `file`. Then the push goes out.
+- `GET /twilio/whatsapp/media/<signed token>/`: the public, signed link (valid 1 hour) Twilio fetches an outgoing photo or PDF from. Django signing, not S3 presigning, so it works with local storage too.
+
+## Sending (Approver or Admin and up, `editor`)
+Free text and files only inside the 24-hour window; templates any time; nothing after STOP. Sent by the worker (`whatsapp.tasks.send_message`, never twice), `StatusCallback` on each send, the outcome is written on the message and shown in the chat. A duplicate within 10 seconds is refused. A failure shows a plain reason (`whatsapp/errors.py`; the Twilio code never shows) and, when it makes sense, `retry_url`. Only approved templates whose name starts `spa99_` can be sent, enforced in the service. Template variables: one line, at most 200 characters, all required.
+
+## Office endpoints (Office host; `reader` views, `editor` sends)
+| URL | Method | Does |
+|---|---|---|
+| `/whatsapp/` | GET | Inbox. `?q=` (name, profile name, number, lead address), `?unread=1`, `?page=`. HTMX gets the rows only. Context: `rows[{id, name, phone, preview, preview_kind, direction, last_message_at, unread, opted_out, window_open, url}]`, `has_next` (one extra row, no counts), `page`, `q`, `unread_only`, `unread_total`, `more_url`, `can_send`, `configured` |
+| `/whatsapp/unread/` | GET | `{unread_total}` (chats with unread messages) for the badge |
+| `/whatsapp/<contact>/` | GET | Thread page. Context: `contact`, `messages` (newest 30, oldest first), `has_older`, `older_url`, `unread{count, first_id}`, `last_id`, `cursor`, `templates`, `gold` (with `?gold=<application id>`), `open_picker` (`?picker=1`), `urls{poll, send, send_media, send_template, read, inbox, templates}`, `configured` |
+| `/whatsapp/<contact>/messages/?before=<id>` | GET | JSON `{messages, has_older, older_url}` |
+| `/whatsapp/<contact>/poll/?after=<id>&since=<cursor>` | GET | JSON `{messages (new), updates (changed ticks or errors since the cursor), contact, unread_total, last_id, cursor}` |
+| `/whatsapp/<contact>/send/` | POST `body` | JSON `{ok, message}` or `{ok: false, error, message[, missing]}` (409 window closed or opted out, 400 other) |
+| `/whatsapp/<contact>/send-media/` | POST file `file`, `body` (caption) | same; 413 too big |
+| `/whatsapp/<contact>/send-template/` | POST `template`, `var_<key>` | same; `missing` lists empty variable keys |
+| `/whatsapp/<contact>/read/` | POST | mark read for me |
+| `/whatsapp/<contact>/retry/<message id>/` | POST | send a failed message again |
+| `/whatsapp/templates/?contact=<id>` | GET | JSON `{templates: [{id, name, label, category, body, body_html, variables[{key, label, prefill}]}]}` |
+| `/whatsapp/media/<message id>/` | GET | his or our file, for staff (photos, PDFs, audio and video inline, the rest downloads) |
+| `/people/<id>/whatsapp/`, `/leads/<id>/whatsapp/`, `/gold/<id>/whatsapp/` | GET | the Message button: opens his chat (made on the first click); no mobile: back to the page with a note |
+| `/leads/<id>/contact/` | POST `first_name`, `mobile_country`, `mobile` | add or fix a lead's name and mobile (all his journeys), audited |
+| `/people/<id>/mobile/` | POST `mobile_country`, `mobile` | the same for a registered person |
+
+Message dict (`services.message_dict`): `{id, direction, kind, body, body_html, status, error{reason, can_retry} or null, author, author_id, author_first_name, template{id, name, label} or null, media{url, type, filename, size, width, height} or null, created_at, sent_at, retry_url}`. `body_html` is formatted safely by `whatsapp.formatting.render` (escaped first; also the template filter `{{ text|wa_format }}` from `whatsapp_tags`).
+
+Contact dict: `{id, name, has_name, phone, profile_name, labels[Lead|Registered|Gold], page_url, opted_out, window{state: open|closed|opted_out|empty|template_waiting, open, ends_at}, can_send, url, last_message_at, limits{body, image_bytes, file_bytes}}`.
+
+Lead, person and Gold pages get `whatsapp` = `{configured, has_mobile, mobile, first_name, contact_url, start_url, edit_url (empty on Gold), can_send, can_edit, has_chat, window_open, window_closes_at, opted_out, unread, thread_url}` and `mobile_countries`.
+
+Gold: sending from a Gold chat (`gold=<application id>` posted with the message) turns New into Contacted with a `responded` event (`meta {"whatsapp": true}`), once. `/gold/<id>/respond/` and `?do=respond` (the approver email's link) redirect to the chat. The email Message and Respond views, forms and dialogs are gone; old `PersonMessage` rows still show in timelines; the email template rows `office_message` and `gold_respond` stay in System > Emails, unused.
+
+Timeline (lead, person): not one line per message: "First WhatsApp sent by X" (template name as detail), "WhatsApp: 3 from him, 2 from us" a day (his last message as detail; link to the chat), "He replied STOP", "WhatsApp not sent" with the reason (`kind` `whatsapp_failed`), "Mobile added/changed by X", "First name added/changed by X", "Gold application marked Contacted".
+
+## Push and the Office web app (Office URLconf only)
+`/manifest.webmanifest` and `/sw.js` (header `Service-Worker-Allowed: /`, no cache, public files) exist only in `config.urls_office`; the public site, Control and System return 404 for both and link no manifest. Source: `whatsapp/pwa.py` (manifest fields and the `ICONS` list for the frontend to fill) and `whatsapp/templates/whatsapp/sw.js`. `office/base.html` links the manifest.
+- `GET /whatsapp/push/config/`: `{configured, vapid_public_key, muted, devices, urls{subscribe, unsubscribe, mute, test}}` (also context `whatsapp_push`, `whatsapp_unread`, `whatsapp_configured` on every Office page).
+- `POST /whatsapp/push/subscribe/` JSON `{endpoint, keys{p256dh, auth}}`; `/unsubscribe/` JSON `{endpoint}`; `/mute/` JSON `{muted: bool}`; `/test/` sends a test to my devices.
+- On each message from him the worker pushes `{title: name, body: first line or "Sent a photo", url: "/whatsapp/<contact>/", tag: <contact id>}` to every unmuted staff member with an Office level. 404 or 410 from the push service removes the device.
+
+## Mobile numbers (two parts everywhere)
+Forms post `mobile_country` (ISO code, default `GB`) and `mobile`; `common/phone.py` normalises to E.164 with the `phonenumbers` library (possible, valid, a mobile line), drops a leading 0, lets a typed `+` or `00` win, and answers "That doesn't look like a valid mobile number." `phone.countries()` is the list (`{iso, dial, name}`: UK, Ireland, Israel, US, Canada, Belgium, France, Germany, Netherlands, then A to Z). Context keys: `mobile_countries` (Register and the Office pages), `gate.countries` (the journey page config). Register also still takes a single `mobile` (UK unless it starts with +). The Gold application form still asks for a UK mobile (unchanged).
+
+## System > WhatsApp
+Configured yes or no (names of empty settings only, never values), the two webhook URLs, **Check Twilio** (account active, sender online), the `spa99_` templates with approval status, **Sync templates** (a background job), push keys set and devices. Developer level and the unlock, like the other System pages.
+
+## Erasure and export
+Person delete, lead delete and the GDPR exports include the chats (found by his numbers: account, email step, Gold application): contact, messages, files in storage and the queue records that name those messages. Push subscriptions belong to staff and are not part of a person's data.
+
+## Not done, on purpose
+Unknown numbers that write first make a contact only (no lead row: a lead needs an email). One file per message (WhatsApp sends one per message). Template approval labels come from code defaults (`spa99_lead_follow_up`: First name) or the admin; Twilio does not hold them.

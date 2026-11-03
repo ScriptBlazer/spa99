@@ -371,13 +371,16 @@ class EndpointTests(TestCase):
         self.assertEqual(self.post(client, "/journey/result/", {}, token).status_code, 403)
         session.refresh_from_db()
         self.assertFalse(session.completed)
-        bad = self.post(client, "/journey/lead/", {"email": "not an email", "consent": False}, token)
-        self.assertEqual((bad.status_code, sorted(bad.json()["errors"])), (400, ["consent", "email"]))
-        self.assertEqual(self.post(client, "/journey/lead/", {"email": "Hugo@Example.com", "consent": False}, token).status_code, 400)  # consent is required
-        ok = self.post(client, "/journey/lead/", {"email": " Hugo@Example.com ", "consent": True}, token)
+        bad = self.post(client, "/journey/lead/", {"email": "not an email", "consent": False}, token)  # every field is required: all errors come back at once
+        self.assertEqual((bad.status_code, sorted(bad.json()["errors"])), (400, ["consent", "email", "first_name", "mobile"]))
+        details = {"first_name": " Hugo ", "email": "Hugo@Example.com", "mobile_country": "GB", "mobile": "07400 123450"}
+        self.assertEqual(self.post(client, "/journey/lead/", {**details, "consent": False}, token).status_code, 400)  # consent is required
+        self.assertEqual(self.post(client, "/journey/lead/", {**{k: v for k, v in details.items() if k != "mobile"}, "consent": True}, token).status_code, 400)  # so is the mobile
+        ok = self.post(client, "/journey/lead/", {**details, "email": " Hugo@Example.com ", "consent": True}, token)
         self.assertEqual(ok.status_code, 200)
         session.refresh_from_db()
         self.assertEqual((session.lead_email, session.lead_privacy_version != "", session.lead_at is not None), ("hugo@example.com", True, True))
+        self.assertEqual((session.lead_first_name, session.lead_mobile, session.lead_consent_version), ("Hugo", "+447400123450", services.CONSENT_VERSION))
         self.assertEqual(client.get("/journey/state/").json()["session"]["lead_required"], False)
 
         result = client.get("/journey/result/").json()  # a GET only reads: nothing is stored

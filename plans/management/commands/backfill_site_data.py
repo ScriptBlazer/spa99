@@ -58,6 +58,9 @@ written by hand:
 - (invite email opens, 2026-10-30) the Privacy notice "Emails" part gets the line about the tracking pixel in invitation emails,
   and "Last updated" goes to 30 October 2026: each only while it still has exactly the previous wording.
 
+- (WhatsApp, 2026-11-03) the Privacy notice "What we collect" part gets the WhatsApp lines and "Last updated" goes to 3 November 2026: each
+  only while it still has exactly the previous wording.
+
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 import re
 from collections import Counter
@@ -169,6 +172,7 @@ def backfill():
     changed.update(_barry_changes_2026_10_29())
     changed.update(_whatsapp_and_gold_2026_10_29())
     changed.update(_invite_open_privacy_2026_10_30())
+    changed.update(_whatsapp_privacy_2026_11_03())
     return changed
 
 
@@ -367,6 +371,30 @@ def _invite_open_privacy_2026_10_30():
         section.body = legal.PRIVACY_UPDATED
         section.save()
         changed["content.Section (privacy notice: last updated)"] += 1
+    return changed
+
+
+def _whatsapp_privacy_2026_11_03():
+    """2026-11-03: WhatsApp. The privacy notice "What we collect" part gets the WhatsApp lines (first name and mobile, our chats, Twilio, STOP)
+    and "Last updated" goes to 3 November 2026: each only while it still has exactly the previous wording (with or without the invitation
+    pixel line). A part edited by hand is left alone: add the lines yourself in Control."""
+    from content import legal
+
+    changed = Counter()
+    page = Page.objects.filter(key="privacy").first()
+    if page is None:
+        return changed
+    new_body = dict((key, body) for key, _, body, _, _ in content_seed.PAGES["privacy"][2])["part_2"]
+    without = new_body.replace(legal.WHATSAPP_BLOCK + "\n", "")
+    olds = [without, without.replace(legal.INVITE_OPEN_LINE + "\n", "")]
+    for section in Section.objects.filter(page=page, key="part_2", body__in=olds):
+        section.body = new_body
+        section.save()
+        changed["content.Section (privacy notice: WhatsApp)"] += 1
+    for section in Section.objects.filter(page=page, key="updated", body__in=["30 October 2026", "28 October 2026", "26 October 2026"]):
+        section.body = legal.PRIVACY_UPDATED
+        section.save()
+        changed["content.Section (privacy notice: last updated, WhatsApp)"] += 1
     return changed
 
 
