@@ -48,10 +48,6 @@ class Rich:
         self.html, self.text = mark_safe(html), text
 
 
-# Emails whose replies go to a person (the sender set in System), so the footer leaves out "Questions? ... write to hello@".
-NO_CONTACT_LINE = {"lead_next_morning"}
-
-
 @dataclass(frozen=True)
 class EmailSpec:
     key: str
@@ -67,6 +63,8 @@ class EmailSpec:
     subject_placeholders: dict = field(default_factory=dict)
     values: object = None  # callable(context) -> dict of computed placeholder values
     test_context: object = None  # the raw context a real send gets, for "send me a test" (default: the samples)
+    default_footer: str = "shared"  # "shared" or "no_contact" (replies reach a person, so no "write to hello@" line); System can change it per email
+    default_sender: str = "site"  # "site" (hello@) or "person" (the automatic emails sender set in System > Emails)
 
 
 def _welcome_values(ctx):
@@ -235,7 +233,7 @@ SPECS = {spec.key: spec for spec in [
         "Hello {first_name},\n\nThank you for your interest in Spa 99, the men-only luxury spa at 99 Vale Road, London N4.\n\n"
         "I wanted to say hello personally. If there is anything you would like to know about the memberships or when we open, "
         "just reply to this email and it will reach me.\n\nBest wishes,\n{sender_name}",
-        subject_placeholders=_FIRST),
+        subject_placeholders=_FIRST, default_footer="no_contact", default_sender="person"),
     EmailSpec(
         "gold_declined", "Gold declined (only sent if the approver ticks Email the applicant)",
         {**_FIRST, "name": "The applicant's full name", "reference": "The application reference"},

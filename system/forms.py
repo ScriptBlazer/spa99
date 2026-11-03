@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from common.jsonshape import has_non_ascii_digit
+from notifications import emailsettings
 from plans.models import FINAL_POTENTIAL_CHOICES, SiteSettings, normalise_whatsapp_number
 
 from . import services
@@ -102,6 +103,26 @@ class EmailsForm(VersionedForm):
         if len(split_emails(value)) > 1:
             raise forms.ValidationError({"contact_email": "Enter one address."})
         return value
+
+
+class FooterForm(VersionedForm):
+    """System > Emails > Footer: the three lines under every email. A blank line is left out; placeholders are checked."""
+
+    class Meta:
+        model = SiteSettings
+        fields = list(emailsettings.LINE_FIELDS)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.required = False
+
+    def clean(self):
+        data = super().clean()
+        for name, problems in emailsettings.validate_lines(data).items():
+            for problem in problems:
+                self.add_error(name, problem)
+        return data
 
 
 class ApprovalForm(VersionedForm):

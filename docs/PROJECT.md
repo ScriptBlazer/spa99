@@ -609,5 +609,6 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-11-03 | Live: office outreach release deployed; backfill_sticky_notes copied 1 Gold note (GC-QA9JV2); rebuild_metrics clean (0 differences). |
 | 2026-11-03 | Live: the S3 bucket policy allowed `role/spa99-server` but the server role is `spa99-ec2`, so every S3 call (guide upload, uploaded images) was denied. Moishe added `role/spa99-ec2` to the bucket policy. |
 | 2026-11-03 | Moishe: Barry's next-morning email leaves out the footer line "Questions? Reply to this email or write to hello@" (replies reach Barry). `notifications.emailbody.NO_CONTACT_LINE`. |
+| 2026-11-03 | Moishe: automatic emails fully editable in System: shared footer (all emails), per-email footer (shared / without contact line / custom), per-email sender (hello@ or the person sender), heading and button text. Unsubscribe and notice stay fixed. Added to PR #42. |
 | 2026-11-03 | Moishe: WhatsApp messaging from the Office comes in the next PR, after this branch is live. |
 | 2026-11-03 | Moishe: Gold rules are changing (guide: £199 a year, visits earned through qualifying business, CEO approval). Not final; Gold stays hidden in System > Plans for now. Site copy to revisit later. |

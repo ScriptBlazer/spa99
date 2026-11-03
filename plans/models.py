@@ -11,6 +11,7 @@ from django.db import models
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+from common import emaildefaults
 from common.models import BaseModel
 from common.validators import split_emails, validate_email_list, validate_pdf, validate_sender_domain
 
@@ -254,6 +255,16 @@ class SiteSettings(BaseModel):
     lead_next_morning_min_hours = models.PositiveSmallIntegerField(
         "Next-morning email: at least this many hours after sign-up", default=8, db_default=8, validators=[MaxValueValidator(48)],
         help_text="0 to 48. A lead who gives his email less than this long before the send time is emailed the next day instead.")
+    # System > Emails > Footer (docs/features/office-outreach.md, Email flexibility E1): the three lines under every email. Blank = left out.
+    footer_brand_line = models.CharField(
+        "Footer: brand line", max_length=emaildefaults.FOOTER_LINE_MAX, blank=True, default=emaildefaults.FOOTER_BRAND, db_default=emaildefaults.FOOTER_BRAND,
+        help_text="The first line under every email. Empty = left out.")
+    footer_address_line = models.CharField(
+        "Footer: address line", max_length=emaildefaults.FOOTER_LINE_MAX, blank=True, default=emaildefaults.FOOTER_ADDRESS, db_default=emaildefaults.FOOTER_ADDRESS,
+        help_text="May use {site_name}, {address} and {contact_email}. Empty = left out.")
+    footer_contact_line = models.CharField(
+        "Footer: contact line", max_length=emaildefaults.FOOTER_LINE_MAX, blank=True, default=emaildefaults.FOOTER_CONTACT, db_default=emaildefaults.FOOTER_CONTACT,
+        help_text="May use {site_name}, {address} and {contact_email}. Empty = left out.")
     lead_next_morning_since = models.DateTimeField(null=True, blank=True, editable=False, help_text="When the switch was last turned on (set automatically).")
 
     # System > Launch (docs/features/office-outreach.md, Launch button): set once by the Launch button, never edited by hand.

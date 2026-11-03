@@ -150,3 +150,33 @@ See `docs/GO-LIVE.md`, section "Next release (Office outreach ...)": snapshot, m
 - Clicking (or Enter on) a note's text turns it into the same inline editor as Add note, pre-filled; Save (Ctrl/Cmd+Enter) or Cancel (Esc). Only for people with `can_edit`; others see the note as now. The delete x and Read more keep working.
 - Saving keeps the note's author and date, sets `edited_at`/`edited_by`, and the meta line reads "Moishe, 3 Nov · edited". Same 1000-character limit; empty text is refused (delete instead). No change = nothing saved.
 - The history keeps the old text: a `NoteEvent` "Note edited by X" with the previous text in the person/lead timeline, and a Gold event `note_edited` where the delete line goes today. No Restore on edit lines (out of scope).
+
+---
+
+# Email flexibility (agreed 2026-11-03, same branch / PR #42)
+
+Moishe wants automatic emails fully editable in System.
+
+## E1. Shared footer (all emails)
+- System > Emails gets a **Footer** tab: three lines, each editable, with a live preview (desktop/phone) like the email edit screen:
+  - Brand line (default "Beyond Luxury"),
+  - Address line (default "{site_name}, {address}"),
+  - Contact line (default "Questions? Reply to this email or write to {contact_email}.").
+  Placeholders: {site_name}, {address}, {contact_email}. A blank line = that line is left out. Reset to default per line.
+- Stored in one row (SiteSettings fields or a small single-row model), history + change log like other System edits. db_default on every new column (rollback rule).
+- The **unsubscribe link and "why you get this" notice are never editable or removable** (legal); they stay under the footer.
+
+## E2. Per email (each automatic email's edit screen)
+- **Footer:** Shared footer / Shared without the contact line / Custom (its own three lines, same placeholders).
+- **Sender:** Site sender (hello@, `DEFAULT_FROM_EMAIL`, Reply-To the contact address) / Person sender (the "Automatic emails sender" name+address set in System > Emails; Reply-To the same). Person sender needs that address set, else the screen says so and it falls back to the site sender at send time (logged).
+- **Heading** (the big line at the top; blank = the default) and **button text** (only for emails that have a button; blank = default).
+- Defaults keep today's behaviour exactly; `lead_next_morning` defaults to Person sender + shared footer without the contact line (replaces the hard-coded `NO_CONTACT_LINE`).
+- Preview and "send me a test" use all of these. Reset puts everything back to the defaults.
+- Emails whose layout is a real application (non-editable specs, e.g. the Gold approver emails with their own .txt) are out of scope; the screen already says they are not editable.
+
+## Acceptance
+1. Footer edits show in every automatic email (html and text) and in previews; blank line removed; unsubscribe/notice always present where they were.
+2. Per-email footer modes, sender choice (From/Reply-To headers), heading and button overrides work in send, preview and test.
+3. No change in any email's output until someone edits (defaults = current output; snapshot-style test on a few emails).
+4. Next-morning email unchanged from today's behaviour by default.
+5. Change log rows; db_default on new columns; tests mocked.

@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from plans.models import SiteSettings
 
-from . import emailbody, suppression
+from . import emailbody, emailsettings, suppression
 from .models import EmailLog, NotificationTemplate
 from .seed import DEFAULT_SUBJECTS, LEGACY_KEYS
 
@@ -45,7 +45,7 @@ def body_for(key):
     return row.body if row else ""
 
 
-def render_editable(key, context, body=None, values=None, button_url=None):
+def render_editable(key, context, body=None, values=None, button_url=None, options=None):
     """(body_html, body_text) of an email whose wording is editable. `body` overrides the stored one (a group mailing's own
     text, a preview); `values` overrides the placeholder values (a preview uses the samples)."""
     spec = emailbody.spec_for(key)
@@ -53,12 +53,16 @@ def render_editable(key, context, body=None, values=None, button_url=None):
     if values is None:
         values = emailbody.values_for(spec, context)
     url = button_url if button_url is not None else (context or {}).get("url", "")
-    return emailbody.render(spec, text, values, button_url=url, button_label=emailbody.button_label_for(spec))
+    options = options or emailsettings.options_for(key)
+    return emailbody.render(spec, text, values, button_url=url, button_label=options.button_text or emailbody.button_label_for(spec))
 
 
-def render_email(template, ctx, body=None, values=None, button_url=None, blocks=None):
+def render_email(template, ctx, body=None, values=None, button_url=None, blocks=None, options=None):
     """(html, text) of the whole email for a ready context (the layout around the body). `body` and `values` as in render_editable;
-    the context is given the rendered body as `body_html` / `body_text`."""
+    the context is given the rendered body as `body_html` / `body_text`. `options` (emailsettings.Options) are the email's footer, heading
+    and button settings: the saved ones unless an edit screen gives its own."""
+    options = options or emailsettings.options_for(template)
+    ctx["footer"] = emailsettings.footer_context(options, ctx)
     layout = "gold_approver" if template == "gold_approver_repeat" else template  # one layout, the repeat panel shows on is_repeat
     spec = emailbody.spec_for(template)
     if blocks and template == "mailing":  # a group mailing built from parts (mailings/blocks.py); no parts = the old body
@@ -73,9 +77,11 @@ def render_email(template, ctx, body=None, values=None, button_url=None, blocks=
         ctx["body_html"], ctx["body_text"] = emailbody.render_plain(ctx["plain_body"])
         layout = "_body"
     elif spec is not None and spec.editable:
-        ctx["body_html"], ctx["body_text"] = render_editable(template, ctx, body=body, values=values, button_url=button_url)
+        ctx["body_html"], ctx["body_text"] = render_editable(template, ctx, body=body, values=values, button_url=button_url, options=options)
         layout = "_body"
     if layout == "_body":
+        if options.heading:
+            ctx["heading"] = fill_subject(options.heading, values if values is not None else emailbody.values_for(spec, ctx))
         ctx.setdefault("heading", ctx.get("subject", "").removeprefix("[Test] "))
         ctx.setdefault("preheader", emailbody.preview_text(ctx["body_text"]))
     return render_to_string(f"notifications/emails/{layout}.html", ctx), render_to_string(f"notifications/emails/{layout}.txt", ctx)
@@ -96,19 +102,27 @@ def _staff_sample_context(key):
     }
 
 
-def preview_email(key, subject, body, extra=None, blocks=None):
-    """The email as it would look with the sample values: {"subject", "html", "text"}. `body` blank = the default; `extra` is added to
-    the context (the unsubscribe link and notice of a News mailing)."""
+def preview_email(key, subject, body, extra=None, blocks=None, posted=None, shared=None):
+    """The email as it would look with the sample values: {"subject", "html", "text", "from"}. `body` blank = the default; `extra` is added to
+    the context (the unsubscribe link and notice of a News mailing); `posted` holds footer, sender, heading and button settings typed on
+    the edit screen and not saved yet; `shared` (brand, address, contact) is the shared footer typed on the Footer tab."""
     spec = emailbody.spec_for(key)
     values = emailbody.sample_values(spec)
     ctx = {**base_context(), "subject": fill_subject(subject, values), "url": f"{settings.SITE_URL}/example-link/",
-           **_staff_sample_context(key), "hide_contact_line": key in emailbody.NO_CONTACT_LINE, **(extra or {})}
+           **_staff_sample_context(key), **(extra or {})}
+    options = emailsettings.options_for(key, posted, shared)
     if blocks:  # a personal-link button shows the sample link in a preview
         from mailings import blocks as mailing_blocks
 
         ctx.setdefault("personal_links", mailing_blocks.sample_links())
-    html, text = render_email(key, ctx, body=body if body and body.strip() else spec.default_body, values=values, blocks=blocks)
-    return {"subject": ctx["subject"], "html": html, "text": text}
+    html, text = render_email(key, ctx, body=body if body and body.strip() else spec.default_body, values=values, blocks=blocks, options=options)
+    return {"subject": ctx["subject"], "html": html, "text": text, "from": _from_label(options)}
+
+
+def _from_label(options):
+    """Who the email comes from, in words, for the preview ('Spa 99 <hello@...>' or the person)."""
+    from_email, _ = emailsettings.sender_for(options, SiteSettings.load())
+    return from_email or settings.DEFAULT_FROM_EMAIL
 
 
 def fill_subject(text, values):
@@ -119,15 +133,15 @@ def fill_subject(text, values):
     return text
 
 
-def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None, plain_body=None, blocks=None, attachments=None, from_email=None, reply_to=None):
+def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None, plain_body=None, blocks=None, attachments=None, from_email=None, reply_to=None, options=None):
     """Render the email, send, and log. Returns the EmailLog. Editable emails (notifications/emailbody.py) use the shared
     layout `_body` and the stored or default wording; the Gold approver emails render their own template files.
     `to` and `cc` are lists of addresses. `subject_email` is the person the message is about when it goes to
     someone else (Barry's Gold email), so deleting that person's data finds the log row.
     `headers` are extra mail headers (List-Unsubscribe); `body` replaces the stored wording (a group mailing); `plain_body` is
     text a person typed, sent as typed in the shared layout; `blocks` are a group mailing's parts (used instead of `body`);
-    `attachments` is a list of (filename, bytes, mimetype); `from_email` and `reply_to` (a list) replace the site sender and the
-    contact address for an email that comes from a person (the next-morning email to new leads)."""
+    `attachments` is a list of (filename, bytes, mimetype); `from_email` and `reply_to` (a list) replace the sender the email's
+    settings choose; `options` (emailsettings.Options) replace its saved footer, sender, heading and button settings (a test send from the edit screen)."""
     to, cc = list(to or []), list(cc or [])
     try:
         blocked = suppression.suppressed_set(to + cc)  # THE guard: every email goes through here
@@ -149,7 +163,7 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
                 to=", ".join(sorted(blocked)), subject=subject[:300], template=template, status=EmailLog.SUPPRESSED,
                 subject_email=(subject_email or "").strip().lower(), error="Address is on the suppression list (bounce or complaint).")
             return log
-    ctx = {**base_context(), "subject": subject, "hide_contact_line": template in emailbody.NO_CONTACT_LINE, **(context or {})}
+    ctx = {**base_context(), "subject": subject, **(context or {})}
     if plain_body is not None:
         ctx["plain_body"] = plain_body
     log = EmailLog(
@@ -157,7 +171,10 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
         subject_email=(subject_email or "").strip().lower(),
     )
     try:
-        html, text = render_email(template, ctx, body=body, blocks=blocks)
+        options = options or emailsettings.options_for(template)
+        if from_email is None:  # the email's own sender setting (site by default; the person sender needs its address set in System)
+            from_email, reply_to = emailsettings.sender_for(options, SiteSettings.load())
+        html, text = render_email(template, ctx, body=body, blocks=blocks, options=options)
         message = EmailMultiAlternatives(
             subject=subject,
             body=text,

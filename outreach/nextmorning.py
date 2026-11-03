@@ -25,6 +25,7 @@ from django.db.models import Min
 from django.db.models.functions import Lower
 from django.utils import timezone
 
+from common.emaildefaults import SENDER_PERSON
 from common.jobs import tracked
 from journey.models import JourneySession
 from plans.models import SiteSettings
@@ -141,13 +142,13 @@ def _first_name(email):
 def send_one(row, site, now):
     """Send (or skip) one claimed row. Returns 'sent' or the skip reason. Never raises."""
     from mailings import tokens
+    from notifications import emailsettings
     from notifications.models import EmailLog
     from notifications.services import send_templated, subject_for
 
-    sender = site.auto_sender
     if not site.lead_next_morning_on:
         return _skip(row, SKIP_OFF, now)
-    if not sender:
+    if emailsettings.options_for(TEMPLATE).sender == SENDER_PERSON and not site.auto_sender:  # the email's own sender setting (Person by default)
         return _skip(row, SKIP_NO_SENDER, now)
     if row.due_at < now - TOO_LATE:
         return _skip(row, SKIP_LATE, now)
@@ -159,8 +160,8 @@ def send_one(row, site, now):
         url = tokens.unsubscribe_url(row.email)
         headers = {**tokens.list_unsubscribe_headers(url), "X-PM-Tag": TAG}
         log = send_templated(TEMPLATE, [row.email], subject_for(TEMPLATE, first_name=first_name),
-                             {"first_name": first_name, "sender_name": (site.auto_email_from_name or "").strip() or "Spa 99", "unsubscribe_url": url, "notice": NOTICE, "hide_contact_line": True},  # replies reach the sender, not hello@ (Moishe, 2026-11-03)
-                             subject_email=row.email, headers=headers, from_email=sender, reply_to=[site.auto_email_from_address])
+                             {"first_name": first_name, "sender_name": (site.auto_email_from_name or "").strip() or "Spa 99", "unsubscribe_url": url, "notice": NOTICE},
+                             subject_email=row.email, headers=headers)  # From, Reply-To and the footer come from the email's own settings (System > Emails)
     except Exception as error:  # noqa: BLE001 - one bad row must not stop the others; the row is not retried (it may have gone out)
         logger.error("Next-morning email failed (%s)", type(error).__name__)
         return _skip(row, SKIP_FAILED, now)

@@ -238,6 +238,24 @@ class NextMorningTests(Base):
         self.assertEqual(NextMorningEmail.objects.get().sent_at is not None, True)
         self.assertIn("Next-morning email sent", str(call(self.reader, "get", f"/leads/{session.pk}/").context["timeline_days"]))
 
+    # The email follows its own System > Emails settings: person sender and no contact line by default.
+    def test_defaults_then_the_site_sender_and_shared_footer_when_chosen(self):
+        from notifications.models import NotificationTemplate
+
+        self.given("a@example.com", hours_ago=-1)
+        self.run_job()
+        first = mail.outbox[-1]
+        self.assertEqual(first.from_email, "Barry Lobenstein <barry@spa99.test>")
+        self.assertNotIn("Questions? Reply", first.alternatives[0][0])
+        NotificationTemplate.objects.filter(key="lead_next_morning").update(sender="site", footer_mode="shared")
+        self.site.auto_email_from_address = ""  # a site-sender email needs no person address
+        SiteSettings.objects.update(auto_email_from_address="")
+        self.given("b@example.com", hours_ago=-1)
+        self.run_job()
+        second = mail.outbox[-1]
+        self.assertEqual(second.from_email, "Spa 99 <hello@spa99.test>")
+        self.assertIn("Questions? Reply", second.alternatives[0][0])
+
     def test_only_leads_given_after_the_switch_and_not_the_old_ones(self):
         self.given("old@example.com", hours_ago=5000)
         self.run_job()
@@ -299,3 +317,4 @@ class NextMorningTests(Base):
         call_command("register_schedules", stdout=StringIO()), call_command("register_schedules", stdout=StringIO())
         job = Schedule.objects.get(name="lead-next-morning")
         self.assertEqual((job.func, job.schedule_type, job.minutes), ("outreach.nextmorning.scheduled", Schedule.MINUTES, 15))
+

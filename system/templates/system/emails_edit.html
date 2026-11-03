@@ -4,7 +4,7 @@
   <div class="sys-actions se-actions">
     {% if spec.editable %}<span class="se-testnote" data-se-test-note aria-live="polite"></span><button type="button" class="sys-btn" data-se-test>Send me a test</button>{% endif %}
     {% if can_send_to_group %}<form method="post" action="{% url 'system_email_to_group' spec.key %}" data-se-to-group>{% csrf_token %}<button type="submit" class="sys-btn" data-se-send-to-group>Send to a group</button></form>{% endif %}
-    {% if not is_default %}<form method="post" action="{% url 'system_email_reset' spec.key %}" data-se-reset>{% csrf_token %}<button type="submit" class="sys-btn" data-confirm data-confirm-title="Reset {{ spec.title }} to the default wording?" data-confirm-body="Your subject and wording are replaced. Undo is in the audit log." data-confirm-label="Reset">Reset to default</button></form>{% endif %}
+    {% if not is_default %}<form method="post" action="{% url 'system_email_reset' spec.key %}" data-se-reset>{% csrf_token %}<button type="submit" class="sys-btn" data-confirm data-confirm-title="Reset {{ spec.title }} to the default?" data-confirm-body="Your subject, wording, footer, sender, heading and button text are replaced. Undo is in the audit log." data-confirm-label="Reset">Reset to default</button></form>{% endif %}
   </div>
 </div>
 {% include "system/_emails_tabs.html" with tab="automatic" %}
@@ -29,9 +29,23 @@
             {% if form.subject.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="subject" data-problem-label="Subject">{{ form.subject.errors|join:" " }}</p>{% endif %}
           </div>
         </div>
-        {% if spec.has_button %}<div class="sys-row se-field" data-se-button-row>
-          <span class="sys-label">Button text</span>
-          <div><p class="se-fixed">{{ spec.button_label }}</p><p class="sys-muted se-help">The button appears where <code>{{ "{button}" }}</code> is. Its text is fixed.</p></div>
+        {% if spec.editable %}<div class="sys-row se-field{% if form.heading.errors %} invalid{% endif %}" data-system-field="heading">
+          <label for="{{ form.heading.id_for_label }}">Heading</label>
+          <div>
+            <input type="text" name="heading" id="{{ form.heading.id_for_label }}" value="{{ form.heading.value|default:'' }}" maxlength="150" autocomplete="off" data-se-setting>
+            <p class="se-live-error" data-se-live="heading" hidden></p>
+            <p class="sys-muted se-help">The big line at the top of the email. Empty uses the subject.{% if spec.subject_placeholders %} You can use {% for p in spec.subject_placeholders %}<code>{{ "{" }}{{ p.name }}{{ "}" }}</code>{% endfor %}.{% endif %}</p>
+            {% if form.heading.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="heading" data-problem-label="Heading">{{ form.heading.errors|join:" " }}</p>{% endif %}
+          </div>
+        </div>{% endif %}
+        {% if spec.has_button %}<div class="sys-row se-field{% if form.button_text.errors %} invalid{% endif %}" data-se-button-row data-system-field="button_text">
+          <label for="{{ form.button_text.id_for_label }}">Button text</label>
+          <div>
+            <input type="text" name="button_text" id="{{ form.button_text.id_for_label }}" value="{{ form.button_text.value|default:'' }}" maxlength="60" placeholder="{{ spec.button_label }}" autocomplete="off" data-se-setting>
+            <p class="se-live-error" data-se-live="button_text" hidden></p>
+            <p class="sys-muted se-help">The button appears where <code>{{ "{button}" }}</code> is. Empty uses &ldquo;{{ spec.button_label }}&rdquo;.</p>
+            {% if form.button_text.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="button_text" data-problem-label="Button text">{{ form.button_text.errors|join:" " }}</p>{% endif %}
+          </div>
         </div>{% endif %}
         {% if spec.editable %}<div class="sys-row se-field{% if form.body.errors %} invalid{% endif %}" data-system-field="body">
           <label for="{{ form.body.id_for_label }}">Body</label>
@@ -55,12 +69,38 @@
         </div>
       </div>
     </section>
+    {% if spec.editable %}<section class="sys-panel se-wording se-delivery" aria-label="Footer and sender" data-se-pane="write">
+      <header><h2>Footer and sender</h2></header>
+      <div class="se-body">
+        <fieldset class="se-field" data-system-field="footer_mode">
+          <legend>Footer</legend>
+          {% for radio in form.footer_mode %}<label class="se-choice"><input type="radio" name="footer_mode" value="{{ radio.data.value }}"{% if radio.data.selected %} checked{% endif %} data-se-setting data-se-footer-mode> {{ radio.choice_label }}{% if radio.data.value == footer.default_mode %} <span class="sys-muted">(default for this email)</span>{% endif %}</label>{% endfor %}
+          <p class="sys-muted se-help">The shared footer is set in <a href="{% url 'system_email_footer' %}">Footer</a>. The unsubscribe link and the line saying why someone gets an email always stay under it.</p>
+          {% if form.footer_mode.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="footer_mode" data-problem-label="Footer">{{ form.footer_mode.errors|join:" " }}</p>{% endif %}
+        </fieldset>
+        <div class="se-custom-footer" data-se-custom-footer{% if not footer.custom_open %} hidden{% endif %}>
+          {% for name, label, field in footer.line_fields %}<div class="sys-row se-field{% if field.errors %} invalid{% endif %}" data-system-field="{{ name }}">
+            <label for="{{ field.id_for_label }}">{{ label }}</label>
+            <div><input type="text" name="{{ name }}" id="{{ field.id_for_label }}" value="{{ field.value|default:'' }}" maxlength="300" autocomplete="off" data-se-setting>
+              <p class="se-live-error" data-se-live="{{ name }}" hidden></p>
+              {% if field.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="{{ name }}" data-problem-label="{{ label }}">{{ field.errors|join:" " }}</p>{% endif %}</div>
+          </div>{% endfor %}
+          <p class="sys-muted se-help">Empty line = left out. You can use {% for p in footer.placeholders %}<code>{{ "{" }}{{ p.name }}{{ "}" }}</code> {% endfor %}.</p>
+        </div>
+        <fieldset class="se-field" data-system-field="sender">
+          <legend>Sender</legend>
+          {% for radio in form.sender %}<label class="se-choice"><input type="radio" name="sender" value="{{ radio.data.value }}"{% if radio.data.selected %} checked{% endif %} data-se-setting> {{ radio.choice_label }}{% if radio.data.value == "site" %}: {{ footer.site_sender }}, replies to {{ footer.contact_email }}{% elif footer.person_sender %}: {{ footer.person_sender }}, replies to the same address{% endif %}{% if radio.data.value == footer.default_sender %} <span class="sys-muted">(default for this email)</span>{% endif %}</label>{% endfor %}
+          {% if not footer.person_sender %}<p class="sys-note" data-se-person-missing>The person sender has no address yet. Set it in <a href="{% url 'system_emails' %}">Emails</a>. Until then an email set to the person sender goes from the site sender.</p>{% endif %}
+          {% if form.sender.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="sender" data-problem-label="Sender">{{ form.sender.errors|join:" " }}</p>{% endif %}
+        </fieldset>
+      </div>
+    </section>{% endif %}
     <section class="sys-panel se-preview" aria-label="Preview" data-se-pane="preview">
       <header><h2>Preview</h2>
         <div class="sys-seg se-width" role="group" aria-label="Preview width"><button type="button" aria-pressed="true" data-se-width="desktop">Desktop</button><button type="button" aria-pressed="false" data-se-width="phone">Phone</button></div>
       </header>
       <div class="se-stage">
-        <p class="se-meta"><span data-se-subject-line>Subject: {{ form.subject.value|default:'' }}</span><br><span data-se-sample></span></p>
+        <p class="se-meta"><span data-se-subject-line>Subject: {{ form.subject.value|default:'' }}</span><br><span data-se-from></span><br><span data-se-sample></span></p>
         <p class="se-preview-error" data-se-preview-error hidden>Could not draw the preview. Your wording is safe. <button type="button" class="sys-btn sm" data-se-retry>Retry</button></p>
         <p class="se-preview-note" data-se-preview-note hidden></p>
         <div class="se-frame-wrap" data-se-frame-wrap data-width="desktop">
