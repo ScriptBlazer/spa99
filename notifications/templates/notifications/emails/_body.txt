@@ -4,8 +4,8 @@
 
 -- 
 {{ site_name }}, {{ address }}
-Questions? Reply to this email or write to {{ contact_email }}.
-Beyond Luxury
+{% if not hide_contact_line %}Questions? Reply to this email or write to {{ contact_email }}.
+{% endif %}Beyond Luxury
 {% if notice or unsubscribe_url %}
 {% if notice %}{{ notice }}
 {% endif %}{% if unsubscribe_url %}Unsubscribe from these emails: {{ unsubscribe_url }}

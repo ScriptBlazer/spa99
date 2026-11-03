@@ -102,7 +102,7 @@ def preview_email(key, subject, body, extra=None, blocks=None):
     spec = emailbody.spec_for(key)
     values = emailbody.sample_values(spec)
     ctx = {**base_context(), "subject": fill_subject(subject, values), "url": f"{settings.SITE_URL}/example-link/",
-           **_staff_sample_context(key), **(extra or {})}
+           **_staff_sample_context(key), "hide_contact_line": key in emailbody.NO_CONTACT_LINE, **(extra or {})}
     if blocks:  # a personal-link button shows the sample link in a preview
         from mailings import blocks as mailing_blocks
 
@@ -149,7 +149,7 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
                 to=", ".join(sorted(blocked)), subject=subject[:300], template=template, status=EmailLog.SUPPRESSED,
                 subject_email=(subject_email or "").strip().lower(), error="Address is on the suppression list (bounce or complaint).")
             return log
-    ctx = {**base_context(), "subject": subject, **(context or {})}
+    ctx = {**base_context(), "subject": subject, "hide_contact_line": template in emailbody.NO_CONTACT_LINE, **(context or {})}
     if plain_body is not None:
         ctx["plain_body"] = plain_body
     log = EmailLog(

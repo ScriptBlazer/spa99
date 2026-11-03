@@ -606,5 +606,8 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-11-03 | Moishe: a **Launch** button in System switches everything for opening at once, after listing every change: Memberships page public, email gate off, wording Join, and open payments (emails all members). Built on feature/office-outreach (spec: office-outreach.md, Launch). |
 | 2026-11-03 | Moishe: a sticky note can be edited by clicking it (inline, like Add note); the meta line shows "edited" and the history keeps the old text. |
 | 2026-11-03 | Moishe could not find Archived: the "Archived N" link on Leads now always shows (with an icon), even at 0. Archive a lead from the lead page ("Archive lead" in the Reach out card). |
+| 2026-11-03 | Live: office outreach release deployed; backfill_sticky_notes copied 1 Gold note (GC-QA9JV2); rebuild_metrics clean (0 differences). |
+| 2026-11-03 | Live: the S3 bucket policy allowed `role/spa99-server` but the server role is `spa99-ec2`, so every S3 call (guide upload, uploaded images) was denied. Moishe added `role/spa99-ec2` to the bucket policy. |
+| 2026-11-03 | Moishe: Barry's next-morning email leaves out the footer line "Questions? Reply to this email or write to hello@" (replies reach Barry). `notifications.emailbody.NO_CONTACT_LINE`. |
 | 2026-11-03 | Moishe: WhatsApp messaging from the Office comes in the next PR, after this branch is live. |
 | 2026-11-03 | Moishe: Gold rules are changing (guide: £199 a year, visits earned through qualifying business, CEO approval). Not final; Gold stays hidden in System > Plans for now. Site copy to revisit later. |

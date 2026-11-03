@@ -159,7 +159,7 @@ def send_one(row, site, now):
         url = tokens.unsubscribe_url(row.email)
         headers = {**tokens.list_unsubscribe_headers(url), "X-PM-Tag": TAG}
         log = send_templated(TEMPLATE, [row.email], subject_for(TEMPLATE, first_name=first_name),
-                             {"first_name": first_name, "sender_name": (site.auto_email_from_name or "").strip() or "Spa 99", "unsubscribe_url": url, "notice": NOTICE},
+                             {"first_name": first_name, "sender_name": (site.auto_email_from_name or "").strip() or "Spa 99", "unsubscribe_url": url, "notice": NOTICE, "hide_contact_line": True},  # replies reach the sender, not hello@ (Moishe, 2026-11-03)
                              subject_email=row.email, headers=headers, from_email=sender, reply_to=[site.auto_email_from_address])
     except Exception as error:  # noqa: BLE001 - one bad row must not stop the others; the row is not retried (it may have gone out)
         logger.error("Next-morning email failed (%s)", type(error).__name__)

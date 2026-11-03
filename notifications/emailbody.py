@@ -48,6 +48,10 @@ class Rich:
         self.html, self.text = mark_safe(html), text
 
 
+# Emails whose replies go to a person (the sender set in System), so the footer leaves out "Questions? ... write to hello@".
+NO_CONTACT_LINE = {"lead_next_morning"}
+
+
 @dataclass(frozen=True)
 class EmailSpec:
     key: str
