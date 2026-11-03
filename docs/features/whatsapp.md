@@ -28,8 +28,9 @@ A new number on **WhatsApp (through Twilio)** becomes a full staff to lead chat 
 - The Office chat looks and works like WhatsApp.
 
 ## Open points
-- Consent wording at the email step (one tick for email and WhatsApp, or two).
-- **Launch conflict:** System > Launch turns the email step off, which would stop collecting email and mobile after opening. Decide: keep the step (email + mobile) after launch, or move the mobile ask elsewhere then.
+- Launch turns the email step off once; Moishe can switch "Journey asks for an email" back on in System > Settings after launch (decided 2026-11-03).
+- Consent: one required tick, "Yes, Spa 99 may email and WhatsApp me about opening. I can stop at any time." (decided 2026-11-03).
+- **To confirm:** the WhatsApp sender is set up in Twilio (Messaging > Senders > WhatsApp senders, Online).
 - Templates text (3 to 5, written together, submitted by Moishe).
 
 ## What Moishe does (walkthrough, no code)
