@@ -40,7 +40,9 @@ A new number on **WhatsApp (through Twilio)** becomes a full staff to lead chat 
 ## Open points
 - Launch turns the email step off once; Moishe can switch "Journey asks for an email" back on in System > Settings after launch (decided 2026-11-03).
 - Consent: one required tick, "Yes, Spa 99 may email and WhatsApp me about opening. I can stop at any time." (decided 2026-11-03).
-- First Spa 99 templates to write and submit (none exist yet); drafts in the chat 2026-11-03.
+- Lead fields at the email step: **email and mobile only**, no name (decided 2026-11-03). Staff can add a name or mobile by hand.
+- The first WhatsApp is **sent by staff with a click** on the lead page; nothing automatic (decided 2026-11-03).
+- First template, no name (Moishe to confirm the text, then submit in Twilio, likely category Marketing): `spa99_lead_follow_up`: "Hi, thanks for checking out Spa 99. For custom prices, or more information about memberships, just reply here and we'll look after you."
 - Templates text (3 to 5, written together, submitted by Moishe).
 
 ## What Moishe does (walkthrough, no code)
