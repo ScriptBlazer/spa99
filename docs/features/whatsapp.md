@@ -37,12 +37,18 @@ A new number on **WhatsApp (through Twilio)** becomes a full staff to lead chat 
 - **Sending** follows the Message rule: Approver or Admin and up (`can_edit`).
 - The Office chat looks and works like WhatsApp.
 
+## Messaging is WhatsApp, not email (Moishe, 2026-11-03)
+- Staff messages to a lead, person or Gold applicant go by **WhatsApp**, in the chat. The Message button opens his chat; email Message goes away.
+- **Email stays only for** Send guide, automatic emails and anything the system sends.
+- **The chat:** looks very like WhatsApp but themed to Spa 99 (brand colours and fonts, clear and calm). Designer brief first.
+- **WhatsApp text formatting works** in the composer and in the bubbles, the same as in the app: `*bold*`, `_italic_`, `~strikethrough~`, ` ```monospace``` `, `` `inline code` ``, `- ` and `* ` lists, `1. ` numbered lists, `> ` quotes. The text is sent as typed; WhatsApp formats it on his phone and the Office shows the same. Note: WhatsApp's bold is one star each side, not two. Escaped safely (no HTML from message text).
+
 ## Open points
 - Launch turns the email step off once; Moishe can switch "Journey asks for an email" back on in System > Settings after launch (decided 2026-11-03).
 - Consent: one required tick, "Yes, Spa 99 may email and WhatsApp me about opening. I can stop at any time." (decided 2026-11-03).
-- Lead fields at the email step: **email and mobile only**, no name (decided 2026-11-03). Staff can add a name or mobile by hand.
+- Lead fields at the email step: **first name, email and mobile, all required** (Moishe, 2026-11-03, replaces email and mobile only). Staff can add or fix them by hand. When he replies we also store his WhatsApp profile name (Twilio `ProfileName`) for reference; a name staff typed wins.
 - The first WhatsApp is **sent by staff with a click** on the lead page; nothing automatic (decided 2026-11-03).
-- First template, no name (Moishe to confirm the text, then submit in Twilio, likely category Marketing): `spa99_lead_follow_up`: "Hi, thanks for checking out Spa 99. For custom prices, or more information about memberships, just reply here and we'll look after you."
+- First template (Moishe to confirm the text, then submit in Twilio, likely category Marketing): `spa99_lead_follow_up`: "Hi {{1}}, thanks for checking out Spa 99. For custom prices, or more information about memberships, just reply here and we'll look after you."
 - Templates text (3 to 5, written together, submitted by Moishe).
 
 ## What Moishe does (walkthrough, no code)
