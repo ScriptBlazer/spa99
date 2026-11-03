@@ -249,9 +249,10 @@ def timeline_entries(addresses):
     for message in PersonMessage.objects.filter(email__in=addresses):
         out.append((message.sent_at, "message_sent", f"Message sent by {message.author_label or 'the team'}", message.text, ""))
     for edit in PersonEdit.objects.filter(email__in=addresses):
-        noun = "Mobile" if edit.what == PersonEdit.MOBILE else "First name"
+        noun = {PersonEdit.MOBILE: "Mobile", PersonEdit.EMAIL: "Email"}.get(edit.what, "First name")
         verb = "added" if not edit.before else ("removed" if not edit.after else "changed")
-        out.append((edit.at, "person_edit", f"{noun} {verb} by {edit.by_label or 'someone'}", edit.after or edit.before, ""))
+        detail = f"{edit.before} to {edit.after}" if edit.what == PersonEdit.EMAIL else (edit.after or edit.before)
+        out.append((edit.at, "person_edit", f"{noun} {verb} by {edit.by_label or 'someone'}", detail, ""))
     for event in LeadArchiveEvent.objects.filter(email__in=addresses):
         verb = "Archived" if event.kind == LeadArchiveEvent.ARCHIVED else "Moved back"
         out.append((event.at, f"lead_{event.kind}", f"{verb} by {event.by_label or 'someone'}", event.reason, ""))
@@ -338,3 +339,114 @@ def set_person_mobile(user, actor, mobile, mobile_country=None):
     _edit((user.email or "").lower(), PersonEdit.MOBILE, before, new, actor)
     whatsapp.relink(before, new)
     return DONE, {}
+
+
+# ---------- bounced lead emails: Possible fake, correct the address, send the follow-up again ----------
+
+TAKEN, BOUNCED, NO_SENDER, SENT, NOT_SENT = "taken", "bounced", "no_sender", "sent", "not_sent"
+BOUNCE_NOTICE = "This email bounced, so it may not be real. Remove the lead if it looks like spam, or correct the address if it's a typo and resend the follow-up."
+
+
+def bounced_set(addresses):
+    """The lower-cased addresses among `addresses` that are on the suppression list for a PERMANENT BOUNCE (a spam complaint does not count). One query."""
+    from notifications.models import EmailSuppression
+
+    wanted = {(a or "").strip().lower() for a in addresses if a}
+    if not wanted:
+        return set()
+    return set(EmailSuppression.objects.filter(email__in=wanted, reason=EmailSuppression.HARD_BOUNCE).values_list("email", flat=True))
+
+
+def is_bounced(email):
+    return bool(bounced_set([email]))
+
+
+def owner_of_email(new, exclude=""):
+    """Who already holds this address: {"kind": "account"|"lead", "name", "url"} or None. An account (any, verified or not) or another lead's journeys."""
+    from django.urls import reverse
+
+    from journey.models import JourneySession
+    from users.models import User
+
+    user = User.objects.filter(email__iexact=new).first()
+    if user is not None:
+        name = user.get_full_name() or user.email
+        return {"kind": "account", "name": name, "url": reverse("office_person", args=[user.pk], urlconf="config.urls_office") if hasattr(user, "interest") else ""}
+    session = JourneySession.objects.filter(lead_email__iexact=new, is_bot=False).exclude(lead_email__iexact=exclude).order_by("-created_at").first()
+    if session is not None:
+        return {"kind": "lead", "name": session.lead_first_name or new, "url": reverse("office_lead", args=[session.pk], urlconf="config.urls_office")}
+    return None
+
+
+def correct_lead_email(old, new, actor):
+    """Fix a lead's address (a typo): written on every journey that left the old one, and his notes, messages, list entries and history follow it.
+    Refused when the new address already belongs to another lead or an account (the answer says whose). The old address stays on the suppression
+    list. Audited ("Email changed by X"). Returns (DONE | UNCHANGED | INVALID | TAKEN | MISSING, info): info is the message for INVALID, or
+    the owner {kind, name, url} for TAKEN."""
+    from django.core.exceptions import ValidationError
+
+    from common.validators import normalise_email
+    from journey.models import JourneySession
+
+    old = (old or "").strip().lower()
+    try:
+        new = normalise_email(new)
+    except ValidationError as error:
+        return INVALID, error.messages[0]
+    sessions = list(JourneySession.objects.filter(lead_email__iexact=old, is_bot=False))
+    if not sessions:
+        return MISSING, ""
+    if new == old:
+        return UNCHANGED, ""
+    owner = owner_of_email(new, exclude=old)
+    if owner:
+        return TAKEN, owner
+    with transaction.atomic():
+        for session in sessions:
+            session.lead_email = new
+            session.save(update_fields=["lead_email", "updated_at"])
+        for model, field in ((StickyNote, "email"), (PersonMessage, "email"), (OutreachEntry, "lead_email"), (PersonEdit, "email"), (ArchivedLead, "email"), (LeadArchiveEvent, "email")):
+            model.objects.filter(**{field: old}).update(**{field: new})
+        NextMorningEmail.objects.filter(email=old).delete()  # the old address is not kept (the suppression list is the one record of it); the new one may be sent its own follow-up
+        _edit(new, PersonEdit.EMAIL, old, new, actor)
+    _figures_changed()
+    return DONE, ""
+
+
+def follow_up_state(email):
+    """For the lead page: {corrected (a staff correction exists), sent (the next-morning email already went to this address)}."""
+    email = (email or "").strip().lower()
+    return {"corrected": PersonEdit.objects.filter(email=email, what=PersonEdit.EMAIL).exists(),
+            "sent": NextMorningEmail.objects.filter(email=email, sent_at__isnull=False).exists()}
+
+
+def resend_follow_up(email, actor):
+    """Send the next-morning email to this address now, once (after a correction). Works with the automatic switch off, but needs the sender
+    address; not while the address is still bounced. Returns SENT, BOUNCED, NO_SENDER, ALREADY (it went before), MISSING or NOT_SENT (info: why)."""
+    from common.emaildefaults import SENDER_PERSON
+    from journey.models import JourneySession
+    from notifications import emailsettings
+    from plans.models import SiteSettings
+
+    from . import nextmorning
+
+    email = (email or "").strip().lower()
+    if not JourneySession.objects.filter(lead_email__iexact=email, is_bot=False).exists():
+        return MISSING, ""
+    if is_bounced(email):
+        return BOUNCED, ""
+    site, now = SiteSettings.load(), timezone.now()
+    if emailsettings.options_for(nextmorning.TEMPLATE).sender == SENDER_PERSON and not site.auto_sender:
+        return NO_SENDER, ""
+    with transaction.atomic():
+        row = NextMorningEmail.objects.select_for_update().filter(email=email).first()
+        if row is not None and row.sent_at:
+            return ALREADY, ""
+        if row is None:
+            first = JourneySession.objects.filter(lead_email__iexact=email, is_bot=False, lead_at__isnull=False).order_by("lead_at").values_list("lead_at", flat=True).first()
+            row = NextMorningEmail.objects.create(email=email, lead_at=first or now, due_at=now, claimed_at=now)
+        else:
+            NextMorningEmail.objects.filter(pk=row.pk).update(skipped_at=None, skip_reason="", claimed_at=now, due_at=now)
+            row.refresh_from_db()
+    outcome = nextmorning.send_one(row, site, now, force=True)
+    return (SENT, "") if outcome == "sent" else (NOT_SENT, outcome)

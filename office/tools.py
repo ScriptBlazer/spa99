@@ -113,9 +113,21 @@ def archive_context(target, user):
                         "reason_max": REASON_MAX, "can_edit": can_edit(user)}}
 
 
+def bounce_context(target, user):
+    """The lead page only: `bounce` {bounced, email, notice, can_edit, correct_url, resend_url, can_resend, sent}. `can_resend`: staff corrected the address
+    (so the follow-up never went to it) and it does not bounce now."""
+    if target.kind != "lead":
+        return {}
+    bounced = services.is_bounced(target.main)
+    state = services.follow_up_state(target.main)
+    editor = can_edit(user)
+    return {"bounce": {"bounced": bounced, "email": target.main, "notice": services.BOUNCE_NOTICE, "can_edit": editor, "correct_url": target.url("email"), "resend_url": target.url("resend"),
+                       "can_resend": bool(editor and state["corrected"] and not state["sent"] and not bounced), "sent": state["sent"]}}
+
+
 def tools_context(target, user):
     """Everything the three pages add to their context: notes_*, outreach and whatsapp, and `archive` on the lead page."""
-    return {**notes_context(target, user), **outreach_context(target, user), **whatsapp_context(target, user), **archive_context(target, user)}
+    return {**notes_context(target, user), **outreach_context(target, user), **whatsapp_context(target, user), **archive_context(target, user), **bounce_context(target, user)}
 
 
 def outreach_rows(entries):

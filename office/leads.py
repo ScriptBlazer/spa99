@@ -245,6 +245,9 @@ def build_rows(page_sessions):
     for key, label in _heard_answers().filter(ak__in=emails).order_by("session__created_at").values_list("ak", "options__label"):
         heard[key] = label  # the newest answering journey wins
     archived = {a.email: a for a in ArchivedLead.objects.filter(email__in=emails)}
+    from outreach.services import bounced_set
+
+    bounced = bounced_set(emails)  # Possible fake: a permanent bounce on the suppression list (one query for the page)
     out = []
     for page_row in page_sessions:
         session = loaded[page_row.pk]
@@ -258,7 +261,7 @@ def build_rows(page_sessions):
             "tier": session.suggested_plan.name if session.suggested_plan_id else "", "tier_slug": session.suggested_plan.slug if session.suggested_plan_id else "",
             "potential": session.gold_potential, "score": session.gold_score, "industries": labels.get("industry", []),
             "answers": labels, "summary": summary_lines(labels), "heard_via": heard.get(page_row.email_key, ""),
-            "via_chat": page_row.email_key in chatted,
+            "via_chat": page_row.email_key in chatted, "bounced": page_row.email_key in bounced,
             "source": {"host": host, "utm_source": utm, "utm_medium": medium, "utm_campaign": campaign, "device": device,
                        "label": utm or host or "Direct", "campaign": campaign},
             "registered": page_row.has_account, "account_id": str(accounts[page_row.email_key]) if page_row.email_key in accounts else "",

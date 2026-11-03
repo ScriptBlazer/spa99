@@ -148,7 +148,8 @@ a.o-wa-who > .o-icon { color: var(--office-muted); flex: none; }
 .o-wa-drop[hidden] { display: none; }
 .o-wa-wall:has(.o-wa-drop:not([hidden])) .o-wa-scroll { outline: 2px dashed var(--color-control-line); outline-offset: -0.5rem; }
 
-.o-wa-day { position: sticky; top: var(--space-2); z-index: 1; display: flex; justify-content: center; margin: var(--space-3) 0 var(--space-2); pointer-events: none; list-style: none; }
+/* in the flow, not sticky: a pinned pill sat on top of the text under it (a failed-message notice, a bubble) and could not be kept clear of it */
+.o-wa-day { display: flex; justify-content: center; margin: var(--space-3) 0 var(--space-2); pointer-events: none; list-style: none; }
 .o-wa-day span { padding: 0.25rem var(--space-3); border-radius: var(--office-pill); background: var(--office-surface); color: var(--office-muted); font-size: var(--office-text-xs); font-weight: 600; box-shadow: 0 1px 1px rgb(73 46 33 / 0.06); }
 .o-wa-unread { display: flex; justify-content: center; margin: var(--space-3) calc(var(--space-3) * -1) var(--space-2); padding: var(--space-1) var(--space-3); background: color-mix(in srgb, var(--office-surface) 72%, transparent); color: var(--office-text); font-size: var(--office-text-xs); font-weight: 600; list-style: none; }
 @media (min-width: 64em) { .o-wa-unread { margin-inline: calc(var(--space-4) * -1); } }
@@ -218,7 +219,7 @@ a.o-wa-who > .o-icon { color: var(--office-muted); flex: none; }
 .o-wa-video { display: block; width: 18rem; max-width: 100%; max-height: 20rem; border-radius: 9px; background: var(--office-sunken); }
 
 /* a message that did not go */
-.o-wa-fail { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin-top: var(--space-1); max-width: 85%; padding: 0.125rem var(--space-3); border-radius: 1.125rem; background: var(--office-surface); color: var(--office-danger); font-size: var(--text-sm); line-height: 1.35; }
+.o-wa-fail { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin-top: var(--space-1); max-width: 85%; padding: 0.125rem var(--space-3); border-radius: var(--radius-md); background: var(--office-surface); color: var(--office-danger); font-size: var(--text-sm); line-height: 1.35; }
 .o-wa-fail-text { display: inline-flex; align-items: flex-start; gap: var(--space-1); padding-block: 0.25rem; }
 .o-wa-fail-text .o-icon { margin-top: 0.1875rem; }
 .o-wa-fail .o-icon { width: 1rem; height: 1rem; flex: none; }

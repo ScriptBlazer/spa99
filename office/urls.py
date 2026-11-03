@@ -62,5 +62,8 @@ urlpatterns = [
     # archive a lead / move him back (R6)
     path("leads/<uuid:pk>/archive/", t.lead_archive, name="office_lead_archive"),
     path("leads/<uuid:pk>/unarchive/", t.lead_unarchive, name="office_lead_unarchive"),
+    # bounced lead emails: correct the address, send the follow-up again
+    path("leads/<uuid:pk>/email/", t.lead_email, name="office_lead_email"),
+    path("leads/<uuid:pk>/resend/", t.lead_resend, name="office_lead_resend"),
     path("gold/<uuid:pk>/delete/", t.gold_delete, name="office_gold_delete"),
 ]

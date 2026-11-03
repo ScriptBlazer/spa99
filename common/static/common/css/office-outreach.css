@@ -185,3 +185,7 @@ button.o-chip { border: 0; font-family: inherit; }
 @media (min-width: 64em) { .o-nav-list a > span:not(.o-badge-count) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
 
 @media (prefers-reduced-motion: reduce) { .o-note, .o-note-x, .o-row.is-leaving { transition: none; } }
+
+/* bounced lead email: the notice sits clear of the badges above it */
+.o-bounce { margin-block: var(--space-3) var(--space-2); }
+.o-bounce p { max-width: none; }

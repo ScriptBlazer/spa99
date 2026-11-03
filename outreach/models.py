@@ -119,16 +119,16 @@ class PersonMessage(UUIDModel):
 
 
 class PersonEdit(UUIDModel):
-    """Staff added or fixed a person's first name or mobile (lead page, person page): one line of the timeline, "Mobile added by X" /
-    "Mobile changed by X". Erased with the person (the values are personal data)."""
+    """Staff added or fixed a person's first name, mobile or (a lead's) email (lead page, person page): one line of the timeline, "Mobile added by X" /
+    "Email changed by X". Erased with the person (the values are personal data)."""
 
-    FIRST_NAME, MOBILE = "first_name", "mobile"
-    WHAT_CHOICES = [(FIRST_NAME, "First name"), (MOBILE, "Mobile")]
+    FIRST_NAME, MOBILE, EMAIL = "first_name", "mobile", "email"
+    WHAT_CHOICES = [(FIRST_NAME, "First name"), (MOBILE, "Mobile"), (EMAIL, "Email")]
 
     email = models.CharField(max_length=254, db_index=True, help_text="Lower case. The person's main address when it was changed.")
     what = models.CharField(max_length=12, choices=WHAT_CHOICES)
-    before = models.CharField(max_length=100, blank=True)
-    after = models.CharField(max_length=100, blank=True)
+    before = models.CharField(max_length=254, blank=True)
+    after = models.CharField(max_length=254, blank=True)
     by = _person()
     by_label = models.CharField(max_length=254, blank=True)
     at = models.DateTimeField(default=timezone.now, db_index=True)

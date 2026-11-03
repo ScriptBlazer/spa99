@@ -181,6 +181,49 @@ def lead_unarchive(request, pk):
     return redirect(_back(request, target.page_url))
 
 
+@editor
+@require_POST
+def lead_email(request, pk):
+    """Correct a lead's email (a typo), usually after a bounce. POST email. Refused, saying whose it is, when another lead or an account has it."""
+    target = tools.target_for("lead", pk)
+    if target.kind != "lead":
+        return redirect(target.page_url)
+    result, info = services.correct_lead_email(target.main, request.POST.get("email", ""), request.user)
+    if result == services.DONE:
+        messages.success(request, "Email corrected.")
+    elif result == services.UNCHANGED:
+        messages.info(request, "That is the address he already has.")
+    elif result == services.TAKEN:
+        who = info["name"] if info["kind"] == "account" else f"another lead ({info['name']})"
+        messages.error(request, f"That address already belongs to {who}.")
+    elif result == services.INVALID:
+        messages.error(request, info)
+    else:
+        messages.error(request, "Could not correct this email.")
+    return redirect(target.page_url)
+
+
+@editor
+@require_POST
+def lead_resend(request, pk):
+    """Send the next-morning email to his (corrected) address now, once."""
+    target = tools.target_for("lead", pk)
+    if target.kind != "lead":
+        return redirect(target.page_url)
+    result, info = services.resend_follow_up(target.main, request.user)
+    if result == services.SENT:
+        messages.success(request, "Follow-up sent.")
+    elif result == services.BOUNCED:
+        messages.error(request, "That address still bounces, so nothing was sent. Correct it first.")
+    elif result == services.NO_SENDER:
+        messages.error(request, "Set the sender address in System > Settings first, then try again.")
+    elif result == services.ALREADY:
+        messages.info(request, "The follow-up already went to this address.")
+    else:
+        messages.error(request, f"The follow-up was not sent ({info or 'try again'}).")
+    return redirect(target.page_url)
+
+
 # ---------- the approach list page ----------
 
 STATES = listing.STATES

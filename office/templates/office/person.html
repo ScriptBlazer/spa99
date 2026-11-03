@@ -14,8 +14,10 @@
     {% if person.is_staff or person_status != "gold" %}<span class="o-badge o-badge--type">{% if person.is_staff %}Team{% elif person.kind == "lead" %}No account{% elif person.interest.plan %}Member, {{ person.interest.plan }}{% else %}Member{% endif %}</span>{% endif %}{# the status pill already says Gold member (Moishe, 2026-10-27) #}
     {% if person.kind == "account" %}{% if person.verified_at %}<span class="o-badge o-badge--s-approved">Verified</span>{% else %}<span class="o-badge o-badge--s-waiting">Not verified</span>{% endif %}{% endif %}
     {% if person.gold.potential %}{% include "office/_badge.html" with potential=person.gold.potential %}{% endif %}
+    {% if bounce.bounced %}<span class="o-badge o-badge--type" data-possible-fake>Possible fake</span>{% endif %}
     {% if archive.archived %}<span class="o-badge o-badge--archived" data-archived-badge>{% include "office/_icon.html" with name="archive" %}Archived {{ archive.at|dm }}</span>{% endif %}
   </p>
+  {% include "office/_bounce.html" %}
   {% include "office/_notes_open.html" %}
 </header>
 <div class="o-detail o-detail--person">
