@@ -317,7 +317,8 @@ class SiteSettings(BaseModel):
         from email.utils import formataddr
 
         address = (self.auto_email_from_address or "").strip()
-        return formataddr(((self.auto_email_from_name or "").strip() or "Spa 99", address)) if address else ""
+        name = " ".join((self.auto_email_from_name or "").split())  # never a line break in a header
+        return formataddr((name or "Spa 99", address)) if address else ""
 
     @property
     def outreach_title(self):

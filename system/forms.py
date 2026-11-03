@@ -84,6 +84,12 @@ class EmailsForm(VersionedForm):
         for name in ("lead_next_morning_at", "lead_next_morning_min_hours"):
             self.fields[name].required = False  # a post without them (older forms, scripts) keeps the saved value
 
+    def clean_auto_email_from_name(self):
+        name = self.cleaned_data.get("auto_email_from_name") or ""
+        if "\r" in name or "\n" in name:
+            raise forms.ValidationError("Keep the sender name on one line.")
+        return name.strip()
+
     def clean_lead_next_morning_at(self):
         return self.cleaned_data.get("lead_next_morning_at") or self.instance.lead_next_morning_at
 

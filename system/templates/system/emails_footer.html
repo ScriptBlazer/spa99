@@ -22,7 +22,7 @@
           </div>
         </div>{% endif %}{% endfor %}{% endfor %}
         {{ form.row_token }}
-        <p class="sys-muted se-help">Empty line = left out. You can use {% for p in placeholders %}<code>{{ "{" }}{{ p.name }}{{ "}" }}</code> ({{ p.description|lower }}){% if not forloop.last %}, {% endif %}{% endfor %}.</p>
+        <p class="sys-muted se-help">Empty line = left out. You can use {% for p in placeholders %}<code>{{ "{" }}{{ p.name }}{{ "}" }}</code> ({{ p.description }}){% if not forloop.last %}, {% endif %}{% endfor %}.</p>
         <p class="sys-muted se-help">The unsubscribe link and the line saying why someone gets an email cannot be changed or removed. Each email can use this footer, this footer without the contact line, or its own lines: see its page under <a href="{% url 'system_email_list' %}">Automatic emails</a>.</p>
         <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>
       </div>

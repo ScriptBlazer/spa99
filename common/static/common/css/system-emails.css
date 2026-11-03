@@ -328,3 +328,11 @@ body.system {
 .se-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sys-2); }
 .se-actions form { margin: 0; }
 @media (max-width: 48em) { .se-actions .sys-btn { white-space: normal; text-align: center; } .se-people td:nth-child(3) { white-space: nowrap; } }
+
+/* Footer and sender panel (email flexibility, 2026-11-03): one choice per line, room between the custom footer rows. */
+.se-choice { display: flex; align-items: baseline; gap: var(--sys-2); padding-block: var(--sys-1); line-height: 1.4; cursor: pointer; }
+.se-choice input[type=radio] { flex: none; margin: 0; translate: 0 0.1em; }
+.se-custom-footer { display: grid; gap: var(--sys-3); }
+.se-custom-footer[hidden] { display: none; }
+.se-custom-footer .sys-row { display: grid; gap: var(--sys-1); padding-block: 0; }
+.se-custom-footer .sys-row > label { position: relative; z-index: 1; }

@@ -86,3 +86,20 @@ class EmailFlexibilityViewTests(TestCase):
         self.assertIn("Typed button", sent.body)
         bad = self.client.post("/emails/automatic/verify/preview/", {**typed, "heading": "{nope}"}).json()
         self.assertEqual((bad["ok"], "heading" in bad["errors"]), (False, True))
+
+
+class SenderNameOneLineTests(TestCase):
+    """Review 2026-11-03: a line break in the sender name must not break every person-sender email."""
+
+    def test_form_refuses_a_line_break_and_the_header_never_has_one(self):
+        from plans.models import SiteSettings
+        from system.forms import EmailsForm
+
+        site = SiteSettings.load()
+        form = EmailsForm(instance=site)
+        form.cleaned_data = {"auto_email_from_name": "Barry\nBcc: x@example.com"}
+        with self.assertRaises(Exception):
+            form.clean_auto_email_from_name()
+        site.auto_email_from_name, site.auto_email_from_address = "Barry\r\nLobenstein", "barry@example.com"
+        self.assertNotIn("\n", site.auto_sender)
+        self.assertNotIn("\r", site.auto_sender)

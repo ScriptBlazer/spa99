@@ -90,7 +90,7 @@
         <fieldset class="se-field" data-system-field="sender">
           <legend>Sender</legend>
           {% for radio in form.sender %}<label class="se-choice"><input type="radio" name="sender" value="{{ radio.data.value }}"{% if radio.data.selected %} checked{% endif %} data-se-setting> {{ radio.choice_label }}{% if radio.data.value == "site" %}: {{ footer.site_sender }}, replies to {{ footer.contact_email }}{% elif footer.person_sender %}: {{ footer.person_sender }}, replies to the same address{% endif %}{% if radio.data.value == footer.default_sender %} <span class="sys-muted">(default for this email)</span>{% endif %}</label>{% endfor %}
-          {% if not footer.person_sender %}<p class="sys-note" data-se-person-missing>The person sender has no address yet. Set it in <a href="{% url 'system_emails' %}">Emails</a>. Until then an email set to the person sender goes from the site sender.</p>{% endif %}
+          {% if not footer.person_sender %}<p class="sys-note" data-se-person-missing>The person sender has no address yet. Set it in <a href="{% url 'system_emails' %}">Emails</a>. {% if spec.key == "lead_next_morning" %}Until then this email is not sent.{% else %}Until then an email set to the person sender goes from the site sender.{% endif %}</p>{% endif %}
           {% if form.sender.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="sender" data-problem-label="Sender">{{ form.sender.errors|join:" " }}</p>{% endif %}
         </fieldset>
       </div>
