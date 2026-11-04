@@ -133,6 +133,8 @@ body.system.live { --sys-stripe: 3px; }
 .sys-savebar[data-error] { background: var(--sys-danger-bg); }
 .sys-savebar .sys-msg { flex: 1; }
 .sys-inline-save { margin-top: var(--sys-4); } .js .sys-inline-save { display: none; }
+.sys-actions-row { display: flex; flex-wrap: wrap; gap: var(--sys-3); margin-top: var(--sys-4); } /* a form with no save bar (Team > Email): always shown */
+.sys-row label small code { overflow-wrap: anywhere; }
 .sys-changes-list { position: absolute; bottom: 52px; left: 0; right: 0; max-height: 40vh; overflow: auto; background: var(--sys-surface); border-radius: var(--sys-radius-lg); box-shadow: var(--sys-shadow-pop); padding: var(--sys-2) var(--sys-4); }
 .sys-changes-list li { padding: 3px 0; }
 .sys-diff { display: grid; gap: var(--sys-1); font-family: var(--sys-mono); font-size: var(--sys-fs-sm); }

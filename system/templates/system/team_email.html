@@ -20,7 +20,7 @@
         {% if errors.signature %}<p class="sys-error" role="alert" data-problem data-problem-field="signature" data-problem-label="Signature">{{ errors.signature }}</p>{% endif %}</div>
     </div>
   </div>
-  <div class="sys-inline-save">
+  <div class="sys-actions-row">
     <button type="submit" class="sys-btn primary">Save</button>
     <button type="submit" class="sys-btn" name="preview" value="1" data-system-signature-preview>Preview</button>
     <a class="sys-btn" href="{% url 'system_team' %}">Back to Team</a>

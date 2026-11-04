@@ -56,6 +56,8 @@ class Command(BaseCommand):
         if not files:
             raise CommandError(f"No spa99-signature-*.html files with a Senders line in {folder}")
         staff = {u.email.lower(): u for u in team.team_queryset()}
+        for row in StaffSender.objects.filter(user__in=team.team_queryset()).exclude(sending_address="").select_related("user"):
+            staff.setdefault(row.sending_address.lower(), row.user)  # a BML login: its signature file names its @spa99.uk sending address
         filled = 0
         with transaction.atomic():
             for email, html in files.items():
