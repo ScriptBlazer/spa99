@@ -12,6 +12,61 @@ import { toast } from './feedback.js';
 import { bindKeyboard, releaseKeyboard } from './office-keyboard.js';
 import { bytes, dayLabel, dayOf, desktopKeys, fullStamp, h, icon, mb, phone, reduced, timeOf } from './office-dom.js';
 
+// ---------- photos over WhatsApp's 5 MB limit are made smaller here, in the browser ----------
+// WhatsApp's image limit cannot be raised, so a bigger photo is drawn to a canvas and saved again as a JPEG (quality 0.9 down to 0.5, long side 2560 px down by a fifth each round)
+// until it fits. The server's checks and limit stay as they are: what it receives is an ordinary image/jpeg under the limit. WebP and HEIC are always converted.
+const CONVERT_TYPES = new Set(['image/webp', 'image/heic', 'image/heif']);
+const MAX_SIDE = 2560;
+const QUALITIES = [0.9, 0.8, 0.7, 0.6, 0.5];
+
+/** The extra picture types this browser can read (it cannot be known for sure without a file, so the picker offers them where the engine is known to). */
+export function extraImageTypes() {
+  const out = [];
+  const canvas = document.createElement('canvas');
+  if (canvas.toDataURL('image/webp').startsWith('data:image/webp')) out.push('image/webp');
+  if (/Apple/.test(navigator.vendor || '') && /iPhone|iPad|Macintosh/.test(navigator.userAgent)) out.push('image/heic', 'image/heif');
+  return out;
+}
+
+function decodeImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable')); };
+    img.src = url;
+  });
+}
+
+function jpegName(name) {
+  const base = String(name || '').replace(/\.[^.]*$/, '').replace(/[^\w .-]+/g, '').trim().slice(0, 60);
+  return `${base || 'photo'}.jpg`;
+}
+
+/** A JPEG File under `max` bytes made from `file`. Throws Error('unreadable') when the browser cannot read it, Error('toobig') when no size gets it under the limit. */
+export async function shrinkImage(file, max) {
+  const img = await decodeImage(file);
+  const w0 = img.naturalWidth || img.width;
+  const h0 = img.naturalHeight || img.height;
+  if (!w0 || !h0) throw new Error('unreadable');
+  let scale = Math.min(1, MAX_SIDE / Math.max(w0, h0));
+  for (let round = 0; round < 8; round += 1) {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(w0 * scale));
+    canvas.height = Math.max(1, Math.round(h0 * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';   // a PNG with see-through parts would turn black as a JPEG
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (const quality of QUALITIES) {
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+      if (blob && blob.size > 0 && blob.size <= max) return new File([blob], jpegName(file.name), { type: 'image/jpeg', lastModified: Date.now() });
+    }
+    scale *= 0.8;
+  }
+  throw new Error('toobig');
+}
+
 const GROUP_MS = 5 * 60 * 1000;
 const POLL_VISIBLE_MS = 4000;
 const POLL_HIDDEN_MS = 30000;
@@ -132,12 +187,12 @@ export class Thread {
       if (left < 3600000) {
         win.hidden = false;
         win.className = 'o-wa-win o-wa-win--soon';
-        win.replaceChildren(icon('clock'), document.createTextNode(minutes <= 1 ? 'Window closes in under a minute' : `Window closes in ${minutes} minutes`));
-        if (!this.warned) { this.warned = true; this.say(minutes <= 1 ? 'The window closes in under a minute.' : `The window closes in ${minutes} minutes.`); }
+        win.replaceChildren(icon('clock'), document.createTextNode(minutes <= 1 ? 'Under a minute left. His reply restarts it.' : `${minutes} minutes left. His reply restarts it.`));
+        if (!this.warned) { this.warned = true; this.say(minutes <= 1 ? 'Under a minute left to message freely.' : `${minutes} minutes left to message freely.`); }
       } else {
         win.hidden = false;
         win.className = 'o-wa-win';
-        win.replaceChildren(document.createTextNode(`Window closes in ${Math.floor(left / 3600000)}h`));
+        win.replaceChildren(document.createTextNode(`Message freely for ${Math.floor(left / 3600000)}h more. His replies restart this.`));
       }
       pill.textContent = `Open, ${left < 3600000 ? `${minutes}m` : `${Math.floor(left / 3600000)}h`} left`;
     } else {
@@ -540,7 +595,7 @@ export class Thread {
     } else count.hidden = true;
   }
 
-  canSend() { return (this.ui.input.value.trim() || this.file) && !this.overBy(); }
+  canSend() { return !this.preparing && (this.ui.input.value.trim() || this.file) && !this.overBy(); }
 
   /** The microphone takes the Send slot while the field is empty, nothing is attached, voice notes are available here and the browser can record. Typing swaps it back at once. */
   voiceReady() { return !!(this.contact.voice?.available && window.MediaRecorder && navigator.mediaDevices?.getUserMedia); }
@@ -578,6 +633,8 @@ export class Thread {
     });
     send.addEventListener('pointerdown', (event) => event.preventDefault()); // tapping it must not close the keyboard
     composer.addEventListener('submit', (event) => { event.preventDefault(); this.submit(); });
+    const extra = extraImageTypes();
+    if (extra.length) file.accept = `${file.accept},${extra.join(',')}`;
     this.q('[data-attach]').addEventListener('click', () => file.click());
     file.addEventListener('change', () => { if (file.files[0]) this.chooseFile(file.files[0]); file.value = ''; });
     this.q('[data-tray-remove]').addEventListener('click', () => this.clearFile());
@@ -608,33 +665,62 @@ export class Thread {
     input.dispatchEvent(new Event('input'));
   }
 
-  chooseFile(file) {
+  /** A file picked, pasted or dropped. A photo over the limit, a WebP or a HEIC is first made into a smaller JPEG (shrinkImage); the tray and the bubble then show that one. */
+  async chooseFile(file) {
     const limits = this.contact.limits;
-    const isImage = file.type === 'image/jpeg' || file.type === 'image/png';
+    const convert = CONVERT_TYPES.has(file.type);
+    const isImage = file.type === 'image/jpeg' || file.type === 'image/png' || convert;
     const isPdf = file.type === 'application/pdf';
     const isVideo = file.type === 'video/mp4';
     const error = this.ui.trayError;
+    const say = (text) => { error.hidden = false; error.textContent = text; };
     error.hidden = true;
-    if (!isImage && !isPdf && !isVideo) { error.hidden = false; error.textContent = 'Photos, PDFs or MP4 videos only.'; return; }   // an iPhone's own .mov is refused here, as on the server
-    if (isVideo && file.size > limits.file_bytes) { error.hidden = false; error.textContent = `Videos up to ${mb(limits.file_bytes)}.`; return; }
-    if (!isVideo && file.size > (isImage ? limits.image_bytes : limits.file_bytes)) { error.hidden = false; error.textContent = `Photos up to ${mb(limits.image_bytes)}, PDFs up to ${mb(limits.file_bytes)}.`; return; }
+    if (!isImage && !isPdf && !isVideo) { say('Photos, PDFs or MP4 videos only.'); return; }   // an iPhone's own .mov is refused here, as on the server
+    if (isVideo && file.size > limits.file_bytes) { say(`That video is too big. Videos can be up to ${mb(limits.file_bytes)}.`); return; }
+    if (isPdf && file.size > limits.file_bytes) { say(`That PDF is too big. PDFs can be up to ${mb(limits.file_bytes)}.`); return; }
+    if (isImage && (convert || file.size > limits.image_bytes)) {
+      const ticket = (this.choosing = (this.choosing || 0) + 1);
+      this.file = null;
+      this.preparing = true;
+      this.showTray(file, null, 'Making the photo smaller\u2026');
+      this.updateSend();
+      try {
+        file = await shrinkImage(file, limits.image_bytes);
+      } catch (failure) {
+        if (ticket !== this.choosing) return;
+        this.preparing = false;
+        this.ui.tray.hidden = true;
+        this.updateSend();
+        say(failure.message === 'toobig' ? `That photo could not be made small enough. WhatsApp takes photos up to ${mb(limits.image_bytes)}.` : 'That photo could not be read. Try another one.');
+        return;
+      }
+      if (ticket !== this.choosing) return;   // another file was picked meanwhile
+      this.preparing = false;
+    }
     this.file = file;
-    const { tray, trayThumb, trayName, traySize } = this.ui;
-    trayThumb.replaceChildren();
-    if (isImage) {
-      const url = URL.createObjectURL(file);
-      (this.urls_to_free = this.urls_to_free || []).push(url);
-      trayThumb.append(h('img', { src: url, alt: '' }));
-    } else trayThumb.append(icon(isVideo ? 'video' : 'file-pdf', 'o-icon o-wa-tray-icon'));
-    trayName.textContent = file.name;
-    traySize.textContent = bytes(file.size);
-    tray.hidden = false;
+    this.showTray(file, isImage ? file : null, bytes(file.size), isVideo ? 'video' : 'file-pdf');
     this.updateSend();
     this.ui.input.focus({ preventScroll: true });
   }
 
+  /** The tray above the composer: a thumbnail of `image` (or an icon), the name and a line under it. */
+  showTray(file, image, line, iconName) {
+    const { tray, trayThumb, trayName, traySize } = this.ui;
+    trayThumb.replaceChildren();
+    if (image) {
+      const url = URL.createObjectURL(image);
+      (this.urls_to_free = this.urls_to_free || []).push(url);
+      trayThumb.append(h('img', { src: url, alt: '' }));
+    } else trayThumb.append(icon(iconName || 'file-pdf', 'o-icon o-wa-tray-icon'));
+    trayName.textContent = file.name;
+    traySize.textContent = line;
+    tray.hidden = false;
+  }
+
   clearFile() {
     this.file = null;
+    this.preparing = false;
+    this.choosing = (this.choosing || 0) + 1;   // a photo still being made smaller is dropped
     this.ui.tray.hidden = true;
     this.ui.trayError.hidden = true;
     this.updateSend();
@@ -1032,7 +1118,7 @@ export class Thread {
     if (data.error === 'voice_unavailable') this.contact = { ...this.contact, voice: { ...(this.contact.voice || {}), available: false } };
     const words = {
       window_closed: 'Not sent. The window has closed.', opted_out: 'Not sent. He replied STOP.', bad_reply: 'That message can no longer be quoted.',
-      voice_too_long: 'That voice note is over 5 minutes.', too_big: temp.kind === 'audio' ? 'That voice note is too large to send.' : '', voice_unavailable: 'Voice notes are not available right now.',
+      voice_too_long: 'That voice note is over 5 minutes.', too_big: temp.kind === 'audio' ? 'That voice note is too large to send.' : (data.message || 'That file is too big to send.'), voice_unavailable: 'Voice notes are not available right now.',
       bad_file: temp.kind === 'audio' ? 'That recording could not be used. Try again.' : '',
     };
     const reason = words[data.error] || (data.message ? `Not sent. ${data.message}` : 'Not sent. Try again.');
@@ -1062,6 +1148,7 @@ export class Thread {
       try { data = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
       if (xhr.status >= 200 && xhr.status < 300 && data?.ok) { this.afterSent(temp, data.message, caption); return; }
       if (data) { this.serverRefused(temp, data, caption); return; }
+      if (xhr.status === 413) { this.failTemp(temp, 'That file is too big to send.', null); return; }   // refused before it reached the app (not JSON)
       this.failTemp(temp, 'Not sent. Try again.', again);
     });
     xhr.addEventListener('error', () => { this.sending -= 1; this.setOffline(true); this.failTemp(temp, 'Not sent. Try again.', again); });

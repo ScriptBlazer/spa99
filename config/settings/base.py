@@ -225,6 +225,9 @@ EMAILCHAT_MAX_ATTACHMENTS = 20
 # The one domain Postmark may send from (the verified one: where hello@ lives). Office emails go From a staff member's own address only when it is on this domain. Blank = the domain of
 # DEFAULT_FROM_EMAIL (emailchat.sender.sending_domain), so nothing is typed twice.
 EMAIL_SENDING_DOMAIN = (ENV.get("EMAIL_SENDING_DOMAIN", "") or "").strip().lower().strip(".")
+# Emails sent directly to staff (emailchat/direct.py): mail from the internal domain (BML) is ignored (it stays in Outlook); blank = none. The staff group address is one more address that keeps a mail out.
+EMAIL_INTERNAL_DOMAIN = (ENV.get("EMAIL_INTERNAL_DOMAIN", "") or "").strip().lower().strip(".")
+EMAIL_STAFF_GROUP_ADDRESS = (ENV.get("EMAIL_STAFF_GROUP_ADDRESS", "") or "").strip().lower()
 
 LANGUAGE_CODE = "en-gb"
 TIME_ZONE = "Europe/London"

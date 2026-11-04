@@ -13,7 +13,7 @@ from django.http import Http404, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from . import services
+from . import direct, services
 
 logger = logging.getLogger("spa99.emailchat")
 
@@ -31,6 +31,10 @@ def authorised(header):
     ok_user = hmac.compare_digest(user.encode(), settings.EMAIL_INBOUND_USER.encode())  # both always run: timing does not say which part was wrong
     ok_password = hmac.compare_digest(password.encode(), settings.EMAIL_INBOUND_PASSWORD.encode())
     return ok_user and ok_password
+
+
+def _has_message_id(payload):
+    return isinstance(payload.get("MessageID"), str) and bool(payload["MessageID"].strip())
 
 
 @login_not_required  # PUBLIC on purpose: Postmark calls it. The Basic credentials in its URL are the proof.
@@ -53,17 +57,27 @@ def inbound(request):
         return HttpResponse(status=400)
     if not isinstance(payload, dict):
         return HttpResponse(status=400)
-    thread = services.thread_for_token(payload)
-    if thread is None:
-        logger.info("Inbound email for an unknown or missing reply token: not stored")
-        return HttpResponse(status=200)
-    if services.is_group_copy(payload):
-        logger.warning("Inbound email carries the group copy header: not stored (it would loop)")
-        return HttpResponse(status=200)
-    if not isinstance(payload.get("MessageID"), str) or not payload["MessageID"].strip():
-        logger.warning("Inbound email without a MessageID: not stored")
-        return HttpResponse(status=200)
-    message, created = services.record_inbound(payload, thread)
+    direct_route = None
+    if direct.is_direct(payload):  # mail forwarded from a staff mailbox to inbox+<token>@...: emailchat/direct.py decides
+        if services.is_group_copy(payload) or not _has_message_id(payload):
+            logger.warning("Direct email is our own group copy or has no MessageID: not stored")
+            return HttpResponse(status=200)
+        direct_route = direct.route(payload)
+        if direct_route is None:
+            return HttpResponse(status=200)
+        thread = direct_route.thread
+    else:
+        thread = services.thread_for_token(payload)
+        if thread is None:
+            logger.info("Inbound email for an unknown or missing reply token: not stored")
+            return HttpResponse(status=200)
+        if services.is_group_copy(payload):
+            logger.warning("Inbound email carries the group copy header: not stored (it would loop)")
+            return HttpResponse(status=200)
+        if not _has_message_id(payload):
+            logger.warning("Inbound email without a MessageID: not stored")
+            return HttpResponse(status=200)
+    message, created = services.record_inbound(payload, thread, direct_route)
     if not created and not message.incomplete:
         return HttpResponse(status=200)  # Postmark sent it again and it is already whole
     if not created and not services.claim_inbound(message):

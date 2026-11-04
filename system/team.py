@@ -296,6 +296,9 @@ def save_email_sender(actor, target, sending_address, signature):
     from emailchat.models import StaffSender
 
     row, _ = StaffSender.objects.get_or_create(user=target)
+    from emailchat import direct
+
+    direct.ensure_token(row)  # his inbox+<token> address for Microsoft forwarding, made on the first save
     changed = [name for name, new in (("sending address", address), ("signature", cleaned)) if (row.sending_address if name == "sending address" else row.signature_html) != new]
     if not changed:
         return False, {}

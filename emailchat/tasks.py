@@ -18,7 +18,7 @@ def send_message(message_id):
 
 
 def process_inbound(message_id):
-    """His email arrived (the webhook stored it and its files): check each file's first bytes, copy it to the group address (System > Defaults) and notify the team (never for spam)."""
+    """His email arrived (the webhook stored it and its files): check each file's first bytes, copy it to the group address (System > Defaults; not for direct mail) and notify the team (never for spam)."""
     message = Message.objects.select_related("thread").filter(pk=message_id, direction=Message.IN).first()
     if message is None:
         return "skipped"
@@ -31,6 +31,8 @@ def process_inbound(message_id):
     pushed = "already pushed"
     if Message.objects.filter(pk=message.pk, notified_at__isnull=True).update(notified_at=timezone.now()):  # the push is taken once, even if the task runs again
         pushed = f"pushed {push.notify_payload(services.push_payload(message))}"
+    if message.direct_to:
+        return f"{pushed}, no group copy (direct mail)"  # the owner's rule: the app and the push, Outlook already has it
     return f"{pushed}, {services.copy_to_group(message)}"  # the copy to the group after the push (its own claim, once)
 
 

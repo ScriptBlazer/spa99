@@ -123,7 +123,7 @@ export class EmailThread {
   }
 
   addressOf(m) {
-    if (m.direction !== 'out') return m.from_address || 'Address not shown';
+    if (m.direction !== 'out') return `${m.from_address || 'Address not shown'}${m.direct_to ? `. To ${m.direct_to}` : ''}`;   // direct mail: which staff mailbox(es) it was sent to
     const to = `To ${m.to_address || this.thread.email}`;
     return m.from_address ? `From ${m.from_address}. ${to}` : to;   // the address it went out from (older emails have none stored)
   }

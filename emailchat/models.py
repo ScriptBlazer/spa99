@@ -34,6 +34,8 @@ class Thread(UUIDModel):
     last_preview = models.CharField(max_length=200, blank=True)
     last_direction = models.CharField(max_length=3, blank=True)
     has_attachment = models.BooleanField(default=False, help_text="Any message has a file.")
+    direct_to = models.CharField(max_length=254, blank=True, default="", db_default="", help_text="Started by an email sent directly to this staff address (lower case): the first one it was sent to. Blank: started in the Office.")
+    direct_name = models.CharField(max_length=100, blank=True, default="", db_default="", help_text="The staff member's first name, for 'Sent to Barry'.")
 
     class Meta:
         ordering = ["-last_message_at", "-created_at"]
@@ -91,6 +93,8 @@ class Message(models.Model):
     signature_html = models.TextField(blank=True, default="", db_default="", help_text="Ours: the signature this email went with, cleaned (common.richtext.clean_signature), as it was when the email was queued. Not part of body_html.")
     signature_text = models.TextField(blank=True, default="", db_default="", help_text="Ours: the plain text sign-off this email went with (the plain text copy's last lines).")
     group_copied_at = models.DateTimeField(null=True, blank=True, help_text="His reply was copied to the group address (taken by a worker once; Postmark's retries never copy it twice).")
+    direct_to = models.CharField(max_length=300, blank=True, default="", db_default="", help_text="His email was sent directly to these staff (first names, comma separated) and reached us by their forward. Blank: not direct mail.")
+    direct_key = models.CharField(max_length=64, null=True, blank=True, unique=True, help_text="Direct mail only: a hash of the original Message-ID, so one email forwarded from two mailboxes is one message.")
     legacy_person_message = models.UUIDField(null=True, blank=True, unique=True, help_text="The old outreach.PersonMessage this was copied from (backfill_email_threads).")
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     updated_at = models.DateTimeField(default=timezone.now, db_index=True, help_text="Changed when the status changes: the poll reads it.")
@@ -129,6 +133,7 @@ class StaffSender(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="email_sender")
     sending_address = models.CharField(max_length=254, blank=True, default="", help_text="Lower case, on the sending domain. Used only when his own login address is not.")
     signature_html = models.TextField(blank=True, default="", help_text="Cleaned HTML: tables, text, links and pictures only. Pictures may be /static/common/img/email/... (made absolute from SITE_URL when sent).")
+    inbox_token = models.CharField(max_length=32, null=True, blank=True, unique=True, help_text="Random: the part after inbox+ in the address his mailbox forwards to (inbox+<token>@<EMAIL_INBOUND_DOMAIN>). Made when his Email settings are saved.")
     updated_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):

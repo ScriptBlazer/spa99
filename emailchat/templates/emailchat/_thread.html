@@ -12,6 +12,7 @@
   <div class="o-em-scroll" data-scroll tabindex="-1">
     <div class="o-em-col">
       <h1 class="o-em-subject" dir="auto">{{ thread.subject }}</h1>
+      {% if thread.sent_to %}<p class="o-em-sentto"><span class="o-wa-quiet">Sent to {{ thread.sent_to }}</span> <span class="o-wa-whonum"><!--email_off-->{{ thread.sent_to_address }}<!--/email_off--></span></p>{% endif %}
       <p class="o-em-older" data-older-row hidden><button type="button" class="o-quiet" data-older>Show earlier emails</button></p>
       <div class="o-em-msgs" data-msgs></div>
     </div>

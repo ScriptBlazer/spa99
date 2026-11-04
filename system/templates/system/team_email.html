@@ -10,6 +10,10 @@
       <div><div class="sys-ctl"><input type="email" id="sending_address" name="sending_address" value="{{ sending_address }}" maxlength="254" autocomplete="off" placeholder="name@{{ domain }}"></div>
         {% if errors.sending_address %}<p class="sys-error" role="alert" data-problem data-problem-field="sending_address" data-problem-label="Sending address">{{ errors.sending_address }}</p>{% endif %}</div>
     </div>
+    <div class="sys-row" data-system-field="inbox_address">
+      <label for="inbox_address">Inbox address<small>For emails sent directly to him. Copy it into his Microsoft mailbox forwarding (docs/GO-LIVE.md, "Email chat"). A random address, so nobody can guess it. Keep it private.</small></label>
+      <div><div class="sys-ctl"><input type="text" id="inbox_address" class="mono" value="{% if inbox_address %}{{ inbox_address }}{% elif not inbox_domain_set %}Set EMAIL_INBOUND_DOMAIN first{% else %}Press Save and it appears here{% endif %}" readonly></div></div>
+    </div>
     <div class="sys-row{% if errors.signature %} invalid{% endif %}" data-system-field="signature" data-wide>
       <label for="signature">Signature<small>HTML (tables, text, links, pictures). Cleaned when saved: scripts, forms and unsafe styles are removed. Empty: a plain "Kind regards" with his name. Pictures: <span class="mono">/static/common/img/email/signature-logo.png</span> and <span class="mono">signature-banner.jpg</span>. To fill it from the design files, run <span class="mono">manage.py fill_signatures</span>.</small></label>
       <div><div class="sys-ctl"><textarea id="signature" name="signature" rows="14" spellcheck="false" autocomplete="off" class="mono">{{ signature }}</textarea></div>

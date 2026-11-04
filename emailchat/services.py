@@ -51,6 +51,7 @@ REASONS = {"suppressed": ("Not sent. This address bounced before or marked an em
            "send_failed": ("Not sent. Try again.", True)}
 
 
+FAILED_CHECKS = "The sender checks (SPF or DKIM) failed, so this may not be from who it says. Nobody was notified. Take care with links and files."
 TOO_COMPLEX = "The layout of this email was too complicated to show, so only its text is shown."
 MAYBE_NOT_SENT = "This may not have been sent. Check with him before trying again, in case it did arrive."
 
@@ -539,8 +540,10 @@ def thread_for_token(payload):
     return Thread.objects.filter(token=token).first() if re.fullmatch(r"[0-9a-f]{24}", token) else None
 
 
-def record_inbound(payload, thread):
-    """Store one email from him in `thread` (idempotent on Postmark's MessageID). Returns (message, created). Files are not touched here: see store_inbound_files."""
+def record_inbound(payload, thread, route=None):
+    """Store one email from him in `thread` (idempotent on Postmark's MessageID). Returns (message, created). Files are not touched here: see store_inbound_files.
+    `route` (emailchat.direct.Route) is direct mail: `thread` may be None, then the thread is made here with the message (one transaction), and the message carries who it was sent to,
+    the hash of its original Message-ID, and whether its sender check failed (stored as spam: flagged, never pushed)."""
     provider_id = _text(payload.get("MessageID"), 100).strip()
     existing = Message.objects.filter(provider_id=provider_id).first()
     if existing is not None:
@@ -557,17 +560,28 @@ def record_inbound(payload, thread):
     text, quoted = richtext.split_outlook_text(text)  # Outlook's From: / Sent: / To: / Subject: block (Postmark's own stripping does not know it): his words above it, the rest folds
     full = (whole or before) if quoted or (stripped and whole != stripped) else ""
     subject = clean_subject(_text(payload.get("Subject"), 400))
-    spam = _header(payload, "X-Spam-Status").strip().lower().startswith("yes")
+    spam = _header(payload, "X-Spam-Status").strip().lower().startswith("yes") or bool(route and route.spam)
+    note = " ".join(x for x in (TOO_COMPLEX if too_complex else "", route.note if route else "") if x)
     try:
         with transaction.atomic():
+            if thread is None:  # direct mail that starts a thread: with that sender and subject, and no owner link (his From is unproven: common.ownership)
+                thread = Thread.objects.create(email=from_address or route.email, subject=route.subject, direct_to=route.staff, direct_name=route.names)
             message = Message.objects.create(
                 incomplete=True, claimed_at=now(), thread=thread, direction=Message.IN, subject=subject, shows_subject=_shows_subject(thread, subject), body_text=text, body_full=full if full != text else "",
-                body_html=html, has_remote_images=bool(richtext.remote_image_count(html)), status=Message.RECEIVED, note=TOO_COMPLEX if too_complex else "", provider_id=provider_id or None,
+                body_html=html, has_remote_images=bool(richtext.remote_image_count(html)), status=Message.RECEIVED, note=note, provider_id=provider_id or None, direct_to=route.names if route else "", direct_key=route.key if route else None,
                 rfc_message_id=clean_id(_text(_header(payload, "Message-ID"), 300)), in_reply_to=clean_id(_text(_header(payload, "In-Reply-To"), 300)),
                 references=clean_references(_text(_header(payload, "References"), 3000)), from_address=from_address, from_name=from_name, spam=spam)
-            if not spam:  # spam never moves the thread, never counts unread, never pushes. In the same transaction as the message: a death cannot leave one the inbox does not show
+            if not spam or (route and route.new):  # spam never moves the thread, never counts unread, never pushes. In the same transaction as the message: a death cannot leave one the inbox does not show. (A new direct thread shows even when flagged: it has nothing else to show it by.)
                 _touch_thread(thread, message)
-    except IntegrityError:  # Postmark sent it twice at once
+    except IntegrityError:  # Postmark sent it twice at once, or the same direct email came from two mailboxes at once
+        found = Message.objects.filter(provider_id=provider_id).first() if provider_id else None
+        if found is None and route is not None and route.key:
+            found = Message.objects.filter(direct_key=route.key).first()
+            if found is not None:
+                from . import direct
+
+                direct.add_names(found, route.names)
+                return found, False
         return Message.objects.get(provider_id=provider_id), False
     return message, True
 
@@ -682,7 +696,7 @@ def store_inbound_files(message, items):
         layout = is_layout_picture(name, declared, len(data), cid, _text(item.get("Disposition") or item.get("ContentDisposition"), 40), references, bool(message.body_html))
         Attachment.objects.create(message=message, key=key, filename=name, content_type="application/octet-stream", declared_type=declared, size=len(data), content_id=cid, inline_ref=layout)
         kept += 0 if layout else 1  # stored and erased all the same, but a signature picture is not "a file": no paperclip, no list
-    base = TOO_COMPLEX if message.note.startswith(TOO_COMPLEX) else ""  # rebuilt each time, never appended to: a retry (the queue failed, Postmark sends it again) stores the files again
+    base = " ".join(x for x in (TOO_COMPLEX, FAILED_CHECKS) if x in message.note)  # the notes made when it was stored; the rest are rebuilt  # rebuilt each time, never appended to: a retry (the queue failed, Postmark sends it again) stores the files again
     note = " ".join(x for x in [base, *notes] if x)[:500]
     if note != message.note:
         Message.objects.filter(pk=message.pk).update(note=note)
@@ -711,7 +725,8 @@ def push_payload(message):
     thread = message.thread
     who = thread.name or message.from_name or thread.email
     first = preview_of(message.body_text) or ("Sent a file" if message.attachments.filter(inline_ref=False).exists() else "New email")
-    return {"title": f"Email from {who}", "body": f"{message.subject}: {first}"[:100] if message.subject else first[:100], "url": _office("office_email_thread", thread.pk), "tag": f"email-{thread.pk}"}
+    title = f"To {message.direct_to}: {who}" if message.direct_to else f"Email from {who}"  # direct mail: who it was sent to, then who wrote
+    return {"title": title[:100], "body": f"{message.subject}: {first}"[:100] if message.subject else first[:100], "url": _office("office_email_thread", thread.pk), "tag": f"email-{thread.pk}"}
 
 
 # ---------- the copy of his reply to the group ----------
@@ -869,7 +884,7 @@ def attachment_dict(item):
 def message_dict(message):
     """{id, direction, subject, shows_subject, body_text, body_full, body_html (ours: cleaned, safe to show; his: always empty), frame_url and frame_images_url (his HTML: a
     sandboxed frame; empty when he sent plain text), has_remote_images, status, error{reason, can_retry} or null, author, author_id, author_first_name, from_address,
-    from_name, sent_from (ours: the whole From it went with, "Name" <address>, or ""), signature_html (ours: cleaned, as sent), to_address (ours: where it was sent), from_other (it came from an address other than the thread's), spam, note, incomplete (his email is still being stored: its files may be missing), attachments[{id, filename, type, size, url, inline, is_image}], created_at, sent_at, retry_url}."""
+    from_name, sent_from (ours: the whole From it went with, "Name" <address>, or ""), signature_html (ours: cleaned, as sent), to_address (ours: where it was sent), from_other (it came from an address other than the thread's), direct_to (direct mail: the staff first names it was sent to), spam, note, incomplete (his email is still being stored: its files may be missing), attachments[{id, filename, type, size, url, inline, is_image}], created_at, sent_at, retry_url}."""
     reason = ""
     if message.status in Message.BAD:
         reason = REASONS.get(message.error_code, REASONS["send_failed"])[0]
@@ -884,7 +899,7 @@ def message_dict(message):
             "has_remote_images": message.has_remote_images, "status": message.status, "error": {"reason": reason, "can_retry": can} if reason else None, "author": message.author_label,
             "author_id": str(message.author_id) if message.author_id else "", "author_first_name": _first(message.author_label, bool(message.from_address and mine)), "from_address": message.from_address,
             "sent_from": sender_mod.format_address(message.from_address, message.from_name) if (mine and message.from_address) else "", "signature_html": richtext.clean_signature(message.signature_html) if mine else "",
-            "from_name": message.from_name, "to_address": (message.to_address or message.thread.email) if mine else "", "from_other": bool(not mine and message.from_address != message.thread.email), "spam": message.spam, "note": message.note,
+            "from_name": message.from_name, "to_address": (message.to_address or message.thread.email) if mine else "", "from_other": bool(not mine and message.from_address != message.thread.email), "spam": message.spam, "note": message.note, "direct_to": message.direct_to,
             "incomplete": bool(message.incomplete and not mine),
             "attachments": [attachment_dict(a) for a in message.attachments.all() if not a.inline_ref], "created_at": message.created_at.isoformat(), "sent_at": message.sent_at.isoformat() if message.sent_at else "",
             "retry_url": _office("office_email_retry", message.thread_id, message.pk) if can else ""}
@@ -926,7 +941,7 @@ def thread_dict(thread, can_send=False):
         page = _office("office_lead", session) if session else ""
     suppressed = suppression.is_suppressed(thread.email)
     name = display_name(thread)
-    return {"id": str(thread.pk), "email": thread.email, "name": name or thread.email, "has_name": bool(name), "subject": thread.subject, "labels": labels, "page_url": page,
+    return {"id": str(thread.pk), "email": thread.email, "name": name or thread.email, "has_name": bool(name), "subject": thread.subject, "labels": labels, "sent_to": thread.direct_name or (thread.direct_to.partition("@")[0].title() if thread.direct_to else ""), "sent_to_address": thread.direct_to, "page_url": page,
             "url": _office("office_email_thread", thread.pk), "last_message_at": thread.last_message_at.isoformat() if thread.last_message_at else "",
             "replies_to_mailbox": replies_to_mailbox(), "suppressed": suppressed, "reason": "This address bounced or marked an email as spam: nothing can be sent to it." if suppressed else "",
             "can_send": bool(can_send and not suppressed),
@@ -934,7 +949,7 @@ def thread_dict(thread, can_send=False):
 
 
 def inbox_rows(threads, user):
-    """One dict per thread: {id, subject, name, email, preview, direction, status (the tick of the latest message when ours), last_message_at, unread, has_attachment, no_reply, gold, url}."""
+    """One dict per thread: {id, subject, name, email, preview, direction, status (the tick of the latest message when ours), last_message_at, unread, has_attachment, no_reply, gold, sent_to (a staff first name when it began as direct mail, else ''), url}."""
     threads = list(threads)
     ids = [t.pk for t in threads]
     unread = unread_counts(user, ids)
@@ -942,7 +957,7 @@ def inbox_rows(threads, user):
     status = dict(Message.objects.filter(pk__in=newest).values_list("thread_id", "status"))
     return [{"id": str(t.pk), "subject": t.subject, "name": t.name or t.email, "has_name": bool(t.name), "email": t.email, "preview": t.last_preview, "direction": t.last_direction,
              "status": status.get(t.pk, ""), "last_message_at": t.last_message_at.isoformat() if t.last_message_at else "", "unread": unread.get(t.pk, 0), "has_attachment": t.has_attachment,
-             "no_reply": t.last_direction == Message.OUT, "gold": bool(t.application_id), "url": _office("office_email_thread", t.pk)} for t in threads]
+             "no_reply": t.last_direction == Message.OUT, "gold": bool(t.application_id), "sent_to": t.direct_name or (t.direct_to.partition("@")[0].title() if t.direct_to else ""), "url": _office("office_email_thread", t.pk)} for t in threads]
 
 
 def search_people(q, limit=10):
@@ -1085,6 +1100,9 @@ def erase_message(message):
             pass
     thread = message.thread
     message.delete()
+    if thread.direct_to and not Message.objects.filter(thread=thread).exists():  # direct mail that made its thread: an empty one is not left for the retry to repeat
+        thread.delete()
+        return
     refresh_has_attachment([thread.pk])
     last = Message.objects.filter(thread=thread, spam=False).order_by("-id").first()
     Thread.objects.filter(pk=thread.pk).update(last_message_at=last.created_at if last else None, last_preview=preview_of(last.body_text) if last else "",

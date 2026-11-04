@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.views.decorators.http import require_http_methods
 
 from common import richtext
+from emailchat import direct
 from emailchat import sender as sender_mod
 
 from . import team as team_service
@@ -31,9 +32,11 @@ def preview_document(target, signature):
 
 def _context(target, sending_address, signature, errors=None, preview=False):
     sender = sender_mod.sender_for(target)
+    inbox = direct.inbox_address(team_service.email_sender_of(target))
     return {"person": target, "sending_address": sending_address, "signature": signature, "errors": errors or {}, "domain": sender_mod.sending_domain(),
             "preview_doc": preview_document(target, signature) if preview else "",
-            "from_now": sender_mod.format_address(sender.address, sender.name), "from_source": sender.source, "own_ok": sender_mod.on_sending_domain(target.email)}
+            "from_now": sender_mod.format_address(sender.address, sender.name), "from_source": sender.source, "own_ok": sender_mod.on_sending_domain(target.email),
+            "inbox_address": inbox, "inbox_domain_set": bool(settings.EMAIL_INBOUND_DOMAIN)}
 
 
 @unlocked

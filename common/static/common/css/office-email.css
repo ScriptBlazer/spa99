@@ -184,6 +184,8 @@ a.o-em-who > .o-icon { color: var(--office-muted); flex: none; }
 .o-em-sendas-body img { max-width: 100% !important; height: auto !important; }
 .o-em-sendas-body p { margin: 0 0 0.5em; }
 .o-em-subject-field { display: block; }
+.o-em-sentto { margin: 0; padding: 0 var(--space-3) var(--space-2); display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+@media (min-width: 64em) { .o-em-sentto { padding-left: 0; } }
 .o-em-subject-field[hidden] { display: none; }
 .o-em-discard-row { display: flex; justify-content: space-between; margin: 0; }
 .o-em-discard-row .o-quiet { gap: var(--space-1); min-height: 2.25rem; color: var(--office-muted); }

@@ -1,7 +1,7 @@
 {% load whatsapp_tags %}{% comment %}Email thread list rows (docs/features/email-chat-design.md section 2). Server rendered; office-email.js swaps these in for search, filters, Show more and the quiet refresh.
 No avatar: avatars say chat, three lines of words say email. Keys per row: see emailchat.views._list_context. Names, subjects and previews are escaped by Django.{% endcomment %}
 {% for r in rows %}<li class="o-wa-li"><a class="o-em-row{% if r.id == selected %} is-selected{% endif %}" href="{{ r.url }}" data-thread="{{ r.id }}"{% if r.unread %} data-unread{% endif %}{% if r.id == selected %} aria-current="page"{% endif %}>
-  <span class="o-em-name"><span class="o-em-name-text" dir="auto">{{ r.name }}</span>{% if r.gold %}<span class="o-wa-quiet">Gold</span>{% endif %}</span>
+  <span class="o-em-name"><span class="o-em-name-text" dir="auto">{{ r.name }}</span>{% if r.gold %}<span class="o-wa-quiet">Gold</span>{% endif %}{% if r.sent_to %}<span class="o-wa-quiet">Sent to {{ r.sent_to }}</span>{% endif %}</span>
   <time class="o-wa-time" datetime="{{ r.last_message_at }}">{{ r.last_message_at|wa_when }}</time>
   <span class="o-em-subj" dir="auto">{{ r.subject }}</span>
   <span class="o-em-flag">{% if r.has_attachment %}<span class="o-em-clip" role="img" aria-label="Has a file">{% include "office/_icon.html" with name="paperclip" %}</span>{% endif %}</span>

@@ -148,15 +148,15 @@ Every state lives in one slot, `.o-wa-window` plus the composer, so the thread h
 
 | State | Above the composer | Composer |
 |---|---|---|
-| Open, 1h or more | `--office-text-xs` muted, centred: "Window closes in 5h". Hidden under `[data-keyboard]` | Normal |
-| Open, under 1h | Pill `--office-caramel-tint`, espresso 600 (10.25), `i-clock`: "Window closes in 40 minutes", then "in under a minute". Always shown; told once to the live region | Normal |
+| Open, 1h or more | `--office-text-xs` muted, centred: "Message freely for 5h more. His replies restart this." (one line at 375 px). Hidden under `[data-keyboard]` | Normal |
+| Open, under 1h | Pill `--office-caramel-tint`, espresso 600 (10.25), `i-clock`: "40 minutes left. His reply restarts it.", then "Under a minute left. ...". Always shown; told once to the live region | Normal |
 | Closed | None | Replaced, below |
 | Template sent, no reply | None | "Template sent. The window opens when he replies." plus secondary "Send another" |
 | No messages yet | Wall shows a surface pill "No messages yet." | "Start with a template." plus primary "Choose a template" |
 | Opted out | None | Muted: "He replied STOP. He gets no more messages." No buttons. History stays readable |
 | No mobile | Wall shows a surface pill "No mobile on file." | Primary "Add a mobile" (section 6 dialog) |
 
-- **Closed** `.o-wa-closed`: `--office-page`, safe-area padding, one line and one button. Desktop in a row, phone stacked. "Window closed. Send a template to reopen." `--text-sm` espresso, primary `btn` "Choose a template". If it closes while he types, the draft stays in storage and the send fails politely with the failed row.
+- **Closed** `.o-wa-closed`: `--office-page`, safe-area padding, one line and one button. Desktop in a row, phone stacked. "It has been over 24 hours since he wrote. Send a template, and once he replies you can message freely again." `--text-sm` espresso, primary `btn` "Choose a template". If it closes while he types, the draft stays in storage and the send fails politely with the failed row.
 - **Template picker** `dialog.o-sheet.o-wa-tpl`: phone is the existing bottom sheet (`85dvh`, scroll, `modal-in`); desktop a centred dialog, `max-width: 44rem`, `--office-radius-lg`, `--office-shadow-3`, two columns (choices and fields left, preview right). Title "Choose a template". Only approved `spa99_` templates, as Twilio lists them.
 
 1. **Choose.** Tiles `.o-wa-tpl-item` as radios: humanised name 600 ("Lead follow up"), first line of the text in muted, `min-height: 4rem`, `--office-sunken`; chosen is espresso fill with cream text and a check, instantly. With one template it starts chosen.
