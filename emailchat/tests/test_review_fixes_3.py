@@ -2,9 +2,14 @@
 import os
 import time
 
+from django.urls import reverse
+
 from emailchat import services
-from emailchat.models import Message
-from emailchat.tests.test_emailchat import Base, inbound_post, payload_for
+from emailchat.models import Message, Thread
+from emailchat.tests.test_emailchat import Base, inbound_post, office, payload_for
+from office.tests.test_leads import lead
+from users import services as user_services
+from users.tests.test_register import cleaned
 
 
 def _fill(unit, size=1_000_000):
@@ -41,3 +46,21 @@ class HostileHtmlBudgetTests(Base):
         self.assertTrue(richtext.too_complex("<div/>" * 500))  # a slash does not close anything
         self.assertTrue(richtext.too_complex("<span><div></span></div>" * 13_000))  # shallow by the depth count, over the budget
         self.assertFalse(richtext.too_complex("<table><tr><td><div><p>x</p></div></td></tr></table>" * 2_000))  # a long newsletter
+
+
+class StaffStartedEmailOnUnverifiedPersonTests(Base):
+    def test_the_thread_is_linked_to_the_person_staff_chose_and_the_stranger_rule_still_holds(self):
+        lead("victim@example.com")
+        _, leads_thread = services.create_thread("victim@example.com", "For the lead", self.approver)
+        stranger = user_services.register_interest(cleaned(email="victim@example.com")).user
+        created = office(self.approver, "post", "/email/new/", {"person": f"person:{stranger.pk}", "subject": "From his page", "body_html": "<p>Hello</p>"}, HTTP_ACCEPT="application/json")
+        self.assertEqual(created.status_code, 200)
+        thread = Thread.objects.get(subject="From his page")
+        self.assertEqual(thread.user_id, stranger.pk)
+        chat = office(self.reader, "get", f"/people/{stranger.pk}/").context["email_chat"]
+        self.assertEqual((chat["state"], chat["thread_count"]), ("open", 1))  # his own thread, not the lead's on the same address
+        found = services.threads_for_person(stranger, {"victim@example.com"})
+        self.assertEqual(list(found), [thread])
+        self.assertEqual(services.erase_person(stranger, {"victim@example.com"})["email_threads"], 1)
+        self.assertTrue(Thread.objects.filter(pk=leads_thread.pk).exists())  # the lead's thread was never his to erase
+        self.assertFalse(Thread.objects.filter(pk=thread.pk).exists())

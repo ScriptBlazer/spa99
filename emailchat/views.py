@@ -266,7 +266,7 @@ def new_create(request):
     wants_json = request.headers.get("accept", "").startswith("application/json") or request.headers.get("x-requested-with") == "fetch"
     if error:
         return _fail(error) if wants_json else redirect(reverse("office_email_new") + "?" + urlencode({"person": ref} if ref else {}))
-    result, thread_ = services.create_thread(address, request.POST.get("subject", ""), request.user)
+    result, thread_ = services.create_thread(address, request.POST.get("subject", ""), request.user, owner=target.user if target is not None and target.kind == "person" else None)
     if result != services.DONE:
         return _fail(result)
     message = None

@@ -186,8 +186,10 @@ def relink(*addresses):
         logger.exception("Could not refresh the email chat links")
 
 
-def create_thread(email, subject, actor=None):
-    """A new thread for this address (always a new one: a person can have many). Returns (result, thread)."""
+def create_thread(email, subject, actor=None, owner=None):
+    """A new thread for this address (always a new one: a person can have many). Returns (result, thread). `owner` is an account staff chose on purpose (they started the email from
+    that person's page): the thread is linked to it even when the account is unverified, so that page, his export and his erasure find it. That is staff's explicit choice, not
+    address matching: an unverified account still never picks up a thread that merely shares its address (see addresses_for)."""
     address = clean_address(email)
     if not address:
         return BAD_ADDRESS, None
@@ -196,6 +198,8 @@ def create_thread(email, subject, actor=None):
         return NO_SUBJECT, None
     thread = Thread(email=address, subject=subject, created_by=actor if getattr(actor, "pk", None) else None)
     resolve_links(thread, save=False)
+    if owner is not None and thread.user_id is None:
+        thread.user = owner
     thread.save()
     return DONE, thread
 
