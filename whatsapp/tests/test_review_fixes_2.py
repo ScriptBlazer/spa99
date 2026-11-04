@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.utils import timezone
 
+from common import ownership
 from gold import services as gold_services
 from gold.models import GoldApplication
 from gold.tests.test_gold import application_data
@@ -52,7 +53,7 @@ class GoldNumberChangeTests(Base):
         application, _ = gold_services.submit_application(application_data(email=email, mobile=mobile))
         application.refresh_from_db()
         contact = Contact.objects.create(phone=application.mobile)
-        services.resolve_links(contact)
+        ownership.link(contact, application=application)  # staff linked it from the Gold page
         Message.objects.create(contact=contact, direction="in", status="received", body="private gold chat", twilio_sid="SMgold")
         return application, contact
 

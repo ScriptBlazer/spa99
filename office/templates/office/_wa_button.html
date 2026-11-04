@@ -3,11 +3,15 @@
 {% if wa.state != "no_mobile" %}
 <div class="o-channel" data-wa-button data-state="{{ wa.state }}">
   {% if wa.state == "chat" or wa.state == "unconfigured" and wa.has_chat %}
-  <a class="btn {% if primary == 'wa' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{% if wa.state == 'unconfigured' %}{{ wa.thread_url }}{% else %}{{ wa.contact_url }}{% endif %}" data-whatsapp-open{% if wa.opted_out or wa.state == 'unconfigured' %} aria-describedby="wa-hint"{% endif %}>{% include "office/_icon.html" with name="whatsapp" %}<span>Open WhatsApp chat</span>{% if wa.unread %}<span class="o-badge-count">{{ wa.unread }}<span class="sr-only"> unread</span></span>{% endif %}</a>
+  <a class="btn {% if primary == 'wa' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{{ wa.open_url }}" data-whatsapp-open{% if wa.opted_out or wa.state == 'unconfigured' %} aria-describedby="wa-hint"{% endif %}>{% include "office/_icon.html" with name="whatsapp" %}<span>Open WhatsApp chat</span>{% if wa.unread %}<span class="o-badge-count">{{ wa.unread }}<span class="sr-only"> unread</span></span>{% endif %}</a>
   {% if wa.state == "unconfigured" %}<p class="o-hint-line" id="wa-hint">{{ wa.reason }}</p>{% elif wa.opted_out %}<p class="o-hint-line" id="wa-hint">He replied STOP.</p>{% endif %}
   {% elif wa.state == "ready" %}
-  <a class="btn {% if primary == 'wa' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{{ wa.contact_url }}" data-whatsapp-open{% if wa.opted_out %} aria-describedby="wa-hint"{% endif %}>{% include "office/_icon.html" with name="whatsapp" %}<span>{% if wa.opted_out %}Open WhatsApp chat{% else %}Start WhatsApp chat{% endif %}</span></a>
-  {% if wa.opted_out %}<p class="o-hint-line" id="wa-hint">He replied STOP.</p>{% endif %}
+  {% if wa.opted_out %}
+  <a class="btn {% if primary == 'wa' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{{ wa.open_url }}" data-whatsapp-open aria-describedby="wa-hint">{% include "office/_icon.html" with name="whatsapp" %}<span>Open WhatsApp chat</span></a>
+  <p class="o-hint-line" id="wa-hint">He replied STOP.</p>
+  {% else %}{# Start writes (it can make the chat), so it is a POST with CSRF: a link never writes #}
+  <form method="post" action="{{ wa.start_url }}" data-whatsapp-start>{% csrf_token %}<button type="submit" class="btn {% if primary == 'wa' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" data-whatsapp-open>{% include "office/_icon.html" with name="whatsapp" %}<span>Start WhatsApp chat</span></button></form>
+  {% endif %}
   {% elif wa.state == "view_only" %}
   <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="{% if em.state == 'start' and not em.can_send and em.email and not em.suppressed %}em-hint{% else %}wa-hint{% endif %}" data-wa-off>{% include "office/_icon.html" with name="whatsapp" %}<span>No WhatsApp chat yet</span></button>
   {% if em.state == "start" and not em.can_send and em.email and not em.suppressed %}{% else %}<p class="o-hint-line" id="wa-hint">View only.</p>{% endif %}

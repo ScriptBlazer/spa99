@@ -5,9 +5,16 @@ A person's chats and threads are exactly:
   1. those with an explicit owner link (`user`), set by a staff action or by a proven step;
   2. those on his address (`email`, `lead_email`), only when his account email is verified (a person with no account, a lead or an applicant, is found by the address staff opened);
   3. those through his Gold application, only when that application's link is proven: the account is verified, or the application is being handled by staff on its own page.
-A mobile number is never proof of anything, and verifying an email proves the email only. Nothing is linked automatically by number alone: a chat is linked to an account
-because of its mobile only when the chat HAS a lead address and it is the verified account's own address (`mobile_link_ok`). A chat with no lead address stays unlinked until staff
-click through from the person's page (`claim`) or delete it; the page still shows that it exists (`visible_from_page`). Self-service stays stricter: the verified account address only (emailchat.threads_for_member).
+
+THE LINK RULE (who may set a chat's links `user`, `lead_email`, `application`; this is the root of every ownership bug found in review):
+  1. A chat's links are set only by: a) a staff POST by an editor after seeing the chat (`link`, the "This number isn't linked to X. Link it?" button in the thread), b) creating a NEW
+     chat from a staff start action (a POST, `link` right after the create), or c) a proven email address joining up on verify, only when the chat already has that lead address
+     set by a) or b) (`resolve_links` on verify). A staff correction of a lead's address moves the lead address it already holds (`whatsapp.move_address`).
+  2. A number typed on a public form (the journey gate, Register, Gold apply) never sets or replaces any link on an existing chat, nor a chat's name. It may be stored on its own form record.
+  3. No GET ever writes a link or creates ownership: viewing is viewing. Opening a chat is a link; starting one is a POST.
+A mobile number is never proof of anything, and verifying an email proves the email only. Nothing is linked by number: a chat is linked by staff (`link`, `claim`) or, once its lead address
+is a verified account's own, by that account verifying. A chat nobody holds stays unlinked until staff link it from the thread or delete it; the person's page still shows that it exists
+(`visible_from_page`). Self-service stays stricter: the verified account address only (emailchat.threads_for_member).
 
 `Thread` and `Contact` both have `user`, `lead_email` and `application`, so one query serves both; the address columns differ (`address_fields`).
 Existing `GoldApplication.user` rows on live may link an application to an account that was never verified (the old code linked by address alone): nothing here trusts such a
@@ -64,12 +71,6 @@ def owned(model, user=None, addresses=(), application=None, address_fields=("lea
     return model.objects.filter(person_q(user, addresses, application, address_fields))
 
 
-def mobile_link_ok(lead_email, user):
-    """May a chat whose lead address is `lead_email` be linked to this account when the mobiles match? Only a verified account, and only when the chat has a lead address that is the
-    account's own. A chat with no lead address is never linked by its number: a stranger could register with the number of someone who wrote in first."""
-    return is_verified(user) and bool(clean(lead_email)) and clean(lead_email) == clean(user.email)
-
-
 def claim(chat, user):
     """Staff opened this person's page and started the chat: link an ownerless chat to him (their explicit choice, as an email thread is). A chat that already has an owner is never
     taken, and neither is a lead's chat (it has a lead address) unless that is his own verified address. Returns True when it was linked."""
@@ -89,3 +90,29 @@ def visible_from_page(chat, user=None, addresses=(), application=None, address_f
     if chat.user_id is None and not clean(chat.lead_email) and chat.application_id is None:
         return True
     return type(chat).objects.filter(pk=chat.pk).filter(person_q(user, addresses, application, address_fields)).exists()
+
+
+def is_unlinked(chat):
+    """A chat nobody holds yet: no owner, no lead address, no application."""
+    return chat.user_id is None and not clean(chat.lead_email) and chat.application_id is None
+
+
+def link(chat, user=None, lead_email="", application=None):
+    """Rule 1a and 1b: staff chose to link this chat to the person whose page they came from (a POST by an editor, or a chat just created by a start POST). Give exactly one of `user`
+    (a person's page: `claim`), `lead_email` (a lead's page) or `application` (a Gold page; it also takes the applicant's address as the lead address). Only an unlinked chat is linked
+    (a person's page may also claim a chat that holds his own verified address): a chat somebody holds is never taken. Returns True when it was linked."""
+    if user is not None:
+        return claim(chat, user)
+    if not is_unlinked(chat):
+        return False
+    fields = []
+    if application is not None:
+        chat.application = application
+        chat.lead_email = clean(application.email)
+        fields = ["application", "lead_email"]
+    elif clean(lead_email):
+        chat.lead_email = clean(lead_email)
+        fields = ["lead_email"]
+    if fields:
+        chat.save(update_fields=fields)
+    return bool(fields)

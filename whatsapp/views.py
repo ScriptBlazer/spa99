@@ -6,7 +6,8 @@ from datetime import timedelta
 from urllib.parse import urlencode
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.contrib import messages
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.storage import default_storage
 from django.db.models import Exists, F, OuterRef, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
@@ -15,11 +16,11 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.cache import patch_vary_headers
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from common import ownership
 from common.polling import parse_cursor
-from office.permissions import can_edit, editor, reader
+from office.permissions import admin, can_edit, editor, reader
 
 from . import push, services
 from .models import Contact, Message, PushSubscription, WhatsAppPrefs
@@ -115,6 +116,7 @@ def thread(request, pk):
         "has_older": older, "older_url": reverse("office_whatsapp_messages", args=[contact.pk]) + (f"?before={found[0].pk}" if found else ""),
         "unread": {"count": count, "first_id": first_id}, "last_id": found[-1].pk if found else 0, "cursor": timezone.now().isoformat(),
         "templates": services.template_dicts(contact), "gold": gold, "open_picker": request.GET.get("picker") == "1", "section": "whatsapp", "configured": services.configured(),
+        "link_offer": _link_offer(request, contact),
         "urls": {"poll": reverse("office_whatsapp_poll", args=[contact.pk]), "send": reverse("office_whatsapp_send", args=[contact.pk]),
                  "send_media": reverse("office_whatsapp_send_media", args=[contact.pk]), "send_voice": reverse("office_whatsapp_send_voice", args=[contact.pk]), "send_template": reverse("office_whatsapp_send_template", args=[contact.pk]),
                  "read": reverse("office_whatsapp_read", args=[contact.pk]), "inbox": reverse("office_whatsapp"), "templates": reverse("office_whatsapp_templates") + f"?contact={contact.pk}"}}
@@ -271,45 +273,113 @@ def media(request, pk):
     return response
 
 
-# ---------- start a chat from a lead, person or Gold page; add or fix a mobile ----------
+# ---------- start or open a chat from a lead, person or Gold page; link it; delete it; add or fix a mobile ----------
+# The rule (common.ownership): a GET never writes. Open is a GET and only reads; Start, Link and Delete are POSTs by an editor (Delete: Admin and up).
 
-def _start(request, kind, pk):
+def _target(ref):
+    """The lead, person or Gold page named by `kind:id` (the `from` of a link), or None when it is not a real one."""
+    from office import tools
+
+    kind, _, pk = (ref or "").partition(":")
+    if kind not in ("person", "lead", "gold"):
+        return None
+    try:
+        return tools.target_for(kind, pk)
+    except (Http404, ValidationError, ValueError):
+        return None
+
+
+def _links(target):
+    """What a chat takes when staff link it to this page's person: his account, the lead's address or the Gold application."""
+    if target.kind == "person":
+        return {"user": target.user}
+    return {"lead_email": target.main} if target.kind == "lead" else {"application": target.application}
+
+
+def _thread_url(contact, target):
+    query = {"from": f"{target.kind}:{target.pk}"}
+    if target.kind == "gold":
+        query["gold"] = str(target.pk)
+    if not contact.last_message_at:
+        query["picker"] = "1"
+    return reverse("office_whatsapp_thread", args=[contact.pk]) + f"?{urlencode(query)}"
+
+
+def _link_offer(request, contact):
+    """{ref, name, url} for the thread's "This number isn't linked to <name>. Link it?" line: an editor, a chat nobody holds yet, reached from a page (?from=) whose person has this very number."""
+    from office import tools
+
+    target = _target(request.GET.get("from")) if can_edit(request.user) and ownership.is_unlinked(contact) else None
+    if target is None or tools.mobile_and_name(target)[0] != contact.phone:
+        return None
+    return {"ref": f"{target.kind}:{target.pk}", "name": tools.display_name(target), "url": reverse("office_whatsapp_link", args=[contact.pk])}
+
+
+@reader
+@require_http_methods(["GET", "POST"])
+def start(request, kind, pk):
+    """GET opens his chat for reading (no write: the Gold approver email's Respond link ends here too); no chat yet says so and goes back to the page. POST (an editor) starts the chat on
+    his number: a new chat takes this page's links, an existing one is opened untouched and the thread offers the link after staff have seen it."""
     from office import tools
 
     target = tools.target_for(kind, pk)
     mobile, _ = tools.mobile_and_name(target)
     if not mobile:
-        from django.contrib import messages
-
         messages.info(request, "Add a mobile first, so the team can WhatsApp him.")
         return redirect(target.page_url)
-    contact = services.resolve_links(services.get_or_create_contact(mobile))  # links can have gone stale since the chat began
-    if kind == "person":
-        ownership.claim(contact, target.user)  # staff opened his page and chose this chat: an ownerless chat becomes his, as an email thread started here does (common.ownership)
-    query = {}
-    if kind == "gold":
-        query["gold"] = str(pk)
-    if not contact.last_message_at:
-        query["picker"] = "1"
-    return redirect(reverse("office_whatsapp_thread", args=[contact.pk]) + (f"?{urlencode(query)}" if query else ""))
+    if request.method == "POST":
+        if not can_edit(request.user):
+            raise PermissionDenied
+        contact, _ = services.start_chat(mobile, **_links(target))
+    else:
+        contact = Contact.objects.filter(phone=mobile).first()
+        if contact is None:
+            messages.info(request, "There is no WhatsApp chat with him yet. Use Start WhatsApp chat.")
+            return redirect(target.page_url)
+    return redirect(_thread_url(contact, target))
 
 
-@reader
-@require_GET
 def start_person(request, pk):
-    return _start(request, "person", pk)
+    return start(request, "person", pk)
 
 
-@reader
-@require_GET
 def start_lead(request, pk):
-    return _start(request, "lead", pk)
+    return start(request, "lead", pk)
 
 
-@reader
-@require_GET
 def start_gold(request, pk):
-    return _start(request, "gold", pk)
+    return start(request, "gold", pk)
+
+
+@editor
+@require_POST
+def link(request, pk):
+    """POST `from` (kind:id of the page the staff member came from): the "Link it?" button. Links an unlinked chat to that page's person, only when it is his number."""
+    from office import tools
+
+    contact = _contact(pk)
+    target = _target(request.POST.get("from"))
+    if target is None or tools.mobile_and_name(target)[0] != contact.phone:
+        messages.error(request, "That chat could not be linked from there.")
+        return redirect("office_whatsapp_thread", pk=contact.pk)
+    if ownership.link(contact, **_links(target)):
+        services.resolve_links(contact)
+        messages.success(request, f"Linked to {tools.display_name(target)}.")
+    else:
+        messages.info(request, "Nothing changed: this chat is already linked.")
+    return redirect(_thread_url(contact, target))
+
+
+@admin
+@require_POST
+def delete(request, pk):
+    """Erase one chat: its messages, files and queue records (UK GDPR). Admin and up (the level person delete needs); POST `confirm` must be set; audited without message text."""
+    contact = _contact(pk)
+    if not request.POST.get("confirm"):
+        return redirect("office_whatsapp_thread", pk=contact.pk)
+    counts = services.delete_chat(contact, request.user, request)
+    messages.success(request, f"The chat and its {counts['whatsapp_messages']} message{'s' if counts['whatsapp_messages'] != 1 else ''} were deleted.")
+    return redirect("office_whatsapp")
 
 
 def _contact_reply(request, target, result, errors):

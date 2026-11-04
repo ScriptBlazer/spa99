@@ -315,7 +315,6 @@ def set_lead_contact(email, actor, first_name=None, mobile=None, mobile_country=
             _edit(main, PersonEdit.FIRST_NAME, current_name, new_name, actor)
         if new_mobile != current_mobile:
             _edit(main, PersonEdit.MOBILE, current_mobile, new_mobile, actor)
-    whatsapp.relink(current_mobile, new_mobile)
     return DONE, {}
 
 
@@ -340,7 +339,6 @@ def set_person_mobile(user, actor, mobile, mobile_country=None):
     user.mobile = new or None
     user.save(update_fields=["mobile", "updated_at"])
     _edit((user.email or "").lower(), PersonEdit.MOBILE, before, new, actor)
-    whatsapp.relink(before, new)
     return DONE, {}
 
 
@@ -369,7 +367,6 @@ def set_gold_mobile(application, actor, mobile, mobile_country=None):
     before = application.mobile or (sessions[0].lead_mobile if sessions else "")
     if new == (application.mobile or "") and all(session.lead_mobile == new for session in sessions):
         return UNCHANGED, {}
-    olds = {application.mobile, *(session.lead_mobile for session in sessions)}
     with transaction.atomic():
         application.mobile = new
         application.save(update_fields=["mobile", "updated_at"])
@@ -377,7 +374,6 @@ def set_gold_mobile(application, actor, mobile, mobile_country=None):
             session.lead_mobile = new
             session.save(update_fields=["lead_mobile", "updated_at"])
         _edit(email, PersonEdit.MOBILE, before, new, actor)
-    whatsapp.relink(new, *olds)
     return DONE, {}
 
 
@@ -456,7 +452,7 @@ def correct_lead_email(old, new, actor):
         emailchat_services.move_address(old, new)  # his email threads (same reply token: a late reply still lands)
         EmailLog.objects.filter(Q(to__iexact=old) | Q(subject_email__iexact=old)).delete()  # emails sent to the old address (the bounce) are not his on the new one
         _edit(new, PersonEdit.EMAIL, old, new, actor)
-    whatsapp.relink(*{s.lead_mobile for s in sessions if s.lead_mobile})  # his WhatsApp chat now links to the corrected address
+    whatsapp.move_address(old, new)  # his WhatsApp chats that hold the old lead address take the new one
     emailchat_services.relink(new)  # names and links of his threads on the new address
     _figures_changed()
     return DONE, ""

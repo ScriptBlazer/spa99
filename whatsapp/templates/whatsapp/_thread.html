@@ -1,5 +1,6 @@
 {% load whatsapp_tags %}<div class="o-wa-thread" data-wa-thread-root data-contact="{{ contact.id }}" data-state="open">
 {{ wa|json_script:"wa-data" }}
+  <div class="o-wa-top">
   <header class="o-wa-head">
     <a class="o-back o-wa-back" href="{{ urls.inbox }}" aria-label="Back to WhatsApp chats" data-wa-back>{% include "office/_icon.html" with name="chevron-left" %}</a>
     {% if contact.page_url %}<a class="o-wa-who o-wa-phone-only" href="{{ contact.page_url }}">{% include "whatsapp/_who.html" %}{% include "office/_icon.html" with name="chevron-right" %}</a>{% else %}<div class="o-wa-who o-wa-phone-only">{% include "whatsapp/_who.html" %}</div>{% endif %}
@@ -9,6 +10,10 @@
       <span class="o-wa-winpill" data-win-pill></span>
     </div>
   </header>
+  {% if link_offer %}<form class="o-wa-linkbar" method="post" action="{{ link_offer.url }}" data-link-offer>{% csrf_token %}<input type="hidden" name="from" value="{{ link_offer.ref }}"><p>This number isn't linked to {{ link_offer.name }}. Link it?</p><button type="submit" class="btn btn-secondary">Link it</button></form>{% endif %}
+  {% if office_can.can_delete %}<form class="o-wa-linkbar o-wa-linkbar--quiet" method="post" action="{% url 'office_whatsapp_delete' contact.id %}" data-delete-chat>{% csrf_token %}<input type="hidden" name="confirm" value="1">
+    <button type="submit" class="o-danger-link" data-working-text="Deleting" data-confirm data-confirm-danger data-confirm-title="Delete this chat?" data-confirm-body="This removes the chat with {{ contact.name }}, all its messages and files, and the queue records. It cannot be undone." data-confirm-label="Delete for good" data-confirm-cancel="Keep">Delete this chat</button></form>{% endif %}
+  </div>
   <div class="o-wa-wall" data-wall>
     <div class="o-wa-scroll" data-scroll role="log" aria-label="Messages with {{ contact.name }}" tabindex="-1">
       <div class="o-wa-sentinel" data-top-sentinel></div>

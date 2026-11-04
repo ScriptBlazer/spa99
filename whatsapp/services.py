@@ -5,6 +5,7 @@ import logging
 import re
 import uuid
 from datetime import datetime, timedelta, timezone as dt_timezone
+from urllib.parse import urlencode
 
 import phonenumbers
 from django.conf import settings
@@ -89,63 +90,67 @@ def now():
 # ---------- contacts and who they are ----------
 
 def resolve_links(contact, save=True):
-    """Find who this number is, for the chat's name and links: a lead (the mobile given at the email step or typed by staff), a verified account, a Gold application.
-    The number proves nothing (anyone can type any number at sign-up or on an application), so common.ownership decides what it may link: an account only when the chat has a lead
-    address and it is the account's own verified address (a chat with no lead address is never linked by number: staff claim it from the person's page); an application only when the chat's lead address, if it has one, is the application's address. The name
-    staff, the lead or the account gave wins over his WhatsApp profile name. A link found now replaces the stored lead or application; nothing found never clears one, and an
-    owner already on the chat (a staff choice, an earlier proven link) is never replaced by a match on the number."""
-    from gold.models import GoldApplication
+    """The one automatic step: rule 1c of common.ownership. A chat that ALREADY has a lead address (set by staff) is linked to the account whose verified email is that address, and
+    its name comes from what it is already linked to (the account, the lead's first name, the Gold application). Nothing else is linked here, ever: a number typed on a public form
+    (journey gate, Register, Gold apply) proves nothing, so it never sets or replaces a link, or a name, on a chat. Staff link a chat by hand (`ownership.link`). An owner already on the
+    chat is never replaced. The name staff, the lead or the account gave wins over his WhatsApp profile name."""
     from journey.models import JourneySession
     from users.models import User
 
-    session = JourneySession.objects.filter(lead_mobile=contact.phone, is_bot=False).exclude(lead_email="").order_by("-created_at").first()
-    lead = ownership.clean(session.lead_email) if session is not None else ownership.clean(contact.lead_email)
-    user = None
-    if contact.user_id is None:
-        candidate = User.objects.filter(mobile=contact.phone, email_verified_at__isnull=False).first()
-        user = candidate if candidate is not None and ownership.mobile_link_ok(lead, candidate) else None
-    application = GoldApplication.objects.filter(mobile=contact.phone).order_by("-created_at").first()
-    if application is not None and lead and ownership.clean(application.email) != lead:
-        application = None  # his number on someone else's application: not his chat's application
+    lead = ownership.clean(contact.lead_email)
+    if contact.user_id is None and lead:
+        account = User.objects.filter(email__iexact=lead, email_verified_at__isnull=False).first()
+        if account is not None:
+            contact.user = account
     name = ""
-    if user is not None:
-        name = (user.get_full_name() or "").strip()
-    if not name and session is not None:
-        named = JourneySession.objects.filter(lead_email__iexact=session.lead_email, is_bot=False).exclude(lead_first_name="").order_by("-created_at").first()
+    if contact.user_id is not None:
+        name = (contact.user.get_full_name() or "").strip()
+    if not name and lead:
+        named = JourneySession.objects.filter(lead_email__iexact=lead, is_bot=False).exclude(lead_first_name="").order_by("-created_at").first()
         name = named.lead_first_name if named else ""
-    if not name and application is not None:
-        name = application.full_name
-    if user is not None:
-        contact.user = user
-    if session is not None and user is None and contact.user_id is None:
-        contact.lead_email = lead
-    if application is not None:
-        contact.application = application
+    if not name and contact.application_id is not None:
+        name = contact.application.full_name
     if name:
         contact.name = name[:100]
     if save:
-        contact.save(update_fields=["user", "lead_email", "application", "name"])
+        contact.save(update_fields=["user", "name"])
     return contact
 
 
-def relink(*phones):
-    """A mobile was added or changed: refresh the links and names of the chats on those numbers."""
-    try:  # best effort: a sign-up, an application or a save must never fail because a chat could not be relinked
-        for contact in Contact.objects.filter(phone__in=[p for p in phones if p]):
-            resolve_links(contact)
-    except Exception:  # noqa: BLE001
+def relink_address(*addresses):
+    """An address was proven (an account verified it): chats that staff already gave that lead address join up with the account (rule 1c). Best effort."""
+    try:
+        for address in {ownership.clean(a) for a in addresses if a}:
+            for contact in Contact.objects.filter(lead_email__iexact=address, user__isnull=True):
+                resolve_links(contact)
+    except Exception:  # noqa: BLE001 - a verification must never fail because a chat could not be relinked
         logger.exception("Could not refresh the WhatsApp links")
+
+
+def move_address(old, new):
+    """Staff corrected a lead's address: the chats that hold the old lead address take the new one (a chat with an owner, or linked to a Gold application on another address, stays).
+    Returns the number moved."""
+    old, new = ownership.clean(old), ownership.clean(new)
+    if not old or not new or old == new:
+        return 0
+    free = Q(application__isnull=True) | Q(application__email__iexact=new)
+    return Contact.objects.filter(user__isnull=True, lead_email__iexact=old).filter(free).update(lead_email=new)
+
+
+def start_chat(mobile, **links):
+    """A staff start action (a POST by an editor): the chat on this number, made when there is none (rule 1b). A NEW chat takes the links of the page it was started from
+    (`user`, `lead_email` or `application`, see ownership.link); an existing chat is returned untouched, with no write at all: staff see it first and link it from the thread. Returns (contact, created)."""
+    contact, created = Contact.objects.get_or_create(phone=mobile)
+    if created:
+        ownership.link(contact, **links)
+        resolve_links(contact)
+    return contact, created
 
 
 def get_or_create_contact(phone, profile_name=""):
     contact, created = Contact.objects.get_or_create(phone=phone)
-    changed = False
     if profile_name and contact.profile_name != profile_name[:100]:
-        contact.profile_name, changed = profile_name[:100], True
-    if created:
-        resolve_links(contact, save=False)
-        changed = True
-    if changed:
+        contact.profile_name = profile_name[:100]
         contact.save()
     return contact
 
@@ -835,12 +840,23 @@ def template_dicts(contact=None):
             for t in usable_templates()]
 
 
+def open_url(contact, target=None):
+    """The link that opens a chat read-only (a plain GET, no write): the thread, remembering which page it was reached from (`from=kind:id`, and `gold=` on a Gold page) so the thread
+    can offer the staff link (ownership rule 1a)."""
+    query = {}
+    if target is not None:
+        query["from"] = f"{target.kind}:{target.pk}"
+        if target.kind == "gold":
+            query["gold"] = str(target.pk)
+    return _office("office_whatsapp_thread", contact.pk) + (f"?{urlencode(query)}" if query else "")
+
+
 def page_context(mobile, user_obj, can_send, start_url, edit_url, first_name="", target=None):
     """The `whatsapp` dict on the lead, person and Gold pages. `state` says what the button shows: `no_mobile` (no number: the email button stands alone, with `reason`
     "Add a number to enable WhatsApp" and, when `can_add_number`, the staff dialog at `edit_url`), `unconfigured` (Twilio is not set up: the button shows greyed with `reason`),
     `view_only` (a reader with no chat yet), `ready` (a number, nothing sent yet) or `chat` (there are messages)."""
     ok = configured()
-    base = {"configured": ok, "has_mobile": bool(mobile), "mobile": mobile or "", "first_name": first_name, "contact_url": start_url, "start_url": start_url,
+    base = {"configured": ok, "has_mobile": bool(mobile), "mobile": mobile or "", "first_name": first_name, "contact_url": start_url, "start_url": start_url, "open_url": "",
             "edit_url": edit_url, "can_send": bool(can_send and mobile and ok), "can_edit": bool(can_send), "has_chat": False, "window_open": False,
             "window_closes_at": "", "opted_out": False, "unread": 0, "can_add_number": bool(can_send and edit_url and not mobile), "reason": "", "thread_url": ""}
     contact = Contact.objects.filter(phone=mobile).first() if mobile else None
@@ -849,7 +865,8 @@ def page_context(mobile, user_obj, can_send, start_url, edit_url, first_name="",
     if contact is not None:
         ends = window_ends_at(contact)
         base.update({"has_chat": bool(contact.last_message_at), "window_open": window_open(contact), "window_closes_at": ends.isoformat() if ends and window_open(contact) else "",
-                     "opted_out": contact.opted_out, "unread": unread_counts(user_obj, [contact.pk]).get(contact.pk, 0), "thread_url": _office("office_whatsapp_thread", contact.pk)})
+                     "opted_out": contact.opted_out, "unread": unread_counts(user_obj, [contact.pk]).get(contact.pk, 0), "thread_url": _office("office_whatsapp_thread", contact.pk),
+                     "open_url": open_url(contact, target)})
     if not mobile:
         state, reason = "no_mobile", "Add a number to enable WhatsApp"
     elif not ok:
@@ -939,5 +956,31 @@ def erase_person(user=None, addresses=(), application=None):
 
 
 def erase_for_application(application):
-    """Gold Delete: the chats linked to this application, so an applicant with no account leaves none behind. A chat owned by an account stays (his page reaches it)."""
-    return erase_contacts(Contact.objects.filter(application=application, user__isnull=True))
+    """Gold Delete: the chats staff linked to this application AND to its applicant's address (`ownership.link` gives a Gold-linked chat the applicant's lead address), so an applicant with
+    no account leaves none behind. Never a chat held by a verified account: an owner, an account with the applicant's address or the application's own account (his page reaches it). A chat
+    linked only through a typed number, or one with no lead address, is not erased here: nothing proves it is his."""
+    from users.models import User
+
+    address = ownership.clean(application.email)
+    if not address or ownership.is_verified(application.user) or User.objects.filter(email__iexact=address, email_verified_at__isnull=False).exists():
+        return erase_contacts([])
+    return erase_contacts(Contact.objects.filter(application=application, user__isnull=True, lead_email__iexact=address))
+
+
+def unclaimed_for_user(user):
+    """The chats on his mobile that nobody holds (no owner, no lead address, no application): his page shows them, but person export and delete do not reach them until staff link
+    them. [{phone, name, url}], for the confirmation text and the page note; staff open each and delete it from there."""
+    if not user.mobile:
+        return []
+    return [{"phone": c.phone, "name": c.display_name, "url": _office("office_whatsapp_thread", c.pk)}
+            for c in Contact.objects.filter(phone=user.mobile) if ownership.is_unlinked(c)]
+
+
+def delete_chat(contact, actor, request=None):
+    """Staff erase one chat: messages, files, queue records (`erase_contacts`). The System audit log gets who, when and the counts, never a message or a name. Returns the counts."""
+    from system import audit
+    from system.models import SystemEvent
+
+    counts = erase_contacts([contact])
+    audit.log_event(SystemEvent.CHAT_DELETED, request, user=actor, detail=counts, sentence=f"{getattr(actor, 'email', '') or 'Staff'} deleted a WhatsApp chat ({counts['whatsapp_messages']} messages)")
+    return counts

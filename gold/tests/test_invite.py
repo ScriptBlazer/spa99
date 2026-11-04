@@ -81,7 +81,7 @@ class ApprovalTests(TestCase):
         self.assertFalse([m for m in mail.outbox if "approved" in m.subject])
 
     def test_existing_account_gets_gold_and_a_short_email_not_an_invite(self):
-        member = User.objects.create_user("dan@example.com", PASSWORD, first_name="Dan")
+        member = User.objects.create_user("dan@example.com", PASSWORD, first_name="Dan", email_verified_at=timezone.now())
         application = make_application()
         mail.outbox.clear()
         self.assertEqual(invites.approve_and_invite(application, self.barry), invites.ACTIVATED)
@@ -179,6 +179,44 @@ class SetupPageTests(TestCase):
         self.assertEqual(self.post(password="short").status_code, 400)
         self.assertEqual(self.post(privacy_accepted="").status_code, 400)
         self.assertFalse(User.objects.filter(email="dan@example.com").exists())
+
+
+class UnverifiedAccountTests(TestCase):
+    """An unverified account may be a stranger's (anyone can register with any address): approve never gives it Gold, and the real applicant still gets his membership."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_all()
+
+    def test_approve_gives_gold_only_to_a_verified_account_and_the_real_applicant_completes_the_invite(self):
+        mail.outbox.clear()
+        stranger = User.objects.create_user("dan@example.com", "stranger-pass-123", first_name="Stranger")  # registered with Dan's address, never verified
+        application, barry = make_application(), staff()
+        self.assertEqual(invites.approve_and_invite(application, barry), invites.INVITED)  # treated as no account: Dan gets the invite
+        application.refresh_from_db()
+        self.assertIsNone(application.user_id)
+        self.assertFalse(InterestRegistration.objects.filter(user=stranger, plan__slug="gold").exists())
+        self.assertEqual(GoldInvite.objects.count(), 1)
+        client = Client(enforce_csrf_checks=True)
+        client.get("/login/")
+        url = "/" + link_in(invite_mail()).split("/", 3)[3]
+        data = {"password": PASSWORD, "date_of_birth": "1985-03-04", "men_only_accepted": "on", "privacy_accepted": "on", "csrfmiddlewaretoken": client.cookies["csrftoken"].value}
+        self.assertEqual(client.post(url, data).status_code, 302)  # Dan sets up from the invite
+        user = User.objects.get(email="dan@example.com")
+        self.assertEqual((User.objects.filter(email__iexact="dan@example.com").count(), user.first_name, user.check_password(PASSWORD), user.check_password("stranger-pass-123")), (1, "Dan", True, False))
+        self.assertNotEqual(user.pk, stranger.pk)
+        self.assertIsNotNone(user.email_verified_at)
+        self.assertEqual(InterestRegistration.objects.get(user=user).plan.slug, "gold")
+        self.assertEqual(invites.resend_invite(application, barry), invites.SKIPPED)  # now there is a verified account
+
+    def test_a_staff_account_is_never_replaced_by_an_invite(self):
+        mail.outbox.clear()
+        User.objects.create_user("dan@example.com", "staff-pass-123", is_staff=True)
+        application = make_application()
+        self.assertEqual(invites.approve_and_invite(application, staff("barry@example.com")), invites.INVITED)
+        with self.assertRaises(invites.InviteError):
+            invites.accept_invite(invites.make_token(GoldInvite.objects.get()), {"password": PASSWORD, "date_of_birth": timezone.now().date().replace(year=1985)})
+        self.assertTrue(User.objects.get(email="dan@example.com").is_staff)
 
 
 class ReviewFixTests(TestCase):

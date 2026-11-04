@@ -198,11 +198,7 @@ def save_lead(session, email, consent, first_name=None, mobile=None, mobile_coun
     from office import snapshots  # local: the Office job reads the journey tables
 
     snapshots.request_refresh()  # a new lead moves the Office figures (debounced, after commit)
-    if phone:
-        from whatsapp import services as whatsapp
-
-        whatsapp.relink(phone)  # he may have written to us first: his chat now knows who he is
-    return clean
+    return clean  # the number is stored on this session only: it never links or renames a chat (common.ownership, rule 2)
 
 
 def erase_lead(email):

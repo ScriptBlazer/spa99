@@ -122,7 +122,10 @@ Free text and files only inside the 24-hour window; templates any time; nothing 
 | `/whatsapp/<contact>/retry/<message id>/` | POST | send a failed message again |
 | `/whatsapp/templates/?contact=<id>` | GET | JSON `{templates: [{id, name, label, category, body, body_html, variables[{key, label, prefill}]}]}` |
 | `/whatsapp/media/<message id>/` | GET | his or our file, for staff (photos, PDFs, audio and video inline, the rest downloads) |
-| `/people/<id>/whatsapp/`, `/leads/<id>/whatsapp/`, `/gold/<id>/whatsapp/` | GET | the Message button: opens his chat (made on the first click); no mobile: back to the page with a note |
+| `/people/<id>/whatsapp/`, `/leads/<id>/whatsapp/`, `/gold/<id>/whatsapp/` | GET | opens his chat read-only (`?from=<kind>:<id>` and `gold=` ride along): **no write, ever**. This is also the Gold approver email's `?do=respond` target. No chat yet: back to the page with a note; no mobile: back to the page with a note |
+| same three URLs | POST (editor, CSRF) | the Start WhatsApp chat button: makes the chat when there is none and links the NEW chat to this page's person (`ownership.link`); an existing chat is opened untouched (no write), the thread then offers the link |
+| `/whatsapp/<contact>/link/` | POST `from=<kind>:<id>` (editor) | the thread's "This number isn't linked to <name>. Link it?" button (shown to an editor, for an unlinked chat reached from a page whose person has this number, after the chat's name, number and messages are on screen). Only an unlinked chat is linked; refused when the number is not his |
+| `/whatsapp/<contact>/delete/` | POST `confirm` (Admin and up, like person delete) | erase one chat: messages, files, queue records. Audited in the System log (`chat_deleted`: who, when, counts, never text) |
 | `/leads/<id>/contact/` | POST `first_name`, `mobile_country`, `mobile` | add or fix a lead's name and mobile (all his journeys), audited |
 | `/people/<id>/mobile/` | POST `mobile_country`, `mobile` | the same for a registered person |
 
@@ -130,7 +133,7 @@ Message dict (`services.message_dict`): `{id, direction, kind, body, body_html, 
 
 Contact dict: `{id, name, has_name, phone, profile_name, labels[Lead|Registered|Gold], page_url, opted_out, window{state: open|closed|opted_out|empty|template_waiting, open, ends_at}, can_send, url, last_message_at, limits{body, image_bytes, file_bytes}}`.
 
-Lead, person and Gold pages get `whatsapp` = `{configured, has_mobile, mobile, first_name, contact_url, start_url, edit_url (on Gold: `/gold/<id>/mobile/`), can_send, can_edit, has_chat, window_open, window_closes_at, opted_out, unread, thread_url}` and `mobile_countries`.
+Lead, person and Gold pages get `whatsapp` = `{configured, has_mobile, mobile, first_name, contact_url, start_url, edit_url (on Gold: `/gold/<id>/mobile/`), can_send, can_edit, has_chat, window_open, window_closes_at, opted_out, unread, thread_url, open_url}` and `mobile_countries`. `start_url` is where the Start form POSTs; `open_url` is the read-only link for Open (the thread with `?from=`).
 
 Gold: sending from a Gold chat (`gold=<application id>` posted with the message) turns New into Contacted with a `responded` event (`meta {"whatsapp": true}`), once. `/gold/<id>/respond/` and `?do=respond` (the approver email's link) redirect to the chat. The email Message and Respond views, forms and dialogs are gone; old `PersonMessage` rows still show in timelines; the email template rows `office_message` and `gold_respond` stay in System > Emails, unused.
 

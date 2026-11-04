@@ -142,6 +142,10 @@ a.o-wa-who > .o-icon { color: var(--office-muted); flex: none; }
 .o-wa-msgs { flex: none; margin: auto 0 0; padding: 0; list-style: none; }
 .o-wa-edge { align-self: center; margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-3); border-radius: var(--office-pill); background: var(--office-surface); color: var(--office-muted); font-size: var(--office-text-xs); }
 .o-wa-edge[hidden], .o-wa-sentinel[hidden] { display: none; }
+.o-wa-top { position: relative; z-index: 3; }
+.o-wa-linkbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: 0; padding: var(--space-2) var(--space-4); background: var(--office-surface); }
+.o-wa-linkbar p { margin: 0; font-size: var(--text-sm); }
+.o-wa-linkbar--quiet { justify-content: flex-end; background: transparent; padding-block: var(--space-1); }
 .o-wa-wall-note { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
 .o-wa-wall-note[hidden] { display: none; }
 .o-wa-drop { position: absolute; left: 50%; top: var(--space-4); transform: translateX(-50%); font-weight: 600; color: var(--office-text); box-shadow: var(--office-shadow-2); }

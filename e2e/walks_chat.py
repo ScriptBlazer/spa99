@@ -15,6 +15,8 @@ ADMIN = STAFF["admin"]
 WANDA = "chat-wanda@example.com"
 WANDA_PHONE_TYPED, WANDA_PHONE = "07400 123462", "+447400123462"
 EDDIE = "chat-eddie@example.com"
+FRANK = "chat-frank@example.com"
+FRANK_PHONE_TYPED, FRANK_PHONE = "07400 123464", "+447400123464"
 FRAME_FLAGS = "allow-same-origin allow-popups allow-popups-to-escape-sandbox"
 # A visitor the site counts as a person: the headless browser's own user agent is treated as a bot, and a bot's journey is never a lead.
 HUMAN = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -62,6 +64,9 @@ def chat_buttons(w):
         assert wa.inner_text().strip() == "Start WhatsApp chat", wa.inner_text()
         assert em.inner_text().strip() == "Start email", em.inner_text()
         assert "btn-primary" in wa.get_attribute("class") and "btn-secondary" in em.get_attribute("class")
+        # Start can make a chat, so it is a small form POST (with its CSRF token), never a link; Open (below, walk 26) is a link
+        assert card.locator("form[data-whatsapp-start][method=post] input[name=csrfmiddlewaretoken]").count() == 1, "Start WhatsApp chat is not a CSRF form"
+        assert card.locator("a[data-whatsapp-open]").count() == 0, "Start WhatsApp chat is a link: a GET would write"
     with w.step("A lead with no mobile: only the email button, and a grey line that opens Add a mobile", office):
         office.goto(f"{OFFICE}/leads/{dbtool('lead', EDDIE)['id']}/")
         card = office.locator("[data-person-reach]")
@@ -100,6 +105,23 @@ def whatsapp_chat(w):
         office.locator("dialog[data-tpl][open]").wait_for()
         office.keyboard.press("Escape")
         assert "Start with a template" in body_text(office)
+    ensure_lead(w, FRANK, FRANK_PHONE_TYPED, "Frank")
+    with w.step("He wrote first and nobody linked the chat: Open WhatsApp chat is a link, it reads only, and the thread offers Link it after the chat is on screen", office):
+        assert whatsapp_from_him(FRANK_PHONE, "Hi, I'm Frank", "SMe2e0020") == 200
+        office.goto(f"{OFFICE}/leads/{dbtool('lead', FRANK)['id']}/")
+        button = office.locator("[data-person-reach] a[data-whatsapp-open]")
+        assert button.inner_text().strip() == "Open WhatsApp chat", button.inner_text()
+        button.click()
+        office.wait_for_url(re.compile(r"/whatsapp/[0-9a-f-]{36}/"))
+        office.locator("[data-link-offer]").wait_for()
+        text = body_text(office)
+        assert "Hi, I'm Frank" in text and FRANK_PHONE in text, "The chat was not on screen with the offer"
+        assert "This number isn't linked to Frank. Link it?" in text, text[:300]
+    with w.step("Link it links the chat to him (a POST), and the offer goes", office):
+        office.locator("[data-link-offer] button[type=submit]").click()
+        office.wait_for_load_state()
+        office.locator("[data-link-offer]").wait_for(state="detached")
+        assert "Linked to Frank." in body_text(office)
     with w.step("He writes first (a signed Twilio webhook): the window opens and the composer shows", office):
         assert whatsapp_from_him(WANDA_PHONE, "Hello, is Tier 2 available this month?", "SMe2e0001") == 200
         office.reload()

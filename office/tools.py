@@ -91,6 +91,15 @@ def mobile_and_name(target):
     return "", (target.user.first_name if target.user is not None else "")
 
 
+def display_name(target):
+    """The person's name for a sentence on a page: his full name, the applicant's, the lead's first name, else the address."""
+    if target.user is not None:
+        return target.user.get_full_name() or target.user.email
+    if target.application is not None and target.application.full_name:
+        return target.application.full_name
+    return mobile_and_name(target)[1] or target.main
+
+
 def whatsapp_context(target, user):
     """`whatsapp` for the lead, person and Gold pages (design brief section 6): {configured, has_mobile, mobile, first_name, contact_url (opens his chat),
     start_url, edit_url (POST first_name, mobile_country, mobile on a lead; mobile_country, mobile on a person or Gold page), can_send, can_edit, has_chat, window_open, window_closes_at,

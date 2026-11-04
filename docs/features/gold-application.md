@@ -118,7 +118,7 @@ Clean, branded, readable on a phone. Applicant receives a short, calm acknowledg
 - The link opens account setup with name, email and mobile prefilled from the application; the applicant only sets a password (email counts as verified because the link went to it).
 - The new account is linked to the application, Gold is active at once, there is no payment step, and the Gold month starts on the approval date (LC-27).
 - **Actions and audit trail (2026-10-26):** Approve, **Decline** (needs an internal reason; the applicant is emailed only if the approver ticks the box, off by default) and **Respond** (email to the applicant, status Contacted, application stays open), plus an internal **Add note**, in the Office and from the approver email (Decline and Respond open the Office form). Every action, email result and status change is an append-only `gold.ApplicationEvent`, shown as the History on the application. Spec: `gold-actions.md`.
-- Declined applicants get no account. A Gold applicant who already has an account just gets Gold added on approval (no invite needed).
+- Declined applicants get no account. A Gold applicant who already has a VERIFIED account just gets Gold added on approval (no invite needed). An account that was never verified may be a stranger's (anyone can register with any address), so it counts as no account: the invite goes out, and when the applicant sets up from it (the invite went to his address) that unverified account is replaced (staff accounts never are), so the real applicant always gets his membership and the stranger never sees Gold.
 
 ### Built (2026-10-23)
 

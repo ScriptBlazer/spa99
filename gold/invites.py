@@ -1,8 +1,8 @@
 """Gold approval and the account invite (docs/features/gold-application.md, "Approval and invite").
 
 Approve: status approved, approved_at (Gold's month starts here, LC-27), approved_by. A person with no account gets an
-invite (a signed link to a GoldInvite row: valid for System > Defaults days from when it was made, single use). A person who already has an account gets Gold added
-and a short email. Declined applications never get an invite. Gold on an account is the member's plan
+invite (a signed link to a GoldInvite row: valid for System > Defaults days from when it was made, single use). A person who already has a VERIFIED account gets Gold added
+and a short email. An unverified account (anyone can register with any address) counts as no account: the invite goes out, and setting up from it replaces that account. Declined applications never get an invite. Gold on an account is the member's plan
 (users.InterestRegistration.plan = the `gold` plan); no payment step."""
 import logging
 from datetime import timedelta
@@ -75,6 +75,11 @@ def mobile_needs_fixing(application):
     return get_user_model().objects.filter(mobile=mobile).exists()
 
 
+def verified_account(email):
+    """The account that has PROVEN this address, or None. An unverified account proves nothing (anyone can register with any address), so approve never activates Gold on it."""
+    return get_user_model().objects.filter(email__iexact=email, email_verified_at__isnull=False).first()
+
+
 # ---------- gold on the account ----------
 
 def activate_gold(user):
@@ -129,7 +134,7 @@ def approve_and_invite(application, approved_by, from_final=False, channel=audit
     or Gold could not be activated: nothing is changed or sent then). Safe against two people approving at once.
     An application awaiting final approval is only approved by `from_final=True` (a final approver's Confirm), and
     `from_final` only works on an application that is awaiting final approval. The review rule itself is in gold.approval."""
-    existing = get_user_model().objects.filter(email__iexact=application.email).first()
+    existing = verified_account(application.email)  # an unverified account may be a stranger's: it gets no Gold (the invite below lets the real applicant take the address)
     try:
         with transaction.atomic():
             fresh = GoldApplication.objects.select_for_update().get(pk=application.pk)
@@ -183,7 +188,7 @@ def resend_invite(application, actor=None, channel=audit.SYSTEM):
     """A new link; the old one stops working. Only for approved applicants with no account yet. Returns INVITED or SKIPPED."""
     if application.status != GoldApplication.APPROVED or application.user_id is not None:
         return SKIPPED
-    if get_user_model().objects.filter(email__iexact=application.email).exists():
+    if verified_account(application.email) is not None:
         return SKIPPED
     with transaction.atomic():
         application = GoldApplication.objects.select_for_update().get(pk=application.pk)
@@ -214,8 +219,15 @@ def accept_invite(token, cleaned):
             invite = GoldInvite.objects.select_for_update().get(pk=invite.pk)
             if not invite.is_usable:
                 raise InviteError
-            if User.objects.filter(email__iexact=application.email).exists():
+            if verified_account(application.email) is not None:
                 raise InviteError("There is already an account for this email. Please sign in.")
+            squatter = User.objects.filter(email__iexact=application.email).first()  # unverified: someone registered with this address without proving it
+            if squatter is not None:
+                if squatter.is_staff or squatter.is_superuser:
+                    raise InviteError
+                from users.services import delete_user_data
+
+                delete_user_data(squatter)  # the invite went to this address, so its holder is the applicant: the unproven account makes way (only what is proven is erased with it)
             user = User.objects.create_user(
                 application.email, cleaned["password"], first_name=application.first_name, last_name=application.last_name,
                 mobile=mobile, date_of_birth=cleaned["date_of_birth"], email_verified_at=now, men_only_accepted_at=now,
@@ -225,7 +237,7 @@ def accept_invite(token, cleaned):
             )
             from users.services import _after_registration
 
-            _after_registration(user, bool(cleaned.get("marketing_opt_in")))  # invites for this address become registered
+            _after_registration(user, bool(cleaned.get("marketing_opt_in")), proven=True)  # invites for this address become registered; the invite proved the address
             invite.used_at = now
             invite.save(update_fields=["used_at", "updated_at"])  # the Gold figures follow this save (insights.signals)
             metrics.email_verified(now)

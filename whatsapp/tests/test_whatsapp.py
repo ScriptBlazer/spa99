@@ -329,10 +329,13 @@ class TemplatesAndFormattingTests(Base):
 
 
 class ContactTests(Base):
-    def test_numbers_find_the_lead_the_account_and_the_staff_name_wins_over_the_profile_name(self):
+    def test_a_number_links_nothing_staff_link_it_and_the_staff_name_wins_over_the_profile_name(self):
         session = lead("hugo@example.com")
         outreach.set_lead_contact("hugo@example.com", self.approver, first_name="Hugo", mobile="07400 123456")
         contact = services.get_or_create_contact("+447400123456", "Hugo the Great")
+        self.assertEqual((contact.name, contact.profile_name, contact.lead_email, contact.display_name), ("", "Hugo the Great", "", "Hugo the Great"))  # his number is on the lead, not on the chat
+        office(self.approver, "post", f"/whatsapp/{contact.pk}/link/", {"from": f"lead:{session.pk}"})  # staff link it from the thread
+        contact.refresh_from_db()
         self.assertEqual((contact.name, contact.profile_name, contact.lead_email, contact.display_name), ("Hugo", "Hugo the Great", "hugo@example.com", "Hugo"))
         user = user_services.register_interest(cleaned(email="acc@example.com", mobile="07400123789", first_name="Acc", last_name="Ount")).user
         self.assertIsNone(services.get_or_create_contact("+447400123789").user_id)  # an unverified account's number is unproven
@@ -449,16 +452,19 @@ class PagesAndGoldTests(Base):
         outreach.set_lead_contact("hugo@example.com", self.approver, first_name="Hugo", mobile="07400 123456")
         ctx = office(self.approver, "get", f"/leads/{session.pk}/").context["whatsapp"]
         self.assertEqual((ctx["has_mobile"], ctx["can_send"], ctx["window_open"], ctx["opted_out"], ctx["unread"]), (True, True, False, False, 0))
-        go = office(self.approver, "get", f"/leads/{session.pk}/whatsapp/")
+        self.assertEqual(office(self.approver, "get", f"/leads/{session.pk}/whatsapp/").url, f"/leads/{session.pk}/")  # a GET never makes a chat
+        self.assertFalse(Contact.objects.filter(phone="+447400123456").exists())
+        go = office(self.approver, "post", f"/leads/{session.pk}/whatsapp/")  # Start is a POST
         contact = Contact.objects.get(phone="+447400123456")
-        self.assertEqual(go.url, f"/whatsapp/{contact.pk}/?picker=1")
+        self.assertEqual((go.url, contact.lead_email, contact.name), (f"/whatsapp/{contact.pk}/?from=lead%3A{session.pk}&picker=1", "hugo@example.com", "Hugo"))
+        self.assertEqual(office(self.reader, "post", f"/leads/{session.pk}/whatsapp/").status_code, 403)
         self.assertEqual(office(self.reader, "get", f"/leads/{session.pk}/").context["whatsapp"]["can_send"], False)
 
     def test_gold_whatsapp_marks_contacted_once_with_an_audit_event_and_respond_redirects(self):
         application, _ = gold_services.submit_application(application_data(email="dan@example.com", mobile="+447400123321"))
-        go = office(self.approver, "get", f"/gold/{application.pk}/whatsapp/")
+        go = office(self.approver, "post", f"/gold/{application.pk}/whatsapp/")
         contact = Contact.objects.get(phone="+447400123321")
-        self.assertEqual(go.url, f"/whatsapp/{contact.pk}/?gold={application.pk}&picker=1")
+        self.assertEqual(go.url, f"/whatsapp/{contact.pk}/?from=gold%3A{application.pk}&gold={application.pk}&picker=1")
         self.assertEqual(contact.application_id, application.pk)
         template = self.template()
         office(self.approver, "post", f"/whatsapp/{contact.pk}/send-template/", {"template": str(template.pk), "var_1": "Dan", "gold": str(application.pk)})
@@ -468,6 +474,8 @@ class PagesAndGoldTests(Base):
         events = ApplicationEvent.objects.filter(application=application, action="responded")
         self.assertEqual((events.count(), events[0].to_status, events[0].meta, events[0].actor), (1, "contacted", {"whatsapp": True}, self.approver))
         self.assertEqual(office(self.approver, "get", f"/gold/{application.pk}/?do=respond").url, f"/gold/{application.pk}/whatsapp/")
+        opened = office(self.approver, "get", f"/gold/{application.pk}/whatsapp/")  # the approver email's Respond link: a plain open, no write
+        self.assertEqual(opened.url, f"/whatsapp/{contact.pk}/?from=gold%3A{application.pk}&gold={application.pk}")
         self.assertEqual(office(self.approver, "post", f"/gold/{application.pk}/respond/", {"message": "x"}).url, f"/gold/{application.pk}/whatsapp/")
 
     def test_staff_edit_of_a_lead_name_and_mobile_is_audited_and_refuses_a_number_that_is_taken(self):
@@ -611,6 +619,7 @@ class ErasureAndSystemTests(Base):
         session = lead("hugo@example.com")
         outreach.set_lead_contact("hugo@example.com", admin, mobile="07400 123456")
         contact, key = self.make_chat("+447400123456")
+        ownership.link(contact, lead_email="hugo@example.com")  # staff linked it from his page
         export = json.loads(office(admin, "get", f"/leads/{session.pk}/export/").content)
         self.assertEqual(export["whatsapp"][0]["phone"], "+447400123456")
         office(admin, "post", f"/leads/{session.pk}/delete/")
@@ -689,6 +698,7 @@ class ReviewFixTests(Base):
         lead(email)
         outreach.set_lead_contact(email, self.approver, first_name="Hugo", mobile=mobile)
         contact = services.get_or_create_contact(phone.normalise(mobile))
+        ownership.link(contact, lead_email=email)  # staff linked it from his page
         Message.objects.create(contact=contact, direction="in", status="received", body="Private words from Hugo")
         return contact
 
@@ -731,21 +741,26 @@ class ReviewFixTests(Base):
         session.refresh_from_db()
         self.assertEqual((session.lead_consent_version, session.lead_first_name, session.lead_mobile), (journey.CONSENT_VERSION, "A", "+447400123450"))
 
-    def test_he_writes_first_then_applies_for_gold_and_the_chat_finds_the_application(self):
+    def test_he_writes_first_then_applies_for_gold_and_staff_link_the_chat_from_the_thread(self):
         twilio_post("/twilio/whatsapp/incoming/", inbound("Hello", "SMfirst", phone_="+447400123321"))
         contact = Contact.objects.get(phone="+447400123321")
         self.assertIsNone(contact.application_id)
         application, _ = gold_services.submit_application(application_data(email="dan@example.com", mobile="+447400123321"))
         contact.refresh_from_db()
+        self.assertEqual((contact.application_id, contact.name), (None, ""))  # the typed number never links it
+        go = office(self.approver, "get", f"/gold/{application.pk}/whatsapp/")  # Open: reads
+        self.assertEqual(go.url, f"/whatsapp/{contact.pk}/?from=gold%3A{application.pk}&gold={application.pk}")
+        thread = office(self.approver, "get", go.url)
+        self.assertContains(thread, f"This number isn't linked to {application.full_name}. Link it?")
+        office(self.approver, "post", f"/whatsapp/{contact.pk}/link/", {"from": f"gold:{application.pk}"})
+        contact.refresh_from_db()
         self.assertEqual((contact.application_id, contact.name), (application.pk, application.full_name))
-        go = office(self.approver, "get", f"/gold/{application.pk}/whatsapp/")
-        self.assertEqual(go.url, f"/whatsapp/{contact.pk}/?gold={application.pk}")
         template = self.template()
         office(self.approver, "post", f"/whatsapp/{contact.pk}/send-template/", {"template": str(template.pk), "var_1": "Dan", "gold": str(application.pk)})
         application.refresh_from_db()
         self.assertEqual(application.status, GoldApplication.CONTACTED)
 
-    def test_he_writes_first_then_registers_or_becomes_a_lead_and_the_links_follow(self):
+    def test_he_writes_first_then_registers_or_becomes_a_lead_and_nothing_is_linked_by_the_number(self):
         twilio_post("/twilio/whatsapp/incoming/", inbound("Hi", "SMa", phone_="+447400123789"))
         twilio_post("/twilio/whatsapp/incoming/", inbound("Hi", "SMb", phone_="+447400123790"))
         user = user_services.register_interest(cleaned(email="acc@example.com", mobile="07400 123789", first_name="Acc", last_name="Ount")).user
@@ -755,7 +770,7 @@ class ReviewFixTests(Base):
         session = journey.create_session("Mozilla/5.0")
         journey.save_lead(session, "lead@example.com", True, first_name="Leo", mobile="07400 123790", require_details=True)
         linked = Contact.objects.get(phone="+447400123790")
-        self.assertEqual((linked.lead_email, linked.name), ("lead@example.com", "Leo"))
+        self.assertEqual((linked.lead_email, linked.name), ("", ""))  # the gate's number never links or names a chat
 
     def test_changing_a_mobile_keeps_the_old_chat_findable_for_erasure(self):
         chat = self.lead_chat("07400 123456", "hugo@example.com")

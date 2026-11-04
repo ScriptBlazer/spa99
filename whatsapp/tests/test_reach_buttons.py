@@ -21,7 +21,8 @@ class ReachButtonTests(Base):
         self.assertContains(page, "Start WhatsApp chat")
         self.assertContains(page, "Start email")
         html = page.content.decode()
-        self.assertRegex(html, r'class="btn btn-primary btn-block o-wa-btn" href="[^"]*" data-whatsapp-open')
+        self.assertRegex(html, r'<form method="post" action="/leads/[^"]*/whatsapp/" data-whatsapp-start><input type="hidden" name="csrfmiddlewaretoken"[^>]*><button type="submit" class="btn btn-primary btn-block o-wa-btn" data-whatsapp-open>')
+        self.assertNotRegex(html, r'<a [^>]*data-whatsapp-open')  # Start writes, so it is a POST form, never a link
         self.assertRegex(html, r'class="btn btn-secondary btn-block o-wa-btn" href="[^"]*" data-email-open')
 
     def test_no_mobile_shows_the_email_button_alone_with_a_clickable_grey_line_that_opens_the_dialog(self):
@@ -57,7 +58,7 @@ class ReachButtonTests(Base):
         application, _ = gold_services.submit_application(application_data(email="gold-btn@example.com", mobile="+447400123999"))
         html = office(self.approver, "get", f"/gold/{application.pk}/").content.decode()
         self.assertIn("o-channels", html)
-        self.assertRegex(html, r'class="btn btn-secondary btn-block o-wa-btn" href="[^"]*" data-whatsapp-open')
+        self.assertRegex(html, r'<button type="submit" class="btn btn-secondary btn-block o-wa-btn" data-whatsapp-open>')
         self.assertRegex(html, r'class="btn btn-secondary btn-block o-wa-btn" href="[^"]*" data-email-open')
         self.assertNotRegex(html, r'btn-primary btn-block o-wa-btn')
         reader = office(self.reader, "get", f"/gold/{application.pk}/").content.decode()  # outside the can_edit block: a reader sees the card, off, with the reason once

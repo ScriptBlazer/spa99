@@ -183,6 +183,7 @@ def person(request, pk):
     if not _is_fragment(request):
         context.update(_chats_context(person, user=user, email=user.email, filter_key="user", filter_id=user.pk))
         context.update(tools.tools_context(tools.Target("person", user.pk, user=user), request.user))
+        context["unclaimed_chats"] = whatsapp_services.unclaimed_for_user(user)  # named beside Export and Delete: they do not include these
     return render(request, "office/_timeline.html" if _is_fragment(request) else "office/person.html", context)
 
 
@@ -270,8 +271,12 @@ def person_delete(request, pk):
         messages.error(request, "A staff account cannot be deleted here.")
         return redirect("office_person", pk=user.pk)
     name = user.get_full_name() or user.email
+    unclaimed = whatsapp_services.unclaimed_for_user(user)  # chats on his number that nothing links to him: delete does not reach them
     user_services.delete_user_data(user, include_chats=True)  # staff-run: his WhatsApp chats go too
     messages.success(request, f"{name} and their data were deleted.")
+    if unclaimed:
+        messages.warning(request, "Not deleted, because nothing links " + ("it" if len(unclaimed) == 1 else "them") + " to him: the WhatsApp chat with "
+                         + ", ".join(f"{c['name']} ({c['phone']})" for c in unclaimed) + ". Open it in WhatsApp and use Delete this chat if it is his.")
     return redirect("office_people")
 
 

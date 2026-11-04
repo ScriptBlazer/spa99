@@ -54,6 +54,12 @@ class Base(OfficeTestCase):
     def export(self, user):
         return office(self.admin, "get", f"/people/{user.pk}/export/").content.decode()
 
+    def start(self, kind, pk):
+        return office(self.admin, "post", f"/{ {'person': 'people', 'lead': 'leads', 'gold': 'gold'}[kind] }/{pk}/whatsapp/")  # the Start button: a POST
+
+    def link(self, chat, kind, pk):
+        return office(self.admin, "post", f"/whatsapp/{chat.pk}/link/", {"from": f"{kind}:{pk}"})  # the "Link it?" button in the thread
+
 
 class StrangerRegistersWithAVictimsAddressTests(Base):
     def test_register_then_apply_links_nothing_so_export_and_delete_never_touch_the_victims_thread(self):
@@ -94,9 +100,13 @@ class StrangerRegistersWithAVictimsAddressTests(Base):
         from gold import invites
         from gold.tests.test_invite import staff
 
-        self.register("dan@example.com")
+        member = self.register("dan@example.com")
         application = self.apply(self.public_client(), email="dan@example.com")
-        self.assertEqual(invites.approve_and_invite(application, staff()), invites.ACTIVATED)  # an existing account is activated and linked by the approval itself
+        verify(member)  # a VERIFIED account is activated and linked by the approval itself; an unverified one is not (gold.tests.test_invite)
+        application.refresh_from_db()
+        application.user = None
+        application.save(update_fields=["user"])
+        self.assertEqual(invites.approve_and_invite(application, staff()), invites.ACTIVATED)
         application.refresh_from_db()
         self.assertIsNotNone(application.user_id)
 
@@ -108,7 +118,12 @@ class UnverifiedMemberWhatsAppTests(Base):
         WhatsAppMessage.objects.create(contact=contact, direction="in", kind="text", body="my words", status="received")
         self.assertIsNone(contact.user_id)  # unverified: the number links nothing by itself
         self.assertNotIn("my words", self.export(member))
-        office(self.admin, "get", f"/people/{member.pk}/whatsapp/")  # "Open WhatsApp chat": staff's explicit choice
+        self.assertEqual(office(self.admin, "get", f"/people/{member.pk}/whatsapp/").status_code, 302)  # Open: a GET only reads
+        self.start("person", member.pk)  # Start on a chat that exists opens it untouched
+        contact.refresh_from_db()
+        self.assertIsNone(contact.user_id)
+        self.assertContains(office(self.admin, "get", f"/whatsapp/{contact.pk}/?from=person:{member.pk}"), "Link it?")  # staff see the chat first, then are offered the link
+        self.link(contact, "person", member.pk)  # staff's explicit choice: the Link it button
         contact.refresh_from_db()
         self.assertEqual(contact.user_id, member.pk)
         self.assertIn("my words", self.export(member))
@@ -119,7 +134,8 @@ class UnverifiedMemberWhatsAppTests(Base):
     def test_a_leads_chat_is_not_claimed_from_a_strangers_page(self):
         stranger = self.register("stranger@example.com", mobile="07400 123790")
         chat = Contact.objects.create(phone="+447400123790", lead_email=VICTIM, name="Victim")
-        office(self.admin, "get", f"/people/{stranger.pk}/whatsapp/")
+        self.start("person", stranger.pk)
+        self.link(chat, "person", stranger.pk)
         chat.refresh_from_db()
         self.assertIsNone(chat.user_id)  # staff could open it, but it was not linked: it has a lead address that is not his
 
@@ -130,6 +146,7 @@ class StrangerWithALeadsMobileTests(Base):
         journey.save_lead(session, VICTIM, True, first_name="Leo", mobile="07400 123790", require_details=True)
         chat = whatsapp.get_or_create_contact("+447400123790")
         WhatsAppMessage.objects.create(contact=chat, direction="in", kind="text", body="lead words", status="received")
+        self.link(chat, "lead", session.pk)  # staff linked the lead's chat from his page
         stranger = self.register("stranger@example.com", mobile="07400 123790")
         verify(stranger)
         chat.refresh_from_db()
@@ -149,7 +166,10 @@ class StrangerWithALeadsMobileTests(Base):
         self.assertNotIn("wrote in first", self.export(member))
         page = office(self.admin, "get", f"/people/{member.pk}/").context["whatsapp"]
         self.assertTrue(page["has_chat"])  # the page shows the chat exists, so nobody assumes it is gone
-        office(self.admin, "get", f"/people/{member.pk}/whatsapp/")  # staff's explicit choice
+        office(self.admin, "get", f"/people/{member.pk}/whatsapp/")  # Open only reads
+        chat.refresh_from_db()
+        self.assertIsNone(chat.user_id)
+        self.link(chat, "person", member.pk)  # staff's explicit choice
         chat.refresh_from_db()
         self.assertEqual(chat.user_id, member.pk)
         self.assertIn("wrote in first", self.export(member))
@@ -188,7 +208,9 @@ class GoldDeleteTests(Base):
         thread = self.thread_with_words("solo@example.com", "applicant words")
         chat = whatsapp.get_or_create_contact("+447400555001")
         WhatsAppMessage.objects.create(contact=chat, direction="in", kind="text", body="applicant chat", status="received")
-        self.assertEqual((thread.application_id, chat.application_id), (application.pk, application.pk))
+        self.link(chat, "gold", application.pk)  # staff linked it from the Gold page: the application and the applicant's address
+        chat.refresh_from_db()
+        self.assertEqual((thread.application_id, chat.application_id, chat.lead_email), (application.pk, application.pk, "solo@example.com"))
         office(self.admin, "post", f"/gold/{application.pk}/delete/")
         self.assertFalse(GoldApplication.objects.filter(pk=application.pk).exists())
         self.assertFalse(Thread.objects.filter(pk=thread.pk).exists())
@@ -209,6 +231,7 @@ class JoinsUpOnVerifyTests(Base):
         session = journey.create_session("Mozilla/5.0")
         journey.save_lead(session, "hugo@example.com", True, first_name="Hugo", mobile="07400 123792", require_details=True)
         chat = whatsapp.get_or_create_contact("+447400123792")
+        self.link(chat, "lead", session.pk)
         WhatsAppMessage.objects.create(contact=chat, direction="in", kind="text", body="hugo chat", status="received")
         thread = self.thread_with_words("hugo@example.com", "hugo thread")
         member = self.register("hugo@example.com", mobile="07400 123792")
@@ -223,16 +246,17 @@ class JoinsUpOnVerifyTests(Base):
 
 
 class RuleTests(Base):
-    def test_mobile_link_and_claim_follow_the_rule(self):
+    def test_claim_and_link_follow_the_rule(self):
         verified = User.objects.create_user("v@example.com", "a-long-test-password-1", email_verified_at=timezone.now())
         unverified = User.objects.create_user("u@example.com", "a-long-test-password-1")
-        self.assertFalse(ownership.mobile_link_ok("", verified))
-        self.assertTrue(ownership.mobile_link_ok("V@example.com", verified))
-        self.assertFalse(ownership.mobile_link_ok("other@example.com", verified))
-        self.assertFalse(ownership.mobile_link_ok("", unverified))
         free, led = Contact.objects.create(phone="+447400555101"), Contact.objects.create(phone="+447400555102", lead_email="other@example.com")
         self.assertTrue(ownership.claim(free, unverified))
         self.assertFalse(ownership.claim(led, unverified))
         self.assertFalse(ownership.claim(free, verified))  # already owned: never taken
+        nobody, held = Contact.objects.create(phone="+447400555103"), Contact.objects.create(phone="+447400555104", lead_email="someone@example.com")
+        self.assertFalse(ownership.link(held, lead_email="Other@Example.com"))  # a chat somebody holds is never taken
+        self.assertTrue(ownership.link(nobody, lead_email="Lead@Example.com"))
+        self.assertEqual(nobody.lead_email, "lead@example.com")
+        self.assertFalse(ownership.link(nobody, lead_email="again@example.com"))  # now held
         self.assertEqual(ownership.trusted_addresses(unverified, {"U@example.com"}), set())
         self.assertEqual(ownership.trusted_addresses(None, {"U@example.com"}), {"u@example.com"})

@@ -24,7 +24,9 @@ urlpatterns = [
     path("whatsapp/<uuid:pk>/send-template/", v.send_template, name="office_whatsapp_send_template"),
     path("whatsapp/<uuid:pk>/read/", v.read, name="office_whatsapp_read"),
     path("whatsapp/<uuid:pk>/retry/<int:message>/", v.retry, name="office_whatsapp_retry"),
-    # the Message button on the lead, person and Gold pages, and adding or fixing a mobile
+    path("whatsapp/<uuid:pk>/link/", v.link, name="office_whatsapp_link"),
+    path("whatsapp/<uuid:pk>/delete/", v.delete, name="office_whatsapp_delete"),
+    # the Message button on the lead, person and Gold pages (GET opens a chat, POST starts one), and adding or fixing a mobile
     path("people/<uuid:pk>/whatsapp/", v.start_person, name="office_person_whatsapp"),
     path("leads/<uuid:pk>/whatsapp/", v.start_lead, name="office_lead_whatsapp"),
     path("gold/<uuid:pk>/whatsapp/", v.start_gold, name="office_gold_whatsapp"),

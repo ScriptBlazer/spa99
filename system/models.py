@@ -191,6 +191,7 @@ class SystemEvent(AuditRow):
     PAYMENTS_CANCELLED, SETUP_MANUAL, SETUP_CANCELLED = "payments_cancelled", "setup_manual", "setup_cancelled"
     SALE_RESTORED, SETUP_EDITED = "sale_restored", "setup_edited"
     LAUNCHED = "launched"
+    CHAT_DELETED = "chat_deleted"  # staff deleted one WhatsApp chat (counts only, never message text)
     KIND_CHOICES = [
         (SIGN_IN, "Signed in"), (SIGN_IN_FAILED, "Sign-in failed"), (UNLOCK, "Unlocked"), (UNLOCK_FAILED, "Unlock failed"),
         (UNLOCK_RATE_LIMITED, "Unlock blocked (too many tries)"), (LOCK_MANUAL, "Locked"), (LOCK_IDLE, "Locked (idle)"),
@@ -207,7 +208,7 @@ class SystemEvent(AuditRow):
         (PAYMENTS_OPENED, "Payments opened"), (PAYMENTS_SCHEDULED, "Payments scheduled"), (PAYMENTS_CLOSED, "Payments closed"),
         (PAYMENTS_CANCELLED, "Payments schedule cancelled"), (SETUP_MANUAL, "Membership set up manually"), (SETUP_CANCELLED, "Manual membership cancelled"),
         (SALE_RESTORED, "Sale price restored"), (SETUP_EDITED, "Manual membership edited"),
-        (LAUNCHED, "Launched Spa 99"),
+        (LAUNCHED, "Launched Spa 99"), (CHAT_DELETED, "WhatsApp chat deleted"),
     ]
     OK, FAILED, BLOCKED = "ok", "failed", "blocked"
     OUTCOME_CHOICES = [(OK, "OK"), (FAILED, "Failed"), (BLOCKED, "Blocked")]
