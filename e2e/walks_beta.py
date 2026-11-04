@@ -697,7 +697,7 @@ def beta_bad_input(w):
         close_problems(gold)
         gold.wait_for_selector("[data-error-for=email][data-state=error]")
         text = " ".join(form_errors(gold)).lower()
-        assert "valid email" in text and "valid uk mobile" in text, f"The form says: {form_errors(gold)}"
+        assert "valid email" in text and "valid mobile" in text, f"The form says: {form_errors(gold)}"  # the Gold form has a country select now: the words are not UK only
         gold_fill_you(gold, "A" * 300, "Goldbad", "beta-goldbad@example.com", mobile(904))
         gold.locator("[data-primary]").click()
         assert any("too long" in line.lower() for line in problems_modal(gold))

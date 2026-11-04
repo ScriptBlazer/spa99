@@ -172,3 +172,17 @@ Design brief: `whatsapp-design.md`. Files: `whatsapp/templates/whatsapp/` (`inbo
 
 Departures from the brief: see the build report in PROJECT.md; the main ones are the Moishe calls above, the country select in place of the "Outside the UK?" hint, no side link to System on the empty template message, and the page note under the email step hidden on a phone so the step fits 375 by 667.
 
+
+---
+
+# Round 2 (plan, 2026-11-04)
+
+Checked in Twilio's docs on 2026-11-04. The Create Message request has no parameter to quote a message or send a reaction, and the incoming webhook page does not mention reactions. Meta's own API has both, but moving off Twilio is not worth it for these.
+
+- **His replies:** the webhook's `OriginalRepliedMessageSid` links his message to ours and shows the quote. Twilio only sends it for replies to messages under 7 days old.
+- **Staff replies:** Reply on a bubble. The Office links them; his phone gets the quoted line as WhatsApp's `> text` formatting, not the tap-to-jump quote box.
+- **His reactions:** unknown until a real phone test. A message with no text and no file gets a neutral bubble and logs the parameter names only (never values), so we can see what Twilio sends.
+- **Staff reactions:** cannot be sent. A quick emoji row sends the emoji as a normal message, and says so.
+- **Video:** MP4 (H.264 and AAC), up to 16 MB, inside the window.
+- **Voice notes:** recorded in the chat with the browser's recorder, converted on the server to OGG Opus with ffmpeg, because Twilio only takes Opus in OGG and browsers record WebM or MP4. Needs ffmpeg in the Docker image. May show as an audio file rather than a voice note on his phone: check in the phone test.
+- **Button:** the WhatsApp button stays visible when Twilio is not set up, and says so. It was hidden because `wa.configured` was false.
