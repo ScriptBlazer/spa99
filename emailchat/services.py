@@ -164,13 +164,17 @@ def resolve_links(thread, save=True):
 
 def move_address(old, new):
     """A lead's address was corrected (outreach.services.correct_lead_email, in its transaction): his threads move to the new address, so the lead page, export and erasure
-    find them. Each thread keeps its reply token, so a late reply to the old Reply-To still lands in the same thread. What moves: a thread whose `lead_email` is the old address
-    (even if it also has a Gold application link: the application still finds it through that link), and a thread on the old address with no owner and no application. What stays:
-    a thread owned by an account, and a thread linked only to a Gold application with no `lead_email` (its address is the application's, not the lead's). Returns the number moved."""
+    find them. Each thread keeps its reply token, so a late reply to the old Reply-To still lands in the same thread.
+    The rule: a thread linked to a Gold application never moves on a lead's correction, because the correction does not change the application, and staff replies on that thread
+    would go to a different address from the applicant's (possibly a different person) without a word. It moves only when the application's own address already is `new`.
+    The thread stays on the application's address, where the applicant, his export and his erasure find it (threads_for_person also looks up by application).
+    What moves: a thread whose `lead_email` is the old address, and a thread on the old address with no owner, with no application (or one already on `new`). What stays: a thread owned
+    by an account, and a thread linked to an application on another address. Returns the number moved."""
     old, new = (old or "").strip().lower(), (new or "").strip().lower()
     if not old or not new or old == new:
         return 0
-    rows = Thread.objects.filter(user__isnull=True).filter(Q(lead_email=old) | Q(email=old, application__isnull=True))
+    free = Q(application__isnull=True) | Q(application__email__iexact=new)
+    rows = Thread.objects.filter(user__isnull=True).filter(free).filter(Q(lead_email=old) | Q(email=old))
     ids = list(rows.values_list("pk", flat=True))
     Thread.objects.filter(pk__in=ids, email=old).update(email=new)
     Thread.objects.filter(pk__in=ids, lead_email=old).update(lead_email=new)
@@ -893,8 +897,21 @@ def timeline_entries(threads):
 
 
 def threads_for_person(user=None, addresses=()):
-    """Every thread held for a person: by his addresses and by the owner link (staff-run export and erasure)."""
-    return threads_for(addresses_for(user, addresses), user)
+    """Every thread held for a person: by his addresses, the owner link, and his Gold applications (a thread stays linked to the application when the lead's address is corrected,
+    so export and erasure still find it). An unverified account's addresses are ignored (addresses_for); its own links count."""
+    addresses = addresses_for(user, addresses)
+    return Thread.objects.filter(Q(pk__in=threads_for(addresses, user).values("pk")) | Q(application__in=_applications(user, addresses)))
+
+
+def _applications(user, addresses):
+    """The Gold applications that are his: linked to the account, or made with one of his addresses."""
+    from gold.models import GoldApplication
+
+    query = Q(user=user) if user is not None else Q(pk__in=[])
+    for address in addresses:
+        if address:
+            query |= Q(email__iexact=address)
+    return GoldApplication.objects.filter(query).values("pk")
 
 
 def threads_for_member(user):

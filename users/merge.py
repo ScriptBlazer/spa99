@@ -70,6 +70,27 @@ def preview(actor, keep, remove):
     }
 
 
+def _move_chats(keep, remove, apps):
+    """Email threads and WhatsApp chats follow the person: the owner link moves to keep (or the delete would null it and leave the chat on the removed address, found by neither
+    keep's lookup nor staff erasure), and the removed address on the chat becomes keep's. Chats that only share the removed address are keep's only when that address was
+    proven his (verified), as with journeys; chats linked to a moved Gold application follow the application. A chat tied to another account is left alone."""
+    from emailchat.models import Thread
+    from whatsapp.models import Contact
+
+    removed, kept = remove.email.strip().lower(), keep.email.strip().lower()
+    for model in (Thread, Contact):
+        mine = Q(user=remove) | Q(application__in=apps)
+        if remove.email_verified_at:
+            mine |= Q(lead_email=removed)
+            if model is Thread:
+                mine |= Q(email=removed)
+        ids = list(model.objects.filter(mine).filter(Q(user=remove) | Q(user__isnull=True)).values_list("pk", flat=True))
+        model.objects.filter(pk__in=ids, lead_email=removed).update(lead_email=kept)
+        if model is Thread:
+            model.objects.filter(pk__in=ids, email=removed).update(email=kept)
+        model.objects.filter(pk__in=ids).update(user=keep)
+
+
 @transaction.atomic
 def merge(actor, keep, remove):
     """Do the merge. Returns the preview numbers that were moved."""
@@ -104,6 +125,7 @@ def merge(actor, keep, remove):
     GoldApplication.objects.filter(pk__in=apps).update(user=keep, email=keep.email)
     GoldApplication.history.model.objects.filter(id__in=apps).update(user=keep, email=keep.email)
     GoldApplication.objects.filter(approved_by=remove).update(approved_by=keep)
+    _move_chats(keep, remove, apps)
     LoginEvent.objects.filter(user=remove).update(user=keep)
     LoginEvent.objects.filter(attempted_email__iexact=removed_email).update(attempted_email=keep.email)
     EmailLog.objects.filter(subject_email__iexact=removed_email).update(subject_email=keep.email)

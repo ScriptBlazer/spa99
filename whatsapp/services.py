@@ -88,13 +88,13 @@ def now():
 # ---------- contacts and who they are ----------
 
 def resolve_links(contact, save=True):
-    """Find who owns this number: an account (User.mobile), a lead (the mobile given at the email step or typed by staff), a Gold
+    """Find who owns this number: a verified account (User.mobile), a lead (the mobile given at the email step or typed by staff), a Gold
     application. The name staff, the lead or the account gave wins over his WhatsApp profile name."""
     from gold.models import GoldApplication
     from journey.models import JourneySession
     from users.models import User
 
-    user = User.objects.filter(mobile=contact.phone).first()
+    user = User.objects.filter(mobile=contact.phone, email_verified_at__isnull=False).first()  # an unverified account's number is unproven: anyone can register with a lead's number (verifying relinks)
     session = JourneySession.objects.filter(lead_mobile=contact.phone, is_bot=False).exclude(lead_email="").order_by("-created_at").first()
     application = GoldApplication.objects.filter(mobile=contact.phone).order_by("-created_at").first()
     name = ""
@@ -886,7 +886,7 @@ def person_phones(user=None, addresses=()):
     by_user = Q(user=user) if user is not None else Q(pk__in=[])
     phones = set(sessions.filter(by_user | Q(lead_email__in=addresses) | _ci("lead_email", addresses)).values_list("lead_mobile", flat=True))
     phones |= set(applications.filter(by_user | _ci("email", addresses)).values_list("mobile", flat=True))
-    if user is not None and user.mobile:
+    if user is not None and user.mobile and user.email_verified_at:  # an unverified account's number is unproven: anyone can register with a lead's number
         phones.add(user.mobile)
     return phones
 

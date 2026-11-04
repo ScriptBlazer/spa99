@@ -335,6 +335,8 @@ class ContactTests(Base):
         contact = services.get_or_create_contact("+447400123456", "Hugo the Great")
         self.assertEqual((contact.name, contact.profile_name, contact.lead_email, contact.display_name), ("Hugo", "Hugo the Great", "hugo@example.com", "Hugo"))
         user = user_services.register_interest(cleaned(email="acc@example.com", mobile="07400123789", first_name="Acc", last_name="Ount")).user
+        self.assertIsNone(services.get_or_create_contact("+447400123789").user_id)  # an unverified account's number is unproven
+        verify(user)
         linked = services.get_or_create_contact("+447400123789")
         self.assertEqual((linked.user_id, linked.name), (user.pk, "Acc Ount"))
         self.assertEqual(services.get_or_create_contact("+447400123999", "Just Profile").display_name, "Just Profile")
@@ -589,6 +591,7 @@ class ErasureAndSystemTests(Base):
 
     def test_deleting_a_person_removes_his_chat_messages_and_files_and_export_includes_them(self):
         user = user_services.register_interest(cleaned(email="acc@example.com", mobile="07400123789")).user
+        verify(user)
         contact, key = self.make_chat("+447400123789")
         exported = user_services.export_user_data(user, include_chats=True)["whatsapp"]
         self.assertEqual((exported[0]["phone"], exported[0]["messages"][0]["text"]), ("+447400123789", "hi"))
@@ -701,9 +704,9 @@ class ReviewFixTests(Base):
         self.assertTrue(Contact.objects.filter(pk=chat.pk).exists())  # his own deletion never reaches Hugo's chat
         self.assertEqual(Message.objects.filter(contact=chat).count(), 1)
         other = user_services.register_interest(cleaned(email="staffcase@example.com", mobile="07400 123456", first_name="Other")).user
-        self.assertEqual(user_services.export_user_data(other, include_chats=True)["whatsapp"][0]["messages"][0]["text"], "Private words from Hugo")  # staff-run: kept
+        self.assertEqual(user_services.export_user_data(other, include_chats=True)["whatsapp"], [])  # staff-run too: an unverified account's number proves nothing
         user_services.delete_user_data(other, include_chats=True)
-        self.assertFalse(Contact.objects.filter(pk=chat.pk).exists())
+        self.assertTrue(Contact.objects.filter(pk=chat.pk).exists())  # staff erasure of the account never deletes the lead's chat
 
     def test_an_old_page_posting_only_the_email_is_told_to_refresh_and_odd_input_is_refused(self):
         client = Client(HTTP_HOST=PUBLIC)
@@ -741,6 +744,8 @@ class ReviewFixTests(Base):
         twilio_post("/twilio/whatsapp/incoming/", inbound("Hi", "SMa", phone_="+447400123789"))
         twilio_post("/twilio/whatsapp/incoming/", inbound("Hi", "SMb", phone_="+447400123790"))
         user = user_services.register_interest(cleaned(email="acc@example.com", mobile="07400 123789", first_name="Acc", last_name="Ount")).user
+        self.assertIsNone(Contact.objects.get(phone="+447400123789").user_id)  # not until the address is verified
+        verify(user)
         self.assertEqual(Contact.objects.get(phone="+447400123789").user_id, user.pk)
         session = journey.create_session("Mozilla/5.0")
         journey.save_lead(session, "lead@example.com", True, first_name="Leo", mobile="07400 123790", require_details=True)

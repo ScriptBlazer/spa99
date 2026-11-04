@@ -58,7 +58,7 @@ class StrangerTests(Base):
 
 
 class MoveAddressTests(Base):
-    def test_lead_threads_move_even_with_a_gold_link_and_account_or_application_only_threads_stay(self):
+    def test_lead_threads_move_but_a_gold_linked_thread_account_or_application_only_threads_stay(self):
         application, _ = gold_services.submit_application(application_data(email="old@example.com"))
         _, gold_thread = services.create_thread("old@example.com", "Gold chat", self.approver)
         self.assertEqual(gold_thread.application_id, application.pk)
@@ -69,13 +69,12 @@ class MoveAddressTests(Base):
         services.move_address("old@example.com", "new@example.com")
         for row in (gold_thread, application_only, plain, owned):
             row.refresh_from_db()
-        self.assertEqual((gold_thread.email, gold_thread.lead_email), ("new@example.com", "new@example.com"))  # moved: page, export and erase find it on the fixed address
+        self.assertEqual((gold_thread.email, gold_thread.lead_email), ("old@example.com", "old@example.com"))  # stays: the application is unchanged, replies must not go to another address
         self.assertEqual((application_only.email, application_only.lead_email), ("old@example.com", ""))
         self.assertEqual((plain.email, plain.lead_email), ("new@example.com", "new@example.com"))
         self.assertEqual(owned.lead_email, "old@example.com")
-        self.assertIn(gold_thread, services.threads_for(["new@example.com"]))
-        self.assertIn(gold_thread, services.threads_for(application=application))  # the application's own view still finds it through its link
-        self.assertNotIn(gold_thread, services.threads_for(["old@example.com"]))
+        self.assertNotIn(gold_thread, services.threads_for(["new@example.com"]))
+        self.assertIn(gold_thread, services.threads_for(["old@example.com"]))  # the applicant's address still finds it
 
 
 class DeliveryProofTests(Base):
