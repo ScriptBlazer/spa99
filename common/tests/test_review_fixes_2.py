@@ -30,8 +30,8 @@ class HostileMailTests(SimpleTestCase):
             self.assertEqual(text, "> " * richtext.QUOTE_MARKS + "hello")
 
     def test_stray_end_tags_do_not_hide_the_depth(self):
-        self.assertTrue(richtext.too_deep("<blockquote></b>" * 5000))
-        self.assertFalse(richtext.too_deep("<table><tr><td><div><p>x</p></div></td></tr></table>" * 50))
+        self.assertTrue(richtext.too_complex("<blockquote></b>" * 5000))
+        self.assertFalse(richtext.too_complex("<table><tr><td><div><p>x</p></div></td></tr></table>" * 50))
 
     def test_many_breaks_and_empty_blocks_are_linear(self):
         for html in ("<br>" * 80000, "<p></p>" * 100000, "<ul><li>" * 5000 + "x", "\n" * 300000):

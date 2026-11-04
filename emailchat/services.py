@@ -548,7 +548,7 @@ def record_inbound(payload, thread):
     from_name = _text(full.get("Name"), 200) or _text(payload.get("FromName"), 200)
     html_in = _text(payload.get("HtmlBody"), MAX_INBOUND_HTML)
     html = richtext.clean_incoming(html_in) if html_in.strip() else ""
-    too_complex = bool(html_in.strip() and not html and richtext.too_deep(html_in))  # nested far beyond real mail: only its text is kept
+    too_complex = bool(html_in.strip() and not html and richtext.too_complex(html_in))  # nested or sized far beyond real mail: only its text is kept
     stripped, whole = _text(payload.get("StrippedTextReply"), MAX_INBOUND_TEXT).strip(), _text(payload.get("TextBody"), MAX_INBOUND_TEXT).strip()
     text = stripped or whole or richtext.html_to_text(html_in if too_complex else html)  # his new words, else his whole text, else the HTML as text (html_to_text is linear, so safe on raw input)
     subject = clean_subject(_text(payload.get("Subject"), 400))

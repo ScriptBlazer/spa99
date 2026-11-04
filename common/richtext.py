@@ -69,16 +69,33 @@ def clean_outgoing(html):
     return _run(html, OUT_TAGS, RAW_ATTRS_OUT, OUT_STYLES, SCHEMES).strip()
 
 
-MAX_DEPTH = 400  # real mail nests a few dozen levels (tables in tables); nh3 takes seconds, and more, to clean tens of thousands
-TAG = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9]*)[^<>]*>")
+MAX_DEPTH = 400  # real mail nests a few dozen levels (tables in tables)
+MAX_TAGS = 50_000  # `<` characters in the whole HTML. nh3's time is not bounded by depth alone: it is quadratic in some shapes (`<div/>`, `<div <>`, `<x-a></x-b>`, and mis-nested
+# `<span><div></span></div>`), whatever the depth counter says. Measured at this cap the worst shape takes well under a second; real newsletters hold a few thousand `<`.
+NAME = re.compile(r"(/?)([a-zA-Z][^\s/>]*)")  # the start of what sits between a `<` and the next `>`
 NO_NESTING = {"br", "img", "hr", "wbr", "input", "meta", "link", "area", "base", "col", "source", "track", "embed", "p", "li", "td", "th", "tr", "option", "dd", "dt"}  # void or closed by the next one
 
 
-def too_deep(html):
-    """True when the markup nests deeper than MAX_DEPTH. One pass; an end tag only counts when a start tag of that name is open, so stray end tags cannot hide a deep stack.
-    It can only over-count (sloppy mail that never closes its tags), never under-count."""
-    depth, open_by_name = 0, {}
-    for match in TAG.finditer(html or ""):
+def too_complex(html):
+    """True when the markup is refused as hostile or absurd: more than MAX_TAGS `<` characters, or nested deeper than MAX_DEPTH. Linear in the size of the input: `<` is counted
+    first (no tag can hide from that), then one pass jumps from `<` to the next `>` with str.find, so no input can make it back up. An end tag only counts when a start tag of
+    that name is open. A `/>` ending does not close anything (HTML ignores it on these tags). This is a guard, not a parser: the depth it reports can differ from nh3's
+    either way (mis-nested or sloppy mail), which is why the tag count, not the depth, is what bounds the cleaner's time."""
+    html = html or ""
+    if html.count("<") > MAX_TAGS:
+        return True
+    depth, open_by_name, pos = 0, {}, 0
+    while True:
+        start = html.find("<", pos)
+        if start < 0:
+            return False
+        end = html.find(">", start)
+        if end < 0:
+            return False
+        pos = end + 1
+        match = NAME.match(html, start + 1, end)
+        if not match:
+            continue
         closing, name = match.group(1), match.group(2).lower()
         if name in NO_NESTING:
             continue
@@ -86,18 +103,17 @@ def too_deep(html):
             if open_by_name.get(name):
                 open_by_name[name] -= 1
                 depth -= 1
-        elif not match.group(0).endswith("/>"):
+        else:
             open_by_name[name] = open_by_name.get(name, 0) + 1
             depth += 1
             if depth > MAX_DEPTH:
                 return True
-    return False
 
 
 def clean_incoming(html):
-    """What a person sent us. Images are allowed in the markup (src http, https or cid:) and the display endpoint decides whether they load. Markup nested deeper than
-    MAX_DEPTH is not cleaned at all (the cleaner's time grows with the square of the depth): '' comes back, and the caller keeps the plain text."""
-    if too_deep(html):
+    """What a person sent us. Images are allowed in the markup (src http, https or cid:) and the display endpoint decides whether they load. Markup that is `too_complex`
+    (over MAX_TAGS, or deeper than MAX_DEPTH) is not cleaned at all (the cleaner's time grows with the square of the size in bad shapes): '' comes back, and the caller keeps the plain text."""
+    if too_complex(html):
         return ""
     return _run(html, IN_TAGS, RAW_ATTRS_IN, IN_STYLES, SCHEMES | {"cid"}).strip()
 
