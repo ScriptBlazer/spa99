@@ -105,6 +105,7 @@ def whatsapp_chat(w):
         office.locator("dialog[data-tpl][open]").wait_for()
         office.keyboard.press("Escape")
         assert "Start with a template" in body_text(office)
+    wanda_chat = office.url  # the Frank steps leave this page, so the later steps come back to it
     ensure_lead(w, FRANK, FRANK_PHONE_TYPED, "Frank")
     with w.step("He wrote first and nobody linked the chat: Open WhatsApp chat is a link, it reads only, and the thread offers Link it after the chat is on screen", office):
         assert whatsapp_from_him(FRANK_PHONE, "Hi, I'm Frank", "SMe2e0020") == 200
@@ -121,10 +122,10 @@ def whatsapp_chat(w):
         office.locator("[data-link-offer] button[type=submit]").click()
         office.wait_for_load_state()
         office.locator("[data-link-offer]").wait_for(state="detached")
-        assert "Linked to Frank." in body_text(office)
+        office.get_by_text("Linked to Frank.").first.wait_for()  # a toast: it appears just after the page loads
     with w.step("He writes first (a signed Twilio webhook): the window opens and the composer shows", office):
         assert whatsapp_from_him(WANDA_PHONE, "Hello, is Tier 2 available this month?", "SMe2e0001") == 200
-        office.reload()
+        office.goto(wanda_chat)
         office.locator("[data-composer]").wait_for(state="visible")
     with w.step("Staff send a message: it reaches Twilio exactly as typed", office):
         before = len(twilio_calls())
