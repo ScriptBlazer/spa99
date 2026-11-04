@@ -44,7 +44,7 @@ def _respond(request, ok, message, to, status=None, extra=None):
 
 def _limited(request, scope, limit, window):
     """True (answer 429) when this person has done this too often."""
-    return not hit(scope, request.user.pk, limit, window)
+    return not hit(scope, request.user.pk, limit, window, sliding=True)
 
 
 def _spec(key):

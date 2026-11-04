@@ -29,7 +29,7 @@ def _mask(email):
 def unsubscribe(request, token):
     """GET shows a confirm page (a mail scanner opening the link changes nothing); POST (the button, or a mail client's one-click)
     switches news off. Idempotent."""
-    if not hit("unsubscribe", client_ip(request) or "unknown", 30, 60):
+    if not hit("unsubscribe", client_ip(request) or "unknown", 30, 60, sliding=True):
         return _message(request, "Please wait", "Too many attempts. Please try again in a minute.", status=429)
     email = tokens.read_unsubscribe_token(token)
     if email is None:
@@ -45,7 +45,7 @@ def unsubscribe(request, token):
 def invite_link(request, token):
     """The session remembers the invite so the questionnaire's email step and Register can pre-fill name and email. A link that is unknown,
     expired or not sent yet looks the same as a good one: same redirect, nothing remembered."""
-    if not hit("invite-link", client_ip(request) or "unknown", 60, 60):
+    if not hit("invite-link", client_ip(request) or "unknown", 60, 60, sliding=True):
         return _message(request, "Please wait", "Too many attempts. Please try again in a minute.", status=429)
     invite = invites.good_invite(token)
     if invite is not None:

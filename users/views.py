@@ -43,7 +43,7 @@ def _message(request, title, text, status=200):
 
 def _throttled(request, scope, limit, window):
     """True (and the caller should stop) when this IP has done too much."""
-    return not hit(scope, client_ip(request) or "unknown", limit, window)
+    return not hit(scope, client_ip(request) or "unknown", limit, window, sliding=True)
 
 
 # ---------- login ----------
@@ -371,7 +371,7 @@ def password_change_old(request):
 def account_emails(request):
     """Marketing emails on or off (UK GDPR consent, logged in the person's history). 20 a minute per person."""
     wants_json = "application/json" in request.headers.get("accept", "")
-    if not hit("account-emails", request.user.pk, 20, 60):
+    if not hit("account-emails", request.user.pk, 20, 60, sliding=True):
         if wants_json:
             return JsonResponse({"saved": False}, status=429)
         messages.error(request, "Too many changes. Please try again in a minute.")

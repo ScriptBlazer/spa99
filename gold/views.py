@@ -110,7 +110,7 @@ def apply(request):
     form = GoldApplicationForm(data)
     if not form.is_valid():
         return JsonResponse({"errors": {k: [str(m) for m in v] for k, v in form.errors.items()}}, status=400)
-    if not hit(APPLY_SCOPE, client_ip(request) or "unknown", APPLY_LIMIT, APPLY_WINDOW):
+    if not hit(APPLY_SCOPE, client_ip(request) or "unknown", APPLY_LIMIT, APPLY_WINDOW, sliding=True):
         return too_many_response(APPLY_WINDOW)
     session = journey_services.session_from_cookies(request.COOKIES, request.user)
     try:
@@ -134,7 +134,7 @@ def _invalid_link(request, status=410):
 @require_http_methods(["GET", "POST"])
 def invite_setup(request, token):
     """GET shows the setup form (nothing is used up by opening it); POST creates the account and signs him in."""
-    if not hit(SETUP_SCOPE, client_ip(request) or "unknown", SETUP_LIMIT, SETUP_WINDOW):
+    if not hit(SETUP_SCOPE, client_ip(request) or "unknown", SETUP_LIMIT, SETUP_WINDOW, sliding=True):
         return render(request, "gold/invite_invalid.html", {"throttled": True, "days": defaults.get(request).gold_invite_days}, status=429)
     status, invite = invites.read_invite(token)
     if status != invites.OK:
