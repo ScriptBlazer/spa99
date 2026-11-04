@@ -5,8 +5,9 @@ A person's chats and threads are exactly:
   1. those with an explicit owner link (`user`), set by a staff action or by a proven step;
   2. those on his address (`email`, `lead_email`), only when his account email is verified (a person with no account, a lead or an applicant, is found by the address staff opened);
   3. those through his Gold application, only when that application's link is proven: the account is verified, or the application is being handled by staff on its own page.
-A mobile number is never proof of anything, and verifying an email proves the email only. A chat is linked to an account by its mobile only when the chat's lead address, if it
-has one, is the verified account's address (`mobile_link_ok`). Self-service stays stricter: the verified account address only (emailchat.threads_for_member).
+A mobile number is never proof of anything, and verifying an email proves the email only. Nothing is linked automatically by number alone: a chat is linked to an account
+because of its mobile only when the chat HAS a lead address and it is the verified account's own address (`mobile_link_ok`). A chat with no lead address stays unlinked until staff
+click through from the person's page (`claim`) or delete it; the page still shows that it exists (`visible_from_page`). Self-service stays stricter: the verified account address only (emailchat.threads_for_member).
 
 `Thread` and `Contact` both have `user`, `lead_email` and `application`, so one query serves both; the address columns differ (`address_fields`).
 Existing `GoldApplication.user` rows on live may link an application to an account that was never verified (the old code linked by address alone): nothing here trusts such a
@@ -64,12 +65,9 @@ def owned(model, user=None, addresses=(), application=None, address_fields=("lea
 
 
 def mobile_link_ok(lead_email, user):
-    """May a chat whose lead address is `lead_email` (blank when it has none) be linked to this account because the mobiles match? Only a verified account, and only when the
-    chat has no lead address or it is the account's own address: a lead's chat is his, whoever types his number at sign-up."""
-    if not is_verified(user):
-        return False
-    lead = clean(lead_email)
-    return not lead or lead == clean(user.email)
+    """May a chat whose lead address is `lead_email` be linked to this account when the mobiles match? Only a verified account, and only when the chat has a lead address that is the
+    account's own. A chat with no lead address is never linked by its number: a stranger could register with the number of someone who wrote in first."""
+    return is_verified(user) and bool(clean(lead_email)) and clean(lead_email) == clean(user.email)
 
 
 def claim(chat, user):

@@ -138,9 +138,25 @@ class StrangerWithALeadsMobileTests(Base):
         lead_export = office(self.admin, "get", f"/leads/{session.pk}/export/").content.decode()
         self.assertIn("lead words", lead_export)  # the lead's own export still has it
 
-    def test_a_chat_with_no_lead_address_still_links_to_the_verified_account_on_the_number(self):
+    def test_a_chat_with_no_lead_address_is_never_linked_by_number_until_staff_click_through(self):
         chat = whatsapp.get_or_create_contact("+447400123791")
+        WhatsAppMessage.objects.create(contact=chat, direction="in", kind="text", body="wrote in first", status="received")
+        Contact.objects.filter(pk=chat.pk).update(last_message_at=timezone.now())
         member = self.register("acc@example.com", mobile="07400 123791")
+        verify(member)
+        chat.refresh_from_db()
+        self.assertIsNone(chat.user_id)
+        self.assertNotIn("wrote in first", self.export(member))
+        page = office(self.admin, "get", f"/people/{member.pk}/").context["whatsapp"]
+        self.assertTrue(page["has_chat"])  # the page shows the chat exists, so nobody assumes it is gone
+        office(self.admin, "get", f"/people/{member.pk}/whatsapp/")  # staff's explicit choice
+        chat.refresh_from_db()
+        self.assertEqual(chat.user_id, member.pk)
+        self.assertIn("wrote in first", self.export(member))
+
+    def test_a_chat_whose_lead_address_is_his_verified_address_links_on_verify(self):
+        chat = Contact.objects.create(phone="+447400123793", lead_email="acc@example.com")
+        member = self.register("acc@example.com", mobile="07400 123793")
         verify(member)
         chat.refresh_from_db()
         self.assertEqual(chat.user_id, member.pk)
@@ -210,7 +226,7 @@ class RuleTests(Base):
     def test_mobile_link_and_claim_follow_the_rule(self):
         verified = User.objects.create_user("v@example.com", "a-long-test-password-1", email_verified_at=timezone.now())
         unverified = User.objects.create_user("u@example.com", "a-long-test-password-1")
-        self.assertTrue(ownership.mobile_link_ok("", verified))
+        self.assertFalse(ownership.mobile_link_ok("", verified))
         self.assertTrue(ownership.mobile_link_ok("V@example.com", verified))
         self.assertFalse(ownership.mobile_link_ok("other@example.com", verified))
         self.assertFalse(ownership.mobile_link_ok("", unverified))

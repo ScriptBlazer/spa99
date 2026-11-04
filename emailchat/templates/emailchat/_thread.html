@@ -3,8 +3,8 @@
 {{ em|json_script:"em-data" }}
   <header class="o-em-head">
     <a class="o-back o-wa-back" href="{{ urls.inbox }}" aria-label="Back to email" data-em-back>{% include "office/_icon.html" with name="chevron-left" %}</a>
-    {% if thread.page_url %}<a class="o-em-who o-wa-phone-only" href="{{ thread.page_url }}"><span class="o-wa-whotext"><span class="o-wa-whoname" dir="auto">{{ thread.name }}</span>{% if thread.has_name %}<span class="o-wa-whonum">{{ thread.email }}</span>{% endif %}</span>{% include "office/_icon.html" with name="chevron-right" %}</a>{% else %}<div class="o-em-who o-wa-phone-only"><span class="o-wa-whotext"><span class="o-wa-whoname" dir="auto">{{ thread.name }}</span>{% if thread.has_name %}<span class="o-wa-whonum">{{ thread.email }}</span>{% endif %}</span></div>{% endif %}
-    <div class="o-em-who o-wa-desk-only"><span class="o-wa-whotext"><span class="o-wa-whoname" dir="auto">{{ thread.name }}</span>{% if thread.has_name %}<span class="o-wa-whonum">{{ thread.email }}</span>{% endif %}</span></div>
+    {% if thread.page_url %}<a class="o-em-who o-wa-phone-only" href="{{ thread.page_url }}"><span class="o-wa-whotext"><span class="o-wa-whoname" dir="auto">{{ thread.name }}</span>{% if thread.has_name %}<span class="o-wa-whonum"><!--email_off-->{{ thread.email }}<!--/email_off--></span>{% endif %}</span>{% include "office/_icon.html" with name="chevron-right" %}</a>{% else %}<div class="o-em-who o-wa-phone-only"><span class="o-wa-whotext"><span class="o-wa-whoname" dir="auto">{{ thread.name }}</span>{% if thread.has_name %}<span class="o-wa-whonum"><!--email_off-->{{ thread.email }}<!--/email_off--></span>{% endif %}</span></div>{% endif %}
+    <div class="o-em-who o-wa-desk-only"><span class="o-wa-whotext"><span class="o-wa-whoname" dir="auto">{{ thread.name }}</span>{% if thread.has_name %}<span class="o-wa-whonum"><!--email_off-->{{ thread.email }}<!--/email_off--></span>{% endif %}</span></div>
     <div class="o-wa-pills o-wa-desk-only">
       {% if thread.page_url %}{% for l in thread.labels %}<a class="o-badge o-badge--type" href="{{ thread.page_url }}">{{ l }}{% include "office/_icon.html" with name="chevron-right" %}</a>{% endfor %}{% endif %}
     </div>
@@ -27,7 +27,7 @@
         <button type="button" class="btn btn-primary btn-sm o-em-send o-em-send--top" data-ed-send data-working-text="Sending" aria-disabled="true">{% include "office/_icon.html" with name="paper-plane" %}<span>Send</span></button>
       </div>
       <div class="o-em-cbody">
-        <p class="o-em-to">To {{ thread.email }}<button type="button" class="o-quiet" data-subject-toggle aria-expanded="false">Change subject</button></p>
+        <p class="o-em-to">To <!--email_off-->{{ thread.email }}<!--/email_off--><button type="button" class="o-quiet" data-subject-toggle aria-expanded="false">Change subject</button></p>
         <label class="o-em-subject-field" data-subject-row hidden><span class="sr-only">Subject</span><input type="text" class="o-em-input" data-subject-input maxlength="200" value="{{ reply_subject }}" aria-label="Subject" dir="auto" autocomplete="off" enterkeyhint="next"></label>
         {% if replies_to_mailbox %}<p class="o-em-quiet">He will reply to the hello@ mailbox.</p>{% endif %}
         {% include "emailchat/_editor.html" with label="Reply to "|add:thread.name placeholder="Write your reply" %}

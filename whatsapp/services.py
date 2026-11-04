@@ -90,8 +90,8 @@ def now():
 
 def resolve_links(contact, save=True):
     """Find who this number is, for the chat's name and links: a lead (the mobile given at the email step or typed by staff), a verified account, a Gold application.
-    The number proves nothing (anyone can type any number at sign-up or on an application), so common.ownership decides what it may link: an account only when the chat's lead
-    address, if it has one, is the account's own verified address; an application only when the chat's lead address, if it has one, is the application's address. The name
+    The number proves nothing (anyone can type any number at sign-up or on an application), so common.ownership decides what it may link: an account only when the chat has a lead
+    address and it is the account's own verified address (a chat with no lead address is never linked by number: staff claim it from the person's page); an application only when the chat's lead address, if it has one, is the application's address. The name
     staff, the lead or the account gave wins over his WhatsApp profile name. A link found now replaces the stored lead or application; nothing found never clears one, and an
     owner already on the chat (a staff choice, an earlier proven link) is never replaced by a match on the number."""
     from gold.models import GoldApplication

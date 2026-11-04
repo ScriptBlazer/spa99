@@ -11,7 +11,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from common import levels, phone
+from common import levels, ownership, phone
 from gold import services as gold_services
 from gold.models import ApplicationEvent, GoldApplication
 from gold.tests.test_gold import application_data
@@ -338,7 +338,9 @@ class ContactTests(Base):
         self.assertIsNone(services.get_or_create_contact("+447400123789").user_id)  # an unverified account's number is unproven
         verify(user)
         linked = services.get_or_create_contact("+447400123789")
-        self.assertEqual((linked.user_id, linked.name), (user.pk, "Acc Ount"))
+        self.assertEqual((linked.user_id, linked.name), (None, ""))  # never linked by number alone: staff claim it from his page
+        ownership.claim(linked, user)
+        self.assertEqual(linked.user_id, user.pk)
         self.assertEqual(services.get_or_create_contact("+447400123999", "Just Profile").display_name, "Just Profile")
         self.assertTrue(session)
 
@@ -491,6 +493,7 @@ class PagesAndGoldTests(Base):
         interest_user.refresh_from_db()
         self.assertEqual(interest_user.mobile, "+447400123790")
         contact = services.get_or_create_contact("+447400123790")
+        ownership.claim(contact, interest_user)  # staff's click-through from his page
         Message.objects.create(contact=contact, direction="out", status="sent", body="Hi", author_label="Moishe (m@x.test)")
         Message.objects.create(contact=contact, direction="in", status="received", body="Thanks!")
         Message.objects.create(contact=contact, direction="in", status="received", body="STOP")
@@ -593,6 +596,8 @@ class ErasureAndSystemTests(Base):
         user = user_services.register_interest(cleaned(email="acc@example.com", mobile="07400123789")).user
         verify(user)
         contact, key = self.make_chat("+447400123789")
+        self.assertEqual(user_services.export_user_data(user, include_chats=True)["whatsapp"], [])  # not linked by number: staff link it first
+        ownership.claim(contact, user)
         exported = user_services.export_user_data(user, include_chats=True)["whatsapp"]
         self.assertEqual((exported[0]["phone"], exported[0]["messages"][0]["text"]), ("+447400123789", "hi"))
         user_services.delete_user_data(user, include_chats=True)
@@ -746,7 +751,7 @@ class ReviewFixTests(Base):
         user = user_services.register_interest(cleaned(email="acc@example.com", mobile="07400 123789", first_name="Acc", last_name="Ount")).user
         self.assertIsNone(Contact.objects.get(phone="+447400123789").user_id)  # not until the address is verified
         verify(user)
-        self.assertEqual(Contact.objects.get(phone="+447400123789").user_id, user.pk)
+        self.assertIsNone(Contact.objects.get(phone="+447400123789").user_id)  # verifying proves the address, not the number
         session = journey.create_session("Mozilla/5.0")
         journey.save_lead(session, "lead@example.com", True, first_name="Leo", mobile="07400 123790", require_details=True)
         linked = Contact.objects.get(phone="+447400123790")
