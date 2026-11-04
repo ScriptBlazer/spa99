@@ -79,16 +79,20 @@ def outreach_context(target, user):
 
 def mobile_and_name(target):
     """(mobile, first name) known for this person: the account's, else the one given at the email step or typed by staff, else the Gold
-    application's. '' when there is none."""
+    application's. The name is the newest one given even when there is no mobile. '' when there is none."""
+    application = target.application
     if target.user is not None and target.user.mobile:
         return target.user.mobile, target.user.first_name or ""
-    session = (JourneySession.objects.filter(is_bot=False).exclude(lead_mobile="").annotate(k=Lower("lead_email")).filter(k__in=list(target.addresses))
-               .order_by("-created_at").first()) if target.addresses else None
-    if session is not None:
-        return session.lead_mobile, session.lead_first_name
-    if target.application is not None and target.application.mobile:
-        return target.application.mobile, target.application.first_name or ""
-    return "", (target.user.first_name if target.user is not None else "")
+    sessions = (JourneySession.objects.filter(is_bot=False).annotate(k=Lower("lead_email")).filter(k__in=list(target.addresses)).order_by("-created_at")) if target.addresses else []
+    sessions = list(sessions)
+    mobile = next((s.lead_mobile for s in sessions if s.lead_mobile), "")
+    name = (next((s.lead_first_name for s in sessions if s.lead_first_name), "") or (target.user.first_name if target.user is not None else "")
+            or (application.first_name if application is not None and application.first_name else ""))
+    if mobile:
+        return mobile, name
+    if application is not None and application.mobile:
+        return application.mobile, name
+    return "", name
 
 
 def display_name(target):

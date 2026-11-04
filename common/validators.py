@@ -73,6 +73,8 @@ def normalise_email(value):
     cleaned = (value or "").strip().lower()
     if not cleaned:
         raise ValidationError(MESSAGES["email_required"], code="required")
+    if len(cleaned) > 254:
+        raise ValidationError(MESSAGES["email_invalid"], code="invalid")
     try:
         validate_email(cleaned)
     except ValidationError:

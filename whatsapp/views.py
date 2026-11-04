@@ -414,8 +414,8 @@ def lead_contact(request, pk):
     if not form.is_valid():
         return _contact_reply(request, target, outreach.INVALID, {"mobile": "That doesn't look like a valid mobile number."})
     data = form.cleaned_data
-    result, errors = outreach.set_lead_contact(target.main, request.user, first_name=data["first_name"] if "first_name" in request.POST else None,
-                                               mobile=data["mobile"] if "mobile" in request.POST else None, mobile_country=data["mobile_country"])
+    # absent or blank means keep: there is no deliberate "remove the name or number" here, so a save with one field empty can never wipe the other
+    result, errors = outreach.set_lead_contact(target.main, request.user, first_name=data["first_name"] or None, mobile=data["mobile"] or None, mobile_country=data["mobile_country"])
     return _contact_reply(request, target, result, errors)
 
 
@@ -431,6 +431,8 @@ def person_mobile(request, pk):
     form = ContactForm(request.POST)
     if not form.is_valid():
         return _contact_reply(request, target, outreach.INVALID, {"mobile": "That doesn't look like a valid mobile number."})
+    if not form.cleaned_data["mobile"]:  # absent or blank keeps the number
+        return _contact_reply(request, target, outreach.UNCHANGED, {})
     result, errors = outreach.set_person_mobile(target.user, request.user, form.cleaned_data["mobile"], form.cleaned_data["mobile_country"])
     return _contact_reply(request, target, result, errors)
 
@@ -447,6 +449,8 @@ def gold_mobile(request, pk):
     form = ContactForm(request.POST)
     if not form.is_valid():
         return _contact_reply(request, target, outreach.INVALID, {"mobile": "That doesn't look like a valid mobile number."})
+    if not form.cleaned_data["mobile"]:  # absent or blank keeps the number
+        return _contact_reply(request, target, outreach.UNCHANGED, {})
     result, errors = outreach.set_gold_mobile(target.application, request.user, form.cleaned_data["mobile"], form.cleaned_data["mobile_country"])
     return _contact_reply(request, target, result, errors)
 

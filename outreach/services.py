@@ -387,7 +387,7 @@ def set_person_mobile(user, actor, mobile, mobile_country=None):
 
 
 def set_gold_mobile(application, actor, mobile, mobile_country=None):
-    """Add or fix a Gold applicant's mobile (any country, E.164, unique). An applicant who has an account: the account's mobile (set_person_mobile). Otherwise the application's,
+    """Add or fix a Gold applicant's mobile (any country, E.164, unique). An applicant with a verified account: the account's mobile (set_person_mobile). Otherwise the application's,
     and any journey of his that already holds a number is kept in step, so the number the page shows is the number just fixed. Audited like the lead and person ones (a line in his
     timeline). Returns (DONE | UNCHANGED | INVALID, errors)."""
     from django.core.exceptions import ValidationError
@@ -396,7 +396,7 @@ def set_gold_mobile(application, actor, mobile, mobile_country=None):
     from journey.models import JourneySession
     from whatsapp import services as whatsapp
 
-    if application.user_id:
+    if application.user_id and application.user.email_verified_at:  # an unverified account is not him (the page shows the application's number): its mobile is left alone
         return set_person_mobile(application.user, actor, mobile, mobile_country)
     text = (mobile or "").strip()
     try:
@@ -442,11 +442,14 @@ def is_bounced(email):
 
 
 def owner_of_email(new, exclude=""):
-    """Who already holds this address: {"kind": "account"|"lead", "name", "url"} or None. An account (any, verified or not) or another lead's journeys."""
+    """Who already holds this address: {"kind": "account"|"lead"|"gold"|"archived"|"chat", "name", "url"} or None. An account (any, verified or not), another lead's journeys,
+    a Gold application, an archived lead, or a WhatsApp chat linked to it as a lead address."""
     from django.urls import reverse
 
+    from gold.models import GoldApplication
     from journey.models import JourneySession
     from users.models import User
+    from whatsapp.models import Contact
 
     user = User.objects.filter(email__iexact=new).first()
     if user is not None:
@@ -455,19 +458,44 @@ def owner_of_email(new, exclude=""):
     session = JourneySession.objects.filter(lead_email__iexact=new, is_bot=False).exclude(lead_email__iexact=exclude).order_by("-created_at").first()
     if session is not None:
         return {"kind": "lead", "name": session.lead_first_name or new, "url": reverse("office_lead", args=[session.pk], urlconf="config.urls_office")}
+    application = GoldApplication.objects.filter(email__iexact=new).order_by("-created_at").first()
+    if application is not None:
+        return {"kind": "gold", "name": application.full_name or new, "url": reverse("office_gold_application", args=[application.pk], urlconf="config.urls_office")}
+    if ArchivedLead.objects.filter(email=new).exists():
+        return {"kind": "archived", "name": new, "url": ""}
+    if Contact.objects.filter(lead_email__iexact=new).exists():
+        return {"kind": "chat", "name": new, "url": ""}
     return None
+
+
+def _move_follow_up(old, new, bounced):
+    """The next-morning row follows the address, so what already went is not sent again to the new one. A bounced old address: the row is dropped (a resend is then the staff action).
+    The unique email: when the new address has a row of its own, the one that was sent wins."""
+    row = NextMorningEmail.objects.filter(email=old).first()
+    if row is None:
+        return
+    other = NextMorningEmail.objects.filter(email=new).first()
+    if bounced or (other is not None and (other.sent_at or not row.sent_at)):
+        row.delete()
+        return
+    if other is not None:
+        other.delete()
+    row.email = new
+    row.save(update_fields=["email"])
 
 
 def correct_lead_email(old, new, actor):
     """Change a lead's address (a typo or a new one he gave; after a bounce or not): written on every journey that left the old one, and his notes, messages, list entries and history follow it.
-    Refused when the new address already belongs to another lead or an account (the answer says whose). The old address stays on the suppression
+    Refused when the new address already belongs to another lead, an account, a Gold application, an archived lead or a chat (the answer says whose), or when the old one is on a Gold application. The old address stays on the suppression
     list if it was on it. Audited ("Email changed by X"). Returns (DONE | UNCHANGED | INVALID | TAKEN | MISSING, info): info is the message for INVALID, or
     the owner {kind, name, url} for TAKEN."""
     from django.core.exceptions import ValidationError
 
     from chat import services as chat_services
     from common.validators import normalise_email
+    from gold.models import GoldApplication
     from journey.models import JourneySession
+    from mailings.models import EmailOptOut
     from notifications.models import EmailLog
     from whatsapp import services as whatsapp
 
@@ -481,18 +509,27 @@ def correct_lead_email(old, new, actor):
         return MISSING, ""
     if new == old:
         return UNCHANGED, ""
+    if GoldApplication.objects.filter(email__iexact=old).exists():  # one person on two addresses would split him: the application holds the address
+        return INVALID, "This address is on a Gold application. Change it there."
     owner = owner_of_email(new, exclude=old)
     if owner:
         return TAKEN, owner
+    bounced = is_bounced(old)
     with transaction.atomic():
         for session in sessions:
             session.lead_email = new
             session.save(update_fields=["lead_email", "updated_at"])
         for model, field in ((StickyNote, "email"), (PersonMessage, "email"), (OutreachEntry, "lead_email"), (PersonEdit, "email"), (ArchivedLead, "email"), (LeadArchiveEvent, "email")):
             model.objects.filter(**{field: old}).update(**{field: new})
-        NextMorningEmail.objects.filter(email=old).delete()  # the old address is not kept (the suppression list is the one record of it); the new one may be sent its own follow-up
+        _move_follow_up(old, new, bounced)
+        if EmailOptOut.objects.filter(email=old).exists():  # he asked us to stop: that follows him (the old one stays, as the record of the request)
+            EmailOptOut.objects.get_or_create(email=new, defaults={"source": "moved"})
         chat_services.move_lead_email(old, new)  # an Ask us chat where he gave the old address
-        EmailLog.objects.filter(Q(to__iexact=old) | Q(subject_email__iexact=old)).delete()  # emails sent to the old address (the bounce) are not his on the new one
+        if bounced:  # what went to a bouncing address is not his on the new one; otherwise the sent emails are his and follow the address (the timeline reads them by address)
+            EmailLog.objects.filter(Q(to__iexact=old) | Q(subject_email__iexact=old)).delete()
+        else:
+            EmailLog.objects.filter(to__iexact=old).update(to=new)
+            EmailLog.objects.filter(subject_email__iexact=old).update(subject_email=new)
         _edit(new, PersonEdit.EMAIL, old, new, actor)
     whatsapp.move_address(old, new)  # his WhatsApp chats that hold the old lead address take the new one
     _figures_changed()

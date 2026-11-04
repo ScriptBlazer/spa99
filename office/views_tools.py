@@ -221,7 +221,7 @@ def lead_email(request, pk):
     elif result == services.UNCHANGED:
         messages.info(request, "That is the address he already has.")
     elif result == services.TAKEN:
-        who = info["name"] if info["kind"] == "account" else f"another lead ({info['name']})"
+        who = {"account": info["name"], "gold": f"a Gold application ({info['name']})", "archived": "an archived lead", "chat": "a WhatsApp chat"}.get(info["kind"], f"another lead ({info['name']})")
         messages.error(request, f"That address already belongs to {who}.")
     elif result == services.INVALID:
         messages.error(request, info)

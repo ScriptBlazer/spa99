@@ -38,7 +38,7 @@ class MessageForm(forms.Form):
 
 
 class ContactForm(forms.Form):
-    """Add or fix a lead's first name and mobile (a missing field is left as it is, an empty one clears it)."""
+    """Add or fix a lead's first name and mobile (a missing or empty field is left as it is)."""
     first_name = forms.CharField(required=False, strip=True, max_length=100)
     mobile_country = forms.CharField(required=False, strip=True, max_length=2)  # ISO code, default GB
     mobile = forms.CharField(required=False, strip=True, max_length=40)
