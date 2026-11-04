@@ -295,7 +295,7 @@ def export_user_data(user, include_chats=False):
         "interest": _export_interest(user),
         "journey_sessions": _export_sessions(user),
         "chats": chat_services.export_conversations(user=user, email=user.email if user.email_verified_at else None),
-        **({"whatsapp": _export_whatsapp(user), "whatsapp_chats_not_included": _unlinked_chats(user)} if include_chats else {}),  # names only: nothing links them to him, so staff decide
+        **({"whatsapp": _export_whatsapp(user), "whatsapp_chats_not_included": _unlinked_chats(user), "email_threads_not_included": _unlinked_threads(user)} if include_chats else {}),  # names only: nothing links them to him, so staff decide
         "email_threads": _export_email_threads(user, include_chats),
         "gold_applications": gold_services.export_applications(user.email) if user.email_verified_at else [],  # by email only once the address is proven his
         "emails": [
@@ -330,6 +330,18 @@ def _unlinked_chats(user):
     from whatsapp import services as whatsapp
 
     return [{"phone": c["phone"], "name": c["name"]} for c in whatsapp.unclaimed_for_user(user)]
+
+
+def unlinked_threads_for(user):
+    """[{email, subject, url}]: direct email threads on his addresses that nobody has linked (the Office names them beside Export and Delete)."""
+    from emailchat import services as emailchat
+
+    return emailchat.unlinked_direct_for(_chat_addresses(user))
+
+
+def _unlinked_threads(user):
+    """Direct email threads on his address that nobody has linked (their From is unproven): not in his export or erasure, so the export names them (address and subject, never the messages)."""
+    return [{"email": t["email"], "subject": t["subject"]} for t in unlinked_threads_for(user)]
 
 
 def _export_whatsapp(user):

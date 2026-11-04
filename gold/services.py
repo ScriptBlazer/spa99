@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from common.tasks import enqueue, erase_task_records
@@ -221,7 +222,8 @@ def link_user_applications(user):
     verified account: it went out as an invite he did not use) gives him Gold now, once, by the same code as the normal activation (gold.invites.activate_approved), and only for a
     verified account. Returns how many were linked."""
     waiting = GoldApplication.objects.filter(email__iexact=user.email, user__isnull=True)
-    approved = list(waiting.filter(status=GoldApplication.APPROVED).values_list("pk", flat=True))
+    mine = GoldApplication.objects.filter(email__iexact=user.email, status=GoldApplication.APPROVED).filter(Q(user__isnull=True) | Q(user=user))  # also a row the old code already linked to this unverified account
+    approved = list(mine.values_list("pk", flat=True))
     linked = waiting.update(user=user)
     if approved and user.email_verified_at is not None:
         from . import invites

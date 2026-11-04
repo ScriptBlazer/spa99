@@ -135,7 +135,7 @@ def automatic_reason(payload, address):
     """Why this is robot mail, or '' for a person's mail. Auto-Submitted counts when any value is other than `no` or `auto-forwarded` (a forward may add that one itself, and
     dropping on it would silently lose everything); List-Id, Precedence bulk or list, and a mailer-daemon or postmaster sender. X-Auto-Response-Suppress and Return-Path are NOT used:
     real people's mail clients and forwards set them."""
-    if any(v.strip().lower() not in ("", "no", FORWARD_MARKER) for v in _headers(payload, "Auto-Submitted")):
+    if any(v.partition(";")[0].strip().lower() not in ("", "no", FORWARD_MARKER) for v in _headers(payload, "Auto-Submitted")):
         return "auto-submitted"
     if _first(payload, "Precedence").lower() in ROBOT_PRECEDENCE:
         return "precedence"

@@ -184,6 +184,7 @@ def person(request, pk):
         context.update(_chats_context(person, user=user, email=user.email, filter_key="user", filter_id=user.pk))
         context.update(tools.tools_context(tools.Target("person", user.pk, user=user), request.user))
         context["unclaimed_chats"] = whatsapp_services.unclaimed_for_user(user)  # named beside Export and Delete: they do not include these
+        context["unlinked_threads"] = user_services.unlinked_threads_for(user)  # unlinked direct emails from his address: the same
     return render(request, "office/_timeline.html" if _is_fragment(request) else "office/person.html", context)
 
 
@@ -272,11 +273,16 @@ def person_delete(request, pk):
         return redirect("office_person", pk=user.pk)
     name = user.get_full_name() or user.email
     unclaimed = whatsapp_services.unclaimed_for_user(user)  # chats on his number that nothing links to him: delete does not reach them
+    unlinked = user_services.unlinked_threads_for(user)  # direct emails from his address that nothing links to him: delete does not reach them either
     user_services.delete_user_data(user, include_chats=True)  # staff-run: his WhatsApp chats go too
     messages.success(request, f"{name} and their data were deleted.")
     if unclaimed:
         messages.warning(request, "Not deleted, because nothing links " + ("it" if len(unclaimed) == 1 else "them") + " to him: the WhatsApp chat with "
                          + ", ".join(f"{c['name']} ({c['phone']})" for c in unclaimed) + ". Open it in WhatsApp and use Delete this chat if it is his.")
+    if unlinked:
+        many = len(unlinked) != 1
+        messages.warning(request, f"Not deleted, because nothing links {'them' if many else 'it'} to him: {len(unlinked)} direct email thread{'s' if many else ''} from {unlinked[0]['email']}. "
+                         f"Find {'them' if many else 'it'} in Email (search his address) and link or delete {'them' if many else 'it'} if {'they are' if many else 'it is'} his.")
     return redirect("office_people")
 
 

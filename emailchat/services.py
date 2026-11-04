@@ -1082,6 +1082,14 @@ def threads_for_person(user=None, addresses=(), application=None):
     return threads_for(addresses, user, application)
 
 
+def unlinked_direct_for(addresses):
+    """Direct email threads on these addresses that nobody has linked. They are nobody's by address (their From is unproven), so export and erasure leave them; the Office names them so
+    staff can link or delete them first. [{email, subject, url}], newest first."""
+    addresses = {clean_address(a) for a in addresses} - {""}
+    rows = Thread.objects.filter(UNPROVEN, email__in=addresses).order_by("-created_at") if addresses else []
+    return [{"email": t.email, "subject": t.subject, "url": _office("office_email_thread", t.pk)} for t in rows]
+
+
 def threads_for_member(user):
     """Member self-service, stricter than the rule in common.ownership: only the thread(s) on his account email, and only once that address is verified (an unverified account may carry someone else's address)."""
     if not ownership.is_verified(user):

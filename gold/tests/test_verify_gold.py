@@ -151,3 +151,32 @@ class MembershipOnAnUnverifiedAccountTests(Base):
         User.objects.filter(pk=account.pk).update(email_verified_at=application.approved_at)
         application.refresh_from_db()
         self.assertEqual(invites.resend_invite(application), invites.SKIPPED)
+
+
+class RowAlreadyLinkedTests(Base):
+    """The old code linked a row to an unverified account at registration. Verifying must still give Gold, once, and never for a row of another account."""
+
+    def approved_row_linked_to(self, account):
+        application = make_application()
+        self.assertEqual(invites.approve_and_invite(application, self.barry), invites.INVITED)
+        GoldApplication.objects.filter(pk=application.pk).update(user=account)
+        mail.outbox.clear()
+        return application
+
+    def test_a_row_already_linked_to_the_unverified_account_gives_gold_on_verify_once(self):
+        account = self.register_dan()
+        application = self.approved_row_linked_to(account)
+        verify(account)
+        self.assertEqual(InterestRegistration.objects.get(user=account).plan.slug, "gold")
+        self.assertEqual(len([m for m in mail.outbox if "Gold" in m.subject]), 1)
+        self.assertTrue(GoldInvite.objects.filter(application=application, revoked_at__isnull=False).exists())
+        verify(account)  # a replayed link: already verified, nothing again
+        self.assertEqual(len([m for m in mail.outbox if "Gold" in m.subject]), 1)
+
+    def test_a_row_linked_to_another_account_is_not_activated(self):
+        account = self.register_dan()
+        other = User.objects.create_user("other@example.com", PASSWORD)
+        self.approved_row_linked_to(other)
+        verify(account)
+        self.assertNotEqual(InterestRegistration.objects.get(user=account).plan.slug, "gold")
+        self.assertEqual([m for m in mail.outbox if "Gold" in m.subject], [])
