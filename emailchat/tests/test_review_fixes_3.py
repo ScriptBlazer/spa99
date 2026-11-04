@@ -64,3 +64,19 @@ class StaffStartedEmailOnUnverifiedPersonTests(Base):
         self.assertEqual(services.erase_person(stranger, {"victim@example.com"})["email_threads"], 1)
         self.assertTrue(Thread.objects.filter(pk=leads_thread.pk).exists())  # the lead's thread was never his to erase
         self.assertFalse(Thread.objects.filter(pk=thread.pk).exists())
+
+
+class UnverifiedAccountWhatsAppTests(Base):
+    def test_an_unverified_account_does_not_pick_up_a_gold_applicants_chat_on_its_address(self):
+        from gold import services as gold_services
+        from gold.tests.test_gold import application_data
+        from office import profile
+        from whatsapp import services as whatsapp
+        from whatsapp.models import Contact
+
+        application, _ = gold_services.submit_application(application_data(email="victim@example.com"))
+        chat = Contact.objects.create(phone="+447700900123", application=application)
+        stranger = user_services.register_interest(cleaned(email="victim@example.com")).user
+        self.assertEqual(profile._contacts(user=stranger), [])  # the profile timeline
+        self.assertEqual(list(whatsapp.contacts_for_person(stranger, {"victim@example.com"})), [])  # and the export and erase path, with the addresses passed anyway
+        self.assertEqual(list(whatsapp.contacts_for_person(None, {"victim@example.com"})), [chat])  # the lead or applicant's own view still finds it

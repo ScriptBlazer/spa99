@@ -857,9 +857,12 @@ def page_context(mobile, user_obj, can_send, start_url, edit_url, first_name="")
 
 def contacts_for_person(user=None, addresses=(), phones=()):
     """Every chat held for a person: by his numbers, his account, his lead address, and the Gold application link (a chat stays linked to the application after its number
-    was changed, so export and erasure still find the old chat)."""
+    was changed, so export and erasure still find the old chat). An unverified account may carry someone else's address (anyone can register with any address), so for it the
+    addresses are ignored here as well (callers pass them only when verified; this is the second lock): only its own links count."""
     from gold.models import GoldApplication
 
+    if user is not None and not user.email_verified_at:
+        addresses = ()
     query = Q(pk__in=[])
     applications = GoldApplication.objects.filter((Q(user=user) if user is not None else Q(pk__in=[])) | _ci("email", [a for a in addresses if a]))
     query |= Q(application__in=applications.values("pk"))
@@ -877,7 +880,7 @@ def person_phones(user=None, addresses=()):
     from gold.models import GoldApplication
     from journey.models import JourneySession
 
-    addresses = {a.lower() for a in addresses if a}
+    addresses = {a.lower() for a in addresses if a} if user is None or user.email_verified_at else set()  # unverified: his own links only
     sessions = JourneySession.objects.exclude(lead_mobile="")
     applications = GoldApplication.objects.exclude(mobile="")
     by_user = Q(user=user) if user is not None else Q(pk__in=[])

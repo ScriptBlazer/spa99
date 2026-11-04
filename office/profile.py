@@ -250,6 +250,8 @@ def _contacts(user=None, email=""):
     from whatsapp import services as whatsapp
 
     addresses = people.resolve(user=user, email=email)[1]
+    if user is not None and not user.email_verified_at:
+        addresses = set()  # an unverified account may carry someone else's address: his own links only, never a lead's or a Gold applicant's chat on that address
     return list(whatsapp.contacts_for_person(user, addresses, whatsapp.person_phones(user, addresses)))
 
 
