@@ -53,7 +53,7 @@ class Template(UUIDModel):
 
 
 class Contact(UUIDModel):
-    """One WhatsApp number (E.164, unique). Links to who he is are found by phone match (`whatsapp.services.resolve_links`)."""
+    """One WhatsApp number (E.164, unique). Who he is: links made by `whatsapp.services.resolve_links` under the ownership rule (common.ownership); a number alone proves nothing."""
 
     phone = models.CharField(max_length=20, unique=True, help_text="E.164.")
     profile_name = models.CharField(max_length=100, blank=True, help_text="His WhatsApp profile name (Twilio ProfileName): for reference.")

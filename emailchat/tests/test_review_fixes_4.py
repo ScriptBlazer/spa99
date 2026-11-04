@@ -23,7 +23,7 @@ class UnprovenMobileTests(Base):
         addresses = {"victim@example.com"}
 
         def found(person):
-            return list(whatsapp.contacts_for_person(person, addresses, whatsapp.person_phones(person, addresses)))
+            return list(whatsapp.contacts_for_person(person, addresses))
 
         self.assertEqual(found(stranger), [])  # registering did not link the lead's chat to the account either
         self.assertIsNone(Contact.objects.get(pk=victim.pk).user_id)
@@ -31,9 +31,9 @@ class UnprovenMobileTests(Base):
         self.assertTrue(Contact.objects.filter(pk=victim.pk).exists())  # staff erasure of the account never touched the lead's chat
         own = Contact.objects.create(phone="+447912345999", user=stranger)
         self.assertEqual(found(stranger), [own])  # a chat linked to the account stays
-        user_services.verify_email(tokens.make_verify_token(stranger))  # verifying relinks the chat on his number
+        user_services.verify_email(tokens.make_verify_token(stranger))  # verifying proves the ADDRESS, and the lead's chat is on that address
         stranger.refresh_from_db()
-        self.assertCountEqual(found(stranger), [victim, own])  # once the address is proven the number is his
+        self.assertCountEqual(found(stranger), [victim, own])  # once the address is proven the chat on that address is his (never because of the number)
 
 
 class GoldLinkedThreadTests(Base):

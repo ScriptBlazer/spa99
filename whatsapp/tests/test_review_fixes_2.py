@@ -60,7 +60,7 @@ class GoldNumberChangeTests(Base):
         application, contact = self.gold_with_chat()
         self.assertEqual(contact.application_id, application.pk)
         outreach.set_gold_mobile(application, self.approver, "07400 444444", "GB")
-        found = services.contacts_for_person(None, {"gl@example.com"}, services.person_phones(None, {"gl@example.com"}))
+        found = services.contacts_for_person(None, {"gl@example.com"})
         self.assertIn(contact.pk, [c.pk for c in found])
         services.erase_person(None, {"gl@example.com"})
         self.assertFalse(Contact.objects.filter(pk=contact.pk).exists())

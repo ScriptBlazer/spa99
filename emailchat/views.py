@@ -340,7 +340,7 @@ def _start(request, kind, pk):
     from office import tools
 
     target = tools.target_for(kind, pk)
-    latest = services.latest_thread(services.addresses_for(target.user, target.addresses), target.user, target.application)
+    latest = services.latest_thread(target.addresses, target.user, target.application)
     gold = f"?gold={pk}" if kind == "gold" else ""
     if latest is not None:
         return redirect(reverse("office_email_thread", args=[latest.pk]) + gold)

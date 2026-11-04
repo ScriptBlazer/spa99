@@ -212,7 +212,7 @@ def timeline(sessions, user=None, interest=None, applications=(), email="", addr
     if addresses or user is not None:
         from emailchat import services as emailchat
 
-        for at, kind, label, detail, href in emailchat.timeline_entries(list(emailchat.threads_for(emailchat.addresses_for(user, addresses), user))):  # across all his threads: the first, one a thread a day, bounces
+        for at, kind, label, detail, href in emailchat.timeline_entries(list(emailchat.threads_for(addresses, user))):  # across all his threads: the first, one a thread a day, bounces
             out.append(_entry(at, kind, label, detail, href))
     out.sort(key=lambda e: e["_at"], reverse=True)
     for e in out:
@@ -246,13 +246,10 @@ def _addresses(user):
 
 
 def _contacts(user=None, email=""):
-    """The WhatsApp chats of this person (by his numbers, his account or his lead address), for the timeline lines."""
+    """The WhatsApp chats of this person, for the timeline lines: the rule in common.ownership (an unverified account's address is never used)."""
     from whatsapp import services as whatsapp
 
-    addresses = people.resolve(user=user, email=email)[1]
-    if user is not None and not user.email_verified_at:
-        addresses = set()  # an unverified account may carry someone else's address: his own links only, never a lead's or a Gold applicant's chat on that address
-    return list(whatsapp.contacts_for_person(user, addresses, whatsapp.person_phones(user, addresses)))
+    return list(whatsapp.contacts_for_person(user, people.resolve(user=user, email=email)[1]))
 
 
 def lead_sessions_for(email):

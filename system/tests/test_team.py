@@ -7,6 +7,7 @@ from django.contrib.auth.models import Group
 from django.core import mail
 from django.core.management import call_command
 from django.test import Client, TestCase
+from django.utils import timezone
 
 from common import levels
 from gold import services as gold_services
@@ -116,7 +117,7 @@ class MergeTests(TestCase):
         call_command("setup_roles", stdout=StringIO())
         self.dev = at("developer", "dev@example.com")
         self.keep = User.objects.create_user("keep@example.com", "x")
-        self.gone = User.objects.create_user("gone@example.com", "x", first_name="Dan", mobile="+447123456789")
+        self.gone = User.objects.create_user("gone@example.com", "x", first_name="Dan", mobile="+447123456789", email_verified_at=timezone.now())  # verified: an unverified account's Gold links and address matches do not move (common.ownership)
 
     def test_a_merge_moves_membership_sessions_and_gold_then_deletes_the_other(self):
         InterestRegistration.objects.create(user=self.gone, plan=Plan.objects.get(slug="tier-2"))

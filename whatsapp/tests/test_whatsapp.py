@@ -758,7 +758,7 @@ class ReviewFixTests(Base):
         self.assertEqual(outreach.set_lead_contact("hugo@example.com", self.approver, mobile="07400 123499")[0], outreach.DONE)
         chat.refresh_from_db()
         self.assertEqual(chat.lead_email, "hugo@example.com")  # the stored owner link stays
-        self.assertEqual(list(services.contacts_for_person(None, {"hugo@example.com"}, services.person_phones(None, {"hugo@example.com"}))), [chat])
+        self.assertEqual(list(services.contacts_for_person(None, {"hugo@example.com"})), [chat])
         admin = make_team_member("admin@example.test", levels.ADMIN)
         office(admin, "post", f"/leads/{session.pk}/delete/")
         self.assertFalse(Contact.objects.filter(pk=chat.pk).exists())  # the old chat went with him

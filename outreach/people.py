@@ -15,7 +15,8 @@ def resolve(user=None, email="", application=None):
     email = _clean(email)
     if application is not None:
         email = email or _clean(application.email)
-        user = user or application.user
+        if user is None and application.user_id and application.user.email_verified_at:  # an unverified account may only look linked (an old link made by address alone)
+            user = application.user
     if user is None and email:
         user = User.objects.filter(email__iexact=email, email_verified_at__isnull=False).first()
     addresses = {email} if email else set()

@@ -100,7 +100,7 @@ def whatsapp_context(target, user):
 
     mobile, first = mobile_and_name(target)
     edit = target.url("contact") if target.kind == "lead" else target.url("mobile")  # person and Gold: POST mobile_country, mobile
-    return {"whatsapp": whatsapp.page_context(mobile, user, can_edit(user), target.url("whatsapp"), edit, first), "mobile_countries": phone.countries()}
+    return {"whatsapp": whatsapp.page_context(mobile, user, can_edit(user), target.url("whatsapp"), edit, first, target), "mobile_countries": phone.countries()}
 
 
 def email_context(target, user):

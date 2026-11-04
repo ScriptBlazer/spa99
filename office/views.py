@@ -332,7 +332,7 @@ def lead_export(request, pk):
     body = {"email": data["email"], "sessions": journey_services.export_lead(data["email"]),
             "emails": journey_services.export_lead_emails(data["email"]),
             "chats": chat_services.export_conversations(email=data["email"]),
-            "whatsapp": whatsapp_services.export_for(whatsapp_services.contacts_for_person(None, {data["email"]}, whatsapp_services.person_phones(None, {data["email"]}))),
+            "whatsapp": whatsapp_services.export_for(whatsapp_services.contacts_for_person(None, {data["email"]})),
             "email_threads": emailchat_services.export_for(emailchat_services.threads_for_person(None, {data["email"]})),
             "gold_applications": gold_services.export_applications(data["email"])}
     response = JsonResponse(body, json_dumps_params={"indent": 2})
@@ -348,7 +348,7 @@ def lead_delete(request, pk):
     if kind == "account":
         return redirect("office_person", pk=data.pk)
     emailchat_services.erase_person(None, {data["email"]})  # his email threads, messages and files
-    whatsapp_services.erase_person(None, {data["email"]})  # his chats, messages and files (found by his number): before the journeys lose it
+    whatsapp_services.erase_person(None, {data["email"]})  # his chats, messages and files (found by his address, never by a number): before the journeys lose it
     cleared = journey_services.erase_lead_data(data["email"])
     from outreach.services import erase_email
 

@@ -21,7 +21,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import linebreaks
 
-from common import richtext
+from common import ownership, richtext
 from common.tasks import enqueue
 
 from .models import Attachment, Message, Thread, ThreadRead
@@ -193,7 +193,7 @@ def relink(*addresses):
 def create_thread(email, subject, actor=None, owner=None):
     """A new thread for this address (always a new one: a person can have many). Returns (result, thread). `owner` is an account staff chose on purpose (they started the email from
     that person's page): the thread is linked to it even when the account is unverified, so that page, his export and his erasure find it. That is staff's explicit choice, not
-    address matching: an unverified account still never picks up a thread that merely shares its address (see addresses_for)."""
+    address matching: an unverified account still never picks up a thread that merely shares its address (common.ownership)."""
     address = clean_address(email)
     if not address:
         return BAD_ADDRESS, None
@@ -208,22 +208,12 @@ def create_thread(email, subject, actor=None, owner=None):
     return DONE, thread
 
 
-def addresses_for(user, addresses):
-    """The addresses to look threads up by for this person. An unverified account may carry someone else's address (anyone can register with any address), so for it no
-    address is used: it sees and exports only threads that belong to it, never a lead's thread on the same address."""
-    return () if user is not None and not user.email_verified_at else addresses
+THREAD_ADDRESS_FIELDS = ("email", "lead_email")
 
 
 def threads_for(addresses=(), user=None, application=None):
-    query = Q(pk__in=[])
-    addresses = [a.lower() for a in addresses if a]
-    if addresses:
-        query |= Q(email__in=addresses) | Q(lead_email__in=addresses)
-    if user is not None:
-        query |= Q(user=user)
-    if application is not None:
-        query |= Q(application=application)
-    return Thread.objects.filter(query)
+    """Every thread held for a person. The rule is common.ownership (owner link, his address only when verified, a proven Gold application); this is the only lookup."""
+    return ownership.owned(Thread, user, addresses, application, THREAD_ADDRESS_FIELDS)
 
 
 def latest_thread(addresses=(), user=None, application=None):
@@ -241,9 +231,8 @@ def page_context(target, user_obj, can_edit):
     kind = target.kind
     ref = f"{kind}:{target.pk}"
     new_url = _office("office_email_new") + "?" + urlencode({"person": ref})
-    addresses = addresses_for(target.user, target.addresses)
-    threads = threads_for(addresses, target.user, target.application)
-    latest = latest_thread(addresses, target.user, target.application)
+    threads = threads_for(target.addresses, target.user, target.application)
+    latest = latest_thread(target.addresses, target.user, target.application)
     address = target.main
     count = threads.count()
     unread = unread_counts(user_obj, [t.pk for t in threads]) if count else {}
@@ -896,27 +885,14 @@ def timeline_entries(threads):
     return out
 
 
-def threads_for_person(user=None, addresses=()):
-    """Every thread held for a person: by his addresses, the owner link, and his Gold applications (a thread stays linked to the application when the lead's address is corrected,
-    so export and erasure still find it). An unverified account's addresses are ignored (addresses_for); its own links count."""
-    addresses = addresses_for(user, addresses)
-    return Thread.objects.filter(Q(pk__in=threads_for(addresses, user).values("pk")) | Q(application__in=_applications(user, addresses)))
-
-
-def _applications(user, addresses):
-    """The Gold applications that are his: linked to the account, or made with one of his addresses."""
-    from gold.models import GoldApplication
-
-    query = Q(user=user) if user is not None else Q(pk__in=[])
-    for address in addresses:
-        if address:
-            query |= Q(email__iexact=address)
-    return GoldApplication.objects.filter(query).values("pk")
+def threads_for_person(user=None, addresses=(), application=None):
+    """Export and erasure: the same lookup as the page (`threads_for`)."""
+    return threads_for(addresses, user, application)
 
 
 def threads_for_member(user):
-    """Member self-service: only the thread(s) on his account email, and only once that address is verified (an unverified account may carry someone else's address)."""
-    if user is None or not user.email_verified_at:
+    """Member self-service, stricter than the rule in common.ownership: only the thread(s) on his account email, and only once that address is verified (an unverified account may carry someone else's address)."""
+    if not ownership.is_verified(user):
         return Thread.objects.none()
     return Thread.objects.filter(email=user.email.strip().lower())
 
@@ -951,8 +927,14 @@ def erase_threads(threads):
     return {"email_threads": len(ids), "email_messages": len(message_ids), "email_files": len(keys), "queue_records": queue}
 
 
-def erase_person(user=None, addresses=()):
-    return erase_threads(threads_for_person(user, addresses))
+def erase_person(user=None, addresses=(), application=None):
+    return erase_threads(threads_for_person(user, addresses, application))
+
+
+def erase_for_application(application):
+    """Gold Delete: the threads linked to this application, so an applicant with no account (no lead or person page to erase them from) leaves none behind. A thread owned by an
+    account stays: the account's page, export and erasure reach it, and the deleted application's link is simply cleared."""
+    return erase_threads(Thread.objects.filter(application=application, user__isnull=True))
 
 
 def refresh_has_attachment(thread_ids):

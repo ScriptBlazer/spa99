@@ -263,7 +263,7 @@ def password_changed(user):
 
 def export_user_data(user, include_chats=False):
     """Everything we hold about a person, as plain JSON-friendly data. `include_chats` (WhatsApp chats) is for staff-run exports only: a mobile
-    number is not proven (anyone can register with a lead's number), so a member's own download never includes a chat chosen by number."""
+    number is not proven (anyone can register with a lead's number), so a member's own download never includes a WhatsApp chat."""
     profile = {name: getattr(user, name) for name in PERSON_FIELDS}
     profile = {key: (value.isoformat() if hasattr(value, "isoformat") else value) for key, value in profile.items()}
     logins = [
@@ -312,7 +312,7 @@ def export_user_data(user, include_chats=False):
     }
 
 
-def _whatsapp_addresses(user):
+def _chat_addresses(user):
     from outreach import people as outreach_people
 
     return outreach_people.resolve(user=user)[1] | {user.email.lower()}
@@ -321,8 +321,8 @@ def _whatsapp_addresses(user):
 def _export_whatsapp(user):
     from whatsapp import services as whatsapp
 
-    addresses = _whatsapp_addresses(user) if user.email_verified_at else set()
-    return whatsapp.export_for(whatsapp.contacts_for_person(user, addresses, whatsapp.person_phones(user, addresses)))
+    addresses = _chat_addresses(user)  # common.ownership uses them only when the account is verified
+    return whatsapp.export_for(whatsapp.contacts_for_person(user, addresses))
 
 
 def _export_email_threads(user, include_chats):
@@ -331,7 +331,7 @@ def _export_email_threads(user, include_chats):
     from emailchat import services as emailchat
 
     if include_chats:
-        return emailchat.export_for(emailchat.threads_for_person(user, _whatsapp_addresses(user) if user.email_verified_at else set()))  # unverified: the owner link only (the address may be someone else's)
+        return emailchat.export_for(emailchat.threads_for_person(user, _chat_addresses(user)))  # unverified: the owner link only (common.ownership drops the addresses)
     return emailchat.export_for(emailchat.threads_for_member(user))
 
 
@@ -452,12 +452,12 @@ def delete_user_data(user, include_chats=False):
         erase_email(address)
     from whatsapp import services as whatsapp
 
-    if include_chats:  # staff-run erasure only: a member deleting his own account never reaches a chat found by an unproven number
-        whatsapp.erase_person(user, _whatsapp_addresses(user) if user.email_verified_at else set())  # chats, messages and files, by his numbers (before the sessions are cleared)
+    if include_chats:  # staff-run erasure only: a member deleting his own account never reaches a WhatsApp chat
+        whatsapp.erase_person(user, _chat_addresses(user))  # chats, messages and files, by the rule in common.ownership (before the sessions are cleared)
     from emailchat import services as emailchat
 
     if include_chats:  # staff-run: every thread held for him; his own account delete only takes the thread on his verified account email
-        emailchat.erase_person(user, _whatsapp_addresses(user) if user.email_verified_at else set())  # unverified: the owner link only, never a lead's thread on the same address
+        emailchat.erase_person(user, _chat_addresses(user))  # unverified: the owner link only, never a lead's thread on the same address (common.ownership drops the addresses)
     else:
         emailchat.erase_threads(emailchat.threads_for_member(user))
     anonymised = _anonymise_sessions(user)

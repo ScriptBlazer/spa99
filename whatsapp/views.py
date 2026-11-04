@@ -17,6 +17,7 @@ from django.utils.cache import patch_vary_headers
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
+from common import ownership
 from common.polling import parse_cursor
 from office.permissions import can_edit, editor, reader
 
@@ -283,6 +284,8 @@ def _start(request, kind, pk):
         messages.info(request, "Add a mobile first, so the team can WhatsApp him.")
         return redirect(target.page_url)
     contact = services.resolve_links(services.get_or_create_contact(mobile))  # links can have gone stale since the chat began
+    if kind == "person":
+        ownership.claim(contact, target.user)  # staff opened his page and chose this chat: an ownerless chat becomes his, as an email thread started here does (common.ownership)
     query = {}
     if kind == "gold":
         query["gold"] = str(pk)

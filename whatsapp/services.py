@@ -20,6 +20,7 @@ from django.utils import timezone
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
+from common import ownership
 from common.tasks import enqueue
 
 from . import errors, formatting, imagesize, twilio_api, voice
@@ -88,15 +89,24 @@ def now():
 # ---------- contacts and who they are ----------
 
 def resolve_links(contact, save=True):
-    """Find who owns this number: a verified account (User.mobile), a lead (the mobile given at the email step or typed by staff), a Gold
-    application. The name staff, the lead or the account gave wins over his WhatsApp profile name."""
+    """Find who this number is, for the chat's name and links: a lead (the mobile given at the email step or typed by staff), a verified account, a Gold application.
+    The number proves nothing (anyone can type any number at sign-up or on an application), so common.ownership decides what it may link: an account only when the chat's lead
+    address, if it has one, is the account's own verified address; an application only when the chat's lead address, if it has one, is the application's address. The name
+    staff, the lead or the account gave wins over his WhatsApp profile name. A link found now replaces the stored lead or application; nothing found never clears one, and an
+    owner already on the chat (a staff choice, an earlier proven link) is never replaced by a match on the number."""
     from gold.models import GoldApplication
     from journey.models import JourneySession
     from users.models import User
 
-    user = User.objects.filter(mobile=contact.phone, email_verified_at__isnull=False).first()  # an unverified account's number is unproven: anyone can register with a lead's number (verifying relinks)
     session = JourneySession.objects.filter(lead_mobile=contact.phone, is_bot=False).exclude(lead_email="").order_by("-created_at").first()
+    lead = ownership.clean(session.lead_email) if session is not None else ownership.clean(contact.lead_email)
+    user = None
+    if contact.user_id is None:
+        candidate = User.objects.filter(mobile=contact.phone, email_verified_at__isnull=False).first()
+        user = candidate if candidate is not None and ownership.mobile_link_ok(lead, candidate) else None
     application = GoldApplication.objects.filter(mobile=contact.phone).order_by("-created_at").first()
+    if application is not None and lead and ownership.clean(application.email) != lead:
+        application = None  # his number on someone else's application: not his chat's application
     name = ""
     if user is not None:
         name = (user.get_full_name() or "").strip()
@@ -105,12 +115,10 @@ def resolve_links(contact, save=True):
         name = named.lead_first_name if named else ""
     if not name and application is not None:
         name = application.full_name
-    # A link found now replaces the stored one; nothing found never clears it. The stored link is the chat's owner for good (a person whose number
-    # was changed or removed keeps his old chat, so his erasure and export still find it).
     if user is not None:
         contact.user = user
-    if session is not None and user is None:
-        contact.lead_email = (session.lead_email or "").lower()
+    if session is not None and user is None and contact.user_id is None:
+        contact.lead_email = lead
     if application is not None:
         contact.application = application
     if name:
@@ -827,7 +835,7 @@ def template_dicts(contact=None):
             for t in usable_templates()]
 
 
-def page_context(mobile, user_obj, can_send, start_url, edit_url, first_name=""):
+def page_context(mobile, user_obj, can_send, start_url, edit_url, first_name="", target=None):
     """The `whatsapp` dict on the lead, person and Gold pages. `state` says what the button shows: `no_mobile` (no number: the email button stands alone, with `reason`
     "Add a number to enable WhatsApp" and, when `can_add_number`, the staff dialog at `edit_url`), `unconfigured` (Twilio is not set up: the button shows greyed with `reason`),
     `view_only` (a reader with no chat yet), `ready` (a number, nothing sent yet) or `chat` (there are messages)."""
@@ -836,6 +844,8 @@ def page_context(mobile, user_obj, can_send, start_url, edit_url, first_name="")
             "edit_url": edit_url, "can_send": bool(can_send and mobile and ok), "can_edit": bool(can_send), "has_chat": False, "window_open": False,
             "window_closes_at": "", "opted_out": False, "unread": 0, "can_add_number": bool(can_send and edit_url and not mobile), "reason": "", "thread_url": ""}
     contact = Contact.objects.filter(phone=mobile).first() if mobile else None
+    if contact is not None and target is not None and not ownership.visible_from_page(contact, target.user, target.addresses, target.application, CONTACT_ADDRESS_FIELDS):
+        contact = None  # the number is on someone else's chat (a lead's, whoever typed his number): it is not shown as this person's
     if contact is not None:
         ends = window_ends_at(contact)
         base.update({"has_chat": bool(contact.last_message_at), "window_open": window_open(contact), "window_closes_at": ends.isoformat() if ends and window_open(contact) else "",
@@ -855,47 +865,13 @@ def page_context(mobile, user_obj, can_send, start_url, edit_url, first_name="")
 
 # ---------- timeline, export, erase ----------
 
-def contacts_for_person(user=None, addresses=(), phones=()):
-    """Every chat held for a person: by his numbers, his account, his lead address, and the Gold application link (a chat stays linked to the application after its number
-    was changed, so export and erasure still find the old chat). An unverified account may carry someone else's address (anyone can register with any address), so for it the
-    addresses are ignored here as well (callers pass them only when verified; this is the second lock): only its own links count."""
-    from gold.models import GoldApplication
-
-    if user is not None and not user.email_verified_at:
-        addresses = ()
-    query = Q(pk__in=[])
-    applications = GoldApplication.objects.filter((Q(user=user) if user is not None else Q(pk__in=[])) | _ci("email", [a for a in addresses if a]))
-    query |= Q(application__in=applications.values("pk"))
-    if phones:
-        query |= Q(phone__in=[p for p in phones if p])
-    if user is not None:
-        query |= Q(user=user)
-    if addresses:
-        query |= Q(lead_email__in=[a.lower() for a in addresses])
-    return Contact.objects.filter(query)
+CONTACT_ADDRESS_FIELDS = ("lead_email",)
 
 
-def person_phones(user=None, addresses=()):
-    """Every mobile held for a person: the account's, the one given at the email step, the one on a Gold application."""
-    from gold.models import GoldApplication
-    from journey.models import JourneySession
-
-    addresses = {a.lower() for a in addresses if a} if user is None or user.email_verified_at else set()  # unverified: his own links only
-    sessions = JourneySession.objects.exclude(lead_mobile="")
-    applications = GoldApplication.objects.exclude(mobile="")
-    by_user = Q(user=user) if user is not None else Q(pk__in=[])
-    phones = set(sessions.filter(by_user | Q(lead_email__in=addresses) | _ci("lead_email", addresses)).values_list("lead_mobile", flat=True))
-    phones |= set(applications.filter(by_user | _ci("email", addresses)).values_list("mobile", flat=True))
-    if user is not None and user.mobile and user.email_verified_at:  # an unverified account's number is unproven: anyone can register with a lead's number
-        phones.add(user.mobile)
-    return phones
-
-
-def _ci(field, values):
-    query = Q(pk__in=[])
-    for value in values:
-        query |= Q(**{f"{field}__iexact": value})
-    return query
+def contacts_for_person(user=None, addresses=(), application=None):
+    """Every chat held for a person, by the rule in common.ownership: the owner link, the lead address (only when his account is verified), a proven Gold application. His mobile
+    is never used to find a chat (it was linked by `resolve_links` only where the rule allows). This is the only lookup."""
+    return ownership.owned(Contact, user, addresses, application, CONTACT_ADDRESS_FIELDS)
 
 
 def timeline_entries(contacts):
@@ -958,5 +934,10 @@ def erase_contacts(contacts):
     return {"whatsapp_contacts": len(ids), "whatsapp_messages": len(messages), "queue_records": queue}
 
 
-def erase_person(user=None, addresses=()):
-    return erase_contacts(contacts_for_person(user, addresses, person_phones(user, addresses)))
+def erase_person(user=None, addresses=(), application=None):
+    return erase_contacts(contacts_for_person(user, addresses, application))
+
+
+def erase_for_application(application):
+    """Gold Delete: the chats linked to this application, so an applicant with no account leaves none behind. A chat owned by an account stays (his page reaches it)."""
+    return erase_contacts(Contact.objects.filter(application=application, user__isnull=True))

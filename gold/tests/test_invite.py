@@ -193,7 +193,7 @@ class ReviewFixTests(TestCase):
     def test_missing_gold_plan_rolls_back_and_sends_nothing(self):
         from plans.models import Plan
 
-        member = User.objects.create_user("dan@example.com", PASSWORD)
+        member = User.objects.create_user("dan@example.com", PASSWORD, email_verified_at=timezone.now())
         application = make_application()
         mail.outbox.clear()
         Plan.objects.filter(slug="gold").delete()

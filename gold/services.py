@@ -175,7 +175,7 @@ def submit_application(data, session=None):
                 data = {**data, "property_link": rating.PROPERTY_LAWYER}
 
         previous = GoldApplication.objects.filter(email__iexact=email).order_by("created_at").first()
-        person = get_user_model().objects.filter(email__iexact=email).first()
+        person = get_user_model().objects.filter(email__iexact=email, email_verified_at__isnull=False).first()  # an unverified account may carry someone else's address: it is linked when it verifies (link_earlier_data)
         now = timezone.now()
         application = GoldApplication(
             first_name=data["first_name"], last_name=data["last_name"], email=email, mobile=data.get("mobile", ""),
