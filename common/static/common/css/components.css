@@ -338,6 +338,8 @@ html.has-sale .menu::backdrop { background: transparent; }
 .field--country { position: relative; margin: 0; }
 .mobile-row .field { margin: 0; }
 .field--country select { width: 100%; color: transparent; cursor: pointer; text-overflow: clip; }
+/* Chrome autofill paints its own box and black text over the select: keep the well, and keep only the dial showing */
+.field--country select:-webkit-autofill, .field--country select:autofill { -webkit-text-fill-color: transparent; color: transparent; transition: background-color 0s 600000s; }
 .field--country > label { z-index: 2; }
 .field--country select option { color: var(--color-espresso); }
 .field--country .dial { position: absolute; left: var(--space-3); bottom: 0.5rem; z-index: 2; font-size: var(--text-base); color: var(--s-text); pointer-events: none; font-variant-numeric: tabular-nums; }
