@@ -5,7 +5,7 @@
  *    with the answers shown. The current step is also saved on the server so closing and returning resumes.
  *  - Follow-up questions (property link, "Other") appear and disappear live from the questions' own conditions.
  */
-import { el, getJson, postJson, postWithRetry } from './api.js';
+import { csrfToken, el, getJson, postJson, postWithRetry } from './api.js';
 import { observeReveals } from './reveal.js';
 import { arrowIcon as makeArrow, clearableTiles, companyGlyphs, reducedMotion, segmentedEl, settle, tileEl } from './choices.js';
 import { dismiss, toast } from './feedback.js';
@@ -345,7 +345,7 @@ function renderResult(data) {
 
 /* ---------- the email gate (before the result) ---------- */
 
-/** First name, email, mobile (all required) and one consent. Posts to /journey/lead/; the server checks every field and says why when one is wrong. */
+/** First name and email (required), mobile (optional: blank is never an error, a typed one is checked live with optional=1) and one consent. Posts to /journey/lead/; the server checks every field and says why when one is wrong. */
 function renderGate() {
   const g = config.gate || {};
   const field = (id, name, label, attrs, extra) => {
@@ -363,11 +363,14 @@ function renderGate() {
   const dial = el('span', { class: 'dial', 'aria-hidden': 'true', text: dialOf('GB') });
   country.addEventListener('change', () => { dial.textContent = dialOf(country.value); });
   const mobile = field('mobile', 'mobile', g.mobile_label || 'Mobile', { type: 'tel', autocomplete: 'tel-national', inputmode: 'tel', enterkeyhint: 'done' });
+  mobile.input.setAttribute('aria-describedby', g.mobile_hint ? 'lead-mobile-hint lead-mobile-msg' : 'lead-mobile-msg');
+  // one reason to add a number, in the owner's words; an error replaces it (css), so the block never grows
+  const mobileHint = g.mobile_hint ? el('p', { class: 'feedback mobile-hint', id: 'lead-mobile-hint', 'data-state': 'hint', text: g.mobile_hint }) : null;
   mobile.node.classList.add('field--number');
   const mobileRow = el('div', { class: 'mobile-row' },
     el('div', { class: 'field field--country' }, el('label', { for: 'lead-mobile-country' }, g.country_label || 'Country'), country, dial), mobile.node);
   mobile.msg.remove(); // the message sits under the whole row, not inside the narrow number box
-  const mobileGroup = el('div', { class: 'field mobile-group' }, mobileRow, mobile.msg);
+  const mobileGroup = el('div', { class: 'field mobile-group' }, mobileRow, mobileHint, mobile.msg);
   if (config.inviteEmail) email.input.value = config.inviteEmail; // from a personal invite link; he can change it. The consent box is never ticked for him.
   const consent = el('input', { type: 'checkbox', id: 'lead-consent', name: 'consent', 'aria-describedby': 'lead-consent-msg' });
   const consentMsg = el('p', { class: 'feedback', id: 'lead-consent-msg', 'aria-live': 'polite', 'data-state': 'hint' });
@@ -387,6 +390,22 @@ function renderGate() {
   [[first, email], [email, mobile]].forEach(([from, to]) => from.input.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); to.input.focus(); } }));
   for (const [name, f] of Object.entries(fields)) f.input.addEventListener('input', () => { mark(f.msg, ''); f.input.removeAttribute('aria-invalid'); });
   consent.addEventListener('change', () => mark(consentMsg, ''));
+  // live check of a typed number by the server's own rules (POST, so the number never sits in a URL); a blank number is never an error
+  let liveCheck = 0;
+  const checkMobile = async () => {
+    const value = mobile.input.value.trim();
+    const mine = ++liveCheck;
+    if (!value) { mark(mobile.msg, ''); mobile.input.removeAttribute('aria-invalid'); return; }
+    try {
+      const body = new URLSearchParams({ mobile: value, mobile_country: country.value, optional: '1' });
+      const response = await fetch(config.urls.mobileCheck || '/validate/mobile/', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken(), Accept: 'application/json' }, body });
+      if (!response.ok || mine !== liveCheck) return;
+      const data = await response.json();
+      if (data.valid) { mark(mobile.msg, ''); mobile.input.removeAttribute('aria-invalid'); } else { mark(mobile.msg, g.errors?.mobile || 'That mobile does not look right. Check it, or leave it blank.'); mobile.input.setAttribute('aria-invalid', 'true'); }
+    } catch { /* the server checks it again when he continues */ }
+  };
+  mobile.input.addEventListener('blur', checkMobile);
+  country.addEventListener('change', () => { if (mobile.input.value.trim()) checkMobile(); });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (primary.disabled) return;

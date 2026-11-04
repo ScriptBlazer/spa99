@@ -242,7 +242,7 @@ def _recipient(request):
 @never_cache
 def new_form(request):
     """The New email screen. ?person=lead:<id>|person:<id>|gold:<id> or ?to=<address> pre-fills the recipient. Context: recipient {email, name, person, error}, urls{create, people,
-    inbox}, can_send, replies_to_mailbox, limits{...}. POST to `create` with `person` or `to`, `subject`, optional `body_html` and `files`."""
+    inbox}, can_send, replies_to_mailbox, limits{...}, plus the list context (rows ...) and `em_new` (the data the page embeds). POST to `create` with `person` or `to`, `subject`, optional `body_html` and `files`."""
     address, ref, target, error = _recipient(request) if (request.GET.get("person") or request.GET.get("to")) else ("", "", None, None)
     name = ""
     if target is not None:
@@ -250,6 +250,9 @@ def new_form(request):
     context = {"recipient": {"email": address, "name": name, "person": ref, "error": services.WORDS.get(error, "") if error else ""}, "can_send": can_edit(request.user),
                "urls": {"create": reverse("office_email_new"), "people": reverse("office_email_people"), "inbox": reverse("office_email")}, "replies_to_mailbox": services.replies_to_mailbox(),
                "limits": {"file_bytes": settings.EMAILCHAT_MAX_ATTACHMENT_BYTES, "send_bytes": settings.EMAILCHAT_MAX_SEND_BYTES, "files": settings.EMAILCHAT_MAX_ATTACHMENTS}, "section": "email"}
+    context.update({k: v for k, v in _list_context(request).items() if k not in context and k not in ("page", "q", "filter", "more_url")})
+    context.update({"page": 1, "q": "", "filter": "", "more_url": reverse("office_email") + "?page=2", "selected": ""})
+    context["em_new"] = {k: context[k] for k in ("recipient", "urls", "limits", "can_send", "replies_to_mailbox")}
     return render(request, "emailchat/new.html", context)
 
 

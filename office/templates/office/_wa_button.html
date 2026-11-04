@@ -1,9 +1,19 @@
-{% comment %}The WhatsApp button (docs/features/whatsapp-design.md section 6). One partial for the lead, person and Gold pages; `wa` is the page's `whatsapp` context.
-`secondary=True` (Gold) makes it a secondary button so Approve stays the one primary. States: a chat (unread count), a mobile but no chat, opted out, no mobile, view only.{% endcomment %}
-{% if wa.has_mobile %}{% if wa.configured and wa.can_edit or wa.has_chat %}
-<div class="o-wa-btn-wrap" data-wa-button>
-  <a class="btn {% if secondary or wa.opted_out or not wa.can_edit %}btn-secondary{% else %}btn-primary{% endif %} btn-block o-wa-btn" href="{{ wa.contact_url }}" data-whatsapp-open>{% include "office/_icon.html" with name="whatsapp" %}<span>WhatsApp</span>{% if wa.unread %}<span class="o-badge-count">{{ wa.unread }}<span class="sr-only"> unread</span></span>{% endif %}</a>
-  {% if wa.opted_out %}<p class="o-hint-line">He replied STOP.</p>{% elif not wa.has_chat and wa.can_edit %}<p class="o-hint-line">No messages yet.</p>{% endif %}
+{% comment %}The WhatsApp button (docs/features/email-chat-design.md section 1). Keyed on `wa.state`, never on `configured`: with Twilio not set up the button stays and says so.
+`wa` is the page's `whatsapp` context, `em` its `email_chat`, `primary` which channel is the one primary (see reach_primary). No mobile: nothing here, _channels.html draws the grey line under Email.{% endcomment %}
+{% if wa.state != "no_mobile" %}
+<div class="o-channel" data-wa-button data-state="{{ wa.state }}">
+  {% if wa.state == "chat" or wa.state == "unconfigured" and wa.has_chat %}
+  <a class="btn {% if primary == 'wa' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{% if wa.state == 'unconfigured' %}{{ wa.thread_url }}{% else %}{{ wa.contact_url }}{% endif %}" data-whatsapp-open{% if wa.opted_out or wa.state == 'unconfigured' %} aria-describedby="wa-hint"{% endif %}>{% include "office/_icon.html" with name="whatsapp" %}<span>Open WhatsApp chat</span>{% if wa.unread %}<span class="o-badge-count">{{ wa.unread }}<span class="sr-only"> unread</span></span>{% endif %}</a>
+  {% if wa.state == "unconfigured" %}<p class="o-hint-line" id="wa-hint">{{ wa.reason }}</p>{% elif wa.opted_out %}<p class="o-hint-line" id="wa-hint">He replied STOP.</p>{% endif %}
+  {% elif wa.state == "ready" %}
+  <a class="btn {% if primary == 'wa' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{{ wa.contact_url }}" data-whatsapp-open{% if wa.opted_out %} aria-describedby="wa-hint"{% endif %}>{% include "office/_icon.html" with name="whatsapp" %}<span>{% if wa.opted_out %}Open WhatsApp chat{% else %}Start WhatsApp chat{% endif %}</span></a>
+  {% if wa.opted_out %}<p class="o-hint-line" id="wa-hint">He replied STOP.</p>{% endif %}
+  {% elif wa.state == "view_only" %}
+  <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="{% if em.state == 'start' and not em.can_send and em.email and not em.suppressed %}em-hint{% else %}wa-hint{% endif %}" data-wa-off>{% include "office/_icon.html" with name="whatsapp" %}<span>No WhatsApp chat yet</span></button>
+  {% if em.state == "start" and not em.can_send and em.email and not em.suppressed %}{% else %}<p class="o-hint-line" id="wa-hint">View only.</p>{% endif %}
+  {% else %}{# unconfigured, no chat #}
+  <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="wa-hint" data-wa-off>{% include "office/_icon.html" with name="whatsapp" %}<span>Start WhatsApp chat</span></button>
+  <p class="o-hint-line" id="wa-hint">{{ wa.reason }}</p>
+  {% endif %}
 </div>
 {% endif %}
-{% elif wa.can_edit and wa.edit_url %}<button type="button" class="btn btn-secondary btn-block o-wa-btn o-wa-btn--add o-wa-full" data-dialog-open="mobile" aria-haspopup="dialog" data-add-mobile>{% include "office/_icon.html" with name="plus" %}<span>Add a mobile to WhatsApp him</span></button>{% endif %}

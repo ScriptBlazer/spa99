@@ -1,0 +1,21 @@
+{% comment %}The email button (docs/features/email-chat-design.md section 1). `em` is the page's `email_chat` context, `wa` its `whatsapp`, `primary` which channel is the one primary.
+Always `open_url` (his latest thread, or New email), never `latest_thread_url`: on Gold `open_url` carries ?gold=, which marks the application Contacted.{% endcomment %}
+<div class="o-channel" data-email-button data-state="{{ em.state }}">
+  {% if not em.email %}
+  <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="em-hint" data-email-off>{% include "office/_icon.html" with name="envelope" %}<span>Start email</span></button>
+  <p class="o-hint-line" id="em-hint">No email on file.</p>
+  {% elif em.state == "open" %}
+  <a class="btn {% if primary == 'email' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{{ em.open_url }}" data-email-open{% if em.suppressed %} aria-describedby="em-hint"{% endif %}>{% include "office/_icon.html" with name="envelope" %}<span>Open email thread</span>{% if em.unread %}<span class="o-badge-count">{{ em.unread }}<span class="sr-only"> unread</span></span>{% endif %}</a>
+  {% if em.suppressed %}<p class="o-hint-line" id="em-hint">{{ em.reason }}</p>
+  {% elif em.can_send %}<p class="o-hint-line" id="em-hint">{% if em.thread_count > 1 %}{{ em.thread_count }} threads. This opens the latest. {% endif %}<a class="o-quiet" href="{{ em.new_email_url }}" data-email-new>New email</a></p>{% endif %}
+  {% elif em.suppressed %}
+  <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="em-hint" data-email-off>{% include "office/_icon.html" with name="envelope" %}<span>Start email</span></button>
+  <p class="o-hint-line" id="em-hint">{{ em.reason }}</p>
+  {% elif em.can_send %}
+  <a class="btn {% if primary == 'email' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{{ em.open_url }}" data-email-open>{% include "office/_icon.html" with name="envelope" %}<span>Start email</span></a>
+  {% else %}
+  <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="em-hint" data-email-off>{% include "office/_icon.html" with name="envelope" %}<span>No email yet</span></button>
+  <p class="o-hint-line" id="em-hint">View only.</p>
+  {% endif %}
+  {% if em.replies_to_mailbox and em.can_send and not em.suppressed %}<p class="o-hint-line" data-replies-note>Replies go to the hello@ mailbox.</p>{% endif %}
+</div>

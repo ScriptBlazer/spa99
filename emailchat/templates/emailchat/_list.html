@@ -1,0 +1,18 @@
+{% comment %}The thread list pane: head (search, chips), rows. Included by the inbox and by a thread or New email page (desktop shows both). Shares the WhatsApp list's frame classes.{% endcomment %}
+<section class="o-wa-list" aria-label="Email threads" data-em-list>
+  <div class="o-wa-listhead">
+    <form class="o-wa-search" role="search" method="get" action="{% url 'office_email' %}" data-em-search>
+      {% include "office/_icon.html" with name="search" %}
+      <input type="search" name="q" value="{{ q }}" placeholder="Search name, address or subject" aria-label="Search name, address or subject" autocomplete="off" enterkeyhint="search" data-em-q>
+    </form>
+    <div class="o-wa-chips" role="group" aria-label="Show">
+      <button type="button" class="o-chip" data-em-filter="" aria-pressed="{% if not filter %}true{% else %}false{% endif %}">All</button>
+      <button type="button" class="o-chip" data-em-filter="unread" aria-pressed="{% if filter == 'unread' %}true{% else %}false{% endif %}">Unread</button>
+      <button type="button" class="o-chip" data-em-filter="noreply" aria-pressed="{% if filter == 'noreply' %}true{% else %}false{% endif %}">Sent with no reply</button>
+    </div>
+  </div>
+  <div class="o-wa-scroll-list" data-em-list-scroll>
+    {% if replies_to_mailbox %}<p class="o-wa-note">Replies go to the hello@ mailbox for now, not here.</p>{% endif %}
+    <ul class="o-wa-rows" data-em-rows data-more="{{ more_url }}" data-page="{{ page }}">{% include "emailchat/_rows.html" %}</ul>
+  </div>
+</section>

@@ -1,10 +1,10 @@
-{% load office_tags %}{% comment %}"Reach out" card of a person or lead page: Message and Add to the approach list, with their two dialogs (docs/features/office-outreach-design.md sections 3 and 4).
-Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, whatsapp{...see office.tools.whatsapp_context}, mobile_countries. Hidden for read-only people.{% endcomment %}
-{% if whatsapp.can_edit or whatsapp.has_chat or outreach.can_add %}
+{% load office_tags %}{% comment %}"Reach out" card of a person or lead page: the WhatsApp and Email buttons and Add to the approach list, with their dialogs (docs/features/office-outreach-design.md sections 3 and 4,
+docs/features/email-chat-design.md section 1). Always shown: a reader with only an email thread still sees it (the old guard is gone).
+Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, whatsapp{...see office.tools.whatsapp_context}, email_chat{...see office.tools.email_context}, mobile_countries.{% endcomment %}
 {% with who=person.name|default:person.email|first_word %}
 <section class="o-card o-reach" data-person-reach aria-labelledby="reach-h"><h2 id="reach-h" class="o-h3">Reach out</h2>
   <div class="o-reach-actions">
-    {% include "office/_wa_button.html" with wa=whatsapp %}
+    {% include "office/_channels.html" %}
     {% if outreach.can_add %}{% if outreach.on_list %}{% include "office/_onlist.html" %}{% else %}<button type="button" class="btn btn-secondary btn-block" data-dialog-open="outreach" aria-haspopup="dialog">{% include "office/_icon.html" with name="list-checks" %}<span class="o-only-wide">Add to {{ outreach.title }}</span><span class="o-only-narrow">Add to list</span></button>{% endif %}{% endif %}
   </div>
   {% if archive and whatsapp.has_mobile and whatsapp.can_edit and whatsapp.edit_url %}<div class="o-mobile-row" data-mobile-row><span class="o-sub">Mobile <span data-mobile-value>{{ whatsapp.mobile }}</span></span><button type="button" class="o-quiet" data-dialog-open="mobile" aria-haspopup="dialog" data-change-mobile>Change</button></div>{% endif %}
@@ -54,4 +54,3 @@ Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, what
 </dialog>
 {% endif %}
 {% endwith %}
-{% endif %}

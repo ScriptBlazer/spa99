@@ -103,6 +103,11 @@ export DEBUG=true
 export DOMAIN="localhost" OFFICE_DOMAIN="office.localhost" CONTROL_DOMAIN="control.localhost" SYSTEM_DOMAIN="system.localhost"
 export SITE_URL="http://localhost:$PORT" OFFICE_URL="http://office.localhost:$PORT" CONTROL_URL="http://control.localhost:$PORT" SYSTEM_URL="http://system.localhost:$PORT"
 export ADMIN_PATH="e2e-admin/" DEFAULT_FROM_EMAIL="Spa 99 <e2e@example.com>"
+# WhatsApp and email chat: fake values so the webhooks answer and the walk-throughs can sign what they post. Twilio itself is faked in e2e/fakes.py (nothing reaches the
+# network); email goes to files; the Postmark inbound webhook is posted to by the walk-throughs. These exports exist only in this script, never in a settings file.
+export TWILIO_ACCOUNT_SID="ACe2e00000000000000000000000000000" TWILIO_API_KEY_SID="SKe2e00000000000000000000000000000" TWILIO_API_KEY_SECRET="e2e-api-key-secret"
+export TWILIO_AUTH_TOKEN="e2e-twilio-auth-token" TWILIO_WHATSAPP_FROM="+442045384999"
+export EMAIL_INBOUND_DOMAIN="reply.e2e.example" EMAIL_INBOUND_USER="e2e-inbound" EMAIL_INBOUND_PASSWORD="e2e-inbound-password"
 unset AWS_STORAGE_BUCKET_NAME AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY EMAIL_HOST EMAIL_HOST_USER EMAIL_HOST_PASSWORD
 
 echo "Workspace: $WS (database, emails and media live only there)"

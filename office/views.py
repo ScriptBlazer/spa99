@@ -168,7 +168,7 @@ def _is_fragment(request):
 
 
 def _chats_context(person, user=None, email="", filter_key="", filter_id=""):
-    """The "Chats with the assistant" card and what the page shows near the top (how he heard about us)."""
+    """The "Assistant chats" card and what the page shows near the top (how he heard about us)."""
     return {"heard_via": profile.heard_via(person["journeys"]), "chats": profile.chats_card(user, email),
             "chats_all_url": f"{reverse('office_chats')}?{urlencode({filter_key: filter_id})}"}
 
@@ -403,7 +403,7 @@ def chats(request):
 
 
 def _chats_person(request):
-    """Who the Chats list is narrowed to, from ?user= (account id) or ?lead= (a lead's opaque session id): {user, email, label, url} or None."""
+    """Who the Assistant list is narrowed to, from ?user= (account id) or ?lead= (a lead's opaque session id): {user, email, label, url} or None."""
     try:
         if request.GET.get("user"):
             user = get_object_or_404(User, pk=request.GET["user"])

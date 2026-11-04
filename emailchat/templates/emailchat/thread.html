@@ -1,20 +1,13 @@
 {% extends "office/base.html" %}
 {% block title %}{{ thread.subject }} | Email | Spa 99 Office{% endblock %}
-{% block main %}{% comment %}Placeholder markup, the frontend agent replaces it. Context: emailchat.views.thread. His HTML is only ever shown in a sandboxed iframe (frame_url); never put it in this page.{% endcomment %}
-<div data-em-thread>
-  <h1>{{ thread.subject }}</h1>
-  {% if replies_to_mailbox %}<p>Replies go to the hello@ mailbox, not into the Office.</p>{% endif %}
-  {% if thread.suppressed %}<p>{{ thread.reason }}</p>{% endif %}
-  {% for m in chat_messages %}
-  <article data-id="{{ m.id }}" data-direction="{{ m.direction }}">
-    {% if m.shows_subject %}<h2>{{ m.subject }}</h2>{% endif %}
-    {% if m.from_other %}<p>From {{ m.from_address }}</p>{% endif %}
-    {% if m.frame_url %}<iframe sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" src="{{ m.frame_url }}" title="Email"></iframe>
-    {% elif m.direction == "out" %}{{ m.body_html|safe }}{% else %}<p>{{ m.body_text }}</p>{% endif %}
-    {% for a in m.attachments %}<a href="{{ a.url }}">{{ a.filename }}</a>{% endfor %}
-    {% if m.error %}<p>{{ m.error.reason }}</p>{% endif %}{% if m.note %}<p>{{ m.note }}</p>{% endif %}
-  </article>
-  {% endfor %}
-  {{ em|json_script:"em-data" }}
+{% block body_attrs %}data-office-detail data-em-thread{% endblock %}
+{% block header_range %}{% if can_send %}<a class="btn btn-primary btn-sm o-em-newbtn" href="{{ urls.new }}" data-em-new>{% include "office/_icon.html" with name="plus" %}<span>New email</span></a>{% endif %}{% endblock %}
+{% block main %}
+{% comment %}One email thread (docs/features/email-chat-design.md section 2). Desktop shows the list beside it; phone shows the thread alone (the list is hidden by CSS under [data-em-thread]).
+Context: thread, chat_messages, has_older, older_url, unread, last_id, cursor, reply_subject, gold, urls, replies_to_mailbox, plus the list's rows; `em` is what the script reads.
+His HTML is only ever shown in a sandboxed iframe (message.frame_url), never in this page.{% endcomment %}
+<div class="o-wa o-em" data-em-app data-title="Email | Spa 99 Office" data-staff="{{ request.user.pk }}">
+  {% include "emailchat/_list.html" %}
+  <section class="o-wa-pane" data-em-pane aria-label="Email thread">{% include "emailchat/_thread.html" %}</section>
 </div>
 {% endblock %}

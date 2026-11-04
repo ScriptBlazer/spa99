@@ -1,0 +1,37 @@
+{% comment %}New email (docs/features/email-chat-design.md section 2): To (a person or a typed address), Subject, the editor. Phone: a whole-screen page with the composer's top row.
+Desktop: swaps into the reading pane. Context: recipient{email, name, person, error}, urls{create, people, inbox}, can_send, replies_to_mailbox, limits.{% endcomment %}
+<div class="o-em-new" data-em-new-root>
+{{ em_new|json_script:"em-new-data" }}
+  <header class="o-em-head o-em-head--new">
+    <a class="o-back o-wa-back" href="{{ urls.inbox }}" aria-label="Back to email" data-em-back>{% include "office/_icon.html" with name="chevron-left" %}</a>
+    <h1 class="o-em-newtitle">New email</h1>
+    {% if can_send %}<button type="button" class="btn btn-primary btn-sm o-em-send o-em-send--top" data-ed-send data-working-text="Sending" aria-disabled="true">{% include "office/_icon.html" with name="paper-plane" %}<span>Send</span></button>{% endif %}
+  </header>
+  {% if can_send %}
+  <div class="o-em-scroll o-em-newform" data-em-new-form data-scroll>
+    <div class="o-em-col">
+      <div class="o-em-field o-em-field--to" data-to-field>
+        <label class="o-em-label" for="em-to">To</label>
+        <div class="o-em-tobox" data-to-box>
+          <span class="o-em-chip" data-to-chip hidden><span class="o-em-chip-text" dir="auto" data-to-chip-text></span><button type="button" class="o-em-chip-x" data-to-clear aria-label="Remove the recipient">{% include "office/_icon.html" with name="x" %}</button></span>
+          <input id="em-to" class="o-em-input o-em-to-input" type="text" inputmode="email" autocapitalize="none" autocomplete="off" spellcheck="false" enterkeyhint="next" role="combobox" aria-expanded="false" aria-controls="em-to-list" aria-autocomplete="list" aria-describedby="em-to-err" data-to-input>
+        </div>
+        <ul class="o-em-options" id="em-to-list" role="listbox" aria-label="People" data-to-list hidden></ul>
+        <p class="o-em-field-err" id="em-to-err" data-to-error role="alert" hidden></p>
+      </div>
+      <div class="o-em-field">
+        <label class="o-em-label" for="em-subject">Subject</label>
+        <input id="em-subject" class="o-em-input" type="text" maxlength="200" dir="auto" autocomplete="off" enterkeyhint="next" required aria-describedby="em-subject-err" data-subject-input>
+        <p class="o-em-field-err" id="em-subject-err" data-subject-error role="alert" hidden></p>
+      </div>
+      {% if replies_to_mailbox %}<p class="o-em-quiet">He will reply to the hello@ mailbox.</p>{% endif %}
+      <div class="o-em-field o-em-field--body">
+        {% include "emailchat/_editor.html" with label="Message" placeholder="Write your message" %}
+        <p class="o-em-field-err" data-body-error role="alert" hidden></p>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="o-em-scroll"><div class="o-em-col"><p class="o-em-muted-bar">View only. Sending is for Approvers and Admins.</p></div></div>
+  {% endif %}
+</div>

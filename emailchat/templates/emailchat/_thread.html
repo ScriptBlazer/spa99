@@ -1,0 +1,48 @@
+{% comment %}The thread pane: head, the sheets (made by email-thread.js from #em-data), the reply composer. Grid rows: head, scroller, foot.{% endcomment %}
+<div class="o-em-thread" data-em-thread-root data-thread="{{ thread.id }}">
+{{ em|json_script:"em-data" }}
+  <header class="o-em-head">
+    <a class="o-back o-wa-back" href="{{ urls.inbox }}" aria-label="Back to email" data-em-back>{% include "office/_icon.html" with name="chevron-left" %}</a>
+    {% if thread.page_url %}<a class="o-em-who o-wa-phone-only" href="{{ thread.page_url }}"><span class="o-wa-whotext"><span class="o-wa-whoname" dir="auto">{{ thread.name }}</span>{% if thread.has_name %}<span class="o-wa-whonum">{{ thread.email }}</span>{% endif %}</span>{% include "office/_icon.html" with name="chevron-right" %}</a>{% else %}<div class="o-em-who o-wa-phone-only"><span class="o-wa-whotext"><span class="o-wa-whoname" dir="auto">{{ thread.name }}</span>{% if thread.has_name %}<span class="o-wa-whonum">{{ thread.email }}</span>{% endif %}</span></div>{% endif %}
+    <div class="o-em-who o-wa-desk-only"><span class="o-wa-whotext"><span class="o-wa-whoname" dir="auto">{{ thread.name }}</span>{% if thread.has_name %}<span class="o-wa-whonum">{{ thread.email }}</span>{% endif %}</span></div>
+    <div class="o-wa-pills o-wa-desk-only">
+      {% if thread.page_url %}{% for l in thread.labels %}<a class="o-badge o-badge--type" href="{{ thread.page_url }}">{{ l }}{% include "office/_icon.html" with name="chevron-right" %}</a>{% endfor %}{% endif %}
+    </div>
+  </header>
+  <div class="o-em-scroll" data-scroll tabindex="-1">
+    <div class="o-em-col">
+      <h1 class="o-em-subject" dir="auto">{{ thread.subject }}</h1>
+      <p class="o-em-older" data-older-row hidden><button type="button" class="o-quiet" data-older>Show earlier emails</button></p>
+      <div class="o-em-msgs" data-msgs></div>
+    </div>
+  </div>
+  <p class="sr-only" data-live aria-live="polite"></p>
+  <div class="o-em-foot" data-foot>
+    {% if thread.can_send %}
+    <button type="button" class="o-em-reply-open" data-reply-open><span data-reply-open-text>Write a reply</span></button>
+    <div class="o-em-composer" data-composer hidden>
+      <div class="o-em-ctop">
+        <button type="button" class="o-em-close" data-reply-close aria-label="Close">{% include "office/_icon.html" with name="x" %}<span>Close</span></button>
+        <p class="o-em-ctitle">Reply to {{ thread.name|truncatechars:28 }}</p>
+        <button type="button" class="btn btn-primary btn-sm o-em-send o-em-send--top" data-ed-send data-working-text="Sending" aria-disabled="true">{% include "office/_icon.html" with name="paper-plane" %}<span>Send</span></button>
+      </div>
+      <div class="o-em-cbody">
+        <p class="o-em-to">To {{ thread.email }}<button type="button" class="o-quiet" data-subject-toggle aria-expanded="false">Change subject</button></p>
+        <label class="o-em-subject-field" data-subject-row hidden><span class="sr-only">Subject</span><input type="text" class="o-em-input" data-subject-input maxlength="200" value="{{ reply_subject }}" aria-label="Subject" dir="auto" autocomplete="off" enterkeyhint="next"></label>
+        {% if replies_to_mailbox %}<p class="o-em-quiet">He will reply to the hello@ mailbox.</p>{% endif %}
+        {% include "emailchat/_editor.html" with label="Reply to "|add:thread.name placeholder="Write your reply" %}
+        <p class="o-em-discard-row"><button type="button" class="o-quiet o-em-close-desk" data-reply-close-desk>Close</button><button type="button" class="o-quiet" data-discard>{% include "office/_icon.html" with name="trash" %}Discard</button></p>
+      </div>
+    </div>
+    {% elif thread.suppressed %}<p class="o-em-muted-bar">{{ thread.reason }}</p>
+    {% else %}<p class="o-em-muted-bar">View only. Sending is for Approvers and Admins.</p>{% endif %}
+  </div>
+  <dialog class="o-wa-lightbox" data-lightbox aria-label="Photo">
+    <img alt="" data-lb-img>
+    <div class="o-wa-lb-actions">
+      <a class="o-wa-lb-btn" data-lb-download download aria-label="Download">{% include "office/_icon.html" with name="download" %}</a>
+      <button type="button" class="o-wa-lb-btn" data-lb-close aria-label="Close">{% include "office/_icon.html" with name="x" %}</button>
+    </div>
+    <p class="o-wa-lb-cap" data-lb-cap></p>
+  </dialog>
+</div>

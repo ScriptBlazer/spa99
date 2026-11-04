@@ -1,0 +1,15 @@
+{% load office_tags %}{% comment %}The two reach out buttons, WhatsApp then Email, one channel a row (docs/features/email-chat-design.md section 1). Used by the lead, person and Gold pages.
+Keys: whatsapp (office.tools.whatsapp_context), email_chat (office.tools.email_context). `secondary=True` (Gold) makes both secondary so Approve stays the one primary.
+The Add a mobile dialog stays behind its own guard in _person_tools.html; with no number the grey line sits directly under the email button.{% endcomment %}
+{% reach_primary whatsapp email_chat secondary as primary %}
+<div class="o-channels" data-channels>
+  {% include "office/_wa_button.html" with wa=whatsapp em=email_chat primary=primary %}
+  {% include "office/_email_button.html" with em=email_chat wa=whatsapp primary=primary %}
+  {% if whatsapp.state == "no_mobile" %}
+  <div class="o-channel" data-wa-button>
+    {% if whatsapp.can_add_number %}<button type="button" class="o-quiet o-channel-add" data-dialog-open="mobile" aria-haspopup="dialog" data-add-mobile>{% include "office/_icon.html" with name="whatsapp" %}<span>{{ whatsapp.reason }}</span></button>
+    {% elif whatsapp.can_edit %}<p class="o-hint-line o-channel-note" data-wa-note>{{ whatsapp.reason }}</p>
+    {% else %}<p class="o-hint-line o-channel-note" data-wa-note>No mobile on file.</p>{% endif %}
+  </div>
+  {% endif %}
+</div>

@@ -14,6 +14,8 @@ an event loop, where Django refuses database calls, so the run calls this in a c
   waiting                   Gold applications waiting for a decision
   price SLUG                plan price ex VAT
   assets                    Control Library files
+  lead EMAIL                {"exists", "id" (newest journey session with this address), "mobile", "first_name", "consent_version"}
+  thread-token EMAIL        {"exists", "token", "count"} the newest email thread held for this address (for posting a signed inbound reply)
 """
 import argparse
 import json
@@ -93,6 +95,17 @@ def main(argv):
         return {"price": str(Plan.objects.get(slug=args[0]).price_ex_vat)}
     if cmd == "assets":
         return {"count": MediaAsset.objects.count()}
+    if cmd == "lead":
+        from journey.models import JourneySession
+
+        row = JourneySession.objects.filter(lead_email__iexact=args[0]).order_by("-created_at").first()
+        return {"exists": row is not None, "id": str(row.pk) if row else "", "mobile": row.lead_mobile if row else "", "first_name": row.lead_first_name if row else "",
+                "consent_version": row.lead_consent_version if row else ""}
+    if cmd == "thread-token":
+        from emailchat.models import Thread
+
+        rows = Thread.objects.filter(email__iexact=args[0]).order_by("-created_at")
+        return {"exists": rows.exists(), "token": rows.first().token if rows.exists() else "", "count": rows.count()}
     raise SystemExit(f"Unknown command: {cmd}")
 
 

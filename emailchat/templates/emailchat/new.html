@@ -1,10 +1,9 @@
 {% extends "office/base.html" %}
 {% block title %}New email | Spa 99 Office{% endblock %}
-{% block main %}{% comment %}Placeholder markup, the frontend agent replaces it. Context: emailchat.views.new_form (recipient, urls, limits).{% endcomment %}
-<form method="post" action="{{ urls.create }}" data-em-new>{% csrf_token %}
-  <input name="to" value="{{ recipient.email }}" placeholder="Address"><input type="hidden" name="person" value="{{ recipient.person }}">
-  <input name="subject" placeholder="Subject">
-  {% if recipient.error %}<p>{{ recipient.error }}</p>{% endif %}
-  <button type="submit">Create</button>
-</form>
+{% block body_attrs %}data-office-detail data-em-thread{% endblock %}
+{% block main %}{% comment %}The New email screen (docs/features/email-chat-design.md section 2). Context: emailchat.views.new_form (recipient, urls, limits, can_send, replies_to_mailbox, rows ...).{% endcomment %}
+<div class="o-wa o-em" data-em-app data-title="Email | Spa 99 Office" data-staff="{{ request.user.pk }}">
+  {% include "emailchat/_list.html" %}
+  <section class="o-wa-pane" data-em-pane aria-label="New email">{% include "emailchat/_new.html" %}</section>
+</div>
 {% endblock %}

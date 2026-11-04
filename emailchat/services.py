@@ -566,8 +566,9 @@ def push_payload(message):
 IMG = re.compile(r"<img\b[^>]*>", re.I)
 SRC = re.compile(r'\ssrc="([^"]*)"', re.I)
 FRAME_CSS = ("body{margin:0;padding:8px;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#222;background:#fff;overflow-wrap:anywhere}"
-             "img{max-width:100%;height:auto}table{max-width:100%}blockquote{margin:8px 0 8px 4px;padding-left:10px;border-left:3px solid #ccc;color:#555}a{color:#06c}"
-             ".quoted{border-left:3px solid #ccc;padding-left:10px;color:#555}pre{white-space:pre-wrap}")
+             "img{max-width:100%;height:auto}table{max-width:100%}a{color:#06c}pre{white-space:pre-wrap}"
+             "blockquote,.quoted{margin:8px 0;background:#f6f5f2;border-radius:6px;padding:8px 10px;color:#555}"  # a tint, not a one-sided line (BRAND)
+             "@media (max-width:30em){body{font-size:16px}}")  # BRAND's body minimum on a phone
 
 
 def frame_html(message, images=False):

@@ -1,5 +1,5 @@
 {% load static %}{% comment %}The chat list pane: head (search, chips), cards (install, notifications), rows. Included by the inbox and by a thread page (desktop shows both).{% endcomment %}
-<section class="o-wa-list" aria-label="Chats" data-wa-list>
+<section class="o-wa-list" aria-label="WhatsApp chats" data-wa-list>
   <div class="o-wa-listhead">
     <form class="o-wa-search" role="search" method="get" action="{% url 'office_whatsapp' %}" data-wa-search>
       {% include "office/_icon.html" with name="search" %}

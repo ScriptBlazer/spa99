@@ -2,19 +2,19 @@
 logic that needs them; the other journey words are content rows."""
 
 # Changes whenever the consent wording changes; stored on the session like the privacy version (JourneySession.lead_consent_version).
-CONSENT_VERSION = "2026-11-03"
+CONSENT_VERSION = "2026-11-04"
 
 GATE = {
     "heading": "One last thing.",
     "body": "We will show you your tailored membership, with its price.",
     "first_name_label": "First name",
     "email_label": "Email",
-    "mobile_label": "Mobile",
+    "mobile_label": "Mobile (optional)",
     "mobile_optional": True,  # the number is optional: blank is fine, a typed one is checked (Moishe, 2026-11-04)
-    "mobile_hint": "Optional. Add it if you want the team to reach out with good offers.",  # placeholder wording: the designer writes the final line
+    "mobile_hint": "Add it and the team can reach out with good offers.",
     "country_label": "Country",
     "mobile_country_label": "Country code",
-    "consent": "Yes, Spa 99 may email and WhatsApp me about opening. I can stop at any time.",
+    "consent": "Yes, Spa 99 may email me, and WhatsApp me if I add a number, about opening and offers. I can stop at any time.",
     "privacy_label": "How we use your details",
     "cta": "See my tailored membership",
     "saving": "One moment",
@@ -22,7 +22,7 @@ GATE = {
     "errors": {
         "first_name": "Please add your first name.",
         "email": "That email does not look right.",
-        "mobile": "That mobile does not look right. Check the country and the number.",
+        "mobile": "That mobile does not look right. Check it, or leave it blank.",
         "consent": "Please tick the box to carry on.",
     },
 }

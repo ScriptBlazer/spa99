@@ -157,7 +157,7 @@ class SnapshotTests(OfficeTestCase):
         snapshots.build_everything()
         for path in paths:
             self.assertEqual(self.queries(path), empty[path], path)
-            self.assertLessEqual(empty[path], 31, path)  # 30 plus the WhatsApp unread count on the navigation badge
+            self.assertLessEqual(empty[path], 32, path)  # 30 plus the WhatsApp unread count and the Email unread count on the navigation badges
 
     def test_snapshots_are_idempotent_all_ranges_exist_and_the_all_range_has_no_previous_period(self):
         finished_journey()

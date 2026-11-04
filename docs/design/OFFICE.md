@@ -103,6 +103,8 @@ For the WhatsApp section (`docs/features/whatsapp-design.md`). In `office-tokens
 --office-wa-tick: var(--color-control-line);   /* queued, sent, delivered */
 --office-wa-tick-read: var(--office-text);     /* read */
 --office-wa-list-w: clamp(19rem, 26vw, 24rem); --office-wa-bubble-max: 36rem; --office-wa-avatar: 3rem;
+--office-em-list-w: clamp(21rem, 28vw, 26rem);   /* email thread list pane (2026-11-04, proposed) */
+--office-em-read-max: 48rem;                  /* longest email sheet (2026-11-04, proposed) */
 --office-wa-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;   /* code only; the brand has no mono */
 ```
 

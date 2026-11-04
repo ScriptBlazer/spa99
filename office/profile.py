@@ -293,7 +293,7 @@ def heard_via(journeys):
 
 def chats_card(user=None, email="", limit=CHATS_SHOWN):
     """The assistant chats of one person for the card: {rows[{id, at, messages, first_question}], more}. The newest `limit`; two
-    queries (the page fetches one extra row to know if there are more). Same visibility as Office > Chats."""
+    queries (the page fetches one extra row to know if there are more). Same visibility as Office > Assistant."""
     from django.db.models import OuterRef, Subquery
 
     from chat import services as chat_services

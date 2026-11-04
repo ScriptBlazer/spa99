@@ -56,7 +56,7 @@
           <select id="f-industry" name="industry" class="o-select"><option value="">All industries</option>{% for i in choices.industries %}<option value="{{ i.value }}"{% if filters.industry == i.value %} selected{% endif %}>{{ i.label }}</option>{% endfor %}</select></div>
         <div class="o-filter-group"><label class="o-filter-label" for="f-heard">Heard about us</label>
           <select id="f-heard" name="heard" class="o-select"><option value="">Any answer</option>{% for h in choices.heard %}<option value="{{ h.value }}"{% if filters.heard == h.value %} selected{% endif %}>{{ h.label }}</option>{% endfor %}</select></div>
-        <div class="o-filter-group o-filter-group--chip"><label class="o-chip"><input type="checkbox" name="gold" value="yes"{% if filters.gold %} checked{% endif %}><span>Applied for Gold</span></label><label class="o-chip"><input type="checkbox" name="chat" value="1"{% if filters.chat %} checked{% endif %}><span>Gave email in chat</span></label></div>
+        <div class="o-filter-group o-filter-group--chip"><label class="o-chip"><input type="checkbox" name="gold" value="yes"{% if filters.gold %} checked{% endif %}><span>Applied for Gold</span></label><label class="o-chip"><input type="checkbox" name="chat" value="1"{% if filters.chat %} checked{% endif %}><span>Gave email to the assistant</span></label></div>
         {% endif %}
         {% include "office/_sort_group.html" with columns=head_columns dir_value=filters.dir %}
         {% if office_can.can_export %}<a class="btn btn-secondary btn-sm o-export o-export--sheet" href="{% url 'office_leads_csv' %}?{{ request.GET.urlencode }}" data-export-csv data-export-base="{% url 'office_leads_csv' %}">Export CSV</a>{% endif %}

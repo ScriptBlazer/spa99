@@ -11,6 +11,7 @@ import { initTools } from './office-tools.js';
 import { initClamp } from './office-clamp.js';
 import { initPush } from './office-push.js';
 import { initMobileDialog } from './office-mobile.js';
+import { clearDraftsOnSignOut } from './email-drafts.js';
 
 initButtons();
 initFeedback();
@@ -23,4 +24,6 @@ initTools();
 initClamp();
 initPush();
 initMobileDialog();
+clearDraftsOnSignOut();
 if (document.querySelector('[data-wa-app]')) import('./office-whatsapp.js').then((m) => m.initWhatsApp());
+if (document.querySelector('[data-em-app]')) import('./office-email.js').then((m) => m.initEmail());

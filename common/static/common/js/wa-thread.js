@@ -2,67 +2,20 @@
  *
  * Safety rule: no HTML is ever built from message text here. Bubbles are made with createElement and textContent; the only innerHTML is
  * `body_html`, which the server has already escaped and formatted (whatsapp.formatting.render), and a template's `body_html` for the preview.
- * The chat page embeds its data as JSON (#wa-data); polling and sending keep this object in step with the server. */
+ * The chat page embeds its data as JSON (#wa-data); polling and sending keep this object in step with the server.
+ *
+ * Round 2 (docs/features/email-chat-design.md section 4): Reply on a bubble (his phone gets the quoted line as WhatsApp's `> text`, not the tap-to-jump box), a quick
+ * emoji row that sends a NORMAL message (Twilio cannot send a reaction, and the screen says so), MP4 video, voice notes (the microphone is released on every exit,
+ * including leaving the page) and a neutral bubble for what the Office cannot show. */
 import { csrfToken } from './api.js';
 import { toast } from './feedback.js';
+import { bindKeyboard, releaseKeyboard } from './office-keyboard.js';
+import { bytes, dayLabel, dayOf, desktopKeys, fullStamp, h, icon, mb, phone, reduced, timeOf } from './office-dom.js';
 
-const LONDON = 'Europe/London';
-const TIME = new Intl.DateTimeFormat('en-GB', { timeZone: LONDON, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-const DAYKEY = new Intl.DateTimeFormat('en-CA', { timeZone: LONDON, year: 'numeric', month: '2-digit', day: '2-digit' });
-const WEEKDAY = new Intl.DateTimeFormat('en-GB', { timeZone: LONDON, weekday: 'long' });
-const FULLDAY = new Intl.DateTimeFormat('en-GB', { timeZone: LONDON, day: 'numeric', month: 'short', year: 'numeric' });
 const GROUP_MS = 5 * 60 * 1000;
 const POLL_VISIBLE_MS = 4000;
 const POLL_HIDDEN_MS = 30000;
 const NEAR_BOTTOM = '0px 0px 96px 0px';
-const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const desktopKeys = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-const phone = () => window.matchMedia('(max-width: 63.99em)').matches;
-
-const SVG = 'http://www.w3.org/2000/svg';
-export function icon(name, cls = 'o-icon') {
-  const svg = document.createElementNS(SVG, 'svg');
-  svg.setAttribute('class', cls);
-  svg.setAttribute('aria-hidden', 'true');
-  svg.setAttribute('focusable', 'false');
-  const use = document.createElementNS(SVG, 'use');
-  use.setAttribute('href', `#i-${name}`);
-  svg.append(use);
-  return svg;
-}
-
-/** createElement with attributes and children; strings become text nodes (never HTML). */
-function h(tag, attrs = {}, ...children) {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(attrs)) {
-    if (value === null || value === undefined || value === false) continue;
-    if (key === 'class') node.className = value;
-    else if (key === 'text') node.textContent = value;
-    else node.setAttribute(key, value === true ? '' : value);
-  }
-  for (const child of children) if (child !== null && child !== undefined && child !== false) node.append(child);
-  return node;
-}
-
-const dayOf = (iso) => DAYKEY.format(new Date(iso));
-const timeOf = (iso) => TIME.format(new Date(iso));
-function dayLabel(iso) {
-  const key = dayOf(iso);
-  const today = DAYKEY.format(new Date());
-  const toNum = (k) => Date.UTC(...k.split('-').map((n, i) => (i === 1 ? Number(n) - 1 : Number(n))));
-  const days = Math.round((toNum(today) - toNum(key)) / 86400000);
-  if (days <= 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return WEEKDAY.format(new Date(iso));
-  return FULLDAY.format(new Date(iso));
-}
-const fullStamp = (iso) => `${FULLDAY.format(new Date(iso))}, ${timeOf(iso)}`;
-function bytes(n) {
-  if (!n) return '';
-  if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} KB`;
-  return `${(n / 1024 / 1024).toFixed(1).replace(/\.0$/, '')} MB`;
-}
-const mb = (n) => `${Math.round(n / 1024 / 1024)} MB`;
 
 const STATUS = {
   queued: { icon: 'clock', word: 'Sending' },
@@ -75,6 +28,11 @@ const STATUS = {
 const BAD = new Set(['failed', 'undelivered']);
 
 const OTHER_WORDS = { audio: 'Voice note', video: 'Video', file: 'File', other: 'Message' };
+const QUOTE_WORDS = { image: 'Photo', audio: 'Voice note', video: 'Video', document: 'PDF', file: 'File' };   // what a quote of a message with no text says (as the server's quote_text)
+const EMOJI = [['\u{1F44D}', 'thumbs up'], ['\u{1F64F}', 'folded hands'], ['\u{1F642}', 'smiling face'], ['\u{1F44C}', 'OK hand'], ['\u2705', 'check mark']];
+const first = (name) => String(name || '').split(' ')[0] || String(name || '');
+const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+const canPlayOgg = () => { try { return !!document.createElement('audio').canPlayType('audio/ogg; codecs=opus'); } catch { return false; } };
 
 export class Thread {
   constructor(root) {
@@ -103,6 +61,8 @@ export class Thread {
     this.offline = false;
     this.alive = true;
     this.warned = false;
+    this.quote = null;
+    this.rec = null;
     this.ac = new AbortController();
     this.q = (sel) => root.querySelector(sel);
     this.ui = {
@@ -112,11 +72,15 @@ export class Thread {
       send: this.q('[data-send]'), composer: this.q('[data-composer]'), count: this.q('[data-count]'), file: this.q('[data-file]'),
       tray: this.q('[data-tray]'), trayThumb: this.q('[data-tray-thumb]'), trayName: this.q('[data-tray-name]'), traySize: this.q('[data-tray-size]'),
       trayError: this.q('[data-tray-error]'), drop: this.q('[data-drop]'), wall: this.q('[data-wall]'),
+      quote: this.q('[data-quote]'), quoteWho: this.q('[data-quote-who]'), quoteText: this.q('[data-quote-text]'), quoteNote: this.q('[data-quote-note]'),
+      mic: this.q('[data-mic]'), recPanel: this.q('[data-rec]'),
     };
     for (const m of this.messages) this.byId.set(m.id, m);
     this.layout();
     this.bindObservers();
     this.bindComposer();
+    this.bindActs();
+    this.bindVoice();
     this.bindLightbox();
     this.bindTemplates();
     this.bindViewport();
@@ -136,7 +100,8 @@ export class Thread {
     clearTimeout(this.timer);
     clearInterval(this.clock);
     this.io?.forEach((io) => io.disconnect());
-    document.body.removeAttribute('data-keyboard');
+    this.cancelRecording(true); // the phone's microphone indicator must not stay on
+    releaseKeyboard();
     for (const url of this.urls_to_free || []) URL.revokeObjectURL(url);
   }
 
@@ -183,6 +148,7 @@ export class Thread {
     const note = this.ui.wallNote;
     if (!this.messages.length) { note.hidden = false; note.textContent = 'No messages yet.'; } else note.hidden = true;
     if (state !== was && state === 'open' && was) this.ui.input?.focus({ preventScroll: true });
+    if (state !== 'open') { this.cancelRecording(); if (this.quote) this.setQuote(null); this.closeActs(); }
     this.updateSend();
   }
 
@@ -214,6 +180,10 @@ export class Thread {
       prev = m;
     }
     this.ui.msgs.replaceChildren(...nodes);
+    // the log is one tab stop: a roving tabindex on the lines (Up and Down move, see bindActs)
+    const lines = [...this.ui.msgs.querySelectorAll('.o-wa-line')];
+    const keep = lines.find((r) => r.getAttribute('tabindex') === '0') || lines[lines.length - 1];
+    lines.forEach((r) => r.setAttribute('tabindex', r === keep ? '0' : '-1'));
     this.ui.start.hidden = this.hasOlder || !msgs.length;
   }
 
@@ -253,6 +223,13 @@ export class Thread {
     return box;
   }
 
+  /** A card for a file we cannot show inline (or could not play): icon, name, size, download. */
+  fileCard(m, iconName, label) {
+    const media = m.media;
+    return h('a', { class: 'o-wa-file', href: media.url, download: media.filename || '' }, icon(iconName, 'o-icon o-wa-file-icon'),
+      h('span', { class: 'o-wa-file-text' }, h('span', { class: 'o-wa-file-name', text: media.filename || label }), h('span', { class: 'o-wa-file-size', text: `${label}${media.size ? `, ${bytes(media.size)}` : ''}` })), icon('download'));
+  }
+
   /** The file or media part of a bubble. */
   mediaNode(m) {
     const media = m.media;
@@ -270,22 +247,31 @@ export class Thread {
         icon('file-pdf', 'o-icon o-wa-file-icon'), h('span', { class: 'o-wa-file-text' }, h('span', { class: 'o-wa-file-name', text: name }),
           h('span', { class: 'o-wa-file-size', text: `PDF${media.size ? `, ${bytes(media.size)}` : ''}` })), icon('download'));
     }
-    if (m.kind === 'audio' && media) return h('audio', { class: 'o-wa-audio', controls: true, preload: 'none', src: media.url, 'aria-label': 'Voice note' });
-    if (m.kind === 'video' && media) return h('video', { class: 'o-wa-video', controls: true, preload: 'metadata', playsinline: true, src: media.url, 'aria-label': 'Video' });
-    if (media) {
-      return h('a', { class: 'o-wa-file', href: media.url, download: media.filename || '' }, icon('file-pdf', 'o-icon o-wa-file-icon'),
-        h('span', { class: 'o-wa-file-text' }, h('span', { class: 'o-wa-file-name', text: media.filename || OTHER_WORDS[m.kind] || 'File' }), h('span', { class: 'o-wa-file-size', text: bytes(media.size) || 'Download' })), icon('download'));
+    if (m.kind === 'audio' && media) {
+      // an older iPhone may not play OGG: a file card, with the download, instead of a player that cannot play
+      if (!canPlayOgg() && (media.type || '').includes('ogg')) return this.fileCard(m, 'microphone', 'Voice note');
+      return h('audio', { class: 'o-wa-audio', controls: true, preload: 'metadata', src: media.url, 'aria-label': 'Voice note' });
     }
-    if (['audio', 'video', 'file', 'other'].includes(m.kind)) {
+    if (m.kind === 'video' && media) {
+      const video = h('video', { class: 'o-wa-video', controls: true, playsinline: true, preload: 'metadata', src: media.url, 'aria-label': 'Video' });
+      if (media.width && media.height) video.style.aspectRatio = `${media.width} / ${media.height}`;
+      video.addEventListener('error', () => { if (m.progress === undefined) video.replaceWith(this.fileCard(m, 'video', 'Video')); }, { once: true });
+      return video;
+    }
+    if (media) return this.fileCard(m, 'file-pdf', OTHER_WORDS[m.kind] || 'File');
+    if (['audio', 'video', 'file'].includes(m.kind)) {
       return h('div', { class: 'o-wa-file o-wa-file--none' }, icon('file-pdf', 'o-icon o-wa-file-icon'),
-        h('span', { class: 'o-wa-file-text' }, h('span', { class: 'o-wa-file-name', text: m.kind === 'other' ? 'This type of message cannot be shown here.' : `${OTHER_WORDS[m.kind]}. This type cannot be shown here.` })));
+        h('span', { class: 'o-wa-file-text' }, h('span', { class: 'o-wa-file-name', text: `${OTHER_WORDS[m.kind]}. This type cannot be shown here.` })));
     }
     return null;
   }
 
   makeRow(m) {
-    const li = h('li', { class: `o-wa-line o-wa-line--${m.direction}`, 'data-id': String(m.id) });
-    li.append(this.makeBubble(m));
+    const li = h('li', { class: `o-wa-line o-wa-line--${m.direction}`, 'data-id': String(m.id), tabindex: '-1' });
+    const wrap = h('div', { class: 'o-wa-bw' }, this.makeBubble(m));
+    const acts = this.actsNode(m);
+    if (acts) wrap.append(acts);
+    li.append(wrap);
     const fail = this.failNode(m);
     if (fail) li.append(fail);
     return li;
@@ -296,12 +282,15 @@ export class Thread {
     bubble.append(h('span', { class: 'sr-only', 'data-sr': '', text: this.srPrefix(m) }));
     if (m.direction === 'out' && m.author_first_name) bubble.append(h('p', { class: 'o-wa-author', 'data-author': '', text: m.author_first_name, title: m.author || '' }));
     if (m.template) bubble.append(h('p', { class: 'o-wa-tpl-label', text: `Template: ${m.template.label}` }));
+    if (m.reply_to) bubble.append(this.quoteNode(m.reply_to));
     const media = this.mediaNode(m);
     if (media) bubble.append(media);
-    const hasText = !!(m.body_html || m.localText);
+    const other = m.kind === 'other' && !m.media;
+    const hasText = !!(m.body_html || m.localText) || other;
     if (hasText) {
-      const text = h('div', { class: 'o-wa-text', dir: 'auto' });
-      if (m.body_html) text.innerHTML = m.body_html; // server-escaped and formatted, never built here
+      const text = h('div', { class: other ? 'o-wa-text o-wa-other' : 'o-wa-text', dir: 'auto' });
+      if (other) text.textContent = 'This message cannot be shown here.'; // not a fault (it may be a reaction): no icon, no warning colour
+      else if (m.body_html) text.innerHTML = m.body_html; // server-escaped and formatted, never built here
       else text.textContent = m.localText; // an unsent bubble shows plain text until the server answers
       text.append(h('span', { class: 'o-wa-spacer', 'aria-hidden': 'true' }));
       bubble.append(text);
@@ -309,6 +298,7 @@ export class Thread {
     bubble.classList.toggle('has-text', hasText);
     bubble.classList.toggle('has-photo', m.kind === 'image' && !!m.media);
     bubble.classList.toggle('has-photo-only', m.kind === 'image' && !!m.media && !hasText);
+    bubble.classList.toggle('has-video', m.kind === 'video' && !!m.media);
     if (m.progress !== undefined) {
       bubble.classList.add('is-uploading');
       bubble.append(h('span', { class: 'o-wa-progress', 'data-progress': '' }, h('span')));
@@ -326,7 +316,7 @@ export class Thread {
     bubble.querySelector('.o-wa-meta').replaceWith(this.metaNode(m));
     row.querySelector('.o-wa-fail')?.remove();
     const fail = this.failNode(m);
-    if (fail) row.append(fail);
+    if (fail) { row.append(fail); row.querySelector('.o-wa-acts')?.remove(); } // nothing to reply to on a message that did not go
   }
 
   // ---------- scrolling, observers ----------
@@ -499,25 +489,7 @@ export class Thread {
   // ---------- phone keyboard ----------
 
   bindViewport() {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const { signal } = this.ac;
-    this.fullH = window.innerHeight;
-    const apply = () => {
-      if (!phone()) { this.root.style.removeProperty('--wa-vh'); this.root.style.removeProperty('--wa-top'); document.body.removeAttribute('data-keyboard'); this.root.removeAttribute('data-keyboard'); return; }
-      if (!this.root.contains(document.activeElement) || document.activeElement === document.body) this.fullH = Math.max(window.innerHeight, vv.height);
-      const keyboard = this.fullH - vv.height > 120;
-      const was = this.root.hasAttribute('data-keyboard');
-      this.root.style.setProperty('--wa-vh', `${Math.round(vv.height)}px`);
-      this.root.style.setProperty('--wa-top', `${Math.round(vv.offsetTop)}px`);
-      this.root.toggleAttribute('data-keyboard', keyboard);
-      document.body.toggleAttribute('data-keyboard', keyboard);
-      if (keyboard !== was && this.atBottom) this.scrollToBottom();
-    };
-    vv.addEventListener('resize', apply, { signal });
-    vv.addEventListener('scroll', apply, { signal });
-    window.addEventListener('orientationchange', () => setTimeout(apply, 300), { signal });
-    apply();
+    bindKeyboard(this.root, { signal: this.ac.signal, onChange: () => { if (this.atBottom) this.scrollToBottom(); } });
   }
 
   // ---------- composer ----------
@@ -544,16 +516,22 @@ export class Thread {
 
   codePoints(text) { return [...text].length; }
 
+  /** What goes to Twilio as text: with a quote, `> first line`, a blank line, then what he typed (the server builds the same). The 1600 limit counts this. */
+  finalText(body) {
+    if (!this.quote || this.rec) return body;
+    return body ? `> ${this.quote.text}\n\n${body}` : `> ${this.quote.text}`;
+  }
+
   /** The 1600 rule: silent until 100 from the end, never cut, never maxlength. */
   overBy() {
     const max = this.contact.limits.body;
-    return Math.max(0, this.codePoints(this.ui.input.value.trim()) - max);
+    return Math.max(0, this.codePoints(this.finalText(this.ui.input.value.trim())) - max);
   }
 
   updateCount() {
     const { count, input } = this.ui;
     const max = this.contact.limits.body;
-    const n = this.codePoints(input.value.trim());
+    const n = this.codePoints(this.finalText(input.value.trim()));
     if (n >= max - 100) {
       count.hidden = false;
       const over = n - max;
@@ -564,13 +542,19 @@ export class Thread {
 
   canSend() { return (this.ui.input.value.trim() || this.file) && !this.overBy(); }
 
+  /** The microphone takes the Send slot while the field is empty, nothing is attached, voice notes are available here and the browser can record. Typing swaps it back at once. */
+  voiceReady() { return !!(this.contact.voice?.available && window.MediaRecorder && navigator.mediaDevices?.getUserMedia); }
+
   updateSend() {
-    const { send, input } = this.ui;
+    const { send, input, mic } = this.ui;
     if (!send) return;
     const ok = !!this.canSend();
     send.setAttribute('aria-disabled', ok ? 'false' : 'true');
     send.classList.toggle('is-ready', ok);
     input.placeholder = this.file ? 'Add a caption' : 'Message';
+    const showMic = !!mic && this.voiceReady() && !input.value.trim() && !this.file && !this.rec;
+    if (mic) mic.hidden = !showMic;
+    send.hidden = showMic;
     this.updateCount();
   }
 
@@ -628,10 +612,12 @@ export class Thread {
     const limits = this.contact.limits;
     const isImage = file.type === 'image/jpeg' || file.type === 'image/png';
     const isPdf = file.type === 'application/pdf';
+    const isVideo = file.type === 'video/mp4';
     const error = this.ui.trayError;
     error.hidden = true;
-    if (!isImage && !isPdf) { error.hidden = false; error.textContent = 'Photos or PDFs only.'; return; }
-    if (file.size > (isImage ? limits.image_bytes : limits.file_bytes)) { error.hidden = false; error.textContent = `Photos up to ${mb(limits.image_bytes)}, PDFs up to ${mb(limits.file_bytes)}.`; return; }
+    if (!isImage && !isPdf && !isVideo) { error.hidden = false; error.textContent = 'Photos, PDFs or MP4 videos only.'; return; }   // an iPhone's own .mov is refused here, as on the server
+    if (isVideo && file.size > limits.file_bytes) { error.hidden = false; error.textContent = `Videos up to ${mb(limits.file_bytes)}.`; return; }
+    if (!isVideo && file.size > (isImage ? limits.image_bytes : limits.file_bytes)) { error.hidden = false; error.textContent = `Photos up to ${mb(limits.image_bytes)}, PDFs up to ${mb(limits.file_bytes)}.`; return; }
     this.file = file;
     const { tray, trayThumb, trayName, traySize } = this.ui;
     trayThumb.replaceChildren();
@@ -639,7 +625,7 @@ export class Thread {
       const url = URL.createObjectURL(file);
       (this.urls_to_free = this.urls_to_free || []).push(url);
       trayThumb.append(h('img', { src: url, alt: '' }));
-    } else trayThumb.append(icon('file-pdf', 'o-icon o-wa-tray-icon'));
+    } else trayThumb.append(icon(isVideo ? 'video' : 'file-pdf', 'o-icon o-wa-tray-icon'));
     trayName.textContent = file.name;
     traySize.textContent = bytes(file.size);
     tray.hidden = false;
@@ -654,12 +640,300 @@ export class Thread {
     this.updateSend();
   }
 
+  // ---------- reply, emoji: the actions on a bubble (open window only) ----------
+
+  /** Who a quote names: "Spa 99" for ours, his first name for his. */
+  whoQuoted(direction) { return direction === 'out' ? 'Spa 99' : first(this.contact.name); }
+
+  /** The words a quote of this message shows: its first line, or Photo, Voice note, Video, PDF, File, Message. */
+  quoteLabel(m) {
+    const line = String(m.body || m.localText || '').split('\n').map((l) => l.replace(/^[\s>]+/, '').replace(/[*_~`]/g, '').trim()).find(Boolean);
+    return line ? (line.length > 100 ? `${line.slice(0, 99).trimEnd()}\u2026` : line) : (QUOTE_WORDS[m.kind] || 'Message');
+  }
+
+  /** The quote inside a bubble, both directions. Its text goes through textContent only. */
+  quoteNode(r) {
+    const who = this.whoQuoted(r.direction);
+    const button = h('button', { type: 'button', class: 'o-wa-reply', 'aria-label': `Reply to ${who}: ${r.text}. Go to that message.`, 'data-reply-to': String(r.id) },
+      h('span', { class: 'o-wa-reply-who', text: who }), h('span', { class: 'o-wa-reply-text', dir: 'auto', text: r.text }));
+    button.addEventListener('click', () => this.jumpTo(r.id));
+    return button;
+  }
+
+  /** To the original, with one soft fade of an overlay on it; "further back" when it is not loaded. */
+  jumpTo(id) {
+    const row = this.rows.get(id);
+    if (!row) { this.say('That message is further back.'); toast('That message is further back.', { kind: 'info' }); return; }
+    row.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' });
+    const bubble = row.querySelector('.o-wa-msg');
+    if (reduced() || !bubble) return;
+    bubble.classList.remove('is-jump');
+    void bubble.offsetWidth;
+    bubble.classList.add('is-jump');
+    bubble.addEventListener('animationend', () => bubble.classList.remove('is-jump'), { once: true });
+  }
+
+  actsNode(m) {
+    if (typeof m.id !== 'number' || m.kind === 'other' || BAD.has(m.status) || m.localFail) return null;
+    const box = h('div', { class: 'o-wa-acts', role: 'group', 'aria-label': 'Message actions' });
+    box.append(h('button', { type: 'button', class: 'o-wa-act o-wa-act--reply', 'data-act': 'reply', 'aria-label': 'Reply', title: 'Reply', tabindex: '-1' }, icon('reply'), h('span', { class: 'o-wa-act-label', text: 'Reply' })));
+    if (m.direction === 'in') {
+      box.append(h('button', { type: 'button', class: 'o-wa-act o-wa-act--emoji', 'data-act': 'emoji', 'aria-label': 'Quick reply with an emoji', title: 'Quick reply with an emoji', 'aria-haspopup': 'true', 'aria-expanded': 'false', tabindex: '-1' }, icon('smiley')));
+      const panel = h('div', { class: 'o-wa-emojis', role: 'group', 'aria-label': 'Quick reply' });
+      const row = h('div', { class: 'o-wa-emoji-row' });
+      for (const [glyph, name] of EMOJI) row.append(h('button', { type: 'button', class: 'o-wa-emoji', 'data-act': 'send-emoji', 'data-emoji': glyph, 'aria-label': `Send ${name}`, tabindex: '-1', text: glyph }));
+      panel.append(row, h('p', { class: 'o-wa-emoji-note', text: 'Goes as a normal message, not a reaction.' }));
+      box.append(panel);
+    }
+    return box;
+  }
+
+  bindActs() {
+    const { signal } = this.ac;
+    const { msgs, scroll } = this.ui;
+    const messageOf = (el) => this.byId.get(Number(el.closest('.o-wa-line')?.dataset.id));
+    msgs.addEventListener('click', (event) => {
+      const act = event.target.closest('[data-act]');
+      if (act) {
+        const m = messageOf(act);
+        const kind = act.dataset.act;
+        if (kind === 'reply' && m) { this.setQuote(m); this.closeActs(); } else if (kind === 'emoji') {
+          const row = act.closest('.o-wa-line');
+          const on = !row.classList.contains('is-emoji');
+          this.closeActs();
+          if (on) { row.classList.add('is-emoji'); act.setAttribute('aria-expanded', 'true'); this.flipEmoji(row); }
+        } else if (kind === 'send-emoji') { this.closeActs(); this.sendText(act.dataset.emoji, null, { plain: true }); }
+        return;
+      }
+      // a phone: tap the bubble and the actions open under it (not on a link, photo, video or audio control, and not while text is selected)
+      if (desktopKeys() || this.state !== 'open') return;
+      const bubble = event.target.closest('.o-wa-msg');
+      if (!bubble || event.target.closest('a, button, video, audio, img') || String(window.getSelection?.() || '')) { return; }
+      const row = bubble.closest('.o-wa-line');
+      if (!row.querySelector('.o-wa-acts')) return;
+      const on = !row.classList.contains('is-acts');
+      this.closeActs();
+      if (on) row.classList.add('is-acts');
+    }, { signal });
+    document.addEventListener('click', (event) => { if (!event.target.closest('.o-wa-line.is-acts, .o-wa-line.is-emoji')) this.closeActs(); }, { signal });
+    // the keyboard: one tab stop for the log, Up and Down between messages, Enter opens the actions, R replies, Escape goes back
+    scroll.addEventListener('keydown', (event) => {
+      if (event.isComposing) return;
+      const target = event.target;
+      const line = target.closest?.('.o-wa-line');
+      if (!line) return;
+      if (target.classList.contains('o-wa-line')) {
+        const lines = [...msgs.querySelectorAll('.o-wa-line')];
+        const at = lines.indexOf(line);
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          const next = lines[Math.max(0, Math.min(lines.length - 1, at + (event.key === 'ArrowDown' ? 1 : -1)))];
+          lines.forEach((l) => l.setAttribute('tabindex', l === next ? '0' : '-1'));
+          next.focus();
+        } else if ((event.key === 'r' || event.key === 'R') && this.state === 'open' && line.querySelector('.o-wa-acts') && !event.metaKey && !event.ctrlKey && !event.altKey) {
+          event.preventDefault(); this.setQuote(messageOf(line));
+        } else if (event.key === 'Enter' && this.state === 'open') {
+          const first_ = line.querySelector('.o-wa-act'); if (first_) { event.preventDefault(); line.classList.add('is-keys'); first_.setAttribute('tabindex', '0'); first_.focus(); }
+        }
+      } else if (event.key === 'Escape') {
+        event.preventDefault(); this.closeActs(); line.focus();
+      } else if ((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && target.closest('.o-wa-acts')) {
+        const buttons = [...line.querySelectorAll('.o-wa-act, .o-wa-emoji')].filter((b) => b.offsetParent !== null);
+        const at = buttons.indexOf(target);
+        if (at >= 0) { event.preventDefault(); buttons[(at + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length].focus(); }
+      }
+    }, { signal });
+    msgs.addEventListener('focusout', (event) => { const line = event.target.closest?.('.o-wa-line'); if (line && !line.contains(event.relatedTarget)) { line.classList.remove('is-keys'); line.querySelectorAll('.o-wa-act').forEach((b) => b.setAttribute('tabindex', '-1')); } }, { signal });
+    this.ui.quote?.querySelector('[data-quote-remove]')?.addEventListener('click', () => { this.setQuote(null); this.ui.input?.focus({ preventScroll: true }); }, { signal });
+  }
+
+  closeActs() {
+    this.ui.msgs.querySelectorAll('.o-wa-line.is-acts, .o-wa-line.is-emoji').forEach((row) => {
+      row.classList.remove('is-acts', 'is-emoji');
+      row.querySelector('[data-act="emoji"]')?.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  /** The emoji popover opens above its disc, or below when the message is near the top of the pane. */
+  flipEmoji(row) {
+    const room = row.getBoundingClientRect().top - this.ui.scroll.getBoundingClientRect().top;
+    row.classList.toggle('is-below', room < 140);
+  }
+
+  setQuote(m) {
+    if (!m) this.quote = null;
+    else this.quote = { id: m.id, direction: m.direction, kind: m.kind, who: this.whoQuoted(m.direction), text: this.quoteLabel(m) };
+    this.renderQuote();
+    if (m) this.ui.input?.focus({ preventScroll: true });
+    this.updateSend();
+  }
+
+  renderQuote() {
+    const { quote, quoteWho, quoteText, quoteNote } = this.ui;
+    if (!quote) return;
+    quote.hidden = !this.quote;
+    if (!this.quote) return;
+    quoteWho.textContent = `Replying to ${this.quote.who}`;
+    quoteText.textContent = this.quote.text;
+    quoteNote.textContent = this.rec ? 'A voice note carries no quote on his phone.' : 'On his phone this shows as a quoted line.';
+  }
+
+  // ---------- voice notes (docs/features/email-chat-design.md section 4) ----------
+  // Tap to start, tap to send: not hold (hold fights text selection and is hard for a long note). The permission prompt only ever follows that tap. Every exit
+  // (cancel, send, the limit, a locked phone, leaving the chat or the page) stops the recorder AND every track of the stream, or the phone's microphone indicator stays on.
+
+  bindVoice() {
+    const { mic, recPanel } = this.ui;
+    if (!mic || !recPanel) return;
+    const { signal } = this.ac;
+    mic.addEventListener('click', () => this.startRecording(), { signal });
+    recPanel.querySelector('[data-rec-cancel]').addEventListener('click', () => this.cancelRecording(), { signal });
+    recPanel.querySelector('[data-rec-send]').addEventListener('click', () => this.finishRecording(), { signal });
+    // a locked or hidden phone stops the recording; he still chooses Cancel or Send
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && this.rec?.mode === 'recording') this.stopRecorder(); }, { signal });
+    window.addEventListener('pagehide', () => this.cancelRecording(true), { signal });
+  }
+
+  micError(error) {
+    const name = error?.name || '';
+    const app = navigator.standalone === true;
+    let words = 'The microphone could not be started. Try again.';
+    if (['NotAllowedError', 'SecurityError', 'PermissionDeniedError'].includes(name)) words = app ? 'Microphone blocked. Allow it in Settings, then try again.' : 'Microphone blocked. Allow it in your browser settings, then try again.';
+    else if (['NotFoundError', 'DevicesNotFoundError', 'OverconstrainedError'].includes(name)) words = 'No microphone found.';
+    const box = this.ui.trayError;
+    box.hidden = false;
+    box.textContent = words;
+  }
+
+  releaseTracks(rec) {
+    rec?.stream?.getTracks().forEach((track) => { try { track.stop(); } catch { /* already stopped */ } });
+  }
+
+  async startRecording() {
+    if (this.rec || this.state !== 'open' || !this.voiceReady()) return;
+    const rec = { mode: 'asking', stream: null, recorder: null, chunks: [], seconds: 0, timer: 0, warned: false, cancelled: false, sendAfter: false, mime: '' };
+    this.rec = rec;
+    this.ui.trayError.hidden = true;
+    this.ui.input.blur();
+    this.renderRec();
+    let stream = null;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (error) { if (this.rec === rec) this.rec = null; this.renderRec(); this.micError(error); return; }
+    if (!this.alive || this.rec !== rec) { stream.getTracks().forEach((t) => t.stop()); return; } // he left, or cancelled while the phone was asking
+    rec.stream = stream;
+    let recorder = null;
+    try {
+      const type = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find((t) => MediaRecorder.isTypeSupported?.(t));
+      recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+    } catch {
+      this.releaseTracks(rec); this.rec = null; this.renderRec();
+      this.ui.trayError.hidden = false; this.ui.trayError.textContent = 'Voice notes are not available right now.';
+      this.contact = { ...this.contact, voice: { ...(this.contact.voice || {}), available: false } }; this.updateSend();
+      return;
+    }
+    rec.recorder = recorder;
+    rec.mime = recorder.mimeType || 'audio/webm';
+    recorder.addEventListener('dataavailable', (event) => { if (event.data && event.data.size) rec.chunks.push(event.data); });
+    recorder.addEventListener('stop', () => this.recorderStopped(rec));
+    recorder.start(1000);
+    rec.mode = 'recording';
+    rec.startedAt = Date.now();
+    rec.max = this.contact.voice?.max_seconds || 300;
+    rec.timer = setInterval(() => this.tickRec(rec), 250);
+    this.renderRec();
+    this.say('Recording'); // once, never each second
+    this.ui.recPanel.focus({ preventScroll: true });
+  }
+
+  tickRec(rec) {
+    if (this.rec !== rec || rec.mode !== 'recording') return;
+    rec.seconds = (Date.now() - rec.startedAt) / 1000;
+    if (!rec.warned && rec.max - rec.seconds <= 30) { rec.warned = true; this.say(`Stops at ${clock(rec.max)}`); }
+    if (rec.seconds >= rec.max) { rec.seconds = rec.max; rec.atLimit = true; this.stopRecorder(); return; }
+    this.renderRec();
+  }
+
+  /** Stop the recorder (the limit, a hidden page, or Send). The tracks are released when the recorder says it has stopped. */
+  stopRecorder() {
+    const rec = this.rec;
+    if (!rec || rec.mode !== 'recording') return;
+    clearInterval(rec.timer);
+    rec.seconds = Math.min(rec.max, (Date.now() - rec.startedAt) / 1000);
+    rec.mode = 'stopped';
+    this.renderRec();
+    try { if (rec.recorder.state !== 'inactive') rec.recorder.stop(); else this.recorderStopped(rec); } catch { this.recorderStopped(rec); }
+    this.releaseTracks(rec);
+  }
+
+  recorderStopped(rec) {
+    this.releaseTracks(rec);
+    if (rec.cancelled || this.rec !== rec) return;
+    rec.blob = new Blob(rec.chunks, { type: rec.mime || 'audio/webm' });
+    if (rec.sendAfter) this.sendRecorded();
+  }
+
+  /** The send disc: while recording it stops and then sends; when already stopped it sends the held recording. */
+  finishRecording() {
+    const rec = this.rec;
+    if (!rec || rec.mode === 'asking') return;
+    if (rec.mode === 'recording') { rec.sendAfter = true; this.stopRecorder(); return; }
+    if (rec.blob) this.sendRecorded(); else rec.sendAfter = true;
+  }
+
+  sendRecorded() {
+    const rec = this.rec;
+    if (!rec || !rec.blob) return;
+    const reply = this.quote ? { id: this.quote.id, direction: this.quote.direction, kind: this.quote.kind, text: this.quote.text } : null; // a voice note carries no quote on his phone, but the Office still links it
+    const { blob, seconds } = rec;
+    this.rec = null;
+    this.renderRec();
+    this.setQuote(null);
+    if (!blob.size || seconds < 0.5) { this.ui.trayError.hidden = false; this.ui.trayError.textContent = 'That recording could not be used. Try again.'; return; }
+    this.sendVoice(blob, seconds, null, reply);
+    this.updateSend();
+  }
+
+  cancelRecording(silent = false) {
+    const rec = this.rec;
+    if (!rec) return;
+    rec.cancelled = true;
+    clearInterval(rec.timer);
+    try { if (rec.recorder && rec.recorder.state !== 'inactive') rec.recorder.stop(); } catch { /* already stopped */ }
+    this.releaseTracks(rec);
+    this.rec = null;
+    if (!silent) { this.renderRec(); this.updateSend(); }
+  }
+
+  renderRec() {
+    const { composer, recPanel } = this.ui;
+    if (!recPanel) return;
+    const rec = this.rec;
+    if (rec) composer.dataset.recording = rec.mode; else delete composer.dataset.recording;
+    recPanel.hidden = !rec;
+    this.renderQuote();
+    if (!rec) return;
+    const q = (sel) => recPanel.querySelector(sel);
+    q('[data-rec-ask]').hidden = rec.mode !== 'asking';
+    q('[data-rec-live]').hidden = rec.mode === 'asking';
+    q('[data-rec-dot]').hidden = rec.mode !== 'recording';
+    q('[data-rec-time]').textContent = clock(rec.seconds);
+    q('[data-rec-word]').textContent = rec.mode === 'stopped' ? `Stopped at ${clock(rec.seconds)}` : 'Recording';
+    const pill = q('[data-rec-pill]');
+    pill.hidden = !(rec.mode === 'recording' && rec.warned);
+    if (!pill.hidden) pill.textContent = `Stops at ${clock(rec.max)}`;
+    q('[data-rec-send]').setAttribute('aria-disabled', String(rec.mode === 'asking'));
+  }
+
   // ---------- sending ----------
 
   tempMessage(fields) {
     this.tmp += 1;
-    return { id: `tmp-${this.tmp}`, direction: 'out', kind: 'text', body: '', body_html: '', status: 'queued', error: null, author: '', author_id: '', author_first_name: '', template: null, media: null,
+    return { id: `tmp-${this.tmp}`, direction: 'out', kind: 'text', body: '', body_html: '', status: 'queued', error: null, author: '', author_id: '', author_first_name: '', template: null, media: null, reply_to: null,
       created_at: new Date().toISOString(), sent_at: '', retry_url: '', ...fields };
+  }
+
+  /** The quote the message being sent carries: shown in its bubble at once, posted as reply_to. */
+  quoteOf() {
+    return this.quote && !this.rec ? { id: this.quote.id, direction: this.quote.direction, kind: this.quote.kind, text: this.quote.text } : null;
   }
 
   addTemp(m) {
@@ -708,34 +982,39 @@ export class Thread {
     }
     const text = this.ui.input.value.trim();
     const file = this.file;
+    const reply = this.quoteOf();
     this.ui.input.value = '';
     this.grow();
     this.clearFile();
-    if (file) this.sendFile(file, text); else this.sendText(text);
+    this.setQuote(null);
+    if (file) this.sendFile(file, text, null, reply); else this.sendText(text, null, { reply });
     this.updateSend();
     if (!phone()) this.ui.input.focus();
   }
 
-  form(extra) {
+  form(extra, reply) {
     const body = new URLSearchParams(extra);
     if (this.gold) body.set('gold', this.gold.id);
+    if (reply) body.set('reply_to', String(reply.id));
     return body;
   }
 
-  async sendText(text, existing) {
-    const temp = existing || this.tempMessage({ localText: text, body: text });
+  /** `opts.plain`: an emoji from the quick row goes as it is, with no quote (a quote plus one emoji reads worse on his phone than the emoji). */
+  async sendText(text, existing, opts = {}) {
+    const reply = existing ? existing.reply_to : (opts.plain ? null : opts.reply || null);
+    const temp = existing || this.tempMessage({ localText: text, body: text, reply_to: reply });
     if (!existing) this.addTemp(temp);
     temp.status = 'queued';
     this.sending += 1;
     try {
-      const response = await fetch(this.urls.send, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken(), Accept: 'application/json' }, body: this.form({ body: text }) });
+      const response = await fetch(this.urls.send, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken(), Accept: 'application/json' }, body: this.form({ body: text }, reply) });
       const data = await response.json().catch(() => null);
       if (response.ok && data?.ok) { this.afterSent(temp, data.message, text); return; }
       if (!data) throw new Error('bad answer');
-      this.serverRefused(temp, data, text);
+      this.serverRefused(temp, data, opts.plain ? '' : text);
     } catch {
       this.setOffline(true);
-      this.failTemp(temp, 'Not sent. Try again.', () => this.sendText(text, temp));
+      this.failTemp(temp, 'Not sent. Try again.', () => this.sendText(text, temp, opts));
     } finally { this.sending -= 1; }
   }
 
@@ -750,37 +1029,26 @@ export class Thread {
   serverRefused(temp, data, text) {
     if (data.error === 'window_closed') this.contact = { ...this.contact, window: { ...this.contact.window, state: 'closed', open: false } };
     if (data.error === 'opted_out') this.contact = { ...this.contact, opted_out: true };
-    const words = { window_closed: 'Not sent. The window has closed.', opted_out: 'Not sent. He replied STOP.' };
+    if (data.error === 'voice_unavailable') this.contact = { ...this.contact, voice: { ...(this.contact.voice || {}), available: false } };
+    const words = {
+      window_closed: 'Not sent. The window has closed.', opted_out: 'Not sent. He replied STOP.', bad_reply: 'That message can no longer be quoted.',
+      voice_too_long: 'That voice note is over 5 minutes.', too_big: temp.kind === 'audio' ? 'That voice note is too large to send.' : '', voice_unavailable: 'Voice notes are not available right now.',
+      bad_file: temp.kind === 'audio' ? 'That recording could not be used. Try again.' : '',
+    };
     const reason = words[data.error] || (data.message ? `Not sent. ${data.message}` : 'Not sent. Try again.');
-    this.failTemp(temp, reason, null);
+    const retry = temp.kind === 'audio' && data.error === 'bad_file' ? temp.again : null;   // "Try again" resends the held recording
+    this.failTemp(temp, reason, retry);
+    if (data.error === 'bad_reply' && this.quote) this.setQuote(null);
     if (text) { try { sessionStorage.setItem(this.draftKey, text); } catch { /* private mode */ } }
     this.applyState();
     if (this.state === 'open' && text && !this.ui.input.value) { this.ui.input.value = text; this.grow(); this.updateSend(); }
   }
 
-  sendFile(file, caption, existing) {
-    const isImage = file.type.startsWith('image/');
-    const url = URL.createObjectURL(file);
-    (this.urls_to_free = this.urls_to_free || []).push(url);
-    const temp = existing || this.tempMessage({
-      kind: isImage ? 'image' : 'document', localText: caption, body: caption, progress: 0,
-      media: { url, type: file.type, filename: file.name, size: file.size, width: null, height: null },
-    });
-    if (!existing) {
-      if (isImage) { // read the size so the bubble keeps its shape while it uploads
-        const probe = new Image();
-        probe.onload = () => { temp.media.width = probe.naturalWidth; temp.media.height = probe.naturalHeight; };
-        probe.src = url;
-      }
-      this.addTemp(temp);
-    } else { temp.progress = 0; temp.status = 'queued'; this.refreshTemp(temp); }
-    const body = new FormData();
-    body.set('file', file);
-    body.set('body', caption);
-    if (this.gold) body.set('gold', this.gold.id);
+  /** One upload with a progress bar (photo, PDF, video, voice note). `url`, the form, and `again` (what "Try again" runs) differ; the rest is the same. */
+  upload(temp, url, body, again, caption) {
     this.sending += 1;
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', this.urls.send_media);
+    xhr.open('POST', url);
     xhr.setRequestHeader('X-CSRFToken', csrfToken());
     xhr.setRequestHeader('Accept', 'application/json');
     xhr.upload.addEventListener('progress', (event) => {
@@ -794,10 +1062,56 @@ export class Thread {
       try { data = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
       if (xhr.status >= 200 && xhr.status < 300 && data?.ok) { this.afterSent(temp, data.message, caption); return; }
       if (data) { this.serverRefused(temp, data, caption); return; }
-      this.failTemp(temp, 'Not sent. Try again.', () => this.sendFile(file, caption, temp));
+      this.failTemp(temp, 'Not sent. Try again.', again);
     });
-    xhr.addEventListener('error', () => { this.sending -= 1; this.setOffline(true); this.failTemp(temp, 'Not sent. Try again.', () => this.sendFile(file, caption, temp)); });
+    xhr.addEventListener('error', () => { this.sending -= 1; this.setOffline(true); this.failTemp(temp, 'Not sent. Try again.', again); });
     xhr.send(body);
+  }
+
+  sendFile(file, caption, existing, reply) {
+    const kind = file.type.startsWith('image/') ? 'image' : (file.type.startsWith('video/') ? 'video' : 'document');
+    const url = existing ? existing.media.url : URL.createObjectURL(file);
+    if (!existing) (this.urls_to_free = this.urls_to_free || []).push(url);
+    const quote = existing ? existing.reply_to : reply || null;
+    const temp = existing || this.tempMessage({
+      kind, localText: caption, body: caption, progress: 0, reply_to: quote,
+      media: { url, type: file.type, filename: file.name, size: file.size, width: null, height: null },
+    });
+    if (!existing) {
+      if (kind === 'image') { // read the size so the bubble keeps its shape while it uploads
+        const probe = new Image();
+        probe.onload = () => { temp.media.width = probe.naturalWidth; temp.media.height = probe.naturalHeight; };
+        probe.src = url;
+      }
+      this.addTemp(temp);
+    } else { temp.progress = 0; temp.status = 'queued'; this.refreshTemp(temp); }
+    const body = new FormData();
+    body.set('file', file);
+    body.set('body', caption);
+    if (this.gold) body.set('gold', this.gold.id);
+    if (quote) body.set('reply_to', String(quote.id));
+    this.upload(temp, this.urls.send_media, body, () => this.sendFile(file, caption, temp, quote), caption);
+  }
+
+  /** A recorded voice note: the bubble appears at once with the bar and the queued tick; the server converts it, so it stays "Sending" until it answers. */
+  sendVoice(blob, seconds, existing, reply) {
+    const url = existing ? existing.media.url : URL.createObjectURL(blob);
+    if (!existing) (this.urls_to_free = this.urls_to_free || []).push(url);
+    const quote = existing ? existing.reply_to : reply || null;
+    const temp = existing || this.tempMessage({
+      kind: 'audio', progress: 0, reply_to: quote,
+      media: { url, type: blob.type || 'audio/webm', filename: 'voice-note', size: blob.size, width: null, height: null },
+    });
+    if (!existing) this.addTemp(temp); else { temp.progress = 0; temp.status = 'queued'; this.refreshTemp(temp); }
+    const ext = /mp4|aac/.test(blob.type) ? 'm4a' : (/ogg/.test(blob.type) ? 'ogg' : 'webm');
+    const body = new FormData();
+    body.set('file', blob, `voice-note.${ext}`);
+    body.set('duration', String(Math.round(seconds)));
+    if (this.gold) body.set('gold', this.gold.id);
+    if (quote) body.set('reply_to', String(quote.id));
+    const again = () => this.sendVoice(blob, seconds, temp, quote);
+    temp.again = again;
+    this.upload(temp, this.urls.send_voice, body, again, '');
   }
 
   refreshTemp(temp) {

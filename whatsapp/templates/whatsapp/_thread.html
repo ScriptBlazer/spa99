@@ -1,7 +1,7 @@
 {% load whatsapp_tags %}<div class="o-wa-thread" data-wa-thread-root data-contact="{{ contact.id }}" data-state="open">
 {{ wa|json_script:"wa-data" }}
   <header class="o-wa-head">
-    <a class="o-back o-wa-back" href="{{ urls.inbox }}" aria-label="Chats" data-wa-back>{% include "office/_icon.html" with name="chevron-left" %}</a>
+    <a class="o-back o-wa-back" href="{{ urls.inbox }}" aria-label="Back to WhatsApp chats" data-wa-back>{% include "office/_icon.html" with name="chevron-left" %}</a>
     {% if contact.page_url %}<a class="o-wa-who o-wa-phone-only" href="{{ contact.page_url }}">{% include "whatsapp/_who.html" %}{% include "office/_icon.html" with name="chevron-right" %}</a>{% else %}<div class="o-wa-who o-wa-phone-only">{% include "whatsapp/_who.html" %}</div>{% endif %}
     <div class="o-wa-who o-wa-desk-only">{% include "whatsapp/_who.html" %}</div>
     <div class="o-wa-pills o-wa-desk-only">
@@ -31,11 +31,27 @@
       <button type="button" class="o-wa-x" data-tray-remove aria-label="Remove the file">{% include "office/_icon.html" with name="x" %}</button>
     </div>
     <p class="o-wa-tray-error" data-tray-error role="alert" hidden></p>
+    <div class="o-wa-quote" data-quote hidden>
+      <span class="o-wa-quote-icon" aria-hidden="true">{% include "office/_icon.html" with name="reply" %}</span>
+      <div class="o-wa-quote-main"><p class="o-wa-quote-who" data-quote-who></p><p class="o-wa-quote-text" data-quote-text dir="auto"></p><p class="o-wa-quote-note" data-quote-note></p></div>
+      <button type="button" class="o-wa-x" data-quote-remove aria-label="Remove the quote">{% include "office/_icon.html" with name="x" %}</button>
+    </div>
     <form class="o-wa-composer" data-slot="open" data-composer hidden>
-      <button type="button" class="o-wa-attach" data-attach aria-label="Attach a photo or PDF">{% include "office/_icon.html" with name="paperclip" %}</button>
-      <input type="file" class="sr-only" accept="image/jpeg,image/png,application/pdf" data-file tabindex="-1" aria-hidden="true">
+      <button type="button" class="o-wa-attach" data-attach aria-label="Attach a photo, PDF or video">{% include "office/_icon.html" with name="paperclip" %}</button>
+      <input type="file" class="sr-only" accept="image/jpeg,image/png,application/pdf,video/mp4" data-file tabindex="-1" aria-hidden="true">
       <textarea class="o-wa-input" rows="1" placeholder="Message" aria-label="Message to {{ contact.name }}" autocapitalize="sentences" spellcheck="true" dir="auto" enterkeyhint="enter" data-input></textarea>
-      <button type="submit" class="o-wa-send" data-send aria-label="Send" aria-disabled="true">{% include "office/_icon.html" with name="paper-plane" %}</button>
+      <span class="o-wa-sendslot">
+        <button type="button" class="o-wa-mic" data-mic aria-label="Record a voice note" hidden>{% include "office/_icon.html" with name="microphone" %}</button>
+        <button type="submit" class="o-wa-send" data-send aria-label="Send" aria-disabled="true">{% include "office/_icon.html" with name="paper-plane" %}</button>
+      </span>
+      <div class="o-wa-rec" data-rec tabindex="-1" hidden>
+        <button type="button" class="o-wa-rec-cancel" data-rec-cancel aria-label="Cancel">{% include "office/_icon.html" with name="trash" %}</button>
+        <div class="o-wa-rec-main">
+          <p class="o-wa-rec-ask" data-rec-ask hidden>{% include "office/_icon.html" with name="microphone" %}<span>Allow the microphone</span></p>
+          <p class="o-wa-rec-live" data-rec-live hidden><span class="o-wa-rec-dot" data-rec-dot aria-hidden="true"></span><span class="o-wa-rec-time" data-rec-time>0:00</span><span class="o-wa-rec-word" data-rec-word>Recording</span><span class="o-wa-rec-pill" data-rec-pill hidden></span></p>
+        </div>
+        <button type="button" class="o-wa-send is-ready" data-rec-send aria-label="Send the voice note">{% include "office/_icon.html" with name="paper-plane" %}</button>
+      </div>
       <p class="o-wa-count" data-count hidden></p>
       <p class="o-wa-hint" data-hint aria-hidden="true"><b>*bold*</b><i>_italic_</i><s>~strike~</s><span>Shift + Enter for a new line</span></p>
     </form>

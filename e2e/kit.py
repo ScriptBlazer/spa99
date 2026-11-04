@@ -297,18 +297,22 @@ def verify_email_link(page, url):
     page.wait_for_url(re.compile(r"/account/"))
 
 
-def answer_journey(page, stop_before_result=False, email="journey-walker@example.test"):
+def answer_journey(page, stop_before_result=False, email="journey-walker@example.test", mobile="07400 123450", first_name="Walker"):
     """Walk the guided journey: pick the first choice of every question on every screen until the suggested tier shows.
-    Returns the suggested tier text (for example 'Tier 2.')."""
+    Returns the suggested tier text (for example 'Tier 2.'). The mobile at the email step is optional (2026-11-04): pass mobile=None
+    (or "") to leave it blank, as a visitor may."""
     page.goto(f"{SITE}/journey/")
     for _ in range(10):
         page.wait_for_selector("[data-flow-root] .screen, [data-flow-root] .result")
         if page.locator("[data-flow-root] .result").count():
             break
         if page.locator("[data-flow-root] .lead-gate").count():  # the email gate before the result (2026-10-26)
-            page.locator("#lead-first-name").fill("Walker")
+            if stop_before_result:
+                return None
+            page.locator("#lead-first-name").fill(first_name)
             page.locator("#lead-email").fill(email)
-            page.locator("#lead-mobile").fill("07400 123450")  # country select stays on UK (+44)
+            if mobile:
+                page.locator("#lead-mobile").fill(mobile)  # country select stays on UK (+44)
             tick(page, "consent")
             page.locator("[data-gate-primary]").click()
             # The gate stays in the page until the server has taken the address: wait for the result itself, or the next

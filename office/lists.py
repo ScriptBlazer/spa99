@@ -392,7 +392,7 @@ def gold_confirm(application):
 # ---------- chats ----------
 
 def chat_columns(show_cost):
-    """Sortable headers of Office > Chats (R1). First question and Note are plain headers. Cost exists only for Developer level and
+    """Sortable headers of Office > Assistant (R1). First question and Note are plain headers. Cost exists only for Developer level and
     up: for everyone else it is not on the whitelist, so `sort=cost` can never reveal an order."""
     from django.db.models.functions import Coalesce, NullIf
 

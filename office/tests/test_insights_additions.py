@@ -84,7 +84,7 @@ class ChatsCardTests(OfficeTestCase):
         chat("other@example.com", question="Not his")
         chat("hugo@example.com", question="Staff test", staff_test=True)
         page = get(self.office, f"/leads/{session.pk}/")
-        self.assertContains(page, "Chats with the assistant")
+        self.assertContains(page, "Assistant chats")
         self.assertNotContains(page, "Not his")
         self.assertNotContains(page, "Staff test")
         self.assertContains(page, "data-chats-all")
@@ -107,8 +107,8 @@ class ChatsCardTests(OfficeTestCase):
         Conversation.objects.filter(pk=mine.pk).update(last_at=timezone.now() - timedelta(days=91))
         from chat import services as chat_services
         chat_services.prune()
-        self.assertContains(get(self.office, f"/people/{user.pk}/"), "No chats kept")
-        self.assertContains(get(self.office, f"/chats/?user={user.pk}"), "Chats with sam@example.com")
+        self.assertContains(get(self.office, f"/people/{user.pk}/"), "Nothing kept")
+        self.assertContains(get(self.office, f"/chats/?user={user.pk}"), "What sam@example.com asked the assistant")
 
 
 class ChatsCardMoreTests(OfficeTestCase):

@@ -1,9 +1,9 @@
 {% extends "office/base.html" %}
 {% load office_tags text_tags %}
-{% block title %}Chats | Spa 99 Office{% endblock %}
+{% block title %}Assistant | Spa 99 Office{% endblock %}
 {% block main %}
-<h1 class="sr-only">Chats</h1>
-<p class="o-sub">{% if person %}Chats with {{ person.label }}{% else %}Chats with the assistant{% endif %}. Kept for 90 days.</p>
+<h1 class="sr-only">Assistant</h1>
+<p class="o-sub">{% if person %}What {{ person.label }} asked the assistant{% else %}What people asked the assistant{% endif %}. Kept for 90 days.</p>
 {# No filters here: the form only carries the order (the phone's small Sort sheet) and whose chats these are, so the same swap serves the table heads. #}
 <form class="o-filters" method="get" action="{% url 'office_chats' %}" data-filter-form data-full data-list="chats" aria-label="Order the chats">
   {% if request.GET.user %}<input type="hidden" name="user" value="{{ request.GET.user }}">{% endif %}{% if request.GET.lead %}<input type="hidden" name="lead" value="{{ request.GET.lead }}">{% endif %}

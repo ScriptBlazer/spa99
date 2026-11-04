@@ -44,6 +44,7 @@ export function initMobileDialog() {
         await refresh();
         dialog.close();
         toast('Mobile saved.');
+        setTimeout(() => document.querySelector('[data-whatsapp-open]')?.focus(), 0); // the grey line he used is gone: focus goes to the new button
       } else {
         const errors = (data && data.errors) || {};
         const owner = errors.owner;
