@@ -88,7 +88,7 @@ def unread(request):
 # ---------- a thread ----------
 
 def _page_of_messages(contact, before=None):
-    rows = Message.objects.filter(contact=contact).select_related("template")
+    rows = Message.objects.filter(contact=contact).select_related("template", "reply_to")
     if before:
         rows = rows.filter(pk__lt=before)
     found = list(rows.order_by("-id")[:PAGE + 1])  # newest first; one extra row says there are older ones
@@ -114,7 +114,7 @@ def thread(request, pk):
         "unread": {"count": count, "first_id": first_id}, "last_id": found[-1].pk if found else 0, "cursor": timezone.now().isoformat(),
         "templates": services.template_dicts(contact), "gold": gold, "open_picker": request.GET.get("picker") == "1", "section": "whatsapp", "configured": services.configured(),
         "urls": {"poll": reverse("office_whatsapp_poll", args=[contact.pk]), "send": reverse("office_whatsapp_send", args=[contact.pk]),
-                 "send_media": reverse("office_whatsapp_send_media", args=[contact.pk]), "send_template": reverse("office_whatsapp_send_template", args=[contact.pk]),
+                 "send_media": reverse("office_whatsapp_send_media", args=[contact.pk]), "send_voice": reverse("office_whatsapp_send_voice", args=[contact.pk]), "send_template": reverse("office_whatsapp_send_template", args=[contact.pk]),
                  "read": reverse("office_whatsapp_read", args=[contact.pk]), "inbox": reverse("office_whatsapp"), "templates": reverse("office_whatsapp_templates") + f"?contact={contact.pk}"}}
     context.update({k: v for k, v in _list_context(request).items() if k not in context and k not in ("page", "q", "filter", "unread_only", "more_url")})
     context.update({"page": 1, "q": "", "filter": "", "more_url": reverse("office_whatsapp") + "?page=2", "selected": str(contact.pk)})
@@ -149,7 +149,7 @@ def poll(request, pk):
     except ValueError:
         after = 0
     cursor = timezone.now()
-    new = list(Message.objects.filter(contact=contact, pk__gt=after).select_related("template").order_by("id")[:100])
+    new = list(Message.objects.filter(contact=contact, pk__gt=after).select_related("template", "reply_to").order_by("id")[:100])
     updates = []
     try:
         since = datetime.fromisoformat(request.GET["since"]) if request.GET.get("since") else None
@@ -158,7 +158,7 @@ def poll(request, pk):
     if since is not None:
         if timezone.is_naive(since):
             since = timezone.make_aware(since)
-        updates = [services.message_dict(m) for m in Message.objects.filter(contact=contact, pk__lte=after, updated_at__gt=since).select_related("template").order_by("id")[:100]]
+        updates = [services.message_dict(m) for m in Message.objects.filter(contact=contact, pk__lte=after, updated_at__gt=since).select_related("template", "reply_to").order_by("id")[:100]]
     return JsonResponse({"messages": [services.message_dict(m) for m in new], "updates": updates, "contact": services.contact_dict(contact, request.user, can_send=can_edit(request.user)),
                          "unread_total": services.unread_total(request.user), "last_id": new[-1].pk if new else after, "cursor": cursor.isoformat()})
 
@@ -185,7 +185,7 @@ def _after_send(request, contact, message):
 @require_POST
 def send(request, pk):
     contact = _contact(pk)
-    result, message = services.send_text(contact, request.user, request.POST.get("body", ""))
+    result, message = services.send_text(contact, request.user, request.POST.get("body", ""), request.POST.get("reply_to"))
     if result != services.DONE:
         return _fail(result, 409 if result in (services.WINDOW_CLOSED, services.OPTED_OUT) else 400)
     _after_send(request, contact, message)
@@ -199,9 +199,26 @@ def send_media(request, pk):
     upload = request.FILES.get("file")
     if upload is None:
         return _fail(services.BAD_FILE)
-    result, message = services.send_media(contact, request.user, upload, request.POST.get("body", ""))
+    result, message = services.send_media(contact, request.user, upload, request.POST.get("body", ""), request.POST.get("reply_to"))
     if result != services.DONE:
         return _fail(result, 409 if result in (services.WINDOW_CLOSED, services.OPTED_OUT) else (413 if result == services.TOO_BIG else 400))
+    _after_send(request, contact, message)
+    return _ok(message)
+
+
+@editor
+@require_POST
+def send_voice(request, pk):
+    """POST file `file` (the browser recording: audio/webm, audio/mp4 or audio/ogg, found by its first bytes), `duration` (seconds, the browser's figure), optional `reply_to`.
+    Converted to OGG Opus on the server, 5 minutes at most. Same answers as send-media; 503 `voice_unavailable` when ffmpeg is missing (context `voice.available` is false then:
+    hide the microphone), 413 too big, 400 `voice_too_long` or a file that is not audio."""
+    contact = _contact(pk)
+    upload = request.FILES.get("file")
+    if upload is None:
+        return _fail(services.BAD_FILE)
+    result, message = services.send_voice(contact, request.user, upload, request.POST.get("duration"), request.POST.get("reply_to"))
+    if result != services.DONE:
+        return _fail(result, 409 if result in (services.WINDOW_CLOSED, services.OPTED_OUT) else (413 if result == services.TOO_BIG else (503 if result == services.NO_VOICE else 400)))
     _after_send(request, contact, message)
     return _ok(message)
 
@@ -249,7 +266,7 @@ def media(request, pk):
     message = get_object_or_404(Message.objects.exclude(media_key=""), pk=pk)
     if not default_storage.exists(message.media_key):
         raise Http404
-    inline = message.media_type in ("image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/aac", "video/mp4")
+    inline = message.media_type in ("image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/aac", "video/mp4")  # audio/webm is never stored: voice notes are converted to ogg
     response = FileResponse(default_storage.open(message.media_key, "rb"), content_type=message.media_type or "application/octet-stream",
                             as_attachment=not inline, filename=message.media_filename or "file")
     response["X-Content-Type-Options"] = "nosniff"

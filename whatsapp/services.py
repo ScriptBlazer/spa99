@@ -22,7 +22,7 @@ from django.utils.safestring import mark_safe
 
 from common.tasks import enqueue
 
-from . import errors, formatting, imagesize, twilio_api
+from . import errors, formatting, imagesize, twilio_api, voice
 from .models import TEMPLATE_PREFIX, Contact, ContactRead, Message, Template
 
 logger = logging.getLogger("spa99.whatsapp")
@@ -36,13 +36,26 @@ RANK = {Message.QUEUED: 0, Message.SENT: 1, Message.DELIVERED: 2, Message.READ: 
 TWILIO_STATUS = {"accepted": "queued", "scheduled": "queued", "queued": "queued", "sending": "queued", "sent": "sent", "delivered": "delivered",
                  "read": "read", "failed": "failed", "undelivered": "undelivered"}
 SEND_TYPES = {"image/jpeg": (Message.IMAGE, b"\xff\xd8\xff", ".jpg"), "image/png": (Message.IMAGE, b"\x89PNG", ".png"), "application/pdf": (Message.DOCUMENT, b"%PDF-", ".pdf")}
+MP4_BRANDS = {b"isom", b"iso2", b"iso4", b"iso5", b"iso6", b"mp41", b"mp42", b"avc1", b"M4V ", b"MSNV", b"dash"}  # MP4 files; QuickTime (qt  ) and audio-only brands are not sent as video
+
+
+def sniff_send(data):
+    """(kind, content type, extension) from the file's own first bytes (never its name or declared type), or None."""
+    for content_type, (kind, magic, extension) in SEND_TYPES.items():
+        if data.startswith(magic):
+            return kind, content_type, extension
+    if data[4:8] == b"ftyp" and data[8:12] in MP4_BRANDS:
+        return Message.VIDEO, "video/mp4", ".mp4"
+    return None
 DEFAULT_LABELS = {"spa99_lead_follow_up": {"1": "First name"}}  # what each variable of a template is called in the form (kept across syncs)
 
 DONE, EMPTY, TOO_LONG, WINDOW_CLOSED, OPTED_OUT, DUPLICATE = "done", "empty", "too_long", "window_closed", "opted_out", "duplicate"
+BAD_REPLY, NO_VOICE, VOICE_TOO_LONG = "bad_reply", "voice_unavailable", "voice_too_long"
 NOT_CONFIGURED, BAD_FILE, TOO_BIG, BAD_TEMPLATE, MISSING_VARIABLES, NOT_RETRYABLE = "not_configured", "bad_file", "too_big", "bad_template", "missing_variables", "not_retryable"
 WORDS = {EMPTY: "Write a message first.", TOO_LONG: "That message is too long.", WINDOW_CLOSED: "The 24-hour window has closed. Send a template to reopen it.",
          OPTED_OUT: "He replied STOP, so he gets no more messages.", DUPLICATE: "That message was just sent.", NOT_CONFIGURED: "WhatsApp is not set up yet.",
-         BAD_FILE: "Photos or PDFs only.", TOO_BIG: "Photos up to 5 MB, PDFs up to 16 MB.", BAD_TEMPLATE: "That template cannot be sent.",
+         BAD_FILE: "Photos, PDFs or MP4 videos only.", TOO_BIG: "Photos up to 5 MB, PDFs and videos up to 16 MB.",
+         BAD_REPLY: "That message cannot be replied to.", NO_VOICE: "Voice notes are not available on this server.", VOICE_TOO_LONG: "A voice note can be 5 minutes at most.", BAD_TEMPLATE: "That template cannot be sent.",
          MISSING_VARIABLES: "Fill in every field of the template.", NOT_RETRYABLE: "That message cannot be sent again."}
 
 
@@ -241,6 +254,44 @@ def label_for(template, key):
     return (template.variable_labels or {}).get(str(key)) or f"Detail {key}"
 
 
+QUOTE_CHARS = 100
+MEDIA_WORDS = {Message.IMAGE: "Photo", Message.AUDIO: "Voice note", Message.VIDEO: "Video", Message.DOCUMENT: "PDF", Message.FILE: "File", Message.OTHER: "Message"}
+
+
+def quote_text(message):
+    """The words a quote shows for a message: its first line (no formatting marks, no quote of its own), or "Photo", "Voice note", "Video", "PDF" for a file with no text."""
+    for line in formatting.plain(message.body or "").splitlines():
+        line = line.strip().lstrip(">").strip()
+        if line:
+            return line if len(line) <= QUOTE_CHARS else line[:QUOTE_CHARS - 1].rstrip() + "\u2026"
+    return MEDIA_WORDS.get(message.kind, "Message")
+
+
+def outgoing_text(message):
+    """What goes to Twilio as the Body: when staff replied to a bubble, `> first line of the quoted text`, a blank line, then the body as typed (WhatsApp shows the
+    `>` as a quote). Used by the send and by a retry, so both send the same."""
+    if message.kind in (Message.TEMPLATE, Message.AUDIO) or message.reply_to_id is None:  # a voice note has no text to put a quote in (the Office still links it)
+        return message.body
+    quote = f"> {quote_text(message.reply_to)}"
+    return f"{quote}\n\n{message.body}" if message.body else quote
+
+
+def reply_target(contact, reply_to):
+    """The message this reply answers, from a posted id: it must be a message of this same chat. (None, False) when nothing was given, (None, True) when it is not valid."""
+    if reply_to in (None, ""):
+        return None, False
+    try:
+        found = Message.objects.filter(pk=int(reply_to), contact=contact).exclude(kind=Message.TEMPLATE).first()
+    except (TypeError, ValueError):
+        return None, True
+    return found, found is None
+
+
+def _too_long(body, reply):
+    probe = Message(body=body, kind=Message.TEXT, reply_to=reply)
+    return len(outgoing_text(probe)) > settings.WHATSAPP_MAX_BODY
+
+
 def _queue(contact, actor, kind, body="", **fields):
     """Record a queued outgoing message and hand it to the worker. Returns (DONE, message) or (DUPLICATE, None)."""
     since = now() - DUPLICATE_WINDOW
@@ -275,42 +326,82 @@ def _blocked(contact, needs_window):
     return None
 
 
-def send_text(contact, actor, body):
-    """Free text inside the 24-hour window. Returns (result, message)."""
+def send_text(contact, actor, body, reply_to=None):
+    """Free text inside the 24-hour window. `reply_to` is a message id of this chat (staff Reply on a bubble). Returns (result, message)."""
     body = (body or "").replace("\x00", "").strip()
     if not body:
         return EMPTY, None
-    if len(body) > settings.WHATSAPP_MAX_BODY:
+    reply, invalid = reply_target(contact, reply_to)
+    if invalid:
+        return BAD_REPLY, None
+    if _too_long(body, reply):  # the final text, quote included
         return TOO_LONG, None
     blocked = _blocked(contact, needs_window=True)
-    return (blocked, None) if blocked else _queue(contact, actor, Message.TEXT, body)
+    return (blocked, None) if blocked else _queue(contact, actor, Message.TEXT, body, reply_to=reply)
 
 
-def send_media(contact, actor, upload, caption=""):
-    """A photo (JPEG or PNG, 5 MB) or a PDF (16 MB) inside the window, with an optional caption. The file goes to the default storage
-    (S3 on live); Twilio fetches it from a signed, expiring link. Returns (result, message)."""
+def send_media(contact, actor, upload, caption="", reply_to=None):
+    """A photo (JPEG or PNG, 5 MB), a PDF or an MP4 video (16 MB) inside the window, with an optional caption. The file goes to the default storage
+    (S3 on live); Twilio fetches it from a signed, expiring link whose content type is the one stored here (Twilio refuses a mismatch). Returns (result, message)."""
     caption = (caption or "").replace("\x00", "").strip()
-    if len(caption) > settings.WHATSAPP_MAX_BODY:
+    reply, invalid = reply_target(contact, reply_to)
+    if invalid:
+        return BAD_REPLY, None
+    if _too_long(caption, reply):
         return TOO_LONG, None
     blocked = _blocked(contact, needs_window=True)
     if blocked:
         return blocked, None
     data = upload.read(settings.WHATSAPP_MAX_FILE_BYTES + 1)
-    kind = None
-    for content_type, (found, magic, extension) in SEND_TYPES.items():  # the file's own first bytes decide, not its name or declared type
-        if data.startswith(magic):
-            kind, media_type, ext = found, content_type, extension
-    if kind is None:
+    found = sniff_send(data)  # the file's own first bytes decide, not its name or declared type
+    if found is None:
         return BAD_FILE, None
+    kind, media_type, ext = found
     if len(data) > (settings.WHATSAPP_MAX_IMAGE_BYTES if kind == Message.IMAGE else settings.WHATSAPP_MAX_FILE_BYTES):
         return TOO_BIG, None
     width, height = imagesize.size_of(data) if kind == Message.IMAGE else (None, None)
-    key = default_storage.save(f"whatsapp/{contact.pk}/{uuid.uuid4().hex}{ext}", ContentFile(data))
     name = re.sub(r"[^\w .()-]", "_", (getattr(upload, "name", "") or f"file{ext}").rsplit("/", 1)[-1])[:200] or f"file{ext}"
-    result, message = _queue(contact, actor, kind, caption, media_key=key, media_type=media_type, media_filename=name, media_size=len(data), media_width=width, media_height=height)
+    return _store_and_queue(contact, actor, kind, caption, data, media_type, ext, name, width, height, reply)
+
+
+def _store_and_queue(contact, actor, kind, caption, data, media_type, ext, name, width, height, reply):
+    key = default_storage.save(f"whatsapp/{contact.pk}/{uuid.uuid4().hex}{ext}", ContentFile(data))
+    result, message = _queue(contact, actor, kind, caption, media_key=key, media_type=media_type, media_filename=name, media_size=len(data), media_width=width, media_height=height, reply_to=reply)
     if result != DONE:
         default_storage.delete(key)
     return result, message
+
+
+def voice_available():
+    return voice.available()
+
+
+def send_voice(contact, actor, upload, duration=None, reply_to=None):
+    """A voice note recorded in the browser (WebM, MP4 or Ogg audio, found by its first bytes), converted by ffmpeg to OGG Opus and sent as audio inside
+    the window. `duration` is the browser's own figure, used only to refuse an obviously too long one early: the real length is measured after conversion.
+    5 minutes at most. Returns (result, message)."""
+    if not voice.available():
+        return NO_VOICE, None
+    reply, invalid = reply_target(contact, reply_to)
+    if invalid:
+        return BAD_REPLY, None
+    blocked = _blocked(contact, needs_window=True)
+    if blocked:
+        return blocked, None
+    try:
+        claimed = float(duration) if duration not in (None, "") else 0.0
+    except (TypeError, ValueError):
+        claimed = 0.0
+    if claimed > settings.WHATSAPP_VOICE_MAX_SECONDS + 1:
+        return VOICE_TOO_LONG, None
+    data = upload.read(settings.WHATSAPP_VOICE_MAX_UPLOAD_BYTES + 1)
+    if len(data) > settings.WHATSAPP_VOICE_MAX_UPLOAD_BYTES:
+        return TOO_BIG, None
+    try:
+        ogg, _seconds = voice.convert(data)
+    except voice.VoiceError as error:
+        return {"no_ffmpeg": NO_VOICE, "too_long": VOICE_TOO_LONG, "too_big": TOO_BIG}.get(error.code, BAD_FILE), None
+    return _store_and_queue(contact, actor, Message.AUDIO, "", ogg, voice.OUTPUT_TYPE, ".ogg", "voice-note.ogg", None, None, reply)
 
 
 def send_template(contact, actor, template_id, variables):
@@ -397,7 +488,7 @@ def deliver(message):
         return _fail(message, "opted_out", "He replied STOP.")
     try:
         sent = twilio_api.send_message(
-            message.contact.phone, body=message.body if message.kind != Message.TEMPLATE else "",
+            message.contact.phone, body=outgoing_text(message) if message.kind != Message.TEMPLATE else "",
             content_sid=message.template.content_sid if message.kind == Message.TEMPLATE and message.template_id else "",
             content_variables=json.dumps(message.template_variables) if message.kind == Message.TEMPLATE else "",
             media_url=media_url(message) if message.media_key else "", status_callback=status_callback_url())
@@ -437,7 +528,7 @@ def kind_of(content_type):
 
 
 def _preview(message):
-    names = {Message.IMAGE: "Photo", Message.AUDIO: "Voice note", Message.VIDEO: "Video"}
+    names = {Message.IMAGE: "Photo", Message.AUDIO: "Voice note", Message.VIDEO: "Video", Message.OTHER: "Message"}
     if message.kind == Message.DOCUMENT:
         return f"PDF: {message.media_filename}"[:200] if message.media_filename else "PDF"
     if message.kind == Message.FILE:
@@ -468,6 +559,12 @@ def record_inbound(params):
         place = ", ".join(x for x in (params.get("Label"), params.get("Address")) if x)
         body = body or f"Location: {place + ' ' if place else ''}({params['Latitude']}, {params['Longitude']})"
         fields = {"kind": Message.OTHER}
+    elif not body.strip():  # no text, no file, no location: something we do not know (a reaction?). Twilio documents no format, so: a neutral bubble, and the parameter NAMES (never values) in the log
+        logger.info("WhatsApp message with no text, file or location; parameter names: %s", ", ".join(sorted(str(k) for k in params)))
+        body, fields = "", {"kind": Message.OTHER}
+    quoted = params.get("OriginalRepliedMessageSid", "")
+    if quoted:  # he used Reply on one of the messages of this chat (Twilio sends this for messages under 7 days old)
+        fields["reply_to"] = Message.objects.filter(twilio_sid=quoted, contact=contact).first()
     try:
         with transaction.atomic():
             message = Message.objects.create(contact=contact, direction=Message.IN, body=body, status=Message.RECEIVED, twilio_sid=sid, **fields)
@@ -598,7 +695,9 @@ def message_dict(message):
     if message.media_key:
         media = {"url": _office("office_whatsapp_media", message.pk), "type": message.media_type, "filename": message.media_filename, "size": message.media_size,
                  "width": message.media_width, "height": message.media_height}
-    return {"id": message.pk, "direction": message.direction, "kind": message.kind, "body": message.body, "body_html": str(formatting.render(message.body)),
+    quoted = message.reply_to
+    return {"id": message.pk, "direction": message.direction, "kind": message.kind, "body": message.body,
+            "reply_to": {"id": quoted.pk, "direction": quoted.direction, "kind": quoted.kind, "text": quote_text(quoted)} if quoted is not None else None, "body_html": str(formatting.render(message.body)),
             "status": message.status, "error": {"reason": reason, "can_retry": can_retry_now} if reason else None,
             "author": message.author_label, "author_id": str(message.author_id) if message.author_id else "", "author_first_name": _first(message.author_label),
             "template": {"id": str(template.pk), "name": template.name, "label": template.label} if template else None,
@@ -634,7 +733,8 @@ def contact_dict(contact, user=None, can_send=False):
     return {"id": str(contact.pk), "name": contact.display_name, "has_name": bool(contact.name or contact.profile_name), "phone": contact.phone, "profile_name": contact.profile_name,
             "labels": labels, "page_url": page, "opted_out": contact.opted_out, "window": {"state": state, "open": state == "open", "ends_at": ends.isoformat() if ends else ""},
             "can_send": can_send, "url": _office("office_whatsapp_thread", contact.pk), "last_message_at": contact.last_message_at.isoformat() if contact.last_message_at else "",
-            "limits": {"body": settings.WHATSAPP_MAX_BODY, "image_bytes": settings.WHATSAPP_MAX_IMAGE_BYTES, "file_bytes": settings.WHATSAPP_MAX_FILE_BYTES}}
+            "limits": {"body": settings.WHATSAPP_MAX_BODY, "image_bytes": settings.WHATSAPP_MAX_IMAGE_BYTES, "file_bytes": settings.WHATSAPP_MAX_FILE_BYTES},
+            "voice": {"available": voice_available(), "max_seconds": settings.WHATSAPP_VOICE_MAX_SECONDS, "max_bytes": settings.WHATSAPP_VOICE_MAX_UPLOAD_BYTES}}
 
 
 NO_REPLY_DAYS = 3
@@ -669,16 +769,29 @@ def template_dicts(contact=None):
 
 
 def page_context(mobile, user_obj, can_send, start_url, edit_url, first_name=""):
-    """The `whatsapp` dict on the lead, person and Gold pages."""
-    base = {"configured": configured(), "has_mobile": bool(mobile), "mobile": mobile or "", "first_name": first_name, "contact_url": start_url, "start_url": start_url,
-            "edit_url": edit_url, "can_send": bool(can_send and mobile and configured()), "can_edit": bool(can_send), "has_chat": False, "window_open": False,
-            "window_closes_at": "", "opted_out": False, "unread": 0}
+    """The `whatsapp` dict on the lead, person and Gold pages. `state` says what the button shows: `no_mobile` (no number: the email button stands alone, with `reason`
+    "Add a number to enable WhatsApp" and, when `can_add_number`, the staff dialog at `edit_url`), `unconfigured` (Twilio is not set up: the button shows greyed with `reason`),
+    `view_only` (a reader with no chat yet), `ready` (a number, nothing sent yet) or `chat` (there are messages)."""
+    ok = configured()
+    base = {"configured": ok, "has_mobile": bool(mobile), "mobile": mobile or "", "first_name": first_name, "contact_url": start_url, "start_url": start_url,
+            "edit_url": edit_url, "can_send": bool(can_send and mobile and ok), "can_edit": bool(can_send), "has_chat": False, "window_open": False,
+            "window_closes_at": "", "opted_out": False, "unread": 0, "can_add_number": bool(can_send and edit_url and not mobile), "reason": "", "thread_url": ""}
     contact = Contact.objects.filter(phone=mobile).first() if mobile else None
-    if contact is None:
-        return base
-    ends = window_ends_at(contact)
-    return {**base, "has_chat": bool(contact.last_message_at), "window_open": window_open(contact), "window_closes_at": ends.isoformat() if ends and window_open(contact) else "",
-            "opted_out": contact.opted_out, "unread": unread_counts(user_obj, [contact.pk]).get(contact.pk, 0), "thread_url": _office("office_whatsapp_thread", contact.pk)}
+    if contact is not None:
+        ends = window_ends_at(contact)
+        base.update({"has_chat": bool(contact.last_message_at), "window_open": window_open(contact), "window_closes_at": ends.isoformat() if ends and window_open(contact) else "",
+                     "opted_out": contact.opted_out, "unread": unread_counts(user_obj, [contact.pk]).get(contact.pk, 0), "thread_url": _office("office_whatsapp_thread", contact.pk)})
+    if not mobile:
+        state, reason = "no_mobile", "Add a number to enable WhatsApp"
+    elif not ok:
+        state, reason = "unconfigured", "WhatsApp is not set up yet."
+    elif base["has_chat"]:
+        state, reason = "chat", ""
+    elif not can_send:
+        state, reason = "view_only", ""
+    else:
+        state, reason = "ready", ""
+    return {**base, "state": state, "reason": reason}
 
 
 # ---------- timeline, export, erase ----------

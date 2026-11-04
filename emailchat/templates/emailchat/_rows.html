@@ -1,0 +1,4 @@
+{% comment %}Placeholder markup, the frontend agent replaces it. Context: see emailchat.views._list_context (rows, has_next, more_url).{% endcomment %}
+{% for row in rows %}<a class="o-em-row" href="{{ row.url }}" data-unread="{{ row.unread }}"><strong>{{ row.name }}</strong> <span>{{ row.subject }}</span> <small>{{ row.preview }}</small>{% if row.has_attachment %} [file]{% endif %}{% if row.unread %} ({{ row.unread }}){% endif %}</a>
+{% empty %}<p>No emails.</p>{% endfor %}
+{% if has_next %}<a href="{{ more_url }}">More</a>{% endif %}

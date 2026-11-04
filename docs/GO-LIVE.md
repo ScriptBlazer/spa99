@@ -176,6 +176,27 @@ Never edit or delete a migration that is already live.
   4. Other things the old image cannot do: register or save an account that holds a **non-UK mobile** (the number stays stored), and the email Message and Respond come back. WhatsApp stops working (webhooks answer 404 on the old image, Twilio retries and gives up, harmless).
 - **Not verified before release (needs the real account):** that Twilio accepts the Content API and WhatsApp senders endpoints exactly as coded (they are mocked in tests), the plain-reason mapping of Twilio error codes, and the Postgres run (CI runs the tests on Postgres; nothing is Postgres-only).
 
+## Next release (Email chat in the Office, WhatsApp round 2: replies, video, voice notes; mobile optional at the email step)
+
+Spec: `docs/features/office-email-chat.md` and `docs/features/whatsapp.md` (both have a "Built" section).
+
+- **Take the RDS snapshot first.** Migrations run on start (web): `emailchat 0001` (new tables only: thread, message, attachment, read marker) and `whatsapp 0002` (one nullable column, `Message.reply_to`). No data is touched.
+- **The image changes:** it now installs `ffmpeg` (apt, `--no-install-recommends`; voice notes) and `nh3` (a pinned Python wheel that cleans email HTML; manylinux wheels exist, nothing compiles). The image grows by roughly 150 to 250 MB for ffmpeg and its libraries (an estimate: Docker is not available here, so it was not built or measured. Check `docker image ls` after the first build).
+- **Caddy: nothing to change.** The public host (`spa99.uk`) has no `request_body` limit, so Postmark's inbound POST (a mail of up to 35 MB arrives as about 47 MB of JSON, files in base64) passes. The app drops anything over 50 MB (`EMAILCHAT_MAX_INBOUND_BYTES`) with a 200 and a log line; Cloudflare's own upload limit (100 MB on the free plan) is above that. **Do not add a small global limit to the public host later**, or large inbound mail stops arriving. The Office host keeps its 20 MB limit (voice notes are about 1 to 3 MB, files on emails 10 MB each and 9 MB in all).
+- **Email chat setup (Moishe, no code):**
+  1. Postmark: the plan must include **inbound** (10K Pro or Platform, not Basic). Account > Plans & Add-ons.
+  2. Cloudflare DNS: `MX`, name `reply`, value `inbound.postmarkapp.com`, priority 10, DNS only. This subdomain only, so hello@ and BML mail are untouched.
+  3. Postmark > the server > **Inbound** stream > Settings: inbound domain `reply.spa99.uk` (Postmark asks you to confirm it); webhook URL `https://<user>:<password>@spa99.uk/postmark/inbound/` with a password made for this (not the bounce webhook's).
+  4. Server `.env`: `EMAIL_INBOUND_DOMAIN=reply.spa99.uk`, `EMAIL_INBOUND_USER`, `EMAIL_INBOUND_PASSWORD` (the same pair as in the URL). Then `docker compose up -d`; the startup line shows `emailchat=replies-in-office`. With the domain blank it shows `replies-to-mailbox`: staff can still send, Reply-To stays hello@ and the screen says replies go to that mailbox. Domain set but user or password blank shows `inbound-webhook-not-set` (the webhook answers 404; set both).
+  5. Postmark > the Default Transactional Stream webhook: also tick **Delivery** (Bounce and Spam Complaint stay ticked). A bounce marks the email bounced in the thread; Delivery adds the delivered state (without it an email stays "sent"). Matching works through our own `X-PM-Metadata-chat` header, so it needs nothing else.
+  6. Test: Office > a lead > Start email > send to a staff address, reply from that mailbox (the reply lands in the thread within seconds), send a file and an image, reply with an attachment over 10 MB (it is dropped with a note). Check In-Reply-To threading in the mail app: **not verified**, because Postmark may replace the Message-ID we set (we also send In-Reply-To and References from his last mail, which does not depend on that).
+- **Old Office emails (optional):** `docker compose exec web python manage.py backfill_email_threads --dry-run`, read it, then without `--dry-run`. It copies the old Message emails into email threads (one thread per address, subject "A message from Spa 99") so they show in the Email tab; a copied one is no longer listed twice in the timeline. Safe to run twice. Not part of a migration.
+- **Voice notes:** nothing to set (`FFMPEG_BIN` is optional). The startup line shows `voice=on` when ffmpeg is found. If it shows `voice=off` the chat hides the microphone. Phone test: record a note in the chat; check on his phone that it plays as a voice note and not as an audio file (Twilio documents only OGG Opus as audio and we serve it as `audio/ogg`).
+- **Microphone permission:** every response now carries `Permissions-Policy: microphone=(self)` on the Office host and `microphone=()` on the others. Nothing else was blocked before.
+- **Privacy notice: not changed here, needs Moishe's decision.** The notice (3 November 2026) has a WhatsApp section but no line about emails staff exchange with people, replies kept in the Office, or Postmark receiving inbound mail. Add one and bump the notice's date and version through the usual backfill; nothing was bumped silently.
+- **Rollback.** Do in order: (1) **before** setting `APP_TAG` back, with the NEW image running: `docker compose exec web python manage.py migrate emailchat zero` (drops the email chat tables: export first if you need the threads; the old image cannot delete a person who is still referenced from them, as with WhatsApp). The `whatsapp 0002` column is harmless and can stay; if wanted, `migrate whatsapp 0001`. (2) `APP_TAG` back, `docker compose pull && docker compose up -d`. The public email step on the old image asks for the mobile again (the new one made it optional; people who signed up without one keep a blank). Postmark inbound keeps retrying for hours then gives up; unset the inbound webhook in Postmark if you roll back for long.
+- **Not verified before release:** Postmark inbound and Delivery payloads against the real account (tests use payloads written from Postmark's documentation), ffmpeg inside the Docker image, Twilio accepting the converted OGG as a voice note, and the real image size.
+
 ## What is kept, and for how long
 
 Nothing grows without limit on disk: every container's log is capped at 5 x 10 MB (`docker-compose.yml`), and the server holds no app data.
@@ -192,6 +213,7 @@ Nothing grows without limit on disk: every container's log is capped at 5 x 10 M
 | System audit log | forever (`SYSTEM_AUDIT_RETENTION_DAYS=0`) | `housekeeping` once the setting is above 0 (see "Waiting for Moishe") |
 | Sign-in records, email records, change history, journey emails | forever for now | not yet: retention periods await the solicitor ("Waiting for Moishe") |
 | WhatsApp click counts (`LinkClickDay`) | forever (counts only, no personal data) | kept on purpose |
+| Email chat threads, messages and files | forever for now, erased with the person (staff delete, a member's own delete for his verified address) | retention period awaits the solicitor, like WhatsApp chats |
 | Database backups | RDS automatic backups, 14 days | RDS |
 
 ## After launch

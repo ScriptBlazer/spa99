@@ -10,6 +10,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# ffmpeg converts staff voice notes (WebM or MP4 from the browser) to OGG Opus for WhatsApp (whatsapp/voice.py). No recommended packages, apt lists removed.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+
 # Runtime dependencies only (requirements-dev.txt never goes in the image).
 COPY requirements.txt .
 RUN pip install -r requirements.txt

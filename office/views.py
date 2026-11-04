@@ -31,6 +31,7 @@ from plans import payments
 from plans.models import Plan, SiteSettings
 from common import levels, sorting
 from users import services as user_services
+from emailchat import services as emailchat_services
 from whatsapp import services as whatsapp_services
 from users import views as user_views
 from users.models import User
@@ -332,6 +333,7 @@ def lead_export(request, pk):
             "emails": journey_services.export_lead_emails(data["email"]),
             "chats": chat_services.export_conversations(email=data["email"]),
             "whatsapp": whatsapp_services.export_for(whatsapp_services.contacts_for_person(None, {data["email"]}, whatsapp_services.person_phones(None, {data["email"]}))),
+            "email_threads": emailchat_services.export_for(emailchat_services.threads_for_person(None, {data["email"]})),
             "gold_applications": gold_services.export_applications(data["email"])}
     response = JsonResponse(body, json_dumps_params={"indent": 2})
     response["Content-Disposition"] = 'attachment; filename="spa99-lead.json"'
@@ -345,6 +347,7 @@ def lead_delete(request, pk):
     session, (kind, data) = _lead_session(pk)
     if kind == "account":
         return redirect("office_person", pk=data.pk)
+    emailchat_services.erase_person(None, {data["email"]})  # his email threads, messages and files
     whatsapp_services.erase_person(None, {data["email"]})  # his chats, messages and files (found by his number): before the journeys lose it
     cleared = journey_services.erase_lead_data(data["email"])
     from outreach.services import erase_email

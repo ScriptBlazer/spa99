@@ -6,6 +6,7 @@ from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 
 from plans.models import SiteSettings
 
@@ -73,6 +74,13 @@ def render_email(template, ctx, body=None, values=None, button_url=None, blocks=
         ctx["body_html"], ctx["body_text"], preheader = mailing_blocks.render(blocks, shown)
         ctx.setdefault("preheader", preheader)
         layout = "_body"
+    elif ctx.get("html_body") is not None:  # rich text staff composed (the Office email chat): cleaned to the allow-list here, whatever the caller did
+        from common import richtext
+
+        clean = richtext.clean_outgoing(ctx["html_body"])
+        ctx["body_html"] = mark_safe(clean)  # safe only because it has just been through the allow-list
+        ctx["body_text"] = ctx["plain_body"] if ctx.get("plain_body") is not None else richtext.html_to_text(clean)
+        layout = "_body"
     elif ctx.get("plain_body") is not None:  # words typed by a person, sent as typed (the Gold decline message)
         ctx["body_html"], ctx["body_text"] = emailbody.render_plain(ctx["plain_body"])
         layout = "_body"
@@ -133,7 +141,7 @@ def fill_subject(text, values):
     return text
 
 
-def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None, plain_body=None, blocks=None, attachments=None, from_email=None, reply_to=None, options=None):
+def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None, plain_body=None, blocks=None, attachments=None, from_email=None, reply_to=None, options=None, html_body=None):
     """Render the email, send, and log. Returns the EmailLog. Editable emails (notifications/emailbody.py) use the shared
     layout `_body` and the stored or default wording; the Gold approver emails render their own template files.
     `to` and `cc` are lists of addresses. `subject_email` is the person the message is about when it goes to
@@ -141,7 +149,7 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
     `headers` are extra mail headers (List-Unsubscribe); `body` replaces the stored wording (a group mailing); `plain_body` is
     text a person typed, sent as typed in the shared layout; `blocks` are a group mailing's parts (used instead of `body`);
     `attachments` is a list of (filename, bytes, mimetype); `from_email` and `reply_to` (a list) replace the sender the email's
-    settings choose; `options` (emailsettings.Options) replace its saved footer, sender, heading and button settings (a test send from the edit screen)."""
+    settings choose; `html_body` is rich text staff composed: it is cleaned to the allow-list again here (common.richtext) before it is marked safe, and `plain_body` (if given) is the plain text copy; `options` (emailsettings.Options) replace its saved footer, sender, heading and button settings (a test send from the edit screen)."""
     to, cc = list(to or []), list(cc or [])
     try:
         blocked = suppression.suppressed_set(to + cc)  # THE guard: every email goes through here
@@ -164,6 +172,9 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
                 subject_email=(subject_email or "").strip().lower(), error="Address is on the suppression list (bounce or complaint).")
             return log
     ctx = {**base_context(), "subject": subject, **(context or {})}
+    ctx.pop("html_body", None)  # only the argument below can switch this on, never a context key
+    if html_body is not None:
+        ctx["html_body"] = html_body
     if plain_body is not None:
         ctx["plain_body"] = plain_body
     log = EmailLog(

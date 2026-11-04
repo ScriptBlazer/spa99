@@ -316,7 +316,7 @@ def _event_detail(event):
     if event.action in ("approved", "final_confirmed"):
         return {"invited": "An invite to set up his account was queued.", "activated": "Gold was added to his existing account."}.get(meta.get("result"), "")
     if event.action == "responded":
-        return "Marked Contacted: a WhatsApp went to the applicant." if meta.get("whatsapp") else "Emailed to the applicant."
+        return ("Marked Contacted: a WhatsApp went to the applicant." if meta.get("whatsapp") else "Marked Contacted: an email went to the applicant." if meta.get("email") else "Emailed to the applicant.")
     return ""
 
 

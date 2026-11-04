@@ -125,6 +125,7 @@ class Message(models.Model):
     author_label = models.CharField(max_length=254, blank=True)
     template = models.ForeignKey(Template, null=True, blank=True, on_delete=models.SET_NULL, related_name="messages")
     template_variables = models.JSONField(default=dict, blank=True)
+    reply_to = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="replies", help_text="The message this one answers (his reply to ours, or staff Reply on a bubble). Same chat only.")
     claimed_at = models.DateTimeField(null=True, blank=True, help_text="The worker that took this send (a send is never made twice).")
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     updated_at = models.DateTimeField(default=timezone.now, db_index=True, help_text="Changed when the status changes: the poll reads it.")

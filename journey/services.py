@@ -159,7 +159,8 @@ def clean_first_name(value):
 
 
 def save_lead(session, email, consent, first_name=None, mobile=None, mobile_country=None, require_details=False):
-    """Store the visitor's first name, email and mobile on his journey session (all required, one consent). Returns the clean
+    """Store the visitor's first name, email and mobile on his journey session (name and email required, mobile optional: blank stores blank, a typed one is
+    validated; one consent). Returns the clean
     address. Raises LeadError with a message per field. Safe to repeat: a second set replaces the first. The email step passes
     `require_details`; the Ask us chat gives an email only (no name or mobile asked), so there they stay as they were."""
     errors = {}
@@ -175,8 +176,8 @@ def save_lead(session, email, consent, first_name=None, mobile=None, mobile_coun
     except ValidationError:
         errors["email"], clean = GATE["errors"]["email"], ""
     try:
-        if ask:
-            phone = normalise_mobile(mobile if isinstance(mobile, str) else "", mobile_country if isinstance(mobile_country, str) else None)
+        if ask and isinstance(mobile, str) and mobile.strip():  # optional: only a number that was typed is checked
+            phone = normalise_mobile(mobile, mobile_country if isinstance(mobile_country, str) else None)
     except ValidationError:
         errors["mobile"] = GATE["errors"]["mobile"]
     if consent is not True:

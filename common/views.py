@@ -35,7 +35,9 @@ def health(request):
 @rate_limited_json("check-mobile", 30, 60)
 def check_mobile(request):
     """Is this a UK mobile number the server would accept? The browser asks (debounced) so it never disagrees with
-    common.validators.normalise_uk_mobile. {"valid": true} or {"valid": false, "message": "..."}."""
+    common.validators.normalise_uk_mobile. POST `optional=1` makes a blank number valid. {"valid": true} or {"valid": false, "message": "..."}."""
+    if request.POST.get("optional") and not request.POST.get("mobile", "").strip():  # an optional field left blank is fine (the journey's email step)
+        return JsonResponse({"valid": True})
     try:
         if "mobile_country" in request.POST:  # Register: any country, by the same rules the server saves with (common.phone)
             phone.normalise(request.POST.get("mobile", ""), request.POST.get("mobile_country"))

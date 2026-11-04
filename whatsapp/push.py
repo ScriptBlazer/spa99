@@ -56,9 +56,14 @@ def recipients():
 
 def notify_inbound(message):
     """Send the push for one inbound message. Returns how many devices were sent to."""
+    return notify_payload(payload_for(message))
+
+
+def notify_payload(payload):
+    """Push `payload` ({title, body, url, tag}) to every unmuted staff device with an Office level (the WhatsApp mute setting covers email too). Returns how many devices were sent to."""
     if not configured():
         return 0
-    data = json.dumps(payload_for(message))
+    data = json.dumps(payload)
     sent = 0
     for sub in recipients():
         try:

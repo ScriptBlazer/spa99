@@ -134,6 +134,9 @@ def register_interest(data, journey_session=None):
     from whatsapp import services as whatsapp
 
     whatsapp.relink(user.mobile)  # he may have written to us first: his chat now knows who he is
+    from emailchat import services as emailchat
+
+    emailchat.relink(user.email)  # and a thread staff started to his address
     queue_verification_email(user)
     return SignUpResult(user, created=True)
 
@@ -211,6 +214,9 @@ def verify_email(token):
     from whatsapp import services as whatsapp
 
     whatsapp.relink(user.mobile)
+    from emailchat import services as emailchat
+
+    emailchat.relink(user.email)
     try:
         enqueue("users.tasks.send_welcome_email", str(user.pk))
     except Exception:  # noqa: BLE001
@@ -283,6 +289,7 @@ def export_user_data(user, include_chats=False):
         "journey_sessions": _export_sessions(user),
         "chats": chat_services.export_conversations(user=user, email=user.email if user.email_verified_at else None),
         **({"whatsapp": _export_whatsapp(user)} if include_chats else {}),
+        "email_threads": _export_email_threads(user, include_chats),
         "gold_applications": gold_services.export_applications(user.email) if user.email_verified_at else [],  # by email only once the address is proven his
         "emails": [
             {"template": e.template, "subject": e.subject, "status": e.status, "sent_at": _plain(e.sent_at)}
@@ -316,6 +323,16 @@ def _export_whatsapp(user):
 
     addresses = _whatsapp_addresses(user) if user.email_verified_at else set()
     return whatsapp.export_for(whatsapp.contacts_for_person(user, addresses, whatsapp.person_phones(user, addresses)))
+
+
+def _export_email_threads(user, include_chats):
+    """Email chat threads: staff-run export = every thread held for him (his addresses and the owner link); his own download = only the thread(s) on his account email,
+    and only once that address is verified."""
+    from emailchat import services as emailchat
+
+    if include_chats:
+        return emailchat.export_for(emailchat.threads_for_person(user, _whatsapp_addresses(user) if user.email_verified_at else {user.email.lower()}))
+    return emailchat.export_for(emailchat.threads_for_member(user))
 
 
 def _email_logs(email):
@@ -437,6 +454,12 @@ def delete_user_data(user, include_chats=False):
 
     if include_chats:  # staff-run erasure only: a member deleting his own account never reaches a chat found by an unproven number
         whatsapp.erase_person(user, _whatsapp_addresses(user) if user.email_verified_at else set())  # chats, messages and files, by his numbers (before the sessions are cleared)
+    from emailchat import services as emailchat
+
+    if include_chats:  # staff-run: every thread held for him; his own account delete only takes the thread on his verified account email
+        emailchat.erase_person(user, _whatsapp_addresses(user) if user.email_verified_at else {email.lower()})
+    else:
+        emailchat.erase_threads(emailchat.threads_for_member(user))
     anonymised = _anonymise_sessions(user)
     proven = bool(user.email_verified_at)  # rows found only by email are his only once the address is proven (an unverified account may carry someone else's address)
     if proven:

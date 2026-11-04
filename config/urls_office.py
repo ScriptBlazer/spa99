@@ -15,6 +15,7 @@ urlpatterns = [
     path("", include("users.urls")),  # staff sign-in and sign-out
     path("insights/", include("insights.urls")),  # the older statistics JSON, staff roles only
     path("", include("whatsapp.urls_office")),  # chats, push, manifest and service worker: the Office host only
+    path("", include("emailchat.urls_office")),  # email chat: the Office host only
     path("", include("office.urls")),
     # Hidden Django admin on this host too (content, plans, hours, notifications stay there for now).
     path(settings.ADMIN_PATH, admin.site.urls),

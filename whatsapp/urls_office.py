@@ -20,6 +20,7 @@ urlpatterns = [
     path("whatsapp/<uuid:pk>/poll/", v.poll, name="office_whatsapp_poll"),
     path("whatsapp/<uuid:pk>/send/", v.send, name="office_whatsapp_send"),
     path("whatsapp/<uuid:pk>/send-media/", v.send_media, name="office_whatsapp_send_media"),
+    path("whatsapp/<uuid:pk>/send-voice/", v.send_voice, name="office_whatsapp_send_voice"),
     path("whatsapp/<uuid:pk>/send-template/", v.send_template, name="office_whatsapp_send_template"),
     path("whatsapp/<uuid:pk>/read/", v.read, name="office_whatsapp_read"),
     path("whatsapp/<uuid:pk>/retry/<int:message>/", v.retry, name="office_whatsapp_retry"),

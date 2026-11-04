@@ -197,6 +197,9 @@ def submit_application(data, session=None):
     from whatsapp import services as whatsapp
 
     whatsapp.relink(application.mobile)  # if he wrote to us first, his chat now links to this application
+    from emailchat import services as emailchat
+
+    emailchat.relink(application.email)
     return application, True
 
 

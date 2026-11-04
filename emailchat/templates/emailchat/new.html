@@ -1,0 +1,10 @@
+{% extends "office/base.html" %}
+{% block title %}New email | Spa 99 Office{% endblock %}
+{% block main %}{% comment %}Placeholder markup, the frontend agent replaces it. Context: emailchat.views.new_form (recipient, urls, limits).{% endcomment %}
+<form method="post" action="{{ urls.create }}" data-em-new>{% csrf_token %}
+  <input name="to" value="{{ recipient.email }}" placeholder="Address"><input type="hidden" name="person" value="{{ recipient.person }}">
+  <input name="subject" placeholder="Subject">
+  {% if recipient.error %}<p>{{ recipient.error }}</p>{% endif %}
+  <button type="submit">Create</button>
+</form>
+{% endblock %}

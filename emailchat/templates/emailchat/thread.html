@@ -1,0 +1,20 @@
+{% extends "office/base.html" %}
+{% block title %}{{ thread.subject }} | Email | Spa 99 Office{% endblock %}
+{% block main %}{% comment %}Placeholder markup, the frontend agent replaces it. Context: emailchat.views.thread. His HTML is only ever shown in a sandboxed iframe (frame_url); never put it in this page.{% endcomment %}
+<div data-em-thread>
+  <h1>{{ thread.subject }}</h1>
+  {% if replies_to_mailbox %}<p>Replies go to the hello@ mailbox, not into the Office.</p>{% endif %}
+  {% if thread.suppressed %}<p>{{ thread.reason }}</p>{% endif %}
+  {% for m in chat_messages %}
+  <article data-id="{{ m.id }}" data-direction="{{ m.direction }}">
+    {% if m.shows_subject %}<h2>{{ m.subject }}</h2>{% endif %}
+    {% if m.from_other %}<p>From {{ m.from_address }}</p>{% endif %}
+    {% if m.frame_url %}<iframe sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" src="{{ m.frame_url }}" title="Email"></iframe>
+    {% elif m.direction == "out" %}{{ m.body_html|safe }}{% else %}<p>{{ m.body_text }}</p>{% endif %}
+    {% for a in m.attachments %}<a href="{{ a.url }}">{{ a.filename }}</a>{% endfor %}
+    {% if m.error %}<p>{{ m.error.reason }}</p>{% endif %}{% if m.note %}<p>{{ m.note }}</p>{% endif %}
+  </article>
+  {% endfor %}
+  {{ em|json_script:"em-data" }}
+</div>
+{% endblock %}

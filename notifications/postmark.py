@@ -52,6 +52,10 @@ def apply(record):
     feedback_id = str(record.get("ID") or record.get("MessageID") or "")
     if kind == "Open":
         return _opened(record)
+    if kind in ("Bounce", "SpamComplaint", "Delivery"):  # an email chat message (our Metadata `chat`) shows bounced or delivered; it never raises and never changes what follows
+        from emailchat import services as email_chat
+
+        email_chat.apply_feedback(record)
     if kind in ("Bounce", "SpamComplaint"):
         _log_bounce(record, kind)
     if kind == "SpamComplaint":

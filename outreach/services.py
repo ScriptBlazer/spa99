@@ -246,7 +246,10 @@ def timeline_entries(addresses):
         listed.add(note.pk)
     for note in StickyNote.objects.filter(email__in=addresses, deleted_at__isnull=False).exclude(pk__in=listed):  # deleted before the events existed
         out.append((note.deleted_at, "note_deleted", f"Note deleted by {note.deleted_by_label or 'someone'}", note.text, str(note.pk)))
-    for message in PersonMessage.objects.filter(email__in=addresses):
+    from emailchat.models import Message as ChatMessage
+
+    copied = ChatMessage.objects.exclude(legacy_person_message=None).values("legacy_person_message")  # copied into an email thread by backfill_email_threads: the thread shows them now
+    for message in PersonMessage.objects.filter(email__in=addresses).exclude(pk__in=copied):
         out.append((message.sent_at, "message_sent", f"Message sent by {message.author_label or 'the team'}", message.text, ""))
     for edit in PersonEdit.objects.filter(email__in=addresses):
         noun = {PersonEdit.MOBILE: "Mobile", PersonEdit.EMAIL: "Email"}.get(edit.what, "First name")

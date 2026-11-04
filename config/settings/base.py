@@ -3,6 +3,7 @@
 Config comes from common.envloader (env vars -> private .env -> project .env -> defaults).
 """
 import os
+import shutil
 import re
 from datetime import time
 from pathlib import Path
@@ -59,6 +60,7 @@ INSTALLED_APPS = [
     "pages",
     "chat",
     "whatsapp",
+    "emailchat",
 ]
 
 MIDDLEWARE = [
@@ -102,6 +104,7 @@ TEMPLATES = [
                 "system.context.system",
                 "chat.context.chat",
                 "whatsapp.context.push",
+                "emailchat.context.unread",
             ],
         },
     },
@@ -205,6 +208,20 @@ VAPID_SUBJECT = (ENV.get("VAPID_SUBJECT", "") or "").strip()  # mailto:hello@spa
 WHATSAPP_MAX_BODY = 1600  # Twilio's Messages API body limit
 WHATSAPP_MAX_IMAGE_BYTES = 5 * 1024 * 1024  # WhatsApp: images 5 MB
 WHATSAPP_MAX_FILE_BYTES = 16 * 1024 * 1024  # WhatsApp: audio, video and documents 16 MB
+WHATSAPP_VOICE_MAX_SECONDS = 5 * 60  # a voice note staff record in the chat
+WHATSAPP_VOICE_MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # what the browser may upload to be converted (5 minutes of WebM or MP4 audio is about 1 to 3 MB)
+WHATSAPP_VOICE_TIMEOUT_SECONDS = 30  # ffmpeg is killed after this
+FFMPEG_BIN = (ENV.get("FFMPEG_BIN", "") or "").strip() or "ffmpeg"  # voice notes need it; missing = the mic is hidden in the chat
+
+# Email chat (docs/features/office-email-chat.md). Blank EMAIL_INBOUND_DOMAIN = replies go to the hello@ mailbox and nothing arrives in the Office.
+# The inbound webhook (POST /postmark/inbound/) answers 404 until its own user AND password are both set.
+EMAIL_INBOUND_DOMAIN = (ENV.get("EMAIL_INBOUND_DOMAIN", "") or "").strip().lower().strip(".")
+EMAIL_INBOUND_USER = (ENV.get("EMAIL_INBOUND_USER", "") or "").strip()
+EMAIL_INBOUND_PASSWORD = (ENV.get("EMAIL_INBOUND_PASSWORD", "") or "").strip()
+EMAILCHAT_MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024  # one file, in or out (Postmark takes a whole message up to 10 MB to send, 35 MB to receive)
+EMAILCHAT_MAX_SEND_BYTES = 9 * 1024 * 1024  # all files of one email we send (Postmark caps the message at 10 MB after base64)
+EMAILCHAT_MAX_INBOUND_BYTES = 50 * 1024 * 1024  # the whole inbound POST (Postmark's own limit is 35 MB of mail, base64 makes the JSON bigger)
+EMAILCHAT_MAX_ATTACHMENTS = 20
 
 LANGUAGE_CODE = "en-gb"
 TIME_ZONE = "Europe/London"
@@ -294,6 +311,8 @@ def build_startup_report(settings_module):
         "sentry": SENTRY_STATE,
         "chat": "on" if ANTHROPIC_API_KEY else "off",
         "whatsapp": "on" if (TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM and TWILIO_API_KEY_SID and TWILIO_API_KEY_SECRET) else "off",
+        "voice": "on" if shutil.which(FFMPEG_BIN) else "off",
+        "emailchat": ("replies-in-office" if (EMAIL_INBOUND_DOMAIN and EMAIL_INBOUND_USER and EMAIL_INBOUND_PASSWORD) else ("replies-to-mailbox" if not EMAIL_INBOUND_DOMAIN else "inbound-webhook-not-set")),
         "unlock_code_set": bool(SYSTEM_UNLOCK_CODE),
         "unlock_code_invalid": bool(SYSTEM_UNLOCK_CODE_RAW) and not SYSTEM_UNLOCK_CODE_VALID,
         "media_is_local": MEDIA_IS_LOCAL,

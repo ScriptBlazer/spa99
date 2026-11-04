@@ -1,0 +1,9 @@
+{% extends "office/base.html" %}
+{% block title %}Email | Spa 99 Office{% endblock %}
+{% block main %}{% comment %}Placeholder markup, the frontend agent replaces it. Context: emailchat.views._list_context.{% endcomment %}
+<div data-em-app>
+  {% if replies_to_mailbox %}<p>Replies go to the hello@ mailbox, not into the Office.</p>{% endif %}
+  <a href="{{ new_url }}">New email</a>
+  {% include "emailchat/_rows.html" %}
+</div>
+{% endblock %}

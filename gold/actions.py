@@ -16,8 +16,8 @@ DONE, CLOSED, DUPLICATE, NO_GUIDE = "done", "closed", "duplicate", "no_guide"  #
 OPEN = (GoldApplication.NEW, GoldApplication.CONTACTED, GoldApplication.AWAITING_FINAL)
 
 
-def whatsapp_sent(application, actor, text="", channel=audit.OFFICE):
-    """A WhatsApp went to the applicant from his chat (it replaces Respond): New becomes Contacted, with an audit event. Only the
+def whatsapp_sent(application, actor, text="", channel=audit.OFFICE, via="whatsapp"):
+    """A WhatsApp (or, `via="email"`, an email from the email chat) went to the applicant from his chat (it replaces Respond): New becomes Contacted, with an audit event. Only the
     first message does anything; the application stays open and the text is in the chat, not repeated here. Returns True when the
     status changed."""
     with transaction.atomic():
@@ -26,7 +26,7 @@ def whatsapp_sent(application, actor, text="", channel=audit.OFFICE):
             return False
         fresh.status = GoldApplication.CONTACTED
         fresh.save(update_fields=["status", "updated_at"])
-        audit.record(fresh, ApplicationEvent.RESPONDED, actor=actor, channel=channel, from_status=GoldApplication.NEW, to_status=GoldApplication.CONTACTED, meta={"whatsapp": True})
+        audit.record(fresh, ApplicationEvent.RESPONDED, actor=actor, channel=channel, from_status=GoldApplication.NEW, to_status=GoldApplication.CONTACTED, meta={via: True})
     application.refresh_from_db()
     return True
 

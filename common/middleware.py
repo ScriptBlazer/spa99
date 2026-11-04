@@ -26,6 +26,8 @@ class HostRoutingMiddleware:
         else:
             request.urlconf, staff_host = "config.urls", False
         response = self.get_response(request)
+        # Voice notes record from the microphone in the Office chat only: allowed there for the page itself, switched off on every other host.
+        response.setdefault("Permissions-Policy", "microphone=(self)" if request.urlconf == "config.urls_office" else "microphone=()")
         if staff_host:
             response["X-Robots-Tag"] = "noindex, nofollow"
         return response

@@ -10,6 +10,8 @@ GATE = {
     "first_name_label": "First name",
     "email_label": "Email",
     "mobile_label": "Mobile",
+    "mobile_optional": True,  # the number is optional: blank is fine, a typed one is checked (Moishe, 2026-11-04)
+    "mobile_hint": "Optional. Add it if you want the team to reach out with good offers.",  # placeholder wording: the designer writes the final line
     "country_label": "Country",
     "mobile_country_label": "Country code",
     "consent": "Yes, Spa 99 may email and WhatsApp me about opening. I can stop at any time.",

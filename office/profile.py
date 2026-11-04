@@ -188,7 +188,7 @@ def timeline(sessions, user=None, interest=None, applications=(), email="", addr
             if e.action in (ApplicationEvent.EMAIL_SENT, ApplicationEvent.EMAIL_FAILED, ApplicationEvent.NOTE_DELETED, ApplicationEvent.NOTE_RESTORED, ApplicationEvent.NOTE_EDITED) or e.pk in copied:
                 continue  # the email rows below and the Gold page hold these; notes are sticky notes (their deletion is added from the notes)
             text = e.get_action_display()
-            whatsapp_contacted = e.action == ApplicationEvent.RESPONDED and (e.meta or {}).get("whatsapp")
+            whatsapp_contacted = e.action == ApplicationEvent.RESPONDED and ((e.meta or {}).get("whatsapp") or (e.meta or {}).get("email"))
             out.append(_entry(e.at, "gold_applied" if e.action == ApplicationEvent.SUBMITTED else "gold_event",
                               "Applied for Gold" if e.action == ApplicationEvent.SUBMITTED else ("Gold application marked Contacted" if whatsapp_contacted else f"Gold: {text}"),
                               " ".join(x for x in (a.reference, f"by {e.actor_label}" if e.actor_label else "") if x), _href("office_gold_application", a.pk)))
@@ -204,6 +204,11 @@ def timeline(sessions, user=None, interest=None, applications=(), email="", addr
         from whatsapp import services as whatsapp
 
         for at, kind, label, detail, href in whatsapp.timeline_entries(contacts):  # not one line per message: the first, one a day, STOP, failures
+            out.append(_entry(at, kind, label, detail, href))
+    if addresses or user is not None:
+        from emailchat import services as emailchat
+
+        for at, kind, label, detail, href in emailchat.timeline_entries(list(emailchat.threads_for(addresses, user))):  # across all his threads: the first, one a thread a day, bounces
             out.append(_entry(at, kind, label, detail, href))
     out.sort(key=lambda e: e["_at"], reverse=True)
     for e in out:

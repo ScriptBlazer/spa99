@@ -103,6 +103,14 @@ def whatsapp_context(target, user):
     return {"whatsapp": whatsapp.page_context(mobile, user, can_edit(user), target.url("whatsapp"), edit, first), "mobile_countries": phone.countries()}
 
 
+def email_context(target, user):
+    """`email_chat` for the lead, person and Gold pages: {has_thread, thread_count, latest_thread_url, new_email_url, open_url (his latest thread, or New email when none), state
+    (start|open), label ("Start email" / "Open email thread"), email, can_send, can_edit, unread, replies_to_mailbox, suppressed, reason}."""
+    from emailchat import services as emailchat
+
+    return {"email_chat": emailchat.page_context(target, user, can_edit(user))}
+
+
 def archive_context(target, user):
     """The lead page only: `archive` {archived, reason, by, at, archive_url, unarchive_url, reason_max, can_edit}."""
     if target.kind != "lead":
@@ -127,7 +135,7 @@ def bounce_context(target, user):
 
 def tools_context(target, user):
     """Everything the three pages add to their context: notes_*, outreach and whatsapp, and `archive` on the lead page."""
-    return {**notes_context(target, user), **outreach_context(target, user), **whatsapp_context(target, user), **archive_context(target, user), **bounce_context(target, user)}
+    return {**notes_context(target, user), **outreach_context(target, user), **whatsapp_context(target, user), **email_context(target, user), **archive_context(target, user), **bounce_context(target, user)}
 
 
 def outreach_rows(entries):

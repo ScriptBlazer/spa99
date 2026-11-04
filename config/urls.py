@@ -4,6 +4,7 @@ from django.urls import include, path
 from common.views import check_mobile, health
 from plans.views import preview_start
 from notifications.views import postmark_webhook, ses_notifications
+from emailchat import webhooks as emailchat_webhooks
 from whatsapp import webhooks as whatsapp_webhooks
 
 urlpatterns = [
@@ -11,6 +12,7 @@ urlpatterns = [
     path("validate/mobile/", check_mobile, name="check_mobile"),  # public: live mobile check, rate limited
     path("ses/notifications/", ses_notifications, name="ses_notifications"),  # public: Amazon SNS, signature checked
     path("postmark/webhook/", postmark_webhook, name="postmark_webhook"),  # public: Postmark, Basic auth checked
+    path("postmark/inbound/", emailchat_webhooks.inbound, name="email_inbound"),  # public: Postmark inbound (email chat), Basic auth checked, 404 until configured
     path("twilio/whatsapp/incoming/", whatsapp_webhooks.incoming, name="whatsapp_incoming"),  # public: Twilio, X-Twilio-Signature checked
     path("twilio/whatsapp/status/", whatsapp_webhooks.status, name="whatsapp_status"),  # public: Twilio delivery ticks, signature checked
     path("twilio/whatsapp/media/<str:token>/", whatsapp_webhooks.media, name="whatsapp_media"),  # public: Twilio fetches a file we send; signed, expires in an hour
