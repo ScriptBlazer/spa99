@@ -85,6 +85,8 @@ class Message(models.Model):
     error_code = models.CharField(max_length=20, blank=True)
     error_message = models.CharField(max_length=300, blank=True)
     claimed_at = models.DateTimeField(null=True, blank=True, help_text="The worker that took this send (a send is never made twice).")
+    incomplete = models.BooleanField(default=False, db_default=False, help_text="His email is stored but its files or its worker task are not done yet: Postmark's retry of the same MessageID finishes it.")
+    notified_at = models.DateTimeField(null=True, blank=True, help_text="The team push for this email was taken by a worker (it is never pushed twice).")
     legacy_person_message = models.UUIDField(null=True, blank=True, unique=True, help_text="The old outreach.PersonMessage this was copied from (backfill_email_threads).")
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     updated_at = models.DateTimeField(default=timezone.now, db_index=True, help_text="Changed when the status changes: the poll reads it.")
@@ -92,7 +94,7 @@ class Message(models.Model):
 
     class Meta:
         ordering = ["id"]
-        indexes = [models.Index(fields=["thread", "id"])]
+        indexes = [models.Index(fields=["thread", "id"]), models.Index(fields=["thread", "direction", "created_at"], name="emailchat_unread_idx")]  # unread counts and the inbox filter
 
     def __str__(self):
         return f"{self.direction} email {self.pk}"

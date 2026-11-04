@@ -8,6 +8,7 @@ from django.db.models import Prefetch
 from django.urls import reverse
 
 from gold.models import ApplicationEvent, GoldApplication
+from journey.copy import consent_text
 from journey.models import Answer, JourneySession
 from notifications.models import EmailLog
 from plans.models import Plan
@@ -126,7 +127,7 @@ def consent_block(emails, sessions, user=None, applications=()):
         if s.lead_email and (s.lead_at, s.lead_privacy_version) not in seen:
             seen.add((s.lead_at, s.lead_privacy_version))
             gate.append({"email": s.lead_email, "at": _iso(s.lead_at), "privacy_version": s.lead_privacy_version,
-                         "text": "Agreed that we may email and WhatsApp about Spa 99 opening" if s.lead_consent_version else "Agreed that we may email about Spa 99 opening",
+                         "text": consent_text(s.lead_consent_version),  # the wording of the version he ticked, not today's
                          "consent_version": s.lead_consent_version, "first_name": s.lead_first_name, "mobile": s.lead_mobile})
     account = None
     if user is not None:

@@ -41,7 +41,7 @@ One partial per channel: `_wa_button.html` (rewritten) and new `_email_button.ht
 | `unconfigured`, `has_chat` | **Open WhatsApp chat**, secondary | `reason`: WhatsApp is not set up yet. | `thread_url`, history. The thread's `unconfigured` slot explains the rest |
 | `unconfigured`, no chat | **Start WhatsApp chat**, off | `reason`: WhatsApp is not set up yet. | Nothing |
 | `no_mobile`, `can_add_number` | None | **Clickable** greyed line, see below | Add a mobile dialog |
-| `no_mobile`, can edit, Gold page | None | Static greyed line: Add a number to enable WhatsApp | Nothing |
+| `no_mobile`, `can_add_number`, Gold page | None | **Clickable** greyed line, as on a lead or person (staff can add a number everywhere, 2026-11-04) | Add a mobile dialog (mobile only, no first name field) |
 | `no_mobile`, view-only staff | None | Static greyed line: No mobile on file. | Nothing. He cannot add one, so he is not told to |
 
 ### Email

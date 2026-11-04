@@ -13,8 +13,6 @@ from django.http import Http404, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from common.tasks import enqueue
-
 from . import services
 
 logger = logging.getLogger("spa99.emailchat")
@@ -63,16 +61,17 @@ def inbound(request):
         logger.warning("Inbound email without a MessageID: not stored")
         return HttpResponse(status=200)
     message, created = services.record_inbound(payload, thread)
-    if not created:
-        return HttpResponse(status=200)
+    if not created and not message.incomplete:
+        return HttpResponse(status=200)  # Postmark sent it again and it is already whole
+    if not created and not services.claim_inbound(message):
+        return HttpResponse(status=500)  # an earlier attempt may still be working on it: Postmark tries again later
     try:
-        services.store_inbound_files(message, payload.get("Attachments"))
-    except Exception:  # noqa: BLE001 - the files could not be stored: take the email back out so Postmark's retry stores it whole
+        services.finish_inbound(message, payload, resumed=not created)
+    except services.StoreError:  # noqa: BLE001 - the files could not be stored: take the email back out so Postmark's retry stores it whole
         logger.exception("Inbound email files could not be stored")
         services.erase_message(message)
         return HttpResponse(status=500)
-    try:
-        enqueue("emailchat.tasks.process_inbound", message.pk)
-    except Exception:  # noqa: BLE001 - stored; only the file check and the push are lost
+    except Exception:  # noqa: BLE001 - stored, but the worker task could not be queued: it stays incomplete and the retry finishes it
         logger.exception("Could not queue the email chat follow-up for message %s", message.pk)
+        return HttpResponse(status=500)
     return HttpResponse(status=200)

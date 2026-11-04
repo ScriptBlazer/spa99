@@ -64,3 +64,29 @@ class ReachButtonTests(Base):
         self.assertIn("o-channels", reader)
         self.assertIn("No WhatsApp chat yet", reader)
         self.assertEqual(reader.count("View only."), 1)
+
+    def test_gold_with_no_number_gets_the_add_a_mobile_dialog_and_staff_can_save_one_audited(self):
+        from outreach.models import PersonEdit
+
+        application, _ = gold_services.submit_application(application_data(email="gold-none@example.com", mobile=""))
+        page = office(self.approver, "get", f"/gold/{application.pk}/")
+        self.assertEqual(page.context["whatsapp"]["edit_url"], f"/gold/{application.pk}/mobile/")
+        self.assertTrue(page.context["whatsapp"]["can_add_number"])
+        self.assertContains(page, 'data-dialog="mobile"')
+        self.assertContains(page, "data-add-mobile")
+        self.assertEqual(office(self.reader, "post", f"/gold/{application.pk}/mobile/", {"mobile_country": "GB", "mobile": "07400 123456"}).status_code, 403)
+        saved = office(self.approver, "post", f"/gold/{application.pk}/mobile/", {"mobile_country": "GB", "mobile": "07400 123456"}, HTTP_ACCEPT="application/json").json()
+        self.assertTrue(saved["ok"])
+        application.refresh_from_db()
+        self.assertEqual(application.mobile, "+447400123456")
+        self.assertTrue(PersonEdit.objects.filter(email="gold-none@example.com", what=PersonEdit.MOBILE, after="+447400123456").exists())
+        self.assertEqual(office(self.approver, "get", f"/gold/{application.pk}/").context["whatsapp"]["state"], "ready")
+        bad = office(self.approver, "post", f"/gold/{application.pk}/mobile/", {"mobile_country": "GB", "mobile": "12"}, HTTP_ACCEPT="application/json").json()
+        self.assertFalse(bad["ok"])
+
+    def test_the_consent_text_follows_the_version_the_lead_ticked(self):
+        from journey.copy import consent_text
+
+        self.assertEqual(consent_text(""), "Agreed that we may email about Spa 99 opening")
+        self.assertEqual(consent_text("2026-11-03"), "Agreed that we may email and WhatsApp about Spa 99 opening")
+        self.assertIn("if a number was added", consent_text("2026-11-04"))

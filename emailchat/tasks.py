@@ -1,6 +1,8 @@
 """Background jobs (django-q2; inline in tests). Only ids go into the queue: no email text and no file bytes sit in the task table."""
 import logging
 
+from django.utils import timezone
+
 from whatsapp import push
 
 from . import services
@@ -26,4 +28,6 @@ def process_inbound(message_id):
         logger.exception("Could not check the files of email message %s", message.pk)
     if message.spam:
         return "spam, not pushed"
+    if not Message.objects.filter(pk=message.pk, notified_at__isnull=True).update(notified_at=timezone.now()):  # the push is taken once, even if the task runs again
+        return "already pushed"
     return f"pushed {push.notify_payload(services.push_payload(message))}"

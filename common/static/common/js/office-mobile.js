@@ -1,4 +1,4 @@
-/* "Add a mobile" / "Change the mobile" on the lead and person pages (docs/features/whatsapp-design.md section 6).
+/* "Add a mobile" / "Change the mobile" on the lead, person and Gold pages (docs/features/whatsapp-design.md section 6).
  * The dialog posts in the background; a wrong number is told under the field, and a number that already belongs to someone says who.
  * When it saves, the Reach out card and the Mobile lines are swapped for the server's new ones, so the button becomes WhatsApp without a reload. */
 import { toast } from './feedback.js';
@@ -65,7 +65,7 @@ export function initMobileDialog() {
     try {
       const response = await fetch(location.href, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } });
       const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
-      for (const selector of ['[data-person-reach]', '[data-person-details]', '[data-person-line]', '[data-gold-more]']) {
+      for (const selector of ['[data-person-reach]', '[data-person-details]', '[data-person-line]', '[data-gold-more]', '[data-channels]']) {
         const fresh = doc.querySelector(selector);
         const old = document.querySelector(selector);
         if (fresh && old) old.replaceWith(document.importNode(fresh, true));

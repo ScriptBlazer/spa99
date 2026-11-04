@@ -9,6 +9,7 @@ SENDING_STOPPED = {"20003", "20005", "20008", "63038", "63015"}  # authenticatio
 TOO_BIG = {"63021", "63005"}  # media too big or not supported
 
 TRY_AGAIN = "Not sent. Try again."
+MAYBE_NOT_SENT = "This may not have been sent. Check the chat on his phone if you can, then try again."
 
 
 def reason(code="", http_status=None):

@@ -264,6 +264,8 @@ def quote_text(message):
         line = line.strip().lstrip(">").strip()
         if line:
             return line if len(line) <= QUOTE_CHARS else line[:QUOTE_CHARS - 1].rstrip() + "\u2026"
+    if message.kind == Message.TEMPLATE and message.template_id:  # a template with no text of its own: its name
+        return (message.template.label or message.template.name or "Template")[:QUOTE_CHARS]
     return MEDIA_WORDS.get(message.kind, "Message")
 
 
@@ -281,7 +283,7 @@ def reply_target(contact, reply_to):
     if reply_to in (None, ""):
         return None, False
     try:
-        found = Message.objects.filter(pk=int(reply_to), contact=contact).exclude(kind=Message.TEMPLATE).first()
+        found = Message.objects.filter(pk=int(reply_to), contact=contact).select_related("template").first()  # templates can be replied to: the quote is their text, or their name
     except (TypeError, ValueError):
         return None, True
     return found, found is None
@@ -424,12 +426,24 @@ def send_template(contact, actor, template_id, variables):
 
 
 STUCK_AFTER = timedelta(minutes=5)
+CLAIM_TIMEOUT = timedelta(minutes=10)  # longer than the worker's job time limit and all its retries (Q_CLUSTER timeout 120 s, retry 180 s, 3 attempts)
 
 
 def is_stuck(message, at=None):
-    """Queued, never taken by a worker and older than a few minutes (the queue lost it): "Try again" is allowed."""
-    return bool(message.direction == Message.OUT and message.status == Message.QUEUED and message.claimed_at is None and message.twilio_sid is None
-                and message.updated_at < (at or now()) - STUCK_AFTER)
+    """Queued, never taken by a worker and older than a few minutes (the queue lost it), or taken by a worker that then died (claimed more than CLAIM_TIMEOUT ago
+    and still queued with no Twilio id): "Try again" is allowed. In that second case the worker may have died after Twilio took the message and before its id was
+    saved, so a Try again can, rarely, make a second WhatsApp for him; the wording says "may not have been sent"."""
+    at = at or now()
+    if message.direction != Message.OUT or message.status != Message.QUEUED or message.twilio_sid is not None:
+        return False
+    if message.claimed_at is None:
+        return message.updated_at < at - STUCK_AFTER
+    return message.claimed_at < at - CLAIM_TIMEOUT
+
+
+def is_unsure(message, at=None):
+    """A worker took this and never reported back: it may or may not have been sent."""
+    return bool(message.claimed_at is not None and is_stuck(message, at))
 
 
 def can_retry(message):
@@ -688,7 +702,7 @@ def check_twilio():
 def message_dict(message):
     reason, _ = errors.reason(message.error_code) if message.status in Message.BAD else ("", False)
     if not reason and is_stuck(message):
-        reason = errors.TRY_AGAIN
+        reason = errors.MAYBE_NOT_SENT if is_unsure(message) else errors.TRY_AGAIN
     can_retry_now = bool(reason) and can_retry(message)
     template = message.template
     media = None

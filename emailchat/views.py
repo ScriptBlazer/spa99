@@ -17,6 +17,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_GET, require_POST
 
+from common.ratelimit import rate_limited_json
 from office.permissions import can_edit, editor, reader
 
 from . import services
@@ -270,9 +271,14 @@ def new_create(request):
         return _fail(result)
     message = None
     if request.POST.get("body_html", "").strip() or _uploads(request):
-        sent, message = services.send(thread_, request.user, thread_.subject, request.POST.get("body_html", ""), _uploads(request))
+        try:
+            sent, message = services.send(thread_, request.user, thread_.subject, request.POST.get("body_html", ""), _uploads(request))
+        except Exception:
+            thread_.delete()  # nothing was sent: no empty thread is left behind
+            raise
         if sent != services.DONE:
-            return _fail(sent, _status_for(sent), thread_url=reverse("office_email_thread", args=[thread_.pk]))
+            thread_.delete()  # the send checks failed (empty, too big, a bad file...): a failed attempt leaves no empty thread
+            return _fail(sent, _status_for(sent))
         _after_send(request, thread_, message)
     url = reverse("office_email_thread", args=[thread_.pk]) + (f"?gold={target.pk}" if target is not None and target.kind == "gold" else "")
     if not wants_json:
@@ -288,8 +294,10 @@ def new(request):
 @reader
 @require_GET
 @never_cache
+@rate_limited_json("emailchat-people", 120, 60)
 def people(request):
-    """?q= (two letters at least). JSON {results: [{name, email, kind (the first of kinds), kinds[lead|registered|gold], person ("lead:<id>" ...), suppressed}]}, ten at most."""
+    """?q= (two letters at least). JSON {results: [{name, email, kind (the first of kinds), kinds[lead|registered|gold], person ("lead:<id>" ...), suppressed}]}, ten at most.
+    Rate limited (120 a minute per address, 429 JSON beyond it): search as you type must not become a way to list everyone."""
     return JsonResponse({"results": services.search_people(request.GET.get("q", ""))})
 
 

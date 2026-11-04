@@ -70,6 +70,6 @@
   <div class="o-bar-actions">{% include "office/_gold_actions.html" with bar=True %}</div>
 </div>
 {% endif %}
-{% if office_can.can_edit %}{% include "office/_gold_dialogs.html" %}{% if outreach.can_add and not outreach.on_list %}{% include "office/_outreach_dialog.html" with who=a.name|first_word %}{% endif %}{% endif %}
+{% if office_can.can_edit %}{% include "office/_mobile_dialog.html" %}{% include "office/_gold_dialogs.html" %}{% if outreach.can_add and not outreach.on_list %}{% include "office/_outreach_dialog.html" with who=a.name|first_word %}{% endif %}{% endif %}
 {% endwith %}
 {% endblock %}

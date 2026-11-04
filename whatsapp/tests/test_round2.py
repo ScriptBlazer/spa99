@@ -196,3 +196,35 @@ class MicrophoneAndButtonTests(Base):
         self.assertFalse(client.post("/validate/mobile/", {"mobile": "", "mobile_country": "GB"}).json()["valid"])
         self.assertFalse(client.post("/validate/mobile/", {"mobile": "12", "mobile_country": "GB", "optional": "1"}).json()["valid"])
 
+
+
+class ReviewFixTests(Base):
+    """Review fixes: a lost send that a worker had claimed, and Reply on a template bubble."""
+
+    def test_a_send_claimed_by_a_worker_that_died_says_it_may_not_have_been_sent_and_try_again_sends_once(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        self.open_window()
+        at = timezone.now() - timedelta(minutes=15)
+        message = Message.objects.create(contact=self.contact, direction="out", body="Hello", status="queued", claimed_at=at, updated_at=at)
+        recent = Message.objects.create(contact=self.contact, direction="out", body="Hi", status="queued", claimed_at=timezone.now(), updated_at=timezone.now())
+        self.assertIsNone(services.message_dict(recent)["error"])
+        error = services.message_dict(message)["error"]
+        self.assertIn("may not have been sent", error["reason"])
+        self.assertTrue(error["can_retry"])
+        with mock.patch("whatsapp.twilio_api.send_message", return_value={"sid": "SMretry", "status": "queued"}) as call:
+            self.assertEqual(services.retry(message, self.approver)[0], services.DONE)
+            self.assertEqual(services.retry(message, self.approver)[0], services.NOT_RETRYABLE)  # a double click
+        self.assertEqual(call.call_count, 1)
+
+    def test_a_template_bubble_can_be_replied_to_and_quotes_its_text(self):
+        self.open_window()
+        template = self.template()
+        sent = Message.objects.create(contact=self.contact, direction="out", kind="template", body="Hi Dan, thanks.", template=template, status="delivered", twilio_sid="SMtpl")
+        target, invalid = services.reply_target(self.contact, sent.pk)
+        self.assertEqual((target.pk, invalid), (sent.pk, False))
+        self.assertEqual(services.quote_text(sent), "Hi Dan, thanks.")
+        bare = Message.objects.create(contact=self.contact, direction="out", kind="template", body="", template=template, status="delivered", twilio_sid="SMtpl2")
+        self.assertEqual(services.quote_text(bare), template.label or template.name)

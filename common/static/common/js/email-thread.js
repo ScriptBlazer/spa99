@@ -123,7 +123,7 @@ export class EmailThread {
   }
 
   addressOf(m) {
-    return m.direction === 'out' ? `To ${this.thread.email}` : (m.from_address || this.thread.email);
+    return m.direction === 'out' ? `To ${this.thread.email}` : (m.from_address || 'Address not shown');
   }
 
   statusNode(m) {
@@ -178,7 +178,7 @@ export class EmailThread {
     if (m.shows_subject && m.subject && m.subject !== this.thread.subject) part.append(h('h2', { class: 'o-em-msubject', dir: 'auto', text: m.subject }));
     if (m.from_other) {
       part.append(h('p', { class: 'o-em-note o-em-note--other' }, icon('warning'),
-        h('span', { text: `Sent from ${m.from_address}, not ${this.thread.email}. Check it is him before sharing anything.` })));
+        h('span', { text: m.from_address ? `Sent from ${m.from_address}, not ${this.thread.email}. Check it is him before sharing anything.` : `The sender's address was not shown, so it may not be ${this.thread.email}. Check it is him before sharing anything.` })));
     }
     if (m.spam) part.append(h('p', { class: 'o-em-note' }, icon('warning'), h('span', { text: 'Flagged as spam. Nobody was notified. Take care with links and files.' })));
     if (mine) {

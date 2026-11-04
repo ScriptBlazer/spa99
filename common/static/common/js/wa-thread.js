@@ -648,7 +648,7 @@ export class Thread {
   /** The words a quote of this message shows: its first line, or Photo, Voice note, Video, PDF, File, Message. */
   quoteLabel(m) {
     const line = String(m.body || m.localText || '').split('\n').map((l) => l.replace(/^[\s>]+/, '').replace(/[*_~`]/g, '').trim()).find(Boolean);
-    return line ? (line.length > 100 ? `${line.slice(0, 99).trimEnd()}\u2026` : line) : (QUOTE_WORDS[m.kind] || 'Message');
+    return line ? (line.length > 100 ? `${line.slice(0, 99).trimEnd()}\u2026` : line) : (m.kind === 'template' && m.template ? (m.template.label || m.template.name) : (QUOTE_WORDS[m.kind] || 'Message'));
   }
 
   /** The quote inside a bubble, both directions. Its text goes through textContent only. */

@@ -31,6 +31,7 @@ logger = logging.getLogger("spa99.emailchat")
 EPOCH = datetime(1970, 1, 1, tzinfo=dt_timezone.utc)
 DUPLICATE_WINDOW = timedelta(seconds=10)
 STUCK_AFTER = timedelta(minutes=5)
+CLAIM_TIMEOUT = timedelta(minutes=10)  # longer than the worker job limit and all its retries (Q_CLUSTER timeout 120 s, retry 180 s, 3 attempts)
 MAX_TEXT = 100_000
 MAX_INBOUND_TEXT = 200_000
 MAX_INBOUND_HTML = 1_000_000
@@ -47,6 +48,9 @@ WORDS = {EMPTY: "Write a message first.", TOO_LONG: "That message is too long.",
 REASONS = {"suppressed": ("Not sent. This address bounced before or marked an email as spam, so nothing more can be sent to it.", False),
            "bounced": ("Bounced. The address did not accept this email.", False), "complaint": ("Marked as spam by the recipient. Nothing more can be sent to this address.", False),
            "send_failed": ("Not sent. Try again.", True)}
+
+
+MAYBE_NOT_SENT = "This may not have been sent. Check with him before trying again, in case it did arrive."
 
 
 def now():
@@ -120,19 +124,20 @@ def reply_subject(thread, given=""):
     base = last or thread.subject or DEFAULT_SUBJECT
     if last is None or re.match(r"^\s*re\s*:", base, re.I):
         return base
-    return f"Re: {base}"
+    return clean_subject(f"Re: {base}")  # clean_subject trims to the column length (300) after "Re: " is added
 
 
 # ---------- threads and who they are ----------
 
 def resolve_links(thread, save=True):
-    """Find who owns this address: an account, a lead (he left it at the journey gate), a Gold application. A link found now replaces the stored one; nothing found never
-    clears it (the stored link is the thread's owner for good, so an erasure still finds a thread after an address was corrected)."""
+    """Find who owns this address: an account, a lead (he left it at the journey gate), a Gold application. Only a VERIFIED account is linked (an unverified account may carry
+    someone else's address: anyone can register with any address, so it never takes the thread, its owner link or its name). A link found now replaces the stored one; nothing
+    found never clears it. The owner link does not survive an address correction by itself: `move_address` moves the threads (and so the erasure still finds them)."""
     from gold.models import GoldApplication
     from journey.models import JourneySession
     from users.models import User
 
-    user = User.objects.filter(email__iexact=thread.email).first()
+    user = User.objects.filter(email__iexact=thread.email, email_verified_at__isnull=False).first()
     session = JourneySession.objects.filter(lead_email__iexact=thread.email, is_bot=False).order_by("-created_at").first()
     application = GoldApplication.objects.filter(email__iexact=thread.email).order_by("-created_at").first()
     name = ""
@@ -154,6 +159,17 @@ def resolve_links(thread, save=True):
     if save:
         thread.save(update_fields=["user", "lead_email", "application", "name"])
     return thread
+
+
+def move_address(old, new):
+    """A lead's address was corrected (outreach.services.correct_lead_email, in its transaction): his threads move to the new address, so the lead page, export and erasure
+    find them. Each thread keeps its reply token, so a late reply to the old Reply-To still lands in the same thread. A thread owned by an account is left alone. Returns the number moved."""
+    old, new = (old or "").strip().lower(), (new or "").strip().lower()
+    if not old or not new or old == new:
+        return 0
+    moved = Thread.objects.filter(email=old, user__isnull=True).update(email=new)
+    Thread.objects.filter(lead_email=old).update(lead_email=new)
+    return moved
 
 
 def relink(*addresses):
@@ -193,7 +209,8 @@ def threads_for(addresses=(), user=None, application=None):
 
 def latest_thread(addresses=(), user=None, application=None):
     """His most recent thread (by its last message, or when it was made), or None. The page button says Open when there is one and Start when not."""
-    found = threads_for(addresses, user, application).annotate(at=Coalesce("last_message_at", "created_at")).order_by("-at", "-created_at")
+    found = threads_for(addresses, user, application).filter(Exists(Message.objects.filter(thread=OuterRef("pk")))).annotate(
+        at=Coalesce("last_message_at", "created_at")).order_by("-at", "-created_at")  # an empty thread (nothing sent or received) is not one to open
     return found.first()
 
 
@@ -330,7 +347,19 @@ def _enqueue_send(message):
 
 
 def is_stuck(message, at=None):
-    return bool(message.direction == Message.OUT and message.status == Message.QUEUED and message.claimed_at is None and message.updated_at < (at or now()) - STUCK_AFTER)
+    """Queued and lost: never taken by a worker for a few minutes, or taken by a worker that then died (claimed more than CLAIM_TIMEOUT ago, still queued). In the second
+    case the worker may have died after the mail server took the email and before SENT was written, so a Try again can, rarely, send it twice; the page says "may not have
+    been sent"."""
+    at = at or now()
+    if message.direction != Message.OUT or message.status != Message.QUEUED:
+        return False
+    if message.claimed_at is None:
+        return message.updated_at < at - STUCK_AFTER
+    return message.claimed_at < at - CLAIM_TIMEOUT
+
+
+def is_unsure(message, at=None):
+    return bool(message.claimed_at is not None and is_stuck(message, at))
 
 
 def can_retry(message):
@@ -364,9 +393,10 @@ def _headers(message):
     headers = {"Message-ID": own, "X-PM-Tag": "office-chat", "X-PM-Metadata-chat": str(message.pk)}
     prior = Message.objects.filter(thread_id=message.thread_id, pk__lt=message.pk).exclude(rfc_message_id="").order_by("-id")
     last = prior.filter(direction=Message.IN).first() or prior.first()
-    if last is not None:
-        chain = (last.references.split() + [last.rfc_message_id])[-10:]
-        headers["In-Reply-To"] = last.rfc_message_id
+    last_id = clean_id(last.rfc_message_id) if last is not None else ""  # cleaned on read too: older rows may hold a newline
+    if last_id:
+        chain = (clean_references(last.references).split() + [last_id])[-10:]
+        headers["In-Reply-To"] = last_id
         headers["References"] = " ".join(chain)
     return headers, own
 
@@ -466,6 +496,15 @@ def _header(payload, name):
     return ""
 
 
+def clean_id(value):
+    """A Message-ID or In-Reply-To value on one line with no whitespace (a stored newline would make every later reply fail with BadHeaderError)."""
+    return "".join((value or "").split())
+
+
+def clean_references(value):
+    return " ".join((value or "").split())
+
+
 def _text(value, limit):
     return value.replace("\x00", "")[:limit] if isinstance(value, str) else ""
 
@@ -493,15 +532,51 @@ def record_inbound(payload, thread):
     try:
         with transaction.atomic():
             message = Message.objects.create(
-                thread=thread, direction=Message.IN, subject=subject, shows_subject=_shows_subject(thread, subject), body_text=text, body_full=whole if stripped and whole != stripped else "",
+                incomplete=True, claimed_at=now(), thread=thread, direction=Message.IN, subject=subject, shows_subject=_shows_subject(thread, subject), body_text=text, body_full=whole if stripped and whole != stripped else "",
                 body_html=html, has_remote_images=bool(richtext.remote_image_count(html)), status=Message.RECEIVED, provider_id=provider_id or None,
-                rfc_message_id=_text(_header(payload, "Message-ID"), 300).strip(), in_reply_to=_text(_header(payload, "In-Reply-To"), 300).strip(),
-                references=_text(_header(payload, "References"), 3000).strip(), from_address=from_address, from_name=from_name, spam=spam)
+                rfc_message_id=clean_id(_text(_header(payload, "Message-ID"), 300)), in_reply_to=clean_id(_text(_header(payload, "In-Reply-To"), 300)),
+                references=clean_references(_text(_header(payload, "References"), 3000)), from_address=from_address, from_name=from_name, spam=spam)
+            if not spam:  # spam never moves the thread, never counts unread, never pushes. In the same transaction as the message: a death cannot leave one the inbox does not show
+                _touch_thread(thread, message)
     except IntegrityError:  # Postmark sent it twice at once
         return Message.objects.get(provider_id=provider_id), False
-    if not spam:  # spam never moves the thread, never counts unread, never pushes
-        _touch_thread(thread, message)
     return message, True
+
+
+INBOUND_CLAIM = timedelta(minutes=2)
+
+
+class StoreError(Exception):
+    """His files could not be stored."""
+
+
+def claim_inbound(message):
+    """Take an incomplete email to finish (Postmark's retry of the same MessageID). One conditional update: an attempt still working on it (claimed less than two minutes
+    ago) keeps it, so two attempts never store its files twice at once."""
+    return bool(Message.objects.filter(pk=message.pk, incomplete=True).filter(Q(claimed_at__isnull=True) | Q(claimed_at__lt=now() - INBOUND_CLAIM)).update(claimed_at=now()))
+
+
+def clear_files(message):
+    """Take the stored files of a message out (rows and storage) so a second go at storing them cannot double them."""
+    for item in list(message.attachments.all()):
+        try:
+            default_storage.delete(item.key)
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not delete an email file from storage")
+        item.delete()
+
+
+def finish_inbound(message, payload, resumed=False):
+    """Files stored and the worker task queued: then (and only then) the message is complete. A resume (a retry after a death or a failed queue) starts its files again from
+    the payload, so nothing is stored twice. Raises when the files cannot be stored or the task cannot be queued: the webhook answers 500 and Postmark retries."""
+    try:
+        if resumed:
+            clear_files(message)
+        store_inbound_files(message, payload.get("Attachments"))
+    except Exception as error:
+        raise StoreError from error
+    enqueue("emailchat.tasks.process_inbound", message.pk)
+    Message.objects.filter(pk=message.pk).update(incomplete=False)
 
 
 def store_inbound_files(message, items):
@@ -637,16 +712,16 @@ def message_dict(message):
     if message.status in Message.BAD:
         reason = REASONS.get(message.error_code, REASONS["send_failed"])[0]
     elif is_stuck(message):
-        reason = REASONS["send_failed"][0]
+        reason = MAYBE_NOT_SENT if is_unsure(message) else REASONS["send_failed"][0]
     can = bool(reason) and can_retry(message)
     mine = message.direction == Message.OUT
-    html = message.body_html or (str(linebreaks(message.body_text)) if mine else "")  # an old copied message has text only: shown as safe paragraphs
+    html = message.body_html or (str(linebreaks(message.body_text, autoescape=True)) if mine else "")  # an old copied message has text only: shown as safe paragraphs
     frame = _office("office_email_frame", message.pk) if (not mine and message.body_html) else ""
     return {"id": message.pk, "direction": message.direction, "subject": message.subject, "shows_subject": message.shows_subject, "body_text": message.body_text,
             "body_full": message.body_full, "body_html": html if mine else "", "frame_url": frame, "frame_images_url": frame + "?images=1" if frame else "",
             "has_remote_images": message.has_remote_images, "status": message.status, "error": {"reason": reason, "can_retry": can} if reason else None, "author": message.author_label,
             "author_id": str(message.author_id) if message.author_id else "", "author_first_name": _first(message.author_label), "from_address": message.from_address,
-            "from_name": message.from_name, "from_other": bool(message.from_address and message.from_address != message.thread.email), "spam": message.spam, "note": message.note,
+            "from_name": message.from_name, "from_other": bool(not mine and message.from_address != message.thread.email), "spam": message.spam, "note": message.note,
             "attachments": [attachment_dict(a) for a in message.attachments.all()], "created_at": message.created_at.isoformat(), "sent_at": message.sent_at.isoformat() if message.sent_at else "",
             "retry_url": _office("office_email_retry", message.thread_id, message.pk) if can else ""}
 
@@ -766,13 +841,13 @@ def threads_for_member(user):
 
 
 def export_for(threads):
-    """Everything held: each thread with its emails (subject, text, status, times, from address, sent by) and file names, sizes and types."""
+    """Everything held: each thread with its emails (subject, text, the whole text with his quoted mail, status, times, from address and name, sent by) and a listing of the files (names, sizes, types; the file bytes are not in the export)."""
     out = []
     for thread in threads:
         out.append({"email": thread.email, "subject": thread.subject, "name": thread.name,
-                    "messages": [{"direction": m.direction, "subject": m.subject, "text": m.body_text, "html": m.body_html, "status": m.status, "at": m.created_at.isoformat(),
-                                  "sent_at": m.sent_at.isoformat() if m.sent_at else None, "from": m.from_address or None, "spam": m.spam, "sent_by": m.author_label or None,
-                                  "note": m.note or None, "files": [{"name": a.filename, "type": a.declared_type, "size": a.size} for a in m.attachments.all()]}
+                    "messages": [{"direction": m.direction, "subject": m.subject, "text": m.body_text, "full_text": m.body_full, "html": m.body_html, "status": m.status, "at": m.created_at.isoformat(),
+                                  "sent_at": m.sent_at.isoformat() if m.sent_at else None, "from": m.from_address or None, "from_name": m.from_name or None, "spam": m.spam, "sent_by": m.author_label or None,
+                                  "note": m.note or None, "files": [{"name": a.filename, "type": a.declared_type or a.content_type, "size": a.size} for a in m.attachments.all()]}
                                  for m in thread.messages.prefetch_related("attachments").order_by("id")]})
     return out
 
@@ -797,6 +872,16 @@ def erase_threads(threads):
 
 def erase_person(user=None, addresses=()):
     return erase_threads(threads_for_person(user, addresses))
+
+
+def erase_attachments(items):
+    """Attachment rows and their files in storage (admin delete). A missing file does not stop the delete."""
+    for item in items:
+        try:
+            default_storage.delete(item.key)
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not delete an email file from storage")
+        item.delete()
 
 
 def erase_message(message):

@@ -30,4 +30,5 @@ urlpatterns = [
     path("gold/<uuid:pk>/whatsapp/", v.start_gold, name="office_gold_whatsapp"),
     path("leads/<uuid:pk>/contact/", v.lead_contact, name="office_lead_contact"),
     path("people/<uuid:pk>/mobile/", v.person_mobile, name="office_person_mobile"),
+    path("gold/<uuid:pk>/mobile/", v.gold_mobile, name="office_gold_mobile"),
 ]

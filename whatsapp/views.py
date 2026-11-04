@@ -366,6 +366,22 @@ def person_mobile(request, pk):
     return _contact_reply(request, target, result, errors)
 
 
+@editor
+@require_POST
+def gold_mobile(request, pk):
+    """Add or fix a Gold applicant's mobile. POST mobile_country (ISO, default GB), mobile. Same answers as lead_contact."""
+    from office import tools
+    from office.forms import ContactForm
+    from outreach import services as outreach
+
+    target = tools.target_for("gold", pk)
+    form = ContactForm(request.POST)
+    if not form.is_valid():
+        return _contact_reply(request, target, outreach.INVALID, {"mobile": "That doesn't look like a valid mobile number."})
+    result, errors = outreach.set_gold_mobile(target.application, request.user, form.cleaned_data["mobile"], form.cleaned_data["mobile_country"])
+    return _contact_reply(request, target, result, errors)
+
+
 # ---------- push controls (this staff member's devices) ----------
 
 def _json_body(request):

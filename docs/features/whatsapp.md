@@ -1,6 +1,6 @@
 # WhatsApp in the Office (plan, 2026-11-03)
 
-Status: **server side built** (2026-11-03, branch `feature/whatsapp`); the chat UI follows from `whatsapp-design.md`. Ship in one go after testing. Decisions in PROJECT.md (2026-11-03 WhatsApp rows). The section "Built" at the end lists the endpoints, payloads and context keys as they are in the code.
+Status: **built and reviewed** (2026-11-03 server side and UI, round 2 and review fixes 2026-11-04, branch `feature/whatsapp`, not released); the design is in `whatsapp-design.md`. Ship in one go after testing. Decisions in PROJECT.md (2026-11-03 WhatsApp rows). The section "Built" at the end lists the endpoints, payloads and context keys as they are in the code.
 
 ## Provider: Twilio (Moishe, 2026-11-03)
 The number is a **Twilio** number and the WhatsApp side is already verified at Meta. We talk to **Twilio**, not to Meta directly:
@@ -130,7 +130,7 @@ Message dict (`services.message_dict`): `{id, direction, kind, body, body_html, 
 
 Contact dict: `{id, name, has_name, phone, profile_name, labels[Lead|Registered|Gold], page_url, opted_out, window{state: open|closed|opted_out|empty|template_waiting, open, ends_at}, can_send, url, last_message_at, limits{body, image_bytes, file_bytes}}`.
 
-Lead, person and Gold pages get `whatsapp` = `{configured, has_mobile, mobile, first_name, contact_url, start_url, edit_url (empty on Gold), can_send, can_edit, has_chat, window_open, window_closes_at, opted_out, unread, thread_url}` and `mobile_countries`.
+Lead, person and Gold pages get `whatsapp` = `{configured, has_mobile, mobile, first_name, contact_url, start_url, edit_url (on Gold: `/gold/<id>/mobile/`), can_send, can_edit, has_chat, window_open, window_closes_at, opted_out, unread, thread_url}` and `mobile_countries`.
 
 Gold: sending from a Gold chat (`gold=<application id>` posted with the message) turns New into Contacted with a `responded` event (`meta {"whatsapp": true}`), once. `/gold/<id>/respond/` and `?do=respond` (the approver email's link) redirect to the chat. The email Message and Respond views, forms and dialogs are gone; old `PersonMessage` rows still show in timelines; the email template rows `office_message` and `gold_respond` stay in System > Emails, unused.
 
@@ -212,7 +212,7 @@ Settings added: `FFMPEG_BIN` (optional, default `ffmpeg`), limits in settings `W
 
 ## Mobile optional at the end of the journey (server side, 2026-11-04)
 - `journey.services.save_lead`: first name and email are required, consent as before; a blank `mobile` is stored blank; a typed one is still validated by `common.phone` (error key `mobile`). `POST /journey/lead/` errors no longer include `mobile` when it is blank. The gate config (`gate`, from `journey.copy.GATE`) gains `mobile_optional: true` and `mobile_hint` (placeholder wording, the designer writes the final line). The browser should not send a blank mobile through live validation as an error: `POST /validate/mobile/` takes `optional=1` and then answers valid for a blank number (a typed one is still checked). Register and the Gold form are unchanged.
-- Office: `whatsapp.state == "no_mobile"` on a lead or person with no number: show the email button alone and the greyed line `whatsapp.reason`; when `whatsapp.can_add_number`, it opens the existing Add a mobile dialog (`whatsapp.edit_url`). **A Gold applicant with no mobile can occur** (the application form requires one, but `GoldApplication.mobile` is `blank=True`, so an old or admin-made row can have none; the number may also come from his account or a journey lead on his address) and the Gold page has **no `edit_url`**, so `can_add_number` is false there: show the greyed line only, no dialog.
+- Office: `whatsapp.state == "no_mobile"` on a lead or person with no number: show the email button alone and the greyed line `whatsapp.reason`; when `whatsapp.can_add_number`, it opens the existing Add a mobile dialog (`whatsapp.edit_url`). **A Gold applicant with no mobile can occur** (the application form requires one, but `GoldApplication.mobile` is `blank=True`, so an old or admin-made row can have none; the number may also come from his account or a journey lead on his address) and the Gold page has an `edit_url` too (`POST /gold/<id>/mobile/`, `mobile_country` and `mobile`; `outreach.services.set_gold_mobile`: an applicant with an account gets his account's mobile set, otherwise the application's, and any journey of his that already holds a number is kept in step; audited as a Mobile line in his timeline, like the lead and person ones), so `can_add_number` works there and the same dialog (`_mobile_dialog.html`) opens.
 
 
 ---
@@ -221,7 +221,7 @@ Settings added: `FFMPEG_BIN` (optional, default `ffmpeg`), limits in settings `W
 
 Design brief: `email-chat-design.md` (sections 1, 4, 5 and 6). Files: `office/templates/office/_channels.html`, `_wa_button.html` and `_email_button.html` (the two reach out buttons), `whatsapp/templates/whatsapp/_thread.html` (quote bar, microphone, recording panel), `common/static/common/js/wa-thread.js` (extended), `office-keyboard.js` (the phone keyboard handling, now shared with email), `office-dom.js` (small shared helpers), `office-whatsapp.css` (round 2 section at the end).
 
-- **Buttons.** `_channels.html` draws WhatsApp then Email, one channel a row, keyed on `whatsapp.state` (never on `configured`). Twilio not set up: "Start WhatsApp chat" stays, greyed, with "WhatsApp is not set up yet."; with a chat already, "Open WhatsApp chat" stays a link to the history. No mobile: the email button alone and, under it, a grey line that opens the Add a mobile dialog (staff who may add one), or a static line (Gold: no dialog; view-only staff: "No mobile on file."). After the dialog saves, the card is swapped from the server and focus moves to the new button. `reach_primary` (in `office_tags`) decides the one primary: WhatsApp when he can be sent to on it, else Email, none on Gold.
+- **Buttons.** `_channels.html` draws WhatsApp then Email, one channel a row, keyed on `whatsapp.state` (never on `configured`). Twilio not set up: "Start WhatsApp chat" stays, greyed, with "WhatsApp is not set up yet."; with a chat already, "Open WhatsApp chat" stays a link to the history. No mobile: the email button alone and, under it, a grey line that opens the Add a mobile dialog (staff who may add one), or a static line (view-only staff: "No mobile on file."; staff can add a number on every page, Gold included). After the dialog saves, the card is swapped from the server and focus moves to the new button. `reach_primary` (in `office_tags`) decides the one primary: WhatsApp when he can be sent to on it, else Email, none on Gold.
 - **Reply.** Open window only. A fine pointer: Reply (and, on his messages, an emoji disc) appear beside the bubble on hover or focus; a touch screen: tap the bubble and the row opens under it (not on a link, photo, video or audio control, not while text is selected). The log is one tab stop with Up and Down between messages, Enter opens the actions, R replies, Escape goes back. The quote bar sits above the composer with the note "On his phone this shows as a quoted line." (a voice note: "A voice note carries no quote on his phone."). In a bubble the quote is a button that scrolls to the original with one soft fade (or says "That message is further back."). The 1600 limit counts the final text with the `> ` line.
 - **Emoji.** Five calm emoji, a tap sends one normal message with no quote, and the row says "Goes as a normal message, not a reaction."
 - **Video.** `accept` gains `video/mp4`; an iPhone `.mov` is refused in the server's words. The bubble shows the video with controls, its time and tick on their own line beneath; if the browser cannot play it the bubble becomes a file card with a download.
@@ -230,3 +230,12 @@ Design brief: `email-chat-design.md` (sections 1, 4, 5 and 6). Files: `office/te
 
 ## Mobile optional at the email step, the screen (2026-11-04)
 See `journey.md` (Updated 2026-11-04). The staff side is in the buttons above.
+
+---
+
+# Review fixes (2026-11-04)
+
+- **Reply works on template bubbles.** `reply_target` no longer refuses a template; the quote is its text (the filled body), or its name when it has none.
+- **A send claimed by a worker that died** (queued, claimed more than 10 minutes ago, no Twilio id) shows "This may not have been sent" with Try again (`whatsapp.services.is_unsure`). The retry is still one conditional update, so a double click sends once. It cannot be made safe in one rare case: the worker died after Twilio took the message and before its id was saved; Try again then makes a second WhatsApp for him. The wording tells staff to check his phone first.
+- **Gold with no number:** staff can add or fix a mobile on the Gold page (see above).
+- **Consent text in the Office follows the version he ticked** (`journey.copy.consent_text`): "" (email only), `2026-11-03` (email and WhatsApp) and `2026-11-04` (email, WhatsApp if a number was added, about opening and offers).

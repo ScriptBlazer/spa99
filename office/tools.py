@@ -93,13 +93,13 @@ def mobile_and_name(target):
 
 def whatsapp_context(target, user):
     """`whatsapp` for the lead, person and Gold pages (design brief section 6): {configured, has_mobile, mobile, first_name, contact_url (opens his chat),
-    start_url, edit_url (POST first_name, mobile_country, mobile; empty on the Gold page), can_send, can_edit, has_chat, window_open, window_closes_at,
+    start_url, edit_url (POST first_name, mobile_country, mobile on a lead; mobile_country, mobile on a person or Gold page), can_send, can_edit, has_chat, window_open, window_closes_at,
     opted_out, unread, thread_url}, plus `mobile_countries` for the add-a-mobile dialog."""
     from common import phone
     from whatsapp import services as whatsapp
 
     mobile, first = mobile_and_name(target)
-    edit = target.url("contact") if target.kind == "lead" else (target.url("mobile") if target.kind == "person" else "")
+    edit = target.url("contact") if target.kind == "lead" else target.url("mobile")  # person and Gold: POST mobile_country, mobile
     return {"whatsapp": whatsapp.page_context(mobile, user, can_edit(user), target.url("whatsapp"), edit, first), "mobile_countries": phone.countries()}
 
 

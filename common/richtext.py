@@ -83,30 +83,63 @@ def cid_names(clean_html):
 
 
 class _Text(HTMLParser):
-    BLOCKS = {"p", "div", "li", "tr", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "table", "pre", "hr"}
+    BLOCKS = {"p", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "table", "pre", "hr"}
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.out, self.href, self.skip = [], None, 0
+        self.out, self.href, self.link_from, self.skip, self.quote, self.lists = [], None, 0, 0, 0, []
+
+    def nl(self):
+        self.out.append("\n" + "> " * self.quote)  # every line of a quote starts "> "
 
     def handle_starttag(self, tag, attrs):
         if tag in ("script", "style", "head", "title"):
             self.skip += 1
         elif tag == "br":
-            self.out.append("\n")
+            self.nl()
+        elif tag in ("ul", "ol"):
+            if not self.lists:
+                self.nl()
+            self.lists.append([tag, 0])
+        elif tag == "li":
+            self.nl()
+            if self.lists and self.lists[-1][0] == "ol":
+                self.lists[-1][1] += 1
+                self.out.append(f"{self.lists[-1][1]}. ")
+            else:
+                self.out.append("- ")
+        elif tag == "blockquote":
+            self.quote += 1
+            self.nl()
         elif tag in self.BLOCKS:
-            self.out.append("\n" + ("- " if tag == "li" else "") + ("> " if tag == "blockquote" else ""))
+            self.nl()
         elif tag == "a":
-            self.href = dict(attrs).get("href")
+            self.href, self.link_from = dict(attrs).get("href"), len(self.out)
 
     def handle_endtag(self, tag):
         if tag in ("script", "style", "head", "title"):
             self.skip = max(self.skip - 1, 0)
+        elif tag == "blockquote":
+            self.quote = max(self.quote - 1, 0)
+            self.nl()
+        elif tag in ("ul", "ol"):
+            if self.lists:
+                self.lists.pop()
+            if not self.lists:
+                self.nl()
+        elif tag == "li":
+            pass  # the next item, or the end of the list, starts the new line
         elif tag in self.BLOCKS:
-            self.out.append("\n")
+            self.nl()
         elif tag == "a" and self.href:
-            if self.href.startswith(("http://", "https://")) and (not self.out or self.href not in "".join(self.out[-3:])):
-                self.out.append(f" ({self.href})")
+            href = self.href.strip()
+            shown = "".join(self.out[self.link_from:])
+            if href.lower().startswith("mailto:"):
+                target = href[7:].split("?")[0].strip()
+            else:
+                target = href if href.startswith(("http://", "https://")) else ""
+            if target and target not in shown:
+                self.out.append(f" ({target})")
             self.href = None
 
     def handle_data(self, data):
@@ -115,10 +148,21 @@ class _Text(HTMLParser):
 
 
 def html_to_text(html):
-    """A readable plain text copy: blocks become lines, list items start "- ", quotes "> ", links keep their address in brackets."""
+    """A readable plain text copy: blocks become lines, list items start "- " (numbered lists keep their numbers), every quoted line "> ", links and mailto: addresses are kept in brackets."""
     parser = _Text()
     parser.feed(html or "")
     parser.close()
     text = "".join(parser.out).replace("\xa0", " ")
-    text = re.sub(r"[ \t]+\n", "\n", text)
-    return re.sub(r"\n{3,}", "\n\n", text).strip()
+    raw = [line.rstrip() for line in text.split("\n")]
+    lines, blank = [], False
+    for i, line in enumerate(raw):
+        empty = not line.replace(">", "").strip()
+        if empty:
+            before = next((x for x in reversed(lines) if x), "")
+            after = next((x for x in raw[i + 1:] if x.replace(">", "").strip()), "")
+            line = ">" if line.startswith(">") and before.startswith(">") and after.startswith(">") else ""  # a gap inside a quote keeps its ">"
+            if blank and not line:
+                continue
+        blank = not line
+        lines.append(line)
+    return "\n".join(lines).strip()

@@ -331,7 +331,7 @@ def _export_email_threads(user, include_chats):
     from emailchat import services as emailchat
 
     if include_chats:
-        return emailchat.export_for(emailchat.threads_for_person(user, _whatsapp_addresses(user) if user.email_verified_at else {user.email.lower()}))
+        return emailchat.export_for(emailchat.threads_for_person(user, _whatsapp_addresses(user) if user.email_verified_at else set()))  # unverified: the owner link only (the address may be someone else's)
     return emailchat.export_for(emailchat.threads_for_member(user))
 
 
@@ -457,7 +457,7 @@ def delete_user_data(user, include_chats=False):
     from emailchat import services as emailchat
 
     if include_chats:  # staff-run: every thread held for him; his own account delete only takes the thread on his verified account email
-        emailchat.erase_person(user, _whatsapp_addresses(user) if user.email_verified_at else {email.lower()})
+        emailchat.erase_person(user, _whatsapp_addresses(user) if user.email_verified_at else set())  # unverified: the owner link only, never a lead's thread on the same address
     else:
         emailchat.erase_threads(emailchat.threads_for_member(user))
     anonymised = _anonymise_sessions(user)

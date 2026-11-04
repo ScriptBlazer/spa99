@@ -344,6 +344,43 @@ def set_person_mobile(user, actor, mobile, mobile_country=None):
     return DONE, {}
 
 
+def set_gold_mobile(application, actor, mobile, mobile_country=None):
+    """Add or fix a Gold applicant's mobile (any country, E.164, unique). An applicant who has an account: the account's mobile (set_person_mobile). Otherwise the application's,
+    and any journey of his that already holds a number is kept in step, so the number the page shows is the number just fixed. Audited like the lead and person ones (a line in his
+    timeline). Returns (DONE | UNCHANGED | INVALID, errors)."""
+    from django.core.exceptions import ValidationError
+
+    from common.validators import normalise_mobile
+    from journey.models import JourneySession
+    from whatsapp import services as whatsapp
+
+    if application.user_id:
+        return set_person_mobile(application.user, actor, mobile, mobile_country)
+    text = (mobile or "").strip()
+    try:
+        new = normalise_mobile(text, mobile_country) if text else ""
+    except ValidationError as error:
+        return INVALID, {"mobile": error.messages[0]}
+    email = (application.email or "").strip().lower()
+    owner = whatsapp.owner_of_phone(new, exclude_email=email) if new else None
+    if owner:
+        return INVALID, {"mobile": f"This number is already on {owner['name']}.", "owner": owner}
+    sessions = list(JourneySession.objects.filter(lead_email__iexact=email, is_bot=False).exclude(lead_mobile="")) if email else []
+    before = application.mobile or (sessions[0].lead_mobile if sessions else "")
+    if new == (application.mobile or "") and all(session.lead_mobile == new for session in sessions):
+        return UNCHANGED, {}
+    olds = {application.mobile, *(session.lead_mobile for session in sessions)}
+    with transaction.atomic():
+        application.mobile = new
+        application.save(update_fields=["mobile", "updated_at"])
+        for session in sessions:
+            session.lead_mobile = new
+            session.save(update_fields=["lead_mobile", "updated_at"])
+        _edit(email, PersonEdit.MOBILE, before, new, actor)
+    whatsapp.relink(new, *olds)
+    return DONE, {}
+
+
 # ---------- bounced lead emails: Possible fake, correct the address, send the follow-up again ----------
 
 TAKEN, BOUNCED, NO_SENDER, SENT, NOT_SENT = "taken", "bounced", "no_sender", "sent", "not_sent"
@@ -390,6 +427,7 @@ def correct_lead_email(old, new, actor):
 
     from chat import services as chat_services
     from common.validators import normalise_email
+    from emailchat import services as emailchat_services
     from journey.models import JourneySession
     from notifications.models import EmailLog
     from whatsapp import services as whatsapp
@@ -415,9 +453,11 @@ def correct_lead_email(old, new, actor):
             model.objects.filter(**{field: old}).update(**{field: new})
         NextMorningEmail.objects.filter(email=old).delete()  # the old address is not kept (the suppression list is the one record of it); the new one may be sent its own follow-up
         chat_services.move_lead_email(old, new)  # an Ask us chat where he gave the old address
+        emailchat_services.move_address(old, new)  # his email threads (same reply token: a late reply still lands)
         EmailLog.objects.filter(Q(to__iexact=old) | Q(subject_email__iexact=old)).delete()  # emails sent to the old address (the bounce) are not his on the new one
         _edit(new, PersonEdit.EMAIL, old, new, actor)
     whatsapp.relink(*{s.lead_mobile for s in sessions if s.lead_mobile})  # his WhatsApp chat now links to the corrected address
+    emailchat_services.relink(new)  # names and links of his threads on the new address
     _figures_changed()
     return DONE, ""
 

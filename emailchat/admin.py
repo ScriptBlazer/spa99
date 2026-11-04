@@ -38,8 +38,21 @@ class MessageAdmin(ExportCsvMixin, admin.ModelAdmin):
     raw_id_fields = ("thread", "author")
     exclude = ("body_html",)  # the cleaned HTML is shown in the Office only, in a sandbox
 
+    def delete_model(self, request, obj):  # UK GDPR: the files in storage go too, and the thread's last line is repaired
+        services.erase_message(obj)
+
+    def delete_queryset(self, request, queryset):
+        for message in list(queryset.select_related("thread")):
+            services.erase_message(message)
+
 
 @admin.register(Attachment)
 class AttachmentAdmin(admin.ModelAdmin):
     list_display = ("filename", "message", "content_type", "size", "inline_ok")
     raw_id_fields = ("message",)
+
+    def delete_model(self, request, obj):  # the file in storage goes with the row
+        services.erase_attachments([obj])
+
+    def delete_queryset(self, request, queryset):
+        services.erase_attachments(list(queryset))

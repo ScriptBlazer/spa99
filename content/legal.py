@@ -21,7 +21,7 @@ INVITE_OPEN_LINE = ("- Invitation emails contain a tiny image (a tracking pixel)
                     "Other emails we send you do not.")
 WHATSAPP_BLOCK = "\n".join([
     "### WhatsApp",
-    "- Your first name and mobile number, if you gave them before seeing your suggested membership, and that you agreed we may email and WhatsApp you about opening. "
+    "- Your first name and mobile number, if you gave them before seeing your suggested membership, and that you agreed we may email you, and WhatsApp you if you add a number, about opening and offers. "
     "Registered people can also be WhatsApped on the mobile number on their account.",
     "- Our WhatsApp messages with you: the text, photos and files, with the times and whether they were delivered and read, and your WhatsApp profile name. "
     "They pass through Twilio, our messaging provider, and WhatsApp.",
@@ -57,7 +57,7 @@ PRIVACY_PARTS = [
         "tablet or computer), and when you started and finished.",
         "Answers are saved as you go, even if you stop part way. They carry no name unless you register.",
         "- Your email address, if you give it. Before the journey shows your suggested membership and price, it asks for "
-        "your email, with a tick to say Spa 99 may email you about opening. We keep the address with your answers, the "
+        "your email, with a tick to say Spa 99 may email you, and WhatsApp you if you add a number, about opening and offers. We keep the address with your answers, the "
         "date you gave it and the version of this notice in force. If you are signed in, we use your account email "
         "instead and do not ask.",
         "### When you register",
@@ -111,9 +111,9 @@ PRIVACY_PARTS = [
         "{contact}. Basis: your consent.",
         "### To email you about opening after the journey",
         "If you gave your email in the guided journey and ticked the box, we use it to send news about the opening and "
-        "to understand which membership suits people (your answers, linked to your address, show us what people "
+        "offers, and to understand which membership suits people (your answers, linked to your address, show us what people "
         "choose). Basis: your consent. You can withdraw it at any time by following the unsubscribe link in any email "
-        "or by writing to {contact}; we then stop emailing you and delete the address.",
+        "or by writing to {contact}; we then stop emailing and WhatsApping you and delete the address.",
         "### To answer your questions in the chat",
         "The Ask us assistant answers questions about Spa 99 from our own information. It does not make decisions about "
         "you. Basis: legitimate interests.",
