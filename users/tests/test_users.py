@@ -2,6 +2,7 @@ from django.contrib.auth import authenticate
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from django.utils import timezone
 
 from common.ids import UNAMBIGUOUS_ALPHABET, normalise_public_code
 from common.models import LoginEvent
@@ -79,7 +80,7 @@ class UserModelTests(TestCase):
 
 class PersonDataTests(TestCase):
     def test_export_and_delete_cover_login_events_and_history(self):
-        user = User.objects.create_user("gone@example.com", "a-long-password-1", first_name="Gus")
+        user = User.objects.create_user("gone@example.com", "a-long-password-1", first_name="Gus", email_verified_at=timezone.now())  # verified: wrong tries typed with his address are his
         LoginEvent.objects.create(event=LoginEvent.LOGIN, user=user, attempted_email=user.email, ip_address="203.0.113.1")
         LoginEvent.objects.create(event=LoginEvent.FAILED, attempted_email="GONE@example.com")
         LoginEvent.objects.create(event=LoginEvent.FAILED, attempted_email="someone-else@example.com")

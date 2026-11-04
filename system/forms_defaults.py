@@ -14,7 +14,7 @@ GROUPS = [
     ("Website and journey", [("result_reasons", "reasons"), ("gold_nudge_high", ""), ("gold_nudge_medium", ""), ("gold_nudge_low", ""),
                              ("opener_lines", "lines"), ("chat_monthly_cap_gbp", "£ a month")]),
     ("Gold", [("gold_invite_days", "days"), ("gold_approval_days", "days")]),
-    ("Emails", [("register_invite_days", "days"), ("invite_landing", ""), ("recent_mailings", "shown"), ("recent_batches", "shown")]),
+    ("Emails", [("register_invite_days", "days"), ("invite_landing", ""), ("recent_mailings", "shown"), ("recent_batches", "shown"), ("office_copy_email", "")]),
     ("Sign-in", [("office_session_days", "days"), ("email_confirm_hours", "hours")]),
     ("System", [("changelog_page_size", "rows"), ("audit_page_size", "rows"), ("dashboard_recent_changes", "shown")]),
     ("Payments", [("payment_window_days", "days"), ("payment_reminder_days_before", "days"), ("payment_staff_alert_days_before", "days"), ("payment_staff_alert_hour", "o'clock"), ("staff_alert_emails_on", ""), ("staff_alert_emails", "")]),

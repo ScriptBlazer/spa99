@@ -252,6 +252,20 @@ def validate_staff_alert_emails(value):
         raise ValidationError("Enter at most 5 addresses.")
 
 
+def validate_group_copy_email(value):
+    """One address, or blank (off). Never an address on the inbound domain: a copy sent there would land in an Office thread (or be refused) instead of reaching the group."""
+    from django.conf import settings
+    from django.core.validators import validate_email
+
+    value = (value or "").strip()
+    if not value:
+        return
+    validate_email(value)
+    domain = settings.EMAIL_INBOUND_DOMAIN
+    if domain and value.lower().rpartition("@")[2] in (domain, f"mail.{domain}"):
+        raise ValidationError("Not an address on the reply domain: the copy would land back in the Office.")
+
+
 def _number(label, default, low, high, help_text=""):
     return models.PositiveSmallIntegerField(label, default=default, validators=[MinValueValidator(low), MaxValueValidator(high)], help_text=help_text)
 
@@ -326,6 +340,12 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
     staff_alert_emails = models.CharField(
         "Payment alert emails", max_length=500, blank=True, default="", validators=[validate_staff_alert_emails],
         help_text="Where the warning about launch-price holders who have not set up is emailed. Up to 5 addresses, separated by commas. Empty: no email is sent (the notice still shows in the Office and System).")
+
+    # Office email: the copy of a reply to the group
+    office_copy_seeded = models.BooleanField(default=False, db_default=False, editable=False)
+    office_copy_email = models.CharField(
+        "Copy of replies to the Office goes to", max_length=254, blank=True, default="", db_default="", validators=[validate_group_copy_email],
+        help_text="When someone replies to an Office email, a short plain copy goes to this address so the team sees it. One address; empty: no copy. Answers still go in the Office.")
 
     # Notifications
     toast_seconds = _number("On-screen notification stays (seconds)", 4, 2, 30)

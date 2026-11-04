@@ -139,12 +139,14 @@ def register_interest(data, journey_session=None):
 
 
 def _after_registration(user, opted_in, proven=False):
-    """Invites for this address become 'registered'. Ticking the news box lifts an earlier unsubscribe only when the address is `proven` (an invite link sent to it, or the verify step):
-    an unverified account may be a stranger's, and must never undo another person's unsubscribe. Never raises."""
+    """Only when the address is `proven` (the verify step): the invites for it become 'registered', and ticking the news box lifts an earlier unsubscribe. An unverified account may be a
+    stranger's (anyone can register any address), so at Register it neither marks the real person's invite registered nor undoes his unsubscribe. Never raises."""
     from mailings import invites
 
+    if not proven:
+        return
     invites.on_registered(user)
-    if opted_in and proven:
+    if opted_in:
         _lift_unsubscribe(user)
 
 
@@ -215,8 +217,7 @@ def verify_email(token):
         user.save(update_fields=["email_verified_at", "updated_at"])
         metrics.email_verified(user.email_verified_at)
         link_earlier_data(user)  # the address is proven: earlier leads and applications with it become his
-    if user.marketing_consent:
-        _lift_unsubscribe(user)  # ticking the news box lifts an earlier unsubscribe, but only once the address is proven (see _after_registration)
+    _after_registration(user, user.marketing_consent, proven=True)  # the address is proven: its invites become registered, and ticking the news box lifts an earlier unsubscribe
     from whatsapp import services as whatsapp
 
     whatsapp.relink_address(user.email)  # rule 1c: a chat staff gave this lead address now joins the verified account
@@ -437,7 +438,10 @@ def _export_sessions(user):
 
 
 def _login_events(user):
-    """Events linked to the person, plus failed attempts typed with their email (same set delete removes)."""
+    """Events linked to the person, plus failed attempts typed with their email, only once the address is proven his (same set delete removes). An unverified account may carry someone else's
+    address, and anyone can type any address at the sign-in: an unproven address exports a stranger's attempts (with his IP) and its deletion would erase the real owner's."""
+    if not user.email_verified_at:
+        return LoginEvent.objects.filter(user=user)
     return LoginEvent.objects.filter(Q(user=user) | Q(attempted_email__iexact=user.email))
 
 

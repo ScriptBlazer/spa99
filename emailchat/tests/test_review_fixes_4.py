@@ -52,9 +52,8 @@ class GoldLinkedThreadTests(Base):
     def test_a_lead_correction_leaves_a_gold_linked_thread_on_the_applicants_address(self):
         lead("old@example.com")
         application, _ = gold_services.submit_application(application_data(email="old@example.com"))
-        _, gold_thread = services.create_thread("old@example.com", "Gold chat", self.approver)
-        _, plain_thread = services.create_thread("old@example.com", "Lead chat", self.approver)
-        Thread.objects.filter(pk=plain_thread.pk).update(application=None)
+        _, gold_thread = services.create_thread("old@example.com", "Gold chat", self.approver, application=application)  # from the Gold page
+        _, plain_thread = services.create_thread("old@example.com", "Lead chat", self.approver, lead_email="old@example.com")  # from the lead page
         self.assertEqual(gold_thread.application_id, application.pk)
         self.assertEqual(outreach.correct_lead_email("old@example.com", "new@example.com", self.approver)[0], outreach.DONE)
         gold_thread.refresh_from_db()

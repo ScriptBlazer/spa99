@@ -21,6 +21,7 @@ from common.polling import parse_cursor
 from common.ratelimit import rate_limited_json
 from office.permissions import can_edit, editor, reader
 
+from . import sender as sender_mod
 from . import services
 from .models import Attachment, Message, Thread
 
@@ -111,7 +112,7 @@ def _urls(thread):
 @never_cache
 def thread(request, pk):
     """Context: thread {id, email, name, has_name, subject, labels, page_url, url, last_message_at, replies_to_mailbox, suppressed, reason, can_send, limits{file_bytes, send_bytes, files}},
-    chat_messages (the newest 30, oldest first, see services.message_dict), has_older, older_url, unread{count, first_id}, last_id, cursor (server time for the poll),
+    chat_messages (the newest 30, oldest first, see services.message_dict), sender {from, address, source, has_signature, signature_html} (who the next email goes out as), has_older, older_url, unread{count, first_id}, last_id, cursor (server time for the poll),
     reply_subject (what the subject box is filled with), gold {id, reference, status} when ?gold=<application id>, urls{poll, send, read, inbox, new, people}, plus the list context
     (rows ...) and `em` (the data the page embeds)."""
     thread_ = _thread(pk)
@@ -123,7 +124,7 @@ def thread(request, pk):
     context = {"thread": services.thread_dict(thread_, can_send=can_edit(request.user)), "chat_messages": [services.message_dict(m) for m in found], "has_older": older,
                "older_url": reverse("office_email_messages", args=[thread_.pk]) + (f"?before={found[0].pk}" if found else ""), "unread": {"count": count, "first_id": first_id},
                "last_id": found[-1].pk if found else 0, "cursor": timezone.now().isoformat(), "reply_subject": services.reply_subject(thread_), "gold": gold, "urls": _urls(thread_),
-               "section": "email", "replies_to_mailbox": services.replies_to_mailbox()}
+               "section": "email", "replies_to_mailbox": services.replies_to_mailbox(), "sender": sender_mod.composer_info(request.user)}
     context.update({k: v for k, v in _list_context(request).items() if k not in context and k not in ("page", "q", "filter", "more_url")})
     context.update({"page": 1, "q": "", "filter": "", "more_url": reverse("office_email") + "?page=2", "selected": str(thread_.pk)})
     context["em"] = {k: context[k] for k in ("thread", "chat_messages", "has_older", "older_url", "unread", "last_id", "cursor", "reply_subject", "gold", "urls", "replies_to_mailbox")}
@@ -234,6 +235,17 @@ def _recipient(request):
     return address, "", None, None if address else services.BAD_ADDRESS
 
 
+def _links(target, address):
+    """What a New email started from a page links its thread to (common.ownership, rule 1b): the person's account, the lead's address or the Gold application. Nothing for a typed address."""
+    if target is None:
+        return {}
+    if target.kind == "person" and target.user is not None:
+        return {"user": target.user}
+    if target.kind == "gold" and target.application is not None:
+        return {"application": target.application}
+    return {"lead_email": address} if target.kind == "lead" else {}
+
+
 @reader
 @require_GET
 @never_cache
@@ -246,7 +258,8 @@ def new_form(request):
         name = (target.user.get_full_name() if target.user else (target.application.full_name if target.application else "")) or ""
     context = {"recipient": {"email": address, "name": name, "person": ref, "error": services.WORDS.get(error, "") if error else ""}, "can_send": can_edit(request.user),
                "urls": {"create": reverse("office_email_new"), "people": reverse("office_email_people"), "inbox": reverse("office_email")}, "replies_to_mailbox": services.replies_to_mailbox(),
-               "limits": {"file_bytes": settings.EMAILCHAT_MAX_ATTACHMENT_BYTES, "send_bytes": settings.EMAILCHAT_MAX_SEND_BYTES, "files": settings.EMAILCHAT_MAX_ATTACHMENTS}, "section": "email"}
+               "limits": {"file_bytes": settings.EMAILCHAT_MAX_ATTACHMENT_BYTES, "send_bytes": settings.EMAILCHAT_MAX_SEND_BYTES, "files": settings.EMAILCHAT_MAX_ATTACHMENTS}, "section": "email",
+               "sender": sender_mod.composer_info(request.user)}
     context.update({k: v for k, v in _list_context(request).items() if k not in context and k not in ("page", "q", "filter", "more_url")})
     context.update({"page": 1, "q": "", "filter": "", "more_url": reverse("office_email") + "?page=2", "selected": ""})
     context["em_new"] = {k: context[k] for k in ("recipient", "urls", "limits", "can_send", "replies_to_mailbox")}
@@ -262,7 +275,7 @@ def new_create(request):
     wants_json = request.headers.get("accept", "").startswith("application/json") or request.headers.get("x-requested-with") == "fetch"
     if error:
         return _fail(error) if wants_json else redirect(reverse("office_email_new") + "?" + urlencode({"person": ref} if ref else {}))
-    result, thread_ = services.create_thread(address, request.POST.get("subject", ""), request.user, owner=target.user if target is not None and target.kind == "person" else None)
+    result, thread_ = services.create_thread(address, request.POST.get("subject", ""), request.user, **_links(target, address))
     if result != services.DONE:
         return _fail(result)
     message = None

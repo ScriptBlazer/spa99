@@ -1,9 +1,10 @@
 from django.contrib import admin
 
+from common import richtext
 from common.admin import ExportCsvMixin
 
 from . import services
-from .models import Attachment, Message, Thread
+from .models import Attachment, Message, StaffSender, Thread
 
 
 class MessageInline(admin.TabularInline):
@@ -36,7 +37,7 @@ class MessageAdmin(ExportCsvMixin, admin.ModelAdmin):
     list_filter = ("direction", "status", "spam")
     search_fields = ("thread__email", "subject", "body_text", "provider_id")
     raw_id_fields = ("thread", "author")
-    exclude = ("body_html",)  # the cleaned HTML is shown in the Office only, in a sandbox
+    exclude = ("body_html", "signature_html")  # the cleaned HTML is shown in the Office only, in a sandbox
 
     def delete_model(self, request, obj):  # UK GDPR: the files in storage go too, and the thread's last line is repaired
         services.erase_message(obj)
@@ -56,3 +57,15 @@ class AttachmentAdmin(admin.ModelAdmin):
 
     def delete_queryset(self, request, queryset):
         services.erase_attachments(list(queryset))
+
+
+@admin.register(StaffSender)
+class StaffSenderAdmin(admin.ModelAdmin):
+    """A team member's sending address and signature (also edited in System > Team > Email). The signature is cleaned on save here too."""
+    list_display = ("user", "sending_address", "updated_at")
+    search_fields = ("user__email", "sending_address")
+    raw_id_fields = ("user",)
+
+    def save_model(self, request, obj, form, change):
+        obj.signature_html = richtext.clean_signature(obj.signature_html)
+        super().save_model(request, obj, form, change)

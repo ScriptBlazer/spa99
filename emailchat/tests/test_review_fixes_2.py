@@ -60,7 +60,7 @@ class StrangerTests(Base):
 class MoveAddressTests(Base):
     def test_lead_threads_move_but_a_gold_linked_thread_account_or_application_only_threads_stay(self):
         application, _ = gold_services.submit_application(application_data(email="old@example.com"))
-        _, gold_thread = services.create_thread("old@example.com", "Gold chat", self.approver)
+        _, gold_thread = services.create_thread("old@example.com", "Gold chat", self.approver, application=application)  # started from the Gold page
         self.assertEqual(gold_thread.application_id, application.pk)
         Thread.objects.filter(pk=gold_thread.pk).update(lead_email="old@example.com")
         application_only = Thread.objects.create(email="old@example.com", subject="Application only", application=application)
@@ -157,7 +157,7 @@ class IncompleteTests(Base):
 class SmallFixTests(Base):
     def test_to_address_is_kept_when_the_lead_address_is_corrected(self):
         session = lead("old@example.com")
-        _, thread = services.create_thread("old@example.com", "Hello", self.approver)
+        _, thread = services.create_thread("old@example.com", "Hello", self.approver, lead_email="old@example.com")
         _, message = services.send(thread, self.approver, "Hello", "<p>Hi</p>")
         outreach.correct_lead_email("old@example.com", "new@example.com", self.approver)
         message.refresh_from_db()

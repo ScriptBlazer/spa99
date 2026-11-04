@@ -34,6 +34,21 @@ def _seed_staff_alert_email():
     SiteDefaults.objects.filter(pk=row.pk).update(staff_alert_seeded=True)
 
 
+INITIAL_GROUP_COPY_EMAIL = "staff@spa99.uk"  # the ONE place this address lives: first value of System > Defaults > "Copy of replies to the Office goes to"
+
+
+def _seed_group_copy_email():
+    """Same pattern as the payment alert address: fill it only the first time and only while empty, so an edit (or clearing it to switch the copy off) is never overwritten."""
+    from system.models import SiteDefaults
+
+    row = SiteDefaults.load()
+    if row.office_copy_seeded:
+        return
+    if not row.office_copy_email:
+        SiteDefaults.objects.filter(pk=row.pk).update(office_copy_email=INITIAL_GROUP_COPY_EMAIL)
+    SiteDefaults.objects.filter(pk=row.pk).update(office_copy_seeded=True)
+
+
 def seed_all():
     """Run every seed. Returns Counter of 'app.Model' -> rows created."""
     created = Counter()
@@ -47,6 +62,7 @@ def seed_all():
     for _, module in SEEDS:
         module.run(ensure)
     _seed_staff_alert_email()
+    _seed_group_copy_email()
     return created
 
 

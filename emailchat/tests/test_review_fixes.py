@@ -27,7 +27,7 @@ class CorrectedAddressTests(Base):
 
     def test_thread_moves_with_the_corrected_address_and_a_late_reply_still_lands(self):
         session = lead("wrong@example.com")
-        _, thread = services.create_thread("wrong@example.com", "Hello", self.approver)
+        _, thread = services.create_thread("wrong@example.com", "Hello", self.approver, lead_email="wrong@example.com")  # started from his lead page
         services.send(thread, self.approver, "Hello", "<p>Hi</p>")
         token = thread.token
         self.assertEqual(outreach.correct_lead_email("wrong@example.com", "right@example.com", self.approver)[0], outreach.DONE)
@@ -74,7 +74,7 @@ class UnverifiedAccountTests(Base):
         super().setUp()
         lead("victim@example.com")
         self.stranger = user_services.register_interest(cleaned(email="victim@example.com")).user
-        _, self.thread_v = services.create_thread("victim@example.com", "For Victim", self.approver)
+        _, self.thread_v = services.create_thread("victim@example.com", "For Victim", self.approver, lead_email="victim@example.com")  # started from his lead page
         services.send(self.thread_v, self.approver, "For Victim", "<p>Private</p>")
 
     def test_unverified_account_does_not_take_the_thread(self):

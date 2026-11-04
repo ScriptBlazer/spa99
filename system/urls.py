@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import views, views_code as c, views_defaults as d, views_faq as fq, views_assistant as asst, views_emails as e, views_rules as r, views_sales as sl, views_payments as pay, views_launch as lc, views_whatsapp as wa
+from . import views, views_code as c, views_defaults as d, views_faq as fq, views_assistant as asst, views_emails as e, views_rules as r, views_sales as sl, views_payments as pay, views_launch as lc, views_whatsapp as wa, views_team_email as te
 from .permissions import unlocked
 
 urlpatterns = [
@@ -120,6 +120,7 @@ urlpatterns = [
     path("team/<uuid:pk>/active/", views.team_active, name="system_team_active"),
     path("team/<uuid:pk>/remove/", views.team_remove, name="system_team_remove"),
     path("team/<uuid:pk>/invite/", views.team_invite, name="system_team_invite"),
+    path("team/<uuid:pk>/email/", te.team_email, name="system_team_email"),
     path("code/<slug:section>/", c.code, name="system_code"),
     path("code/<slug:section>/preview/", c.code_preview, name="system_code_preview"),
     path("code/<slug:section>/apply/", c.code_apply, name="system_code_apply"),

@@ -24,6 +24,7 @@ from django.utils.html import linebreaks
 from common import ownership, richtext
 from common.tasks import enqueue
 
+from . import sender as sender_mod
 from .models import Attachment, Message, Thread, ThreadRead
 
 logger = logging.getLogger("spa99.emailchat")
@@ -131,34 +132,30 @@ def reply_subject(thread, given=""):
 # ---------- threads and who they are ----------
 
 def resolve_links(thread, save=True):
-    """Find who owns this address: an account, a lead (he left it at the journey gate), a Gold application. Only a VERIFIED account is linked (an unverified account may carry
-    someone else's address: anyone can register with any address, so it never takes the thread, its owner link or its name). A link found now replaces the stored one; nothing
-    found never clears it. The owner link does not survive an address correction by itself: `move_address` moves the threads (and so the erasure still finds them)."""
-    from gold.models import GoldApplication
+    """The one automatic step: rule 1c of common.ownership. A thread that ALREADY has a lead address (set by staff, `ownership.link`) is linked to the account whose VERIFIED email is that
+    address, and its name comes from what it is linked to (the account, the lead's first name, the Gold application). Nothing else is ever linked here: an address typed on a public form
+    (the journey gate, Register, Gold apply) proves nothing, so it never sets or replaces `user`, `lead_email` or `application` on a thread, or its name. Before this, a Gold application typed
+    with a lead's address linked the lead's thread to that application, and deleting the application erased the lead's thread. Staff link a thread by hand (`create_thread`, `ownership.link`)."""
     from journey.models import JourneySession
     from users.models import User
 
-    user = User.objects.filter(email__iexact=thread.email, email_verified_at__isnull=False).first()
-    session = JourneySession.objects.filter(lead_email__iexact=thread.email, is_bot=False).order_by("-created_at").first()
-    application = GoldApplication.objects.filter(email__iexact=thread.email).order_by("-created_at").first()
+    lead = ownership.clean(thread.lead_email)
+    if thread.user_id is None and lead:
+        account = User.objects.filter(email__iexact=lead, email_verified_at__isnull=False).first()
+        if account is not None:
+            thread.user = account
     name = ""
-    if user is not None:
-        name = (user.get_full_name() or "").strip()
-    if not name and session is not None:
-        named = JourneySession.objects.filter(lead_email__iexact=thread.email, is_bot=False).exclude(lead_first_name="").order_by("-created_at").first()
+    if thread.user_id is not None:
+        name = (thread.user.get_full_name() or "").strip()
+    if not name and lead:
+        named = JourneySession.objects.filter(lead_email__iexact=lead, is_bot=False).exclude(lead_first_name="").order_by("-created_at").first()
         name = named.lead_first_name if named else ""
-    if not name and application is not None:
-        name = application.full_name
-    if user is not None:
-        thread.user = user
-    elif session is not None:
-        thread.lead_email = thread.email
-    if application is not None:
-        thread.application = application
+    if not name and thread.application_id is not None:
+        name = thread.application.full_name
     if name:
         thread.name = name[:100]
     if save:
-        thread.save(update_fields=["user", "lead_email", "application", "name"])
+        thread.save(update_fields=["user", "name"])
     return thread
 
 
@@ -182,29 +179,28 @@ def move_address(old, new):
 
 
 def relink(*addresses):
-    """An address was added or corrected: refresh the links of the threads on it. Best effort."""
+    """An address was proven or corrected: threads that staff already gave that lead address join up with the verified account (rule 1c, `resolve_links`). Best effort."""
     try:
-        for thread in Thread.objects.filter(email__in=[a.lower() for a in addresses if a]):
+        for thread in Thread.objects.filter(lead_email__in=[ownership.clean(a) for a in addresses if a], user__isnull=True):
             resolve_links(thread)
     except Exception:  # noqa: BLE001
         logger.exception("Could not refresh the email chat links")
 
 
-def create_thread(email, subject, actor=None, owner=None):
-    """A new thread for this address (always a new one: a person can have many). Returns (result, thread). `owner` is an account staff chose on purpose (they started the email from
-    that person's page): the thread is linked to it even when the account is unverified, so that page, his export and his erasure find it. That is staff's explicit choice, not
-    address matching: an unverified account still never picks up a thread that merely shares its address (common.ownership)."""
+def create_thread(email, subject, actor=None, **links):
+    """A new thread for this address (always a new one: a person can have many). Returns (result, thread). `links` are what staff chose on purpose by starting the email from a page:
+    `user=` (a person's page: linked even when the account is unverified, so his page, export and erasure find it), `lead_email=` (a lead's page) or `application=` (a Gold page). That is
+    the link rule's 1b (a NEW thread from a staff start action). An address staff only TYPED links nothing: it is found by its address, and staff link it from the thread."""
     address = clean_address(email)
     if not address:
         return BAD_ADDRESS, None
     subject = clean_subject(subject)
     if not subject:
         return NO_SUBJECT, None
-    thread = Thread(email=address, subject=subject, created_by=actor if getattr(actor, "pk", None) else None)
-    resolve_links(thread, save=False)
-    if owner is not None and thread.user_id is None:
-        thread.user = owner
-    thread.save()
+    thread = Thread.objects.create(email=address, subject=subject, created_by=actor if getattr(actor, "pk", None) else None)
+    if links:
+        ownership.link(thread, **links)
+        resolve_links(thread)
     return DONE, thread
 
 
@@ -321,13 +317,16 @@ def send(thread, actor, subject, html, uploads=()):
         return DUPLICATE, None
     from gold import audit
 
+    sender = sender_mod.sender_for(actor)  # decided now, at queue time: a retry keeps it
+    sign_html, sign_text = sender_mod.sign_off(actor)
     keys = []
     try:
         for name, data, content_type in files:
             keys.append((_store_file(thread, data), name, content_type, len(data)))
         with transaction.atomic():
             message = Message.objects.create(thread=thread, direction=Message.OUT, subject=subject, shows_subject=_shows_subject(thread, subject), body_text=text, body_html=clean, to_address=thread.email,
-                                             status=Message.QUEUED, author=actor if getattr(actor, "pk", None) else None, author_label=audit.label_for(actor))
+                                             status=Message.QUEUED, author=actor if getattr(actor, "pk", None) else None, author_label=audit.label_for(actor),
+                                             from_address=sender.address, from_name=sender.name, signature_html=sign_html, signature_text=sign_text)
             for key, name, content_type, size in keys:
                 Attachment.objects.create(message=message, key=key, filename=name, content_type=content_type, declared_type=content_type, size=size, checked=True)
             _touch_thread(thread, message)
@@ -438,15 +437,18 @@ def deliver(message):
     try:
         headers, own = _headers(message)
         Message.objects.filter(pk=message.pk).update(rfc_message_id=own, to_address=thread.email)  # the address it really goes to (a retry after a correction goes to the new one)
-        from_email, _ = emailsettings.sender_for(emailsettings.options_for("office_message"), SiteSettings.load())
+        if message.from_address:  # what it was queued with (sender.py), never worked out again
+            from_email = sender_mod.format_address(message.from_address, message.from_name)
+        else:  # queued before senders were stored: the site address, as before
+            from_email, _ = emailsettings.sender_for(emailsettings.options_for("office_message"), SiteSettings.load())
         attachments = []
         for item in message.attachments.all():
             with default_storage.open(item.key, "rb") as handle:
                 attachments.append((item.filename, handle.read(), item.declared_type or "application/octet-stream"))
-        reply_to = [reply_to_address(thread)] if inbound_domain() else None  # None: send_templated uses the contact (hello@) address
+        reply_to = [sender_mod.format_address(reply_to_address(thread), message.from_name or sender_mod.BRAND)] if inbound_domain() else None  # a name, so mail apps show "Barry, Spa 99"; None: send_templated uses the contact (hello@) address
         first_name = (thread.name or "").split(" ")[0]
         log = send_templated("office_message", [thread.email], message.subject, {"first_name": first_name}, subject_email=thread.email, headers=headers,
-                             html_body=message.body_html, plain_body=message.body_text, attachments=attachments, from_email=from_email or settings.DEFAULT_FROM_EMAIL, reply_to=reply_to)
+                             html_body=message.body_html, plain_body=message.body_text, signature_html=message.signature_html, signature_text=message.signature_text, attachments=attachments, from_email=from_email or settings.DEFAULT_FROM_EMAIL, reply_to=reply_to)
     except Exception:  # noqa: BLE001 - the outcome is recorded on the message, never raised
         logger.exception("Email chat message %s could not be prepared", message.pk)
         return _fail(message, "send_failed", "Could not be prepared.")
@@ -551,12 +553,15 @@ def record_inbound(payload, thread):
     too_complex = bool(html_in.strip() and not html and richtext.too_complex(html_in))  # nested or sized far beyond real mail: only its text is kept
     stripped, whole = _text(payload.get("StrippedTextReply"), MAX_INBOUND_TEXT).strip(), _text(payload.get("TextBody"), MAX_INBOUND_TEXT).strip()
     text = stripped or whole or richtext.html_to_text(html_in if too_complex else html)  # his new words, else his whole text, else the HTML as text (html_to_text is linear, so safe on raw input)
+    before = text
+    text, quoted = richtext.split_outlook_text(text)  # Outlook's From: / Sent: / To: / Subject: block (Postmark's own stripping does not know it): his words above it, the rest folds
+    full = (whole or before) if quoted or (stripped and whole != stripped) else ""
     subject = clean_subject(_text(payload.get("Subject"), 400))
     spam = _header(payload, "X-Spam-Status").strip().lower().startswith("yes")
     try:
         with transaction.atomic():
             message = Message.objects.create(
-                incomplete=True, claimed_at=now(), thread=thread, direction=Message.IN, subject=subject, shows_subject=_shows_subject(thread, subject), body_text=text, body_full=whole if stripped and whole != stripped else "",
+                incomplete=True, claimed_at=now(), thread=thread, direction=Message.IN, subject=subject, shows_subject=_shows_subject(thread, subject), body_text=text, body_full=full if full != text else "",
                 body_html=html, has_remote_images=bool(richtext.remote_image_count(html)), status=Message.RECEIVED, note=TOO_COMPLEX if too_complex else "", provider_id=provider_id or None,
                 rfc_message_id=clean_id(_text(_header(payload, "Message-ID"), 300)), in_reply_to=clean_id(_text(_header(payload, "In-Reply-To"), 300)),
                 references=clean_references(_text(_header(payload, "References"), 3000)), from_address=from_address, from_name=from_name, spam=spam)
@@ -632,11 +637,27 @@ def give_up_incomplete(dry_run=False, at=None):
     return count
 
 
+SIGNATURE_PICTURE_MAX = 100_000  # a signature picture is small; a photo he means to send is not
+SIGNATURE_NAMES = re.compile(r"^(?:image\d{1,4}|outlook-[\w-]+|spacer|facebook|linkedin|twitter|instagram|youtube|whatsapp|~wrd\d+|att\d+|[\w. -]*(?:signature|logo|banner|icon)[\w. -]*)\.(?:png|jpe?g|gif)$", re.I)
+
+
+def is_layout_picture(name, declared, size, cid, disposition, references, has_html):
+    """A picture that belongs to his email's layout (a signature logo), not a file he sent. Asked in this order: (1) his HTML points at it (cid: and the same Content-ID, the reliable test);
+    (2) the mail itself marked it inline (a Disposition or ContentDisposition of "inline", when Postmark gives one); (3) only when his email has HTML: a small image named like a signature
+    picture (image001.png, logo.png, banner.jpg ...). A Content-ID alone proves nothing: Gmail and Apple Mail give one to ordinary attachments too. Anything else stays a file."""
+    if cid and cid.lower() in references:
+        return True
+    if (disposition or "").strip().lower() == "inline":
+        return True
+    return bool(has_html and declared.startswith("image/") and size <= SIGNATURE_PICTURE_MAX and SIGNATURE_NAMES.match(name or ""))
+
+
 def store_inbound_files(message, items):
     """His attachments (Postmark `Attachments`: Name, Content base64, ContentType, ContentLength, ContentID). A file over the size limit, past the count limit or
     that cannot be decoded is dropped and the message gets a note. Each file goes straight to the default storage (web and worker share no disk, so S3 is the
     one safe place to hand bytes over: the task queue only ever holds ids). Returns the number kept."""
     kept, notes, limit = 0, [], settings.EMAILCHAT_MAX_ATTACHMENT_BYTES
+    references = {c.lower() for c in richtext.cid_names(message.body_html)}
     items = [i for i in (items or []) if isinstance(i, dict)]
     for index, item in enumerate(items):
         name = safe_filename(_text(item.get("Name"), 300), fallback="file")
@@ -658,8 +679,9 @@ def store_inbound_files(message, items):
         key = _store_file(message.thread, data)  # a storage failure is not caught: the webhook answers 500 and Postmark retries
         declared = _text(item.get("ContentType"), 100).split(";")[0].strip().lower()
         cid = _text(item.get("ContentID"), 300).strip().removeprefix("cid:").strip("<>")
-        Attachment.objects.create(message=message, key=key, filename=name, content_type="application/octet-stream", declared_type=declared, size=len(data), content_id=cid)
-        kept += 1
+        layout = is_layout_picture(name, declared, len(data), cid, _text(item.get("Disposition") or item.get("ContentDisposition"), 40), references, bool(message.body_html))
+        Attachment.objects.create(message=message, key=key, filename=name, content_type="application/octet-stream", declared_type=declared, size=len(data), content_id=cid, inline_ref=layout)
+        kept += 0 if layout else 1  # stored and erased all the same, but a signature picture is not "a file": no paperclip, no list
     base = TOO_COMPLEX if message.note.startswith(TOO_COMPLEX) else ""  # rebuilt each time, never appended to: a retry (the queue failed, Postmark sends it again) stores the files again
     note = " ".join(x for x in [base, *notes] if x)[:500]
     if note != message.note:
@@ -688,8 +710,87 @@ def check_files(message):
 def push_payload(message):
     thread = message.thread
     who = thread.name or message.from_name or thread.email
-    first = preview_of(message.body_text) or ("Sent a file" if message.attachments.exists() else "New email")
+    first = preview_of(message.body_text) or ("Sent a file" if message.attachments.filter(inline_ref=False).exists() else "New email")
     return {"title": f"Email from {who}", "body": f"{message.subject}: {first}"[:100] if message.subject else first[:100], "url": _office("office_email_thread", thread.pk), "tag": f"email-{thread.pk}"}
+
+
+# ---------- the copy of his reply to the group ----------
+
+GROUP_COPY = "office_group_copy"  # EmailLog.template of the copy (subject_email is his address, so the erasure finds it)
+GROUP_COPY_HEADER = "X-Spa99-Group-Copy"
+GROUP_COPY_TEXT = 3000  # characters of his words in the copy; the thread has the rest
+
+
+def group_copy_address():
+    """Where the copy goes (System > Defaults), or '' for off. Never an address on the reply domain: a copy sent there would land in an Office thread (or be refused), not reach the group."""
+    from system import defaults
+
+    address = clean_address(defaults.get().office_copy_email)
+    domain = inbound_domain()
+    if not address or (domain and address.rpartition("@")[2] in (domain, f"mail.{domain}")):
+        return ""
+    return address
+
+
+def is_group_copy(payload):
+    """True for mail that carries our own copy header: a copy that was forwarded or answered by robot must never be stored as his reply (no loop)."""
+    return bool(_header(payload, GROUP_COPY_HEADER).strip())
+
+
+def group_copy_content(message):
+    """(subject, text, html) of the short plain copy: who wrote, his subject and words, his files named (not attached), and the way to answer, a link to the thread in the Office."""
+    from django.utils.html import escape
+
+    thread = message.thread
+    name = (message.from_name or thread.name or "").strip()
+    who = f"{name} <{message.from_address or thread.email}>" if name else (message.from_address or thread.email)
+    subject = message.subject or thread.subject or DEFAULT_SUBJECT
+    words = (message.body_text or "").strip()
+    words = words[:GROUP_COPY_TEXT].rstrip() + (" ..." if len(words) > GROUP_COPY_TEXT else "")
+    files = [a.filename for a in message.attachments.filter(inline_ref=False)]
+    link = settings.OFFICE_URL + _office("office_email_thread", thread.pk)
+    lines = [f"{who} wrote to the Office.", f"Subject: {subject}", "", words or "(no text)"]
+    if files:
+        lines += ["", "Files, named here and not attached: " + ", ".join(files)]
+    lines += ["", "Answer in the Office, not by replying to this email:", link]
+    text = "\n".join(lines)
+    paragraphs = [f"{escape(who)} wrote to the Office.<br>Subject: {escape(subject)}", escape(words or "(no text)").replace("\n", "<br>")]
+    if files:
+        paragraphs.append(escape("Files, named here and not attached: " + ", ".join(files)))
+    paragraphs.append(f'<b>Answer in the Office</b>, not by replying to this email:<br><a href="{escape(link)}">{escape(link)}</a>')
+    return f"Reply in the Office: {subject}"[:300], text, "".join(f"<p>{p}</p>" for p in paragraphs)
+
+
+def copy_to_group(message):
+    """Email his reply once to the group address (System > Defaults), from a worker. Not spam, not our own email, never twice: the claim on `group_copied_at` is one conditional update, so a
+    Postmark retry or a task that runs again copies nothing more. A copy that could not be sent gives the claim back (the email log row says why). Reply-To is the group address itself, so
+    "Reply" in a mail app goes to the group and never to him, and there is no reply+ address in it, so nothing in the copy can find its way back into a thread. Returns a word for the log."""
+    if message.direction != Message.IN or message.spam:
+        return "not copied"
+    address = group_copy_address()
+    if not address:
+        return "copy is off"
+    if not Message.objects.filter(pk=message.pk, group_copied_at__isnull=True).update(group_copied_at=now()):
+        return "already copied"
+    from notifications import emailsettings
+    from notifications.models import EmailLog
+    from notifications.services import send_templated
+
+    try:
+        subject, text, html = group_copy_content(message)
+        headers = {GROUP_COPY_HEADER: "1", "Auto-Submitted": "auto-generated", "X-Auto-Response-Suppress": "All", "X-PM-Tag": "office-group-copy"}
+        from_email = sender_mod.format_address(sender_mod.site_address(), f"{sender_mod.BRAND} Office") if sender_mod.site_address() else settings.DEFAULT_FROM_EMAIL
+        log = send_templated(GROUP_COPY, [address], subject, {"first_name": ""}, subject_email=message.thread.email, headers=headers, html_body=html, plain_body=text,
+                             options=emailsettings.options_for(GROUP_COPY, {"footer_mode": "no_contact"}),  # internal: no "write to hello@" line
+                             from_email=from_email, reply_to=[address])  # Reply-To: the group itself, never him and never the thread
+        ok = log.status == EmailLog.SENT
+    except Exception:  # noqa: BLE001 - a copy must never stop the push
+        logger.exception("Could not copy email message %s to the group", message.pk)
+        ok = False
+    if not ok:
+        Message.objects.filter(pk=message.pk).update(group_copied_at=None)
+        return "copy failed"
+    return "copied"
 
 
 # ---------- his HTML, for the sandboxed frame ----------
@@ -751,8 +852,13 @@ def frame_csp(images=False):
 
 # ---------- what the pages need ----------
 
-def _first(label):
-    return (label or "").split(" (")[0].split("@")[0].split(" ")[0]
+def _first(label, has_address=False):
+    """His first name from "Name (email)". A bare email (an account with no name) gives its prefix only on older rows: where the email went out From a stored sending address there is no
+    fallback, the sheet says "Spa 99"."""
+    label = label or ""
+    if " (" not in label and "@" in label:
+        return "" if has_address else label.split("@")[0]
+    return label.split(" (")[0].split(" ")[0]
 
 
 def attachment_dict(item):
@@ -763,7 +869,7 @@ def attachment_dict(item):
 def message_dict(message):
     """{id, direction, subject, shows_subject, body_text, body_full, body_html (ours: cleaned, safe to show; his: always empty), frame_url and frame_images_url (his HTML: a
     sandboxed frame; empty when he sent plain text), has_remote_images, status, error{reason, can_retry} or null, author, author_id, author_first_name, from_address,
-    from_name, to_address (ours: where it was sent), from_other (it came from an address other than the thread's), spam, note, incomplete (his email is still being stored: its files may be missing), attachments[{id, filename, type, size, url, inline, is_image}], created_at, sent_at, retry_url}."""
+    from_name, sent_from (ours: the whole From it went with, "Name" <address>, or ""), signature_html (ours: cleaned, as sent), to_address (ours: where it was sent), from_other (it came from an address other than the thread's), spam, note, incomplete (his email is still being stored: its files may be missing), attachments[{id, filename, type, size, url, inline, is_image}], created_at, sent_at, retry_url}."""
     reason = ""
     if message.status in Message.BAD:
         reason = REASONS.get(message.error_code, REASONS["send_failed"])[0]
@@ -776,11 +882,25 @@ def message_dict(message):
     return {"id": message.pk, "direction": message.direction, "subject": message.subject, "shows_subject": message.shows_subject, "body_text": message.body_text,
             "body_full": message.body_full, "body_html": html if mine else "", "frame_url": frame, "frame_images_url": frame + "?images=1" if frame else "",
             "has_remote_images": message.has_remote_images, "status": message.status, "error": {"reason": reason, "can_retry": can} if reason else None, "author": message.author_label,
-            "author_id": str(message.author_id) if message.author_id else "", "author_first_name": _first(message.author_label), "from_address": message.from_address,
+            "author_id": str(message.author_id) if message.author_id else "", "author_first_name": _first(message.author_label, bool(message.from_address and mine)), "from_address": message.from_address,
+            "sent_from": sender_mod.format_address(message.from_address, message.from_name) if (mine and message.from_address) else "", "signature_html": richtext.clean_signature(message.signature_html) if mine else "",
             "from_name": message.from_name, "to_address": (message.to_address or message.thread.email) if mine else "", "from_other": bool(not mine and message.from_address != message.thread.email), "spam": message.spam, "note": message.note,
             "incomplete": bool(message.incomplete and not mine),
-            "attachments": [attachment_dict(a) for a in message.attachments.all()], "created_at": message.created_at.isoformat(), "sent_at": message.sent_at.isoformat() if message.sent_at else "",
+            "attachments": [attachment_dict(a) for a in message.attachments.all() if not a.inline_ref], "created_at": message.created_at.isoformat(), "sent_at": message.sent_at.isoformat() if message.sent_at else "",
             "retry_url": _office("office_email_retry", message.thread_id, message.pk) if can else ""}
+
+
+def display_name(thread):
+    """The name the thread header shows: the resolved name, else the name on his latest email from the thread's own address (a forwarded mail's sender is somebody else), else ''. One line,
+    no control characters, at most 100 characters; the page shows it as text (the template escapes it, the script uses text nodes)."""
+    if thread.name:
+        return thread.name
+    row = (Message.objects.filter(thread=thread, direction=Message.IN, spam=False, from_address=thread.email).exclude(from_name="").order_by("-id").values_list("from_name", flat=True).first())
+    name = " ".join(re.sub(r"[\x00-\x1f\x7f]", " ", row or "").split())
+    if len(name) > 1 and name[0] == name[-1] and name[0] in "\"'":  # "Dan Smith" with its own quotes
+        name = name[1:-1].strip()
+    name = name[:100]
+    return "" if name.lower() == thread.email else name
 
 
 def thread_dict(thread, can_send=False):
@@ -805,7 +925,8 @@ def thread_dict(thread, can_send=False):
         session = JourneySession.objects.filter(lead_email__iexact=thread.lead_email, is_bot=False).order_by("-created_at").values_list("pk", flat=True).first()
         page = _office("office_lead", session) if session else ""
     suppressed = suppression.is_suppressed(thread.email)
-    return {"id": str(thread.pk), "email": thread.email, "name": thread.name or thread.email, "has_name": bool(thread.name), "subject": thread.subject, "labels": labels, "page_url": page,
+    name = display_name(thread)
+    return {"id": str(thread.pk), "email": thread.email, "name": name or thread.email, "has_name": bool(name), "subject": thread.subject, "labels": labels, "page_url": page,
             "url": _office("office_email_thread", thread.pk), "last_message_at": thread.last_message_at.isoformat() if thread.last_message_at else "",
             "replies_to_mailbox": replies_to_mailbox(), "suppressed": suppressed, "reason": "This address bounced or marked an email as spam: nothing can be sent to it." if suppressed else "",
             "can_send": bool(can_send and not suppressed),
@@ -866,12 +987,12 @@ def timeline_entries(threads):
     out = []
     for thread in threads:
         href = _office("office_email_thread", thread.pk)
-        rows = list(Message.objects.filter(thread=thread).order_by("id").values_list("direction", "created_at", "subject", "status", "error_code", "author_label", "spam"))
+        rows = list(Message.objects.filter(thread=thread).order_by("id").values_list("direction", "created_at", "subject", "status", "error_code", "author_label", "spam", "from_address"))
         first_out = next((r for r in rows if r[0] == Message.OUT), None)
         if first_out is not None:
-            out.append((first_out[1], "email_chat", f"First email sent by {_first(first_out[5]) or 'the team'}", first_out[2], href))
+            out.append((first_out[1], "email_chat", f"First email sent by {_first(first_out[5], bool(first_out[7])) or 'the team'}", first_out[2], href))
         days = {}
-        for direction, at, subject, status, code, author, spam in rows:
+        for direction, at, subject, status, code, author, spam, _from in rows:
             if direction == Message.OUT and status in Message.BAD:
                 out.append((at, "email_failed", "Email bounced" if status == Message.BOUNCED else "Email not sent", REASONS.get(code, REASONS["send_failed"])[0], href))
             if spam:
@@ -939,7 +1060,7 @@ def erase_for_application(application):
 
 def refresh_has_attachment(thread_ids):
     for pk in set(thread_ids):
-        Thread.objects.filter(pk=pk).update(has_attachment=Attachment.objects.filter(message__thread_id=pk).exists())
+        Thread.objects.filter(pk=pk).update(has_attachment=Attachment.objects.filter(message__thread_id=pk, inline_ref=False).exists())
 
 
 def erase_attachments(items):

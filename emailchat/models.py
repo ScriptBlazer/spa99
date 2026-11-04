@@ -88,6 +88,9 @@ class Message(models.Model):
     claimed_at = models.DateTimeField(null=True, blank=True, help_text="The worker that took this send (a send is never made twice).")
     incomplete = models.BooleanField(default=False, db_default=False, help_text="His email is stored but its files or its worker task are not done yet: Postmark's retry of the same MessageID finishes it.")
     notified_at = models.DateTimeField(null=True, blank=True, help_text="The team push for this email was taken by a worker (it is never pushed twice).")
+    signature_html = models.TextField(blank=True, default="", db_default="", help_text="Ours: the signature this email went with, cleaned (common.richtext.clean_signature), as it was when the email was queued. Not part of body_html.")
+    signature_text = models.TextField(blank=True, default="", db_default="", help_text="Ours: the plain text sign-off this email went with (the plain text copy's last lines).")
+    group_copied_at = models.DateTimeField(null=True, blank=True, help_text="His reply was copied to the group address (taken by a worker once; Postmark's retries never copy it twice).")
     legacy_person_message = models.UUIDField(null=True, blank=True, unique=True, help_text="The old outreach.PersonMessage this was copied from (backfill_email_threads).")
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     updated_at = models.DateTimeField(default=timezone.now, db_index=True, help_text="Changed when the status changes: the poll reads it.")
@@ -112,7 +115,21 @@ class Attachment(models.Model):
     size = models.PositiveIntegerField(default=0)
     content_id = models.CharField(max_length=300, blank=True, help_text="The Content-ID an inline picture in his HTML points at (cid:).")
     inline_ok = models.BooleanField(default=False)
+    inline_ref = models.BooleanField(default=False, db_default=False, help_text="Part of his email's layout (a picture his HTML points at, or a signature picture), not a file he sent: stored and erased, never listed as a file.")
     checked = models.BooleanField(default=False, help_text="The worker has looked at its first bytes.")
 
     class Meta:
         ordering = ["id"]
+
+
+class StaffSender(models.Model):
+    """What a staff member's Office emails go out with (System > Team > Email): a sending address when his own login address is not on the sending domain, and his signature.
+    One row per person, made on first save. Erased with the account (CASCADE); the signature is cleaned HTML (common.richtext.clean_signature)."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="email_sender")
+    sending_address = models.CharField(max_length=254, blank=True, default="", help_text="Lower case, on the sending domain. Used only when his own login address is not.")
+    signature_html = models.TextField(blank=True, default="", help_text="Cleaned HTML: tables, text, links and pictures only. Pictures may be /static/common/img/email/... (made absolute from SITE_URL when sent).")
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"Email sender for {self.user_id}"

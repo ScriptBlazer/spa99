@@ -123,7 +123,9 @@ export class EmailThread {
   }
 
   addressOf(m) {
-    return m.direction === 'out' ? `To ${m.to_address || this.thread.email}` : (m.from_address || 'Address not shown');
+    if (m.direction !== 'out') return m.from_address || 'Address not shown';
+    const to = `To ${m.to_address || this.thread.email}`;
+    return m.from_address ? `From ${m.from_address}. ${to}` : to;   // the address it went out from (older emails have none stored)
   }
 
   statusNode(m) {
@@ -185,6 +187,11 @@ export class EmailThread {
       const body = h('div', { class: 'o-em-body', dir: 'auto' });
       body.innerHTML = m.body_html; // ours only: the server cleaned it (common.richtext), the one allowed innerHTML
       part.append(body);
+      if (m.signature_html) {   // what went under it, as sent: collapsed, cleaned by the server (common.richtext.clean_signature), the second allowed innerHTML
+        const sig = h('div', { class: 'o-em-sendas-body' });
+        sig.innerHTML = m.signature_html;
+        part.append(h('details', { class: 'o-em-sendas', 'data-signature': '' }, h('summary', { class: 'o-em-sendas-sum', text: 'Signature as sent' }), sig));
+      }
     } else if (m.frame_url) this.buildFrame(m, part);
     else this.buildText(m, part);
     part.append(h('div', { class: 'o-em-extras', 'data-extras': '' }), h('div', { class: 'o-em-foot-slot', 'data-foot-slot': '' }));
@@ -298,9 +305,15 @@ export class EmailThread {
     state.ro.observe(doc.body);
   }
 
-  /** Hide every `.quoted` and any outermost blockquote with no text after it. Outlook's quotes carry no marker, so they stay shown. If folding would leave nothing to read, nothing folds. */
+  /** Hide every `.quoted`, any outermost blockquote with no text after it, and Outlook's quote: the server puts an empty `.em-fold-from` in front of it (Outlook's own markers are stripped), and
+   *  that marker and everything after it in the document fold. If folding would leave nothing to read, nothing folds. */
   foldQuotes(state, doc) {
     const marks = new Set();
+    const from = doc.querySelector('.em-fold-from');
+    if (from) {
+      marks.add(from);
+      for (let node = from; node && node !== doc.body; node = node.parentElement) for (let el = node.nextElementSibling; el; el = el.nextElementSibling) marks.add(el);   // the marker's later siblings, then those of each parent
+    }
     for (const el of doc.querySelectorAll('.quoted')) if (!el.parentElement.closest('.quoted')) marks.add(el);
     for (const el of doc.querySelectorAll('blockquote')) {
       if (el.parentElement.closest('blockquote, .quoted')) continue;

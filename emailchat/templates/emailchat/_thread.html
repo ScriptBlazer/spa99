@@ -29,6 +29,7 @@
       <div class="o-em-cbody">
         <p class="o-em-to">To <!--email_off-->{{ thread.email }}<!--/email_off--><button type="button" class="o-quiet" data-subject-toggle aria-expanded="false">Change subject</button></p>
         <label class="o-em-subject-field" data-subject-row hidden><span class="sr-only">Subject</span><input type="text" class="o-em-input" data-subject-input maxlength="200" value="{{ reply_subject }}" aria-label="Subject" dir="auto" autocomplete="off" enterkeyhint="next"></label>
+        {% include "emailchat/_sendas.html" %}
         {% if replies_to_mailbox %}<p class="o-em-quiet">He will reply to the hello@ mailbox.</p>{% endif %}
         {% include "emailchat/_editor.html" with label="Reply to "|add:thread.name placeholder="Write your reply" %}
         <p class="o-em-discard-row"><button type="button" class="o-quiet o-em-close-desk" data-reply-close-desk>Close</button><button type="button" class="o-quiet" data-discard>{% include "office/_icon.html" with name="trash" %}Discard</button></p>

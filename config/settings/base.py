@@ -222,6 +222,9 @@ EMAILCHAT_MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024  # one file, in or out (Postma
 EMAILCHAT_MAX_SEND_BYTES = 9 * 1024 * 1024  # all files of one email we send (Postmark caps the message at 10 MB after base64)
 EMAILCHAT_MAX_INBOUND_BYTES = 50 * 1024 * 1024  # the whole inbound POST (Postmark's own limit is 35 MB of mail, base64 makes the JSON bigger)
 EMAILCHAT_MAX_ATTACHMENTS = 20
+# The one domain Postmark may send from (the verified one: where hello@ lives). Office emails go From a staff member's own address only when it is on this domain. Blank = the domain of
+# DEFAULT_FROM_EMAIL (emailchat.sender.sending_domain), so nothing is typed twice.
+EMAIL_SENDING_DOMAIN = (ENV.get("EMAIL_SENDING_DOMAIN", "") or "").strip().lower().strip(".")
 
 LANGUAGE_CODE = "en-gb"
 TIME_ZONE = "Europe/London"

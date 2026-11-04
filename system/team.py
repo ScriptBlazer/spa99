@@ -46,7 +46,7 @@ def rows(actor):
         level, approver = levels.held(user)
         final = levels.held_roles(user)[1] and levels.can_hold_final_approver(user)
         approver = approver and levels.can_hold_approver(user)
-        result.append({"user": user, "level": level, "level_label": levels.LABELS[level], "approver": approver, "final_approver": final,
+        result.append({"user": user, "level": level, "level_label": levels.LABELS[level], "approver": approver, "final_approver": final, "can_edit_email": user.pk == actor.pk or levels.can_manage(actor, user),
                        "role_labels": [name for name, held in ((levels.APPROVER_GROUP, approver), (levels.FINAL_APPROVER_GROUP, final)) if held],
                        "can_manage": levels.can_manage(actor, user), "invite_pending": not user.has_usable_password()})
     return result
@@ -241,3 +241,66 @@ def merge_accounts(actor, keep_email, remove_email):
     record_direct(actor, "team", "users.user", keep, "merged", moved["removed_email"], keep.email, sentence=sentence)
     audit.log_event(SystemEvent.ROLE_CHANGED, user=actor, detail={"kept": keep.email, "removed": moved["removed_email"], "moved": {k: v for k, v in moved.items() if k != "removed_email"}}, sentence=sentence)
     return keep, moved
+
+
+# ---------- Office email: sending address and signature ----------
+
+def can_edit_email(actor, target):
+    """Same level as the other staff settings in Team (strictly below you; a superuser may manage another superuser), and your own: a signature is yours to edit."""
+    return target.pk == actor.pk or levels.can_manage(actor, target)
+
+
+def email_sender_of(target):
+    from emailchat.models import StaffSender
+
+    return StaffSender.objects.filter(user=target).first()
+
+
+def check_email_sender(sending_address, signature):
+    """(clean address, clean signature, {field: message}): the sending address must be on the sending domain (the one Postmark is verified for), the signature is cleaned to the
+    signature allow-list (a signature that is something but cleans to nothing, or is too long, is refused rather than saved empty)."""
+    from django.core.validators import validate_email
+
+    from common import richtext
+    from emailchat import sender as sender_mod
+
+    errors = {}
+    address = sender_mod.clean_address(sending_address)
+    if address:
+        try:
+            validate_email(address)
+        except ValidationError:
+            errors["sending_address"] = "That does not look like an email address."
+        else:
+            if not sender_mod.on_sending_domain(address):
+                errors["sending_address"] = f"The sending address must end in @{sender_mod.sending_domain()}: only that domain can send."
+    raw = (signature or "").replace("\x00", "").strip()
+    cleaned = richtext.clean_signature(raw)
+    if raw and not cleaned:
+        errors["signature"] = f"That signature could not be used: it is over {richtext.MAX_SIGNATURE:,} characters, too complicated, or nothing safe was left in it."
+    return address, cleaned, errors
+
+
+@transaction.atomic
+def save_email_sender(actor, target, sending_address, signature):
+    """Save the sending address and signature of a team member. Returns (changed, errors): errors is {} when saved. Recorded in the audit log (what changed, never the signature itself)."""
+    if not team_queryset().filter(pk=target.pk).exists():
+        raise ChangeRefused("That person is not on the team. Members are managed in the Office.")
+    if not can_edit_email(actor, target):
+        raise ChangeRefused("Only a superuser can change another superuser." if target.is_superuser else "You can only change people below your own level.")
+    address, cleaned, errors = check_email_sender(sending_address, signature)
+    if errors:
+        return False, errors
+    from django.utils import timezone
+
+    from emailchat.models import StaffSender
+
+    row, _ = StaffSender.objects.get_or_create(user=target)
+    changed = [name for name, new in (("sending address", address), ("signature", cleaned)) if (row.sending_address if name == "sending address" else row.signature_html) != new]
+    if not changed:
+        return False, {}
+    row.sending_address, row.signature_html, row.updated_at = address, cleaned, timezone.now()
+    row.save()
+    audit.log_event(SystemEvent.ROLE_CHANGED, user=actor, detail={"person": target.email, "changed": changed, "sending_address": address},
+                    sentence=f"Changed the Office email {' and '.join(changed)} for {target.email}")
+    return True, {}

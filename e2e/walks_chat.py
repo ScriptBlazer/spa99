@@ -204,6 +204,8 @@ def email_chat(w):
         assert token and f"reply+{token}@reply.e2e.example" in str(message["Reply-To"]), message["Reply-To"]
         html = message.get_body(preferencelist=("html",)).get_content()
         assert "<strong>welcome</strong>" in html or "<b>welcome</b>" in html, "The bold word is not bold in the email"
+        assert "Spa 99" in str(message["From"]) and "Spa 99" in str(message["Reply-To"]).split("<")[0], (message["From"], message["Reply-To"])  # a display name on both (2026-11-04); UNRUN, written with the sender change
+        assert "<h1" not in html and "Kind regards" in html and "Kind regards" in mailbox.text_body(message), "An Office email has no heading and ends in a sign-off (no signature set in this walk)"
     with w.step("His formatted reply arrives (a signed-in Postmark post, found by the poll) and shows in the sandboxed frame", office):
         html_body = ('<p>Thanks, that is <b>great</b>.</p><script>window.__pwned = 1</script><img src="https://tracker.example/pixel.gif" width="1" height="1">'
                      '<p>Regards, Wanda</p><blockquote>Hello Wanda, welcome</blockquote>')
@@ -223,6 +225,8 @@ def email_chat(w):
         assert office.locator("[data-em-thread-root] script:not([type='application/json'])").count() == 0, "A script is in the Office page"
         assert "Outside pictures are hidden." in office.locator("[data-em-thread-root]").inner_text()
         assert office.locator(".o-em-toggle", has_text="Show earlier text").count() == 1, "The quoted history is not folded"
+        copy = mailbox.wait_for("", "Reply in the Office")  # the copy to the group address (System > Defaults, seeded); UNRUN, written with the group copy
+        assert "Answer in the Office" in mailbox.text_body(copy) and "Thanks, that is great." in mailbox.text_body(copy) and "reply+" not in str(copy), "The group copy is wrong or carries a reply address"
     with w.step("Reply from the thread: the editor, bold, send; a second email goes out with Re:", office):
         office.locator("[data-reply-open]").click()
         editor = office.locator("[data-composer] [data-ed-editable]")

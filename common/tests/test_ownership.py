@@ -45,8 +45,9 @@ class Base(OfficeTestCase):
         self.assertEqual(response.status_code, 201, response.content)
         return GoldApplication.objects.get(email__iexact=over.get("email", "dan@example.com"))
 
-    def thread_with_words(self, email=VICTIM, words="Private reply from the victim"):
-        _, thread = emailchat.create_thread(email, "Gold chat", self.admin)
+    def thread_with_words(self, email=VICTIM, words="Private reply from the victim", **links):
+        """A thread staff started. `links` are what starting it from a page links it to (user=, lead_email=, application=); an address typed by staff links nothing."""
+        _, thread = emailchat.create_thread(email, "Gold chat", self.admin, **links)
         EmailMessage.objects.create(thread=thread, direction="in", body_text=words, status="received")
         thread.refresh_from_db()
         return thread
@@ -68,7 +69,7 @@ class StrangerRegistersWithAVictimsAddressTests(Base):
         application = self.apply(self.public_client(), email=VICTIM)
         self.assertIsNone(application.user_id)  # an unverified account never takes the application
         thread = self.thread_with_words()
-        self.assertEqual(thread.application_id, application.pk)
+        self.assertIsNone(thread.application_id)  # a Gold application typed with his address never links his thread, so deleting that application cannot erase it (test below)
         self.assertNotIn("Private reply from the victim", self.export(stranger))
         office(self.admin, "post", f"/people/{stranger.pk}/delete/")
         self.assertFalse(User.objects.filter(pk=stranger.pk).exists())
@@ -93,7 +94,7 @@ class StrangerRegistersWithAVictimsAddressTests(Base):
         verify(member)
         application.refresh_from_db()
         thread.refresh_from_db()
-        self.assertEqual((application.user_id, thread.user_id), (member.pk, member.pk))
+        self.assertEqual((application.user_id, thread.user_id), (member.pk, None))  # verifying proves the address: his export and erasure find the thread by it, no link is written
         self.assertIn("Dan's own reply", self.export(member))
 
     def test_approving_and_the_invite_still_work_for_an_application_with_no_account_link(self):
@@ -190,7 +191,7 @@ class MergeOfAnUnverifiedAccountTests(Base):
         gone = self.register(VICTIM, mobile="07912345602")
         application, _ = gold_services.submit_application(application_data(email=VICTIM, mobile="+447912345699"))
         GoldApplication.objects.filter(pk=application.pk).update(user=gone)  # as the old code linked it
-        thread = self.thread_with_words()
+        thread = self.thread_with_words(application=application)  # staff started it from the application's page
         chat = Contact.objects.create(phone="+447912345699", application=application, lead_email=VICTIM)
         boss = User.objects.create_user("boss@example.com", "x-Pass-123456", is_superuser=True, is_staff=True)
         merge.merge(boss, keep, gone)
@@ -205,7 +206,7 @@ class MergeOfAnUnverifiedAccountTests(Base):
 class GoldDeleteTests(Base):
     def test_deleting_an_applicants_application_erases_his_threads_and_chats(self):
         application, _ = gold_services.submit_application(application_data(email="solo@example.com", mobile="+447400555001"))
-        thread = self.thread_with_words("solo@example.com", "applicant words")
+        thread = self.thread_with_words("solo@example.com", "applicant words", application=application)
         chat = whatsapp.get_or_create_contact("+447400555001")
         WhatsAppMessage.objects.create(contact=chat, direction="in", kind="text", body="applicant chat", status="received")
         self.link(chat, "gold", application.pk)  # staff linked it from the Gold page: the application and the applicant's address
@@ -220,8 +221,10 @@ class GoldDeleteTests(Base):
     def test_a_thread_owned_by_an_account_stays_reachable(self):
         member = User.objects.create_user("acc@example.com", "a-long-test-password-1", email_verified_at=timezone.now())
         application, _ = gold_services.submit_application(application_data(email="acc@example.com"))
-        thread = self.thread_with_words("acc@example.com", "his words")
-        self.assertEqual(thread.user_id, member.pk)
+        thread = self.thread_with_words("acc@example.com", "his words", application=application)
+        Thread.objects.filter(pk=thread.pk).update(user=member)  # staff also started one from his person page
+        thread.refresh_from_db()
+        self.assertEqual((thread.user_id, thread.application_id), (member.pk, application.pk))
         office(self.admin, "post", f"/gold/{application.pk}/delete/")
         self.assertTrue(Thread.objects.filter(pk=thread.pk, user=member).exists())
 
@@ -233,7 +236,7 @@ class JoinsUpOnVerifyTests(Base):
         chat = whatsapp.get_or_create_contact("+447400123792")
         self.link(chat, "lead", session.pk)
         WhatsAppMessage.objects.create(contact=chat, direction="in", kind="text", body="hugo chat", status="received")
-        thread = self.thread_with_words("hugo@example.com", "hugo thread")
+        thread = self.thread_with_words("hugo@example.com", "hugo thread", lead_email="hugo@example.com")  # started from his lead page
         member = self.register("hugo@example.com", mobile="07400 123792")
         self.assertNotIn("hugo thread", self.export(member))
         verify(member)

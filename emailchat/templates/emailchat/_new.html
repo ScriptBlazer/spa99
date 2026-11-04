@@ -24,6 +24,7 @@ Desktop: swaps into the reading pane. Context: recipient{email, name, person, er
         <input id="em-subject" class="o-em-input" type="text" maxlength="200" dir="auto" autocomplete="off" enterkeyhint="next" required aria-describedby="em-subject-err" data-subject-input>
         <p class="o-em-field-err" id="em-subject-err" data-subject-error role="alert" hidden></p>
       </div>
+      {% include "emailchat/_sendas.html" %}
       {% if replies_to_mailbox %}<p class="o-em-quiet">He will reply to the hello@ mailbox.</p>{% endif %}
       <div class="o-em-field o-em-field--body">
         {% include "emailchat/_editor.html" with label="Message" placeholder="Write your message" %}

@@ -108,7 +108,7 @@ class SendingTests(Base):
         self.assertEqual(message.subject, "Re: Hello")  # no subject typed: Re: and the thread's subject
         sent = mail.outbox[-1]
         self.assertEqual(sent.to, ["him@example.com"])
-        self.assertEqual(sent.reply_to, [f"reply+{self.thread.token}@{DOMAIN}"])
+        self.assertEqual(sent.reply_to, [f"Spa 99 <reply+{self.thread.token}@{DOMAIN}>"])  # a display name, so mail apps show one
         self.assertEqual(sent.extra_headers["In-Reply-To"], "<first@mail.example.com>")
         self.assertEqual(sent.extra_headers["References"], "<root@mail.example.com> <first@mail.example.com>")
         self.assertEqual(sent.extra_headers["X-PM-Metadata-chat"], str(message.pk))

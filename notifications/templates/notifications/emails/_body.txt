@@ -1,6 +1,8 @@
 {% autoescape off %}SPA 99
 
-{{ body_text }}
+{{ body_text }}{% if signature_text %}
+
+{{ signature_text }}{% endif %}
 
 -- 
 {{ footer.text }}{% if notice or unsubscribe_url %}

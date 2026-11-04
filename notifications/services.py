@@ -66,6 +66,7 @@ def render_email(template, ctx, body=None, values=None, button_url=None, blocks=
     ctx["footer"] = emailsettings.footer_context(options, ctx)
     layout = "gold_approver" if template == "gold_approver_repeat" else template  # one layout, the repeat panel shows on is_repeat
     spec = emailbody.spec_for(template)
+    personal = False
     if blocks and template == "mailing":  # a group mailing built from parts (mailings/blocks.py); no parts = the old body
         from mailings import blocks as mailing_blocks
 
@@ -80,6 +81,12 @@ def render_email(template, ctx, body=None, values=None, button_url=None, blocks=
         clean = richtext.clean_outgoing(ctx["html_body"])
         ctx["body_html"] = mark_safe(clean)  # safe only because it has just been through the allow-list
         ctx["body_text"] = ctx["plain_body"] if ctx.get("plain_body") is not None else richtext.html_to_text(clean)
+        sign = ctx.pop("signature_html", "") or ""
+        if sign:  # his signature: the wider signature allow-list, our own picture addresses made absolute
+            ctx["signature_html"] = mark_safe(richtext.absolute_images(richtext.clean_signature(sign), settings.SITE_URL))  # safe only because it has just been through clean_signature
+        ctx["signature_text"] = (ctx.get("signature_text") or "").strip()
+        ctx["heading"] = ""  # a personal email has no big title repeating its subject (Office emails and the group copy)
+        personal = True
         layout = "_body"
     elif ctx.get("plain_body") is not None:  # words typed by a person, sent as typed (the Gold decline message)
         ctx["body_html"], ctx["body_text"] = emailbody.render_plain(ctx["plain_body"])
@@ -88,7 +95,7 @@ def render_email(template, ctx, body=None, values=None, button_url=None, blocks=
         ctx["body_html"], ctx["body_text"] = render_editable(template, ctx, body=body, values=values, button_url=button_url, options=options)
         layout = "_body"
     if layout == "_body":
-        if options.heading:
+        if options.heading and not personal:
             ctx["heading"] = fill_subject(options.heading, values if values is not None else emailbody.values_for(spec, ctx))
         ctx.setdefault("heading", ctx.get("subject", "").removeprefix("[Test] "))
         ctx.setdefault("preheader", emailbody.preview_text(ctx["body_text"]))
@@ -141,7 +148,8 @@ def fill_subject(text, values):
     return text
 
 
-def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None, plain_body=None, blocks=None, attachments=None, from_email=None, reply_to=None, options=None, html_body=None):
+def send_templated(template, to, subject, context=None, cc=None, subject_email="", headers=None, body=None, plain_body=None, blocks=None, attachments=None, from_email=None, reply_to=None, options=None, html_body=None,
+                   signature_html=None, signature_text=None):
     """Render the email, send, and log. Returns the EmailLog. Editable emails (notifications/emailbody.py) use the shared
     layout `_body` and the stored or default wording; the Gold approver emails render their own template files.
     `to` and `cc` are lists of addresses. `subject_email` is the person the message is about when it goes to
@@ -149,7 +157,7 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
     `headers` are extra mail headers (List-Unsubscribe); `body` replaces the stored wording (a group mailing); `plain_body` is
     text a person typed, sent as typed in the shared layout; `blocks` are a group mailing's parts (used instead of `body`);
     `attachments` is a list of (filename, bytes, mimetype); `from_email` and `reply_to` (a list) replace the sender the email's
-    settings choose; `html_body` is rich text staff composed: it is cleaned to the allow-list again here (common.richtext) before it is marked safe, and `plain_body` (if given) is the plain text copy; `options` (emailsettings.Options) replace its saved footer, sender, heading and button settings (a test send from the edit screen)."""
+    settings choose; `html_body` is rich text staff composed: it is cleaned to the allow-list again here (common.richtext) before it is marked safe, and `plain_body` (if given) is the plain text copy; `options` (emailsettings.Options) replace its saved footer, sender, heading and button settings (a test send from the edit screen). `signature_html` and `signature_text` (only with `html_body`) go under the text: the signature is cleaned by `common.richtext.clean_signature` before it is marked safe, and a key of that name in `context` is ignored, like `html_body`. An email with `html_body` has no heading."""
     to, cc = list(to or []), list(cc or [])
     try:
         blocked = suppression.suppressed_set(to + cc)  # THE guard: every email goes through here
@@ -172,9 +180,14 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
                 subject_email=(subject_email or "").strip().lower(), error="Address is on the suppression list (bounce or complaint).")
             return log
     ctx = {**base_context(), "subject": subject, **(context or {})}
-    ctx.pop("html_body", None)  # only the argument below can switch this on, never a context key
+    for key in ("html_body", "signature_html", "signature_text"):
+        ctx.pop(key, None)  # only the arguments below can switch these on, never a context key
     if html_body is not None:
         ctx["html_body"] = html_body
+        if signature_html:
+            ctx["signature_html"] = signature_html
+        if signature_text:
+            ctx["signature_text"] = signature_text
     if plain_body is not None:
         ctx["plain_body"] = plain_body
     log = EmailLog(

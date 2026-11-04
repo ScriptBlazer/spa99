@@ -57,6 +57,9 @@ def inbound(request):
     if thread is None:
         logger.info("Inbound email for an unknown or missing reply token: not stored")
         return HttpResponse(status=200)
+    if services.is_group_copy(payload):
+        logger.warning("Inbound email carries the group copy header: not stored (it would loop)")
+        return HttpResponse(status=200)
     if not isinstance(payload.get("MessageID"), str) or not payload["MessageID"].strip():
         logger.warning("Inbound email without a MessageID: not stored")
         return HttpResponse(status=200)

@@ -175,6 +175,14 @@ a.o-em-who > .o-icon { color: var(--office-muted); flex: none; }
 .o-em-to { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin: 0; color: var(--office-muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
 .o-em-to .o-quiet { min-height: 2.25rem; color: var(--office-text); text-decoration: underline; text-underline-offset: 0.2em; }
 .o-em-quiet { margin: 0; color: var(--office-muted); font-size: var(--text-sm); }
+/* "From Barry, Spa 99 <...>, with your signature": one quiet line; open, a preview of what is added (cleaned HTML from the server, scaled to the pane). Also used in a sent sheet as "Signature as sent". */
+.o-em-sendas { margin: 0; color: var(--office-muted); font-size: var(--text-sm); }
+.o-em-sendas-sum { min-height: 2.25rem; display: flex; align-items: center; cursor: pointer; overflow-wrap: anywhere; }
+.o-em-sendas-body { margin: var(--space-1) 0 var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--office-radius); background: var(--office-caramel-tint); max-height: 16rem; overflow: auto; color: var(--office-text); }
+.o-em-sendas-body table { max-width: 100% !important; }
+.o-em-sendas-body > table { width: 100% !important; max-width: 37.5rem !important; }
+.o-em-sendas-body img { max-width: 100% !important; height: auto !important; }
+.o-em-sendas-body p { margin: 0 0 0.5em; }
 .o-em-subject-field { display: block; }
 .o-em-subject-field[hidden] { display: none; }
 .o-em-discard-row { display: flex; justify-content: space-between; margin: 0; }
