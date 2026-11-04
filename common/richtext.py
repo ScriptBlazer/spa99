@@ -72,17 +72,20 @@ def clean_outgoing(html):
 MAX_DEPTH = 400  # real mail nests a few dozen levels (tables in tables)
 MAX_TAGS = 50_000  # `<` characters in the whole HTML. nh3's time is not bounded by depth alone: it is quadratic in some shapes (`<div/>`, `<div <>`, `<x-a></x-b>`, and mis-nested
 # `<span><div></span></div>`), whatever the depth counter says. Measured at this cap the worst shape takes well under a second; real newsletters hold a few thousand `<`.
+MAX_HTML = 300_000  # characters of HTML. The tag budget cannot see inside one tag: nh3's time is quadratic in the number of different attributes on a tag (203,000 of them in 1 MB took
+# 33 s; 0.7 s at 240,000 characters), and a quoted `>` hides how many tags there are, so no count of `<` or `>` bounds it. Total size does: at this cap the worst shape measured about a
+# second. A real newsletter is 20 to 100 KB (an 18,000 `<` one about 150 KB), so a mail over this is refused (its text is kept) rather than risk a worker for half a minute.
 NAME = re.compile(r"(/?)([a-zA-Z][^\s/>]*)")  # the start of what sits between a `<` and the next `>`
 NO_NESTING = {"br", "img", "hr", "wbr", "input", "meta", "link", "area", "base", "col", "source", "track", "embed", "p", "li", "td", "th", "tr", "option", "dd", "dt"}  # void or closed by the next one
 
 
 def too_complex(html):
-    """True when the markup is refused as hostile or absurd: more than MAX_TAGS `<` characters, or nested deeper than MAX_DEPTH. Linear in the size of the input: `<` is counted
+    """True when the markup is refused as hostile or absurd: longer than MAX_HTML, more than MAX_TAGS `<` characters, or nested deeper than MAX_DEPTH. Linear in the size of the input: `<` is counted
     first (no tag can hide from that), then one pass jumps from `<` to the next `>` with str.find, so no input can make it back up. An end tag only counts when a start tag of
     that name is open. A `/>` ending does not close anything (HTML ignores it on these tags). This is a guard, not a parser: the depth it reports can differ from nh3's
     either way (mis-nested or sloppy mail), which is why the tag count, not the depth, is what bounds the cleaner's time."""
     html = html or ""
-    if html.count("<") > MAX_TAGS:
+    if len(html) > MAX_HTML or html.count("<") > MAX_TAGS:
         return True
     depth, open_by_name, pos = 0, {}, 0
     while True:
@@ -112,7 +115,7 @@ def too_complex(html):
 
 def clean_incoming(html):
     """What a person sent us. Images are allowed in the markup (src http, https or cid:) and the display endpoint decides whether they load. Markup that is `too_complex`
-    (over MAX_TAGS, or deeper than MAX_DEPTH) is not cleaned at all (the cleaner's time grows with the square of the size in bad shapes): '' comes back, and the caller keeps the plain text."""
+    (over MAX_HTML or MAX_TAGS, or deeper than MAX_DEPTH) is not cleaned at all (the cleaner's time grows with the square of the size in bad shapes): '' comes back, and the caller keeps the plain text."""
     if too_complex(html):
         return ""
     return _run(html, IN_TAGS, RAW_ATTRS_IN, IN_STYLES, SCHEMES | {"cid"}).strip()

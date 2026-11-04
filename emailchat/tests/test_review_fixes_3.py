@@ -7,6 +7,7 @@ from unittest import mock
 from django.urls import reverse
 from django.utils import timezone
 
+from common import richtext
 from emailchat import services
 from emailchat.models import Message, Thread
 from emailchat.tests.test_emailchat import Base, inbound_post, office, payload_for
@@ -19,7 +20,17 @@ def _fill(unit, size=1_000_000):
     return (unit * (size // len(unit) + 1))[:size]
 
 
+def _attributes(count, template="a%d", tag="div"):
+    return f"<{tag} " + " ".join(template % i for i in range(count)) + ">"
+
+
+CAP = richtext.MAX_HTML
 SHAPES = {
+    # attribute floods: nh3 is quadratic in the different attributes on one tag, and a quoted `>` hides them from any count of `<` or `>`
+    "1 MB of attributes": _attributes(200_000), "1 MB of quoted > attributes": _attributes(110_000, 'a%d=">"'), "1 MB of attributes, never closed": _attributes(200_000)[:-1],
+    "attributes just under the size cap": _attributes((CAP - 12) // 7), "quoted > attributes just under the cap": _attributes((CAP - 12) // 12, 'a%d=">"'),
+    "x-tag attributes just under the cap": _attributes((CAP - 12) // 7, tag="x-a"), "many tags with 5000 attributes": "".join(_attributes(5_000) for _ in range(CAP // 40_000)),
+    "just under the cap, many tags": _fill("<span><div></span></div>", CAP), "just under the cap, a newsletter": _fill("<table><tr><td><div><p>x</p></div></td></tr></table>", CAP),
     "div/": _fill("<div/>"), "div <>": _fill("<div <>"), 'div a="<"': _fill('<div a="<">'), "x-a x-b": _fill("<x-a></x-b>"),
     "span div misnest": _fill("<span><div></span></div>"), "deep": "<div>" * 200_000, "wide": _fill("<p>a</p>"), "comments": _fill("<!-- a -->"),
     "entities": _fill("&amp;&lt;&#x41;"), "unclosed": _fill("<a"), "unclosed with a late >": _fill("<a<") + ">",
@@ -36,12 +47,25 @@ class HostileHtmlBudgetTests(Base):
             self.assertEqual(inbound_post(payload).status_code, 200, name)
             times[name] = time.monotonic() - started
             message = Message.objects.get(provider_id=f"pm-shape-{number}")
-            if message.body_html == "":  # refused: the text is kept and the note says so
+            if message.body_html == "" and richtext.too_complex(html):  # refused: the text is kept and the note says so
                 self.assertEqual(message.note, services.TOO_COMPLEX, name)
         if os.environ.get("SHOW_TIMES"):
             for name, took in sorted(times.items(), key=lambda item: -item[1]):
                 print(f"{took:6.2f}s  {name}")
         self.assertLess(max(times.values()), 2.5, times)
+
+    def test_the_size_cap_refuses_big_html_and_a_normal_newsletter_still_passes(self):
+        newsletter = "<table><tr><td><div><p>x</p></div></td></tr></table>" * 1_800  # 18,000 `<`, about 100 KB
+        self.assertEqual(newsletter.count("<"), 18_000)
+        self.assertFalse(richtext.too_complex(newsletter))
+        self.assertNotEqual(richtext.clean_incoming(newsletter), "")
+        self.assertTrue(richtext.too_complex("x" * (richtext.MAX_HTML + 1)))
+        self.assertFalse(richtext.too_complex("x" * richtext.MAX_HTML))
+        payload = {**payload_for(self.thread, text="", message_id="pm-big"), "HtmlBody": "<p>kept words</p>" + "x" * richtext.MAX_HTML}
+        self.assertEqual(inbound_post(payload).status_code, 200)
+        message = Message.objects.get(provider_id="pm-big")
+        self.assertEqual((message.body_html, message.note), ("", services.TOO_COMPLEX))
+        self.assertIn("kept words", message.body_text)
 
     def test_the_budget_refuses_by_tag_count_and_lets_real_mail_through(self):
         from common import richtext
