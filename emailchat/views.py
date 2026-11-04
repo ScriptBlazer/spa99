@@ -165,7 +165,7 @@ def poll(request, pk):
     if since is not None:
         if timezone.is_naive(since):
             since = timezone.make_aware(since)
-        updates = [services.message_dict(m) for m in _messages(thread_).filter(pk__lte=after, updated_at__gt=since).order_by("id")[:100]]
+        updates = [services.message_dict(m) for m in services.poll_updates(_messages(thread_), after, since, cursor).order_by("id")[:100]]
     return JsonResponse({"messages": [services.message_dict(m) for m in new], "updates": updates, "thread": services.thread_dict(thread_, can_send=can_edit(request.user)),
                          "unread_total": services.unread_total(request.user), "last_id": new[-1].pk if new else after, "cursor": cursor.isoformat()})
 
@@ -344,7 +344,7 @@ def _start(request, kind, pk):
     from office import tools
 
     target = tools.target_for(kind, pk)
-    latest = services.latest_thread(target.addresses, target.user, target.application)
+    latest = services.latest_thread(services.addresses_for(target.user, target.addresses), target.user, target.application)
     gold = f"?gold={pk}" if kind == "gold" else ""
     if latest is not None:
         return redirect(reverse("office_email_thread", args=[latest.pk]) + gold)

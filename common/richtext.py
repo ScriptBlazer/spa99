@@ -69,8 +69,36 @@ def clean_outgoing(html):
     return _run(html, OUT_TAGS, RAW_ATTRS_OUT, OUT_STYLES, SCHEMES).strip()
 
 
+MAX_DEPTH = 400  # real mail nests a few dozen levels (tables in tables); nh3 takes seconds, and more, to clean tens of thousands
+TAG = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9]*)[^<>]*>")
+NO_NESTING = {"br", "img", "hr", "wbr", "input", "meta", "link", "area", "base", "col", "source", "track", "embed", "p", "li", "td", "th", "tr", "option", "dd", "dt"}  # void or closed by the next one
+
+
+def too_deep(html):
+    """True when the markup nests deeper than MAX_DEPTH. One pass; an end tag only counts when a start tag of that name is open, so stray end tags cannot hide a deep stack.
+    It can only over-count (sloppy mail that never closes its tags), never under-count."""
+    depth, open_by_name = 0, {}
+    for match in TAG.finditer(html or ""):
+        closing, name = match.group(1), match.group(2).lower()
+        if name in NO_NESTING:
+            continue
+        if closing:
+            if open_by_name.get(name):
+                open_by_name[name] -= 1
+                depth -= 1
+        elif not match.group(0).endswith("/>"):
+            open_by_name[name] = open_by_name.get(name, 0) + 1
+            depth += 1
+            if depth > MAX_DEPTH:
+                return True
+    return False
+
+
 def clean_incoming(html):
-    """What a person sent us. Images are allowed in the markup (src http, https or cid:) and the display endpoint decides whether they load."""
+    """What a person sent us. Images are allowed in the markup (src http, https or cid:) and the display endpoint decides whether they load. Markup nested deeper than
+    MAX_DEPTH is not cleaned at all (the cleaner's time grows with the square of the depth): '' comes back, and the caller keeps the plain text."""
+    if too_deep(html):
+        return ""
     return _run(html, IN_TAGS, RAW_ATTRS_IN, IN_STYLES, SCHEMES | {"cid"}).strip()
 
 
@@ -82,15 +110,26 @@ def cid_names(clean_html):
     return set(re.findall(r'<img\b[^>]*\ssrc="cid:([^"]+)"', clean_html or "", re.I))
 
 
+QUOTE_MARKS = 8  # how many "> " a line shows: a deeper quote is still one quote to read, and a hostile mail cannot make every line thousands of characters long
+
+
 class _Text(HTMLParser):
+    """Collects lines as [quote depth, text]. Everything is one pass over the input: nothing here looks back or forward over the lines collected so far."""
     BLOCKS = {"p", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "table", "pre", "hr"}
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.out, self.href, self.link_from, self.skip, self.quote, self.lists = [], None, 0, 0, 0, []
+        self.lines, self.cur, self.href, self.link, self.skip, self.quote, self.lists = [], [], None, [], 0, 0, []
+        self.level = 0
 
     def nl(self):
-        self.out.append("\n" + "> " * self.quote)  # every line of a quote starts "> "
+        self.lines.append((self.level, "".join(self.cur)))
+        self.cur, self.level = [], self.quote  # every line of a quote starts "> "
+
+    def add(self, text):
+        self.cur.append(text)
+        if self.href is not None:
+            self.link.append(text)
 
     def handle_starttag(self, tag, attrs):
         if tag in ("script", "style", "head", "title"):
@@ -105,16 +144,16 @@ class _Text(HTMLParser):
             self.nl()
             if self.lists and self.lists[-1][0] == "ol":
                 self.lists[-1][1] += 1
-                self.out.append(f"{self.lists[-1][1]}. ")
+                self.add(f"{self.lists[-1][1]}. ")
             else:
-                self.out.append("- ")
+                self.add("- ")
         elif tag == "blockquote":
             self.quote += 1
             self.nl()
         elif tag in self.BLOCKS:
             self.nl()
         elif tag == "a":
-            self.href, self.link_from = dict(attrs).get("href"), len(self.out)
+            self.href, self.link = dict(attrs).get("href"), []
 
     def handle_endtag(self, tag):
         if tag in ("script", "style", "head", "title"):
@@ -133,36 +172,44 @@ class _Text(HTMLParser):
             self.nl()
         elif tag == "a" and self.href:
             href = self.href.strip()
-            shown = "".join(self.out[self.link_from:])
+            shown = "".join(self.link)
             if href.lower().startswith("mailto:"):
                 target = href[7:].split("?")[0].strip()
             else:
                 target = href if href.startswith(("http://", "https://")) else ""
             if target and target not in shown:
-                self.out.append(f" ({target})")
+                self.add(f" ({target})")
             self.href = None
 
     def handle_data(self, data):
-        if not self.skip:
-            self.out.append(data)
+        if self.skip:
+            return
+        first, *rest = data.replace("\xa0", " ").split("\n")
+        self.add(first)
+        for part in rest:  # a newline in the source is a line break (and the next line keeps its quote marks)
+            self.nl()
+            self.add(part)
 
 
 def html_to_text(html):
-    """A readable plain text copy: blocks become lines, list items start "- " (numbered lists keep their numbers), every quoted line "> ", links and mailto: addresses are kept in brackets."""
+    """A readable plain text copy: blocks become lines, list items start "- " (numbered lists keep their numbers), every quoted line "> " (at most QUOTE_MARKS deep), links and
+    mailto: addresses are kept in brackets. Linear in the size of the input. A line that holds only a typed ">" is kept; a line with nothing on it is a gap."""
     parser = _Text()
     parser.feed(html or "")
     parser.close()
-    text = "".join(parser.out).replace("\xa0", " ")
-    raw = [line.rstrip() for line in text.split("\n")]
-    lines, blank = [], False
-    for i, line in enumerate(raw):
-        empty = not line.replace(">", "").strip()
-        if empty:
-            before = next((x for x in reversed(lines) if x), "")
-            after = next((x for x in raw[i + 1:] if x.replace(">", "").strip()), "")
-            line = ">" if line.startswith(">") and before.startswith(">") and after.startswith(">") else ""  # a gap inside a quote keeps its ">"
-            if blank and not line:
-                continue
-        blank = not line
-        lines.append(line)
-    return "\n".join(lines).strip()
+    parser.nl()
+    lines = [(level, text.rstrip()) for level, text in parser.lines]
+    after, next_level = [0] * len(lines), 0  # the quote depth of the next line with words on it, found by one pass from the end
+    for i in range(len(lines) - 1, -1, -1):
+        after[i] = next_level
+        if lines[i][1].strip():
+            next_level = lines[i][0]
+    out, before, blank = [], 0, False
+    for i, (level, text) in enumerate(lines):
+        if text.strip():
+            out.append("> " * min(level, QUOTE_MARKS) + text)
+            before, blank = level, False
+        elif not blank:
+            out.append(">" if level and before and after[i] else "")  # a gap inside a quote keeps its ">"
+            blank = True
+    return "\n".join(out).strip()

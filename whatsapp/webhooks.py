@@ -67,7 +67,7 @@ def status(request):
     if refused:
         return refused
     if services.to_e164(request.POST.get("From", "")) == services.sender():
-        services.apply_status(request.POST.dict())
+        services.apply_status(request.POST.dict(), request.GET.get("m"))
     return _empty()
 
 

@@ -194,7 +194,10 @@ def timeline(sessions, user=None, interest=None, applications=(), email="", addr
                               "Applied for Gold" if e.action == ApplicationEvent.SUBMITTED else ("Gold application marked Contacted" if whatsapp_contacted else f"Gold: {text}"),
                               " ".join(x for x in (a.reference, f"by {e.actor_label}" if e.actor_label else "") if x), _href("office_gold_application", a.pk)))
     if email:
-        for log in EmailLog.objects.filter(to__iexact=email).order_by("-created_at")[:defaults.get().person_emails_shown]:
+        logs = EmailLog.objects.filter(to__iexact=email)
+        if user is not None and not user.email_verified_at:
+            logs = logs.exclude(template="office_message")  # what staff wrote to this address is the lead's, not an unverified account's (anyone can register any address)
+        for log in logs.order_by("-created_at")[:defaults.get().person_emails_shown]:
             out.append(_entry(log.sent_at or log.created_at, "email", f"Email: {log.subject}", log.get_status_display()))
     if addresses:
         from outreach import services as outreach_services
@@ -209,7 +212,7 @@ def timeline(sessions, user=None, interest=None, applications=(), email="", addr
     if addresses or user is not None:
         from emailchat import services as emailchat
 
-        for at, kind, label, detail, href in emailchat.timeline_entries(list(emailchat.threads_for(addresses, user))):  # across all his threads: the first, one a thread a day, bounces
+        for at, kind, label, detail, href in emailchat.timeline_entries(list(emailchat.threads_for(emailchat.addresses_for(user, addresses), user))):  # across all his threads: the first, one a thread a day, bounces
             out.append(_entry(at, kind, label, detail, href))
     out.sort(key=lambda e: e["_at"], reverse=True)
     for e in out:

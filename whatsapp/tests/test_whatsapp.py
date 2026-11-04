@@ -170,7 +170,7 @@ class SendingTests(Base):
             result, message = services.send_text(self.contact, self.approver, "Hello *Daniel*")
         self.assertEqual(result, services.DONE)
         kwargs = call.call_args.kwargs
-        self.assertEqual((call.call_args.args[0], kwargs["body"], kwargs["status_callback"]), (PHONE, "Hello *Daniel*", "https://spa99.uk/twilio/whatsapp/status/"))
+        self.assertEqual((call.call_args.args[0], kwargs["body"], kwargs["status_callback"]), (PHONE, "Hello *Daniel*", f"https://spa99.uk/twilio/whatsapp/status/?m={message.pk}"))  # the message id rides in the address
         message.refresh_from_db()
         self.assertEqual((message.twilio_sid, message.status), ("SMnew", "queued"))
 

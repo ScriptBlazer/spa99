@@ -80,6 +80,7 @@ class Message(models.Model):
     references = models.TextField(blank=True)
     from_address = models.CharField(max_length=254, blank=True, help_text="Lower case. His: who it came from (it can differ from the thread address, e.g. forwarded mail).")
     from_name = models.CharField(max_length=200, blank=True)
+    to_address = models.CharField(max_length=254, blank=True, default="", db_default="", help_text="Ours: the address it was sent to (the thread's address can be corrected later). Blank on older rows: the thread's address.")
     spam = models.BooleanField(default=False, help_text="Postmark's X-Spam-Status said Yes: stored, marked, never pushed or counted unread.")
     note = models.CharField(max_length=500, blank=True, help_text="Something staff should know about this email, e.g. a file that was too big to keep.")
     error_code = models.CharField(max_length=20, blank=True)

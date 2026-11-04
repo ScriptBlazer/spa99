@@ -123,7 +123,7 @@ export class EmailThread {
   }
 
   addressOf(m) {
-    return m.direction === 'out' ? `To ${this.thread.email}` : (m.from_address || 'Address not shown');
+    return m.direction === 'out' ? `To ${m.to_address || this.thread.email}` : (m.from_address || 'Address not shown');
   }
 
   statusNode(m) {
@@ -169,7 +169,7 @@ export class EmailThread {
     const part = art.querySelector('[data-open-part]');
     part.hidden = !open;
     if (open && !part.dataset.built) { this.buildBody(m, part); part.dataset.built = '1'; }
-    if (open) this.patchFoot(m, part);
+    if (open) { this.patchExtras(m, part); this.patchFoot(m, part); }
     if (open) this.frames.get(m.id)?.show?.();
   }
 
@@ -187,9 +187,21 @@ export class EmailThread {
       part.append(body);
     } else if (m.frame_url) this.buildFrame(m, part);
     else this.buildText(m, part);
-    if (m.attachments.length) part.append(this.filesNode(m));
-    if (m.note) part.append(h('p', { class: 'o-em-filenote', text: m.note }));
-    part.append(h('div', { class: 'o-em-foot-slot', 'data-foot-slot': '' }));
+    part.append(h('div', { class: 'o-em-extras', 'data-extras': '' }), h('div', { class: 'o-em-foot-slot', 'data-foot-slot': '' }));
+    this.patchExtras(m, part);
+  }
+
+  /** The files, the note and the "still loading" line. Rebuilt only when one of them changed, so a poll that brings the files of an email that was still being stored shows them. */
+  patchExtras(m, part) {
+    const slot = part.querySelector('[data-extras]');
+    if (!slot) return;
+    const key = JSON.stringify([m.attachments.map((a) => a.id), m.note || '', !!m.incomplete]);
+    if (slot.dataset.key === key) return;
+    slot.dataset.key = key;
+    slot.replaceChildren();
+    if (m.attachments.length) slot.append(this.filesNode(m));
+    if (m.incomplete) slot.append(h('p', { class: 'o-em-filenote', 'data-incomplete': '', text: 'Still loading its attachments. This updates by itself.' }));
+    if (m.note) slot.append(h('p', { class: 'o-em-filenote', text: m.note }));
   }
 
   buildText(m, part) {

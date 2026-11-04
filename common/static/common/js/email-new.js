@@ -98,20 +98,22 @@ export class NewEmail {
     const mine = ++this.seq;
     if (text.length < 2) { this.closeList(); return; }
     let results = [];
+    let limited = false;
     try {
       const response = await fetch(`${this.urls.people}?q=${encodeURIComponent(text)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
       if (response.ok) results = (await response.json()).results || [];
+      else if (response.status === 429) limited = true; // too many searches in a minute: say so, never show an empty list
     } catch { /* the typed address below still works */ }
     if (mine !== this.seq) return;
-    this.renderOptions(text, results);
+    this.renderOptions(text, results, limited);
   }
 
-  renderOptions(text, results) {
+  renderOptions(text, results, limited = false) {
     const rows = results.map((r) => ({ type: 'person', r }));
     if (looksLikeAddress(text) && !results.some((r) => r.email === text.toLowerCase())) rows.push({ type: 'typed', text: text.trim() });
     this.options = rows;
     this.list.replaceChildren();
-    if (!rows.length) { this.closeList(); return; }
+    if (!rows.length && !limited) { this.closeList(); return; }
     rows.forEach((row, i) => {
       const li = h('li', { class: 'o-em-option', role: 'option', id: `em-opt-${i}`, 'aria-selected': 'false' });
       if (row.type === 'typed') li.append(h('span', { class: 'o-em-opt-main' }, h('span', { class: 'o-em-opt-name', dir: 'auto', text: `Use ${row.text}` })));
@@ -127,6 +129,7 @@ export class NewEmail {
       li.addEventListener('click', () => this.pick(i));
       this.list.append(li);
     });
+    if (limited) this.list.append(h('li', { class: 'o-em-option is-off', role: 'presentation', text: 'Too many searches just now. Wait a minute, or type the full address.' }));
     this.list.hidden = false;
     this.input.setAttribute('aria-expanded', 'true');
     this.setActive(-1);
@@ -134,7 +137,7 @@ export class NewEmail {
 
   setActive(i) {
     this.active = i;
-    [...this.list.children].forEach((li, n) => li.setAttribute('aria-selected', String(n === i)));
+    [...this.list.children].forEach((li, n) => { if (li.getAttribute('role') === 'option') li.setAttribute('aria-selected', String(n === i)); });
     if (i >= 0) { this.input.setAttribute('aria-activedescendant', `em-opt-${i}`); this.list.children[i].scrollIntoView({ block: 'nearest' }); } else this.input.removeAttribute('aria-activedescendant');
   }
 

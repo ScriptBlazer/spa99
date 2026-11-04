@@ -31,3 +31,8 @@ def process_inbound(message_id):
     if not Message.objects.filter(pk=message.pk, notified_at__isnull=True).update(notified_at=timezone.now()):  # the push is taken once, even if the task runs again
         return "already pushed"
     return f"pushed {push.notify_payload(services.push_payload(message))}"
+
+
+def give_up_incomplete_scheduled():
+    """Hourly (common/management/commands/register_schedules.py): emails incomplete over a day stop saying they are loading."""
+    return f"gave up on {services.give_up_incomplete()} incomplete emails"

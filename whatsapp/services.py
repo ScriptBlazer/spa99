@@ -144,6 +144,7 @@ def get_or_create_contact(phone, profile_name=""):
 
 def owner_of_phone(phone, exclude_email="", exclude_user=None):
     """Who already has this number ({name, url}), or None. Used to refuse the same number on two people (two people would share one chat)."""
+    from gold.models import GoldApplication
     from journey.models import JourneySession
     from users.models import User
 
@@ -163,6 +164,16 @@ def owner_of_phone(phone, exclude_email="", exclude_user=None):
     found = sessions.order_by("-created_at").first()
     if found is not None:
         return {"name": found.lead_first_name or found.lead_email.lower(), "url": _office("office_lead", found.pk)}
+    applications = GoldApplication.objects.filter(mobile=phone)  # a Gold applicant's number counts too; a person's own application does not
+    if exclude_email:
+        applications = applications.exclude(email__iexact=exclude_email)
+    if exclude_user is not None:
+        applications = applications.exclude(user=exclude_user)
+        if exclude_user.email:
+            applications = applications.exclude(email__iexact=exclude_user.email)
+    gold = applications.order_by("-created_at").first()
+    if gold is not None:
+        return {"name": gold.full_name or gold.email.lower(), "url": _office("office_gold_application", gold.pk)}
     return None
 
 
@@ -258,13 +269,14 @@ QUOTE_CHARS = 100
 MEDIA_WORDS = {Message.IMAGE: "Photo", Message.AUDIO: "Voice note", Message.VIDEO: "Video", Message.DOCUMENT: "PDF", Message.FILE: "File", Message.OTHER: "Message"}
 
 
-def quote_text(message):
-    """The words a quote shows for a message: its first line (no formatting marks, no quote of its own), or "Photo", "Voice note", "Video", "PDF" for a file with no text."""
+def quote_text(message, customer=False):
+    """The words a quote shows for a message: its first line (no formatting marks, no quote of its own), or "Photo", "Voice note", "Video", "PDF" for a file with no text.
+    A template with no text shows its name to staff; `customer=True` (what goes out to him) says "Message": a template's internal name is never sent."""
     for line in formatting.plain(message.body or "").splitlines():
         line = line.strip().lstrip(">").strip()
         if line:
             return line if len(line) <= QUOTE_CHARS else line[:QUOTE_CHARS - 1].rstrip() + "\u2026"
-    if message.kind == Message.TEMPLATE and message.template_id:  # a template with no text of its own: its name
+    if message.kind == Message.TEMPLATE and message.template_id and not customer:  # a template with no text of its own: its name (for staff only)
         return (message.template.label or message.template.name or "Template")[:QUOTE_CHARS]
     return MEDIA_WORDS.get(message.kind, "Message")
 
@@ -274,7 +286,7 @@ def outgoing_text(message):
     `>` as a quote). Used by the send and by a retry, so both send the same."""
     if message.kind in (Message.TEMPLATE, Message.AUDIO) or message.reply_to_id is None:  # a voice note has no text to put a quote in (the Office still links it)
         return message.body
-    quote = f"> {quote_text(message.reply_to)}"
+    quote = f"> {quote_text(message.reply_to, customer=True)}"
     return f"{quote}\n\n{message.body}" if message.body else quote
 
 
@@ -446,6 +458,19 @@ def is_unsure(message, at=None):
     return bool(message.claimed_at is not None and is_stuck(message, at))
 
 
+def becomes_stuck_between(since, until):
+    """Queued messages that crossed into the stuck state in (since, until]: `is_stuck` depends on the clock, so `updated_at` never moves when it happens. Each message matches
+    in exactly one poll window, so a poll never rereads old stuck ones and the cost does not grow."""
+    waiting = Q(claimed_at__isnull=True, updated_at__gt=since - STUCK_AFTER, updated_at__lte=until - STUCK_AFTER)
+    taken = Q(claimed_at__gt=since - CLAIM_TIMEOUT, claimed_at__lte=until - CLAIM_TIMEOUT)
+    return Q(direction=Message.OUT, status=Message.QUEUED, twilio_sid__isnull=True) & (waiting | taken)
+
+
+def poll_updates(queryset, after, since, until):
+    """The messages already on the page (id up to `after`) that changed since the cursor, or became stuck since it."""
+    return queryset.filter(pk__lte=after).filter(Q(updated_at__gt=since) | becomes_stuck_between(since, until))
+
+
 def can_retry(message):
     """A message we never handed to Twilio (no sid) that failed for a reason worth retrying, or one the queue lost. A message Twilio has accepted is never
     sent again (that could be a second WhatsApp for him)."""
@@ -487,8 +512,10 @@ def message_for_media_token(token, max_age=3600):
     return Message.objects.filter(pk=pk, direction=Message.OUT).exclude(media_key="").first()
 
 
-def status_callback_url():
-    return f"{settings.SITE_URL}{reverse('whatsapp_status', urlconf='config.urls')}"
+def status_callback_url(message=None):
+    """Where Twilio reports this message. The message id rides in the address (`?m=`; Twilio signs the whole URL), so a tick can find a message whose Twilio id was never saved
+    (the worker died after Twilio took it): see apply_status."""
+    return f"{settings.SITE_URL}{reverse('whatsapp_status', urlconf='config.urls')}" + (f"?m={message.pk}" if message is not None else "")
 
 
 def deliver(message):
@@ -505,7 +532,7 @@ def deliver(message):
             message.contact.phone, body=outgoing_text(message) if message.kind != Message.TEMPLATE else "",
             content_sid=message.template.content_sid if message.kind == Message.TEMPLATE and message.template_id else "",
             content_variables=json.dumps(message.template_variables) if message.kind == Message.TEMPLATE else "",
-            media_url=media_url(message) if message.media_key else "", status_callback=status_callback_url())
+            media_url=media_url(message) if message.media_key else "", status_callback=status_callback_url(message))
     except twilio_api.TwilioError as error:
         logger.warning("WhatsApp send failed (message %s, code %s, http %s)", message.pk, error.code or "-", error.status)
         return _fail(message, error.code or (f"http_{error.status}" if error.status else "network"), str(error), error.status)
@@ -623,9 +650,27 @@ def store_media(message):
     return True
 
 
-def apply_status(params):
-    """A delivery tick from Twilio. Idempotent; never moves a message backwards; failures keep Twilio's code. False when the sid is not ours."""
-    message = Message.objects.filter(twilio_sid=params.get("MessageSid", ""), direction=Message.OUT).first()
+def _by_callback_id(params, message_pk):
+    """The message a tick names in its callback address (`?m=`) when the tick's own Twilio id is not on any message: only one with no Twilio id saved, and only when the tick's
+    `To` is that chat's number. The id is saved now, so the page stops offering Try again (Twilio did take it)."""
+    sid = str(params.get("MessageSid", ""))
+    try:
+        pk = int(message_pk)
+    except (TypeError, ValueError):
+        return None
+    candidate = Message.objects.select_related("contact").filter(pk=pk, direction=Message.OUT, twilio_sid__isnull=True).first()
+    if not sid or candidate is None or to_e164(params.get("To", "")) != candidate.contact.phone:
+        return None
+    return candidate if Message.objects.filter(pk=pk, twilio_sid__isnull=True).update(twilio_sid=sid) else None
+
+
+def apply_status(params, message_pk=None):
+    """A delivery tick from Twilio. Idempotent; never moves a message backwards; failures keep Twilio's code. False when the message is not ours. A tick whose id is on no
+    message is matched through `message_pk` (the `?m=` in the callback address) when that message has no Twilio id: a worker that died after Twilio took the message but before
+    the id was saved is put right by the first tick. (Messages sent before the address carried it, or a message Twilio never reports on, cannot be matched.)"""
+    message = Message.objects.filter(twilio_sid=params.get("MessageSid", ""), direction=Message.OUT).first() if params.get("MessageSid") else None
+    if message is None and message_pk:
+        message = _by_callback_id(params, message_pk)
     status = TWILIO_STATUS.get(str(params.get("MessageStatus", "")).lower())
     if message is None or status is None:
         return False
@@ -811,7 +856,13 @@ def page_context(mobile, user_obj, can_send, start_url, edit_url, first_name="")
 # ---------- timeline, export, erase ----------
 
 def contacts_for_person(user=None, addresses=(), phones=()):
+    """Every chat held for a person: by his numbers, his account, his lead address, and the Gold application link (a chat stays linked to the application after its number
+    was changed, so export and erasure still find the old chat)."""
+    from gold.models import GoldApplication
+
     query = Q(pk__in=[])
+    applications = GoldApplication.objects.filter((Q(user=user) if user is not None else Q(pk__in=[])) | _ci("email", [a for a in addresses if a]))
+    query |= Q(application__in=applications.values("pk"))
     if phones:
         query |= Q(phone__in=[p for p in phones if p])
     if user is not None:

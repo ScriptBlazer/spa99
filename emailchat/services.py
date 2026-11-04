@@ -50,6 +50,7 @@ REASONS = {"suppressed": ("Not sent. This address bounced before or marked an em
            "send_failed": ("Not sent. Try again.", True)}
 
 
+TOO_COMPLEX = "The layout of this email was too complicated to show, so only its text is shown."
 MAYBE_NOT_SENT = "This may not have been sent. Check with him before trying again, in case it did arrive."
 
 
@@ -163,12 +164,14 @@ def resolve_links(thread, save=True):
 
 def move_address(old, new):
     """A lead's address was corrected (outreach.services.correct_lead_email, in its transaction): his threads move to the new address, so the lead page, export and erasure
-    find them. Each thread keeps its reply token, so a late reply to the old Reply-To still lands in the same thread. A thread owned by an account is left alone. Returns the number moved."""
+    find them. Each thread keeps its reply token, so a late reply to the old Reply-To still lands in the same thread. A thread owned by an account or linked to a Gold application is
+    left alone (its address is the account's or the application's, not the lead's), and so is its lead_email. Returns the number moved."""
     old, new = (old or "").strip().lower(), (new or "").strip().lower()
     if not old or not new or old == new:
         return 0
-    moved = Thread.objects.filter(email=old, user__isnull=True).update(email=new)
-    Thread.objects.filter(lead_email=old).update(lead_email=new)
+    mine = Thread.objects.filter(user__isnull=True, application__isnull=True)
+    moved = mine.filter(email=old).update(email=new)
+    mine.filter(lead_email=old).update(lead_email=new)
     return moved
 
 
@@ -193,6 +196,12 @@ def create_thread(email, subject, actor=None):
     resolve_links(thread, save=False)
     thread.save()
     return DONE, thread
+
+
+def addresses_for(user, addresses):
+    """The addresses to look threads up by for this person. An unverified account may carry someone else's address (anyone can register with any address), so for it no
+    address is used: it sees and exports only threads that belong to it, never a lead's thread on the same address."""
+    return () if user is not None and not user.email_verified_at else addresses
 
 
 def threads_for(addresses=(), user=None, application=None):
@@ -222,8 +231,9 @@ def page_context(target, user_obj, can_edit):
     kind = target.kind
     ref = f"{kind}:{target.pk}"
     new_url = _office("office_email_new") + "?" + urlencode({"person": ref})
-    threads = threads_for(target.addresses, target.user, target.application)
-    latest = latest_thread(target.addresses, target.user, target.application)
+    addresses = addresses_for(target.user, target.addresses)
+    threads = threads_for(addresses, target.user, target.application)
+    latest = latest_thread(addresses, target.user, target.application)
     address = target.main
     count = threads.count()
     unread = unread_counts(user_obj, [t.pk for t in threads]) if count else {}
@@ -317,7 +327,7 @@ def send(thread, actor, subject, html, uploads=()):
         for name, data, content_type in files:
             keys.append((_store_file(thread, data), name, content_type, len(data)))
         with transaction.atomic():
-            message = Message.objects.create(thread=thread, direction=Message.OUT, subject=subject, shows_subject=_shows_subject(thread, subject), body_text=text, body_html=clean,
+            message = Message.objects.create(thread=thread, direction=Message.OUT, subject=subject, shows_subject=_shows_subject(thread, subject), body_text=text, body_html=clean, to_address=thread.email,
                                              status=Message.QUEUED, author=actor if getattr(actor, "pk", None) else None, author_label=audit.label_for(actor))
             for key, name, content_type, size in keys:
                 Attachment.objects.create(message=message, key=key, filename=name, content_type=content_type, declared_type=content_type, size=size, checked=True)
@@ -360,6 +370,19 @@ def is_stuck(message, at=None):
 
 def is_unsure(message, at=None):
     return bool(message.claimed_at is not None and is_stuck(message, at))
+
+
+def becomes_stuck_between(since, until):
+    """Queued messages that crossed into the stuck state in (since, until]: `is_stuck` depends on the clock, not on a change to the row, so `updated_at` never moves when it
+    happens. Each message matches in exactly one poll window, so a poll never rereads old stuck ones, and the cost does not grow."""
+    waiting = Q(claimed_at__isnull=True, updated_at__gt=since - STUCK_AFTER, updated_at__lte=until - STUCK_AFTER)
+    taken = Q(claimed_at__gt=since - CLAIM_TIMEOUT, claimed_at__lte=until - CLAIM_TIMEOUT)
+    return Q(direction=Message.OUT, status=Message.QUEUED) & (waiting | taken)
+
+
+def poll_updates(queryset, after, since, until):
+    """The messages already on the page (id up to `after`) that changed since the cursor, or became stuck since it."""
+    return queryset.filter(pk__lte=after).filter(Q(updated_at__gt=since) | becomes_stuck_between(since, until))
 
 
 def can_retry(message):
@@ -415,7 +438,7 @@ def deliver(message):
     thread = message.thread
     try:
         headers, own = _headers(message)
-        Message.objects.filter(pk=message.pk).update(rfc_message_id=own)
+        Message.objects.filter(pk=message.pk).update(rfc_message_id=own, to_address=thread.email)  # the address it really goes to (a retry after a correction goes to the new one)
         from_email, _ = emailsettings.sender_for(emailsettings.options_for("office_message"), SiteSettings.load())
         attachments = []
         for item in message.attachments.all():
@@ -454,7 +477,7 @@ def _our_message(record):
         return None
     message = Message.objects.select_related("thread").filter(pk=pk, direction=Message.OUT).first() if pk else None
     address = record.get("Email") or record.get("Recipient") or ""
-    if message is None or not isinstance(address, str) or message.thread.email != address.strip().lower():  # the address must be the one we wrote to
+    if message is None or not isinstance(address, str) or address.strip().lower() not in (message.thread.email, message.to_address):  # the address must be the one we wrote to (or its thread's now)
         return None
     return message
 
@@ -471,8 +494,8 @@ def apply_feedback(record):
         if provider and not Message.objects.filter(provider_id=provider).exclude(pk=message.pk).exists():
             update["provider_id"] = provider[:100]
         if kind == "Delivery":
-            if message.status == Message.SENT:
-                update["status"] = Message.DELIVERED
+            if message.status in (Message.SENT, Message.QUEUED):  # QUEUED: a worker took it and died before it wrote SENT; the delivery is the proof it went, so no Try again
+                update.update(status=Message.DELIVERED, sent_at=message.sent_at or now())
         elif kind == "SpamComplaint" or record.get("Type") in ("SpamComplaint", "Unsubscribe"):
             update.update(status=Message.BOUNCED, error_code="complaint", error_message="Marked as spam by the recipient.")
         elif record.get("Type") in IGNORED_BOUNCES:
@@ -525,15 +548,16 @@ def record_inbound(payload, thread):
     from_name = _text(full.get("Name"), 200) or _text(payload.get("FromName"), 200)
     html_in = _text(payload.get("HtmlBody"), MAX_INBOUND_HTML)
     html = richtext.clean_incoming(html_in) if html_in.strip() else ""
+    too_complex = bool(html_in.strip() and not html and richtext.too_deep(html_in))  # nested far beyond real mail: only its text is kept
     stripped, whole = _text(payload.get("StrippedTextReply"), MAX_INBOUND_TEXT).strip(), _text(payload.get("TextBody"), MAX_INBOUND_TEXT).strip()
-    text = stripped or whole or richtext.html_to_text(html)  # his new words, else his whole text, else the HTML as text
+    text = stripped or whole or richtext.html_to_text(html_in if too_complex else html)  # his new words, else his whole text, else the HTML as text (html_to_text is linear, so safe on raw input)
     subject = clean_subject(_text(payload.get("Subject"), 400))
     spam = _header(payload, "X-Spam-Status").strip().lower().startswith("yes")
     try:
         with transaction.atomic():
             message = Message.objects.create(
                 incomplete=True, claimed_at=now(), thread=thread, direction=Message.IN, subject=subject, shows_subject=_shows_subject(thread, subject), body_text=text, body_full=whole if stripped and whole != stripped else "",
-                body_html=html, has_remote_images=bool(richtext.remote_image_count(html)), status=Message.RECEIVED, provider_id=provider_id or None,
+                body_html=html, has_remote_images=bool(richtext.remote_image_count(html)), status=Message.RECEIVED, note=TOO_COMPLEX if too_complex else "", provider_id=provider_id or None,
                 rfc_message_id=clean_id(_text(_header(payload, "Message-ID"), 300)), in_reply_to=clean_id(_text(_header(payload, "In-Reply-To"), 300)),
                 references=clean_references(_text(_header(payload, "References"), 3000)), from_address=from_address, from_name=from_name, spam=spam)
             if not spam:  # spam never moves the thread, never counts unread, never pushes. In the same transaction as the message: a death cannot leave one the inbox does not show
@@ -576,7 +600,25 @@ def finish_inbound(message, payload, resumed=False):
     except Exception as error:
         raise StoreError from error
     enqueue("emailchat.tasks.process_inbound", message.pk)
-    Message.objects.filter(pk=message.pk).update(incomplete=False)
+    Message.objects.filter(pk=message.pk).update(incomplete=False, updated_at=now())  # updated_at: a page that opened it while it was incomplete picks up the files on its next poll
+
+
+GIVE_UP_AFTER = timedelta(days=1)  # Postmark stops retrying well inside this
+GAVE_UP = "Some files with this email could not be saved. Ask him to send them again."
+
+
+def give_up_incomplete(dry_run=False, at=None):
+    """Emails still incomplete after a day will never be finished (Postmark has stopped retrying): they stop saying they are loading and say the files could not be saved.
+    The message and what it holds stay (and so does its erasure). Returns the number given up; with `dry_run` nothing is changed."""
+    cutoff = (at or now()) - GIVE_UP_AFTER
+    found = Message.objects.filter(direction=Message.IN, incomplete=True, created_at__lt=cutoff)
+    if dry_run:
+        return found.count()
+    count = 0
+    for message in found:
+        note = " ".join(x for x in (message.note, GAVE_UP) if x)[:500]
+        count += Message.objects.filter(pk=message.pk, incomplete=True).update(incomplete=False, note=note, updated_at=now())
+    return count
 
 
 def store_inbound_files(message, items):
@@ -608,7 +650,7 @@ def store_inbound_files(message, items):
         Attachment.objects.create(message=message, key=key, filename=name, content_type="application/octet-stream", declared_type=declared, size=len(data), content_id=cid)
         kept += 1
     if notes:
-        Message.objects.filter(pk=message.pk).update(note=" ".join(notes)[:500])
+        Message.objects.filter(pk=message.pk).update(note=" ".join(([message.note] if message.note else []) + notes)[:500])
     if kept:
         Thread.objects.filter(pk=message.thread_id).update(has_attachment=True)
         if not message.thread.last_preview and not message.spam:
@@ -707,7 +749,7 @@ def attachment_dict(item):
 def message_dict(message):
     """{id, direction, subject, shows_subject, body_text, body_full, body_html (ours: cleaned, safe to show; his: always empty), frame_url and frame_images_url (his HTML: a
     sandboxed frame; empty when he sent plain text), has_remote_images, status, error{reason, can_retry} or null, author, author_id, author_first_name, from_address,
-    from_name, from_other (it came from an address other than the thread's), spam, note, attachments[{id, filename, type, size, url, inline, is_image}], created_at, sent_at, retry_url}."""
+    from_name, to_address (ours: where it was sent), from_other (it came from an address other than the thread's), spam, note, incomplete (his email is still being stored: its files may be missing), attachments[{id, filename, type, size, url, inline, is_image}], created_at, sent_at, retry_url}."""
     reason = ""
     if message.status in Message.BAD:
         reason = REASONS.get(message.error_code, REASONS["send_failed"])[0]
@@ -721,7 +763,8 @@ def message_dict(message):
             "body_full": message.body_full, "body_html": html if mine else "", "frame_url": frame, "frame_images_url": frame + "?images=1" if frame else "",
             "has_remote_images": message.has_remote_images, "status": message.status, "error": {"reason": reason, "can_retry": can} if reason else None, "author": message.author_label,
             "author_id": str(message.author_id) if message.author_id else "", "author_first_name": _first(message.author_label), "from_address": message.from_address,
-            "from_name": message.from_name, "from_other": bool(not mine and message.from_address != message.thread.email), "spam": message.spam, "note": message.note,
+            "from_name": message.from_name, "to_address": (message.to_address or message.thread.email) if mine else "", "from_other": bool(not mine and message.from_address != message.thread.email), "spam": message.spam, "note": message.note,
+            "incomplete": bool(message.incomplete and not mine),
             "attachments": [attachment_dict(a) for a in message.attachments.all()], "created_at": message.created_at.isoformat(), "sent_at": message.sent_at.isoformat() if message.sent_at else "",
             "retry_url": _office("office_email_retry", message.thread_id, message.pk) if can else ""}
 
@@ -830,7 +873,7 @@ def timeline_entries(threads):
 
 def threads_for_person(user=None, addresses=()):
     """Every thread held for a person: by his addresses and by the owner link (staff-run export and erasure)."""
-    return threads_for(addresses, user)
+    return threads_for(addresses_for(user, addresses), user)
 
 
 def threads_for_member(user):
@@ -846,7 +889,7 @@ def export_for(threads):
     for thread in threads:
         out.append({"email": thread.email, "subject": thread.subject, "name": thread.name,
                     "messages": [{"direction": m.direction, "subject": m.subject, "text": m.body_text, "full_text": m.body_full, "html": m.body_html, "status": m.status, "at": m.created_at.isoformat(),
-                                  "sent_at": m.sent_at.isoformat() if m.sent_at else None, "from": m.from_address or None, "from_name": m.from_name or None, "spam": m.spam, "sent_by": m.author_label or None,
+                                  "sent_at": m.sent_at.isoformat() if m.sent_at else None, "to": (m.to_address or None) if m.direction == Message.OUT else None, "from": m.from_address or None, "from_name": m.from_name or None, "spam": m.spam, "sent_by": m.author_label or None,
                                   "note": m.note or None, "files": [{"name": a.filename, "type": a.declared_type or a.content_type, "size": a.size} for a in m.attachments.all()]}
                                  for m in thread.messages.prefetch_related("attachments").order_by("id")]})
     return out
@@ -874,14 +917,22 @@ def erase_person(user=None, addresses=()):
     return erase_threads(threads_for_person(user, addresses))
 
 
+def refresh_has_attachment(thread_ids):
+    for pk in set(thread_ids):
+        Thread.objects.filter(pk=pk).update(has_attachment=Attachment.objects.filter(message__thread_id=pk).exists())
+
+
 def erase_attachments(items):
-    """Attachment rows and their files in storage (admin delete). A missing file does not stop the delete."""
+    """Attachment rows and their files in storage (admin delete). A missing file does not stop the delete. The thread's paperclip is put right."""
+    items = list(items)
+    thread_ids = [i.message.thread_id for i in items]
     for item in items:
         try:
             default_storage.delete(item.key)
         except Exception:  # noqa: BLE001
             logger.warning("Could not delete an email file from storage")
         item.delete()
+    refresh_has_attachment(thread_ids)
 
 
 def erase_message(message):
@@ -893,6 +944,7 @@ def erase_message(message):
             pass
     thread = message.thread
     message.delete()
+    refresh_has_attachment([thread.pk])
     last = Message.objects.filter(thread=thread, spam=False).order_by("-id").first()
     Thread.objects.filter(pk=thread.pk).update(last_message_at=last.created_at if last else None, last_preview=preview_of(last.body_text) if last else "",
                                                last_direction=last.direction if last else "")

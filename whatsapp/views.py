@@ -158,7 +158,7 @@ def poll(request, pk):
     if since is not None:
         if timezone.is_naive(since):
             since = timezone.make_aware(since)
-        updates = [services.message_dict(m) for m in Message.objects.filter(contact=contact, pk__lte=after, updated_at__gt=since).select_related("template", "reply_to").order_by("id")[:100]]
+        updates = [services.message_dict(m) for m in services.poll_updates(Message.objects.filter(contact=contact), after, since, cursor).select_related("template", "reply_to").order_by("id")[:100]]
     return JsonResponse({"messages": [services.message_dict(m) for m in new], "updates": updates, "contact": services.contact_dict(contact, request.user, can_send=can_edit(request.user)),
                          "unread_total": services.unread_total(request.user), "last_id": new[-1].pk if new else after, "cursor": cursor.isoformat()})
 
