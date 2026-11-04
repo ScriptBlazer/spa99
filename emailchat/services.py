@@ -164,15 +164,17 @@ def resolve_links(thread, save=True):
 
 def move_address(old, new):
     """A lead's address was corrected (outreach.services.correct_lead_email, in its transaction): his threads move to the new address, so the lead page, export and erasure
-    find them. Each thread keeps its reply token, so a late reply to the old Reply-To still lands in the same thread. A thread owned by an account or linked to a Gold application is
-    left alone (its address is the account's or the application's, not the lead's), and so is its lead_email. Returns the number moved."""
+    find them. Each thread keeps its reply token, so a late reply to the old Reply-To still lands in the same thread. What moves: a thread whose `lead_email` is the old address
+    (even if it also has a Gold application link: the application still finds it through that link), and a thread on the old address with no owner and no application. What stays:
+    a thread owned by an account, and a thread linked only to a Gold application with no `lead_email` (its address is the application's, not the lead's). Returns the number moved."""
     old, new = (old or "").strip().lower(), (new or "").strip().lower()
     if not old or not new or old == new:
         return 0
-    mine = Thread.objects.filter(user__isnull=True, application__isnull=True)
-    moved = mine.filter(email=old).update(email=new)
-    mine.filter(lead_email=old).update(lead_email=new)
-    return moved
+    rows = Thread.objects.filter(user__isnull=True).filter(Q(lead_email=old) | Q(email=old, application__isnull=True))
+    ids = list(rows.values_list("pk", flat=True))
+    Thread.objects.filter(pk__in=ids, email=old).update(email=new)
+    Thread.objects.filter(pk__in=ids, lead_email=old).update(lead_email=new)
+    return len(ids)
 
 
 def relink(*addresses):

@@ -58,19 +58,24 @@ class StrangerTests(Base):
 
 
 class MoveAddressTests(Base):
-    def test_gold_thread_and_account_lead_email_are_left_alone(self):
+    def test_lead_threads_move_even_with_a_gold_link_and_account_or_application_only_threads_stay(self):
         application, _ = gold_services.submit_application(application_data(email="old@example.com"))
         _, gold_thread = services.create_thread("old@example.com", "Gold chat", self.approver)
         self.assertEqual(gold_thread.application_id, application.pk)
         Thread.objects.filter(pk=gold_thread.pk).update(lead_email="old@example.com")
+        application_only = Thread.objects.create(email="old@example.com", subject="Application only", application=application)
         plain = Thread.objects.create(email="old@example.com", subject="Lead only", lead_email="old@example.com")
         owned = Thread.objects.create(email="x@example.com", subject="Owned", user=self.approver, lead_email="old@example.com")
         services.move_address("old@example.com", "new@example.com")
-        for row in (gold_thread, plain, owned):
+        for row in (gold_thread, application_only, plain, owned):
             row.refresh_from_db()
-        self.assertEqual((gold_thread.email, gold_thread.lead_email), ("old@example.com", "old@example.com"))
+        self.assertEqual((gold_thread.email, gold_thread.lead_email), ("new@example.com", "new@example.com"))  # moved: page, export and erase find it on the fixed address
+        self.assertEqual((application_only.email, application_only.lead_email), ("old@example.com", ""))
         self.assertEqual((plain.email, plain.lead_email), ("new@example.com", "new@example.com"))
         self.assertEqual(owned.lead_email, "old@example.com")
+        self.assertIn(gold_thread, services.threads_for(["new@example.com"]))
+        self.assertIn(gold_thread, services.threads_for(application=application))  # the application's own view still finds it through its link
+        self.assertNotIn(gold_thread, services.threads_for(["old@example.com"]))
 
 
 class DeliveryProofTests(Base):
