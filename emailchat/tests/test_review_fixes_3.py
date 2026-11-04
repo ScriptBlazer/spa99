@@ -1,8 +1,11 @@
 """Final review fixes for the email chat. Mocked: nothing real is sent, the queue runs inline."""
 import os
 import time
+from datetime import timedelta
+from unittest import mock
 
 from django.urls import reverse
+from django.utils import timezone
 
 from emailchat import services
 from emailchat.models import Message, Thread
@@ -80,3 +83,63 @@ class UnverifiedAccountWhatsAppTests(Base):
         self.assertEqual(profile._contacts(user=stranger), [])  # the profile timeline
         self.assertEqual(list(whatsapp.contacts_for_person(stranger, {"victim@example.com"})), [])  # and the export and erase path, with the addresses passed anyway
         self.assertEqual(list(whatsapp.contacts_for_person(None, {"victim@example.com"})), [chat])  # the lead or applicant's own view still finds it
+
+
+class InboundNotesAndGiveUpTests(Base):
+    def stuck_inbound(self, message_id="pm-x", files=True, **extra):
+        attachments = [{"Name": "a.png", "Content": "AAAA", "ContentType": "image/png"}] if files else []
+        payload = payload_for(self.thread, Attachments=attachments, message_id=message_id)
+        with mock.patch("emailchat.services.enqueue", side_effect=RuntimeError("queue")):
+            inbound_post(payload)
+        message = Message.objects.get(provider_id=message_id)
+        old = timezone.now() - timedelta(days=2)
+        Message.objects.filter(pk=message.pk).update(created_at=old, **{"claimed_at": old, **extra})
+        return payload, message
+
+    def test_a_retry_after_a_failed_queue_rebuilds_the_note_instead_of_doubling_it(self):
+        too_big = [{"Name": "huge.bin", "Content": "A" * 400, "ContentType": "application/octet-stream"}]
+        payload = payload_for(self.thread, Attachments=too_big, message_id="pm-note")
+        with mock.patch("emailchat.services.enqueue", side_effect=RuntimeError("queue")), self.settings(EMAILCHAT_MAX_ATTACHMENT_BYTES=100):
+            inbound_post(payload)
+            message = Message.objects.get(provider_id="pm-note")
+            first = message.note
+            self.assertIn("too big", first)
+            Message.objects.filter(pk=message.pk).update(claimed_at=timezone.now() - timedelta(minutes=3))
+            inbound_post(payload)  # Postmark's retry: the queue fails again
+        message.refresh_from_db()
+        self.assertEqual(message.note, first)
+
+    def test_give_up_leaves_a_live_claim_uses_fitting_words_and_pushes_once(self):
+        _, claimed = self.stuck_inbound("pm-live", claimed_at=timezone.now())
+        self.assertEqual(services.give_up_incomplete(), 0)  # a worker is on it
+        _, bare = self.stuck_inbound("pm-bare", files=False)
+        with mock.patch("whatsapp.push.notify_payload", return_value=1) as push:
+            self.assertEqual(services.give_up_incomplete(), 1)
+            self.assertEqual(services.give_up_incomplete(), 0)
+        bare.refresh_from_db()
+        claimed.refresh_from_db()
+        self.assertTrue(claimed.incomplete)
+        self.assertFalse(bare.incomplete)
+        self.assertEqual(bare.note, services.GAVE_UP_NO_FILES)
+        self.assertNotIn("Some files", bare.note)
+        self.assertIsNotNone(bare.notified_at)
+        self.assertEqual(push.call_count, 1)
+
+
+class FeedbackAndCursorTests(Base):
+    def test_a_blank_recipient_does_not_bounce_a_row_with_a_blank_to_address(self):
+        message = Message.objects.create(thread=self.thread, direction="out", subject="s", body_text="b", status="sent", to_address="")
+        for record in ({"RecordType": "Bounce", "Type": "HardBounce", "Recipient": "", "Metadata": {"chat": str(message.pk)}},
+                       {"RecordType": "Bounce", "Type": "HardBounce", "Email": "  ", "Metadata": {"chat": str(message.pk)}}):
+            self.assertFalse(services.apply_feedback(record))
+        message.refresh_from_db()
+        self.assertEqual(message.status, "sent")
+
+    def test_an_absurd_cursor_is_a_bad_cursor_not_a_500(self):
+        from whatsapp.models import Contact
+
+        contact = Contact.objects.create(phone="+447700900555")
+        for url in (f"/email/{self.thread.pk}/poll/", f"/whatsapp/{contact.pk}/poll/"):
+            for since in ("0001-01-01", "0001-01-01T00:00:00+00:00", "9999-12-31T23:59:59+00:00", "nonsense"):
+                response = office(self.reader, "get", url, {"after": 0, "since": since})
+                self.assertEqual(response.status_code, 200, (url, since))

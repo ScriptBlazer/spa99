@@ -483,7 +483,8 @@ def _our_message(record):
         return None
     message = Message.objects.select_related("thread").filter(pk=pk, direction=Message.OUT).first() if pk else None
     address = record.get("Email") or record.get("Recipient") or ""
-    if message is None or not isinstance(address, str) or address.strip().lower() not in (message.thread.email, message.to_address):  # the address must be the one we wrote to (or its thread's now)
+    address = address.strip().lower() if isinstance(address, str) else ""
+    if message is None or not address or address not in (message.thread.email, message.to_address):  # the address must be the one we wrote to (or its thread's now); a blank one is nobody's
         return None
     return message
 
@@ -611,19 +612,30 @@ def finish_inbound(message, payload, resumed=False):
 
 GIVE_UP_AFTER = timedelta(days=1)  # Postmark stops retrying well inside this
 GAVE_UP = "Some files with this email could not be saved. Ask him to send them again."
+GAVE_UP_NO_FILES = "This email did not finish arriving, so any files it had could not be saved. Ask him to send them again if you need them."
 
 
 def give_up_incomplete(dry_run=False, at=None):
     """Emails still incomplete after a day will never be finished (Postmark has stopped retrying): they stop saying they are loading and say the files could not be saved.
-    The message and what it holds stay (and so does its erasure). Returns the number given up; with `dry_run` nothing is changed."""
-    cutoff = (at or now()) - GIVE_UP_AFTER
-    found = Message.objects.filter(direction=Message.IN, incomplete=True, created_at__lt=cutoff)
+    One a worker is still finishing (claimed in the last two minutes) is left for the next run. The message and what it holds stay (and so does its erasure). A message the team was
+    never told about gets the normal push now (the follow-up task never ran). Returns the number given up; with `dry_run` nothing is changed."""
+    moment = at or now()
+    found = Message.objects.filter(direction=Message.IN, incomplete=True, created_at__lt=moment - GIVE_UP_AFTER).filter(Q(claimed_at__isnull=True) | Q(claimed_at__lt=moment - INBOUND_CLAIM))
     if dry_run:
         return found.count()
     count = 0
     for message in found:
-        note = " ".join(x for x in (message.note, GAVE_UP) if x)[:500]
-        count += Message.objects.filter(pk=message.pk, incomplete=True).update(incomplete=False, note=note, updated_at=now())
+        words = GAVE_UP if message.attachments.exists() else GAVE_UP_NO_FILES
+        note = " ".join(x for x in (message.note, words) if x)[:500]
+        done = Message.objects.filter(pk=message.pk, incomplete=True).filter(Q(claimed_at__isnull=True) | Q(claimed_at__lt=moment - INBOUND_CLAIM)).update(incomplete=False, note=note, updated_at=now())
+        count += done
+        if done and not message.spam and message.notified_at is None:
+            from . import tasks
+
+            try:
+                tasks.process_inbound(message.pk)  # the push is taken once (notified_at), so a second run cannot repeat it
+            except Exception:  # noqa: BLE001 - giving up must not stop on one push
+                logger.exception("Could not notify the team of email message %s", message.pk)
     return count
 
 
@@ -655,8 +667,11 @@ def store_inbound_files(message, items):
         cid = _text(item.get("ContentID"), 300).strip().removeprefix("cid:").strip("<>")
         Attachment.objects.create(message=message, key=key, filename=name, content_type="application/octet-stream", declared_type=declared, size=len(data), content_id=cid)
         kept += 1
-    if notes:
-        Message.objects.filter(pk=message.pk).update(note=" ".join(([message.note] if message.note else []) + notes)[:500])
+    base = TOO_COMPLEX if message.note.startswith(TOO_COMPLEX) else ""  # rebuilt each time, never appended to: a retry (the queue failed, Postmark sends it again) stores the files again
+    note = " ".join(x for x in [base, *notes] if x)[:500]
+    if note != message.note:
+        Message.objects.filter(pk=message.pk).update(note=note)
+        message.note = note
     if kept:
         Thread.objects.filter(pk=message.thread_id).update(has_attachment=True)
         if not message.thread.last_preview and not message.spam:

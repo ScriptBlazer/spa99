@@ -135,7 +135,7 @@ class IncompleteTests(Base):
     def test_the_sweep_gives_up_after_a_day_and_dry_run_changes_nothing(self):
         _, message = self.half_stored()
         self.assertEqual(services.give_up_incomplete(), 0)  # not yet a day
-        Message.objects.filter(pk=message.pk).update(created_at=timezone.now() - timedelta(days=2))
+        Message.objects.filter(pk=message.pk).update(created_at=timezone.now() - timedelta(days=2), claimed_at=timezone.now() - timedelta(days=2))
         out = StringIO()
         call_command("give_up_incomplete_emails", "--dry-run", stdout=out)
         self.assertIn("Would give up on 1", out.getvalue())

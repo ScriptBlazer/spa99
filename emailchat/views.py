@@ -1,7 +1,7 @@
 """The Office side of email chat: the inbox, a thread, polling, sending, a new email, searching for a person, files, his email in a sandboxed frame, and the page
 buttons. Short views: they check, call emailchat.services, answer. `reader` sees, `editor` (approver or Admin and up) sends. The send endpoints answer JSON
 {ok, message?, error?} so the page can show a failure in place."""
-from datetime import datetime, timedelta
+from datetime import timedelta
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -17,6 +17,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_GET, require_POST
 
+from common.polling import parse_cursor
 from common.ratelimit import rate_limited_json
 from office.permissions import can_edit, editor, reader
 
@@ -158,13 +159,8 @@ def poll(request, pk):
     cursor = timezone.now()
     new = list(_messages(thread_).filter(pk__gt=after).order_by("id")[:100])
     updates = []
-    try:
-        since = datetime.fromisoformat(request.GET["since"]) if request.GET.get("since") else None
-    except ValueError:
-        since = None
+    since = parse_cursor(request.GET.get("since"))
     if since is not None:
-        if timezone.is_naive(since):
-            since = timezone.make_aware(since)
         updates = [services.message_dict(m) for m in services.poll_updates(_messages(thread_), after, since, cursor).order_by("id")[:100]]
     return JsonResponse({"messages": [services.message_dict(m) for m in new], "updates": updates, "thread": services.thread_dict(thread_, can_send=can_edit(request.user)),
                          "unread_total": services.unread_total(request.user), "last_id": new[-1].pk if new else after, "cursor": cursor.isoformat()})

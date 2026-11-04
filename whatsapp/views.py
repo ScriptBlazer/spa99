@@ -2,7 +2,7 @@
 staff media link, and the push controls. Short views: they check, call whatsapp.services, answer. `reader` sees chats, `editor`
 (approver or Admin and up) sends. The send endpoints answer JSON {ok, message?, error?} so the chat page can show a failure in place."""
 import json
-from datetime import datetime, timedelta
+from datetime import timedelta
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -17,6 +17,7 @@ from django.utils.cache import patch_vary_headers
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
+from common.polling import parse_cursor
 from office.permissions import can_edit, editor, reader
 
 from . import push, services
@@ -151,13 +152,8 @@ def poll(request, pk):
     cursor = timezone.now()
     new = list(Message.objects.filter(contact=contact, pk__gt=after).select_related("template", "reply_to").order_by("id")[:100])
     updates = []
-    try:
-        since = datetime.fromisoformat(request.GET["since"]) if request.GET.get("since") else None
-    except ValueError:
-        since = None
+    since = parse_cursor(request.GET.get("since"))
     if since is not None:
-        if timezone.is_naive(since):
-            since = timezone.make_aware(since)
         updates = [services.message_dict(m) for m in services.poll_updates(Message.objects.filter(contact=contact), after, since, cursor).select_related("template", "reply_to").order_by("id")[:100]]
     return JsonResponse({"messages": [services.message_dict(m) for m in new], "updates": updates, "contact": services.contact_dict(contact, request.user, can_send=can_edit(request.user)),
                          "unread_total": services.unread_total(request.user), "last_id": new[-1].pk if new else after, "cursor": cursor.isoformat()})
