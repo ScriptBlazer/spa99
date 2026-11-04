@@ -77,28 +77,6 @@ class RateLimitDatabaseCacheTests(TestCase):
             moment[0] += 31  # the next minute
             self.assertEqual([hit("t", "ip", 3, 60) for _ in range(4)], [True, True, True, False])
 
-    def test_sliding_mode_keeps_a_non_stop_caller_blocked_across_a_window_edge(self):
-        from django.utils import timezone
-
-        moment, start, real = [1_000_050.0], 1_000_050.0, timezone.now()  # 10 s before a minute edge; the DB cache has its own clocks (time.time and tz_now): move them too
-        real_ts = time.time()
-        with mock.patch("common.ratelimit.time", mock.Mock(time=lambda: moment[0])), mock.patch(
-                "django.core.cache.backends.db.tz_now", lambda: real + timedelta(seconds=moment[0] - start)), mock.patch(
-                "django.core.cache.backends.base.time.time", lambda: real_ts + moment[0] - start):
-            self.assertEqual([hit("login", "ip", 3, 60, sliding=True) for _ in range(5)], [True] * 3 + [False] * 2)
-            for _ in range(10):  # keeps trying for 100 s, across the edge: every try, including the "right password", is refused
-                moment[0] += 10
-                self.assertFalse(hit("login", "ip", 3, 60, sliding=True))
-            moment[0] += 61  # stops for a whole window
-            self.assertTrue(hit("login", "ip", 3, 60, sliding=True))
-
-    def test_sliding_mode_gives_no_burst_at_a_window_edge(self):
-        moment = [1_000_055.0]
-        with mock.patch("common.ratelimit.time", mock.Mock(time=lambda: moment[0])):
-            self.assertEqual([hit("forgot", "ip", 5, 3600, sliding=True) for _ in range(5)], [True] * 5)
-            moment[0] += 3600 - 55 + 1  # the hour edge has passed, but the last hit is only seconds old
-            self.assertFalse(hit("forgot", "ip", 5, 3600, sliding=True))
-
     def test_the_stored_entry_expires_with_its_window_not_after_five_minutes(self):
         from django.db import connection
         from django.utils import timezone

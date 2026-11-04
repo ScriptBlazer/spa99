@@ -41,9 +41,9 @@ def _message(request, title, text, status=200):
     return render(request, "users/message.html", {"title": title, "text": text}, status=status)
 
 
-def _throttled(request, scope, limit, window):
-    """True (and the caller should stop) when this IP has done too much."""
-    return not hit(scope, client_ip(request) or "unknown", limit, window, sliding=True)
+def _throttled(request, scope, limit, window, lock=False):
+    """True (and the caller should stop) when this IP has done too much. lock=True for guessing (see common.ratelimit.hit)."""
+    return not hit(scope, client_ip(request) or "unknown", limit, window, rolling=True, lock=lock)
 
 
 # ---------- login ----------
@@ -99,7 +99,7 @@ class LoginView(auth_views.LoginView):
         return _forget_journey_cookie(response) if foreign else response
 
     def post(self, request, *args, **kwargs):
-        if _throttled(request, "login", 10, 300):
+        if _throttled(request, "login", 10, 300, lock=True):
             context = {"form": self.get_form_class()(request), "throttled": True, **_login_layout(request)}
             return render(request, self.template_name, context, status=429)
         return super().post(request, *args, **kwargs)
@@ -371,7 +371,7 @@ def password_change_old(request):
 def account_emails(request):
     """Marketing emails on or off (UK GDPR consent, logged in the person's history). 20 a minute per person."""
     wants_json = "application/json" in request.headers.get("accept", "")
-    if not hit("account-emails", request.user.pk, 20, 60, sliding=True):
+    if not hit("account-emails", request.user.pk, 20, 60, rolling=True):
         if wants_json:
             return JsonResponse({"saved": False}, status=429)
         messages.error(request, "Too many changes. Please try again in a minute.")
@@ -391,7 +391,7 @@ class _PasswordChange(auth_views.PasswordChangeView):
     form_class = ChangePasswordForm
 
     def post(self, request, *args, **kwargs):
-        if _throttled(request, "password-change", 10, 3600):
+        if _throttled(request, "password-change", 10, 3600, lock=True):
             return _message(request, "Please wait", "Too many attempts. Please try again later.", status=429)
         return super().post(request, *args, **kwargs)
 

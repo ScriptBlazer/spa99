@@ -29,9 +29,11 @@ def _mask(email):
 def unsubscribe(request, token):
     """GET shows a confirm page (a mail scanner opening the link changes nothing); POST (the button, or a mail client's one-click)
     switches news off. Idempotent."""
-    if not hit("unsubscribe", client_ip(request) or "unknown", 30, 60, sliding=True):
-        return _message(request, "Please wait", "Too many attempts. Please try again in a minute.", status=429)
     email = tokens.read_unsubscribe_token(token)
+    # A valid signed POST is never rate limited: unsubscribing is a legal duty, and a mail scanner opening the link from the same address must not be able to block it.
+    # It is idempotent and needs a token only we can sign. Everything else (GETs, bad tokens) shares a plain fixed window, with no lock.
+    if not (email is not None and request.method == "POST") and not hit("unsubscribe", client_ip(request) or "unknown", 30, 60):
+        return _message(request, "Please wait", "Too many attempts. Please try again in a minute.", status=429)
     if email is None:
         return _message(request, "Link not valid", "This unsubscribe link is not valid. Reply to any Spa 99 email and we will stop them for you.", status=400)
     if request.method == "POST":
@@ -45,7 +47,7 @@ def unsubscribe(request, token):
 def invite_link(request, token):
     """The session remembers the invite so the questionnaire's email step and Register can pre-fill name and email. A link that is unknown,
     expired or not sent yet looks the same as a good one: same redirect, nothing remembered."""
-    if not hit("invite-link", client_ip(request) or "unknown", 60, 60, sliding=True):
+    if not hit("invite-link", client_ip(request) or "unknown", 60, 60):
         return _message(request, "Please wait", "Too many attempts. Please try again in a minute.", status=429)
     invite = invites.good_invite(token)
     if invite is not None:

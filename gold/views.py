@@ -110,7 +110,7 @@ def apply(request):
     form = GoldApplicationForm(data)
     if not form.is_valid():
         return JsonResponse({"errors": {k: [str(m) for m in v] for k, v in form.errors.items()}}, status=400)
-    if not hit(APPLY_SCOPE, client_ip(request) or "unknown", APPLY_LIMIT, APPLY_WINDOW, sliding=True):
+    if not hit(APPLY_SCOPE, client_ip(request) or "unknown", APPLY_LIMIT, APPLY_WINDOW, rolling=True):
         return too_many_response(APPLY_WINDOW)
     session = journey_services.session_from_cookies(request.COOKIES, request.user)
     try:
@@ -134,7 +134,12 @@ def _invalid_link(request, status=410):
 @require_http_methods(["GET", "POST"])
 def invite_setup(request, token):
     """GET shows the setup form (nothing is used up by opening it); POST creates the account and signs him in."""
-    if not hit(SETUP_SCOPE, client_ip(request) or "unknown", SETUP_LIMIT, SETUP_WINDOW, sliding=True):
+    # Only POSTs use the hourly limit (a rolling one); opening the form has its own generous fixed window, so a mail scanner or a refresh cannot use up a real person's tries.
+    if request.method == "POST":
+        allowed = hit(SETUP_SCOPE, client_ip(request) or "unknown", SETUP_LIMIT, SETUP_WINDOW, rolling=True)
+    else:
+        allowed = hit(SETUP_SCOPE + "-view", client_ip(request) or "unknown", 60, 60)
+    if not allowed:
         return render(request, "gold/invite_invalid.html", {"throttled": True, "days": defaults.get(request).gold_invite_days}, status=429)
     status, invite = invites.read_invite(token)
     if status != invites.OK:
