@@ -24,11 +24,12 @@ class ReachButtonTests(Base):
         self.assertNotRegex(html, r'<a [^>]*data-whatsapp-open')  # Start writes, so it is a POST form, never a link
         self.assertRegex(html, r'class="btn btn-secondary btn-block o-email-btn" data-dialog-open="email"[^>]*data-email-open')
 
-    def test_no_mobile_shows_the_email_button_alone_with_a_clickable_grey_line_that_opens_the_dialog(self):
+    def test_no_mobile_shows_the_email_button_alone_with_the_grey_line_as_text_and_the_details_add_opening_the_dialog(self):
         page = self.lead_page(self.approver, "eddie@example.com", mobile="")
         self.assertNotContains(page, "data-whatsapp-open")
         self.assertContains(page, "Add a number to enable WhatsApp")
-        self.assertRegex(page.content.decode(), r'<button type="button" class="o-quiet o-channel-add" data-dialog-open="mobile"[^>]*data-add-mobile>')
+        self.assertRegex(page.content.decode(), r'<button type="button" class="o-quiet" data-dialog-open="mobile"[^>]*data-add-mobile>Add</button>')  # the one Add is the Details row
+        self.assertNotContains(page, "o-channel-add")
         self.assertRegex(page.content.decode(), r'class="btn btn-primary btn-block o-email-btn" data-dialog-open="email"[^>]*data-email-open')  # no WhatsApp: Email is the one primary
 
     @override_settings(TWILIO_ACCOUNT_SID="")

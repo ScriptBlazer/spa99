@@ -459,9 +459,9 @@ def owner_of_email(new, exclude=""):
 
 
 def correct_lead_email(old, new, actor):
-    """Fix a lead's address (a typo): written on every journey that left the old one, and his notes, messages, list entries and history follow it.
+    """Change a lead's address (a typo or a new one he gave; after a bounce or not): written on every journey that left the old one, and his notes, messages, list entries and history follow it.
     Refused when the new address already belongs to another lead or an account (the answer says whose). The old address stays on the suppression
-    list. Audited ("Email changed by X"). Returns (DONE | UNCHANGED | INVALID | TAKEN | MISSING, info): info is the message for INVALID, or
+    list if it was on it. Audited ("Email changed by X"). Returns (DONE | UNCHANGED | INVALID | TAKEN | MISSING, info): info is the message for INVALID, or
     the owner {kind, name, url} for TAKEN."""
     from django.core.exceptions import ValidationError
 

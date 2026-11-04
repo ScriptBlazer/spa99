@@ -398,18 +398,19 @@ a.o-wa-who > .o-icon { color: var(--office-muted); flex: none; }
 .o-channel > .o-hint-line { margin: 0; text-align: center; }
 .o-channel > .o-hint-line .o-quiet { display: inline-flex; vertical-align: middle; min-height: 2.25rem; color: var(--office-text); text-decoration: underline; text-underline-offset: 0.2em; }
 @media (pointer: coarse) { .o-channel > .o-hint-line .o-quiet { min-height: 2.75rem; } }
-/* the clickable grey line (no mobile, staff may add one): the underline is what separates it from the static line, which never has one */
-.o-channels .o-channel-add { justify-self: center; gap: var(--space-2); min-height: 2.25rem; color: var(--office-muted); font-size: var(--text-sm); cursor: pointer; text-decoration: underline; text-underline-offset: 0.2em; }
-.o-channels .o-channel-add .o-icon { width: 1rem; height: 1rem; flex: none; }
-@media (pointer: coarse) { .o-channels .o-channel-add { min-height: 2.75rem; } }
-@media (hover: hover) and (pointer: fine) { .o-channels .o-channel-add:hover { color: var(--office-text); } }
 .o-channel-note { margin: 0; }
 .o-detail-rail .o-channels { margin-top: var(--space-3); }
 .o-channels + .o-actions-more { margin-top: var(--space-2); }
 .o-field-error--inline { display: block; margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--office-danger); }
 .o-field-error--inline a { color: inherit; text-underline-offset: 0.2em; }
-.o-mobile-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.o-mobile-row .o-quiet { min-height: 2.75rem; color: var(--office-muted); flex: none; }
+/* Details in the Reach out card: label left, plain value, a quiet Add or Change on the right. Rows wrap on a narrow card; every control is a full tap target */
+.o-details { margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--office-sunken); }
+.o-details-h { margin: 0 0 var(--space-1); font-size: var(--text-sm); font-weight: 600; color: var(--office-muted); }
+.o-details-rows { display: grid; margin: 0; }
+.o-details-rows > div { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 2.75rem; }
+.o-details-rows dt { flex: none; font-size: var(--text-sm); color: var(--office-muted); }
+.o-details-rows dd { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; column-gap: var(--space-2); min-width: 0; margin: 0; text-align: right; overflow-wrap: anywhere; }
+.o-details-rows .o-quiet { min-height: 2.75rem; padding-inline: var(--space-2); flex: none; color: var(--office-muted); }
 .o-mobile-hint { margin: var(--space-1) 0 0; color: var(--office-muted); font-size: var(--text-sm); }
 .o-dialog .o-mobile-parts { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
 
@@ -509,3 +510,4 @@ a.o-wa-who > .o-icon { color: var(--office-muted); flex: none; }
 .o-wa-rec-time { font-size: var(--text-base); font-variant-numeric: tabular-nums; }
 .o-wa-rec-word { color: var(--office-muted); font-size: var(--text-sm); }
 .o-wa-rec-pill { padding: 0.125rem var(--space-2); border-radius: var(--office-pill); background: var(--office-caramel-tint); color: var(--office-text); font-size: var(--office-text-xs); font-weight: 600; }
+.o-details-rows .o-muted { color: var(--office-muted); }

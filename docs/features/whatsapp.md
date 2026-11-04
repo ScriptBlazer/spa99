@@ -43,7 +43,7 @@ A new number on **WhatsApp (through Twilio)** becomes a full staff to lead chat 
 - **The chat:** looks very like WhatsApp but themed to Spa 99 (brand colours and fonts, clear and calm). Designer brief first.
 - **WhatsApp text formatting works** in the composer and in the bubbles, the same as in the app: `*bold*`, `_italic_`, `~strikethrough~`, ` ```monospace``` `, `` `inline code` ``, `- ` and `* ` lists, `1. ` numbered lists, `> ` quotes. The text is sent as typed; WhatsApp formats it on his phone and the Office shows the same. Note: WhatsApp's bold is one star each side, not two. Escaped safely (no HTML from message text).
 
-- **No mobile:** the WhatsApp button is replaced by a grey line, "Add a number to enable WhatsApp"; the Email button still works.
+- **No mobile:** the WhatsApp button is replaced by a grey line of plain text, "Add a number to enable WhatsApp"; the Email button still works. The one Add is the **Details** row below (see "Details rows").
 - **Consent:** new leads tick at the email step. Moishe's call: **registered people count as agreed**, so staff can WhatsApp anyone with a mobile. The privacy notice gets a WhatsApp line (backfill with dry run). A "STOP" reply marks him opted out and blocks further templates (START clears it); the template text does not mention it (Moishe, 2026-11-03). Risk noted to Moishe: complaints affect the WhatsApp account shared with BML.
 - **Gold Respond** also goes by WhatsApp: opens his chat and marks the application Contacted when sent.
 
@@ -192,7 +192,7 @@ Checked in Twilio's docs on 2026-11-04. The Create Message request has no parame
 
 ## The mobile at the end of the journey (Moishe, 2026-11-04: briefly optional, then required again)
 - The email step asks for first name, email and mobile, all required, since WhatsApp is the channel. The tick reads "Yes, Spa 99 may email and WhatsApp me about opening and offers. I can stop at any time." (`CONSENT_VERSION` `2026-11-04-2`).
-- **No mobile on a page:** only the Email button shows, with a greyed line under it, "Add a number to enable WhatsApp". Clicking it opens the staff Add a mobile dialog. Once saved, the WhatsApp button appears.
+- **No mobile on a page:** only the Email button shows, with a greyed line under it, "Add a number to enable WhatsApp". The Add is the Mobile row in Details (the grey line is only text). Once saved, the WhatsApp button appears.
 - Register and the Gold form are unchanged (still ask for a mobile).
 
 
@@ -214,7 +214,7 @@ Settings added: `FFMPEG_BIN` (optional, default `ffmpeg`), limits in settings `W
 
 ## The mobile at the end of the journey (server side)
 - `journey.services.save_lead`: first name, email and mobile are all required (`common.phone` validates; error key `mobile`), consent as before.
-- Office: `whatsapp.state == "no_mobile"` on a lead or person with no number: show the Email button alone and the greyed line `whatsapp.reason`; when `whatsapp.can_add_number`, it opens the existing Add a mobile dialog (`whatsapp.edit_url`). **A Gold applicant with no mobile can occur** (the application form requires one, but `GoldApplication.mobile` is `blank=True`, so an old or admin-made row can have none; the number may also come from his account or a journey lead on his address) and the Gold page has an `edit_url` too (`POST /gold/<id>/mobile/`, `mobile_country` and `mobile`; `outreach.services.set_gold_mobile`: an applicant with an account gets his account's mobile set, otherwise the application's, and any journey of his that already holds a number is kept in step; audited as a Mobile line in his timeline, like the lead and person ones), so `can_add_number` works there and the same dialog (`_mobile_dialog.html`) opens.
+- Office: `whatsapp.state == "no_mobile"` on a lead or person with no number: show the Email button alone and the greyed line `whatsapp.reason`; when `whatsapp.can_add_number`, the Details row's Add opens the existing Add a mobile dialog (`whatsapp.edit_url`). **A Gold applicant with no mobile can occur** (the application form requires one, but `GoldApplication.mobile` is `blank=True`, so an old or admin-made row can have none; the number may also come from his account or a journey lead on his address) and the Gold page has an `edit_url` too (`POST /gold/<id>/mobile/`, `mobile_country` and `mobile`; `outreach.services.set_gold_mobile`: an applicant with an account gets his account's mobile set, otherwise the application's, and any journey of his that already holds a number is kept in step; audited as a Mobile line in his timeline, like the lead and person ones), so `can_add_number` works there and the same dialog (`_mobile_dialog.html`) opens.
 
 
 ---
@@ -268,3 +268,12 @@ Who owns a chat is decided in one module, `common/ownership.py`; every lookup fo
 - Merge (`users/merge.py`): applications move only when the removed account is verified; chats follow by the same rule; the address on a chat is rewritten to keep's only for a verified removed account.
 - Gold Delete erases the WhatsApp chats staff linked to that application, unless an account owns them, and only when the chat has the applicant's own address as its lead address.
 - A member's own download and delete never include a WhatsApp chat.
+
+
+## Details rows (2026-11-04, Moishe: staff can add or change a number on lead, person and Gold pages, and a lead's name and email)
+
+A small plain **Details** section (`office/_details.html`) sits in the Reach out card of the lead and person pages and in the Gold Decision card. Values are shown plainly; editors get a quiet Add or Change, a reader sees the values and no controls.
+- **Lead:** First name (Add or Change), Mobile (Add or Change), Email (Change). First name and Mobile open the one dialog `data-dialog="mobile"`, titled "Change the details" on a lead (first name plus number; leave the number empty to change only the name, which posts no `mobile`). Email Change opens the existing `correct-email` dialog (`/leads/<id>/email/`), bounced or not; the heading is "Correct the email" while the address bounces and "Change the email" otherwise. There is one such dialog per page, rendered by `_bounce.html`.
+- **Person:** Mobile (Add or Change, `/people/<id>/mobile/`). The email is plain text with no control: an account's email is his sign-in, so changing it has other consequences. The old Mobile and Email rows of the rail's Details card were removed, so there is one control.
+- **Gold:** Mobile only (`/gold/<id>/mobile/`). An application's email is not editable here.
+- After a save the Reach out card (with Details and the buttons) is swapped for the server's, so the WhatsApp button and chat state update without a reload. Every change is a line in his timeline.

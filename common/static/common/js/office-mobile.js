@@ -9,6 +9,7 @@ export function initMobileDialog() {
   const dialog = form.closest('dialog');
   const error = form.querySelector('[data-mobile-error]');
   const input = form.elements.mobile;
+  const nameInput = form.elements.first_name; // lead pages only: the dialog is Change the details
   const submit = form.querySelector('[type="submit"]');
   const show = (message, owner) => {
     error.replaceChildren();
@@ -27,24 +28,28 @@ export function initMobileDialog() {
   };
   input.addEventListener('input', () => show(''));
   dialog.addEventListener('close', () => { show(''); });
-  dialog.addEventListener('close', () => { input.value = ''; });
+  dialog.addEventListener('close', () => { input.value = ''; if (nameInput) nameInput.value = nameInput.defaultValue; });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (submit.disabled) return;
-    if (!input.value.trim()) { show('That does not look like a mobile number.'); return; }
+    const nameChanged = !!nameInput && nameInput.value.trim() !== nameInput.defaultValue.trim();
+    const noNumber = !input.value.trim();
+    if (noNumber && !nameChanged) { show(nameInput ? 'Change the name or type a number.' : 'That does not look like a mobile number.'); return; }
+    const body = new FormData(form);
+    if (noNumber) body.delete('mobile'); // a name-only change leaves his number as it is
     submit.disabled = true;
     submit.setAttribute('aria-busy', 'true');
     const label = submit.textContent;
     submit.textContent = 'Saving';
     try {
-      const response = await fetch(form.action, { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', 'X-Requested-With': 'fetch' }, body: new FormData(form) });
+      const response = await fetch(form.action, { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', 'X-Requested-With': 'fetch' }, body });
       const data = await response.json().catch(() => null);
       if (response.ok && data && data.ok) {
         await refresh();
         dialog.close();
-        toast('Mobile saved.');
-        setTimeout(() => document.querySelector('[data-whatsapp-open]')?.focus(), 0); // the grey line he used is gone: focus goes to the new button
+        toast(noNumber ? 'Name saved.' : 'Mobile saved.');
+        setTimeout(() => document.querySelector(noNumber ? '[data-change-name]' : '[data-whatsapp-open], [data-change-mobile]')?.focus(), 0); // the Add he used is gone: focus goes to the new WhatsApp button, or the row's Change
       } else {
         const errors = (data && data.errors) || {};
         const owner = errors.owner;
@@ -73,6 +78,8 @@ export function initMobileDialog() {
       const newDialog = doc.querySelector('dialog[data-dialog="mobile"] h2');
       const title = dialog.querySelector('h2');
       if (newDialog && title) title.textContent = newDialog.textContent;
+      const freshName = doc.querySelector('dialog[data-dialog="mobile"] input[name="first_name"]');
+      if (freshName && nameInput) nameInput.defaultValue = freshName.getAttribute('value') || '';
       const hint = doc.querySelector('dialog[data-dialog="mobile"] .o-mobile-hint');
       const here = dialog.querySelector('.o-mobile-hint');
       if (hint && here) here.textContent = hint.textContent;

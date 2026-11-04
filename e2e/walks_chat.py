@@ -14,6 +14,7 @@ ADMIN = STAFF["admin"]
 WANDA = "chat-wanda@example.com"
 WANDA_PHONE_TYPED, WANDA_PHONE = "07400 123462", "+447400123462"
 EDDIE = "chat-eddie@example.com"
+ZED, ZED_NEW = "chat-zed@example.com", "chat-zed-fixed@example.com"  # the lead whose name and email the Details step changes: no other walk uses him
 FRANK = "chat-frank@example.com"
 FRANK_PHONE_TYPED, FRANK_PHONE = "07400 123464", "+447400123464"
 # A visitor the site counts as a person: the headless browser's own user agent is treated as a bot, and a bot's journey is never a lead.
@@ -67,14 +68,16 @@ def chat_buttons(w):
         # Start can make a chat, so it is a small form POST (with its CSRF token), never a link; Open (below, walk 26) is a link
         assert card.locator("form[data-whatsapp-start][method=post] input[name=csrfmiddlewaretoken]").count() == 1, "Start WhatsApp chat is not a CSRF form"
         assert card.locator("a[data-whatsapp-open]").count() == 0, "Start WhatsApp chat is a link: a GET would write"
-    with w.step("A lead with no mobile: only the email button, and a grey line that opens Add a mobile", office):
+    with w.step("A lead with no mobile: only the email button, a grey line of plain text, and ONE Add (the Details row) that opens the dialog", office):
         office.goto(f"{OFFICE}/leads/{dbtool('lead', EDDIE)['id']}/")
         card = office.locator("[data-person-reach]")
         assert card.locator("[data-whatsapp-open]").count() == 0, "A WhatsApp button shows for a man with no number"
         assert "btn-primary" in card.locator("[data-email-open]").get_attribute("class"), "With no WhatsApp, Email should be the primary"
-        add = card.locator("button[data-add-mobile]")
-        assert "Add a number to enable WhatsApp" in add.inner_text()
-        add.click()
+        assert "Add a number to enable WhatsApp" in card.locator("[data-wa-note]").inner_text()
+        assert card.locator("[data-wa-note] button, button.o-channel-add").count() == 0, "The grey line is a second Add"
+        assert card.locator("button[data-add-mobile]").count() == 1, "There should be exactly one Add a number"
+        assert card.locator("[data-details] [data-detail=email] [data-change-email]").count() == 1, "The Details row has no email Change"
+        card.locator("[data-details] button[data-add-mobile]").click()
         office.locator("dialog[data-dialog=mobile][open]").wait_for()
     with w.step("Saving a number swaps the card: Start WhatsApp chat appears, primary, with focus; Email drops to secondary", office):
         dialog = office.locator("dialog[data-dialog=mobile][open]")
@@ -86,6 +89,34 @@ def chat_buttons(w):
         assert card.locator("[data-whatsapp-open]").inner_text().strip() == "Start WhatsApp chat"
         assert "btn-primary" in card.locator("[data-whatsapp-open]").get_attribute("class")
         assert "btn-secondary" in card.locator("[data-email-open]").get_attribute("class")
+    with w.step("Details: change a lead's first name alone, then his email with no bounce (Change the email), audited; one dialog; a taken address is refused", office):  # UNRUN: written with the Details change (no e2e here)
+        ensure_lead(w, ZED, "07400 123466", "Zed")
+        office.goto(f"{OFFICE}/leads/{dbtool('lead', ZED)['id']}/")
+        office.locator("[data-details] [data-change-name]").click()
+        dialog = office.locator("dialog[data-dialog=mobile][open]")
+        dialog.wait_for()
+        dialog.locator("input[name=first_name]").fill("Zachary")
+        dialog.locator("button[type=submit]").click()
+        office.wait_for_function("document.querySelector('[data-name-value]') && document.querySelector('[data-name-value]').textContent.trim() === 'Zachary'")
+        assert office.locator("[data-details] [data-mobile-value]").inner_text().strip() != "None given", "A name-only change cleared his number"
+        office.locator("[data-details] [data-change-email]").click()
+        dialog = office.locator("dialog[data-dialog=correct-email][open]")
+        dialog.wait_for()
+        assert "Change the email" in dialog.inner_text() and "bounce list" not in dialog.inner_text(), dialog.inner_text()
+        assert office.locator("dialog[data-dialog=correct-email]").count() == 1, "More than one email dialog on the page"
+        dialog.locator("input[name=email]").fill(EDDIE)  # another lead's address
+        dialog.locator("button[type=submit]").click()
+        office.locator("text=already belongs to").wait_for()
+        office.locator("[data-details] [data-change-email]").click()
+        dialog = office.locator("dialog[data-dialog=correct-email][open]")
+        dialog.wait_for()
+        dialog.locator("input[name=email]").fill(ZED_NEW)
+        dialog.locator("button[type=submit]").click()
+        office.locator("text=Email changed.").wait_for()
+        assert office.locator("[data-details] [data-email-value]").inner_text().strip() == ZED_NEW
+        assert "Email changed by" in office.locator("[data-person-timeline], .o-timeline").first.inner_text(), "The change is not in the timeline"
+        office.reload()
+        assert office.locator("[data-details] [data-email-value]").inner_text().strip() == ZED_NEW, "The new email is lost on refresh"
     with w.step("Email: the pop-up (one text box) sends from him with his address as Reply-To, and the timeline shows it", office):
         office.goto(f"{OFFICE}/leads/{dbtool('lead', WANDA)['id']}/")
         office.locator("[data-email-open]").click()
@@ -235,7 +266,7 @@ def journey_mobile_required(w):
 
 
 CHAT_WALKS = [
-    ("chat_buttons", "25. Reach out buttons: Start or Open, the grey line, adding a number", chat_buttons, ()),
+    ("chat_buttons", "25. Reach out buttons: Start or Open, the grey line, Details (add a number, change name and email)", chat_buttons, ()),
     ("whatsapp_chat", "26. WhatsApp: send, his reply, reply with a quote, emoji, MP4, a message it cannot show", whatsapp_chat, ()),
     ("journey_mobile_required", "27. Journey mobile is required; Register still requires one", journey_mobile_required, (r"status of 40\d",)),
 ]

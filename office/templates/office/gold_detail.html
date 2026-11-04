@@ -53,7 +53,7 @@
       {% if office_can.can_act and a.can_approve %}<p class="o-sub">He gets an email to set up his account. The link lasts 14 days.{% if a.potential in final_waits and not a.sent_back %} The potential is {{ a.potential|capfirst }}, so a final approver confirms first.{% endif %}</p>{% endif %}
       {% if a.person_id and office_can.can_see_all %}<a class="o-quiet" href="{% url 'office_person' a.person_id %}">Open his account</a>{% endif %}
       {% include "office/_channels.html" with secondary=True %}{# both channels are secondary here, so Approve stays the one primary; outside can_edit so a reader still sees a live thread #}
-      {% if whatsapp.has_mobile and whatsapp.can_edit and whatsapp.edit_url %}<div class="o-mobile-row" data-mobile-row><span class="o-sub">Mobile <span data-mobile-value>{{ whatsapp.mobile }}</span></span><button type="button" class="o-quiet" data-dialog-open="mobile" aria-haspopup="dialog" data-change-mobile>Change</button></div>{% endif %}{# same row as the lead page: with a number on file the dialog needs an opener #}
+      {% include "office/_details.html" with gold=True %}{# the one Add or Change for the number; a reader sees the value #}
       {% if office_can.can_edit %}<div class="o-actions-more" data-gold-more>
         {% if guide_available %}<button type="button" class="btn btn-secondary" data-gold-open="guide" aria-haspopup="dialog" data-send-guide>{% include "office/_icon.html" with name="paper-plane" %}Send guide</button>
         {% else %}<button type="button" class="btn btn-secondary o-btn-off" aria-disabled="true" aria-describedby="guide-hint" data-send-guide>{% include "office/_icon.html" with name="paper-plane" %}Send guide</button>{% endif %}

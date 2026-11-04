@@ -188,7 +188,7 @@ Moishe wants automatic emails fully editable in System.
 When a lead's email address has a **permanent bounce** (it is on the suppression list as a bounce; spam complaints do not count):
 - **Leads list:** the row shows a tag **Possible fake**. A Leads filter is optional, only if cheap.
 - **Lead page:** a clear notice near the top: "This email bounced, so it may not be real. Remove the lead if it looks like spam, or correct the address if it's a typo and resend the follow-up."
-- **Correct the email** (`can_edit`, audited in the timeline): updates the address on his journeys. Refused if that address already belongs to another lead or an account (say whose). The bounced address stays on the suppression list. The tag goes because the new address is clean.
+- **Correct the email** (`can_edit`, audited in the timeline): updates the address on his journeys. It is also reachable without a bounce: the lead page's Details row (Reach out card) has Email, Change, which opens the same dialog titled "Change the email" (see whatsapp.md, Details rows); the first name and mobile Change are there too. Refused if that address already belongs to another lead or an account (say whose). The bounced address stays on the suppression list. The tag goes because the new address is clean.
 - **Resend follow-up:** after a correction, one button sends the next-morning email to the new address straight away (from the System sender, once per address, recorded in his timeline). Works with the automatic switch off, but needs a sender address set; otherwise the button explains. No resend while the address is still bounced.
 - **Remove the lead** stays as it is today, and Archive stays available.
 - Figures: a Possible fake lead still counts until removed or archived.

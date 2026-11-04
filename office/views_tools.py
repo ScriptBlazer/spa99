@@ -211,13 +211,13 @@ def lead_unarchive(request, pk):
 @editor
 @require_POST
 def lead_email(request, pk):
-    """Correct a lead's email (a typo), usually after a bounce. POST email. Refused, saying whose it is, when another lead or an account has it."""
+    """Change a lead's email (a typo, or a new address he gave), after a bounce or not. POST email. Refused, saying whose it is, when another lead or an account has it."""
     target = tools.target_for("lead", pk)
     if target.kind != "lead":
         return redirect(target.page_url)
     result, info = services.correct_lead_email(target.main, request.POST.get("email", ""), request.user)
     if result == services.DONE:
-        messages.success(request, "Email corrected.")
+        messages.success(request, "Email changed.")
     elif result == services.UNCHANGED:
         messages.info(request, "That is the address he already has.")
     elif result == services.TAKEN:

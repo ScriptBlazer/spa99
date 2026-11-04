@@ -6,7 +6,7 @@ Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, what
     {% include "office/_channels.html" %}
     {% if outreach.can_add %}{% if outreach.on_list %}{% include "office/_onlist.html" %}{% else %}<button type="button" class="btn btn-secondary btn-block" data-dialog-open="outreach" aria-haspopup="dialog">{% include "office/_icon.html" with name="list-checks" %}<span class="o-only-wide">Add to {{ outreach.title }}</span><span class="o-only-narrow">Add to list</span></button>{% endif %}{% endif %}
   </div>
-  {% if archive and whatsapp.has_mobile and whatsapp.can_edit and whatsapp.edit_url %}<div class="o-mobile-row" data-mobile-row><span class="o-sub">Mobile <span data-mobile-value>{{ whatsapp.mobile }}</span></span><button type="button" class="o-quiet" data-dialog-open="mobile" aria-haspopup="dialog" data-change-mobile>Change</button></div>{% endif %}
+  {% include "office/_details.html" %}
   {% if archive %}{% if archive.archived %}
   <div class="o-archived-state" data-lead-archived>
     <p class="o-onlist o-onlist--archived">{% include "office/_icon.html" with name="archive" %}<span class="o-onlist-text">Archived{% if archive.by %} by {{ archive.by|first_word }}{% endif %}, {{ archive.at|dm }}</span></p>

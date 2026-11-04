@@ -1,0 +1,11 @@
+{% comment %}"Details" of the Reach out card (lead and person pages) and of the Gold Decision card: plain values, with Add or Change for editors. One place to edit a number, so no second Add.
+Keys: whatsapp (office.tools.whatsapp_context), and on a lead page archive (first name) and bounce (email, correct_url, can_edit). Pass gold=True on the Gold page (mobile only: an application's email has other consequences),
+person on a person page (mobile; the email shows as text, because an account's email is his sign-in). A reader sees the values and no buttons.{% endcomment %}
+<div class="o-details" data-details>
+  <h3 class="o-details-h">Details</h3>
+  <dl class="o-details-rows">
+    {% if archive and not gold %}<div data-detail="first-name"><dt>First name</dt><dd><span class="{% if not whatsapp.first_name %}o-muted{% endif %}" data-name-value>{{ whatsapp.first_name|default:"None given" }}</span>{% if whatsapp.can_edit and whatsapp.edit_url %}<button type="button" class="o-quiet" data-dialog-open="mobile" aria-haspopup="dialog" data-change-name>{% if whatsapp.first_name %}Change{% else %}Add{% endif %}</button>{% endif %}</dd></div>{% endif %}
+    <div data-mobile-row data-detail="mobile"><dt>Mobile</dt><dd><span class="{% if not whatsapp.has_mobile %}o-muted{% endif %}" data-mobile-value>{{ whatsapp.mobile|default:"None given" }}</span>{% if whatsapp.can_edit and whatsapp.edit_url %}{% if whatsapp.has_mobile %}<button type="button" class="o-quiet" data-dialog-open="mobile" aria-haspopup="dialog" data-change-mobile>Change</button>{% else %}<button type="button" class="o-quiet" data-dialog-open="mobile" aria-haspopup="dialog" data-add-mobile>Add</button>{% endif %}{% endif %}</dd></div>
+    {% if not gold %}<div data-detail="email"><dt>Email</dt><dd><span data-email-value>{{ person.email }}</span>{% if bounce.can_edit %}<button type="button" class="o-quiet" data-dialog-open="correct-email" aria-haspopup="dialog" data-change-email>Change</button>{% endif %}</dd></div>{% endif %}
+  </dl>
+</div>
