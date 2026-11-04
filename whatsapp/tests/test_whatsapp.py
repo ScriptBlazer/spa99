@@ -18,6 +18,8 @@ from gold.tests.test_gold import application_data
 from journey import services as journey
 from office.tests.test_leads import lead, verify
 from office.tests.test_office import OfficeTestCase
+from outreach import nextmorning
+from outreach.models import NextMorningEmail
 from outreach import services as outreach
 from plans.tests.helpers import make_team_member
 from users import services as user_services
@@ -154,7 +156,13 @@ class SignatureAndWebhookTests(Base):
 
 class SendingTests(Base):
     def twilio(self, **result):
-        return mock.patch("whatsapp.twilio_api.send_message", return_value={"sid": "SMnew", "status": "queued", **result})
+        count = iter(range(1, 1000))  # the first send is SMnew, the next SMnew2 ...: a sid is unique on a message
+
+        def reply(*args, **kwargs):
+            n = next(count)
+            return {"sid": "SMnew" if n == 1 else f"SMnew{n}", "status": "queued", **result}
+
+        return mock.patch("whatsapp.twilio_api.send_message", side_effect=reply)
 
     def test_text_goes_inside_the_window_with_a_status_callback_and_is_recorded(self):
         self.open_window()
@@ -183,18 +191,60 @@ class SendingTests(Base):
             self.assertEqual(services.send_text(self.contact, self.approver, "Once")[0], services.DUPLICATE)
         self.assertEqual(Message.objects.filter(direction="out").count(), 1)
 
-    def test_a_twilio_failure_is_recorded_with_a_plain_reason_and_can_be_retried(self):
+    def test_a_twilio_failure_is_recorded_with_a_plain_reason_and_only_a_retryable_one_can_be_retried(self):
         self.open_window()
         with mock.patch("whatsapp.twilio_api.send_message", side_effect=twilio_api.TwilioError("boom", code="63016", status=400)):
-            _, message = services.send_text(self.contact, self.approver, "Hello")
+            _, closed = services.send_text(self.contact, self.approver, "Hello")
+        closed.refresh_from_db()
+        self.assertEqual((closed.status, closed.error_code), ("failed", "63016"))
+        shown = services.message_dict(closed)
+        self.assertEqual((shown["error"]["reason"], shown["error"]["can_retry"], shown["retry_url"]), ("Not sent. The window has closed.", False, ""))
+        self.assertEqual(services.retry(closed, self.approver)[0], services.NOT_RETRYABLE)  # a retry cannot succeed: refused
+        with mock.patch("whatsapp.twilio_api.send_message", side_effect=twilio_api.TwilioError("down")):  # no answer from Twilio: worth trying again
+            _, lost = services.send_text(self.contact, self.approver, "Hello again")
+        lost.refresh_from_db()
+        self.assertEqual((lost.status, services.message_dict(lost)["error"]["can_retry"]), ("failed", True))
+        with self.twilio():
+            self.assertEqual(services.retry(lost, self.approver)[0], services.DONE)
+        lost.refresh_from_db()
+        self.assertEqual((lost.status, lost.twilio_sid, lost.error_code), ("queued", "SMnew", ""))
+
+    def test_a_message_twilio_accepted_is_never_sent_again_and_a_double_click_sends_once(self):
+        self.open_window()
+        with self.twilio():
+            _, taken = services.send_text(self.contact, self.approver, "Hello")
+        Message.objects.filter(pk=taken.pk).update(status="failed", error_code="30008")  # failed later, by Twilio's callback: the sid is set
+        taken.refresh_from_db()
+        self.assertEqual(services.retry(taken, self.approver)[0], services.NOT_RETRYABLE)
+        Message.objects.filter(pk=taken.pk).update(twilio_sid=None)
+        taken.refresh_from_db()
+        with self.twilio() as call:
+            first = services.retry(taken, self.approver)
+            second = services.retry(taken, self.approver)  # the double click: the status has moved on
+        self.assertEqual((first[0], second[0], call.call_count), (services.DONE, services.NOT_RETRYABLE, 1))
+
+    def test_a_message_the_queue_lost_can_be_tried_again_after_a_few_minutes_only(self):
+        self.open_window()
+        message = Message.objects.create(contact=self.contact, direction="out", status="queued", body="Lost", author=self.approver)
+        self.assertEqual(services.message_dict(message)["error"], None)  # still within the first minutes
+        Message.objects.filter(pk=message.pk).update(updated_at=timezone.now() - timedelta(minutes=10))
         message.refresh_from_db()
-        self.assertEqual((message.status, message.error_code), ("failed", "63016"))
         shown = services.message_dict(message)
-        self.assertEqual(shown["error"]["reason"], "Not sent. The window has closed.")
+        self.assertEqual((shown["error"]["reason"], shown["error"]["can_retry"]), ("Not sent. Try again.", True))
         with self.twilio():
             self.assertEqual(services.retry(message, self.approver)[0], services.DONE)
+
+    def test_the_worker_rechecks_stop_before_it_sends(self):
+        self.open_window()
+        with self.twilio() as call:
+            Message.objects.all().delete()
+            message = Message.objects.create(contact=self.contact, direction="out", status="queued", body="Hello")
+            Contact.objects.filter(pk=self.contact.pk).update(opted_out_at=timezone.now())  # he replied STOP after it was queued
+            from whatsapp import tasks
+            tasks.send_message(message.pk)
         message.refresh_from_db()
-        self.assertEqual((message.status, message.twilio_sid), ("queued", "SMnew"))
+        self.assertEqual((call.call_count, message.status, message.error_code), (0, "failed", "opted_out"))
+        self.assertEqual(services.message_dict(message)["error"]["reason"], "Not sent. He replied STOP.")
 
     def test_the_worker_never_sends_a_message_twice(self):
         self.open_window()
@@ -540,9 +590,9 @@ class ErasureAndSystemTests(Base):
     def test_deleting_a_person_removes_his_chat_messages_and_files_and_export_includes_them(self):
         user = user_services.register_interest(cleaned(email="acc@example.com", mobile="07400123789")).user
         contact, key = self.make_chat("+447400123789")
-        exported = user_services.export_user_data(user)["whatsapp"]
+        exported = user_services.export_user_data(user, include_chats=True)["whatsapp"]
         self.assertEqual((exported[0]["phone"], exported[0]["messages"][0]["text"]), ("+447400123789", "hi"))
-        user_services.delete_user_data(user)
+        user_services.delete_user_data(user, include_chats=True)
         self.assertFalse(Contact.objects.filter(pk=contact.pk).exists())
         self.assertEqual(Message.objects.filter(contact_id=contact.pk).count(), 0)
         self.assertFalse(default_storage.exists(key))
@@ -567,9 +617,10 @@ class ErasureAndSystemTests(Base):
         self.assertContains(page, "https://spa99.uk/twilio/whatsapp/incoming/")
         self.assertNotContains(page, "token123")
         self.assertNotContains(page, "secret")
-        with mock.patch("whatsapp.twilio_api.account", return_value={"status": "active"}), mock.patch(
-                "whatsapp.twilio_api.sender_status", return_value={"found": True, "status": "ONLINE", "name": "Spa 99", "quality": ""}):
-            client.post("/whatsapp/check/")
+        with mock.patch("whatsapp.twilio_api.sender_status", return_value={"found": True, "status": "ONLINE", "name": "Spa 99", "quality": ""}) as senders:
+            client.post("/whatsapp/check/")  # through the Senders API only: a Standard API key cannot read Accounts
+        self.assertEqual(senders.call_count, 1)
+        self.assertFalse(hasattr(twilio_api, "account"))
         self.assertContains(client.get("/whatsapp/"), "Spa 99: Online")
         contents = [{"sid": "HX1", "friendly_name": "spa99_a", "types": {"twilio/text": {"body": "Hi"}}, "approval_requests": {"whatsapp": {"status": "approved"}}}]
         with mock.patch("whatsapp.twilio_api.list_contents", return_value=contents):
@@ -621,3 +672,197 @@ class GateTests(Base):
         client.cookies[journey.COOKIE_NAME] = session.key
         form = client.get("/register/").context["form"]
         self.assertEqual((form.initial["first_name"], form.initial["mobile"], form.initial["mobile_country"]), ("Hugo", "07400 123456", "GB"))
+
+
+class ReviewFixTests(Base):
+    """The review of 2026-11-04: numbers are unproven, links go stale, rollback, small hardening."""
+
+    def lead_chat(self, mobile="07400 123456", email="hugo@example.com"):
+        lead(email)
+        outreach.set_lead_contact(email, self.approver, first_name="Hugo", mobile=mobile)
+        contact = services.get_or_create_contact(phone.normalise(mobile))
+        Message.objects.create(contact=contact, direction="in", status="received", body="Private words from Hugo")
+        return contact
+
+    def test_an_account_with_a_leads_number_cannot_export_or_erase_his_chat_but_staff_can(self):
+        chat = self.lead_chat()
+        probe = user_services.register_interest(cleaned(email="probe@example.com", mobile="07400 123456", first_name="Probe")).user  # nobody proved this number is his
+        verify(probe)
+        probe.set_password("a-Long-pass-123")
+        probe.save()
+        client = Client(HTTP_HOST=PUBLIC)
+        client.force_login(probe)
+        exported = client.get("/account/export/")
+        self.assertNotIn("whatsapp", json.loads(exported.content))
+        self.assertNotIn(b"Private words", exported.content)
+        self.assertNotIn("whatsapp", user_services.export_user_data(probe))  # the service default is the safe one
+        client.post("/account/delete/", {"password": "a-Long-pass-123"})
+        self.assertFalse(User.objects.filter(pk=probe.pk).exists())
+        self.assertTrue(Contact.objects.filter(pk=chat.pk).exists())  # his own deletion never reaches Hugo's chat
+        self.assertEqual(Message.objects.filter(contact=chat).count(), 1)
+        other = user_services.register_interest(cleaned(email="staffcase@example.com", mobile="07400 123456", first_name="Other")).user
+        self.assertEqual(user_services.export_user_data(other, include_chats=True)["whatsapp"][0]["messages"][0]["text"], "Private words from Hugo")  # staff-run: kept
+        user_services.delete_user_data(other, include_chats=True)
+        self.assertFalse(Contact.objects.filter(pk=chat.pk).exists())
+
+    def test_an_old_page_posting_only_the_email_is_told_to_refresh_and_odd_input_is_refused(self):
+        client = Client(HTTP_HOST=PUBLIC)
+        client.get("/journey/state/")
+        post = lambda data: client.post("/journey/lead/", json.dumps(data), content_type="application/json")
+        old = post({"email": "a@example.com", "consent": True})
+        self.assertEqual((old.status_code, old.json()["errors"]["email"]), (400, "Please refresh the page and try again."))
+        self.assertEqual(post({"email": 12345, "first_name": "A", "mobile": "07400 123450", "consent": True}).status_code, 400)  # not a 500
+        self.assertEqual(post({"email": ["a@example.com"], "first_name": "A", "mobile": "07400 123450", "consent": True}).status_code, 400)
+        for bad in ("see http://spam.example", "<b>Hugo</b>", "a" * 101):
+            self.assertIn("first_name", post({"first_name": bad, "email": "a@example.com", "mobile": "07400 123450", "consent": True}).json()["errors"])
+
+    def test_the_consent_version_is_kept_when_the_chat_saves_the_same_email_again(self):
+        session = journey.create_session("Mozilla/5.0")
+        journey.save_lead(session, "a@example.com", True, first_name="A", mobile="07400 123450", require_details=True)
+        journey.save_lead(session, "a@example.com", True)  # the Ask us chat: email only
+        session.refresh_from_db()
+        self.assertEqual((session.lead_consent_version, session.lead_first_name, session.lead_mobile), (journey.CONSENT_VERSION, "A", "+447400123450"))
+
+    def test_he_writes_first_then_applies_for_gold_and_the_chat_finds_the_application(self):
+        twilio_post("/twilio/whatsapp/incoming/", inbound("Hello", "SMfirst", phone_="+447400123321"))
+        contact = Contact.objects.get(phone="+447400123321")
+        self.assertIsNone(contact.application_id)
+        application, _ = gold_services.submit_application(application_data(email="dan@example.com", mobile="+447400123321"))
+        contact.refresh_from_db()
+        self.assertEqual((contact.application_id, contact.name), (application.pk, application.full_name))
+        go = office(self.approver, "get", f"/gold/{application.pk}/whatsapp/")
+        self.assertEqual(go.url, f"/whatsapp/{contact.pk}/?gold={application.pk}")
+        template = self.template()
+        office(self.approver, "post", f"/whatsapp/{contact.pk}/send-template/", {"template": str(template.pk), "var_1": "Dan", "gold": str(application.pk)})
+        application.refresh_from_db()
+        self.assertEqual(application.status, GoldApplication.CONTACTED)
+
+    def test_he_writes_first_then_registers_or_becomes_a_lead_and_the_links_follow(self):
+        twilio_post("/twilio/whatsapp/incoming/", inbound("Hi", "SMa", phone_="+447400123789"))
+        twilio_post("/twilio/whatsapp/incoming/", inbound("Hi", "SMb", phone_="+447400123790"))
+        user = user_services.register_interest(cleaned(email="acc@example.com", mobile="07400 123789", first_name="Acc", last_name="Ount")).user
+        self.assertEqual(Contact.objects.get(phone="+447400123789").user_id, user.pk)
+        session = journey.create_session("Mozilla/5.0")
+        journey.save_lead(session, "lead@example.com", True, first_name="Leo", mobile="07400 123790", require_details=True)
+        linked = Contact.objects.get(phone="+447400123790")
+        self.assertEqual((linked.lead_email, linked.name), ("lead@example.com", "Leo"))
+
+    def test_changing_a_mobile_keeps_the_old_chat_findable_for_erasure(self):
+        chat = self.lead_chat("07400 123456", "hugo@example.com")
+        session = journey.JourneySession.objects.get(lead_email="hugo@example.com")
+        self.assertEqual(outreach.set_lead_contact("hugo@example.com", self.approver, mobile="07400 123499")[0], outreach.DONE)
+        chat.refresh_from_db()
+        self.assertEqual(chat.lead_email, "hugo@example.com")  # the stored owner link stays
+        self.assertEqual(list(services.contacts_for_person(None, {"hugo@example.com"}, services.person_phones(None, {"hugo@example.com"}))), [chat])
+        admin = make_team_member("admin@example.test", levels.ADMIN)
+        office(admin, "post", f"/leads/{session.pk}/delete/")
+        self.assertFalse(Contact.objects.filter(pk=chat.pk).exists())  # the old chat went with him
+
+    def test_correcting_the_email_relinks_his_chat_and_moves_his_ask_us_chat_and_clears_the_old_mails(self):
+        from chat.models import Conversation
+        from notifications.models import EmailLog
+
+        chat = self.lead_chat("07400 123456", "typo@example.com")
+        conversation = Conversation.objects.create(lead_email="typo@example.com")
+        EmailLog.objects.create(to="typo@example.com", template="lead_next_morning", subject="Hi", status="bounced")
+        self.assertEqual(outreach.correct_lead_email("typo@example.com", "fixed@example.com", self.approver)[0], outreach.DONE)
+        chat.refresh_from_db()
+        conversation.refresh_from_db()
+        self.assertEqual((chat.lead_email, conversation.lead_email), ("fixed@example.com", "fixed@example.com"))
+        self.assertFalse(EmailLog.objects.filter(to="typo@example.com").exists())
+
+    def test_the_resend_has_one_winner(self):
+        lead("fixed@example.com")
+        from plans.models import SiteSettings
+        SiteSettings.objects.update(auto_email_from_address="barry@spa99.test", auto_email_from_name="Barry")
+        from django.core import mail
+        results = []
+        real = nextmorning.send_one
+        with mock.patch.object(nextmorning, "send_one", side_effect=lambda *a, **k: results.append(1) or real(*a, **k)):
+            first = outreach.resend_follow_up("fixed@example.com", self.approver)
+            second = outreach.resend_follow_up("fixed@example.com", self.approver)
+        self.assertEqual((first[0], second[0], len(results), len(mail.outbox)), (outreach.SENT, outreach.ALREADY, 1, 1))
+        # a worker takes the row between the read and the claim: the conditional update on claimed_at loses, so nothing is sent
+        row = NextMorningEmail.objects.get()
+        NextMorningEmail.objects.filter(pk=row.pk).update(sent_at=None, skipped_at=timezone.now(), claimed_at=timezone.now() - timedelta(minutes=1))
+        original = NextMorningEmail.objects.filter
+
+        def worker_wins(*args, **kwargs):
+            original(pk=row.pk).update(claimed_at=timezone.now())
+            return original(*args, **kwargs)
+
+        results.clear()
+        with mock.patch.object(NextMorningEmail.objects, "filter", side_effect=worker_wins), mock.patch.object(nextmorning, "send_one", side_effect=lambda *a, **k: results.append(1)):
+            self.assertEqual(outreach.resend_follow_up("fixed@example.com", self.approver)[0], outreach.ALREADY)
+        self.assertEqual(results, [])
+
+    def test_the_approval_may_sit_on_the_content_or_under_whatsapp(self):
+        flat = {"sid": "HX1", "friendly_name": "spa99_flat", "types": {"twilio/text": {"body": "Hi"}}, "approval_requests": {"status": "approved", "category": "UTILITY"}}
+        with mock.patch("whatsapp.twilio_api.list_contents", return_value=[flat]):
+            services.sync_templates()
+        self.assertEqual((Template.objects.get().approval_status, Template.objects.get().category), ("approved", "utility"))
+
+    def test_push_calls_time_out(self):
+        PushSubscription.objects.create(user=self.approver, endpoint="https://push.example.test/x", p256dh="k", auth="a")
+        with mock.patch("whatsapp.push.webpush") as sent:
+            twilio_post("/twilio/whatsapp/incoming/", inbound("Hi", "SMt"))
+        self.assertEqual(sent.call_args.kwargs["timeout"], 10)
+
+    def test_odd_ids_are_not_a_500_and_a_00_prefix_is_international(self):
+        self.assertEqual(office(self.approver, "get", "/whatsapp/templates/?contact=not-a-uuid").status_code, 200)
+        self.open_window()
+        self.assertEqual(services.send_template(self.contact, self.approver, "not-a-uuid", {})[0], services.BAD_TEMPLATE)
+        self.assertEqual(phone.normalise("0033 6 12 34 56 78", "GB"), "+33612345678")
+        self.assertEqual(phone.normalise("0044 7400 123456", "FR"), "+447400123456")
+
+    def test_a_storage_failure_on_his_file_does_not_lose_the_message_or_the_push(self):
+        with mock.patch("whatsapp.twilio_api.fetch_media", return_value=(PNG, "image/png")), mock.patch("whatsapp.services.default_storage.save", side_effect=OSError("disk")), \
+                mock.patch("whatsapp.push.webpush") as sent:
+            PushSubscription.objects.create(user=self.approver, endpoint="https://push.example.test/y", p256dh="k", auth="a")
+            twilio_post("/twilio/whatsapp/incoming/", inbound("", "SMimg2", NumMedia="1", MediaUrl0="https://api.twilio.com/m/9", MediaContentType0="image/png"))
+        message = Message.objects.get(twilio_sid="SMimg2")
+        self.assertEqual((message.kind, message.media_key, sent.call_count), ("other", "", 1))
+
+    def test_links_never_carry_a_quote_or_a_backtick_and_the_fuzz_finds_no_unsafe_html(self):
+        import random
+        import re
+        from html.parser import HTMLParser
+
+        self.assertIn('<a href="https://x.com/a" ', str(formatting.render('"https://x.com/a"')))
+        self.assertNotIn("&quot;", re.search(r'href="([^"]*)"', str(formatting.render('"https://x.com/a"'))).group(1))
+        self.assertIn("<code>https://y.com</code>", str(formatting.render("`https://y.com`")))
+        ok_tags = {"a", "strong", "em", "s", "code", "pre", "ul", "ol", "li", "blockquote", "br"}
+        bad = []
+
+        class Check(HTMLParser):
+            def handle_starttag(self, tag, attrs):
+                if tag not in ok_tags:
+                    bad.append(tag)
+                elif tag == "a":
+                    found = dict(attrs)
+                    if set(found) != {"href", "target", "rel"} or not re.fullmatch(r"https?://[^\s<>\"'`]*", found["href"]):
+                        bad.append(found)
+                elif attrs:
+                    bad.append(attrs)
+
+        random.seed(11)
+        alphabet = list("*_~`<>\"'&/:.-#() \n\\") + ["http://", "https://", "www.", "```", "> ", "- ", "1. ", "javascript:", "onmouseover=", "<script>", "&lt;", "", "", "a"]
+        for _ in range(3000):
+            text = "".join(random.choice(alphabet) for _ in range(random.randint(1, 40)))
+            html_out = str(formatting.render(text))
+            Check().feed(html_out)
+            self.assertFalse(bad, (text, html_out, bad))
+            self.assertTrue("" not in html_out and "" not in html_out and "<script" not in html_out.lower(), (text, html_out))
+
+    def test_the_gold_form_takes_a_non_uk_number_with_the_country_select(self):
+        from gold.forms import GoldApplicationForm
+
+        form = GoldApplicationForm({"mobile": "06 12 34 56 78", "mobile_country": "FR"})
+        form.is_valid()
+        self.assertEqual(form.cleaned_data["mobile"], "+33612345678")
+        form = GoldApplicationForm({"mobile": "07400 123450"})  # no country: the UK, a leading 0 dropped
+        form.is_valid()
+        self.assertEqual(form.cleaned_data["mobile"], "+447400123450")
+        form = GoldApplicationForm({"mobile": "123"})
+        form.is_valid()
+        self.assertIn("mobile", form.errors)

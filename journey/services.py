@@ -153,7 +153,7 @@ def lead_required(session, user=None):
 def clean_first_name(value):
     """A first name: trimmed, one line, 1 to 100 characters. Raises ValidationError."""
     cleaned = " ".join((value or "").replace("\x00", "").split()) if isinstance(value, str) else ""
-    if not cleaned or len(cleaned) > 100:
+    if not cleaned or len(cleaned) > 100 or "://" in cleaned or "<" in cleaned or ">" in cleaned:  # a name, not a link or markup
         raise ValidationError(GATE["errors"]["first_name"], code="invalid")
     return cleaned
 
@@ -171,7 +171,7 @@ def save_lead(session, email, consent, first_name=None, mobile=None, mobile_coun
     except ValidationError as error:
         errors["first_name"] = error.messages[0]
     try:
-        clean = normalise_email(email)
+        clean = normalise_email(email if isinstance(email, str) else "")
     except ValidationError:
         errors["email"], clean = GATE["errors"]["email"], ""
     try:
@@ -190,12 +190,17 @@ def save_lead(session, email, consent, first_name=None, mobile=None, mobile_coun
         session.lead_first_name, session.lead_mobile = name, phone
     session.lead_at = timezone.now()
     session.lead_privacy_version = SiteSettings.load().privacy_version
-    session.lead_consent_version = CONSENT_VERSION if ask else ""  # the chat's email-only wording is not the email-and-WhatsApp consent
+    if ask:  # the chat's email-only wording is not the email-and-WhatsApp consent: it never replaces a version already recorded
+        session.lead_consent_version = CONSENT_VERSION
     session.save(update_fields=[*LEAD_FIELDS, "updated_at"])
     touch(session)
     from office import snapshots  # local: the Office job reads the journey tables
 
     snapshots.request_refresh()  # a new lead moves the Office figures (debounced, after commit)
+    if phone:
+        from whatsapp import services as whatsapp
+
+        whatsapp.relink(phone)  # he may have written to us first: his chat now knows who he is
     return clean
 
 

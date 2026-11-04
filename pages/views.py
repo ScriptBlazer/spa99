@@ -209,7 +209,7 @@ def gold_apply(request, slug=""):
         "slugs": GOLD_SLUGS, "sentSlug": GOLD_SENT_SLUG, "base": reverse("gold_apply"),
         "copy": _copy("gold-apply", keys), "open": SiteSettings.load().register_interest_open,
         "journeyCopy": _copy("journey", ["continue", "skip", "back", "prefer_not", "screen_1", "screen_2", "screen_3"]),
-        "facilityImages": services.journey_facility_images(), "iconSprite": static("common/img/icons.svg"),
+        "facilityImages": services.journey_facility_images(), "iconSprite": static("common/img/icons.svg"), "countries": phone.countries(),
         "urls": {"home": reverse("home"), "privacy": reverse("privacy"), "terms": reverse("terms"),
                  "whatsappBusiness": short_url("gold", msg="gold_business"),  # '' while no WhatsApp link is set: the note and button are hidden
                  "journey": reverse("journey_page", args=[JOURNEY_SLUGS[1]])},

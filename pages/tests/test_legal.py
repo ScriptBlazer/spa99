@@ -175,6 +175,7 @@ class InviteOpenNoticeTests(TestCase):
         old = rows.get(key="part_2").body.replace(legal.WHATSAPP_BLOCK + "\n", "")
         rows.filter(key="part_2").update(body=old)
         rows.filter(key="updated").update(body="30 October 2026")
+        SiteSettings.objects.filter(singleton_key="site").update(privacy_version="2026-10-26")
         out = StringIO()
         call_command("backfill_site_data", "--dry-run", stdout=out)
         self.assertIn("privacy notice: WhatsApp", out.getvalue())
@@ -182,3 +183,4 @@ class InviteOpenNoticeTests(TestCase):
         call_command("backfill_site_data", stdout=StringIO())
         self.assertIn("Reply STOP", rows.get(key="part_2").body)
         self.assertEqual(rows.get(key="updated").body, "3 November 2026")
+        self.assertEqual(SiteSettings.load().privacy_version, "2026-11-03")  # new sign-ups record it; nobody is asked to accept again

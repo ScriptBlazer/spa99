@@ -89,6 +89,17 @@ function field(name, label, { optional = true, help = '', type = 'text', autocom
     el('p', { class: 'feedback', 'data-error-for': name, id: `error-${name}`, 'aria-live': 'polite', 'data-hint': help || hint, 'data-good': rules ? 'Looks right' : '', 'data-state': 'hint', text: help || hint }));
 }
 
+/** The country select beside the mobile (same markup as Register): it shows only the dial code in the box, the list has the names. */
+function countrySelect() {
+  const countries = config.countries || [];
+  const chosen = form.mobile_country || 'GB';
+  const select = el('select', { id: 'g-mobile_country', name: 'mobile_country', 'aria-label': 'Country code', autocomplete: 'tel-country-code', 'data-country-select': '' },
+    countries.map((c) => el('option', { value: c.iso, text: `${c.name} (${c.dial})`, ...(c.iso === chosen ? { selected: '' } : {}) })));
+  const dial = el('span', { class: 'dial', 'aria-hidden': 'true', 'data-dial': '', text: countries.find((c) => c.iso === chosen)?.dial || '+44' });
+  select.addEventListener('change', () => { setField('mobile_country', select.value); dial.textContent = /\((\+\d+)\)$/.exec(select.selectedOptions[0].textContent)?.[1] || ''; });
+  return el('div', { class: 'field field--country' }, el('label', { for: 'g-mobile_country' }, 'Country'), select, dial);
+}
+
 function choiceGroup(name, title, optionList, { kind = '', help = '', layout = 'tiles', cls = 'tiles tiles--stack', sub = false, hidden = false, multi = false } = {}) {
   const labelId = `l-${name}`;
   const isChecked = (value) => (multi ? industries().includes(value) : form[name] === value);
@@ -214,7 +225,7 @@ function screenYou() {
   return [
     el('div', { class: 'field-pair' }, field('first_name', 'First name', { optional: false, rules: 'required name', autocomplete: 'given-name' }), field('last_name', 'Last name', { optional: false, rules: 'required name', autocomplete: 'family-name' })),
     el('div', { class: 'question' }, field('email', 'Email', { optional: false, type: 'email', rules: 'required email', autocomplete: 'email' })),
-    el('div', { class: 'question' }, field('mobile', 'Mobile', { optional: false, type: 'tel', rules: 'required mobile', autocomplete: 'tel', hint: 'A UK mobile, like 07123 456789.' })),
+    el('div', { class: 'question' }, el('div', { class: 'mobile-row' }, countrySelect(), field('mobile', 'Mobile', { optional: false, type: 'tel', rules: 'required mobile', autocomplete: 'tel-national', hint: 'UK numbers can start with 07.' }))),
     el('div', { class: 'question field' }, el('label', { for: 'g-note' }, 'What benefits could you bring to BML? ', el('span', { class: 'optional', text: '(optional)' })), note),
     el('div', { class: 'question' },
       el('div', { class: 'field' },
@@ -330,7 +341,7 @@ function back() {
 
 /* ---------- submit ---------- */
 
-const FIELDS = ['first_name', 'last_name', 'email', 'mobile', 'industry', 'industry_other', 'property_link', 'size_range', 'location', 'company', 'role', 'bml_relationship', 'business_willing', 'referred_by', 'note', 'privacy_accepted', 'marketing_opt_in'];
+const FIELDS = ['first_name', 'last_name', 'email', 'mobile_country', 'mobile', 'industry', 'industry_other', 'property_link', 'size_range', 'location', 'company', 'role', 'bml_relationship', 'business_willing', 'referred_by', 'note', 'privacy_accepted', 'marketing_opt_in'];
 const STEP_OF = { industry: 1, industry_other: 1, property_link: 1, size_range: 1, location: 1, company: 1, role: 1, bml_relationship: 1, business_willing: 1, referred_by: 1 };
 
 let sending = false; // one application in flight at a time: a second click or Enter while it is sent does nothing

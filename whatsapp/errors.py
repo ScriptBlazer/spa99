@@ -14,6 +14,8 @@ TRY_AGAIN = "Not sent. Try again."
 def reason(code="", http_status=None):
     """Plain reason and whether 'Try again' makes sense, from a Twilio error code (or an HTTP status when there is no code)."""
     code = str(code or "")
+    if code == "opted_out":
+        return "Not sent. He replied STOP.", False
     if code in WINDOW_CLOSED:
         return "Not sent. The window has closed.", False
     if code in NOT_ON_WHATSAPP:

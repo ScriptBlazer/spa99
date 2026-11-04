@@ -11,7 +11,7 @@ from django.utils.safestring import mark_safe
 OPEN, CLOSE = "\ue000", "\ue001"  # private-use characters hold finished HTML while the marks are processed
 BLOCK = re.compile(r"```(.+?)```", re.S)
 INLINE_CODE = re.compile(r"(?<![\w`])`(?=[^\s`])([^`\n]+?)(?<=[^\s`])`(?![\w`])")
-URL = re.compile(r"(?:https?://|www\.)[^\s<]+", re.I)
+URL = re.compile(r"(?:https?://|www\.)[^\s<>\"'`\ue000\ue001]+", re.I)  # matched on the RAW text: never across a quote, a bracket or a backtick
 BULLET = re.compile(r"^[-*] (.*)$")
 NUMBER = re.compile(r"^\d+\. (.*)$")
 MARKS = (("*", "strong"), ("_", "em"), ("~", "s"))
@@ -34,21 +34,24 @@ def _hold(store, markup):
 def _link(match, store):
     raw = match.group(0)
     end = len(raw)
-    while end and raw[end - 1] in TRAILING and not (raw[end - 1] == ")" and "(" in raw[:end]):
+    while end and raw[end - 1] in TRAILING and not (raw[end - 1] == ")" and raw[:end].count("(") >= raw[:end].count(")")):  # a closing bracket stays only when it is balanced
         end -= 1
     url, tail = raw[:end], raw[end:]
     if not url or url.lower() in ("www.", "http://", "https://"):
         return raw
     target = url if url.lower().startswith("http") else f"https://{url}"
-    return _hold(store, f'<a href="{target}" target="_blank" rel="noopener noreferrer nofollow">{url}</a>') + tail
+    link = f'<a href="{html.escape(target, quote=True)}" target="_blank" rel="noopener noreferrer nofollow">{html.escape(url, quote=True)}</a>'
+    return _hold(store, link) + tail
 
 
 def _inline(line):
-    """One line of raw text to safe HTML."""
+    """One line of raw text to safe HTML. Code and links are found in the raw text (so a quote or a backtick can never end up inside a link's
+    address) and held as finished, escaped HTML; everything else is escaped, then the marks are applied."""
     store = []
-    text = html.escape(line.replace(OPEN, "").replace(CLOSE, ""), quote=True)
-    text = INLINE_CODE.sub(lambda m: _hold(store, f"<code>{m.group(1)}</code>"), text)
+    text = line.replace(OPEN, "").replace(CLOSE, "")
+    text = INLINE_CODE.sub(lambda m: _hold(store, f"<code>{html.escape(m.group(1), quote=True)}</code>"), text)
     text = URL.sub(lambda m: _link(m, store), text)
+    text = html.escape(text, quote=True)
     for pattern, tag in PATTERNS:
         text = pattern.sub(lambda m, tag=tag: f"<{tag}>{m.group(2)}</{tag}>", text)
     for _ in range(3):  # a held piece can sit inside another (a link in bold)
@@ -86,7 +89,7 @@ def _blocks(text):
 
 def render(text):
     """Safe HTML for a message. Empty text gives an empty string."""
-    text = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    text = (text or "").replace("\r\n", "\n").replace("\r", "\n").replace(OPEN, "").replace(CLOSE, "")
     out, last = [], 0
     for match in (m for m in BLOCK.finditer(text) if m.group(1).strip()):
         if match.start() > last:

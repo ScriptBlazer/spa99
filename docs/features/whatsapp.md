@@ -21,7 +21,7 @@ The number is a **Twilio** number and the WhatsApp side is already verified at M
 - **Webhook URLs** (public site host, same pattern as Postmark): `https://spa99.uk/twilio/whatsapp/incoming/` and `https://spa99.uk/twilio/whatsapp/status/`. Cloudflare must let them through (Bot Fight Mode stays off).
 
 ## Goal
-A new number on **WhatsApp (through Twilio)** becomes a full staff to lead chat in the Office, as close to WhatsApp as we like, with push notifications (PWA). The AI assistant chat stays separate. Email Message stays.
+A new number on **WhatsApp (through Twilio)** becomes a full staff to lead chat in the Office, as close to WhatsApp as we like, with push notifications (PWA). The AI assistant chat stays separate. Staff messages go by WhatsApp; email stays only for Send guide and automatic emails (the email Message was removed).
 
 ## How the API works (constraints we design around)
 - A chat we start must open with an **approved template**. Templates are submitted to Meta (minutes to a day to approve).
@@ -146,10 +146,10 @@ Timeline (lead, person): not one line per message: "First WhatsApp sent by X" (t
 Forms post `mobile_country` (ISO code, default `GB`) and `mobile`; `common/phone.py` normalises to E.164 with the `phonenumbers` library (possible, valid, a mobile line), drops a leading 0, lets a typed `+` or `00` win, and answers "That doesn't look like a valid mobile number." `phone.countries()` is the list (`{iso, dial, name}`: UK, Ireland, Israel, US, Canada, Belgium, France, Germany, Netherlands, then A to Z). Context keys: `mobile_countries` (Register and the Office pages), `gate.countries` (the journey page config). Register also still takes a single `mobile` (UK unless it starts with +). The Gold application form still asks for a UK mobile (unchanged).
 
 ## System > WhatsApp
-Configured yes or no (names of empty settings only, never values), the two webhook URLs, **Check Twilio** (account active, sender online), the `spa99_` templates with approval status, **Sync templates** (a background job), push keys set and devices. Developer level and the unlock, like the other System pages.
+Configured yes or no (names of empty settings only, never values), the two webhook URLs, **Check Twilio** (is the Spa 99 sender online; read through the WhatsApp Senders API only, because a Standard API key cannot read the Twilio account), the `spa99_` templates with approval status, **Sync templates** (a background job), push keys set and devices. Developer level and the unlock, like the other System pages.
 
 ## Erasure and export
-Person delete, lead delete and the GDPR exports include the chats (found by his numbers: account, email step, Gold application): contact, messages, files in storage and the queue records that name those messages. Push subscriptions belong to staff and are not part of a person's data.
+Staff-run person delete, lead delete, Django admin delete and the staff exports include the chats (found by his numbers and by the owner link stored on the chat): contact, messages, files in storage and the queue records that name those messages. **A member's own self-service download and account delete leave chats out**: a mobile number is not proven (anyone can register with a lead's number), so a number must never select someone else's chat; a member who wants his chat exported or erased asks the team. The chat keeps a stored owner link (`user`, `lead_email`, `application`), kept even when the number is later changed or removed, so an erasure finds an old chat. Push subscriptions belong to staff and are not part of a person's data.
 
 ## Not done, on purpose
 Unknown numbers that write first make a contact only (no lead row: a lead needs an email). One file per message (WhatsApp sends one per message). Template approval labels come from code defaults (`spa99_lead_follow_up`: First name) or the admin; Twilio does not hold them.

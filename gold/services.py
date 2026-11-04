@@ -194,6 +194,9 @@ def submit_application(data, session=None):
         audit.record(application, ApplicationEvent.SUBMITTED, channel=audit.SYSTEM, to_status=GoldApplication.NEW,
                      meta={"repeat": application.is_repeat, "potential": application.potential_level})
     queue_emails(application)
+    from whatsapp import services as whatsapp
+
+    whatsapp.relink(application.mobile)  # if he wrote to us first, his chat now links to this application
     return application, True
 
 

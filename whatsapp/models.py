@@ -1,5 +1,5 @@
 """WhatsApp in the Office (docs/features/whatsapp.md): contacts, messages, Twilio templates, push subscriptions.
-Personal data (numbers, message text, media) is erased with the person: see whatsapp.services.erase_phones.
+Personal data (numbers, message text, media) is erased with the person: see whatsapp.services.erase_contacts and erase_person.
 
 Deviation (one line): no django-simple-history on these models. Messages are themselves the log, and history copies would
 double every message and every number we must erase."""

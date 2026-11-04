@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db.models import Exists, F, OuterRef, Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
@@ -232,7 +233,10 @@ def retry(request, pk, message):
 @require_GET
 def templates(request):
     """JSON {templates: [{id, name, label, category, body, body_html, variables[{key, label, prefill}]}]} (approved `spa99_` only). ?contact=<id> pre-fills First name."""
-    contact = Contact.objects.filter(pk=request.GET.get("contact")).first() if request.GET.get("contact") else None
+    try:
+        contact = Contact.objects.filter(pk=request.GET.get("contact")).first() if request.GET.get("contact") else None
+    except (ValidationError, ValueError):  # not a UUID
+        contact = None
     return JsonResponse({"templates": services.template_dicts(contact)})
 
 
@@ -265,7 +269,7 @@ def _start(request, kind, pk):
 
         messages.info(request, "Add a mobile first, so the team can WhatsApp him.")
         return redirect(target.page_url)
-    contact = services.get_or_create_contact(mobile)
+    contact = services.resolve_links(services.get_or_create_contact(mobile))  # links can have gone stale since the chat began
     query = {}
     if kind == "gold":
         query["gold"] = str(pk)

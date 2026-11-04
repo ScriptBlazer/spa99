@@ -399,6 +399,13 @@ def _whatsapp_privacy_2026_11_03():
         section.body = legal.PRIVACY_UPDATED
         section.save()
         changed["content.Section (privacy notice: last updated, WhatsApp)"] += 1
+    from plans.models import SiteSettings
+
+    site = SiteSettings.load()
+    if site.privacy_version == "2026-10-26" and Section.objects.filter(page=page, key="part_2", body=new_body).exists():  # the notice now says it: new sign-ups record the new version (nobody is asked to accept again; old records stay as they were)
+        site.privacy_version = legal.PRIVACY_VERSION
+        site.save()
+        changed["plans.SiteSettings (privacy version, WhatsApp)"] += 1
     return changed
 
 

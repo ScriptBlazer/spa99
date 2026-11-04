@@ -810,13 +810,15 @@ export class Thread {
   async retry(m, button) {
     if (m.retry) { delete m.localFail; delete m.error; m.retry(); return; }
     if (!m.retry_url && !(m.error && m.error.can_retry)) return;
+    if (button.getAttribute('aria-busy') === 'true' || m.retrying) return; // a double click sends once (the server also refuses the second)
+    m.retrying = true;
     button.setAttribute('aria-busy', 'true');
     try {
       const url = `${this.urls.send.replace(/send\/$/, '')}retry/${m.id}/`;
       const response = await fetch(m.retry_url || url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken(), Accept: 'application/json' } });
       const data = await response.json().catch(() => null);
       if (data?.ok) { Object.assign(m, data.message); this.patchRow(m); } else toast(data?.message || 'That could not be sent again.', { kind: 'error' });
-    } catch { toast('No connection. Try again in a moment.', { kind: 'error' }); } finally { button.removeAttribute('aria-busy'); }
+    } catch { toast('No connection. Try again in a moment.', { kind: 'error' }); } finally { m.retrying = false; button.removeAttribute('aria-busy'); }
   }
 
   // ---------- lightbox ----------

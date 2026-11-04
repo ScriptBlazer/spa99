@@ -63,7 +63,7 @@ def notify_inbound(message):
     for sub in recipients():
         try:
             webpush(subscription_info={"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}}, data=data,
-                    vapid_private_key=settings.VAPID_PRIVATE_KEY, vapid_claims={"sub": settings.VAPID_SUBJECT}, ttl=3600)
+                    vapid_private_key=settings.VAPID_PRIVATE_KEY, vapid_claims={"sub": settings.VAPID_SUBJECT}, ttl=3600, timeout=10)
             sub.last_used_at = timezone.now()
             sub.save(update_fields=["last_used_at"])
             sent += 1
@@ -87,7 +87,7 @@ def send_test(user):
         try:
             webpush(subscription_info={"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}},
                     data=json.dumps({"title": "Spa 99 Office", "body": "Notifications are on.", "url": "/", "tag": "test"}),
-                    vapid_private_key=settings.VAPID_PRIVATE_KEY, vapid_claims={"sub": settings.VAPID_SUBJECT}, ttl=300)
+                    vapid_private_key=settings.VAPID_PRIVATE_KEY, vapid_claims={"sub": settings.VAPID_SUBJECT}, ttl=300, timeout=10)
             sent += 1
         except WebPushException as error:
             if getattr(getattr(error, "response", None), "status_code", None) in (404, 410):

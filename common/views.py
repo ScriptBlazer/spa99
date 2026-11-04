@@ -39,7 +39,7 @@ def check_mobile(request):
     try:
         if "mobile_country" in request.POST:  # Register: any country, by the same rules the server saves with (common.phone)
             phone.normalise(request.POST.get("mobile", ""), request.POST.get("mobile_country"))
-        else:  # the Gold application form is UK only
+        else:  # an older form without the country select keeps the UK rules
             normalise_uk_mobile(request.POST.get("mobile", ""))
     except ValidationError as error:
         return JsonResponse({"valid": False, "message": error.messages[0]})

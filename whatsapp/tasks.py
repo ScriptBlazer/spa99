@@ -19,7 +19,10 @@ def process_inbound(message_id):
     if message is None:
         return "skipped"
     if message.media_source_url:
-        services.store_media(message)
+        try:
+            services.store_media(message)
+        except Exception:  # noqa: BLE001 - whatever went wrong with his file, the team is still told he wrote
+            logger.exception("His file for WhatsApp message %s could not be copied", message.pk)
         message.refresh_from_db()
     return f"pushed {push.notify_inbound(message)}"
 

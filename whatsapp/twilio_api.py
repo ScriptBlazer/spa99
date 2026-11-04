@@ -102,10 +102,6 @@ def list_contents():
     return out
 
 
-def account():
-    return request("GET", f"{API}/Accounts/{settings.TWILIO_ACCOUNT_SID}.json")
-
-
 def sender_status():
     """The Spa 99 sender as Twilio lists it: {found, status, name, quality?}. Reads the WhatsApp senders list."""
     data = request("GET", f"{SENDERS}?Channel=whatsapp&PageSize=50")

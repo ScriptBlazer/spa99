@@ -27,7 +27,7 @@ WHATSAPP_BLOCK = "\n".join([
     "They pass through Twilio, our messaging provider, and WhatsApp.",
     "- Reply STOP to a message and we stop writing to you on WhatsApp.",
 ])
-PRIVACY_VERSION = "2026-10-26"  # SiteSettings.privacy_version; recorded on everyone who accepts this notice
+PRIVACY_VERSION = "2026-11-03"  # SiteSettings.privacy_version (WhatsApp added); recorded on everyone who accepts this notice. Changing it forces nobody to accept again: only new sign-ups, leads and applications record the new one.
 
 COMPANY_LINE = ("Spa 99 is run by BML SPA 99 LIMITED, a company registered in England (company number 16930909). "
                 "Our registered office is 40 Wellington Avenue, London N15 6AS.")

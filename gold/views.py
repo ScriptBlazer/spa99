@@ -149,5 +149,7 @@ def invite_setup(request, token):
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         messages.success(request, "Welcome to Spa 99. Your Gold Card is active.")
         return redirect("account")
-    return render(request, "gold/invite_setup.html", {"form": form, "application": application},
+    from common import phone
+
+    return render(request, "gold/invite_setup.html", {"form": form, "application": application, "mobile_countries": phone.countries()},
                   status=400 if request.method == "POST" else 200)

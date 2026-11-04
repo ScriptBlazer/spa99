@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone as dt_timezone
 import phonenumbers
 from django.conf import settings
 from django.core import signing
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
@@ -83,7 +84,6 @@ def resolve_links(contact, save=True):
     user = User.objects.filter(mobile=contact.phone).first()
     session = JourneySession.objects.filter(lead_mobile=contact.phone, is_bot=False).exclude(lead_email="").order_by("-created_at").first()
     application = GoldApplication.objects.filter(mobile=contact.phone).order_by("-created_at").first()
-    lead_email = (session.lead_email or "").lower() if session is not None and user is None else ""
     name = ""
     if user is not None:
         name = (user.get_full_name() or "").strip()
@@ -92,7 +92,16 @@ def resolve_links(contact, save=True):
         name = named.lead_first_name if named else ""
     if not name and application is not None:
         name = application.full_name
-    contact.user, contact.lead_email, contact.application, contact.name = user, lead_email, application, name[:100]
+    # A link found now replaces the stored one; nothing found never clears it. The stored link is the chat's owner for good (a person whose number
+    # was changed or removed keeps his old chat, so his erasure and export still find it).
+    if user is not None:
+        contact.user = user
+    if session is not None and user is None:
+        contact.lead_email = (session.lead_email or "").lower()
+    if application is not None:
+        contact.application = application
+    if name:
+        contact.name = name[:100]
     if save:
         contact.save(update_fields=["user", "lead_email", "application", "name"])
     return contact
@@ -100,8 +109,11 @@ def resolve_links(contact, save=True):
 
 def relink(*phones):
     """A mobile was added or changed: refresh the links and names of the chats on those numbers."""
-    for contact in Contact.objects.filter(phone__in=[p for p in phones if p]):
-        resolve_links(contact)
+    try:  # best effort: a sign-up, an application or a save must never fail because a chat could not be relinked
+        for contact in Contact.objects.filter(phone__in=[p for p in phones if p]):
+            resolve_links(contact)
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not refresh the WhatsApp links")
 
 
 def get_or_create_contact(phone, profile_name=""):
@@ -307,7 +319,10 @@ def send_template(contact, actor, template_id, variables):
     blocked = _blocked(contact, needs_window=False)
     if blocked:
         return blocked, None
-    template = Template.objects.filter(pk=template_id).first()
+    try:
+        template = Template.objects.filter(pk=template_id).first()
+    except (ValidationError, ValueError):  # not a UUID
+        template = None
     if template is None or not template.sendable:  # enforced here, whatever a page posted: BML templates never go from Spa 99
         return BAD_TEMPLATE, None
     values = {str(k): _clean_variable(variables.get(str(k))) for k in template.variables}
@@ -317,16 +332,37 @@ def send_template(contact, actor, template_id, variables):
     return _queue(contact, actor, Message.TEMPLATE, fill_body(template.body, values), template=template, template_variables=values)
 
 
+STUCK_AFTER = timedelta(minutes=5)
+
+
+def is_stuck(message, at=None):
+    """Queued, never taken by a worker and older than a few minutes (the queue lost it): "Try again" is allowed."""
+    return bool(message.direction == Message.OUT and message.status == Message.QUEUED and message.claimed_at is None and message.twilio_sid is None
+                and message.updated_at < (at or now()) - STUCK_AFTER)
+
+
+def can_retry(message):
+    """A message we never handed to Twilio (no sid) that failed for a reason worth retrying, or one the queue lost. A message Twilio has accepted is never
+    sent again (that could be a second WhatsApp for him)."""
+    if message.direction != Message.OUT or message.twilio_sid:
+        return False
+    if message.status == Message.FAILED:
+        return errors.reason(message.error_code)[1]
+    return is_stuck(message)
+
+
 def retry(message, actor):
-    """Send a failed message again (the same bubble). Returns (result, message)."""
-    if message.direction != Message.OUT or message.status not in Message.BAD + (Message.QUEUED,):
+    """Send a failed or lost message again (the same bubble). The reset is one conditional update, so a double click sends once. Returns (result, message)."""
+    message.refresh_from_db()
+    if not can_retry(message):
         return NOT_RETRYABLE, None
-    if message.status == Message.QUEUED and message.claimed_at is None:
-        return NOT_RETRYABLE, None  # still waiting for the worker
     blocked = _blocked(message.contact, needs_window=message.kind != Message.TEMPLATE)
     if blocked:
         return blocked, None
-    Message.objects.filter(pk=message.pk).update(status=Message.QUEUED, error_code="", error_message="", twilio_sid=None, claimed_at=None, updated_at=now())
+    claimed = Message.objects.filter(pk=message.pk, twilio_sid__isnull=True, status=message.status, claimed_at=message.claimed_at).update(
+        status=Message.QUEUED, error_code="", error_message="", claimed_at=None, updated_at=now())
+    if not claimed:  # someone else got there first
+        return NOT_RETRYABLE, None
     message.refresh_from_db()
     _enqueue_send(message)
     return DONE, message
@@ -357,6 +393,8 @@ def deliver(message):
     message.refresh_from_db()
     if not configured():
         return _fail(message, "not_configured", "WhatsApp is not set up.")
+    if Contact.objects.filter(pk=message.contact_id, opted_out_at__isnull=False).exists():  # he replied STOP after this was queued
+        return _fail(message, "opted_out", "He replied STOP.")
     try:
         sent = twilio_api.send_message(
             message.contact.phone, body=message.body if message.kind != Message.TEMPLATE else "",
@@ -461,7 +499,12 @@ def store_media(message):
     data, content_type = got
     kind = kind_of(content_type or message.media_type)
     ext = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "application/pdf": ".pdf", "audio/ogg": ".ogg", "audio/mpeg": ".mp3", "video/mp4": ".mp4"}.get(content_type or message.media_type, "")
-    key = default_storage.save(f"whatsapp/{message.contact_id}/{uuid.uuid4().hex}{ext}", ContentFile(data))
+    try:
+        key = default_storage.save(f"whatsapp/{message.contact_id}/{uuid.uuid4().hex}{ext}", ContentFile(data))
+    except Exception:  # noqa: BLE001 - a storage problem must not lose the message or its notification
+        logger.exception("Could not store the file of WhatsApp message %s", message.pk)
+        Message.objects.filter(pk=message.pk).update(kind=Message.OTHER, media_source_url="", body=(message.body + "\n" if message.body else "") + "The file could not be saved.")
+        return False
     width, height = imagesize.size_of(data) if kind == Message.IMAGE else (None, None)
     Message.objects.filter(pk=message.pk).update(kind=kind, media_key=key, media_type=content_type or message.media_type, media_size=len(data), media_width=width, media_height=height,
                                                  media_filename=f"{kind}-{message.pk}{ext}", media_source_url="")
@@ -502,7 +545,8 @@ def sync_templates():
         name = str(content.get("friendly_name") or "")
         if not name.lower().startswith(TEMPLATE_PREFIX):
             continue
-        approval = ((content.get("approval_requests") or {}).get("whatsapp")) or {}
+        requests_ = content.get("approval_requests") or {}
+        approval = requests_.get("whatsapp") or requests_  # nested under "whatsapp", or the status and category right on it
         body = _content_body(content)
         keys = sorted((content.get("variables") or {}).keys(), key=lambda k: (not str(k).isdigit(), int(k) if str(k).isdigit() else 0, str(k))) or sorted(set(re.findall(r"\{\{\s*(\w+)\s*\}\}", body)))
         row = Template.objects.filter(content_sid=content["sid"]).first()
@@ -528,39 +572,38 @@ def usable_templates():
 
 
 def check_twilio():
-    """System > WhatsApp "Check": does Twilio accept our key, and is the Spa 99 sender online? {ok, steps[{label, ok, detail}]}. Never raises."""
-    steps = []
+    """System > WhatsApp "Check": is the Spa 99 sender online? Read through the WhatsApp Senders API only (a Standard API key cannot read the
+    Accounts resource). {ok, steps[{label, ok, detail}]}. Never raises."""
     if not configured():
         return {"ok": False, "steps": [{"label": "Settings", "ok": False, "detail": "Missing: " + ", ".join(twilio_api.missing())}]}
     try:
-        account = twilio_api.account()
-        steps.append({"label": "Twilio account", "ok": account.get("status") == "active", "detail": f"Status: {account.get('status', 'unknown')}"})
-    except twilio_api.TwilioError as error:
-        return {"ok": False, "steps": [{"label": "Twilio account", "ok": False, "detail": str(error)}]}
-    try:
         found = twilio_api.sender_status()
-        online = found["found"] and found["status"].upper() == "ONLINE"
-        steps.append({"label": "WhatsApp sender", "ok": online, "detail": (f"{found['name'] or 'Spa 99'}: {found['status'].title() or 'unknown'}" + (f", quality {found['quality'].title()}" if found["quality"] else "")) if found["found"] else "That number was not found among the account's WhatsApp senders."})
     except twilio_api.TwilioError as error:
-        steps.append({"label": "WhatsApp sender", "ok": False, "detail": str(error)})
-    return {"ok": all(s["ok"] for s in steps), "steps": steps}
+        return {"ok": False, "steps": [{"label": "WhatsApp sender", "ok": False, "detail": str(error)}]}
+    online = found["found"] and found["status"].upper() == "ONLINE"
+    detail = (f"{found['name'] or 'Spa 99'}: {found['status'].title() or 'unknown'}" + (f", quality {found['quality'].title()}" if found["quality"] else "")) if found["found"] \
+        else "That number was not found among the account's WhatsApp senders."
+    return {"ok": online, "steps": [{"label": "WhatsApp sender", "ok": online, "detail": detail}]}
 
 
 # ---------- what the pages need ----------
 
 def message_dict(message):
-    reason, can_retry = errors.reason(message.error_code) if message.status in Message.BAD else ("", False)
+    reason, _ = errors.reason(message.error_code) if message.status in Message.BAD else ("", False)
+    if not reason and is_stuck(message):
+        reason = errors.TRY_AGAIN
+    can_retry_now = bool(reason) and can_retry(message)
     template = message.template
     media = None
     if message.media_key:
         media = {"url": _office("office_whatsapp_media", message.pk), "type": message.media_type, "filename": message.media_filename, "size": message.media_size,
                  "width": message.media_width, "height": message.media_height}
     return {"id": message.pk, "direction": message.direction, "kind": message.kind, "body": message.body, "body_html": str(formatting.render(message.body)),
-            "status": message.status, "error": {"reason": reason, "can_retry": can_retry} if reason else None,
+            "status": message.status, "error": {"reason": reason, "can_retry": can_retry_now} if reason else None,
             "author": message.author_label, "author_id": str(message.author_id) if message.author_id else "", "author_first_name": _first(message.author_label),
             "template": {"id": str(template.pk), "name": template.name, "label": template.label} if template else None,
             "media": media, "created_at": message.created_at.isoformat(), "sent_at": message.sent_at.isoformat() if message.sent_at else "",
-            "retry_url": _office("office_whatsapp_retry", message.contact_id, message.pk) if reason and can_retry else ""}
+            "retry_url": _office("office_whatsapp_retry", message.contact_id, message.pk) if can_retry_now else ""}
 
 
 def _first(label):

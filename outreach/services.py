@@ -385,8 +385,11 @@ def correct_lead_email(old, new, actor):
     the owner {kind, name, url} for TAKEN."""
     from django.core.exceptions import ValidationError
 
+    from chat import services as chat_services
     from common.validators import normalise_email
     from journey.models import JourneySession
+    from notifications.models import EmailLog
+    from whatsapp import services as whatsapp
 
     old = (old or "").strip().lower()
     try:
@@ -408,7 +411,10 @@ def correct_lead_email(old, new, actor):
         for model, field in ((StickyNote, "email"), (PersonMessage, "email"), (OutreachEntry, "lead_email"), (PersonEdit, "email"), (ArchivedLead, "email"), (LeadArchiveEvent, "email")):
             model.objects.filter(**{field: old}).update(**{field: new})
         NextMorningEmail.objects.filter(email=old).delete()  # the old address is not kept (the suppression list is the one record of it); the new one may be sent its own follow-up
+        chat_services.move_lead_email(old, new)  # an Ask us chat where he gave the old address
+        EmailLog.objects.filter(Q(to__iexact=old) | Q(subject_email__iexact=old)).delete()  # emails sent to the old address (the bounce) are not his on the new one
         _edit(new, PersonEdit.EMAIL, old, new, actor)
+    whatsapp.relink(*{s.lead_mobile for s in sessions if s.lead_mobile})  # his WhatsApp chat now links to the corrected address
     _figures_changed()
     return DONE, ""
 
@@ -439,14 +445,20 @@ def resend_follow_up(email, actor):
     if emailsettings.options_for(nextmorning.TEMPLATE).sender == SENDER_PERSON and not site.auto_sender:
         return NO_SENDER, ""
     with transaction.atomic():
-        row = NextMorningEmail.objects.select_for_update().filter(email=email).first()
+        row = NextMorningEmail.objects.filter(email=email).first()
         if row is not None and row.sent_at:
             return ALREADY, ""
         if row is None:
             first = JourneySession.objects.filter(lead_email__iexact=email, is_bot=False, lead_at__isnull=False).order_by("lead_at").values_list("lead_at", flat=True).first()
-            row = NextMorningEmail.objects.create(email=email, lead_at=first or now, due_at=now, claimed_at=now)
-        else:
-            NextMorningEmail.objects.filter(pk=row.pk).update(skipped_at=None, skip_reason="", claimed_at=now, due_at=now)
+            try:
+                with transaction.atomic():
+                    row = NextMorningEmail.objects.create(email=email, lead_at=first or now, due_at=now, claimed_at=now)  # unique email: a second click cannot make a second row
+            except IntegrityError:
+                return ALREADY, ""
+        else:  # the one winner of a conditional update on claimed_at sends: a double click, or the worker, can never send it twice
+            same = Q(claimed_at=row.claimed_at) if row.claimed_at else Q(claimed_at__isnull=True)
+            if not NextMorningEmail.objects.filter(same, pk=row.pk, sent_at__isnull=True).update(claimed_at=now, due_at=now, skipped_at=None, skip_reason=""):
+                return ALREADY, ""
             row.refresh_from_db()
     outcome = nextmorning.send_one(row, site, now, force=True)
     return (SENT, "") if outcome == "sent" else (NOT_SENT, outcome)

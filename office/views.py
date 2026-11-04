@@ -255,7 +255,7 @@ def person_setup_cancel(request, pk):
 def person_export(request, pk):
     """UK GDPR: everything we hold about this person, as a JSON download."""
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
-    response = JsonResponse(user_services.export_user_data(user), json_dumps_params={"indent": 2})
+    response = JsonResponse(user_services.export_user_data(user, include_chats=True), json_dumps_params={"indent": 2})
     response["Content-Disposition"] = f'attachment; filename="spa99-person-{user.public_id}.json"'
     return response
 
@@ -269,7 +269,7 @@ def person_delete(request, pk):
         messages.error(request, "A staff account cannot be deleted here.")
         return redirect("office_person", pk=user.pk)
     name = user.get_full_name() or user.email
-    user_services.delete_user_data(user)
+    user_services.delete_user_data(user, include_chats=True)  # staff-run: his WhatsApp chats go too
     messages.success(request, f"{name} and their data were deleted.")
     return redirect("office_people")
 

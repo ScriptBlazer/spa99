@@ -438,3 +438,8 @@ def export_conversations(user=None, email=None):
 def erase_conversations(user=None, email=None):
     """Delete a person's chats (by account, journey session of the account, or the email given in the chat). Returns the number."""
     return Conversation.objects.filter(_person_filter(user, email)).delete()[1].get("chat.Conversation", 0)
+
+
+def move_lead_email(old, new):
+    """A lead's address was corrected: the chats where he gave the old one now carry the new one. Returns the number moved."""
+    return Conversation.objects.filter(lead_email__iexact=(old or "").strip()).update(lead_email=(new or "").strip().lower())

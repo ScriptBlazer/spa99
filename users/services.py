@@ -131,6 +131,9 @@ def register_interest(data, journey_session=None):
     except IntegrityError:  # two people (or two clicks) raced for the same email or mobile
         raise SignUpError({"email": ["That email or mobile number is already registered."]}) from None
     _after_registration(user, bool(data.get("marketing_opt_in")))
+    from whatsapp import services as whatsapp
+
+    whatsapp.relink(user.mobile)  # he may have written to us first: his chat now knows who he is
     queue_verification_email(user)
     return SignUpResult(user, created=True)
 
@@ -205,6 +208,9 @@ def verify_email(token):
         user.save(update_fields=["email_verified_at", "updated_at"])
         metrics.email_verified(user.email_verified_at)
         link_earlier_data(user)  # the address is proven: earlier leads and applications with it become his
+    from whatsapp import services as whatsapp
+
+    whatsapp.relink(user.mobile)
     try:
         enqueue("users.tasks.send_welcome_email", str(user.pk))
     except Exception:  # noqa: BLE001
@@ -249,8 +255,9 @@ def password_changed(user):
 
 # ---------- GDPR ----------
 
-def export_user_data(user):
-    """Everything we hold about a person, as plain JSON-friendly data."""
+def export_user_data(user, include_chats=False):
+    """Everything we hold about a person, as plain JSON-friendly data. `include_chats` (WhatsApp chats) is for staff-run exports only: a mobile
+    number is not proven (anyone can register with a lead's number), so a member's own download never includes a chat chosen by number."""
     profile = {name: getattr(user, name) for name in PERSON_FIELDS}
     profile = {key: (value.isoformat() if hasattr(value, "isoformat") else value) for key, value in profile.items()}
     logins = [
@@ -275,7 +282,7 @@ def export_user_data(user):
         "interest": _export_interest(user),
         "journey_sessions": _export_sessions(user),
         "chats": chat_services.export_conversations(user=user, email=user.email if user.email_verified_at else None),
-        "whatsapp": _export_whatsapp(user),
+        **({"whatsapp": _export_whatsapp(user)} if include_chats else {}),
         "gold_applications": gold_services.export_applications(user.email) if user.email_verified_at else [],  # by email only once the address is proven his
         "emails": [
             {"template": e.template, "subject": e.subject, "status": e.status, "sent_at": _plain(e.sent_at)}
@@ -415,7 +422,7 @@ def _anonymise_sessions(user):
 
 
 @transaction.atomic
-def delete_user_data(user):
+def delete_user_data(user, include_chats=False):
     """Erase a person: account, interest, Gold applications by their email, email log (including emails about them sent to staff), django-q task records, login events and the history
     rows that copy their details. Journey sessions are anonymised (kept for statistics, no longer linked).
     Erasure overrides the "history is never deleted" rule because history holds personal data."""
@@ -428,7 +435,8 @@ def delete_user_data(user):
         erase_email(address)
     from whatsapp import services as whatsapp
 
-    whatsapp.erase_person(user, _whatsapp_addresses(user) if user.email_verified_at else set())  # chats, messages and files, found by his numbers (before the sessions are cleared)
+    if include_chats:  # staff-run erasure only: a member deleting his own account never reaches a chat found by an unproven number
+        whatsapp.erase_person(user, _whatsapp_addresses(user) if user.email_verified_at else set())  # chats, messages and files, by his numbers (before the sessions are cleared)
     anonymised = _anonymise_sessions(user)
     proven = bool(user.email_verified_at)  # rows found only by email are his only once the address is proven (an unverified account may carry someone else's address)
     if proven:
