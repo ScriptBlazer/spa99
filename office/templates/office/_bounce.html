@@ -4,7 +4,7 @@ The notice and Correct the email show while the address bounces; Resend follow-u
 <div class="o-callout o-callout--calm o-bounce" data-bounce-notice role="note">
   <p><strong>Possible fake</strong></p>
   <p>{{ bounce.notice }}</p>
-  {% if bounce.can_edit %}<p><button type="button" class="btn btn-secondary btn-sm" data-dialog-open="email" aria-haspopup="dialog" data-correct-email>Correct the email</button></p>{% endif %}
+  {% if bounce.can_edit %}<p><button type="button" class="btn btn-secondary btn-sm" data-dialog-open="correct-email" aria-haspopup="dialog" data-correct-email>Correct the email</button></p>{% endif %}
 </div>
 {% elif bounce.can_resend %}
 <div class="o-callout o-callout--calm o-bounce" data-bounce-resend>
@@ -13,9 +13,9 @@ The notice and Correct the email show while the address bounces; Resend follow-u
 </div>
 {% endif %}
 {% if bounce.can_edit %}
-<dialog class="fb-modal o-dialog" data-dialog="email" aria-labelledby="od-email-h">
+<dialog class="fb-modal o-dialog" data-dialog="correct-email" aria-labelledby="od-correct-email-h">
   <form method="post" action="{{ bounce.correct_url }}" class="fb-modal-wrap">{% csrf_token %}
-    <h2 class="fb-modal-title" id="od-email-h">Correct the email</h2>
+    <h2 class="fb-modal-title" id="od-correct-email-h">Correct the email</h2>
     <p class="fb-modal-body">Now: {{ bounce.email }}. Fix a typo here. His journeys, notes and history move to the new address. The old one stays on the bounce list.</p>
     <label class="fb-modal-field"><span>New email</span><input class="fb-modal-input" type="email" name="email" value="" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="email" required></label>
     <div class="fb-modal-actions">

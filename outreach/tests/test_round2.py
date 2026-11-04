@@ -1,5 +1,6 @@
 """Round 2 of the office outreach: list sorting, Gold delete, approach list tabs, archived leads, restore a note, the next-morning email.
 Mocked: sync queue and in-memory mail."""
+import json
 from datetime import datetime, time, timedelta, timezone as tz
 from unittest import mock
 from zoneinfo import ZoneInfo
@@ -375,6 +376,16 @@ class BouncedLeadTests(Base):
 
         self.assertTrue(EmailSuppression.objects.filter(email="typo@example.com").exists())  # the old address stays on the list
 
+    def test_the_lead_page_has_one_email_send_dialog_and_a_separate_correct_email_one(self):
+        session = lead("fine@example.com")
+        html = call(self.approver, "get", f"/leads/{session.pk}/").content.decode()
+        self.assertIn("data-consent-text", html)  # the wording he ticked reaches the page
+        self.assertEqual(html.count('data-dialog="email"'), 1)
+        self.assertEqual(html.count('data-dialog="correct-email"'), 1)
+        send = html.split('data-dialog="email"')[1].split("</dialog>")[0]
+        self.assertIn('name="message"', send)  # the send form, not the correct-email one
+        self.assertNotIn('type="email"', send)
+
     def test_a_taken_address_is_refused_and_says_whose(self):
         first, other = lead("typo@example.com"), lead("other@example.com")
         JourneySession.objects.filter(pk=other.pk).update(lead_first_name="Olly")
@@ -413,3 +424,29 @@ class BouncedLeadTests(Base):
         self.assertEqual(services.resend_follow_up("fixed@example.com", self.approver)[0], services.ALREADY)  # once
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Next-morning email sent", str(call(self.reader, "get", f"/leads/{session.pk}/").context["timeline_days"]))
+
+
+class StaffEmailExportTests(Base):
+    def test_staff_email_text_is_in_both_exports_and_an_unverified_account_gets_none(self):
+        from outreach.models import PersonMessage
+
+        PersonMessage.objects.create(email="acc@example.com", text="Hello Acc", author_label="Barry", subject="Hi")
+        session = lead("acc@example.com")
+        lead_export = call(self.admin, "get", f"/leads/{session.pk}/export/")
+        self.assertEqual([m["text"] for m in json.loads(lead_export.content)["staff_emails"]], ["Hello Acc"])
+        user = user_services.register_interest(cleaned(email="acc@example.com")).user
+        self.assertEqual(user_services.export_user_data(user)["staff_emails"], [])  # not proven his yet
+        type(user).objects.filter(pk=user.pk).update(email_verified_at=timezone.now())
+        user.refresh_from_db()
+        mine = user_services.export_user_data(user)["staff_emails"]
+        self.assertEqual((mine[0]["text"], mine[0]["written_by"]), ("Hello Acc", "Barry"))
+
+
+class SendMessageGuardTests(Base):
+    def test_resending_after_a_failure_sends_but_a_repeat_of_a_good_one_does_not(self):
+        with mock.patch("outreach.services.enqueue", side_effect=RuntimeError("queue down")):
+            result, first = services.send_message(self.approver, "a@example.com", "Hello there")
+        self.assertEqual((result, first.status), (services.DONE, "failed"))
+        with mock.patch("outreach.services.enqueue"):
+            self.assertEqual(services.send_message(self.approver, "a@example.com", "Hello there")[0], services.DONE)  # not "already sent"
+            self.assertEqual(services.send_message(self.approver, "a@example.com", "Hello there")[0], services.DUPLICATE)

@@ -5,7 +5,7 @@ Status: agreed 2026-11-03, building on `feature/office-outreach`. Decisions in P
 ## 1. Send the Gold Card guide
 
 - **The guide** is a PDF uploaded in **System** (a file field on the site settings or a small single-row model, default storage: S3 on live, `.private/media` locally). Replace any time; no release needed. The first file is `SPA99_Gold_Card_Guide.pdf` (local copy in `.private/incoming/`, git-ignored; Moishe uploads it on live).
-- **Gold application, Decision card:** the **Add note** button becomes **Send guide**. It opens a short confirm (or a sheet with the editable message, same pattern as Respond) and emails the applicant **from the site sender (hello@spa99.uk, `DEFAULT_FROM_EMAIL`)** with the PDF **attached**. Reply-To is the contact address, as for Respond.
+- **Gold application, Decision card:** the **Add note** button becomes **Send guide**. It opens a short confirm (or a sheet with the editable message) and emails the applicant **from the site sender (hello@spa99.uk, `DEFAULT_FROM_EMAIL`)** with the PDF **attached**. Reply-To is the contact address.
 - The email text is an **editable template** (System > Emails), key `gold_guide`, short and on brand.
 - Allowed in **any** status (new, contacted, awaiting final, approved, declined). Sending is recorded in the application history ("Guide sent by X") through `gold.audit.record`, with a duplicate-submit guard like Respond.
 - No guide uploaded: the button is disabled, with the hint "Upload the guide in System".
@@ -38,7 +38,7 @@ Status: agreed 2026-11-03, building on `feature/office-outreach`. Decisions in P
 
 ## 5. Message a lead or a person
 
-- **Message** button on the lead page and the person page (same pattern as Gold **Respond**): write an email, sent from the site sender, Reply-To the contact address, through the queue.
+- **Email** button on the lead page, the person page and the Gold page (beside WhatsApp; Respond on Gold opens WhatsApp or this pop-up): one text box, sent **From the logged-in person** (their sending address, hello@spa99.uk as the fallback) with Reply-To their address, through the queue. See `whatsapp.md` ("Email button").
 - Editable template key `office_message` (the typed text goes inside the branded layout).
 - Recorded in the person's or lead's timeline ("Message sent by X" with the text).
 - An unsubscribed person can still get a one-to-one message (it is not marketing); the sheet shows "Unsubscribed from news" as a warning.

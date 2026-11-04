@@ -26,6 +26,7 @@ from gold.models import GoldApplication
 from insights.metrics import K
 from journey import services as journey_services
 from journey.models import JourneySession
+from outreach import services as outreach_services
 from outreach.models import ArchivedLead
 from plans import payments
 from plans.models import Plan, SiteSettings
@@ -336,6 +337,7 @@ def lead_export(request, pk):
     body = {"email": data["email"], "sessions": journey_services.export_lead(data["email"]),
             "emails": journey_services.export_lead_emails(data["email"]),
             "chats": chat_services.export_conversations(email=data["email"]),
+            "staff_emails": outreach_services.export_messages([data["email"]]),
             "whatsapp": whatsapp_services.export_for(whatsapp_services.contacts_for_person(None, {data["email"]})),
             "gold_applications": gold_services.export_applications(data["email"])}
     response = JsonResponse(body, json_dumps_params={"indent": 2})

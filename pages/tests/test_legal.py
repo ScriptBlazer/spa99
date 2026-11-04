@@ -178,7 +178,7 @@ class InviteOpenNoticeTests(TestCase):
         SiteSettings.objects.filter(singleton_key="site").update(privacy_version="2026-10-26")
         out = StringIO()
         call_command("backfill_site_data", "--dry-run", stdout=out)
-        self.assertIn("privacy notice: WhatsApp", out.getvalue())
+        self.assertIn("privacy part_2: WhatsApp block", out.getvalue())
         self.assertEqual(rows.get(key="part_2").body, old)
         call_command("backfill_site_data", stdout=StringIO())
         self.assertIn("Reply STOP", rows.get(key="part_2").body)

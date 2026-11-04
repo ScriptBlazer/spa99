@@ -22,10 +22,10 @@ New icons in `_icons.html` (same 24 grid, 1.5 stroke, `currentColor`; redraw the
 
 Order in `.o-detail-rail .o-card[data-region=decision]` stays: badges, callouts, Decline, Approve and invite (primary), the 14 days line, "Open his account", then `.o-actions-more`.
 
-- `.o-actions-more`: `display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2)`. Buttons: **Respond** | **Send guide** (`btn btn-secondary`, `min-height: var(--control-h)`, icon `i-paper-plane` 1.125rem before the label on Send guide only). When Respond is not allowed, Send guide spans both columns (`grid-column: 1 / -1`, use `:only-child`). Send guide shows in every status.
+- `.o-actions-more`: `display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2)`. Gold Decision card: **Send guide** (`btn btn-secondary`, `min-height: var(--control-h)`, icon `i-paper-plane` 1.125rem before the label), which shows in every status. There is no Respond button now: WhatsApp and Email are the two reach out buttons, and the old Respond link goes to one of them.
 - Under it, a quiet row: **Add to Approach list** (section 3). Add note leaves this card.
 - **No guide uploaded:** the button stays focusable with `aria-disabled="true"` and `aria-describedby="guide-hint"` (not `disabled`, so the hint is read). Look: `background: var(--office-sunken); color: var(--office-muted); box-shadow: none; cursor: not-allowed`; click does nothing. Hint below the row, full width: `<p class="o-hint-line" id="guide-hint">Upload the guide in System</p>`, `--text-sm`, `--office-muted`, `margin-top: var(--space-2)`. If the user can open System, "System" is a link to the guide setting.
-- **Phone:** the decision bar (`.o-bar`) is unchanged. Respond and Send guide stay in the card, which sits after the application sections; same grid.
+- **Phone:** the decision bar (`.o-bar`) is unchanged. Send guide stays in the card, which sits after the application sections; same grid.
 
 **Send guide dialog** (`dialog.fb-modal.o-dialog[data-gold-dialog=guide]`, same build as Respond, posted as a form, `data-problems`, duplicate guard via `data-working-text`):
 
@@ -99,22 +99,22 @@ Title everywhere = `outreach_list_name` from System, or "Approach list" while em
 
 ### Add to list (lead, person, Gold pages)
 
-- Gold: a quiet full-width row in the Decision card under Respond / Send guide: `o-quiet` button with `i-list-checks`, "Add to Approach list".
+- Gold: a quiet full-width row in the Decision card under Send guide: `o-quiet` button with `i-list-checks`, "Add to Approach list".
 - Person and lead: in the new **Reach out** rail card (section 4), second button: `btn btn-secondary btn-block`, `i-list-checks`, "Add to Approach list".
 - Opens a small `fb-modal.o-dialog[data-dialog=outreach]`: title "Add Daniel to the Approach list?", reason chips (choosing first): "High potential", "Asked to talk", "Big business" (`.o-chip`, tapping one fills the field, tap again clears), then `fb-modal-field` "Reason (optional)", textarea 2 rows, `maxlength=200`. Actions **Cancel** / **Add to list** (primary). Toast "Added to the Approach list."
 - **Already on the list:** the button is replaced by a state row `.o-onlist`: `i-check`, "On the Approach list", `--text-sm` meta "Moishe, 3 Nov", and `o-quiet` link "View" to the page. If the entry is done: "Approached 4 Nov by Barry", no link button. A second add (race) returns the same state with toast "Already on the Approach list."
 - Row action on lists: not in this round (no cheap spot without a hover menu).
 
-## 4. Message (lead and person pages)
+## 4. Email (lead, person and Gold pages)
 
-- New first card in `.o-detail-rail`: `section.o-card[data-person-reach]`, `h2.o-h3` "Reach out". Buttons stacked, `gap: var(--space-2)`: **Message** (`btn btn-secondary btn-block`, `i-paper-plane`) then Add to Approach list. Phone: card order right after the header (`order: 1`), the two buttons side by side (`grid-template-columns: 1fr 1fr`), labels "Message" and "Add to list" (`o-only-narrow`). Read-only users: card hidden.
-- Dialog `fb-modal.o-dialog[data-dialog=message]`, a copy of Respond:
-  - Title "Message Daniel" (name, else the email).
-  - Body "From hello@spa99.uk. His reply comes to the team. Kept in his timeline."
+- New first card in `.o-detail-rail`: `section.o-card[data-person-reach]`, `h2.o-h3` "Reach out". Buttons stacked, `gap: var(--space-2)`: **WhatsApp** and **Email** (`btn btn-block`, one primary, `.o-email-btn`), then Add to Approach list. Phone: card order right after the header (`order: 1`). Read-only users: card hidden.
+- Dialog `fb-modal.o-dialog[data-dialog=email]` (the lead page's Correct the email dialog is `data-dialog=correct-email`):
+  - Title "Email Daniel" (name, else the email).
+  - Body "From <his name and address>. His reply goes to <that address>. Kept in his timeline."
   - Unsubscribed: `.o-warn` above the field, `i-warning` 1rem inline: "Unsubscribed from news. This is a one-to-one message, so it still goes."
   - Field "Message", 6 rows, `required minlength=5 maxlength=2000`.
-  - Actions **Cancel** / **Send message** (working text "Sending").
-- Toast "Message sent." Timeline: label "Message sent by Moishe", detail = text clamped to 3 lines.
+  - Actions **Cancel** / **Send email** (working text "Sending").
+- Toast "Your email is on its way." Timeline: label "Email sent by Moishe", detail = text clamped to 3 lines.
 
 ## 5. Leads: the Show filter goes
 

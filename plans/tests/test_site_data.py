@@ -303,3 +303,54 @@ class BarryChangesBackfillTests(TestCase):
         self.assertFalse(GoldChoice.objects.get(group="where", value="rest_of_london").active)
         self.assertEqual(GoldChoice.objects.filter(group="where", value="midlands").count(), 1)
         self.assertEqual(GoldApplication.objects.get(pk=application.pk).location, "midlands")
+
+
+class PrivacyNoticeBackfillTests(TestCase):
+    """A database seeded on origin/main (real old parts 2 and 3) gets the WhatsApp wording; edits made by hand elsewhere survive."""
+
+    def setUp(self):
+        from content import legal
+        from plans.tests.privacy_2026_10_30 import OLD_PART_2, OLD_PART_3
+
+        seed_all()
+        self.legal, self.new2, self.new3 = legal, Section.objects.get(page__key="privacy", key="part_2").body, Section.objects.get(page__key="privacy", key="part_3").body
+        self.old2, self.old3 = OLD_PART_2, OLD_PART_3
+        Section.objects.filter(page__key="privacy", key="part_2").update(body=OLD_PART_2)
+        Section.objects.filter(page__key="privacy", key="part_3").update(body=OLD_PART_3)
+        Section.objects.filter(page__key="privacy", key="updated").update(body="30 October 2026")
+        SiteSettings.objects.update(privacy_version="2026-10-26")
+
+    def body(self, key):
+        return Section.objects.get(page__key="privacy", key=key).body
+
+    def run_it(self, *args):
+        out = StringIO()
+        call_command("backfill_site_data", *args, stdout=out)
+        return out.getvalue()
+
+    def test_dry_run_lists_every_change_and_saves_nothing_then_the_run_matches_the_seed(self):
+        dry = self.run_it("--dry-run")
+        for line in ("part_2: the journey tick", "part_2: WhatsApp block", "part_3: news about", "part_3: withdrawing", "last updated", "privacy version"):
+            self.assertIn(line, dry)
+        self.assertNotIn("invitation email pixel line", dry)  # origin/main already has that line
+        self.assertEqual((self.body("part_2"), self.body("part_3")), (self.old2, self.old3))
+        self.assertEqual(SiteSettings.load().privacy_version, "2026-10-26")
+        self.run_it()
+        self.assertEqual((self.body("part_2"), self.body("part_3"), self.body("updated")), (self.new2, self.new3, self.legal.PRIVACY_UPDATED))
+        self.assertEqual(SiteSettings.load().privacy_version, self.legal.PRIVACY_VERSION)
+        self.assertIn("Nothing to change.", self.run_it())
+
+    def test_hand_edited_text_stays_and_is_reported_left_alone(self):
+        edited3 = self.old3.replace("Basis: your consent.", "Basis: consent (edited).", 1)
+        tick = "a tick to say Spa 99 may email you about opening."
+        edited2 = self.old2.replace(tick, "a tick to say we may write to you about opening.")
+        Section.objects.filter(page__key="privacy", key="part_3").update(body=edited3)
+        Section.objects.filter(page__key="privacy", key="part_2").update(body=edited2)
+        dry = self.run_it("--dry-run")
+        self.assertIn("Left alone", dry)
+        self.assertIn("privacy part_2: the journey tick", dry.split("Left alone")[1])
+        self.run_it()
+        self.assertIn("Basis: consent (edited).", self.body("part_3"))
+        self.assertIn("WhatsApping you", self.body("part_3"))
+        self.assertIn("we may write to you about opening.", self.body("part_2"))
+        self.assertIn(self.legal.WHATSAPP_BLOCK, self.body("part_2"))

@@ -290,6 +290,7 @@ def export_user_data(user, include_chats=False):
         "journey_sessions": _export_sessions(user),
         "chats": chat_services.export_conversations(user=user, email=user.email if user.email_verified_at else None),
         **({"whatsapp": _export_whatsapp(user), "whatsapp_chats_not_included": _unlinked_chats(user)} if include_chats else {}),  # names only: nothing links them to him, so staff decide
+        "staff_emails": _export_staff_emails(user) if user.email_verified_at else [],  # found by address: only once the address is proven his
         "gold_applications": gold_services.export_applications(user.email) if user.email_verified_at else [],  # by email only once the address is proven his
         "emails": [
             {"template": e.template, "subject": e.subject, "status": e.status, "sent_at": _plain(e.sent_at)}
@@ -316,6 +317,12 @@ def _chat_addresses(user):
     from outreach import people as outreach_people
 
     return outreach_people.resolve(user=user)[1] | {user.email.lower()}
+
+
+def _export_staff_emails(user):
+    from outreach.services import export_messages
+
+    return export_messages(_chat_addresses(user))
 
 
 def _unlinked_chats(user):

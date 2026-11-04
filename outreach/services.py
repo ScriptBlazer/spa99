@@ -172,7 +172,7 @@ def send_message(actor, to_email, text):
         return EMPTY, None
     if len(text) > MESSAGE_MAX:
         return TOO_LONG, None
-    recent = PersonMessage.objects.filter(email=to_email, text=text, sent_at__gte=timezone.now() - DUPLICATE_WINDOW)
+    recent = PersonMessage.objects.filter(email=to_email, text=text, sent_at__gte=timezone.now() - DUPLICATE_WINDOW).exclude(status=PersonMessage.FAILED)  # a failed send may be tried again
     recent = recent.filter(author=actor) if getattr(actor, "pk", None) else recent.filter(author__isnull=True)
     if recent.exists():
         return DUPLICATE, None
@@ -258,6 +258,13 @@ def unarchive_lead(email, actor):
 
 
 # ---------- erasure and the timeline ----------
+
+def export_messages(addresses):
+    """UK GDPR export: the staff emails sent to these addresses (text, who wrote it, status, time), oldest first."""
+    addresses = [(a or "").strip().lower() for a in addresses if a]
+    return [{"to": m.email, "subject": m.subject, "text": m.text, "written_by": m.author_label, "status": m.status, "sent_at": m.sent_at.isoformat()}
+            for m in PersonMessage.objects.filter(email__in=addresses).order_by("sent_at", "id")]
+
 
 def erase_email(email):
     """UK GDPR: notes, messages and approach-list entries held for this address go with the person."""
