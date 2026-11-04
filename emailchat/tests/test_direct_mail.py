@@ -100,7 +100,7 @@ class DirectMailTests(Base):
         bare = forward(self.tb, to=(f"inbox+{self.tb}@{DOMAIN}",), mid="rw3", rfc="<rw3@x>")
         with self.assertLogs("spa99.emailchat", "WARNING") as log:
             self.post(bare)
-        self.assertIn("original To could not be determined", log.output[0])
+        self.assertIn("reason=original-to-unknown", log.output[0])
         self.assertNotIn("dan@", log.output[0])  # no personal data in the log
         self.assertEqual(self.stored().count(), 1)
 
@@ -108,7 +108,7 @@ class DirectMailTests(Base):
     def test_internal_and_automatic_mail_stays_in_outlook(self):
         for n, sender in enumerate((MOISHE, "x@staff.example.test", "boss@bml.example.test", "someone@sub.bml.example.test", "reader@example.test")):
             self.post(forward(self.tb, sender=sender, mid=f"i{n}", rfc=f"<i{n}@x>"))
-        for n, extra in enumerate(({"Auto-Submitted": "auto-replied"}, {"Precedence": "bulk"}, {"List-Id": "<news.example>"}, {"X-Auto-Response-Suppress": "All"})):
+        for n, extra in enumerate(({"Auto-Submitted": "auto-replied"}, {"Precedence": "bulk"}, {"List-Id": "<news.example>"}, {"Auto-Submitted": "auto-generated"})):
             name, value = next(iter(extra.items()))
             self.post(forward(self.tb, mid=f"a{n}", rfc=f"<a{n}@x>", headers=[header(name, value)]))
         self.post(forward(self.tb, sender="mailer-daemon@client.example", mid="bounce", rfc="<b@x>"))
@@ -129,37 +129,48 @@ class DirectMailTests(Base):
         self.assertEqual(self.stored().get().direct_to, "Barry, Moishe")
         self.assertEqual(services.message_dict(self.stored().get())["direct_to"], "Barry, Moishe")
 
-    def test_a_reply_to_something_we_sent_joins_that_thread_but_the_same_subject_alone_never_does(self):
+    def test_a_mail_names_an_earlier_message_but_joins_only_an_unlinked_direct_thread_from_the_same_sender(self):
         self.send()  # an Office email in self.thread, with its own Message-ID
         ours = Message.objects.get(direction="out")
         self.assertTrue(ours.rfc_message_id)
         self.post(forward(self.tb, sender="him@example.com", mid="r1", rfc="<r1@x>", headers=[header("In-Reply-To", ours.rfc_message_id)], Subject="Re: Hello"))
         message = Message.objects.get(provider_id="r1")
-        self.assertEqual((message.thread_id, message.direct_to, Thread.objects.count()), (self.thread.pk, "Barry", 1))
-        self.assertEqual(self.thread.messages.count(), 2)
+        self.assertNotEqual(message.thread_id, self.thread.pk)  # an Office-started thread is never joined by a direct mail: From is unproven
+        self.assertEqual(self.thread.messages.count(), 1)
         self.post(forward(self.tb, sender="stranger@client.example", mid="r2", rfc="<r2@x>", Subject="Hello"))  # same subject, no header: a new thread
-        self.post(forward(self.tb, sender="stranger@client.example", mid="r3", rfc="<r3@x>", headers=[header("References", "<unknown@x> <r2@x>")]))  # answers his own earlier mail: joined
+        self.post(forward(self.tb, sender="stranger@client.example", mid="r3", rfc="<r3@x>", headers=[header("References", "<unknown@x> <r2@x>")]))  # answers his own earlier direct mail: joined
         self.post(forward(self.tb, sender="other@client.example", mid="r4", rfc="<r4@x>", headers=[header("In-Reply-To", "<r2@x>")]))  # somebody else naming that id: not joined
-        self.assertEqual(Thread.objects.count(), 3)
-        self.assertEqual(Message.objects.get(provider_id="r3").thread.email, "stranger@client.example")
+        self.assertEqual(Thread.objects.count(), 4)
+        self.assertEqual(Message.objects.get(provider_id="r3").thread, Message.objects.get(provider_id="r2").thread)
         self.assertNotEqual(Message.objects.get(provider_id="r4").thread, Message.objects.get(provider_id="r2").thread)
+        r2 = Message.objects.get(provider_id="r2").thread
+        r2.lead_email = "stranger@client.example"  # once staff have linked it, a direct mail never joins it either
+        r2.save()
+        self.post(forward(self.tb, sender="stranger@client.example", mid="r5", rfc="<r5@x>", headers=[header("In-Reply-To", "<r2@x>")]))
+        self.assertNotEqual(Message.objects.get(provider_id="r5").thread, r2)
 
-    def test_spam_and_failed_sender_checks_are_stored_flagged_never_pushed(self):
+    def test_only_postmarks_own_spam_verdict_flags_a_mail_and_authentication_headers_decide_nothing(self):
         PushSubscription.objects.create(user=self.approver, endpoint="https://push.example/1", p256dh="k", auth="a")
         with mock.patch("whatsapp.push.webpush") as sent:
             self.post(forward(self.tb, mid="s1", rfc="<s1@x>", sender="a@client.example", headers=[header("X-Spam-Status", "Yes, score=9")]))
-            self.post(forward(self.tb, mid="s2", rfc="<s2@x>", sender="b@client.example", headers=[header("Authentication-Results", "spf=pass; dkim=fail; dmarc=fail")]))
-            self.post(forward(self.tb, mid="s3", rfc="<s3@x>", sender="c@client.example", headers=[header("Received-SPF", "Fail (sender not authorised)")]))
             self.assertEqual(sent.call_count, 0)
-            self.post(forward(self.tb, mid="ok1", rfc="<ok1@x>", sender="d@client.example", headers=[header("Authentication-Results", "spf=fail; dkim=pass; dmarc=pass")]))  # forwarding broke SPF only
-            self.post(forward(self.tb, mid="ok2", rfc="<ok2@x>", sender="e@client.example", headers=[header("Authentication-Results", "spf=pass; dkim=pass"), header("Received-SPF", "Fail")]))
+            self.post(forward(self.tb, mid="ok1", rfc="<ok1@x>", sender="d@client.example", headers=[header("Authentication-Results", "spf=fail; dkim=fail; dmarc=fail")]))  # forgeable, and a forward breaks SPF
+            self.post(forward(self.tb, mid="ok2", rfc="<ok2@x>", sender="e@client.example", headers=[header("Received-SPF", "Fail")]))
             self.assertEqual(sent.call_count, 2)
-        self.assertEqual([Message.objects.get(provider_id=p).spam for p in ("s1", "s2", "s3", "ok1", "ok2")], [True, True, True, False, False])
-        flagged = Message.objects.get(provider_id="s2")
-        self.assertIn("sender checks", flagged.note)
-        self.assertEqual(services.unread_total(self.reader), 2)  # only the two that passed count as unread
-        self.assertTrue(flagged.thread.last_message_at)  # the flagged one is in the inbox so staff can see it
+        self.assertEqual([Message.objects.get(provider_id=p).spam for p in ("s1", "ok1", "ok2")], [True, False, False])
+        self.assertEqual(services.unread_total(self.reader), 2)  # the spam one is not unread
+        self.assertTrue(Message.objects.get(provider_id="s1").thread.last_message_at)  # but staff can still see it in the inbox
         self.assertEqual([m for m in mail.outbox if m.extra_headers.get("X-Spa99-Group-Copy")], [])
+
+    def test_a_forward_does_not_make_a_real_mail_look_like_a_robot_and_every_drop_says_why(self):
+        for n, extra in enumerate(({"Auto-Submitted": "auto-forwarded"}, {"X-Auto-Response-Suppress": "DR, RN, NRN, OOF, AutoReply"}, {"Return-Path": "<>"})):
+            name, value = next(iter(extra.items()))
+            self.post(forward(self.tb, sender=f"p{n}@client.example", mid=f"f{n}", rfc=f"<f{n}@x>", headers=[header(name, value)]))
+        self.assertEqual(self.stored().count(), 3)
+        with self.assertLogs("spa99.emailchat", "INFO") as log:
+            self.post(forward(self.tb, mid="robot", rfc="<robot@x>", headers=[header("Auto-Submitted", "auto-replied")]))
+            self.post(forward("0" * 24, mid="nobody"))
+        self.assertEqual(log.output, ["INFO:spa99.emailchat:Direct email dropped: reason=auto-submitted", "INFO:spa99.emailchat:Direct email dropped: reason=unknown-token"])
 
     def test_our_own_group_copy_and_a_failed_file_store_leave_nothing_behind(self):
         self.assertEqual(self.post(forward(self.tb, mid="loop", headers=[header("X-Spa99-Group-Copy", "1")])).status_code, 200)
@@ -179,7 +190,8 @@ class DirectMailTests(Base):
         self.assertEqual((counts["email_threads"], counts["email_messages"], counts["email_files"]), (1, 1, 1))
         self.assertEqual((Thread.objects.filter(pk=thread.pk).count(), Message.objects.filter(thread_id=thread.pk).count(), Attachment.objects.filter(key__in=keys).count()), (0, 0, 0))
 
-    def test_a_verified_account_finds_the_thread_by_its_address_and_an_unverified_one_does_not(self):
+    def test_a_direct_thread_belongs_to_nobody_until_staff_link_it_and_then_export_and_erase_cover_it(self):
+        from office import tools
         from office.tests.test_leads import verify
         from users import services as user_services
         from users.tests.test_register import cleaned
@@ -187,10 +199,67 @@ class DirectMailTests(Base):
         self.post(forward(self.tb, sender="member@client.example"))
         thread = Thread.objects.get(direct_to=BARRY)
         account = user_services.register_interest(cleaned(email="member@client.example")).user
-        self.assertEqual(list(services.threads_for_person(account, ["member@client.example"])), [])  # the address is not proof until the account is verified (common.ownership)
         verify(account)
         account.refresh_from_db()
+        for found in (services.threads_for_person(account, ["member@client.example"]), services.threads_for_member(account)):
+            self.assertEqual(list(found), [])  # verified or not, his From is unproven
+        target = tools.person_target(account.pk)
+        self.assertEqual(services.threads_for(target.addresses, target.user, target.application).count(), 0)  # what the person's page, timeline and export use
+        page = office(self.reader, "get", f"/email/{thread.pk}/")
+        self.assertContains(page, "Unproven sender")
+        self.assertContains(page, "member@client.example")
+        self.assertNotContains(page, "data-link-offer")  # a reader sees the tag, only an editor is asked to link
+        offer = office(self.approver, "get", f"/email/{thread.pk}/")
+        self.assertContains(offer, "data-link-offer")
+        self.assertContains(offer, f"person:{account.pk}")
+        self.assertEqual(office(self.reader, "post", f"/email/{thread.pk}/link/", {"from": f"person:{account.pk}"}).status_code, 403)
+        thread.refresh_from_db()
+        self.assertIsNone(thread.user_id)
+        self.assertEqual(office(self.approver, "get", f"/email/{thread.pk}/link/").status_code, 405)  # a GET never links
+        self.assertEqual(office(self.approver, "post", f"/email/{thread.pk}/link/", {"from": f"person:{account.pk}"}).status_code, 302)
+        thread.refresh_from_db()
+        self.assertEqual(thread.user_id, account.pk)
         self.assertEqual(list(services.threads_for_person(account, ["member@client.example"])), [thread])
+        self.assertNotContains(office(self.approver, "get", f"/email/{thread.pk}/"), "Unproven sender")
+        self.assertEqual(len(services.export_for(services.threads_for_person(account, ["member@client.example"]))), 1)
+        self.assertEqual(office(self.approver, "post", f"/email/{thread.pk}/delete/", {"confirm": "1"}).status_code, 302)  # linked: refused
+        self.assertTrue(Thread.objects.filter(pk=thread.pk).exists())
+
+    def test_only_a_verified_account_or_a_lead_on_that_very_address_can_be_linked(self):
+        from office.tests.test_leads import lead, verify
+        from users import services as user_services
+        from users.tests.test_register import cleaned
+
+        self.post(forward(self.tb, sender="member@client.example"))
+        thread = Thread.objects.get(direct_to=BARRY)
+        unverified = user_services.register_interest(cleaned(email="member@client.example")).user
+        other = user_services.register_interest(cleaned(email="other@client.example", mobile="07911222333")).user
+        verify(other)
+        self.assertIsNone(services.link_candidate(thread))  # an unverified account proves nothing
+        for ref in (f"person:{unverified.pk}", f"person:{other.pk}", "gold:00000000-0000-0000-0000-000000000000", "nonsense"):
+            office(self.approver, "post", f"/email/{thread.pk}/link/", {"from": ref})
+        thread.refresh_from_db()
+        self.assertEqual((thread.user_id, thread.lead_email), (None, ""))  # a person with another address, or an unverified one, cannot be linked
+        session = lead("member@client.example")
+        self.assertEqual(services.link_candidate(thread)["ref"], f"lead:{session.pk}")
+        office(self.approver, "post", f"/email/{thread.pk}/link/", {"from": f"lead:{session.pk}"})
+        thread.refresh_from_db()
+        self.assertEqual(thread.lead_email, "member@client.example")
+
+    def test_deleting_an_unlinked_direct_thread_removes_everything_and_the_log_has_no_text(self):
+        from system.models import SystemEvent
+
+        self.post(forward(self.tb, Attachments=[{"Name": "photo.png", "Content": b64(PNG), "ContentType": "image/png"}], TextBody="a private sentence"))
+        thread = Thread.objects.get(direct_to=BARRY)
+        self.assertEqual(office(self.reader, "post", f"/email/{thread.pk}/delete/", {"confirm": "1"}).status_code, 403)
+        office(self.approver, "post", f"/email/{thread.pk}/delete/")  # no confirm: nothing happens
+        self.assertTrue(Thread.objects.filter(pk=thread.pk).exists())
+        self.assertEqual(office(self.approver, "post", f"/email/{thread.pk}/delete/", {"confirm": "1"}).status_code, 302)
+        self.assertEqual((Thread.objects.filter(direct_to__gt="").count(), Message.objects.filter(direct_to__gt="").count(), Attachment.objects.count()), (0, 0, 0))
+        event = SystemEvent.objects.get(kind=SystemEvent.CHAT_DELETED)
+        self.assertEqual(event.detail["email_messages"], 1)
+        self.assertNotIn("private sentence", f"{event.sentence} {event.detail}")
+        self.assertNotIn("dan@client.example", f"{event.sentence} {event.detail}")
 
     def test_the_inbox_token_is_made_on_save_shown_in_team_and_never_changes(self):
         from system.tests.test_system import unlocked_client

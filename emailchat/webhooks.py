@@ -60,7 +60,7 @@ def inbound(request):
     direct_route = None
     if direct.is_direct(payload):  # mail forwarded from a staff mailbox to inbox+<token>@...: emailchat/direct.py decides
         if services.is_group_copy(payload) or not _has_message_id(payload):
-            logger.warning("Direct email is our own group copy or has no MessageID: not stored")
+            direct.drop("group-copy-or-no-message-id", logging.WARNING)
             return HttpResponse(status=200)
         direct_route = direct.route(payload)
         if direct_route is None:

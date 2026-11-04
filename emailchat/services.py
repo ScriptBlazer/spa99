@@ -51,7 +51,6 @@ REASONS = {"suppressed": ("Not sent. This address bounced before or marked an em
            "send_failed": ("Not sent. Try again.", True)}
 
 
-FAILED_CHECKS = "The sender checks (SPF or DKIM) failed, so this may not be from who it says. Nobody was notified. Take care with links and files."
 TOO_COMPLEX = "The layout of this email was too complicated to show, so only its text is shown."
 MAYBE_NOT_SENT = "This may not have been sent. Check with him before trying again, in case it did arrive."
 
@@ -172,7 +171,7 @@ def move_address(old, new):
     if not old or not new or old == new:
         return 0
     free = Q(application__isnull=True) | Q(application__email__iexact=new)
-    rows = Thread.objects.filter(user__isnull=True).filter(free).filter(Q(lead_email=old) | Q(email=old))
+    rows = Thread.objects.filter(user__isnull=True).filter(free).filter(Q(lead_email=old) | Q(email=old)).exclude(UNPROVEN)  # an unlinked direct thread belongs to nobody: its address is not moved
     ids = list(rows.values_list("pk", flat=True))
     Thread.objects.filter(pk__in=ids, email=old).update(email=new)
     Thread.objects.filter(pk__in=ids, lead_email=old).update(lead_email=new)
@@ -206,11 +205,68 @@ def create_thread(email, subject, actor=None, **links):
 
 
 THREAD_ADDRESS_FIELDS = ("email", "lead_email")
+UNPROVEN = ~Q(direct_to="") & Q(user__isnull=True, lead_email="", application__isnull=True)  # a direct email thread nobody has linked: its From is unproven, so it is nobody's by address
 
 
 def threads_for(addresses=(), user=None, application=None):
-    """Every thread held for a person. The rule is common.ownership (owner link, his address only when verified, a proven Gold application); this is the only lookup."""
-    return ownership.owned(Thread, user, addresses, application, THREAD_ADDRESS_FIELDS)
+    """Every thread held for a person. The rule is common.ownership (owner link, his address only when verified, a proven Gold application); this is the only lookup.
+    An unlinked direct email thread is never found by an address (it appears in the Email tab only, until staff link it)."""
+    return ownership.owned(Thread, user, addresses, application, THREAD_ADDRESS_FIELDS, skip=UNPROVEN)
+
+
+def is_unproven(thread):
+    """A direct email thread nobody has linked yet: shown in the Email tab with an 'Unproven sender' tag."""
+    return bool(thread.direct_to) and ownership.is_unlinked(thread)
+
+
+def link_candidate(thread):
+    """The one person this unproven thread's address can be linked to, as the page ref the Link button posts ('person:<id>' or 'lead:<id>') and his name, or None. Only a VERIFIED
+    account on that address, or a lead who left that address at the journey gate (the person's page then shows it). Never a Gold application, never an unverified account."""
+    from journey.models import JourneySession
+    from users.models import User
+
+    address = ownership.clean(thread.email)
+    if not address or not is_unproven(thread):
+        return None
+    account = User.objects.filter(email__iexact=address, email_verified_at__isnull=False, interest__isnull=False).first()
+    if account is not None:
+        return {"ref": f"person:{account.pk}", "name": account.get_full_name() or account.email}
+    session = JourneySession.objects.filter(lead_email__iexact=address, is_bot=False).order_by("-created_at").first()
+    if session is not None:
+        return {"ref": f"lead:{session.pk}", "name": session.lead_first_name or address}
+    return None
+
+
+def link_unproven(thread, target):
+    """Staff chose to link this unproven direct thread to `target` (an office Target): only when it is that person's own address, a verified account or a lead. Returns True when linked."""
+    if not is_unproven(thread) or ownership.clean(target.main) != ownership.clean(thread.email):
+        return False
+    if target.kind == "person":
+        if not ownership.is_verified(target.user):
+            return False
+        links = {"user": target.user}
+    elif target.kind == "lead":
+        links = {"lead_email": target.main}
+    else:
+        return False
+    if not ownership.link(thread, **links):
+        return False
+    resolve_links(thread)
+    return True
+
+
+def delete_unproven(thread, actor, request=None):
+    """Staff erase one UNLINKED direct thread (mail from a sender nobody has linked): messages, files, queue records. The System audit log gets who, when and the counts, never a
+    message, name or address. Returns the counts, or None when the thread is linked (that is erased from the person it belongs to)."""
+    if not is_unproven(thread):
+        return None
+    from system import audit
+    from system.models import SystemEvent
+
+    counts = erase_threads([thread])
+    audit.log_event(SystemEvent.CHAT_DELETED, request, user=actor, detail=counts,
+                    sentence=f"{getattr(actor, 'email', '') or 'Staff'} deleted an unlinked email thread ({counts['email_messages']} messages)")
+    return counts
 
 
 def latest_thread(addresses=(), user=None, application=None):
@@ -543,7 +599,7 @@ def thread_for_token(payload):
 def record_inbound(payload, thread, route=None):
     """Store one email from him in `thread` (idempotent on Postmark's MessageID). Returns (message, created). Files are not touched here: see store_inbound_files.
     `route` (emailchat.direct.Route) is direct mail: `thread` may be None, then the thread is made here with the message (one transaction), and the message carries who it was sent to,
-    the hash of its original Message-ID, and whether its sender check failed (stored as spam: flagged, never pushed)."""
+    and the hash of its original Message-ID. Spam is only Postmark's X-Spam-Status Yes (flagged, never pushed)."""
     provider_id = _text(payload.get("MessageID"), 100).strip()
     existing = Message.objects.filter(provider_id=provider_id).first()
     if existing is not None:
@@ -560,8 +616,8 @@ def record_inbound(payload, thread, route=None):
     text, quoted = richtext.split_outlook_text(text)  # Outlook's From: / Sent: / To: / Subject: block (Postmark's own stripping does not know it): his words above it, the rest folds
     full = (whole or before) if quoted or (stripped and whole != stripped) else ""
     subject = clean_subject(_text(payload.get("Subject"), 400))
-    spam = _header(payload, "X-Spam-Status").strip().lower().startswith("yes") or bool(route and route.spam)
-    note = " ".join(x for x in (TOO_COMPLEX if too_complex else "", route.note if route else "") if x)
+    spam = _header(payload, "X-Spam-Status").strip().lower().startswith("yes")  # Postmark's own verdict, nothing else (Authentication-Results can be forged and a forward breaks SPF)
+    note = TOO_COMPLEX if too_complex else ""
     try:
         with transaction.atomic():
             if thread is None:  # direct mail that starts a thread: with that sender and subject, and no owner link (his From is unproven: common.ownership)
@@ -696,7 +752,7 @@ def store_inbound_files(message, items):
         layout = is_layout_picture(name, declared, len(data), cid, _text(item.get("Disposition") or item.get("ContentDisposition"), 40), references, bool(message.body_html))
         Attachment.objects.create(message=message, key=key, filename=name, content_type="application/octet-stream", declared_type=declared, size=len(data), content_id=cid, inline_ref=layout)
         kept += 0 if layout else 1  # stored and erased all the same, but a signature picture is not "a file": no paperclip, no list
-    base = " ".join(x for x in (TOO_COMPLEX, FAILED_CHECKS) if x in message.note)  # the notes made when it was stored; the rest are rebuilt  # rebuilt each time, never appended to: a retry (the queue failed, Postmark sends it again) stores the files again
+    base = TOO_COMPLEX if TOO_COMPLEX in message.note else ""  # the notes made when it was stored; the rest are rebuilt  # rebuilt each time, never appended to: a retry (the queue failed, Postmark sends it again) stores the files again
     note = " ".join(x for x in [base, *notes] if x)[:500]
     if note != message.note:
         Message.objects.filter(pk=message.pk).update(note=note)
@@ -941,7 +997,7 @@ def thread_dict(thread, can_send=False):
         page = _office("office_lead", session) if session else ""
     suppressed = suppression.is_suppressed(thread.email)
     name = display_name(thread)
-    return {"id": str(thread.pk), "email": thread.email, "name": name or thread.email, "has_name": bool(name), "subject": thread.subject, "labels": labels, "sent_to": thread.direct_name or (thread.direct_to.partition("@")[0].title() if thread.direct_to else ""), "sent_to_address": thread.direct_to, "page_url": page,
+    return {"id": str(thread.pk), "email": thread.email, "name": name or thread.email, "has_name": bool(name), "subject": thread.subject, "labels": labels, "sent_to": thread.direct_name or (thread.direct_to.partition("@")[0].title() if thread.direct_to else ""), "sent_to_address": thread.direct_to, "unproven": is_unproven(thread), "page_url": page,
             "url": _office("office_email_thread", thread.pk), "last_message_at": thread.last_message_at.isoformat() if thread.last_message_at else "",
             "replies_to_mailbox": replies_to_mailbox(), "suppressed": suppressed, "reason": "This address bounced or marked an email as spam: nothing can be sent to it." if suppressed else "",
             "can_send": bool(can_send and not suppressed),
@@ -957,7 +1013,7 @@ def inbox_rows(threads, user):
     status = dict(Message.objects.filter(pk__in=newest).values_list("thread_id", "status"))
     return [{"id": str(t.pk), "subject": t.subject, "name": t.name or t.email, "has_name": bool(t.name), "email": t.email, "preview": t.last_preview, "direction": t.last_direction,
              "status": status.get(t.pk, ""), "last_message_at": t.last_message_at.isoformat() if t.last_message_at else "", "unread": unread.get(t.pk, 0), "has_attachment": t.has_attachment,
-             "no_reply": t.last_direction == Message.OUT, "gold": bool(t.application_id), "sent_to": t.direct_name or (t.direct_to.partition("@")[0].title() if t.direct_to else ""), "url": _office("office_email_thread", t.pk)} for t in threads]
+             "no_reply": t.last_direction == Message.OUT, "gold": bool(t.application_id), "unproven": is_unproven(t), "sent_to": t.direct_name or (t.direct_to.partition("@")[0].title() if t.direct_to else ""), "url": _office("office_email_thread", t.pk)} for t in threads]
 
 
 def search_people(q, limit=10):
@@ -1030,7 +1086,7 @@ def threads_for_member(user):
     """Member self-service, stricter than the rule in common.ownership: only the thread(s) on his account email, and only once that address is verified (an unverified account may carry someone else's address)."""
     if not ownership.is_verified(user):
         return Thread.objects.none()
-    return Thread.objects.filter(email=user.email.strip().lower())
+    return Thread.objects.filter(email=user.email.strip().lower()).exclude(UNPROVEN)
 
 
 def export_for(threads):

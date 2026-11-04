@@ -4,11 +4,13 @@ A staff mailbox keeps its copy in Outlook and also forwards to `inbox+<token>@<E
 like that is: nothing (answer 200, store nothing, log without personal data), or a `Route` the webhook stores through `services.record_inbound`. The rules, in order:
   1. the token must be a staff member's (`StaffSender.inbox_token`); a guess stores nothing;
   2. his address must be directly in the ORIGINAL To or Cc, and neither hello@, the staff group address nor the group-copy address may be (else the team would see it three times);
-  3. internal mail (from staff, the sending domain or EMAIL_INTERNAL_DOMAIN) and robot mail (auto-replies, bounces, lists, calendar replies) stays in Outlook;
-  4. the same email forwarded from two mailboxes is one message (one thread, both staff named); a reply to a message we sent, by In-Reply-To or References, joins that thread, anything
-     else starts a new one with that sender and subject (never joined by subject);
-  5. From is unproven (nothing here checks SPF or DKIM itself): the thread gets no owner link from it (common.ownership), and a mail whose headers say the sender check failed is stored
-     flagged, never pushed.
+  3. internal mail (from staff, the sending domain or EMAIL_INTERNAL_DOMAIN) and robot mail (Auto-Submitted other than no or auto-forwarded, List-Id, Precedence bulk or list, mailer-daemon
+     senders) stays in Outlook. Every drop logs one line, `Direct email dropped: reason=...`, with no address or text in it;
+  4. the same email forwarded from two mailboxes is one message (one thread, both staff named); a mail joins an existing thread only by In-Reply-To or References naming a message in it, with
+     From equal to that thread's address, and only when that thread is itself direct mail and not linked to anyone. Anything else (an Office-started or linked thread, a stranger who knows a
+     Message-ID, the same subject) starts a new thread. Real replies to Office email come by reply+token and never come here;
+  5. From is unproven, whatever the headers say (a forward breaks SPF and Authentication-Results can be forged): the thread gets no owner link (common.ownership) until staff link it, and
+     nothing about authentication decides what is stored. Only Postmark's own X-Spam-Status Yes flags a mail as spam (stored, never pushed).
 No group copy is sent for direct mail (tasks.process_inbound)."""
 import hashlib
 import logging
@@ -28,11 +30,11 @@ from .models import Message, StaffSender, Thread
 
 logger = logging.getLogger("spa99.emailchat")
 
-Route = namedtuple("Route", "thread email subject names staff key spam note new")  # thread: existing one or None (made with the message); names: "Barry"; staff: his address; key: hash of the original Message-ID
+Route = namedtuple("Route", "thread email subject names staff key new")  # thread: existing one or None (made with the message); names: "Barry"; staff: his address; key: hash of the original Message-ID
 TOKEN = re.compile(r"[0-9a-f]{24}")
 ROBOT_PRECEDENCE = {"bulk", "list", "junk", "auto_reply", "auto-reply"}
 ROBOT_SENDERS = {"mailer-daemon", "postmaster"}
-FAILED_CHECKS = services.FAILED_CHECKS
+FORWARD_MARKER = "auto-forwarded"  # what a forward itself says about itself (a Microsoft forward may add it): not a sign the ORIGINAL was a robot
 MAX_IDS = 20
 
 
@@ -129,19 +131,24 @@ def is_internal(address):
     return any(levels.level_of(u) != levels.NONE for u in get_user_model().objects.filter(email__iexact=address, is_active=True))
 
 
-def is_automatic(payload, address):
-    auto = _first(payload, "Auto-Submitted").lower()
-    return bool((auto and auto != "no") or _first(payload, "Precedence").lower() in ROBOT_PRECEDENCE or _first(payload, "List-Id") or _first(payload, "X-Auto-Response-Suppress")
-                or address.partition("@")[0] in ROBOT_SENDERS or _first(payload, "Return-Path") == "<>")
+def automatic_reason(payload, address):
+    """Why this is robot mail, or '' for a person's mail. Auto-Submitted counts when any value is other than `no` or `auto-forwarded` (a forward may add that one itself, and
+    dropping on it would silently lose everything); List-Id, Precedence bulk or list, and a mailer-daemon or postmaster sender. X-Auto-Response-Suppress and Return-Path are NOT used:
+    real people's mail clients and forwards set them."""
+    if any(v.strip().lower() not in ("", "no", FORWARD_MARKER) for v in _headers(payload, "Auto-Submitted")):
+        return "auto-submitted"
+    if _first(payload, "Precedence").lower() in ROBOT_PRECEDENCE:
+        return "precedence"
+    if _first(payload, "List-Id"):
+        return "list"
+    if address.partition("@")[0] in ROBOT_SENDERS:
+        return "mailer-daemon"
+    return ""
 
 
-def failed_checks(payload):
-    """True when the headers say the sender check failed. The receiving mail system's own verdict (Authentication-Results, which Microsoft adds to the original) wins: dmarc=fail, or
-    spf=fail or dkim=fail without dmarc=pass. Only when there is none, Postmark's Received-SPF is used, and only a plain 'fail' (a forward always looks like a different sender to SPF)."""
-    results = " ".join(_headers(payload, "Authentication-Results")).lower()
-    if results:
-        return "dmarc=fail" in results or (("spf=fail" in results or "dkim=fail" in results) and "dmarc=pass" not in results)
-    return _first(payload, "Received-SPF").lower().startswith("fail")
+def drop(reason, level=logging.INFO):
+    """Every direct mail that is not stored says why in one line with no personal data, so the first real test can be diagnosed from the log."""
+    logger.log(level, "Direct email dropped: reason=%s", reason)
 
 
 # ---------- threads ----------
@@ -159,15 +166,15 @@ def reference_ids(payload):
 
 
 def thread_by_headers(payload, address):
-    """The thread of a message we sent that this mail answers (In-Reply-To or References), else the thread of an earlier direct mail from the same sender it answers. Never by subject."""
+    """The thread this mail joins, or None (a new thread). Only by In-Reply-To or References naming a message in the thread, AND From equal to the thread's address, AND a thread that is
+    itself direct mail and linked to nobody. An Office-started or linked thread is never joined: From is unproven, so a stranger who knows a Message-ID must not write into somebody's thread.
+    Never by subject."""
     ids = reference_ids(payload)
     if not ids:
         return None
-    ours = Message.objects.filter(direction=Message.OUT, rfc_message_id__in=ids).order_by("-id").select_related("thread").first()
-    if ours is not None:
-        return ours.thread
-    earlier = Message.objects.filter(direction=Message.IN, rfc_message_id__in=ids, thread__email=address).exclude(direct_to="").order_by("-id").select_related("thread").first()
-    return earlier.thread if earlier is not None else None
+    found = (Message.objects.filter(rfc_message_id__in=ids, thread__email=address, thread__user__isnull=True, thread__lead_email="", thread__application__isnull=True)
+             .exclude(thread__direct_to="").order_by("-id").select_related("thread").first())
+    return found.thread if found is not None else None
 
 
 def first_name_of(user):
@@ -185,40 +192,40 @@ def route(payload):
     """What to do with direct mail: a Route to store, or None (nothing to store; the reason is logged with no address or text in it)."""
     profile = staff_for_token(payload)
     if profile is None:
-        logger.info("Direct email for an unknown inbox token: not stored")
+        drop("unknown-token")
         return None
     name = first_name_of(profile.user)
     existing = Message.objects.filter(provider_id=services._text(payload.get("MessageID"), 100).strip()).select_related("thread").first()
     if existing is not None:
-        return Route(existing.thread, "", "", name, "", None, False, "", False)  # Postmark's retry of one we have: record_inbound answers it
+        return Route(existing.thread, "", "", name, "", None, False)  # Postmark's retry of one we have: record_inbound answers it
     recipients = original_recipients(payload)
     if not recipients:
-        logger.warning("Direct email: the original To could not be determined: not stored")
+        drop("original-to-unknown", logging.WARNING)
         return None
     if not (staff_addresses(profile) & recipients) or (kept_out_addresses() & recipients):
-        logger.info("Direct email not addressed directly to this staff member, or also to hello@ or the group: not stored")
+        drop("not-addressed-directly")  # not to this staff member directly, or also to hello@ or the group
         return None
     full = payload.get("FromFull") if isinstance(payload.get("FromFull"), dict) else {}
     address = services.clean_address(services._text(full.get("Email"), 254)) or services.clean_address(services._text(payload.get("From"), 254))
     if not address:
-        logger.info("Direct email without a usable From address: not stored")
+        drop("no-from-address")
         return None
     if is_internal(address):
-        logger.info("Direct email from an internal address: left in Outlook")
+        drop("internal-sender")
         return None
-    if is_automatic(payload, address):
-        logger.info("Direct email is automatic (auto-reply, bounce, list or calendar): not stored")
+    robot = automatic_reason(payload, address)
+    if robot:
+        drop(robot)
         return None
     key = key_for(payload)
     dup = Message.objects.filter(direct_key=key).first() if key else None
     if dup is not None:
         add_names(dup, name)
-        logger.info("Direct email already stored from another mailbox: staff name added")
+        drop("same-email-from-another-mailbox")
         return None
-    spam = failed_checks(payload)
     thread = thread_by_headers(payload, address)
     own = sorted(staff_addresses(profile) & recipients)[0]
-    return Route(thread, address, services.clean_subject(services._text(payload.get("Subject"), 400)) or "(No subject)", name, own, key, spam, FAILED_CHECKS if spam else "", thread is None)
+    return Route(thread, address, services.clean_subject(services._text(payload.get("Subject"), 400)) or "(No subject)", name, own, key, thread is None)
 
 
 def discard_empty(thread):

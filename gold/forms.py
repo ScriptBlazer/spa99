@@ -163,9 +163,9 @@ class GoldSetupForm(forms.Form):
 
     def clean_mobile(self):
         mobile = normalise_mobile(self.cleaned_data["mobile"], self.data.get("mobile_country"))
-        from users.models import User
+        from . import invites
 
-        if User.objects.filter(mobile=mobile).exists():
+        if invites.mobile_taken(mobile, self.application):  # the unverified account this invite replaces holds its own mobile: that is his, so it is allowed
             raise ValidationError("That mobile number is already registered.")
         return mobile
 

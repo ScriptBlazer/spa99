@@ -17,7 +17,7 @@ from common.tasks import enqueue
 from insights import metrics
 from common.validators import normalise_uk_mobile
 from plans import sales as sale_services
-from plans.models import Plan, SiteSettings
+from plans.models import PaymentMark, Plan, SiteSettings, Subscription
 from users.models import InterestRegistration
 
 from system import defaults
@@ -33,7 +33,7 @@ GOLD_SLUG = "gold"
 OK, INVALID = "ok", "invalid"  # bad links are all INVALID: the page never says whether a link expired, was used or never existed
 
 # Results of approve / resend, for the admin message.
-INVITED, ACTIVATED, SKIPPED = "invited", "activated", "skipped"
+INVITED, ACTIVATED, SKIPPED, NEEDS_STAFF = "invited", "activated", "skipped", "needs_staff"  # NEEDS_STAFF: approved, but no invite: see blocking_account
 
 
 class InviteError(Exception):
@@ -63,16 +63,42 @@ def read_invite(token):
     return (OK, invite) if invite is not None and invite.is_usable else (INVALID, None)
 
 
+def account_to_replace(application):
+    """The unverified account on this applicant's address (anyone can register with any address): setting up from the invite replaces it. None when there is none, or it is a staff account
+    (that is never replaced). A verified account is not this: the person signs in to it."""
+    user = get_user_model().objects.filter(email__iexact=application.email, email_verified_at__isnull=True).first()
+    return None if user is None or user.is_staff or user.is_superuser else user
+
+
+def has_payment_record(user):
+    """True when this account has a membership set up or any payment recorded on it (a Subscription or a PaymentMark): erasing it would lose a paid membership."""
+    return Subscription.objects.filter(registration__user=user).exists() or PaymentMark.objects.filter(registration__user=user).exists()
+
+
+def blocking_account(application):
+    """The unverified account on his address that must NOT be replaced because it holds a membership or a payment, or None. While there is one, no invite goes out (it could not be used):
+    staff are told to have him verify that account (Gold is then added to it, `activate_approved`), or to sort it out by hand when it is not his."""
+    user = account_to_replace(application)
+    return user if user is not None and has_payment_record(user) else None
+
+
 def mobile_needs_fixing(application):
     """True when the application's mobile cannot go on the account as it is: not a valid UK mobile (same validator as
-    registration) or already on another account. The setup form then lets him enter it."""
+    registration) or already on another account (the unverified account the invite replaces does not count: it goes). The setup form then lets him enter it."""
     if not application.mobile:
         return False
     try:
         mobile = normalise_uk_mobile(application.mobile)
     except ValidationError:
         return True
-    return get_user_model().objects.filter(mobile=mobile).exists()
+    return mobile_taken(mobile, application)
+
+
+def mobile_taken(mobile, application):
+    """Is this (normalised) mobile on another account, not counting the unverified one the invite replaces."""
+    held = get_user_model().objects.filter(mobile=mobile)
+    replaced = account_to_replace(application)
+    return (held.exclude(pk=replaced.pk) if replaced is not None else held).exists()
 
 
 def verified_account(email):
@@ -130,11 +156,12 @@ class _Rollback(Exception):
 
 
 def approve_and_invite(application, approved_by, from_final=False, channel=audit.SYSTEM):
-    """Approve one application. Returns INVITED, ACTIVATED (existing account) or SKIPPED (declined, already approved,
-    or Gold could not be activated: nothing is changed or sent then). Safe against two people approving at once.
+    """Approve one application. Returns INVITED, ACTIVATED (existing account), NEEDS_STAFF (approved, but an unverified account on his address holds a membership, so no invite: staff
+    are told what to do) or SKIPPED (declined, already approved, or Gold could not be activated: nothing is changed or sent then). Safe against two people approving at once.
     An application awaiting final approval is only approved by `from_final=True` (a final approver's Confirm), and
     `from_final` only works on an application that is awaiting final approval. The review rule itself is in gold.approval."""
     existing = verified_account(application.email)  # an unverified account may be a stranger's: it gets no Gold (the invite below lets the real applicant take the address)
+    held = existing is None and blocking_account(application) is not None  # an unverified account with a membership on it is never replaced: approved, no invite, staff are told
     try:
         with transaction.atomic():
             fresh = GoldApplication.objects.select_for_update().get(pk=application.pk)
@@ -152,8 +179,8 @@ def approve_and_invite(application, approved_by, from_final=False, channel=audit
                 fresh.user = existing
             fresh.save()
             audit.record(fresh, ApplicationEvent.FINAL_CONFIRMED if from_final else ApplicationEvent.APPROVED, actor=approved_by, channel=channel,
-                         from_status=before, to_status=GoldApplication.APPROVED, meta={"result": ACTIVATED if existing is not None else INVITED})
-            if existing is None:
+                         from_status=before, to_status=GoldApplication.APPROVED, meta={"result": ACTIVATED if existing is not None else NEEDS_STAFF if held else INVITED})
+            if existing is None and not held:
                 _new_invite(fresh)
     except _Rollback:
         return SKIPPED
@@ -161,7 +188,7 @@ def approve_and_invite(application, approved_by, from_final=False, channel=audit
     if existing is not None:
         _queue("gold.tasks.send_gold_active_email", str(application.pk))
         return ACTIVATED
-    return INVITED
+    return NEEDS_STAFF if held else INVITED
 
 
 def decline_application(application, actor=None, reason="", channel=audit.SYSTEM, email_message=None):
@@ -184,15 +211,25 @@ def decline_application(application, actor=None, reason="", channel=audit.SYSTEM
     return True
 
 
+def can_resend(application):
+    """Approved, nobody has proven the address (no verified account, and a linked account must be unverified), and no unverified account with a membership would be replaced.
+    The Office shows the Resend button by this."""
+    if application.status != GoldApplication.APPROVED:
+        return False
+    linked = application.user if application.user_id is not None else None
+    if linked is not None and (linked.email_verified_at is not None or linked.is_staff or linked.is_superuser):
+        return False
+    return verified_account(application.email) is None and blocking_account(application) is None
+
+
 def resend_invite(application, actor=None, channel=audit.SYSTEM):
-    """A new link; the old one stops working. Only for approved applicants with no account yet. Returns INVITED or SKIPPED."""
-    if application.status != GoldApplication.APPROVED or application.user_id is not None:
-        return SKIPPED
-    if verified_account(application.email) is not None:
+    """A new link; the old one stops working. Only for approved applicants with no VERIFIED account yet (an old row linked to an unverified account still gets one: setting up replaces that
+    account), and never when that account holds a membership or a payment (`blocking_account`). Returns INVITED or SKIPPED."""
+    if not can_resend(application):
         return SKIPPED
     with transaction.atomic():
         application = GoldApplication.objects.select_for_update().get(pk=application.pk)
-        if application.status != GoldApplication.APPROVED or application.user_id is not None:
+        if not can_resend(application):
             return SKIPPED
         audit.record(application, ApplicationEvent.INVITE_RESENT, actor=actor, channel=channel)
         _new_invite(application)
@@ -200,6 +237,20 @@ def resend_invite(application, actor=None, channel=audit.SYSTEM):
 
 
 # ---------- the setup page ----------
+
+def activate_approved(user, application_ids):
+    """Gold approved while he had no verified account, and now he has one (he verified his registration: users.services.verify_email): the same activation as the normal approval, once
+    (`link_user_applications` calls this only for the rows it has just linked, so a second verify finds none). The open invite is revoked (its link then answers as a dead link) and
+    the short 'Gold is active' email is queued. Returns True when Gold was activated."""
+    ids = list(application_ids)
+    if not ids or not activate_gold(user):
+        return False
+    GoldInvite.objects.filter(application_id__in=ids, used_at__isnull=True, revoked_at__isnull=True).update(revoked_at=timezone.now())
+    for pk in ids:
+        _queue("gold.tasks.send_gold_active_email", str(pk))
+    logger.info("Gold activated on account %s: approved application verified its address", user.pk)
+    return True
+
 
 def accept_invite(token, cleaned):
     """Create the account from a valid invite. `cleaned` is GoldSetupForm.cleaned_data. Returns the user.
@@ -225,6 +276,8 @@ def accept_invite(token, cleaned):
             if squatter is not None:
                 if squatter.is_staff or squatter.is_superuser:
                     raise InviteError
+                if has_payment_record(squatter):  # a membership set up (or a payment) on that account: never erased for an invite
+                    raise InviteError("This email already has an account with a membership on it. Please check your email for its verification link, or contact us and we will help.")
                 from users.services import delete_user_data
 
                 delete_user_data(squatter)  # the invite went to this address, so its holder is the applicant: the unproven account makes way (only what is proven is erased with it)

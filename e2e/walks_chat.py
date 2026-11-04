@@ -110,7 +110,7 @@ def whatsapp_chat(w):
         assert whatsapp_from_him(FRANK_PHONE, "Hi, I'm Frank", "SMe2e0020") == 200
         office.goto(f"{OFFICE}/leads/{dbtool('lead', FRANK)['id']}/")
         button = office.locator("[data-person-reach] a[data-whatsapp-open]")
-        assert button.inner_text().strip() == "Open WhatsApp chat", button.inner_text()
+        assert button.locator("span").first.inner_text().strip() == "Open WhatsApp chat", button.inner_text()  # the button also carries his unread count, so read the label span only
         button.click()
         office.wait_for_url(re.compile(r"/whatsapp/[0-9a-f-]{36}/"))
         office.locator("[data-link-offer]").wait_for()

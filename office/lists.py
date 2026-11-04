@@ -10,6 +10,7 @@ from django.utils import timezone
 from common import sorting
 from common.sorting import Column
 from system import defaults
+from gold import invites as gold_invites
 from gold import services as gold_services
 from gold.models import ApplicationEvent, GoldApplication
 from users.models import InterestRegistration, User
@@ -235,7 +236,7 @@ def gold_columns(filters, request):
 
 
 def gold_queryset(filters):
-    applications = GoldApplication.objects.prefetch_related("invites").order_by(*sorting.ordering_from(GOLD_COLUMNS, filters, "applied", ("-created_at", "-pk")))
+    applications = GoldApplication.objects.select_related("user").prefetch_related("invites").order_by(*sorting.ordering_from(GOLD_COLUMNS, filters, "applied", ("-created_at", "-pk")))
     if filters["status"] == "waiting":
         applications = applications.filter(status__in=UNDECIDED)
     elif filters["status"] != "all":
@@ -253,7 +254,7 @@ def invite_state(application):
     if application.status != GoldApplication.APPROVED:
         return {"state": "", "sent_at": None, "expires_at": None}
     invites = list(application.invites.all())  # newest first (Meta ordering); prefetched
-    if any(i.used_at for i in invites) or application.user_id:
+    if any(i.used_at for i in invites) or (application.user_id and application.user.email_verified_at is not None):  # a link to an unverified account is not a set-up one
         return {"state": "account_set_up", "sent_at": None, "expires_at": None}
     latest = next((i for i in invites if i.revoked_at is None), None)
     if latest is None:
@@ -373,7 +374,7 @@ def gold_detail(application, can_restore=False):
         "sent_back": {"at": application.sent_back_at.isoformat(), "by": _name(application.sent_back_by), "note": application.sent_back_note}
                      if application.sent_back_at else None,
         "note_max": GoldApplication.NOTE_MAX,
-        "can_resend": application.status == GoldApplication.APPROVED and state["state"] != "account_set_up" and not application.user_id,
+        "can_resend": state["state"] != "account_set_up" and gold_invites.can_resend(application),
     }
 
 

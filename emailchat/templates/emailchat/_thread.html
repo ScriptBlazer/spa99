@@ -11,6 +11,12 @@
   </header>
   <div class="o-em-scroll" data-scroll tabindex="-1">
     <div class="o-em-col">
+      {% if unproven %}<div class="o-em-unproven" data-unproven>
+        <p class="o-em-sentto"><span class="o-badge o-badge--type" data-unproven-tag>Unproven sender</span> <span class="o-wa-whonum"><!--email_off-->{{ unproven.address }}<!--/email_off--></span></p>
+        {% if unproven.offer %}<form class="o-wa-linkbar" method="post" action="{{ unproven.offer.url }}" data-link-offer>{% csrf_token %}<input type="hidden" name="from" value="{{ unproven.offer.ref }}"><p>This sender isn't linked to {{ unproven.offer.name }}. Link it?</p><button type="submit" class="btn btn-secondary">Link it</button></form>{% endif %}
+        {% if unproven.can_edit %}<form class="o-wa-linkbar o-wa-linkbar--quiet" method="post" action="{{ unproven.delete_url }}" data-delete-thread>{% csrf_token %}<input type="hidden" name="confirm" value="1">
+          <button type="submit" class="o-danger-link" data-working-text="Deleting" data-confirm data-confirm-danger data-confirm-title="Delete this thread?" data-confirm-body="This removes the thread, all its emails and files, and the queue records. It cannot be undone." data-confirm-label="Delete for good" data-confirm-cancel="Keep">Delete this thread</button></form>{% endif %}
+      </div>{% endif %}
       <h1 class="o-em-subject" dir="auto">{{ thread.subject }}</h1>
       {% if thread.sent_to %}<p class="o-em-sentto"><span class="o-wa-quiet">Sent to {{ thread.sent_to }}</span> <span class="o-wa-whonum"><!--email_off-->{{ thread.sent_to_address }}<!--/email_off--></span></p>{% endif %}
       <p class="o-em-older" data-older-row hidden><button type="button" class="o-quiet" data-older>Show earlier emails</button></p>

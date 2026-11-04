@@ -256,7 +256,7 @@ def email_sender_of(target):
     return StaffSender.objects.filter(user=target).first()
 
 
-def check_email_sender(sending_address, signature):
+def check_email_sender(sending_address, signature, target=None):
     """(clean address, clean signature, {field: message}): the sending address must be on the sending domain (the one Postmark is verified for), the signature is cleaned to the
     signature allow-list (a signature that is something but cleans to nothing, or is too long, is refused rather than saved empty)."""
     from django.core.validators import validate_email
@@ -274,6 +274,8 @@ def check_email_sender(sending_address, signature):
         else:
             if not sender_mod.on_sending_domain(address):
                 errors["sending_address"] = f"The sending address must end in @{sender_mod.sending_domain()}: only that domain can send."
+            elif sender_mod.belongs_to_someone_else(address, target):
+                errors["sending_address"] = "That address belongs to another person (their login or sending address). Use your own."
     raw = (signature or "").replace("\x00", "").strip()
     cleaned = richtext.clean_signature(raw)
     if raw and not cleaned:
@@ -288,7 +290,7 @@ def save_email_sender(actor, target, sending_address, signature):
         raise ChangeRefused("That person is not on the team. Members are managed in the Office.")
     if not can_edit_email(actor, target):
         raise ChangeRefused("Only a superuser can change another superuser." if target.is_superuser else "You can only change people below your own level.")
-    address, cleaned, errors = check_email_sender(sending_address, signature)
+    address, cleaned, errors = check_email_sender(sending_address, signature, target)
     if errors:
         return False, errors
     from django.utils import timezone

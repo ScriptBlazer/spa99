@@ -78,7 +78,7 @@ class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
 
     @admin.action(description="Approve and invite", permissions=["change"])
     def approve_and_invite(self, request, queryset):
-        done = {invites.INVITED: 0, invites.ACTIVATED: 0, invites.SKIPPED: 0, approval.AWAITING: 0}
+        done = {invites.INVITED: 0, invites.ACTIVATED: 0, invites.SKIPPED: 0, invites.NEEDS_STAFF: 0, approval.AWAITING: 0}
         for application in queryset:
             done[approval.approve(application, request.user, channel=audit.ADMIN)] += 1
             if application.status not in (GoldApplication.DECLINED, GoldApplication.APPROVED, GoldApplication.AWAITING_FINAL):
@@ -87,6 +87,8 @@ class GoldApplicationAdmin(ExportCsvMixin, SimpleHistoryAdmin):
             self.message_user(request, f"Approved and invited: {done[invites.INVITED]}.", messages.SUCCESS)
         if done[invites.ACTIVATED]:
             self.message_user(request, f"Approved, Gold added to their existing account: {done[invites.ACTIVATED]}.", messages.SUCCESS)
+        if done[invites.NEEDS_STAFF]:
+            self.message_user(request, f"Approved but NO invite sent: {done[invites.NEEDS_STAFF]}. An unverified account on that email holds a membership. Ask him to verify that account (Gold is then added to it).", messages.WARNING)
         if done[approval.AWAITING]:
             self.message_user(request, f"Sent for final approval: {done[approval.AWAITING]}.", messages.SUCCESS)
         if done[invites.SKIPPED]:

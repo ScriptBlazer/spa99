@@ -59,6 +59,22 @@ def profile_for(user):
     return StaffSender.objects.filter(user=user).first() if getattr(user, "pk", None) else None
 
 
+def belongs_to_someone_else(address, user):
+    """True when `address` is another person's login address or another staff member's sending address: nobody may send as them (a Developer typing it into Team > Email would otherwise)."""
+    from django.contrib.auth import get_user_model
+
+    from .models import StaffSender
+
+    address = clean_address(address)
+    if not address:
+        return False
+    others = get_user_model().objects.filter(email__iexact=address)
+    taken = StaffSender.objects.filter(sending_address__iexact=address)
+    if getattr(user, "pk", None):
+        others, taken = others.exclude(pk=user.pk), taken.exclude(user=user)
+    return others.exists() or taken.exists()
+
+
 def sender_for(user):
     """Sender(address, name, source) for an email written by `user` (None or anonymous: the site address). Own address, then the sending address set in System, then hello@."""
     name = display_name(user)
@@ -66,7 +82,7 @@ def sender_for(user):
         if on_sending_domain(user.email):
             return Sender(clean_address(user.email), name, "own")
         profile = profile_for(user)
-        if profile is not None and on_sending_domain(profile.sending_address):
+        if profile is not None and on_sending_domain(profile.sending_address) and not belongs_to_someone_else(profile.sending_address, user):  # a stored address that is somebody else's is never used
             return Sender(clean_address(profile.sending_address), name, "set")
     return Sender(clean_address(site_address()), name, "site")
 

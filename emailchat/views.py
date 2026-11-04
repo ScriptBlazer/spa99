@@ -5,6 +5,7 @@ from datetime import timedelta
 from urllib.parse import urlencode
 
 from django.conf import settings
+from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db.models import Exists, F, OuterRef, Q
@@ -124,11 +125,58 @@ def thread(request, pk):
     context = {"thread": services.thread_dict(thread_, can_send=can_edit(request.user)), "chat_messages": [services.message_dict(m) for m in found], "has_older": older,
                "older_url": reverse("office_email_messages", args=[thread_.pk]) + (f"?before={found[0].pk}" if found else ""), "unread": {"count": count, "first_id": first_id},
                "last_id": found[-1].pk if found else 0, "cursor": timezone.now().isoformat(), "reply_subject": services.reply_subject(thread_), "gold": gold, "urls": _urls(thread_),
-               "section": "email", "replies_to_mailbox": services.replies_to_mailbox(), "sender": sender_mod.composer_info(request.user)}
+               "section": "email", "replies_to_mailbox": services.replies_to_mailbox(), "sender": sender_mod.composer_info(request.user),
+               "unproven": _unproven(request, thread_)}
     context.update({k: v for k, v in _list_context(request).items() if k not in context and k not in ("page", "q", "filter", "more_url")})
     context.update({"page": 1, "q": "", "filter": "", "more_url": reverse("office_email") + "?page=2", "selected": str(thread_.pk)})
     context["em"] = {k: context[k] for k in ("thread", "chat_messages", "has_older", "older_url", "unread", "last_id", "cursor", "reply_subject", "gold", "urls", "replies_to_mailbox")}
     return render(request, "emailchat/thread.html", context)
+
+
+def _unproven(request, thread_):
+    """For a direct email thread nobody has linked: {address, can_edit, offer {ref, name, url} or None, delete_url}. The offer is the person found by that address (a verified account or a
+    lead), asked only of an editor. None for any other thread."""
+    if not services.is_unproven(thread_):
+        return None
+    editor_ = can_edit(request.user)
+    offer = services.link_candidate(thread_) if editor_ else None
+    return {"address": thread_.email, "can_edit": editor_, "offer": {**offer, "url": reverse("office_email_link", args=[thread_.pk])} if offer else None,
+            "delete_url": reverse("office_email_delete", args=[thread_.pk]) if editor_ else ""}
+
+
+@editor
+@require_POST
+def link(request, pk):
+    """POST `from` (kind:id, the person found by the thread's address): the "Link it?" button on an unproven direct thread. Only an unlinked direct thread, only a verified account or a lead
+    on that very address (the link rule, common.ownership 1a)."""
+    from office import tools
+
+    thread_ = _thread(pk)
+    kind, _, target_pk = request.POST.get("from", "").partition(":")
+    try:
+        target = tools.target_for(kind, target_pk) if kind in ("person", "lead") else None
+    except (Http404, ValidationError, ValueError):
+        target = None
+    if target is not None and services.link_unproven(thread_, target):
+        messages.success(request, f"Linked to {tools.display_name(target)}.")
+    else:
+        messages.error(request, "That thread could not be linked to that person.")
+    return redirect("office_email_thread", pk=thread_.pk)
+
+
+@editor
+@require_POST
+def delete(request, pk):
+    """Erase one unlinked direct thread (messages, files, queue records): an editor, POST `confirm` set, audited without any text. A linked thread is refused (it is erased from its person)."""
+    thread_ = _thread(pk)
+    if not request.POST.get("confirm"):
+        return redirect("office_email_thread", pk=thread_.pk)
+    counts = services.delete_unproven(thread_, request.user, request)
+    if counts is None:
+        messages.error(request, "That thread is linked to a person, so it cannot be deleted from here.")
+        return redirect("office_email_thread", pk=thread_.pk)
+    messages.success(request, f"The thread and its {counts['email_messages']} email{'s' if counts['email_messages'] != 1 else ''} were deleted.")
+    return redirect("office_email")
 
 
 @reader

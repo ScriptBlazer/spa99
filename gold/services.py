@@ -217,8 +217,17 @@ def resend_approver_email(application):
 # ---------- linking ----------
 
 def link_user_applications(user):
-    """When someone registers with the email of earlier Gold applications, link them (no approval implied)."""
-    return GoldApplication.objects.filter(email__iexact=user.email, user__isnull=True).update(user=user)
+    """When someone registers with the email of earlier Gold applications, link them. A link alone implies no approval, but an application ALREADY approved (it was approved while he had no
+    verified account: it went out as an invite he did not use) gives him Gold now, once, by the same code as the normal activation (gold.invites.activate_approved), and only for a
+    verified account. Returns how many were linked."""
+    waiting = GoldApplication.objects.filter(email__iexact=user.email, user__isnull=True)
+    approved = list(waiting.filter(status=GoldApplication.APPROVED).values_list("pk", flat=True))
+    linked = waiting.update(user=user)
+    if approved and user.email_verified_at is not None:
+        from . import invites
+
+        invites.activate_approved(user, approved)
+    return linked
 
 
 def approval_token(application):

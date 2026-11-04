@@ -668,6 +668,8 @@ export class Thread {
   /** A file picked, pasted or dropped. A photo over the limit, a WebP or a HEIC is first made into a smaller JPEG (shrinkImage); the tray and the bubble then show that one. */
   async chooseFile(file) {
     const limits = this.contact.limits;
+    const ticket = (this.choosing = (this.choosing || 0) + 1);   // every pick takes a new ticket: a shrink still running for an earlier pick finds it stale and is dropped, even when this one needs no shrink
+    if (this.preparing) { this.preparing = false; this.ui.tray.hidden = true; this.updateSend(); }   // the earlier photo's "Making the photo smaller" is over
     const convert = CONVERT_TYPES.has(file.type);
     const isImage = file.type === 'image/jpeg' || file.type === 'image/png' || convert;
     const isPdf = file.type === 'application/pdf';
@@ -679,7 +681,6 @@ export class Thread {
     if (isVideo && file.size > limits.file_bytes) { say(`That video is too big. Videos can be up to ${mb(limits.file_bytes)}.`); return; }
     if (isPdf && file.size > limits.file_bytes) { say(`That PDF is too big. PDFs can be up to ${mb(limits.file_bytes)}.`); return; }
     if (isImage && (convert || file.size > limits.image_bytes)) {
-      const ticket = (this.choosing = (this.choosing || 0) + 1);
       this.file = null;
       this.preparing = true;
       this.showTray(file, null, 'Making the photo smaller\u2026');

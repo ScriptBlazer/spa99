@@ -522,6 +522,11 @@ def _approve_channel(request, application):
     return audit.EMAIL_LINK if approval.approve_token_is_valid(request.POST.get("token", ""), application) else audit.OFFICE
 
 
+NEEDS_STAFF_TEXT = ("{first} is approved, but NO invite was sent. Someone registered on this email and never verified it, and that account has a membership set up on it, so it must not be "
+                    "replaced. Next step: ask him to open the verification email for that account (Gold is then added to it automatically). If it is not his account, "
+                    "check the membership on the person's page first, then ask a developer to sort it out.")
+
+
 @approver
 @require_POST
 def gold_approve(request, pk):
@@ -531,8 +536,9 @@ def gold_approve(request, pk):
         text = {approval.AWAITING: "Sent for final approval.",
                 invites.INVITED: f"{first} is approved. His invite is on its way.",
                 invites.ACTIVATED: f"{first} is approved. Gold was added to his existing account.",
+                invites.NEEDS_STAFF: NEEDS_STAFF_TEXT.format(first=first),
                 invites.SKIPPED: "Nothing changed: it was already decided, or Gold could not be activated."}[result]
-        messages.success(request, text) if result != invites.SKIPPED else messages.warning(request, text)
+        messages.success(request, text) if result not in (invites.SKIPPED, invites.NEEDS_STAFF) else messages.warning(request, text)
     return _act(request, pk, run)
 
 
@@ -578,6 +584,8 @@ def gold_final_confirm(request, pk):
             messages.success(request, f"{first} is approved. His invite is on its way.")
         elif result == invites.ACTIVATED:
             messages.success(request, f"{first} is approved. Gold was added to his existing account.")
+        elif result == invites.NEEDS_STAFF:
+            messages.warning(request, NEEDS_STAFF_TEXT.format(first=first))
         else:
             messages.warning(request, "Nothing changed: it is not waiting for final approval any more.")
     return _final_act(request, pk, run)
@@ -606,7 +614,8 @@ def gold_resend(request, pk):
         if invites.resend_invite(application, request.user, channel=audit.OFFICE) == invites.INVITED:
             messages.success(request, "A new invite is on its way. The old link no longer works.")
         else:
-            messages.warning(request, "No invite was sent: only approved applicants without an account get one.")
+            messages.warning(request, NEEDS_STAFF_TEXT.format(first=application.first_name or "He") if invites.blocking_account(application) is not None
+                             else "No invite was sent: only approved applicants without an account get one.")
     return _act(request, pk, run)
 
 

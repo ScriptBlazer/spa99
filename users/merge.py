@@ -82,13 +82,13 @@ def _chats_of(remove):
     """{model: ids} of the email threads and WhatsApp chats that follow the person, by the one rule (common.ownership), read BEFORE the applications move. A chat tied to another
     account is left alone."""
     from emailchat.models import Thread
-    from emailchat.services import THREAD_ADDRESS_FIELDS
+    from emailchat.services import THREAD_ADDRESS_FIELDS, UNPROVEN
     from whatsapp.models import Contact
     from whatsapp.services import CONTACT_ADDRESS_FIELDS
 
     found = {}
     for model, fields in ((Thread, THREAD_ADDRESS_FIELDS), (Contact, CONTACT_ADDRESS_FIELDS)):
-        query = ownership.person_q(remove, {remove.email}, None, fields)
+        query = ownership.person_q(remove, {remove.email}, None, fields, skip=UNPROVEN if model is Thread else None)
         found[model] = list(model.objects.filter(query).filter(Q(user=remove) | Q(user__isnull=True)).values_list("pk", flat=True))
     return found
 

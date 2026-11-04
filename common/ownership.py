@@ -53,22 +53,23 @@ def applications(user=None, addresses=(), application=None):
     return GoldApplication.objects.filter(query)
 
 
-def person_q(user=None, addresses=(), application=None, address_fields=("lead_email",)):
-    """Q for a Thread or Contact: owner link, trusted address columns, proven applications."""
+def person_q(user=None, addresses=(), application=None, address_fields=("lead_email",), skip=None):
+    """Q for a Thread or Contact: owner link, trusted address columns, proven applications. `skip` is a Q for rows an address never finds (a direct email thread nobody has linked
+    yet: its From is unproven, so it is nobody's by address)."""
     query = Q(pk__in=[])
     if user is not None:
         query |= Q(user=user)  # the explicit link counts even for an unverified account
     trusted = trusted_addresses(user, addresses)
     if trusted:
         for field in address_fields:
-            query |= Q(**{f"{field}__in": trusted})
+            query |= Q(**{f"{field}__in": trusted}) & ~skip if skip is not None else Q(**{f"{field}__in": trusted})
     query |= Q(application__in=applications(user, addresses, application).values("pk"))
     return query
 
 
-def owned(model, user=None, addresses=(), application=None, address_fields=("lead_email",)):
+def owned(model, user=None, addresses=(), application=None, address_fields=("lead_email",), skip=None):
     """Every row of `model` (Thread or Contact) held for this person. The only lookup the page, timeline, export, erasure and merge use."""
-    return model.objects.filter(person_q(user, addresses, application, address_fields))
+    return model.objects.filter(person_q(user, addresses, application, address_fields, skip))
 
 
 def claim(chat, user):
