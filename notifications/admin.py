@@ -2,9 +2,10 @@ from django.contrib import admin
 
 from simple_history.admin import SimpleHistoryAdmin
 
+from common import richtext
 from common.admin import ExportCsvMixin
 
-from .models import EmailBounce, EmailLog, EmailSuppression, NotificationTemplate
+from .models import EmailBounce, EmailLog, EmailSuppression, NotificationTemplate, StaffSender
 
 
 @admin.register(EmailLog)
@@ -62,3 +63,15 @@ class EmailBounceAdmin(ExportCsvMixin, admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(StaffSender)
+class StaffSenderAdmin(admin.ModelAdmin):
+    """A team member's sending address and signature (also edited in System > Team > Email). The signature is cleaned on save here too."""
+    list_display = ("user", "sending_address", "updated_at")
+    search_fields = ("user__email", "sending_address")
+    raw_id_fields = ("user",)
+
+    def save_model(self, request, obj, form, change):
+        obj.signature_html = richtext.clean_signature(obj.signature_html)
+        super().save_model(request, obj, form, change)

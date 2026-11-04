@@ -6,7 +6,7 @@ Dev settings, made safe and quiet for a robot:
   can never be touched, whatever the environment says;
 - media and email go to folders in that workspace (emails are written as files the run reads back);
 - no rate limits (one robot IP signs in many times) and background jobs run inline;
-- Twilio is faked (e2e/fakes.py); the WhatsApp and Postmark inbound settings come from scripts/e2e.sh as fake environment values, so the webhooks answer and can be signed.
+- Twilio is faked (e2e/fakes.py); the WhatsApp settings come from scripts/e2e.sh as fake environment values, so the webhooks answer and can be signed.
 """
 import os
 from pathlib import Path

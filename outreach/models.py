@@ -103,12 +103,17 @@ class OutreachEntry(UUIDModel):
 
 
 class PersonMessage(UUIDModel):
-    """A one-to-one email an Office user wrote to a lead or a person. The text is kept so the timeline can show it."""
+    """A one-to-one email an Office user wrote to a lead or a person (the Email button). The text is kept so the timeline can show it; `status` says whether it went."""
+
+    QUEUED, SENT, FAILED = "queued", "sent", "failed"
+    STATUS_CHOICES = [(QUEUED, "Queued"), (SENT, "Sent"), (FAILED, "Failed")]
 
     email = models.CharField(max_length=254, db_index=True, help_text="Lower case. Where it was sent.")
     text = models.TextField()
     author = _person()
     author_label = models.CharField(max_length=254, blank=True)
+    subject = models.CharField(max_length=300, blank=True, default="", db_default="", help_text="The subject it went with.")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=SENT, db_default=SENT, help_text="Rows from before this column count as sent.")
     sent_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:

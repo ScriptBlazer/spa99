@@ -1,4 +1,4 @@
-/* The phone keyboard, shared by the WhatsApp chat and the email thread (docs/features/whatsapp-design.md section 1, email-chat-design.md section 2).
+/* The phone keyboard, used by the WhatsApp chat (docs/features/whatsapp-design.md section 1).
  * `100dvh` is not enough: iOS does not shrink dvh for the keyboard and ignores interactive-widget. So a visualViewport listener sets --wa-vh and --wa-top on the
  * pane (the CSS reads them) and `data-keyboard` when the viewport shrank by more than 120px. Works the same on Android. One script, not two copies. */
 const phone = () => window.matchMedia('(max-width: 63.99em)').matches;

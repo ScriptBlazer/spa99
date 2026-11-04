@@ -3,7 +3,7 @@
 `whatsapp.twilio_api.request` is replaced: nothing is ever sent to Twilio. A "send a message" call is answered the way Twilio answers (a sid and status "queued") and
 written, one JSON line, to twilio-calls.jsonl in the throwaway workspace, so a walk-through can check what the site would have sent (the body, the number, the media link).
 His messages and the delivery ticks are posted to the site's real webhooks by the walk-through, signed with the fake Auth Token (see e2e/chatkit.py). Email: the file
-backend of e2e.settings already stands in for Postmark; his replies are posted to the real inbound webhook.
+backend of e2e.settings already stands in for Postmark.
 """
 import json
 import uuid

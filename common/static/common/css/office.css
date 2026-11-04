@@ -13,7 +13,6 @@
 @import "office-leads.css";
 @import "office-outreach.css";
 @import "office-whatsapp.css";
-@import "office-email.css";
 
 /* The site-wide cross-document view transition is off in the Office (it threw "Transition was skipped"). */
 @view-transition { navigation: none; }
@@ -64,11 +63,10 @@
   .o-nav-list .o-icon { box-sizing: content-box; width: 1.5rem; height: 1.5rem; padding: 4px 16px; border-radius: var(--office-pill); transition: background-color var(--office-dur-lift) var(--ease-soft); }
   .o-nav-list a[aria-current="page"] .o-icon { background: var(--office-sunken); }
   .o-nav-list .o-badge-count { position: absolute; top: 0.375rem; left: calc(50% + 0.5rem); min-width: 1.125rem; height: 1.125rem; padding: 0 5px; border: 2px solid var(--office-surface); box-sizing: content-box; }
-  /* five slots at most: Home, WhatsApp, Email, Gold, More. Leads is the first row of the More sheet (data-nav-overflow on its <li>); Registered, Analytics, the Assistant and Invited too.
-     To put Leads back on the bar: remove data-nav-overflow from the Leads <li> in base.html, give it order 1 here and move the others up by one (the bar holds five). */
+  /* five slots at most: Home, Leads, WhatsApp, Gold, More (Registered, Analytics, the Assistant and Invited live in the More sheet) */
   .o-nav-list li { min-width: 0; }
-  .o-nav-list li:has([data-office-nav-item="whatsapp"]) { order: 1; }
-  .o-nav-list li:has([data-office-nav-item="email"]) { order: 2; }
+  .o-nav-list li:has([data-office-nav-item="leads"]) { order: 1; }
+  .o-nav-list li:has([data-office-nav-item="whatsapp"]) { order: 2; }
   .o-nav-list li:has([data-office-nav-item="gold"]) { order: 3; }
   .o-nav-more { display: block; order: 4; }
   .o-nav-list:has(.o-nav-more) li[data-nav-overflow] { display: none; }

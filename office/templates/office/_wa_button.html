@@ -1,5 +1,5 @@
-{% comment %}The WhatsApp button (docs/features/email-chat-design.md section 1). Keyed on `wa.state`, never on `configured`: with Twilio not set up the button stays and says so.
-`wa` is the page's `whatsapp` context, `em` its `email_chat`, `primary` which channel is the one primary (see reach_primary). No mobile: nothing here, _channels.html draws the grey line under Email.{% endcomment %}
+{% comment %}The WhatsApp button (lead, person and Gold pages). Keyed on `wa.state`, never on `configured`: with Twilio not set up the button stays and says so.
+`wa` is the page's `whatsapp` context, `em` its `email_msg`, `primary` which channel is the one primary (see reach_primary). No mobile: nothing here, _channels.html draws the grey line under Email.{% endcomment %}
 {% if wa.state != "no_mobile" %}
 <div class="o-channel" data-wa-button data-state="{{ wa.state }}">
   {% if wa.state == "chat" or wa.state == "unconfigured" and wa.has_chat %}
@@ -13,8 +13,8 @@
   <form method="post" action="{{ wa.start_url }}" data-whatsapp-start>{% csrf_token %}<button type="submit" class="btn {% if primary == 'wa' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" data-whatsapp-open>{% include "office/_icon.html" with name="whatsapp" %}<span>Start WhatsApp chat</span></button></form>
   {% endif %}
   {% elif wa.state == "view_only" %}
-  <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="{% if em.state == 'start' and not em.can_send and em.email and not em.suppressed %}em-hint{% else %}wa-hint{% endif %}" data-wa-off>{% include "office/_icon.html" with name="whatsapp" %}<span>No WhatsApp chat yet</span></button>
-  {% if em.state == "start" and not em.can_send and em.email and not em.suppressed %}{% else %}<p class="o-hint-line" id="wa-hint">View only.</p>{% endif %}
+  <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="wa-hint" data-wa-off>{% include "office/_icon.html" with name="whatsapp" %}<span>No WhatsApp chat yet</span></button>
+  <p class="o-hint-line" id="wa-hint">View only.</p>
   {% else %}{# unconfigured, no chat #}
   <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="wa-hint" data-wa-off>{% include "office/_icon.html" with name="whatsapp" %}<span>Start WhatsApp chat</span></button>
   <p class="o-hint-line" id="wa-hint">{{ wa.reason }}</p>

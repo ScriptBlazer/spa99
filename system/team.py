@@ -251,7 +251,7 @@ def can_edit_email(actor, target):
 
 
 def email_sender_of(target):
-    from emailchat.models import StaffSender
+    from notifications.models import StaffSender
 
     return StaffSender.objects.filter(user=target).first()
 
@@ -262,7 +262,7 @@ def check_email_sender(sending_address, signature, target=None):
     from django.core.validators import validate_email
 
     from common import richtext
-    from emailchat import sender as sender_mod
+    from notifications import sender as sender_mod
 
     errors = {}
     address = sender_mod.clean_address(sending_address)
@@ -295,12 +295,9 @@ def save_email_sender(actor, target, sending_address, signature):
         return False, errors
     from django.utils import timezone
 
-    from emailchat.models import StaffSender
+    from notifications.models import StaffSender
 
     row, _ = StaffSender.objects.get_or_create(user=target)
-    from emailchat import direct
-
-    direct.ensure_token(row)  # his inbox+<token> address for Microsoft forwarding, made on the first save
     changed = [name for name, new in (("sending address", address), ("signature", cleaned)) if (row.sending_address if name == "sending address" else row.signature_html) != new]
     if not changed:
         return False, {}

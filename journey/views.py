@@ -156,7 +156,7 @@ def result(request):
 @require_POST
 @rate_limited_json("journey-lead", 20, 60)
 def lead(request):
-    """The email step: {"first_name", "email", "mobile_country" (ISO, default GB), "mobile" (optional: blank is stored blank), "consent": true}; first name and email are required. Stored on the journey session; shown to nobody
+    """The email step: {"first_name", "email", "mobile_country" (ISO, default GB), "mobile", "consent": true}, all required. Stored on the journey session; shown to nobody
     publicly. 400 {"errors": {first_name | email | mobile | consent: message}} (every problem at once)."""
     data = _body(request)
     if data is None:

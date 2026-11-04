@@ -1,4 +1,4 @@
-"""The person tools shared by the lead, person and Gold application pages: sticky notes, the approach list and Message. One
+"""The person tools shared by the lead, person and Gold application pages: sticky notes, the approach list and the Email button. One
 person = a set of addresses (outreach.people.resolve), so the same notes show on all three pages. The views stay thin and call
 these; the services are in outreach.services."""
 from django.db.models.functions import Lower
@@ -8,7 +8,7 @@ from django.urls import reverse
 from gold.models import GoldApplication
 from journey.models import JourneySession
 from outreach import people, services
-from outreach.models import NOTE_MAX, REASON_MAX, OutreachEntry
+from outreach.models import MESSAGE_MAX, NOTE_MAX, REASON_MAX, OutreachEntry
 from plans.models import SiteSettings
 from users.models import User
 
@@ -113,11 +113,14 @@ def whatsapp_context(target, user):
 
 
 def email_context(target, user):
-    """`email_chat` for the lead, person and Gold pages: {has_thread, thread_count, latest_thread_url, new_email_url, open_url (his latest thread, or New email when none), state
-    (start|open), label ("Start email" / "Open email thread"), email, can_send, can_edit, unread, replies_to_mailbox, suppressed, reason}."""
-    from emailchat import services as emailchat
+    """`email_msg` for the lead, person and Gold pages (the Email button and its pop-up): {url, to, name, max, can_send, blocked (why he cannot be emailed, or ''), unsubscribed, from_label,
+    reply_to}. `from_label` is the logged-in person's From line and `reply_to` where his reply goes (notifications.sender)."""
+    from notifications import sender as sender_mod
 
-    return {"email_chat": emailchat.page_context(target, user, can_edit(user))}
+    sender = sender_mod.sender_for(user)
+    reply = sender.address if sender.source != "site" else SiteSettings.load().contact_address
+    return {"email_msg": {"url": target.url("message"), "to": target.main, "name": display_name(target), "max": MESSAGE_MAX, "can_send": can_edit(user), "blocked": services.email_block(target.main),
+                          "unsubscribed": services.is_unsubscribed(target.addresses, target.user), "from_label": f"{sender.name} <{sender.address}>", "reply_to": reply}}
 
 
 def archive_context(target, user):

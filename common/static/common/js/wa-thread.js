@@ -4,7 +4,7 @@
  * `body_html`, which the server has already escaped and formatted (whatsapp.formatting.render), and a template's `body_html` for the preview.
  * The chat page embeds its data as JSON (#wa-data); polling and sending keep this object in step with the server.
  *
- * Round 2 (docs/features/email-chat-design.md section 4): Reply on a bubble (his phone gets the quoted line as WhatsApp's `> text`, not the tap-to-jump box), a quick
+ * Round 2 (docs/features/whatsapp.md, Round 2): Reply on a bubble (his phone gets the quoted line as WhatsApp's `> text`, not the tap-to-jump box), a quick
  * emoji row that sends a NORMAL message (Twilio cannot send a reaction, and the screen says so), MP4 video, voice notes (the microphone is released on every exit,
  * including leaving the page) and a neutral bubble for what the Office cannot show. */
 import { csrfToken } from './api.js';
@@ -865,7 +865,7 @@ export class Thread {
     quoteNote.textContent = this.rec ? 'A voice note carries no quote on his phone.' : 'On his phone this shows as a quoted line.';
   }
 
-  // ---------- voice notes (docs/features/email-chat-design.md section 4) ----------
+  // ---------- voice notes (docs/features/whatsapp.md, Round 2) ----------
   // Tap to start, tap to send: not hold (hold fights text selection and is hard for a long note). The permission prompt only ever follows that tap. Every exit
   // (cancel, send, the limit, a locked phone, leaving the chat or the page) stops the recorder AND every track of the stream, or the phone's microphone indicator stays on.
 

@@ -131,9 +131,6 @@ def register_interest(data, journey_session=None):
     except IntegrityError:  # two people (or two clicks) raced for the same email or mobile
         raise SignUpError({"email": ["That email or mobile number is already registered."]}) from None
     _after_registration(user, bool(data.get("marketing_opt_in")))
-    from emailchat import services as emailchat
-
-    emailchat.relink(user.email)  # a thread staff started to his address (the typed mobile never links a WhatsApp chat: common.ownership, rule 2)
     queue_verification_email(user)
     return SignUpResult(user, created=True)
 
@@ -221,9 +218,6 @@ def verify_email(token):
     from whatsapp import services as whatsapp
 
     whatsapp.relink_address(user.email)  # rule 1c: a chat staff gave this lead address now joins the verified account
-    from emailchat import services as emailchat
-
-    emailchat.relink(user.email)
     try:
         enqueue("users.tasks.send_welcome_email", str(user.pk))
     except Exception:  # noqa: BLE001
@@ -295,8 +289,7 @@ def export_user_data(user, include_chats=False):
         "interest": _export_interest(user),
         "journey_sessions": _export_sessions(user),
         "chats": chat_services.export_conversations(user=user, email=user.email if user.email_verified_at else None),
-        **({"whatsapp": _export_whatsapp(user), "whatsapp_chats_not_included": _unlinked_chats(user), "email_threads_not_included": _unlinked_threads(user)} if include_chats else {}),  # names only: nothing links them to him, so staff decide
-        "email_threads": _export_email_threads(user, include_chats),
+        **({"whatsapp": _export_whatsapp(user), "whatsapp_chats_not_included": _unlinked_chats(user)} if include_chats else {}),  # names only: nothing links them to him, so staff decide
         "gold_applications": gold_services.export_applications(user.email) if user.email_verified_at else [],  # by email only once the address is proven his
         "emails": [
             {"template": e.template, "subject": e.subject, "status": e.status, "sent_at": _plain(e.sent_at)}
@@ -332,33 +325,11 @@ def _unlinked_chats(user):
     return [{"phone": c["phone"], "name": c["name"]} for c in whatsapp.unclaimed_for_user(user)]
 
 
-def unlinked_threads_for(user):
-    """[{email, subject, url}]: direct email threads on his addresses that nobody has linked (the Office names them beside Export and Delete)."""
-    from emailchat import services as emailchat
-
-    return emailchat.unlinked_direct_for(_chat_addresses(user))
-
-
-def _unlinked_threads(user):
-    """Direct email threads on his address that nobody has linked (their From is unproven): not in his export or erasure, so the export names them (address and subject, never the messages)."""
-    return [{"email": t["email"], "subject": t["subject"]} for t in unlinked_threads_for(user)]
-
-
 def _export_whatsapp(user):
     from whatsapp import services as whatsapp
 
     addresses = _chat_addresses(user)  # common.ownership uses them only when the account is verified
     return whatsapp.export_for(whatsapp.contacts_for_person(user, addresses))
-
-
-def _export_email_threads(user, include_chats):
-    """Email chat threads: staff-run export = every thread held for him (his addresses and the owner link); his own download = only the thread(s) on his account email,
-    and only once that address is verified."""
-    from emailchat import services as emailchat
-
-    if include_chats:
-        return emailchat.export_for(emailchat.threads_for_person(user, _chat_addresses(user)))  # unverified: the owner link only (common.ownership drops the addresses)
-    return emailchat.export_for(emailchat.threads_for_member(user))
 
 
 def _email_logs(email):
@@ -487,12 +458,6 @@ def delete_user_data(user, include_chats=False):
 
     if include_chats:  # staff-run erasure only: a member deleting his own account never reaches a WhatsApp chat
         whatsapp.erase_person(user, _chat_addresses(user))  # chats, messages and files, by the rule in common.ownership (before the sessions are cleared)
-    from emailchat import services as emailchat
-
-    if include_chats:  # staff-run: every thread held for him; his own account delete only takes the thread on his verified account email
-        emailchat.erase_person(user, _chat_addresses(user))  # unverified: the owner link only, never a lead's thread on the same address (common.ownership drops the addresses)
-    else:
-        emailchat.erase_threads(emailchat.threads_for_member(user))
     anonymised = _anonymise_sessions(user)
     if proven:
         journey_services.erase_lead(email)  # an address given at the journey gate before he had an account

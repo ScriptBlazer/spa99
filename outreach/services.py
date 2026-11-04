@@ -6,11 +6,12 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from common.tasks import enqueue
 from gold import audit
 from gold.models import ApplicationEvent, GoldApplication
 
 from . import people
-from .models import (NOTE_MAX, REASON_MAX, ArchivedLead, LeadArchiveEvent, NextMorningEmail, NoteEvent, OutreachEntry, PersonEdit,
+from .models import (MESSAGE_MAX, NOTE_MAX, REASON_MAX, ArchivedLead, LeadArchiveEvent, NextMorningEmail, NoteEvent, OutreachEntry, PersonEdit,
                      PersonMessage, StickyNote)
 
 logger = logging.getLogger("spa99.outreach")
@@ -161,7 +162,46 @@ def remove_entry(entry):
     return DONE
 
 
-# ---------- messages: staff now write by WhatsApp (whatsapp.services); old PersonMessage rows still show in timelines ----------
+# ---------- messages: the Email button (a plain text email from the logged-in person) ----------
+
+def send_message(actor, to_email, text):
+    """Record a one-to-one email and queue it (task outreach.tasks.send_office_message: template `office_message`, From and Reply-To the logged-in person, his signature). An unsubscribed person
+    still gets it: it is not marketing. A queue that cannot take it marks the row failed. Returns (result, message)."""
+    text, to_email = audit.clean_text(text), (to_email or "").strip().lower()
+    if not text or not to_email:
+        return EMPTY, None
+    if len(text) > MESSAGE_MAX:
+        return TOO_LONG, None
+    recent = PersonMessage.objects.filter(email=to_email, text=text, sent_at__gte=timezone.now() - DUPLICATE_WINDOW)
+    recent = recent.filter(author=actor) if getattr(actor, "pk", None) else recent.filter(author__isnull=True)
+    if recent.exists():
+        return DUPLICATE, None
+    message = PersonMessage.objects.create(email=to_email, text=text, author=_actor(actor), author_label=label(actor), status=PersonMessage.QUEUED)
+    try:
+        enqueue("outreach.tasks.send_office_message", str(message.pk))
+    except Exception:  # noqa: BLE001 - the message is recorded as failed; the problem is logged
+        logger.exception("Could not queue the Office email to a person")
+        PersonMessage.objects.filter(pk=message.pk).update(status=PersonMessage.FAILED)
+    message.refresh_from_db()  # inline (tests) or a fast worker may already have finished it
+    return DONE, message
+
+
+def email_block(address):
+    """"" when the address can be emailed, else the plain reason it cannot (no valid address, bounced, or marked as spam)."""
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+
+    from notifications.models import EmailSuppression
+
+    address = (address or "").strip().lower()
+    try:
+        validate_email(address)
+    except ValidationError:
+        return "No valid email address."
+    row = EmailSuppression.objects.filter(email=address).first()
+    if row is None:
+        return ""
+    return "This address marked an email as spam, so he cannot be emailed." if row.reason == EmailSuppression.COMPLAINT else "This address bounced, so he cannot be emailed."
 
 def is_unsubscribed(addresses, user=None):
     from mailings.models import EmailOptOut
@@ -246,11 +286,8 @@ def timeline_entries(addresses):
         listed.add(note.pk)
     for note in StickyNote.objects.filter(email__in=addresses, deleted_at__isnull=False).exclude(pk__in=listed):  # deleted before the events existed
         out.append((note.deleted_at, "note_deleted", f"Note deleted by {note.deleted_by_label or 'someone'}", note.text, str(note.pk)))
-    from emailchat.models import Message as ChatMessage
-
-    copied = ChatMessage.objects.exclude(legacy_person_message=None).values("legacy_person_message")  # copied into an email thread by backfill_email_threads: the thread shows them now
-    for message in PersonMessage.objects.filter(email__in=addresses).exclude(pk__in=copied):
-        out.append((message.sent_at, "message_sent", f"Message sent by {message.author_label or 'the team'}", message.text, ""))
+    for message in PersonMessage.objects.filter(email__in=addresses):
+        out.append((message.sent_at, "message_sent", f"Email {'failed' if message.status == PersonMessage.FAILED else 'sent'} by {message.author_label or 'the team'}", message.text, ""))
     for edit in PersonEdit.objects.filter(email__in=addresses):
         noun = {PersonEdit.MOBILE: "Mobile", PersonEdit.EMAIL: "Email"}.get(edit.what, "First name")
         verb = "added" if not edit.before else ("removed" if not edit.after else "changed")
@@ -423,7 +460,6 @@ def correct_lead_email(old, new, actor):
 
     from chat import services as chat_services
     from common.validators import normalise_email
-    from emailchat import services as emailchat_services
     from journey.models import JourneySession
     from notifications.models import EmailLog
     from whatsapp import services as whatsapp
@@ -449,11 +485,9 @@ def correct_lead_email(old, new, actor):
             model.objects.filter(**{field: old}).update(**{field: new})
         NextMorningEmail.objects.filter(email=old).delete()  # the old address is not kept (the suppression list is the one record of it); the new one may be sent its own follow-up
         chat_services.move_lead_email(old, new)  # an Ask us chat where he gave the old address
-        emailchat_services.move_address(old, new)  # his email threads (same reply token: a late reply still lands)
         EmailLog.objects.filter(Q(to__iexact=old) | Q(subject_email__iexact=old)).delete()  # emails sent to the old address (the bounce) are not his on the new one
         _edit(new, PersonEdit.EMAIL, old, new, actor)
     whatsapp.move_address(old, new)  # his WhatsApp chats that hold the old lead address take the new one
-    emailchat_services.relink(new)  # names and links of his threads on the new address
     _figures_changed()
     return DONE, ""
 

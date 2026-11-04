@@ -1,6 +1,5 @@
-"""The two reach out buttons on the lead, person and Gold pages (docs/features/email-chat-design.md section 1): keyed on `state`, never on `configured`; WhatsApp is the one
+"""The two reach out buttons on the lead, person and Gold pages (docs/features/whatsapp.md, Reach out buttons): keyed on `state`, never on `configured`; WhatsApp is the one
 primary when he can be sent to on it, else Email; the grey line when there is no mobile; Gold keeps both secondary and shows them to a reader too. Mocked: no real Twilio call."""
-from emailchat import services as email_services
 from gold import services as gold_services
 from gold.tests.test_gold import application_data
 from office.tests.test_leads import lead
@@ -19,18 +18,18 @@ class ReachButtonTests(Base):
     def test_a_mobile_and_no_chat_shows_both_buttons_with_whatsapp_the_one_primary(self):
         page = self.lead_page(self.approver)
         self.assertContains(page, "Start WhatsApp chat")
-        self.assertContains(page, "Start email")
+        self.assertContains(page, "data-email-open")
         html = page.content.decode()
         self.assertRegex(html, r'<form method="post" action="/leads/[^"]*/whatsapp/" data-whatsapp-start><input type="hidden" name="csrfmiddlewaretoken"[^>]*><button type="submit" class="btn btn-primary btn-block o-wa-btn" data-whatsapp-open>')
         self.assertNotRegex(html, r'<a [^>]*data-whatsapp-open')  # Start writes, so it is a POST form, never a link
-        self.assertRegex(html, r'class="btn btn-secondary btn-block o-wa-btn" href="[^"]*" data-email-open')
+        self.assertRegex(html, r'class="btn btn-secondary btn-block o-email-btn" data-dialog-open="email"[^>]*data-email-open')
 
     def test_no_mobile_shows_the_email_button_alone_with_a_clickable_grey_line_that_opens_the_dialog(self):
         page = self.lead_page(self.approver, "eddie@example.com", mobile="")
         self.assertNotContains(page, "data-whatsapp-open")
         self.assertContains(page, "Add a number to enable WhatsApp")
         self.assertRegex(page.content.decode(), r'<button type="button" class="o-quiet o-channel-add" data-dialog-open="mobile"[^>]*data-add-mobile>')
-        self.assertRegex(page.content.decode(), r'class="btn btn-primary btn-block o-wa-btn" href="[^"]*" data-email-open')  # no WhatsApp: Email is the one primary
+        self.assertRegex(page.content.decode(), r'class="btn btn-primary btn-block o-email-btn" data-dialog-open="email"[^>]*data-email-open')  # no WhatsApp: Email is the one primary
 
     @override_settings(TWILIO_ACCOUNT_SID="")
     def test_twilio_not_set_up_keeps_the_button_and_says_so(self):
@@ -43,24 +42,16 @@ class ReachButtonTests(Base):
         page = self.lead_page(self.reader)
         html = page.content.decode()
         self.assertContains(page, "No WhatsApp chat yet")
-        self.assertContains(page, "No email yet")
+        self.assertContains(page, "data-email-off")
         self.assertEqual(html.count("View only."), 1)
-
-    def test_a_reader_with_a_live_email_thread_can_open_it(self):
-        session = lead("thread@example.com")
-        _, thread = email_services.create_thread("thread@example.com", "Hello", self.approver)
-        email_services.send(thread, self.approver, "Hello", "<p>Hi</p>", [])
-        page = office(self.reader, "get", f"/leads/{session.pk}/")
-        self.assertContains(page, "Open email thread")
-        self.assertRegex(page.content.decode(), r'class="btn btn-secondary btn-block o-wa-btn" href="[^"]*" data-email-open')
 
     def test_gold_shows_both_channels_secondary_so_approve_stays_the_one_primary_and_a_reader_still_sees_them(self):
         application, _ = gold_services.submit_application(application_data(email="gold-btn@example.com", mobile="+447400123999"))
         html = office(self.approver, "get", f"/gold/{application.pk}/").content.decode()
         self.assertIn("o-channels", html)
         self.assertRegex(html, r'<button type="submit" class="btn btn-secondary btn-block o-wa-btn" data-whatsapp-open>')
-        self.assertRegex(html, r'class="btn btn-secondary btn-block o-wa-btn" href="[^"]*" data-email-open')
-        self.assertNotRegex(html, r'btn-primary btn-block o-wa-btn')
+        self.assertRegex(html, r'class="btn btn-secondary btn-block o-email-btn" data-dialog-open="email"[^>]*data-email-open')
+        self.assertNotRegex(html, r'btn-primary btn-block o-(wa|email)-btn')
         reader = office(self.reader, "get", f"/gold/{application.pk}/").content.decode()  # outside the can_edit block: a reader sees the card, off, with the reason once
         self.assertIn("o-channels", reader)
         self.assertIn("No WhatsApp chat yet", reader)
@@ -90,4 +81,5 @@ class ReachButtonTests(Base):
 
         self.assertEqual(consent_text(""), "Agreed that we may email about Spa 99 opening")
         self.assertEqual(consent_text("2026-11-03"), "Agreed that we may email and WhatsApp about Spa 99 opening")
-        self.assertIn("if a number was added", consent_text("2026-11-04"))
+        self.assertEqual(consent_text("2026-11-04-2"), "Agreed that we may email and WhatsApp about Spa 99 opening and offers")
+        self.assertIn("if a number was added", consent_text("2026-11-04"))  # an older wording keeps its own text

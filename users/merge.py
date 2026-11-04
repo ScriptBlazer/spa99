@@ -79,33 +79,22 @@ def _applications_of(remove):
 
 
 def _chats_of(remove):
-    """{model: ids} of the email threads and WhatsApp chats that follow the person, by the one rule (common.ownership), read BEFORE the applications move. A chat tied to another
-    account is left alone."""
-    from emailchat.models import Thread
-    from emailchat.services import THREAD_ADDRESS_FIELDS, UNPROVEN
+    """The ids of the WhatsApp chats that follow the person, by the one rule (common.ownership), read BEFORE the applications move. A chat tied to another account is left alone."""
     from whatsapp.models import Contact
-    from whatsapp.services import CONTACT_ADDRESS_FIELDS
 
-    found = {}
-    for model, fields in ((Thread, THREAD_ADDRESS_FIELDS), (Contact, CONTACT_ADDRESS_FIELDS)):
-        query = ownership.person_q(remove, {remove.email}, None, fields, skip=UNPROVEN if model is Thread else None)
-        found[model] = list(model.objects.filter(query).filter(Q(user=remove) | Q(user__isnull=True)).values_list("pk", flat=True))
-    return found
+    query = ownership.person_q(remove, {remove.email}, None)
+    return list(Contact.objects.filter(query).filter(Q(user=remove) | Q(user__isnull=True)).values_list("pk", flat=True))
 
 
-def _move_chats(keep, remove, found):
-    """Email threads and WhatsApp chats follow the person: the owner link moves to keep (or the delete would null it and leave the chat on the removed address, found by neither
-    keep's lookup nor staff erasure). The removed address on a chat becomes keep's only when that address was proven his (verified): a thread's replies go to its address, so an
-    unproven address is never turned into keep's."""
-    from emailchat.models import Thread
+def _move_chats(keep, remove, ids):
+    """WhatsApp chats follow the person: the owner link moves to keep (or the delete would null it and leave the chat on the removed address, found by neither keep's lookup nor staff
+    erasure). The removed address on a chat becomes keep's only when that address was proven his (verified)."""
+    from whatsapp.models import Contact
 
     removed, kept = remove.email.strip().lower(), keep.email.strip().lower()
-    for model, ids in found.items():
-        if remove.email_verified_at:
-            model.objects.filter(pk__in=ids, lead_email=removed).update(lead_email=kept)
-            if model is Thread:
-                model.objects.filter(pk__in=ids, email=removed).update(email=kept)
-        model.objects.filter(pk__in=ids).update(user=keep)
+    if remove.email_verified_at:
+        Contact.objects.filter(pk__in=ids, lead_email=removed).update(lead_email=kept)
+    Contact.objects.filter(pk__in=ids).update(user=keep)
 
 
 @transaction.atomic

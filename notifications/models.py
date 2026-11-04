@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from django.db.models import Q
 from simple_history.models import HistoricalRecords
 
@@ -122,3 +124,16 @@ class EmailBounce(BaseModel):
 
     def __str__(self):
         return f"{self.email} ({self.kind})"
+
+
+class StaffSender(models.Model):
+    """What a staff member's Office emails go out with (System > Team > Email): a sending address when his own login address is not on the sending domain, and his signature.
+    One row per person, made on first save. Erased with the account (CASCADE); the signature is cleaned HTML (common.richtext.clean_signature)."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="email_sender")
+    sending_address = models.CharField(max_length=254, blank=True, default="", db_default="", help_text="Lower case, on the sending domain. Used only when his own login address is not.")
+    signature_html = models.TextField(blank=True, default="", db_default="", help_text="Cleaned HTML: tables, text, links and pictures only. Pictures may be /static/common/img/email/... (made absolute from SITE_URL when sent).")
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"Email sender for {self.user_id}"

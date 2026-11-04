@@ -1,10 +1,10 @@
-"""Who an Office email comes from and what goes under it (docs/features/office-email-chat.md, "Who an Office email comes from").
+"""Who an Office email comes from and what goes under it (the Email button on lead, person and Gold pages).
 
 From: the staff member's own login address when it is on the sending domain (the domain verified in Postmark), else the "sending address" set for him in System > Team > Email (also on that
-domain), else the site address (hello@). The display name is "<First name>, Spa 99", or "Spa 99" when he has no first name. Decided when the email is QUEUED and stored on the message, so a retry,
-or a later change to his address, never changes what an email already went out with. Automatic and system emails never come through here.
+domain), else the site address (hello@). The display name is "<First name>, Spa 99", or "Spa 99" when he has no first name. Reply-To is the same address, so a reply reaches his Outlook
+(for the hello@ fallback: the contact address). Automatic and system emails never come through here.
 
-Under the text: his signature (cleaned HTML, System > Team > Email), or a plain sign-off with his name when he has none. Both are snapshots on the message, shown in the thread as sent."""
+Under the text: his signature (cleaned HTML, System > Team > Email), or a plain "Kind regards" with his name when he has none."""
 import re
 from collections import namedtuple
 from email.utils import formataddr, parseaddr
@@ -113,11 +113,5 @@ def sign_off(user):
 
 
 def preview_html(user):
-    """What the composer shows as "with your signature": safe to put in the page (cleaned HTML, or an escaped sign-off)."""
+    """What the settings page shows as the sign-off: safe to put in the page (cleaned HTML, or an escaped sign-off)."""
     return mark_safe(sign_off(user)[0])  # cleaned by clean_signature above, or built from an escaped name
-
-
-def composer_info(user):
-    """For the thread and New email screens: {from (the whole header), label (the same, for people to read), address, source, has_signature, signature_html}."""
-    sender = sender_for(user)
-    return {"from": format_address(sender.address, sender.name), "label": f"{sender.name} <{sender.address}>", "address": sender.address, "source": sender.source, "has_signature": bool(signature_html_of(user)), "signature_html": preview_html(user)}

@@ -1,6 +1,0 @@
-{% comment %}Who this email goes out as and what goes under it: a compact note, not editable text (docs/features/office-email-chat.md, "Who an Office email comes from"). Context: sender{label, address, has_signature, signature_html}.
-signature_html is cleaned HTML (common.richtext.clean_signature) or an escaped sign-off, safe to show. The note is a native details: closed it is one line, open it previews what will be added.{% endcomment %}
-{% if sender %}<details class="o-em-sendas" data-sendas>
-  <summary class="o-em-sendas-sum"><span>From <span dir="ltr">{{ sender.label }}</span>{% if sender.has_signature %}, with your signature{% else %}, with a plain sign-off{% endif %}</span></summary>
-  <div class="o-em-sendas-body" data-sendas-body>{{ sender.signature_html }}</div>
-</details>{% endif %}

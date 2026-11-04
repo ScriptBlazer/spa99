@@ -1,21 +1,10 @@
-{% comment %}The email button (docs/features/email-chat-design.md section 1). `em` is the page's `email_chat` context, `wa` its `whatsapp`, `primary` which channel is the one primary.
-Always `open_url` (his latest thread, or New email), never `latest_thread_url`: on Gold `open_url` carries ?gold=, which marks the application Contacted.{% endcomment %}
-<div class="o-channel" data-email-button data-state="{{ em.state }}">
-  {% if not em.email %}
-  <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="em-hint" data-email-off>{% include "office/_icon.html" with name="envelope" %}<span>Start email</span></button>
-  <p class="o-hint-line" id="em-hint">No email on file.</p>
-  {% elif em.state == "open" %}
-  <a class="btn {% if primary == 'email' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{{ em.open_url }}" data-email-open{% if em.suppressed %} aria-describedby="em-hint"{% endif %}>{% include "office/_icon.html" with name="envelope" %}<span>Open email thread</span>{% if em.unread %}<span class="o-badge-count">{{ em.unread }}<span class="sr-only"> unread</span></span>{% endif %}</a>
-  {% if em.suppressed %}<p class="o-hint-line" id="em-hint">{{ em.reason }}</p>
-  {% elif em.can_send %}<p class="o-hint-line" id="em-hint">{% if em.thread_count > 1 %}{{ em.thread_count }} threads. This opens the latest. {% endif %}<a class="o-quiet" href="{{ em.new_email_url }}" data-email-new>New email</a></p>{% endif %}
-  {% elif em.suppressed %}
-  <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="em-hint" data-email-off>{% include "office/_icon.html" with name="envelope" %}<span>Start email</span></button>
-  <p class="o-hint-line" id="em-hint">{{ em.reason }}</p>
-  {% elif em.can_send %}
-  <a class="btn {% if primary == 'email' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{{ em.open_url }}" data-email-open>{% include "office/_icon.html" with name="envelope" %}<span>Start email</span></a>
+{% comment %}The Email button (lead, person and Gold pages): it opens the Email pop-up (_email_dialog.html). `em` is the page's `email_msg` context, `wa` its `whatsapp`, `primary` which channel is the one primary (see reach_primary).
+Always shown, plainly labelled. Disabled with its reason when he has no valid address or it bounced; for a reader, disabled and "View only." (said once: WhatsApp's own line covers it when it shows one).{% endcomment %}
+<div class="o-channel" data-email-button>
+  {% if em.can_send and not em.blocked %}
+  <button type="button" class="btn {% if primary == 'email' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-email-btn" data-dialog-open="email" aria-haspopup="dialog" data-email-open>{% include "office/_icon.html" with name="envelope" %}<span>Email</span></button>
   {% else %}
-  <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="em-hint" data-email-off>{% include "office/_icon.html" with name="envelope" %}<span>No email yet</span></button>
-  <p class="o-hint-line" id="em-hint">View only.</p>
+  <button type="button" class="btn btn-secondary btn-block o-email-btn o-btn-off" aria-disabled="true" aria-describedby="{% if wa.state == 'view_only' and not em.blocked %}wa-hint{% else %}em-hint{% endif %}" data-email-off>{% include "office/_icon.html" with name="envelope" %}<span>Email</span></button>
+  {% if em.blocked %}<p class="o-hint-line" id="em-hint" data-email-reason>{{ em.blocked }}</p>{% elif wa.state != "view_only" %}<p class="o-hint-line" id="em-hint" data-email-reason>View only.</p>{% endif %}
   {% endif %}
-  {% if em.replies_to_mailbox and em.can_send and not em.suppressed %}<p class="o-hint-line" data-replies-note>Replies go to the hello@ mailbox.</p>{% endif %}
 </div>

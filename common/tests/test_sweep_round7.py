@@ -1,4 +1,4 @@
-"""The last ownership sweep (2026-11-04): an address typed on a public form never sets a link or marks anything for someone else. Gold apply and relink on a thread; Register and a
+"""The last ownership sweep (2026-11-04): an address typed on a public form never sets a link or marks anything for someone else. Gold apply and a lead's chat; Register and a
 person's invite; failed sign-ins typed with an address. Mocked: nothing is sent."""
 import uuid
 
@@ -6,33 +6,24 @@ from django.utils import timezone
 
 from common.models import LoginEvent
 from common.tests.test_ownership import VICTIM, Base
-from emailchat import services as emailchat
-from emailchat.tests.test_emailchat import office
-from emailchat.models import Thread
 from gold.models import GoldApplication
 from mailings.models import Invite
 from office.tests.test_leads import verify
 from users import services as user_services
+from whatsapp.models import Contact
+from whatsapp.tests.test_whatsapp import office
 
 
-class RelinkNeverLinksByTypedAddressTests(Base):
-    def test_a_gold_application_typed_with_a_leads_address_does_not_link_his_thread_so_gold_delete_leaves_it(self):
-        thread = self.thread_with_words(VICTIM, "the lead's words", lead_email=VICTIM)  # staff started it from the lead's page
+class GoldApplyNeverLinksByTypedAddressTests(Base):
+    def test_a_gold_application_typed_with_a_leads_address_does_not_link_his_chat_so_gold_delete_leaves_it(self):
+        chat = self.chat_with_words(VICTIM, "the lead's words")  # staff linked it from the lead's page
         application = self.apply(self.public_client(), email=VICTIM)  # a stranger applies with the lead's address
-        emailchat.relink(VICTIM, application.email)
-        thread.refresh_from_db()
-        self.assertIsNone(thread.application_id)
-        self.assertEqual(thread.lead_email, VICTIM)  # what staff set is untouched
+        chat.refresh_from_db()
+        self.assertIsNone(chat.application_id)
+        self.assertEqual(chat.lead_email, VICTIM)  # what staff set is untouched
         office(self.admin, "post", f"/gold/{application.pk}/delete/")
         self.assertFalse(GoldApplication.objects.filter(pk=application.pk).exists())
-        self.assertTrue(Thread.objects.filter(pk=thread.pk).exists())  # before the fix the delete erased it
-
-    def test_a_typed_address_thread_links_nothing_and_a_page_start_links_what_staff_chose(self):
-        typed = self.thread_with_words("typed@example.com", "x")
-        self.assertEqual((typed.user_id, typed.lead_email, typed.application_id), (None, "", None))
-        application = self.apply(self.public_client(), email="gold@example.com")
-        started = self.thread_with_words("gold@example.com", "y", application=application)
-        self.assertEqual((started.application_id, started.lead_email), (application.pk, "gold@example.com"))
+        self.assertTrue(Contact.objects.filter(pk=chat.pk).exists())  # before the fix the delete erased it
 
 
 class RegisterNeverMarksSomeoneElsesInviteTests(Base):

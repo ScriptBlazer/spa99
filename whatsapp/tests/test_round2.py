@@ -190,11 +190,6 @@ class MicrophoneAndButtonTests(Base):
         self.assertFalse(mobile(mobile="", can_send=False)["can_add_number"])
         self.assertEqual(mobile(can_send=False)["state"], "view_only")
 
-    def test_the_mobile_is_optional_at_the_gate_check_but_a_typed_one_is_still_checked(self):
-        client = Client(HTTP_HOST=PUBLIC)
-        self.assertEqual(client.post("/validate/mobile/", {"mobile": "", "mobile_country": "GB", "optional": "1"}).json(), {"valid": True})
-        self.assertFalse(client.post("/validate/mobile/", {"mobile": "", "mobile_country": "GB"}).json()["valid"])
-        self.assertFalse(client.post("/validate/mobile/", {"mobile": "12", "mobile_country": "GB", "optional": "1"}).json()["valid"])
 
 
 

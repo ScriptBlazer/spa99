@@ -1,7 +1,7 @@
-"""Who owns an email thread or a WhatsApp chat: the one rule, in one place. `emailchat` and `whatsapp` both ask here, for the page, the timeline, the export, the erasure
-and the merge. Nothing else decides ownership (docs/features/office-email-chat.md, "Ownership").
+"""Who owns a WhatsApp chat: the one rule, in one place. `whatsapp` asks here, for the page, the timeline, the export, the erasure
+and the merge. Nothing else decides ownership (docs/features/whatsapp.md, "Ownership").
 
-A person's chats and threads are exactly:
+A person's chats are exactly:
   1. those with an explicit owner link (`user`), set by a staff action or by a proven step;
   2. those on his address (`email`, `lead_email`), only when his account email is verified (a person with no account, a lead or an applicant, is found by the address staff opened);
   3. those through his Gold application, only when that application's link is proven: the account is verified, or the application is being handled by staff on its own page.
@@ -14,9 +14,8 @@ THE LINK RULE (who may set a chat's links `user`, `lead_email`, `application`; t
   3. No GET ever writes a link or creates ownership: viewing is viewing. Opening a chat is a link; starting one is a POST.
 A mobile number is never proof of anything, and verifying an email proves the email only. Nothing is linked by number: a chat is linked by staff (`link`, `claim`) or, once its lead address
 is a verified account's own, by that account verifying. A chat nobody holds stays unlinked until staff link it from the thread or delete it; the person's page still shows that it exists
-(`visible_from_page`). Self-service stays stricter: the verified account address only (emailchat.threads_for_member).
+(`visible_from_page`).
 
-`Thread` and `Contact` both have `user`, `lead_email` and `application`, so one query serves both; the address columns differ (`address_fields`).
 Existing `GoldApplication.user` rows on live may link an application to an account that was never verified (the old code linked by address alone): nothing here trusts such a
 link, and nothing rewrites it. Plain Django, no database features beyond `iexact`, so it works the same on SQLite and Postgres."""
 from django.db.models import Q
@@ -53,27 +52,25 @@ def applications(user=None, addresses=(), application=None):
     return GoldApplication.objects.filter(query)
 
 
-def person_q(user=None, addresses=(), application=None, address_fields=("lead_email",), skip=None):
-    """Q for a Thread or Contact: owner link, trusted address columns, proven applications. `skip` is a Q for rows an address never finds (a direct email thread nobody has linked
-    yet: its From is unproven, so it is nobody's by address)."""
+def person_q(user=None, addresses=(), application=None):
+    """Q for a Contact: owner link, trusted lead addresses, proven applications."""
     query = Q(pk__in=[])
     if user is not None:
         query |= Q(user=user)  # the explicit link counts even for an unverified account
     trusted = trusted_addresses(user, addresses)
     if trusted:
-        for field in address_fields:
-            query |= Q(**{f"{field}__in": trusted}) & ~skip if skip is not None else Q(**{f"{field}__in": trusted})
+        query |= Q(lead_email__in=trusted)
     query |= Q(application__in=applications(user, addresses, application).values("pk"))
     return query
 
 
-def owned(model, user=None, addresses=(), application=None, address_fields=("lead_email",), skip=None):
-    """Every row of `model` (Thread or Contact) held for this person. The only lookup the page, timeline, export, erasure and merge use."""
-    return model.objects.filter(person_q(user, addresses, application, address_fields, skip))
+def owned(model, user=None, addresses=(), application=None):
+    """Every row of `model` (the WhatsApp Contact) held for this person. The only lookup the page, timeline, export, erasure and merge use."""
+    return model.objects.filter(person_q(user, addresses, application))
 
 
 def claim(chat, user):
-    """Staff opened this person's page and started the chat: link an ownerless chat to him (their explicit choice, as an email thread is). A chat that already has an owner is never
+    """Staff opened this person's page and started the chat: link an ownerless chat to him (their explicit choice). A chat that already has an owner is never
     taken, and neither is a lead's chat (it has a lead address) unless that is his own verified address. Returns True when it was linked."""
     if user is None or chat.user_id is not None:
         return False
@@ -85,12 +82,12 @@ def claim(chat, user):
     return True
 
 
-def visible_from_page(chat, user=None, addresses=(), application=None, address_fields=("lead_email",)):
+def visible_from_page(chat, user=None, addresses=(), application=None):
     """Does the person's page show this chat as its own? Held for him by the rule, or nobody's yet (no owner, lead address or application: staff can still open and claim it).
     A chat that is someone else's is not shown as his."""
     if chat.user_id is None and not clean(chat.lead_email) and chat.application_id is None:
         return True
-    return type(chat).objects.filter(pk=chat.pk).filter(person_q(user, addresses, application, address_fields)).exists()
+    return type(chat).objects.filter(pk=chat.pk).filter(person_q(user, addresses, application)).exists()
 
 
 def is_unlinked(chat):

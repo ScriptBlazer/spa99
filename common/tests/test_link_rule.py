@@ -11,8 +11,6 @@ from django_q.models import Task
 
 from common import levels
 from common.tests.test_ownership import Base, VICTIM
-from emailchat.models import Thread
-from emailchat.tests.test_emailchat import office
 from gold.models import GoldApplication
 from gold.tests.test_gold import application_data
 from journey.models import JourneySession
@@ -24,6 +22,7 @@ from plans.tests.helpers import make_team_member
 from system.models import SystemEvent
 from users.models import User
 from whatsapp.models import Contact, Message
+from whatsapp.tests.test_whatsapp import office
 
 PHONE = "+447400123790"
 
@@ -99,13 +98,12 @@ class NoGetWritesTests(LinkBase):
         chat = self.chat()
         session = self.victim_lead("07400 123888")  # a lead with a number and no chat yet
         application = self.apply(self.public_client(), email="gold@example.com", mobile="+447400123889")
-        before = (Contact.objects.count(), Thread.objects.count())
+        before = Contact.objects.count()
         paths = [f"/people/{stranger.pk}/whatsapp/", f"/leads/{session.pk}/whatsapp/", f"/gold/{application.pk}/whatsapp/", f"/gold/{application.pk}/?do=respond",
-                 f"/whatsapp/{chat.pk}/?from=person:{stranger.pk}", f"/people/{stranger.pk}/email-chat/", f"/leads/{session.pk}/email-chat/", f"/gold/{application.pk}/email-chat/",
-                 f"/email/new/?person=lead:{session.pk}", f"/people/{stranger.pk}/", f"/leads/{session.pk}/", f"/gold/{application.pk}/"]
+                 f"/whatsapp/{chat.pk}/?from=person:{stranger.pk}", f"/people/{stranger.pk}/", f"/leads/{session.pk}/", f"/gold/{application.pk}/"]
         for path in paths:
             self.assertIn(office(self.admin, "get", path, follow=True).status_code, (200,), path)
-        self.assertEqual((Contact.objects.count(), Thread.objects.count()), before)
+        self.assertEqual(Contact.objects.count(), before)
         self.assertEqual(self.state(chat), (None, "", None, ""))
 
     def test_the_thread_offers_the_link_after_the_chat_is_seen_and_only_to_an_editor(self):

@@ -84,10 +84,6 @@
   --office-wa-avatar: 3rem;                      /* list avatar (2.5rem in the thread header) */
   --office-wa-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;  /* code only; the brand has no mono */
 
-  /* ---------- Email chat (docs/features/email-chat-design.md section 0, 2026-11-04, proposed). No new colour. ---------- */
-  --office-em-list-w: clamp(21rem, 28vw, 26rem); /* thread list pane: wider than WhatsApp's, subject lines need it (403px at 1440) */
-  --office-em-read-max: 48rem;                   /* longest message sheet */
-
   /* ---------- surface names: the shared components (buttons, fields, messages) follow these (below) ---------- */
 }
 /* .on-dark inside the Office (the sign-in section) stays light */

@@ -1,0 +1,17 @@
+{% comment %}The Email pop-up, the old Message dialog restored: one text box, posted as an ordinary form (office.views_tools.message_send). Keys: email_msg (office.tools.email_context).
+A mistake comes back as a toast; the server checks everything.{% endcomment %}
+{% if email_msg.can_send and not email_msg.blocked %}
+<dialog class="fb-modal o-dialog" data-dialog="email"{% if open_form == "email" %} data-open{% endif %} aria-labelledby="od-email-h">
+  <form method="post" action="{{ email_msg.url }}" class="fb-modal-wrap" data-problems data-message>{% csrf_token %}
+    <h2 class="fb-modal-title" id="od-email-h">Email {{ email_msg.name }}</h2>
+    <p class="fb-modal-body">From {{ email_msg.from_label }}. His reply goes to {{ email_msg.reply_to }}. Kept in his timeline.</p>
+    {% if email_msg.unsubscribed %}<p class="o-warn" data-unsubscribed-warning>{% include "office/_icon.html" with name="warning" %}Unsubscribed from news. This is a one-to-one message, so it still goes.</p>{% endif %}
+    <label class="fb-modal-field"><span>Message</span>
+      <textarea class="fb-modal-textarea" name="message" rows="6" required minlength="5" maxlength="{{ email_msg.max }}" data-label="Message"></textarea></label>
+    <div class="fb-modal-actions">
+      <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
+      <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Sending">Send email</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}

@@ -43,7 +43,7 @@ class Command(BaseCommand):
         parser.add_argument("--source", default=str(Path(settings.BASE_DIR) / "docs" / "design"), help="Folder holding the spa99-signature-*.html files (default docs/design).")
 
     def handle(self, *args, **options):
-        from emailchat.models import StaffSender
+        from notifications.models import StaffSender
         from system import team
 
         folder = Path(options["source"])

@@ -13,7 +13,7 @@ self.addEventListener('push', (event) => {
   const tag = data.tag || 'spa99';
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    // a chat or an email thread he has open and can see needs no notification (the page path is the chat's /whatsapp/<id>/ or the thread's /email/<id>/; a ?gold= does not change the path)
+    // a chat he has open and can see needs no notification (the page path is the chat's /whatsapp/<id>/; a ?gold= does not change the path)
     if (windows.some((w) => w.visibilityState === 'visible' && new URL(w.url).pathname === url)) return;
     // a second message from the same chat replaces the first; from the third on it counts them
     const earlier = (await self.registration.getNotifications({ tag })).reduce((n, existing) => Math.max(n, (existing.data && existing.data.count) || 1), 0);

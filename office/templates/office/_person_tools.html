@@ -1,6 +1,5 @@
-{% load office_tags %}{% comment %}"Reach out" card of a person or lead page: the WhatsApp and Email buttons and Add to the approach list, with their dialogs (docs/features/office-outreach-design.md sections 3 and 4,
-docs/features/email-chat-design.md section 1). Always shown: a reader with only an email thread still sees it (the old guard is gone).
-Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, whatsapp{...see office.tools.whatsapp_context}, email_chat{...see office.tools.email_context}, mobile_countries.{% endcomment %}
+{% load office_tags %}{% comment %}"Reach out" card of a person or lead page: the WhatsApp and Email buttons and Add to the approach list, with their dialogs (docs/features/office-outreach-design.md sections 3 and 4). Always shown.
+Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, whatsapp{...see office.tools.whatsapp_context}, email_msg{...see office.tools.email_context}, mobile_countries.{% endcomment %}
 {% with who=person.name|default:person.email|first_word %}
 <section class="o-card o-reach" data-person-reach aria-labelledby="reach-h"><h2 id="reach-h" class="o-h3">Reach out</h2>
   <div class="o-reach-actions">
@@ -17,6 +16,7 @@ Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, what
   {% elif archive.can_edit %}<button type="button" class="o-quiet o-archive-btn o-archive-btn--rail" data-dialog-open="archive" aria-haspopup="dialog">{% include "office/_icon.html" with name="archive" %}Archive lead</button>{% endif %}{% endif %}
 </section>
 {% include "office/_mobile_dialog.html" %}
+{% include "office/_email_dialog.html" %}
 {% if outreach.can_add and not outreach.on_list %}{% include "office/_outreach_dialog.html" with who=who %}{% endif %}
 {% if archive.can_edit and not archive.archived %}
 <dialog class="fb-modal o-dialog" data-dialog="archive" aria-labelledby="od-archive-h">

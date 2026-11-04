@@ -860,7 +860,7 @@ def page_context(mobile, user_obj, can_send, start_url, edit_url, first_name="",
             "edit_url": edit_url, "can_send": bool(can_send and mobile and ok), "can_edit": bool(can_send), "has_chat": False, "window_open": False,
             "window_closes_at": "", "opted_out": False, "unread": 0, "can_add_number": bool(can_send and edit_url and not mobile), "reason": "", "thread_url": ""}
     contact = Contact.objects.filter(phone=mobile).first() if mobile else None
-    if contact is not None and target is not None and not ownership.visible_from_page(contact, target.user, target.addresses, target.application, CONTACT_ADDRESS_FIELDS):
+    if contact is not None and target is not None and not ownership.visible_from_page(contact, target.user, target.addresses, target.application):
         contact = None  # the number is on someone else's chat (a lead's, whoever typed his number): it is not shown as this person's
     if contact is not None:
         ends = window_ends_at(contact)
@@ -882,13 +882,10 @@ def page_context(mobile, user_obj, can_send, start_url, edit_url, first_name="",
 
 # ---------- timeline, export, erase ----------
 
-CONTACT_ADDRESS_FIELDS = ("lead_email",)
-
-
 def contacts_for_person(user=None, addresses=(), application=None):
     """Every chat held for a person, by the rule in common.ownership: the owner link, the lead address (only when his account is verified), a proven Gold application. His mobile
     is never used to find a chat (it was linked by `resolve_links` only where the rule allows). This is the only lookup."""
-    return ownership.owned(Contact, user, addresses, application, CONTACT_ADDRESS_FIELDS)
+    return ownership.owned(Contact, user, addresses, application)
 
 
 def timeline_entries(contacts):

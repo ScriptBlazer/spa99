@@ -209,11 +209,6 @@ def timeline(sessions, user=None, interest=None, applications=(), email="", addr
 
         for at, kind, label, detail, href in whatsapp.timeline_entries(contacts):  # not one line per message: the first, one a day, STOP, failures
             out.append(_entry(at, kind, label, detail, href))
-    if addresses or user is not None:
-        from emailchat import services as emailchat
-
-        for at, kind, label, detail, href in emailchat.timeline_entries(list(emailchat.threads_for(addresses, user))):  # across all his threads: the first, one a thread a day, bounces
-            out.append(_entry(at, kind, label, detail, href))
     out.sort(key=lambda e: e["_at"], reverse=True)
     for e in out:
         del e["_at"]

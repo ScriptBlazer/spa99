@@ -338,10 +338,6 @@ html:has(.gold-apply) { scroll-padding-top: calc(var(--header-h) + var(--space-4
 .lead-gate .question .field { margin-top: var(--space-2); }
 .lead-gate .question .field:first-child { margin-top: 0; }
 .lead-gate .mobile-group { margin-top: var(--space-2); gap: var(--space-1); }
-/* the one reason to add a number: an error replaces it, so the block does not grow (2026-11-04) */
-.lead-gate .mobile-hint { margin: 0; }
-.lead-gate .mobile-group > .feedback { margin-top: 0; }   /* the empty message slot under the hint added 16px of air: the step must fit 375 by 667 */
-.lead-gate .mobile-group:has(.feedback[data-state="error"]) .mobile-hint { display: none; }
 .lead-gate .question .mobile-row .field { margin: 0; }
 .lead-gate .question .field > label:not(.check) { pointer-events: none; }
 .lead-gate .field input, .lead-gate .field select { scroll-margin-bottom: calc(var(--bar-h) + var(--space-3)); }
@@ -350,7 +346,7 @@ html:has(.gold-apply) { scroll-padding-top: calc(var(--header-h) + var(--space-4
   .lead-gate .screen-head .lead { margin-top: var(--space-2); font-size: var(--text-base); line-height: var(--leading-snug); }
   .lead-gate .question { margin-top: var(--space-4); }
   .lead-gate .screen-body > .question:first-child { margin-top: var(--space-3); }
-  .lead-gate .check { min-height: 3.5rem; padding: var(--space-2) var(--space-3); gap: var(--space-2); }   /* the longer tick wording (2026-11-04) wraps to 4 lines, not 5 */
+  .lead-gate .check { min-height: 3.5rem; padding: var(--space-2) var(--space-3); gap: var(--space-2); }   
   .lead-gate .screen-body > .question + .question { margin-top: var(--space-3); }
   .lead-gate .action-bar { margin-top: 0; }
 }

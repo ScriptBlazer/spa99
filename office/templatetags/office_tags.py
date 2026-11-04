@@ -490,7 +490,7 @@ def pick_columns(columns, spec=""):
     return picked
 
 
-# ---------- the reach out buttons (docs/features/email-chat-design.md section 1) ----------
+# ---------- the reach out buttons ----------
 
 @register.simple_tag
 def reach_primary(wa, em, secondary=False):
@@ -500,6 +500,6 @@ def reach_primary(wa, em, secondary=False):
         return ""
     if wa.get("state") in ("chat", "ready") and wa.get("can_edit") and not wa.get("opted_out"):
         return "wa"
-    if em.get("can_send") and not em.get("suppressed"):
+    if em.get("can_send") and not em.get("blocked"):
         return "email"
     return ""

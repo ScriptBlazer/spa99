@@ -1,4 +1,4 @@
-"""Helpers for the WhatsApp and email chat walk-throughs: what Twilio and Postmark would post to the site, signed the way they sign it, and a reader for what the
+"""Helpers for the chat walk-throughs: what Twilio would post to the site, signed the way it signs, and a reader for what the
 site would have sent to Twilio (the fake in e2e/fakes.py writes each send to twilio-calls.jsonl). Nothing here reaches a real service."""
 import base64
 import hashlib
@@ -13,8 +13,6 @@ from .kit import SITE, WORKSPACE_DIR
 
 TWILIO_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "e2e-twilio-auth-token")
 SENDER = os.environ.get("TWILIO_WHATSAPP_FROM", "+442045384999")
-INBOUND_USER = os.environ.get("EMAIL_INBOUND_USER", "e2e-inbound")
-INBOUND_PASSWORD = os.environ.get("EMAIL_INBOUND_PASSWORD", "e2e-inbound-password")
 
 
 def twilio_sign(url, params):
@@ -46,15 +44,3 @@ def twilio_calls():
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-
-
-def postmark_inbound(token, message_id, **fields):
-    """An email from him, as Postmark posts it to the inbound webhook (HTTP Basic). `fields`: Subject, TextBody, StrippedTextReply, HtmlBody, FromFull ..."""
-    body = {"MailboxHash": token, "MessageID": message_id, **fields}
-    request = urllib.request.Request(f"{SITE}/postmark/inbound/", data=json.dumps(body).encode(), method="POST", headers={
-        "Content-Type": "application/json", "Authorization": "Basic " + base64.b64encode(f"{INBOUND_USER}:{INBOUND_PASSWORD}".encode()).decode()})
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            return response.status
-    except urllib.error.HTTPError as error:
-        return error.code

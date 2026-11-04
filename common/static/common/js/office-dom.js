@@ -1,4 +1,4 @@
-/* Small helpers shared by the WhatsApp chat and the email thread: building nodes without ever parsing HTML, icons from the sprite, London times, file sizes. */
+/* Small helpers used by the WhatsApp chat: building nodes without ever parsing HTML, icons from the sprite, London times, file sizes. */
 export const LONDON = 'Europe/London';
 const TIME = new Intl.DateTimeFormat('en-GB', { timeZone: LONDON, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const DAYKEY = new Intl.DateTimeFormat('en-CA', { timeZone: LONDON, year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -48,7 +48,7 @@ export function dayLabel(iso) {
   return FULLDAY.format(new Date(iso));
 }
 export const fullStamp = (iso) => `${FULLDAY.format(new Date(iso))}, ${timeOf(iso)}`;
-/** "3 November, 14:20": the form read out for an email sheet. */
+/** "3 November, 14:20": the form read out for a sheet. */
 export const spokenStamp = (iso) => `${LONGDAY.format(new Date(iso))}, ${timeOf(iso)}`;
 export function bytes(n) {
   if (!n) return '';

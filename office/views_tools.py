@@ -1,4 +1,4 @@
-"""Views for the person tools: sticky notes, the approach list and Send guide (Message is WhatsApp now: whatsapp.views). Short: validate, call the service in
+"""Views for the person tools: sticky notes, the approach list, Send guide and the Email button. Short: validate, call the service in
 outreach.services (or gold.actions), answer. Notes answer an HTMX request with the notes partial."""
 from django.contrib import messages
 from urllib.parse import urlencode
@@ -19,7 +19,7 @@ from outreach.models import OutreachEntry, StickyNote
 from plans.models import SiteSettings
 
 from . import lists, tools
-from .forms import ArchiveForm, OutreachAddForm, StickyNoteForm
+from .forms import ArchiveForm, MessageForm, OutreachAddForm, StickyNoteForm
 from system import defaults
 from .permissions import admin, editor, reader
 
@@ -136,6 +136,33 @@ def outreach_add(request, pk, kind):
         messages.info(request, f"Already on {title}.")
     else:
         messages.error(request, "Could not add this person.")
+    return redirect(target.page_url)
+
+
+@editor
+@require_POST
+def message_send(request, pk, kind):
+    """The Email button on a lead, person or Gold page: a plain text email from the logged-in person, queued, kept for the timeline. On a Gold page the first one marks New as Contacted."""
+    target = tools.target_for(kind, pk)
+    form = MessageForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, " ".join(_errors(form)))
+        return redirect(target.page_url)
+    blocked = services.email_block(target.main)
+    if blocked:
+        messages.error(request, f"Not sent. {blocked}")
+        return redirect(target.page_url)
+    result, message = services.send_message(request.user, target.main, form.cleaned_data["message"])
+    if result == services.DUPLICATE:
+        messages.info(request, "That message was already sent.")
+    elif result != services.DONE:
+        messages.error(request, "The email could not be sent.")
+    elif message.status == message.FAILED:
+        messages.error(request, "The email could not be sent. It shows as failed in the timeline.")
+    else:
+        messages.success(request, "Your email is on its way. It is in the timeline.")
+        if kind == "gold":
+            gold_actions.whatsapp_sent(target.application, request.user, message.text, via="email")  # first contact: New becomes Contacted, once
     return redirect(target.page_url)
 
 

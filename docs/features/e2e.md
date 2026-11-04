@@ -4,7 +4,7 @@ Decided 2026-10-24 (PROJECT.md): instead of hundreds of tests, one run drives a 
 
 ## What it does
 
-`scripts/e2e.sh` makes a throwaway copy of the site, starts it, walks 28 scenarios with Playwright (Chromium) (nine user journeys, fifteen beta-tester scenarios, then four chat scenarios), writes a report with a screenshot of every step, and deletes the copy.
+`scripts/e2e.sh` makes a throwaway copy of the site, starts it, walks 27 scenarios with Playwright (Chromium) (nine user journeys, fifteen beta-tester scenarios, then three chat scenarios), writes a report with a screenshot of every step, and deletes the copy.
 
 | # | Name | Covers |
 |---|---|---|
@@ -18,8 +18,8 @@ Decided 2026-10-24 (PROJECT.md): instead of hundreds of tests, one run drives a 
 | 8 | `control` | every Control tab loads; every room card opens a panel with the right title; Back goes to the previous tab exactly once; a generated WAV is uploaded to the Library and deleted |
 | 9 | `phone` | 375x812: home, journey start, register, `/account/` screens, Office dashboard, Control overview: no sideways scrolling |
 
-### Chat scenarios (25 to 28, `e2e/walks_chat.py`, 2026-11-04)
-Twilio and Postmark are faked: `e2e/fakes.py` (an app that only `e2e/settings.py` adds) replaces `whatsapp.twilio_api.request` so a send is recorded in `twilio-calls.jsonl` and never made; his WhatsApp messages are posted to the real webhook signed with the fake Auth Token, his emails to the real Postmark inbound webhook with Basic auth (`e2e/chatkit.py`); the fake settings values come from `scripts/e2e.sh` only. 25 the two reach out buttons (Start or Open, primary, the grey line and Add a mobile, focus after saving, no sideways scroll at 375); 26 WhatsApp (his first message opens the window, send, his reply quoting ours, Reply with the `> ` line, the emoji row, MP4 and a refused .mov, a message the Office cannot show); 27 email chat (New email, the Reply-To token, his formatted reply found by the poll and shown in the frame with the exact sandbox flags and no scripts, Reply, phone width); 28 the journey email step with no mobile, its copy and one-screen fit, and Register still refusing a blank mobile. Voice notes are not walked (they need a microphone and ffmpeg).
+### Chat scenarios (25 to 27, `e2e/walks_chat.py`, 2026-11-04)
+Twilio is faked: `e2e/fakes.py` (an app that only `e2e/settings.py` adds) replaces `whatsapp.twilio_api.request` so a send is recorded in `twilio-calls.jsonl` and never made; his WhatsApp messages are posted to the real webhook signed with the fake Auth Token (`e2e/chatkit.py`); email goes to the file backend; the fake settings values come from `scripts/e2e.sh` only. 25 the two reach out buttons, WhatsApp and Email (Start or Open, primary, the grey line and Add a mobile, focus after saving), then sending the email from the Email pop-up (From and Reply-To his address, the plain sign-off, the timeline line) and no sideways scroll at 375; 26 WhatsApp (his first message opens the window, send, his reply quoting ours, Reply with the `> ` line, the emoji row, MP4 and a refused .mov, a message the Office cannot show); 27 the journey email step with no mobile, its copy and one-screen fit, and Register still refusing a blank mobile. The Email pop-up step (25) is written but not yet run. Voice notes are not walked (they need a microphone and ffmpeg).
 
 ### Beta-tester scenarios (10 to 24, `e2e/walks_beta.py`)
 
@@ -94,7 +94,7 @@ Exit code is 0 only if every step passed. A summary prints in the terminal; the 
 
 ## Files
 
-`scripts/e2e.sh` (workspace, server, run, cleanup), `e2e/settings.py`, `e2e/run.py` (runner), `e2e/walks.py` (walk-throughs 1 to 9), `e2e/walks_beta.py` (10 to 24), `e2e/walks_chat.py` (25 to 28), `e2e/chatkit.py` and `e2e/fakes.py` (the faked Twilio and the signed posts), `e2e/settings_strict.py` (the second server), `e2e/kit.py` (steps, screenshots, error collection, sign-in, register, journey, Gold helpers), `e2e/mailbox.py` (also reads each part of an email and counts by subject), `e2e/dbtool.py` (team accounts and database facts, including Gold history, invites, audit events and ageing an application, in a child process because Playwright's sync API blocks Django's database calls), `e2e/report.py`. `requirements-dev.txt` adds `playwright`.
+`scripts/e2e.sh` (workspace, server, run, cleanup), `e2e/settings.py`, `e2e/run.py` (runner), `e2e/walks.py` (walk-throughs 1 to 9), `e2e/walks_beta.py` (10 to 24), `e2e/walks_chat.py` (25 to 27), `e2e/chatkit.py` and `e2e/fakes.py` (the faked Twilio and the signed posts), `e2e/settings_strict.py` (the second server), `e2e/kit.py` (steps, screenshots, error collection, sign-in, register, journey, Gold helpers), `e2e/mailbox.py` (also reads each part of an email and counts by subject), `e2e/dbtool.py` (team accounts and database facts, including Gold history, invites, audit events and ageing an application, in a child process because Playwright's sync API blocks Django's database calls), `e2e/report.py`. `requirements-dev.txt` adds `playwright`.
 
 ## Not verified at build time
 

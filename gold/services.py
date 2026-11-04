@@ -195,9 +195,6 @@ def submit_application(data, session=None):
         audit.record(application, ApplicationEvent.SUBMITTED, channel=audit.SYSTEM, to_status=GoldApplication.NEW,
                      meta={"repeat": application.is_repeat, "potential": application.potential_level})
     queue_emails(application)
-    from emailchat import services as emailchat  # the typed number is kept on the application only: it never links a WhatsApp chat (common.ownership, rule 2)
-
-    emailchat.relink(application.email)
     return application, True
 
 
