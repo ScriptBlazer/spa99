@@ -151,6 +151,7 @@ def add_to_list(actor, user=None, lead_email="", application=None, reason=""):
                 entry = OutreachEntry.objects.create(reason=reason, added_by=_actor(actor), added_by_label=label(actor), **target)
         except IntegrityError:  # a double submit that raced past the check
             return ALREADY, OutreachEntry.objects.filter(**target, done_at__isnull=True).first()
+    _figures_changed()  # a lead on the list is not in Leads: the stored Leads total follows
     return DONE, entry
 
 
@@ -164,6 +165,7 @@ def mark_done(entry, actor):
 
 def remove_entry(entry):
     entry.delete()
+    _figures_changed()
     return DONE
 
 
@@ -334,6 +336,18 @@ def archive_after_group_email(email):
         LeadArchiveEvent.objects.create(email=email, kind=LeadArchiveEvent.ARCHIVED, reason=EMAILED_NO_NUMBER, by=None, by_label=GROUP_EMAIL_LABEL)
     _figures_changed()
     return DONE
+
+
+def _number_arrived(email, actor):
+    """Staff added a number to a lead the group email archived for having none ("Emailed, no number"): he leaves Archived and joins the approach list, as if he had used his link. Any other lead is left
+    exactly where he is (adding a number to a lead is not a reason to move him)."""
+    row = ArchivedLead.objects.filter(email=email, reason=EMAILED_NO_NUMBER, archived_by_label=GROUP_EMAIL_LABEL).first()
+    if row is None:
+        return
+    row.delete()
+    LeadArchiveEvent.objects.create(email=email, kind=LeadArchiveEvent.RESTORED, by=_actor(actor), by_label=label(actor))
+    add_to_list(actor, lead_email=email, reason="Number added after the group email")
+    _figures_changed()
 
 
 def return_bounced_lead(email):
@@ -585,6 +599,8 @@ def set_lead_contact(email, actor, first_name=None, mobile=None, mobile_country=
             _edit(main, PersonEdit.FIRST_NAME, current_name, new_name, actor)
         if new_mobile != current_mobile:
             _edit(main, PersonEdit.MOBILE, current_mobile, new_mobile, actor)
+            if new_mobile and not current_mobile:
+                _number_arrived(main, actor)
     return DONE, {}
 
 

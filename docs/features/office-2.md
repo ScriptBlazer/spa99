@@ -57,3 +57,55 @@ Gold shows £199 + VAT everywhere it appears, in the Office and on the public si
 
 ## Not doing
 A link to the website from the Office. Bigger WhatsApp button on the website. A tag for people who registered without the questions. Business profile logo (Moishe, not code).
+
+## Built (server side, 2026-11-05, `feature/office-2`)
+
+Server side only; templates are minimal and working, and the frontend agent restyles them to `office-2-design.md`. Levels: **editor** = the Approver permission, or Admin level and up (superusers always); **reader** = any team level. "Fetch" means a request with `X-Requested-With: fetch` or `Accept: application/json`; every list endpoint below also answers a fragment (rows only) to an `HX-Request` header, as the other lists do. Every long list has `more_url` and `has_next` in its context, and `?page=N` loads the next rows, so the phone's auto-load needs no new endpoint.
+
+### Choices made beyond the spec (also in PROJECT.md)
+- **Approved, for Revenue:** a membership counts as approved when Barry's review says approved (`MembershipReview`); a Gold application counts when its status is approved. **Waiting:** membership with no row or waiting; Gold new, contacted or awaiting final. Declined counts in neither. A person on a Tier with a Gold application counts in both Waiting figures, but Revenue counts him once, at his Tier, while his Tier is not declined.
+- **Who is in the membership lists:** registrations that are not on the Gold plan. Gold-plan members are the Gold table of Registered and are never in Approvals. The "of N registered" on the Memberships rings is the membership total (`counts.memberships.total`); the Registered tile is every registration (`registered_total`), Gold members included.
+- **A member's price:** an active subscription's agreed price if there is one, else the kept sale price (while held), else the plan price; times 12.
+- **Archive from the list, Back to Leads and Undo:** both take the entry off the list, so Undo is a POST that puts him back with the same reason (and un-archives first).
+- **Any entry on the approach list (open or done) keeps a lead out of Leads.** Registering takes him off the list only for entries still open and added before he registered; a done entry stays in Done.
+- **Gold Respond with a mobile goes to wa.me, without one to the Email pop-up. Nothing marks New as Contacted on a wa.me click** (it proves nothing): an email sent from the pop-up still marks it, and there is an explicit "Mark contacted" POST.
+- **Group send archiving is a per-mailing switch** (`Mailing.archive_no_number`, on by default only for Barry's starter, only for the leads group), so an ordinary newsletter to leads never moves anyone.
+- **The leads group now equals the Leads list** (no account, not archived, not on the approach list), so the confirm count matches the Leads total.
+- **Add-your-number link expires after 90 days.**
+- **The Office installable app stays** (manifest and a service worker with no push, no cache and no fetch handler), now in `office`.
+- **No stored Gold price copy needs a backfill:** the public price cell comes from the plan's fee (`£199 + VAT a year`), the fee note already read `+ VAT`, and no stored copy holds a literal price.
+
+### Pages and endpoints (Office host)
+| URL | Method, level | Context keys (and what it does) |
+|---|---|---|
+| `/` | GET, reader | `cards` (editor only, else `None`): `{waiting: {gold, memberships}, approved: {...}, revenue: {gold, memberships}, registered_total, leads_total}`; each ring is `{value, of}`; Revenue rings are pence excluding VAT and also carry `possible`. Format with `|pounds_compact`. The old `leads_registered` is gone. |
+| `/approvals/` | GET, editor | `?status=waiting|approved|declined`, `?q=`, `?plan=`, `?page=`. `status`, `tabs [{status,label,count,active,url}]`, `counts {total,waiting,approved,declined}`, `rows [{id (user id), name, email, plan, plan_slug, month_pence (excl. VAT), sale, registered, status, decided_at, decided_by, href, approve_url, decline_url, undo_url}]`, `has_next`, `page`, `more_url`, `q`, `plan`, `plans`, `note`, `gold_waiting`, `gold_url`. Fragment: `_approvals_rows.html`. |
+| `/approvals/<user id>/approve/`, `/decline/`, `/undo/` | POST, editor | Undo means back to waiting. Audited (`MembershipReviewEvent`: from, to, who, when). Never sends or changes anything for the member. A fetch gets `{ok, result (done|unchanged), status, name, row, counts, gold_waiting}`; otherwise a toast and a redirect (`from=<status>` returns to that tab). 404 for someone not on a Tier. |
+| `/revenue/` | GET, editor | `revenue {vat_rate, gold_fee_pence, gold_fee_inc_pence, approved, waiting}`; each bucket has `count, year_ex, month_ex, year_inc, month_inc, avg_year_ex, avg_year_inc` (Decimal pence, exact: round only with `|pounds`) and `by_plan [{slug, name, kind (tier|gold), count, ...same figures}]` in plan order, Gold last. `waiting` is the Possible panel (never added to approved). Also `counts {memberships, gold}`, `empty`, `approvals_url`. |
+| `/people/` | GET, reader | `?table=` (empty = both, `membership`, `gold`), plus the old filters. `tables [{key,title,rows,has_next,page,more_url,columns,empty}]`, `table`, first-table `rows/has_next/page/more_url/columns`, `counts {total,waiting,approved,declined,gold_members,registered_total}`, `approvals_line` (editor only: `{approved,waiting,declined,text,status,url}` or `None`), `total_registered`. Membership rows are approved people only; plan filters Membership only. Row `gold_application_id` is set only for an application that is not approved or declined; Gold rows have `gold_approved_at`. Fragment rows: `_people_rows.html` or `_people_gold_rows.html`. The CSV (`/people/export.csv`) still exports everyone. |
+| `/leads/` | GET, reader | `tiles {leads_total, registered_total}` (true totals), `more_url`, `?emailed=1`, rows have `emailed_at` (empty when bounced: `bounced` is the Possible fake). Archived rows: `archived.by` reads "Group email" for the group send. Hot tile and the went-on-to-register figure are gone (`?hot=1` still works for the Home link). |
+| `/outreach/` | GET, reader | Tabs are only `open` and `done` (`states`, `tabs`, `counts {open,done}`, `open_count`, `done_count`); `?state=registered` falls back to open. `?emailed=1`, `emailed` in context. Rows add `emailed_at`, `bounced`, `is_lead`, `to_leads_url`, `archive_url` (the last two empty for a person or Gold row, which keep `remove_url`). |
+| `/outreach/<id>/to-leads/` | POST, editor | Back to Leads (lead entries only). Answer carries `undo {url, email, reason, archived}`. |
+| `/outreach/<id>/archive/` | POST, editor | `reason` optional (300). Archives and takes him off the list. Same `undo`. |
+| `/outreach/undo/` | POST, editor | `email, reason, archived`: puts him back on the list (un-archiving first). |
+| `/gold/<id>/respond/` | GET, reader | 302 to `https://wa.me/<digits>` with a mobile, else to the Gold page with `?do=email`. |
+| `/gold/<id>/contacted/` | POST, editor | Mark contacted (New becomes Contacted, audited as before). |
+| `/leads/<id>/contact/`, `/people/<id>/mobile/`, `/gold/<id>/mobile/` | POST, editor | Add or fix a number or first name, unchanged in behaviour, now in `office.views_tools` (fetch answers `{ok, result, errors}`). |
+| `/manifest.webmanifest`, `/sw.js` | GET, public | The installable app. |
+| lead, person and Gold pages | | `whatsapp` context is now `{state ("mobile"|"none"), wa_link, has_mobile, mobile, first_name, edit_url, can_edit, can_add_number, reason}`. `_wa_button.html` is a plain link. |
+
+Gone: `/whatsapp/...`, `/people|leads|gold/<id>/whatsapp/`, the push endpoints, `/twilio/...` webhooks, System > WhatsApp, the Notifications row of the person menu.
+
+### Public site
+| URL | Notes |
+|---|---|
+| `/add-number/<token>/` | GET and POST, no sign-in, noindex, rate limited (30 an 10 minutes an address, rolling). Context `state` (`form|done|used|ended`), `email` (read only), `form`, `mobile_countries`, `country`, `consent_text`, `whatsapp_url`. Tampered and expired links are both `ended` (400, same words, no address shown). A taken number is a plain error on `mobile`. A person who registered meanwhile, or who already has a number, is `used`: nothing changes. |
+
+### System
+- Automatic email edit form: `sender_user` select replaces the Site/Person radios (`form.sender_user`, `footer.sender_note`, `footer.reply_to`). Mailing form: `sender_user`, `archive_no_number`, `sender_note`. `GET /emails/mailings/<id>/confirm/` adds `moves {stay, archive, reason, bounced}` for a leads send that archives, and the From and Reply-To follow the chosen sender. Previews return `reply_to`. The starter "Barry's invitation" (`start=barry_invitation`) fills subject, news, leads and the switch; its button is `link: personal_add_number`; text placeholders `{whatsapp_number}` and `{add_number_link}` work for the leads group only.
+- **For the frontend:** the group-send parts editor lists a button's link kinds in its own script; add `personal_add_number` ("Add-your-number link", each lead's own link) beside the two personal ones. The server already accepts it, needs no web address for it, and refuses it (and `{add_number_link}` / `{whatsapp_number}`) for any group but Journey leads. The Waiting/Approved/Declined `.o-seg--counts` tabs, the `data-press` feedback and the Home ring markup are not built server side.
+- **Staff adding a number** to a lead the group email archived ("Emailed, no number") also moves him out of Archived to the approach list (`outreach.services._number_arrived`); a lead archived by a person is left where he is.
+- The single "person sender" settings are removed from System > Emails. The old columns stay until the script has run: `manage.py migrate_person_sender --dry-run`.
+
+### Models and settings
+`office.MembershipReview` (one per `InterestRegistration`, status, by, at; no row means waiting), `office.MembershipReviewEvent` (audit), `mailings.Mailing.sender_user` and `archive_no_number`, `notifications.NotificationTemplate.sender_user`. New snapshot page `counts` in `OfficeSnapshot`. No new env vars; removed: `TWILIO_*`, `VAPID_*`, `FFMPEG_BIN`.

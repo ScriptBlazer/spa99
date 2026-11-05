@@ -252,3 +252,14 @@ class WhatsAppButtonTests(Base):
         call(self.approver, "post", f"/gold/{application.pk}/contacted/")
         application.refresh_from_db()
         self.assertEqual(application.status, "contacted")
+
+
+class InstallableAppTests(Base):
+    def test_the_office_stays_installable_with_a_service_worker_that_does_nothing_else(self):
+        manifest = Client(HTTP_HOST=OFFICE).get("/manifest.webmanifest")
+        self.assertEqual((manifest.status_code, manifest.json()["display"]), (200, "standalone"))
+        worker = Client(HTTP_HOST=OFFICE).get("/sw.js")
+        self.assertEqual((worker.status_code, worker["Service-Worker-Allowed"]), (200, "/"))
+        self.assertNotIn(b"showNotification", worker.content)  # no push, and no fetch handler: it never holds a page or staff data
+        self.assertNotIn(b"addEventListener('fetch'", worker.content)
+        self.assertEqual(Client().get("/sw.js").status_code, 404)  # the public site does not serve it

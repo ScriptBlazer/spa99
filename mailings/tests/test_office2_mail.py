@@ -233,3 +233,20 @@ class AddNumberTests(Base):
             cache.clear()
             statuses = {self.client.get(self.url("a@example.com")).status_code for _ in range(32)}
         self.assertIn(429, statuses)
+
+
+class StaffAddsTheNumberTests(Base):
+    def test_a_number_added_by_staff_moves_a_group_archived_lead_to_the_approach_list_and_leaves_others_alone(self):
+        from common import levels
+        from plans.tests.helpers import make_team_member
+
+        admin = make_team_member("admin@example.test", levels.ADMIN)
+        lead("gone@example.com"), lead("kept@example.com")
+        self.send(archive_no_number=True)
+        self.assertEqual(ArchivedLead.objects.count(), 2)
+        services.archive_lead("kept@example.com", admin, "not a fit")  # archived by a person: replace the group's row
+        ArchivedLead.objects.filter(email="kept@example.com").update(reason="not a fit", archived_by_label="admin@example.test")
+        self.assertEqual(services.set_lead_contact("gone@example.com", admin, mobile="07911123456")[0], services.DONE)
+        self.assertEqual(services.set_lead_contact("kept@example.com", admin, mobile="07911123457")[0], services.DONE)
+        self.assertEqual(list(ArchivedLead.objects.values_list("email", flat=True)), ["kept@example.com"])
+        self.assertEqual(list(OutreachEntry.objects.values_list("lead_email", flat=True)), ["gone@example.com"])

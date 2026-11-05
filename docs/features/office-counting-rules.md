@@ -50,3 +50,16 @@ Started ≥ Finished always (same people). Registered can exceed Finished (someo
 A lead is an email given at the journey gate; "new leads" counts addresses by the day of their first `lead_at`, "went on to register" counts those whose address has an account now. Journeys with that email join the account when the email is verified (see `office-leads.md`); counts merge from the next snapshot.
 
 People are worked out in `insights/people.py` by the snapshot job only; run `rebuild_metrics` once to apply the 2026-10-27 rule to existing snapshots.
+
+## Office 2 (2026-11-05): approvals, Registered, Leads and Revenue
+
+One service holds these figures: `office/counts.py`, stored as one `OfficeSnapshot` row (page `counts`, range `all`), written by the hourly roll-up, by the debounced refresh after each counted event, and right away by every approval decision (`refresh_approvals()`). Pages read that one row; a missing row is an empty state that asks for a refresh. Every figure below is a true total: it ignores the range and the filters.
+
+- **Registered total:** every registration (`InterestRegistration`), Gold-plan members included. There is no "moved on from leads" figure any more.
+- **Leads total:** the Leads list itself: a journey address with no verified account, not staff, **not archived and not on the approach list**. Adding to the approach list takes a lead out of Leads; Back to Leads or removing the entry puts him back.
+- **Membership people:** registrations that are not on the Gold plan. Waiting, approved and declined come from Barry's review (`office.MembershipReview`); **no row means waiting**. Gold-plan members are never in this list.
+- **Gold waiting, approved, declined:** the application's own status. Waiting is new, contacted or awaiting final approval (the same rows as the Gold Waiting list).
+- **A Tier member with a Gold application counts in both Waiting figures** (two different decisions).
+- **Revenue** (an estimate, never money received; whole pence a year, **excluding VAT**, VAT added only for display from the VAT setting): Gold is the number of Gold applications times the Gold plan's annual fee (never a typed number); memberships are each member's own monthly price times 12 (an active subscription's agreed price, else the kept sale price while held, else the plan price). Approved and waiting are summed separately: **possible revenue from those waiting is never added to the approved figures.** A person on a non-declined Tier is counted once, at his Tier, so his Gold application adds nothing. Declined counts in neither. Nothing is rounded until display (the `pounds` filter), so a total is never the sum of rounded rows.
+- **Approach list:** two tabs, Open and Done. An entry whose account was verified after it was added is left out by the lookup (and every count), not rewritten: the row stays in the database.
+- **Emailed tag:** a person's Email pop-up message sent, or a group send that reached him. The automatic emails do not count. A bounced address shows Possible fake instead.
