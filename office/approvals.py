@@ -50,6 +50,11 @@ def price_of(reg):
     return counts.to_pence(reg.plan.price_ex_vat), False
 
 
+def _url(name, *args):
+    """A link into the Office, whichever host the code runs under (the lists are also built from scripts and tests)."""
+    return reverse(name, args=args, urlconf="config.urls_office")
+
+
 def row(reg):
     user = reg.user
     try:
@@ -61,8 +66,8 @@ def row(reg):
     return {"id": str(user.pk), "name": user.get_full_name() or user.email, "email": user.email, "plan": reg.plan.name if reg.plan_id else "", "plan_slug": reg.plan.slug if reg.plan_id else "",
             "month_pence": pence, "sale": sale, "registered": reg.created_at.isoformat(), "status": status,
             "decided_at": review.at.isoformat() if review and review.at else "", "decided_by": review.by_label if review else "",
-            "href": reverse("office_person", args=[user.pk]), "approve_url": reverse("office_approval_approve", args=[user.pk]),
-            "decline_url": reverse("office_approval_decline", args=[user.pk]), "undo_url": reverse("office_approval_undo", args=[user.pk])}
+            "href": _url("office_person", user.pk), "approve_url": _url("office_approval_approve", user.pk),
+            "decline_url": _url("office_approval_decline", user.pk), "undo_url": _url("office_approval_undo", user.pk)}
 
 
 def page(status, number, size, q="", plan=""):
@@ -84,7 +89,7 @@ def line(members):
         parts.append(f"{members['declined']} declined")
     text = f"All {members['approved']} approved" if not members["waiting"] and not members["declined"] else ", ".join(parts)
     return {"approved": members["approved"], "waiting": members["waiting"], "declined": members["declined"], "text": text, "status": WAITING if members["waiting"] else APPROVED,
-            "url": f"{reverse('office_approvals')}?status={WAITING if members['waiting'] else APPROVED}"}
+            "url": f"{_url('office_approvals')}?status={WAITING if members['waiting'] else APPROVED}"}
 
 
 def decide(user_pk, to_status, actor):

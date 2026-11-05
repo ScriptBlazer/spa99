@@ -6,7 +6,6 @@ Dev settings, made safe and quiet for a robot:
   can never be touched, whatever the environment says;
 - media and email go to folders in that workspace (emails are written as files the run reads back);
 - no rate limits (one robot IP signs in many times) and background jobs run inline;
-- Twilio is faked (e2e/fakes.py); the WhatsApp settings come from scripts/e2e.sh as fake environment values, so the webhooks answer and can be signed.
 """
 import os
 from pathlib import Path
@@ -28,7 +27,6 @@ _db = DATABASES["default"]
 if not _db["ENGINE"].endswith("sqlite3") or WORKSPACE not in Path(str(_db["NAME"])).resolve().parents:
     raise ImproperlyConfigured(f"e2e refuses to run: the database must be a SQLite file inside {WORKSPACE} (DATABASE_URL), not {_db['NAME']}.")
 
-INSTALLED_APPS = [*INSTALLED_APPS, "e2e.fakes.FakesConfig"]  # noqa: F405 - the fake Twilio (WhatsApp sends are recorded, never sent); only this settings file adds it
 
 EMAIL_BACKEND = "django.core.mail.backends.filebased.EmailBackend"
 EMAIL_FILE_PATH = str(WORKSPACE / "mail")

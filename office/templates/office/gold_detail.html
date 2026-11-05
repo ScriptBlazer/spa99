@@ -52,6 +52,7 @@
       <div class="o-actions-rail">{% include "office/_gold_actions.html" %}</div>
       {% if office_can.can_act and a.can_approve %}<p class="o-sub">He gets an email to set up his account. The link lasts 14 days.{% if a.potential in final_waits and not a.sent_back %} The potential is {{ a.potential|capfirst }}, so a final approver confirms first.{% endif %}</p>{% endif %}
       {% if a.person_id and office_can.can_see_all %}<a class="o-quiet" href="{% url 'office_person' a.person_id %}">Open his account</a>{% endif %}
+      {% if office_can.can_edit and a.status == "new" %}<form method="post" action="{% url 'office_gold_contacted' a.id %}" data-gold-contacted>{% csrf_token %}<button type="submit" class="o-quiet" data-working-text="Saving">Mark contacted</button></form>{# the WhatsApp button is a wa.me link: it cannot prove a message went, so staff say so (an email sent from the pop-up marks it by itself) #}{% endif %}
       {% include "office/_channels.html" with secondary=True %}{# both channels are secondary here, so Approve stays the one primary; outside can_edit so a reader still sees a live thread #}
       {% include "office/_details.html" with gold=True %}{# the one Add or Change for the number; a reader sees the value #}
       {% if office_can.can_edit %}<div class="o-actions-more" data-gold-more>

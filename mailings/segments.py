@@ -280,7 +280,7 @@ def lead_split(params, kind, personal=False):
     A lead has a mobile when any journey of his address holds one, or a Gold application of his does."""
     from outreach.services import has_mobile_q
 
-    qs = queryset("leads", params, kind, personal).annotate(has_mobile=has_mobile_q("r_email"))
+    qs = queryset("leads", params, kind, personal).annotate(has_mobile=has_mobile_q(OuterRef("r_email")))
     with_mobile = qs.filter(has_mobile=True).order_by().values("r_email").distinct().count()
     return with_mobile, qs.filter(has_mobile=False).order_by().values("r_email").distinct().count()
 
