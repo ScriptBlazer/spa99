@@ -5,7 +5,7 @@ Status: agreed 2026-11-03, building on `feature/office-outreach`. Decisions in P
 ## 1. Send the Gold Card guide
 
 - **The guide** is a PDF uploaded in **System** (a file field on the site settings or a small single-row model, default storage: S3 on live, `.private/media` locally). Replace any time; no release needed. The first file is `SPA99_Gold_Card_Guide.pdf` (local copy in `.private/incoming/`, git-ignored; Moishe uploads it on live).
-- **Gold application, Decision card:** the **Add note** button becomes **Send guide**. It opens a short confirm (or a sheet with the editable message, same pattern as Respond) and emails the applicant **from the site sender (hello@spa99.uk, `DEFAULT_FROM_EMAIL`)** with the PDF **attached**. Reply-To is the contact address, as for Respond.
+- **Gold application, Decision card:** the **Add note** button becomes **Send guide**. It opens a short confirm (or a sheet with the editable message) and emails the applicant **from the site sender (hello@spa99.uk, `DEFAULT_FROM_EMAIL`)** with the PDF **attached**. Reply-To is the contact address.
 - The email text is an **editable template** (System > Emails), key `gold_guide`, short and on brand.
 - Allowed in **any** status (new, contacted, awaiting final, approved, declined). Sending is recorded in the application history ("Guide sent by X") through `gold.audit.record`, with a duplicate-submit guard like Respond.
 - No guide uploaded: the button is disabled, with the hint "Upload the guide in System".
@@ -38,7 +38,7 @@ Status: agreed 2026-11-03, building on `feature/office-outreach`. Decisions in P
 
 ## 5. Message a lead or a person
 
-- **Message** button on the lead page and the person page (same pattern as Gold **Respond**): write an email, sent from the site sender, Reply-To the contact address, through the queue.
+- **Email** button on the lead page, the person page and the Gold page (beside WhatsApp; Respond on Gold opens WhatsApp or this pop-up): one text box, sent **From the logged-in person** (their sending address, hello@spa99.uk as the fallback) with Reply-To their address, through the queue. See `whatsapp.md` ("Email button").
 - Editable template key `office_message` (the typed text goes inside the branded layout).
 - Recorded in the person's or lead's timeline ("Message sent by X" with the text).
 - An unsubscribed person can still get a one-to-one message (it is not marketing); the sheet shows "Unsubscribed from news" as a warning.
@@ -180,3 +180,16 @@ Moishe wants automatic emails fully editable in System.
 3. No change in any email's output until someone edits (defaults = current output; snapshot-style test on a few emails).
 4. Next-morning email unchanged from today's behaviour by default.
 5. Change log rows; db_default on new columns; tests mocked.
+
+---
+
+# Bounced lead emails (agreed 2026-11-03, on feature/whatsapp)
+
+When a lead's email address has a **permanent bounce** (it is on the suppression list as a bounce; spam complaints do not count):
+- **Leads list:** the row shows a tag **Possible fake**. A Leads filter is optional, only if cheap.
+- **Lead page:** a clear notice near the top: "This email bounced, so it may not be real. Remove the lead if it looks like spam, or correct the address if it's a typo and resend the follow-up."
+- **Correct the email** (`can_edit`, audited in the timeline): updates the address on his journeys. It is also reachable without a bounce: the lead page's Details row (Reach out card) has Email, Change, which opens the same dialog titled "Change the email" (see whatsapp.md, Details rows); the first name and mobile Change are there too. Refused if that address already belongs to another lead or an account (say whose). The bounced address stays on the suppression list. The tag goes because the new address is clean.
+- **Resend follow-up:** after a correction, one button sends the next-morning email to the new address straight away (from the System sender, once per address, recorded in his timeline). Works with the automatic switch off, but needs a sender address set; otherwise the button explains. No resend while the address is still bounced.
+- **Remove the lead** stays as it is today, and Archive stays available.
+- Figures: a Possible fake lead still counts until removed or archived.
+- Tests mocked.

@@ -18,7 +18,12 @@
             {% include "common/_field_static.html" with id="setup-last" label="Last name" value=application.last_name %}
           </div>
           {% include "common/_field_static.html" with id="setup-email" label="Email" value=application.email %}
-          {% if form.mobile %}{% include "common/_field.html" with field=form.mobile hint="We could not use the mobile we have. Enter yours." good="Looks right" %}
+          {% if form.mobile %}<div class="mobile-row">
+            <div class="field field--country"><label for="id_mobile_country">Country</label>
+              <select id="id_mobile_country" name="mobile_country" aria-label="Country code" autocomplete="tel-country-code" data-country-select>{% for c in mobile_countries %}<option value="{{ c.iso }}"{% if c.iso == form.mobile_country.value|default:"GB" %} selected{% endif %}>{{ c.name }} ({{ c.dial }})</option>{% endfor %}</select>
+              <span class="dial" aria-hidden="true" data-dial>{% for c in mobile_countries %}{% if c.iso == form.mobile_country.value|default:"GB" %}{{ c.dial }}{% endif %}{% endfor %}</span></div>
+            {% include "common/_field.html" with field=form.mobile hint="We could not use the mobile we have. Enter yours." good="Looks right" %}
+          </div>
           {% elif application.mobile %}{% include "common/_field_static.html" with id="setup-mobile" label="Mobile" value=application.mobile %}{% endif %}
         </fieldset>
 

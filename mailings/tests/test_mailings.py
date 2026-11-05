@@ -17,7 +17,7 @@ from notifications import suppression
 from notifications.models import EmailSuppression
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import Plan
-from users import member, services as user_services
+from users import member, services as user_services, tokens as user_tokens
 from users.models import InterestRegistration
 
 User = get_user_model()
@@ -147,9 +147,11 @@ class LeadGroupTests(TestCase):
     def test_a_lead_who_registers_with_news_ticked_is_back_and_one_who_does_not_is_out(self):
         lead("a@example.com")
         EmailOptOut.objects.create(email="a@example.com")
-        user_services.register_interest({
+        user = user_services.register_interest({
             "first_name": "Al", "last_name": "B", "email": "a@example.com", "password": "a-long-test-password-1", "mobile": "+447912345678",
-            "date_of_birth": datetime.date(1990, 1, 1), "plan": "tier-2", "marketing_opt_in": True})
+            "date_of_birth": datetime.date(1990, 1, 1), "plan": "tier-2", "marketing_opt_in": True}).user
+        self.assertTrue(EmailOptOut.objects.exists())  # an unverified account (maybe a stranger's) cannot lift someone's unsubscribe
+        user_services.verify_email(user_tokens.make_verify_token(user))
         self.assertFalse(EmailOptOut.objects.exists())
         self.assertEqual(self.emails(), [])  # he has an account now: the other groups cover him
 
@@ -312,10 +314,12 @@ class UnsubscribeTests(TestCase):
         self.assertFalse(optout.unsubscribe("g@example.com")["changed"])  # idempotent
         self.assertTrue(EmailOptOut.objects.filter(email="g@example.com").exists())
         self.assertFalse(GoldApplication.objects.get().marketing_consent)
-        user_services.register_interest({
+        user = user_services.register_interest({
             "first_name": "Gil", "last_name": "B", "email": "g@example.com", "password": "a-long-test-password-1", "mobile": "+447912345678",
-            "date_of_birth": datetime.date(1990, 1, 1), "plan": "tier-2", "marketing_opt_in": True})
-        self.assertFalse(EmailOptOut.objects.exists())  # chose news again when registering
+            "date_of_birth": datetime.date(1990, 1, 1), "plan": "tier-2", "marketing_opt_in": True}).user
+        self.assertTrue(EmailOptOut.objects.exists())
+        user_services.verify_email(user_tokens.make_verify_token(user))
+        self.assertFalse(EmailOptOut.objects.exists())  # chose news again when registering, and proved the address
 
     def test_a_bad_token_is_refused(self):
         self.assertEqual(Client().post("/unsubscribe/not-a-token/").status_code, 400)

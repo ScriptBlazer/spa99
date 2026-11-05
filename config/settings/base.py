@@ -3,6 +3,7 @@
 Config comes from common.envloader (env vars -> private .env -> project .env -> defaults).
 """
 import os
+import shutil
 import re
 from datetime import time
 from pathlib import Path
@@ -58,6 +59,7 @@ INSTALLED_APPS = [
     "control",
     "pages",
     "chat",
+    "whatsapp",
 ]
 
 MIDDLEWARE = [
@@ -100,6 +102,7 @@ TEMPLATES = [
                 "office.context.office",
                 "system.context.system",
                 "chat.context.chat",
+                "whatsapp.context.push",
             ],
         },
     },
@@ -190,6 +193,28 @@ CHAT_OFF_TOPIC_LIMIT = 2  # off-topic or refused turns after which the conversat
 CHAT_COOKIE = "spa99_chat"  # set by GET /chat/state/: proves the request comes from the page
 CHAT_COOKIE_SECONDS = 24 * 60 * 60
 
+# WhatsApp through Twilio (docs/features/whatsapp.md). All secrets: never logged or printed. Any of the first five blank = WhatsApp is
+# "not configured" (the webhooks answer 404, sending is refused, System > WhatsApp says so). Push needs the VAPID pair as well.
+TWILIO_ACCOUNT_SID = (ENV.get("TWILIO_ACCOUNT_SID", "") or "").strip()
+TWILIO_API_KEY_SID = (ENV.get("TWILIO_API_KEY_SID", "") or "").strip()
+TWILIO_API_KEY_SECRET = (ENV.get("TWILIO_API_KEY_SECRET", "") or "").strip()
+TWILIO_AUTH_TOKEN = (ENV.get("TWILIO_AUTH_TOKEN", "") or "").strip()  # checks X-Twilio-Signature (an API key cannot)
+TWILIO_WHATSAPP_FROM = (ENV.get("TWILIO_WHATSAPP_FROM", "") or "").strip()  # the Spa 99 sender, e.g. +442045384999
+VAPID_PUBLIC_KEY = (ENV.get("VAPID_PUBLIC_KEY", "") or "").strip()
+VAPID_PRIVATE_KEY = (ENV.get("VAPID_PRIVATE_KEY", "") or "").strip()
+VAPID_SUBJECT = (ENV.get("VAPID_SUBJECT", "") or "").strip()  # mailto:hello@spa99.uk
+WHATSAPP_MAX_BODY = 1600  # Twilio's Messages API body limit
+WHATSAPP_MAX_IMAGE_BYTES = 5 * 1024 * 1024  # WhatsApp: images 5 MB
+WHATSAPP_MAX_FILE_BYTES = 16 * 1024 * 1024  # WhatsApp: audio, video and documents 16 MB
+WHATSAPP_VOICE_MAX_SECONDS = 5 * 60  # a voice note staff record in the chat
+WHATSAPP_VOICE_MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # what the browser may upload to be converted (5 minutes of WebM or MP4 audio is about 1 to 3 MB)
+WHATSAPP_VOICE_TIMEOUT_SECONDS = 30  # ffmpeg is killed after this
+FFMPEG_BIN = (ENV.get("FFMPEG_BIN", "") or "").strip() or "ffmpeg"  # voice notes need it; missing = the mic is hidden in the chat
+
+# The one domain Postmark may send from (the verified one: where hello@ lives). Office emails go From a staff member's own address only when it is on this domain. Blank = the domain of
+# DEFAULT_FROM_EMAIL (notifications.sender.sending_domain), so nothing is typed twice.
+EMAIL_SENDING_DOMAIN = (ENV.get("EMAIL_SENDING_DOMAIN", "") or "").strip().lower().strip(".")
+
 LANGUAGE_CODE = "en-gb"
 TIME_ZONE = "Europe/London"
 USE_I18N = True
@@ -277,6 +302,8 @@ def build_startup_report(settings_module):
         "email": describe_email(EMAIL_BACKEND, EMAIL_HOST),
         "sentry": SENTRY_STATE,
         "chat": "on" if ANTHROPIC_API_KEY else "off",
+        "whatsapp": "on" if (TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM and TWILIO_API_KEY_SID and TWILIO_API_KEY_SECRET) else "off",
+        "voice": "on" if shutil.which(FFMPEG_BIN) else "off",
         "unlock_code_set": bool(SYSTEM_UNLOCK_CODE),
         "unlock_code_invalid": bool(SYSTEM_UNLOCK_CODE_RAW) and not SYSTEM_UNLOCK_CODE_VALID,
         "media_is_local": MEDIA_IS_LOCAL,

@@ -16,10 +16,18 @@ How a legal body is written (one line per block, rendered by `content.legal_rend
 Keys: `body` (title and intro), `updated` (the date shown), `part_N` (the numbered parts, in order), `contact`."""
 
 UPDATED = "26 October 2026"
-PRIVACY_UPDATED = "30 October 2026"  # invitation emails track opens; earlier: Ask us chat (Anthropic) added, Postmark added as the email sender
+PRIVACY_UPDATED = "3 November 2026"  # WhatsApp added; earlier: invitation emails track opens, earlier: Ask us chat (Anthropic) added, Postmark added as the email sender
 INVITE_OPEN_LINE = ("- Invitation emails contain a tiny image (a tracking pixel), so we know whether the email was opened. "
                     "Other emails we send you do not.")
-PRIVACY_VERSION = "2026-10-26"  # SiteSettings.privacy_version; recorded on everyone who accepts this notice
+WHATSAPP_BLOCK = "\n".join([
+    "### WhatsApp",
+    "- Your first name and mobile number, if you gave them before seeing your suggested membership, and that you agreed we may email and WhatsApp you about opening and offers. "
+    "Registered people can also be WhatsApped on the mobile number on their account.",
+    "- Our WhatsApp messages with you: the text, photos and files, with the times and whether they were delivered and read, and your WhatsApp profile name. "
+    "They pass through Twilio, our messaging provider, and WhatsApp.",
+    "- Reply STOP to a message and we stop writing to you on WhatsApp.",
+])
+PRIVACY_VERSION = "2026-11-03"  # SiteSettings.privacy_version (WhatsApp added); recorded on everyone who accepts this notice. Changing it forces nobody to accept again: only new sign-ups, leads and applications record the new one.
 
 COMPANY_LINE = ("Spa 99 is run by BML SPA 99 LIMITED, a company registered in England (company number 16930909). "
                 "Our registered office is 40 Wellington Avenue, London N15 6AS.")
@@ -49,7 +57,7 @@ PRIVACY_PARTS = [
         "tablet or computer), and when you started and finished.",
         "Answers are saved as you go, even if you stop part way. They carry no name unless you register.",
         "- Your email address, if you give it. Before the journey shows your suggested membership and price, it asks for "
-        "your email, with a tick to say Spa 99 may email you about opening. We keep the address with your answers, the "
+        "your email, with a tick to say Spa 99 may email and WhatsApp you about opening and offers. We keep the address with your answers, the "
         "date you gave it and the version of this notice in force. If you are signed in, we use your account email "
         "instead and do not ask.",
         "### When you register",
@@ -79,6 +87,7 @@ PRIVACY_PARTS = [
         "- A record of each email we send you: which email, when, and whether it went out.",
         INVITE_OPEN_LINE,
         "- Emails you send us, kept in our mailbox.",
+        WHATSAPP_BLOCK,
         "### Our team",
         "- When our team use our own tools, we record what they do, with their IP address and browser, to keep the "
         "system secure. This covers team accounts only.",
@@ -102,9 +111,9 @@ PRIVACY_PARTS = [
         "{contact}. Basis: your consent.",
         "### To email you about opening after the journey",
         "If you gave your email in the guided journey and ticked the box, we use it to send news about the opening and "
-        "to understand which membership suits people (your answers, linked to your address, show us what people "
+        "offers, and to understand which membership suits people (your answers, linked to your address, show us what people "
         "choose). Basis: your consent. You can withdraw it at any time by following the unsubscribe link in any email "
-        "or by writing to {contact}; we then stop emailing you and delete the address.",
+        "or by writing to {contact}; we then stop emailing and WhatsApping you and delete the address.",
         "### To answer your questions in the chat",
         "The Ask us assistant answers questions about Spa 99 from our own information. It does not make decisions about "
         "you. Basis: legitimate interests.",

@@ -1,10 +1,10 @@
 {% extends "office/base.html" %}
 {% load office_tags %}
-{% block title %}Chat | Spa 99 Office{% endblock %}
+{% block title %}Assistant chat | Spa 99 Office{% endblock %}
 {% block body_attrs %}data-office-detail{% endblock %}
-{% block header_left %}<a class="o-back" href="{% url 'office_chats' %}">{% include "office/_icon.html" with name="chevron-left" %}<span>Chats</span></a>{% endblock %}
+{% block header_left %}<a class="o-back" href="{% url 'office_chats' %}">{% include "office/_icon.html" with name="chevron-left" %}<span>Assistant</span></a>{% endblock %}
 {% block main %}
-<h1>Chat, {{ conversation.created_at|dt }}</h1>
+<h1>Assistant chat, {{ conversation.created_at|dt }}</h1>
 <p class="o-totalline">{% if conversation.user %}{{ conversation.user.email }} (signed in){% elif conversation.lead_email %}{{ conversation.lead_email }} (gave their email in the chat){% else %}Anonymous{% endif %}
   · {{ conversation.message_count }} message{{ conversation.message_count|pluralize }} {% if show_cost %} · {{ conversation.total_cost_pence|floatformat:2 }}p{% endif %}{% if conversation.ended_by_cap %} · stopped by the spending cap{% endif %}{% if conversation.ended_off_topic %} · closed after off-topic turns{% endif %}</p>
 <div class="o-card">

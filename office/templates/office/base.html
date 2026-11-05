@@ -4,20 +4,27 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#F4F2ED">
 <meta name="color-scheme" content="light">
+{# The Office web app (Office host only: the public site has none of these). Status bar "default" because the page is light. #}
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Spa 99 Office">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="{% static 'common/img/app/apple-touch-icon.png' %}">
 <script>var d=document.documentElement;d.classList.add("js");setTimeout(function(){if(!d.dataset.reveal)d.classList.add("no-reveal")},4000)</script>
 <title>{% block title %}Spa 99 Office{% endblock %}</title>
 <link rel="icon" href="{% static 'common/img/mark-gold.svg' %}" type="image/svg+xml">
+<link rel="manifest" href="{% url 'office_manifest' %}">
 <link rel="preload" href="{% static 'common/fonts/signika-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{% static 'common/fonts/figtree-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="{% static 'common/css/office.css' %}">
 <script type="module" src="{% static 'common/js/office.js' %}"></script>
 {% block head_extra %}{% endblock %}
 </head>
-<body class="office" data-office-section="{{ section }}" {% block body_attrs %}{% endblock %}>
+<body class="office" data-office-section="{{ section }}" data-wa-unread="{{ whatsapp_unread|default:0 }}" {% block body_attrs %}{% endblock %}>
 {% include "office/_icons.html" %}
 <a class="skip-link" href="#office-main">Skip to content</a>
 <span class="o-sentinel" data-office-sentinel aria-hidden="true"></span>
@@ -29,13 +36,14 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
   <ul class="o-nav-list">
     {% if office_can.can_see_all %}<li><a href="{% url 'office_dashboard' %}" data-office-nav-item="dashboard"{% if section == "dashboard" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="dashboard" %}<span><span class="o-only-wide">Dashboard</span><span class="o-only-narrow">Home</span></span></a></li>{% endif %}
     {% if office_can.can_see_all %}<li data-nav-overflow><a href="{% url 'office_analytics' %}" data-office-nav-item="analytics"{% if section == "analytics" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="analytics" %}<span>Analytics</span></a></li>{% endif %}
-    {% if office_can.can_see_all %}<li><a href="{% url 'office_people' %}" data-office-nav-item="people"{% if section == "people" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="people" %}<span>Registered</span></a></li>{% endif %}
-    {% if office_can.can_see_all %}<li><a href="{% url 'office_leads' %}" data-office-nav-item="leads"{% if section == "leads" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="envelope" %}<span>Leads</span></a></li>{% endif %}
+    {% if office_can.can_see_all %}<li data-nav-overflow><a href="{% url 'office_people' %}" data-office-nav-item="people"{% if section == "people" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="people" %}<span>Registered</span></a></li>{% endif %}
+    {% if office_can.can_see_all %}<li><a href="{% url 'office_leads' %}" data-office-nav-item="leads"{% if section == "leads" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="address-book" %}<span>Leads</span></a></li>{% endif %}
+    {% if office_can.can_see_all %}<li><a href="{% url 'office_whatsapp' %}" data-office-nav-item="whatsapp"{% if section == "whatsapp" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="whatsapp" %}<span>WhatsApp</span><span class="o-badge-count" data-region="nav-badge" data-office-badge="whatsapp">{% if whatsapp_unread %}{% if whatsapp_unread > 99 %}99+{% else %}{{ whatsapp_unread }}{% endif %}<span class="sr-only"> unread</span>{% endif %}</span></a></li>{% endif %}
     {% if office_can.can_outreach %}<li data-nav-overflow><a href="{% url 'office_outreach' %}" data-office-nav-item="outreach"{% if section == "outreach" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="list-checks" %}<span>{{ office_outreach_title }}</span></a></li>{% endif %}
     {% if office_can.can_export %}<li data-nav-overflow><a href="{% url 'office_invited' %}" data-office-nav-item="invited"{% if section == "invited" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="person-plus" %}<span>Invited</span></a></li>{% endif %}
-    {% if office_can.can_see_all %}<li data-nav-overflow><a href="{% url 'office_chats' %}" data-office-nav-item="chats"{% if section == "chats" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="chat" %}<span>Chats</span></a></li>{% endif %}
+    {% if office_can.can_see_all %}<li data-nav-overflow><a href="{% url 'office_chats' %}" data-office-nav-item="chats"{% if section == "chats" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="chat" %}<span>Assistant</span></a></li>{% endif %}
     <li><a href="{% url 'office_gold' %}" data-office-nav-item="gold"{% if section == "gold" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="gold" %}<span>Gold</span><span class="o-badge-count" data-region="nav-badge" data-office-badge="gold">{% if office_waiting %}{{ office_waiting }}<span class="sr-only"> waiting</span>{% endif %}</span></a></li>
-    {% if office_can.can_see_all %}<li class="o-nav-more"><button type="button" data-nav-more aria-haspopup="dialog" aria-controls="nav-sheet" aria-expanded="false"{% if section == "analytics" or section == "chats" or section == "invited" or section == "outreach" %} class="is-current"{% endif %}>{% include "office/_icon.html" with name="more" %}<span>More</span></button></li>{% endif %}
+    {% if office_can.can_see_all %}<li class="o-nav-more"><button type="button" data-nav-more aria-haspopup="dialog" aria-controls="nav-sheet" aria-expanded="false"{% if section == "analytics" or section == "chats" or section == "invited" or section == "outreach" or section == "people" %} class="is-current"{% endif %}>{% include "office/_icon.html" with name="more" %}<span>More</span></button></li>{% endif %}
   </ul>
   <div class="o-nav-foot">
     <div class="o-who"><span class="o-disc" aria-hidden="true">{{ office_person.initials }}</span><span class="o-who-text"><span class="o-who-name">{{ office_person.name }}</span><span class="o-who-role">{{ office_person.role }}</span></span></div>
@@ -44,18 +52,21 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
 {% if office_can.can_see_all %}
 <dialog class="o-sheet o-navsheet" id="nav-sheet" data-nav-sheet aria-label="More">
   <ul class="o-sheet-links">
+    <li><a href="{% url 'office_people' %}"{% if section == "people" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="people" %}<span>Registered</span>{% include "office/_icon.html" with name="chevron-right" %}</a></li>
     {% if office_can.can_outreach %}<li><a href="{% url 'office_outreach' %}"{% if section == "outreach" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="list-checks" %}<span>{{ office_outreach_title }}</span>{% include "office/_icon.html" with name="chevron-right" %}</a></li>{% endif %}
     <li><a href="{% url 'office_analytics' %}"{% if section == "analytics" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="analytics" %}<span>Analytics</span>{% include "office/_icon.html" with name="chevron-right" %}</a></li>
-    <li><a href="{% url 'office_chats' %}"{% if section == "chats" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="chat" %}<span>Chats</span>{% include "office/_icon.html" with name="chevron-right" %}</a></li>
+    <li><a href="{% url 'office_chats' %}"{% if section == "chats" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="chat" %}<span>Assistant</span>{% include "office/_icon.html" with name="chevron-right" %}</a></li>
     {% if office_can.can_export %}<li><a href="{% url 'office_invited' %}"{% if section == "invited" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="person-plus" %}<span>Invited</span>{% include "office/_icon.html" with name="chevron-right" %}</a></li>{% endif %}
   </ul>
 </dialog>
 {% endif %}
 
+{% if office_can.can_see_all %}{% include "whatsapp/_notify_sheet.html" %}{% endif %}
+
 <div class="o-body">
   <header class="o-header" data-office-header>
     <div class="o-header-left">
-      {% block header_left %}{% include "common/_mark.html" %}<span class="o-title">{% block header_title %}{% if section == "dashboard" %}Dashboard{% elif section == "analytics" %}Analytics{% elif section == "people" %}Registered{% elif section == "leads" %}Leads{% elif section == "gold" %}Gold{% elif section == "chats" %}Chats{% elif section == "invited" %}Invited{% elif section == "outreach" %}{{ office_outreach_title }}{% endif %}{% endblock %}</span>{% endblock %}
+      {% block header_left %}{% include "common/_mark.html" %}<span class="o-title">{% block header_title %}{% if section == "dashboard" %}Dashboard{% elif section == "analytics" %}Analytics{% elif section == "people" %}Registered{% elif section == "leads" %}Leads{% elif section == "gold" %}Gold{% elif section == "chats" %}Assistant{% elif section == "whatsapp" %}WhatsApp{% elif section == "email" %}Email{% elif section == "invited" %}Invited{% elif section == "outreach" %}{{ office_outreach_title }}{% endif %}{% endblock %}</span>{% endblock %}
     </div>
     <div class="o-header-right">
       {% block header_range %}{% endblock %}
@@ -64,6 +75,7 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
         <div class="o-menu">
           <p class="o-menu-name">{{ office_person.name }}</p>
           <p class="o-menu-role">{{ office_person.role }}</p>
+          {% if office_can.can_see_all %}<button type="button" class="o-menu-item o-menu-item--row" data-notify-open aria-haspopup="dialog">{% include "office/_icon.html" with name="bell" %}<span>Notifications</span><span class="o-menu-state" data-notify-state>Off</span></button>{% endif %}
           <a class="o-menu-item" href="{% url 'office_password' %}" data-change-password>Change password</a>
           <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit" class="o-menu-item">Sign out</button></form>
         </div>

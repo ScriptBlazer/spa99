@@ -104,7 +104,7 @@ class EmailUnlocksMembershipsTests(TestCase):
     def test_passing_the_gate_unlocks_it_in_the_same_browser(self):
         import json
         self.assertEqual(self.client.get("/memberships/").status_code, 302)
-        self.client.post("/journey/lead/", json.dumps({"email": "new@example.com", "consent": True}), content_type="application/json")
+        self.client.post("/journey/lead/", json.dumps({"first_name": "New", "email": "new@example.com", "mobile": "07400123450", "consent": True}), content_type="application/json")
         self.assertEqual(self.client.get("/memberships/").status_code, 200)
 
     def test_a_signed_in_member_is_let_in(self):
@@ -122,13 +122,13 @@ class EmailUnlocksMembershipsTests(TestCase):
 
         post = lambda url, body: self.client.post(url, body, content_type="application/json")  # noqa: E731
         self.client.get("/journey/state/")
-        post("/journey/lead/", {"email": "x@example.com", "consent": True})
+        post("/journey/lead/", {"first_name": "X", "email": "x@example.com", "mobile": "07400123451", "consent": True})
         self.assertEqual(self.client.get("/memberships/").status_code, 200)  # x passed the gate
         post("/journey/restart/", {})
         self.assertEqual(self.client.get("/memberships/").status_code, 200)  # a plain restart still carries the email
         post("/journey/restart/", {"new_person": True})
         self.assertEqual(self.client.get("/memberships/").status_code, 302)  # y has not given his email yet
-        post("/journey/lead/", {"email": "y@example.com", "consent": True})
+        post("/journey/lead/", {"first_name": "Y", "email": "y@example.com", "mobile": "07400123452", "consent": True})
         self.assertEqual(self.client.get("/memberships/").status_code, 200)
         self.assertEqual(people.load().started(None, metrics.day()), 2)  # x and y, not one
 

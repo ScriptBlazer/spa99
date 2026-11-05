@@ -90,6 +90,26 @@ For the sticky notes board (`docs/features/office-outreach-design.md`). In `offi
 
 New icons in `_icons.html` (24 grid, 1.5 stroke, redrawn, no library): `list-checks`, `note`, `plus`, `x`, `paperclip`, `paper-plane`. Note that brand cream is a pale yellow-green (`#F5F2D8`), so a note reads as pale yellow paper; a one-line change to `--office-note` recolours the board.
 
+### 2.2c WhatsApp chat tokens (2026-11-03, approved, built)
+
+For the WhatsApp section (`docs/features/whatsapp-design.md`). In `office-tokens.css` under `.office`. One new colour, the rest aliases:
+
+```css
+--office-wa-wall: var(--office-sunken);        /* thread wall */
+--office-wa-in: var(--office-surface);         /* incoming bubble */
+--office-wa-out: #F6E1C8;                      /* NEW: outgoing bubble, gold 35% over surface: espresso 9.74, muted 5.17, gold-text 4.61, danger 7.18 */
+--office-wa-inset: rgb(73 46 33 / 0.07);       /* code, quote, PDF card inside a bubble */
+--office-wa-pattern: 0.6;                      /* opacity of the swan layer on the wall (decoration) */
+--office-wa-tick: var(--color-control-line);   /* queued, sent, delivered */
+--office-wa-tick-read: var(--office-text);     /* read */
+--office-wa-list-w: clamp(19rem, 26vw, 24rem); --office-wa-bubble-max: 36rem; --office-wa-avatar: 3rem;
+--office-em-list-w: clamp(21rem, 28vw, 26rem);   /* email thread list pane (2026-11-04, proposed) */
+--office-em-read-max: 48rem;                  /* longest email sheet (2026-11-04, proposed) */
+--office-wa-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;   /* code only; the brand has no mono */
+```
+
+Also: **Figtree Italic** (`figtree-latin-italic.woff2`, OFL, `@fontsource-variable/figtree` 5.3.0 latin subset), declared in `office-whatsapp.css` only, for `_italic_`. New icons in `_icons.html`: `whatsapp`, `tick`, `ticks`, `clock`, `arrow-down`, `arrow-clockwise`, `file-pdf`, `bell`, `bell-slash`, `share`, `mobile`. The app icons (gold swan on espresso, swan within the central 60%) are in `common/static/common/img/app/` (192, 512, maskable 512, apple-touch 180, white badge 96).
+
 ### 2.3 Type and layout
 
 ```css

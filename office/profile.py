@@ -8,6 +8,7 @@ from django.db.models import Prefetch
 from django.urls import reverse
 
 from gold.models import ApplicationEvent, GoldApplication
+from journey.copy import consent_text
 from journey.models import Answer, JourneySession
 from notifications.models import EmailLog
 from plans.models import Plan
@@ -81,6 +82,7 @@ def journey_item(session):
         "tier_reasons": list(detail.get("reasons", [])),
         "gold_potential": session.gold_potential, "gold_score": session.gold_score, "gold_reasons": list(detail.get("gold_reasons", [])),
         "lead_email": session.lead_email, "lead_at": _iso(session.lead_at), "lead_privacy_version": session.lead_privacy_version,
+        "lead_first_name": session.lead_first_name, "lead_mobile": session.lead_mobile, "lead_consent_version": session.lead_consent_version,
         "source": source_of(session), "answers": answers,
     }
 
@@ -125,7 +127,8 @@ def consent_block(emails, sessions, user=None, applications=()):
         if s.lead_email and (s.lead_at, s.lead_privacy_version) not in seen:
             seen.add((s.lead_at, s.lead_privacy_version))
             gate.append({"email": s.lead_email, "at": _iso(s.lead_at), "privacy_version": s.lead_privacy_version,
-                         "text": "Agreed that we may email about Spa 99 opening"})
+                         "text": consent_text(s.lead_consent_version),  # the wording of the version he ticked, not today's
+                         "consent_version": s.lead_consent_version, "first_name": s.lead_first_name, "mobile": s.lead_mobile})
     account = None
     if user is not None:
         account = {"privacy_version": user.privacy_accepted_version, "accepted_at": _iso(user.privacy_accepted_at),
@@ -143,7 +146,7 @@ def _entry(at, kind, label, detail="", href=""):
     return {"_at": at, "at": _iso(at), "kind": kind, "label": label, "detail": detail, "href": href}
 
 
-def timeline(sessions, user=None, interest=None, applications=(), email="", addresses=()):
+def timeline(sessions, user=None, interest=None, applications=(), email="", addresses=(), contacts=()):
     """Everything that happened to this person, newest first: journey started, email given, journey finished, registered,
     verified, membership choice changed, news opt in or out, Gold steps and emails sent (when recorded)."""
     out, given = [], set()
@@ -186,17 +189,26 @@ def timeline(sessions, user=None, interest=None, applications=(), email="", addr
             if e.action in (ApplicationEvent.EMAIL_SENT, ApplicationEvent.EMAIL_FAILED, ApplicationEvent.NOTE_DELETED, ApplicationEvent.NOTE_RESTORED, ApplicationEvent.NOTE_EDITED) or e.pk in copied:
                 continue  # the email rows below and the Gold page hold these; notes are sticky notes (their deletion is added from the notes)
             text = e.get_action_display()
+            whatsapp_contacted = e.action == ApplicationEvent.RESPONDED and ((e.meta or {}).get("whatsapp") or (e.meta or {}).get("email"))
             out.append(_entry(e.at, "gold_applied" if e.action == ApplicationEvent.SUBMITTED else "gold_event",
-                              "Applied for Gold" if e.action == ApplicationEvent.SUBMITTED else f"Gold: {text}",
+                              "Applied for Gold" if e.action == ApplicationEvent.SUBMITTED else ("Gold application marked Contacted" if whatsapp_contacted else f"Gold: {text}"),
                               " ".join(x for x in (a.reference, f"by {e.actor_label}" if e.actor_label else "") if x), _href("office_gold_application", a.pk)))
     if email:
-        for log in EmailLog.objects.filter(to__iexact=email).order_by("-created_at")[:defaults.get().person_emails_shown]:
+        logs = EmailLog.objects.filter(to__iexact=email)
+        if user is not None and not user.email_verified_at:
+            logs = logs.exclude(template="office_message")  # what staff wrote to this address is the lead's, not an unverified account's (anyone can register any address)
+        for log in logs.order_by("-created_at")[:defaults.get().person_emails_shown]:
             out.append(_entry(log.sent_at or log.created_at, "email", f"Email: {log.subject}", log.get_status_display()))
     if addresses:
         from outreach import services as outreach_services
 
         for at, kind, label, detail, note in outreach_services.timeline_entries(addresses):  # deleted and restored notes, messages, archive
             out.append({**_entry(at, kind, label, detail), "note": note})
+    if contacts:
+        from whatsapp import services as whatsapp
+
+        for at, kind, label, detail, href in whatsapp.timeline_entries(contacts):  # not one line per message: the first, one a day, STOP, failures
+            out.append(_entry(at, kind, label, detail, href))
     out.sort(key=lambda e: e["_at"], reverse=True)
     for e in out:
         del e["_at"]
@@ -220,8 +232,19 @@ def account_profile(user, interest=None):
         "gold": gold_block(sessions, applications),
         "source": {**(source_of(first) if first else {}), "registered_via": interest.source if interest is not None else ""},
         "consent": consent_block([user.email], [*sessions, *pending], user, applications),
-        "timeline": timeline(sessions, user, interest, applications, user.email, addresses=people.resolve(user=user)[1]),
+        "timeline": timeline(sessions, user, interest, applications, user.email, addresses=_addresses(user), contacts=_contacts(user=user)),
     }
+
+
+def _addresses(user):
+    return people.resolve(user=user)[1]
+
+
+def _contacts(user=None, email=""):
+    """The WhatsApp chats of this person, for the timeline lines: the rule in common.ownership (an unverified account's address is never used)."""
+    from whatsapp import services as whatsapp
+
+    return list(whatsapp.contacts_for_person(user, people.resolve(user=user, email=email)[1]))
 
 
 def lead_sessions_for(email):
@@ -236,6 +259,8 @@ def lead_profile(email, session_id):
     first = sessions[0] if sessions else None
     return {
         "kind": "lead", "id": str(session_id), "email": email.lower(), "registered": False,
+        "first_name": next((s.lead_first_name for s in reversed(sessions) if s.lead_first_name), ""), "mobile": next((s.lead_mobile for s in reversed(sessions) if s.lead_mobile), ""),
+        "name": next((s.lead_first_name for s in reversed(sessions) if s.lead_first_name), ""),
         "first_seen": _iso(min((s.lead_at or s.created_at for s in sessions), default=None)),
         "last_seen": _iso(max((s.last_seen_at for s in sessions), default=None)),
         "journeys": [journey_item(s) for s in sessions],
@@ -243,7 +268,7 @@ def lead_profile(email, session_id):
         "gold": gold_block(sessions, applications),
         "source": source_of(first) if first else {},
         "consent": consent_block([email], sessions, None, applications),
-        "timeline": timeline(sessions, applications=applications, email=email, addresses=people.resolve(email=email)[1]),
+        "timeline": timeline(sessions, applications=applications, email=email, addresses=people.resolve(email=email)[1], contacts=_contacts(email=email)),
     }
 
 
@@ -266,7 +291,7 @@ def heard_via(journeys):
 
 def chats_card(user=None, email="", limit=CHATS_SHOWN):
     """The assistant chats of one person for the card: {rows[{id, at, messages, first_question}], more}. The newest `limit`; two
-    queries (the page fetches one extra row to know if there are more). Same visibility as Office > Chats."""
+    queries (the page fetches one extra row to know if there are more). Same visibility as Office > Assistant."""
     from django.db.models import OuterRef, Subquery
 
     from chat import services as chat_services

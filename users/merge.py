@@ -8,7 +8,7 @@ they are on `keep`. Both accounts with a membership are refused unless it is the
 from django.db import transaction
 from django.db.models import Q
 
-from common import levels
+from common import levels, ownership
 from common.models import LoginEvent
 from common.tasks import erase_task_records
 from gold.models import GoldApplication
@@ -63,11 +63,38 @@ def preview(actor, keep, remove):
             "The same membership is on both: one copy is kept" + (", with the sale price they keep" if theirs.sale_percent_off and not mine.sale_percent_off and mine.plan_id == theirs.plan_id else "")
         ) if theirs else "None",
         "sessions": JourneySession.objects.filter(user=remove).count(),
-        "gold": GoldApplication.objects.filter(user=remove).count(),
+        "gold": _applications_of(remove).count(),
         "sign_ins": LoginEvent.objects.filter(user=remove).count(),
         "fill": fill,
         "drops_team_level": levels.held_level(remove) != levels.NONE,
     }
+
+
+def _applications_of(remove):
+    """The Gold applications that move: those linked to the account or made with its address, only when the account is verified. An unverified account may carry someone else's
+    address, and an old link made by address alone proves nothing: its applications are left where they are (the delete clears their link)."""
+    if not remove.email_verified_at:
+        return GoldApplication.objects.none()
+    return GoldApplication.objects.filter(Q(user=remove) | Q(email__iexact=remove.email))
+
+
+def _chats_of(remove):
+    """The ids of the WhatsApp chats that follow the person, by the one rule (common.ownership), read BEFORE the applications move. A chat tied to another account is left alone."""
+    from whatsapp.models import Contact
+
+    query = ownership.person_q(remove, {remove.email}, None)
+    return list(Contact.objects.filter(query).filter(Q(user=remove) | Q(user__isnull=True)).values_list("pk", flat=True))
+
+
+def _move_chats(keep, remove, ids):
+    """WhatsApp chats follow the person: the owner link moves to keep (or the delete would null it and leave the chat on the removed address, found by neither keep's lookup nor staff
+    erasure). The removed address on a chat becomes keep's only when that address was proven his (verified)."""
+    from whatsapp.models import Contact
+
+    removed, kept = remove.email.strip().lower(), keep.email.strip().lower()
+    if remove.email_verified_at:
+        Contact.objects.filter(pk__in=ids, lead_email=removed).update(lead_email=kept)
+    Contact.objects.filter(pk__in=ids).update(user=keep)
 
 
 @transaction.atomic
@@ -100,10 +127,12 @@ def merge(actor, keep, remove):
         JourneySession.history.model.objects.filter(id__in=both, lead_email__iexact=removed_email).update(lead_email=keep.email)
     # Gold applications (linked to the removed account or made with its email) now belong to keep and carry keep's email,
     # because export and erasure find them by email; their history rows follow.
-    apps = list(GoldApplication.objects.filter(Q(user=remove) | Q(email__iexact=removed_email)).values_list("pk", flat=True))
+    chats = _chats_of(remove)
+    apps = list(_applications_of(remove).values_list("pk", flat=True))
     GoldApplication.objects.filter(pk__in=apps).update(user=keep, email=keep.email)
     GoldApplication.history.model.objects.filter(id__in=apps).update(user=keep, email=keep.email)
     GoldApplication.objects.filter(approved_by=remove).update(approved_by=keep)
+    _move_chats(keep, remove, chats)
     LoginEvent.objects.filter(user=remove).update(user=keep)
     LoginEvent.objects.filter(attempted_email__iexact=removed_email).update(attempted_email=keep.email)
     EmailLog.objects.filter(subject_email__iexact=removed_email).update(subject_email=keep.email)

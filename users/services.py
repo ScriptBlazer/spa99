@@ -135,16 +135,25 @@ def register_interest(data, journey_session=None):
     return SignUpResult(user, created=True)
 
 
-def _after_registration(user, opted_in):
-    """Invites for this address become 'registered'; ticking the news box lifts an earlier unsubscribe. Never raises."""
-    from mailings import invites, optout
+def _after_registration(user, opted_in, proven=False):
+    """Only when the address is `proven` (the verify step): the invites for it become 'registered', and ticking the news box lifts an earlier unsubscribe. An unverified account may be a
+    stranger's (anyone can register any address), so at Register it neither marks the real person's invite registered nor undoes his unsubscribe. Never raises."""
+    from mailings import invites
 
+    if not proven:
+        return
     invites.on_registered(user)
     if opted_in:
-        try:
-            optout.clear(user.email)
-        except Exception:  # noqa: BLE001
-            logger.exception("Could not clear the unsubscribe for a new account")
+        _lift_unsubscribe(user)
+
+
+def _lift_unsubscribe(user):
+    from mailings import optout
+
+    try:
+        optout.clear(user.email)
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not clear the unsubscribe for a new account")
 
 
 def link_earlier_data(user):
@@ -205,6 +214,10 @@ def verify_email(token):
         user.save(update_fields=["email_verified_at", "updated_at"])
         metrics.email_verified(user.email_verified_at)
         link_earlier_data(user)  # the address is proven: earlier leads and applications with it become his
+    _after_registration(user, user.marketing_consent, proven=True)  # the address is proven: its invites become registered, and ticking the news box lifts an earlier unsubscribe
+    from whatsapp import services as whatsapp
+
+    whatsapp.relink_address(user.email)  # rule 1c: a chat staff gave this lead address now joins the verified account
     try:
         enqueue("users.tasks.send_welcome_email", str(user.pk))
     except Exception:  # noqa: BLE001
@@ -249,8 +262,9 @@ def password_changed(user):
 
 # ---------- GDPR ----------
 
-def export_user_data(user):
-    """Everything we hold about a person, as plain JSON-friendly data."""
+def export_user_data(user, include_chats=False):
+    """Everything we hold about a person, as plain JSON-friendly data. `include_chats` (WhatsApp chats) is for staff-run exports only: a mobile
+    number is not proven (anyone can register with a lead's number), so a member's own download never includes a WhatsApp chat."""
     profile = {name: getattr(user, name) for name in PERSON_FIELDS}
     profile = {key: (value.isoformat() if hasattr(value, "isoformat") else value) for key, value in profile.items()}
     logins = [
@@ -275,6 +289,8 @@ def export_user_data(user):
         "interest": _export_interest(user),
         "journey_sessions": _export_sessions(user),
         "chats": chat_services.export_conversations(user=user, email=user.email if user.email_verified_at else None),
+        **({"whatsapp": _export_whatsapp(user), "whatsapp_chats_not_included": _unlinked_chats(user)} if include_chats else {}),  # names only: nothing links them to him, so staff decide
+        "staff_emails": _export_staff_emails(user) if user.email_verified_at else [],  # found by address: only once the address is proven his
         "gold_applications": gold_services.export_applications(user.email) if user.email_verified_at else [],  # by email only once the address is proven his
         "emails": [
             {"template": e.template, "subject": e.subject, "status": e.status, "sent_at": _plain(e.sent_at)}
@@ -286,15 +302,41 @@ def export_user_data(user):
         ],
         "invites": [
             {"name": i.name, "status": i.status, "sent_at": _plain(i.sent_at), "opened_at": _plain(i.opened_at), "registered_at": _plain(i.registered_at)}
-            for i in _invites(user.email).order_by("created_at")
+            for i in _invites(user.email).order_by("created_at") if user.email_verified_at  # found by the address only: an unverified account may carry someone else's
         ],
         "uploaded_lists": [
             {"list": m.list.name, "name": m.name, "added_at": _plain(m.added_at)}
-            for m in _list_memberships(user.email).select_related("list").order_by("added_at")
+            for m in _list_memberships(user.email).select_related("list").order_by("added_at") if user.email_verified_at
         ],
         "login_events": logins,
         "history": history,
     }
+
+
+def _chat_addresses(user):
+    from outreach import people as outreach_people
+
+    return outreach_people.resolve(user=user)[1] | {user.email.lower()}
+
+
+def _export_staff_emails(user):
+    from outreach.services import export_messages
+
+    return export_messages(_chat_addresses(user))
+
+
+def _unlinked_chats(user):
+    """Chats on his mobile that nobody holds: not part of his export or erasure (common.ownership), so the export names them (number and name, never the messages)."""
+    from whatsapp import services as whatsapp
+
+    return [{"phone": c["phone"], "name": c["name"]} for c in whatsapp.unclaimed_for_user(user)]
+
+
+def _export_whatsapp(user):
+    from whatsapp import services as whatsapp
+
+    addresses = _chat_addresses(user)  # common.ownership uses them only when the account is verified
+    return whatsapp.export_for(whatsapp.contacts_for_person(user, addresses))
 
 
 def _email_logs(email):
@@ -306,6 +348,8 @@ def _mailing_rows(user):
     """Group-send rows for the person (by account or address)."""
     from mailings.models import MailingRecipient
 
+    if not user.email_verified_at:  # rows found only by the address are his only once it is proven
+        return MailingRecipient.objects.filter(user=user)
     return MailingRecipient.objects.filter(Q(user=user) | Q(email__iexact=user.email))
 
 
@@ -359,7 +403,8 @@ def _export_sessions(user):
     result = []
     for session in sessions:
         if session.user_id != user.pk:  # matched only by the address he gave: his lead details, nothing more about that visit
-            result.append({"started_at": session.created_at.isoformat(), "lead_email": session.lead_email, "lead_at": _plain(session.lead_at)})
+            result.append({"started_at": session.created_at.isoformat(), "lead_email": session.lead_email, "lead_at": _plain(session.lead_at),
+                           "lead_first_name": session.lead_first_name, "lead_mobile": session.lead_mobile, "lead_consent_version": session.lead_consent_version})
             continue
         answers = [
             {
@@ -372,7 +417,8 @@ def _export_sessions(user):
             "started_at": session.created_at.isoformat(), "device": session.device_type, "referrer": session.referrer,
             "utm_source": session.utm_source, "utm_medium": session.utm_medium, "utm_campaign": session.utm_campaign,
             "utm_term": session.utm_term, "utm_content": session.utm_content,
-            "lead_email": session.lead_email, "lead_at": _plain(session.lead_at),  # the address given before the result
+            "lead_email": session.lead_email, "lead_at": _plain(session.lead_at),  # the details given before the result
+            "lead_first_name": session.lead_first_name, "lead_mobile": session.lead_mobile, "lead_consent_version": session.lead_consent_version,
             "completed": session.completed, "completed_at": _plain(session.completed_at),
             "suggested_plan": session.suggested_plan.name if session.suggested_plan else None,
             "suggestion_detail": session.suggestion_detail,
@@ -382,7 +428,10 @@ def _export_sessions(user):
 
 
 def _login_events(user):
-    """Events linked to the person, plus failed attempts typed with their email (same set delete removes)."""
+    """Events linked to the person, plus failed attempts typed with their email, only once the address is proven his (same set delete removes). An unverified account may carry someone else's
+    address, and anyone can type any address at the sign-in: an unproven address exports a stranger's attempts (with his IP) and its deletion would erase the real owner's."""
+    if not user.email_verified_at:
+        return LoginEvent.objects.filter(user=user)
     return LoginEvent.objects.filter(Q(user=user) | Q(attempted_email__iexact=user.email))
 
 
@@ -391,29 +440,32 @@ def _anonymise_sessions(user):
     replaced, person key cleared, referrer and any typed text removed (also in the history rows)."""
     ids = list(JourneySession.objects.filter(user=user).values_list("pk", flat=True))
     for session_id in ids:
-        JourneySession.objects.filter(pk=session_id).update(user=None, key=new_session_key(), person_key="", referrer="",
-                                                            lead_email="", lead_at=None, lead_privacy_version="")
+        JourneySession.objects.filter(pk=session_id).update(user=None, key=new_session_key(), person_key="", referrer="", **journey_services.LEAD_BLANKS)
     Answer.objects.filter(session_id__in=ids).update(text_value="")
-    JourneySession.history.model.objects.filter(id__in=ids).update(user=None, key="", person_key="", referrer="",
-                                                                   lead_email="", lead_at=None, lead_privacy_version="")
+    JourneySession.history.model.objects.filter(id__in=ids).update(user=None, key="", person_key="", referrer="", **journey_services.LEAD_BLANKS)
     Answer.history.model.objects.filter(session_id__in=ids).update(text_value="")
     return len(ids)
 
 
 @transaction.atomic
-def delete_user_data(user):
+def delete_user_data(user, include_chats=False):
     """Erase a person: account, interest, Gold applications by their email, email log (including emails about them sent to staff), django-q task records, login events and the history
     rows that copy their details. Journey sessions are anonymised (kept for statistics, no longer linked).
     Erasure overrides the "history is never deleted" rule because history holds personal data."""
     pk, email = user.pk, user.email
+    proven = bool(user.email_verified_at)  # anything found only by email is his only once the address is proven (an unverified account may carry someone else's address)
     chat_services.erase_conversations(user=user)  # before the sessions are unlinked (chats are also found through the account's sessions)
     from outreach import people as outreach_people
     from outreach.services import erase_email
 
-    for address in outreach_people.resolve(user=user)[1] | {email.lower()}:  # notes, messages and list entries on all his addresses (resolve() merges journey addresses only when verified)
-        erase_email(address)
+    if proven:  # notes, messages, approach list and archive rows on all his addresses: an unverified account never erases another person's
+        for address in outreach_people.resolve(user=user)[1] | {email.lower()}:
+            erase_email(address)
+    from whatsapp import services as whatsapp
+
+    if include_chats:  # staff-run erasure only: a member deleting his own account never reaches a WhatsApp chat
+        whatsapp.erase_person(user, _chat_addresses(user))  # chats, messages and files, by the rule in common.ownership (before the sessions are cleared)
     anonymised = _anonymise_sessions(user)
-    proven = bool(user.email_verified_at)  # rows found only by email are his only once the address is proven (an unverified account may carry someone else's address)
     if proven:
         journey_services.erase_lead(email)  # an address given at the journey gate before he had an account
     removed_logins = _login_events(user).delete()[0]

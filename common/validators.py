@@ -73,6 +73,8 @@ def normalise_email(value):
     cleaned = (value or "").strip().lower()
     if not cleaned:
         raise ValidationError(MESSAGES["email_required"], code="required")
+    if len(cleaned) > 254:
+        raise ValidationError(MESSAGES["email_invalid"], code="invalid")
     try:
         validate_email(cleaned)
     except ValidationError:
@@ -96,6 +98,13 @@ def normalise_uk_mobile(value):
     if not is_uk_mobile:
         raise ValidationError(MESSAGES["mobile_invalid"], code="invalid")
     return phonenumbers.format_number(number, phonenumbers.PhoneNumberFormat.E164)
+
+
+def normalise_mobile(value, country=None):
+    """Any country's mobile -> E.164 (see common.phone). `country` is an ISO code, GB by default; a number typed with + wins."""
+    from . import phone
+
+    return phone.normalise(value, country)
 
 
 def validate_uk_mobile(value):

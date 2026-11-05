@@ -8,11 +8,12 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 
 from common.useragent import device_type
-from common.validators import normalise_email
+from common.validators import normalise_email, normalise_mobile
 from insights import metrics
 from plans.models import SiteSettings
 
 from .conditions import matches
+from .copy import CONSENT_VERSION, GATE
 from .models import Answer, JourneySession, Option, Question, new_session_key
 
 COOKIE_NAME = "spa99_journey"
@@ -31,6 +32,10 @@ class AnswerError(ValueError):
 
 # ---------- sessions ----------
 
+# Everything the email step stores on a session (carried across a restart in the same browser, cleared by erasure).
+LEAD_FIELDS = ("lead_email", "lead_at", "lead_privacy_version", "lead_first_name", "lead_mobile", "lead_consent_version")
+LEAD_BLANKS = {"lead_email": "", "lead_at": None, "lead_privacy_version": "", "lead_first_name": "", "lead_mobile": "", "lead_consent_version": ""}
+
 def create_session(user_agent="", referrer="", utm=None, user=None, previous=None):
     """A new journey session. `previous` (a restart in the same browser) hands over its person_key and email, so the person
     stays one person; otherwise the session's own key becomes its person_key. A "Not you?" restart passes no `previous`:
@@ -47,8 +52,7 @@ def create_session(user_agent="", referrer="", utm=None, user=None, previous=Non
             referrer=(referrer or "")[:500],
             user=user if user is not None and user.is_authenticated else None,
             # a restart in the same browser is the same person: he is not asked for his email again
-            **({"lead_email": previous.lead_email, "lead_at": previous.lead_at, "lead_privacy_version": previous.lead_privacy_version}
-               if previous is not None else {}),
+            **({name: getattr(previous, name) for name in LEAD_FIELDS} if previous is not None else {}),
             **{name: (utm.get(name) or "")[:100] for name in UTM_FIELDS},
         )
         if not session.is_bot:  # bots are never counted
@@ -125,11 +129,11 @@ def link_leads(user):
 
 # ---------- the email gate (before the result) ----------
 
-CONSENT_MESSAGE = "Please tick the box so we may email you about Spa 99 opening."
+CONSENT_MESSAGE = GATE["errors"]["consent"]
 
 
 class LeadError(ValueError):
-    """The email or the consent is not acceptable. `errors` is {field: message}, safe to show."""
+    """Something at the email step is not acceptable. `errors` is {field: message}, safe to show."""
 
     def __init__(self, errors):
         super().__init__("; ".join(errors.values()))
@@ -137,8 +141,8 @@ class LeadError(ValueError):
 
 
 def lead_required(session, user=None):
-    """Does this visitor still have to leave an email before the result? Not when signed in (his account is his
-    address), not once an address was given on this session, and not while System has the email screen switched off."""
+    """Does this visitor still have to leave his details before the result? Not when signed in (his account is his
+    address), not once an address was given on this session, and not while System has the email step switched off."""
     if user is not None and user.is_authenticated:
         return False
     if not SiteSettings.load().journey_email_gate:
@@ -146,15 +150,35 @@ def lead_required(session, user=None):
     return session.user_id is None and not session.lead_email
 
 
-def save_lead(session, email, consent):
-    """Store the visitor's email on his journey session (one field, one consent). Returns the clean address.
-    Raises LeadError. Safe to repeat: a second address replaces the first."""
+def clean_first_name(value):
+    """A first name: trimmed, one line, 1 to 100 characters. Raises ValidationError."""
+    cleaned = " ".join((value or "").replace("\x00", "").split()) if isinstance(value, str) else ""
+    if not cleaned or len(cleaned) > 100 or "://" in cleaned or "<" in cleaned or ">" in cleaned:  # a name, not a link or markup
+        raise ValidationError(GATE["errors"]["first_name"], code="invalid")
+    return cleaned
+
+
+def save_lead(session, email, consent, first_name=None, mobile=None, mobile_country=None, require_details=False):
+    """Store the visitor's first name, email and mobile on his journey session (first name, email and mobile all required, one consent). Returns the clean
+    address. Raises LeadError with a message per field. Safe to repeat: a second set replaces the first. The email step passes
+    `require_details`; the Ask us chat gives an email only (no name or mobile asked), so there they stay as they were."""
     errors = {}
+    ask = require_details or first_name is not None or mobile is not None
+    name = phone = ""
     try:
-        clean = normalise_email(email)
+        if ask:
+            name = clean_first_name(first_name)
     except ValidationError as error:
-        errors["email"] = error.messages[0]
-        clean = ""
+        errors["first_name"] = error.messages[0]
+    try:
+        clean = normalise_email(email if isinstance(email, str) else "")
+    except ValidationError:
+        errors["email"], clean = GATE["errors"]["email"], ""
+    try:
+        if ask:
+            phone = normalise_mobile(mobile if isinstance(mobile, str) else "", mobile_country if isinstance(mobile_country, str) else None)
+    except ValidationError:
+        errors["mobile"] = GATE["errors"]["mobile"]
     if consent is not True:
         errors["consent"] = CONSENT_MESSAGE
     if errors:
@@ -162,14 +186,18 @@ def save_lead(session, email, consent):
     from plans.models import SiteSettings  # local: plans imports journey services indirectly
 
     session.lead_email = clean
+    if ask:
+        session.lead_first_name, session.lead_mobile = name, phone
     session.lead_at = timezone.now()
     session.lead_privacy_version = SiteSettings.load().privacy_version
-    session.save(update_fields=["lead_email", "lead_at", "lead_privacy_version", "updated_at"])
+    if ask:  # the chat's email-only wording is not the email-and-WhatsApp consent: it never replaces a version already recorded
+        session.lead_consent_version = CONSENT_VERSION
+    session.save(update_fields=[*LEAD_FIELDS, "updated_at"])
     touch(session)
     from office import snapshots  # local: the Office job reads the journey tables
 
     snapshots.request_refresh()  # a new lead moves the Office figures (debounced, after commit)
-    return clean
+    return clean  # the number is stored on this session only: it never links or renames a chat (common.ownership, rule 2)
 
 
 def erase_lead(email):
@@ -182,8 +210,8 @@ def erase_lead(email):
 
     chat_services.erase_conversations(email=email)  # chats where the address was given
     ids = list(JourneySession.objects.filter(lead_email__iexact=email).values_list("pk", flat=True))
-    JourneySession.objects.filter(pk__in=ids).update(lead_email="", lead_at=None, lead_privacy_version="")
-    JourneySession.history.model.objects.filter(lead_email__iexact=email).update(lead_email="", lead_at=None, lead_privacy_version="")
+    JourneySession.objects.filter(pk__in=ids).update(**LEAD_BLANKS)
+    JourneySession.history.model.objects.filter(lead_email__iexact=email).update(**LEAD_BLANKS)
     return len(ids)
 
 
@@ -202,10 +230,10 @@ def erase_lead_data(email):
     chat_services.erase_conversations(email=email)
     ids = list(JourneySession.objects.filter(lead_email__iexact=email).values_list("pk", flat=True))
     for pk in ids:
-        JourneySession.objects.filter(pk=pk).update(key=new_session_key(), person_key="", referrer="", lead_email="", lead_at=None, lead_privacy_version="")
+        JourneySession.objects.filter(pk=pk).update(key=new_session_key(), person_key="", referrer="", **LEAD_BLANKS)
     Answer.objects.filter(session_id__in=ids).update(text_value="")
     History = JourneySession.history.model
-    History.objects.filter(id__in=ids).update(key="", person_key="", referrer="", lead_email="", lead_at=None, lead_privacy_version="")
+    History.objects.filter(id__in=ids).update(key="", person_key="", referrer="", **LEAD_BLANKS)
     Answer.history.model.objects.filter(session_id__in=ids).update(text_value="")
     EmailLog.objects.filter(to__iexact=email).delete()
     erase_address(email)
@@ -497,6 +525,7 @@ def export_lead(email):
             "started_at": session.created_at.isoformat(), "device": session.device_type, "referrer": session.referrer,
             "utm_source": session.utm_source, "utm_medium": session.utm_medium, "utm_campaign": session.utm_campaign,
             "lead_email": session.lead_email, "lead_at": session.lead_at.isoformat() if session.lead_at else None,
+            "lead_first_name": session.lead_first_name, "lead_mobile": session.lead_mobile, "lead_consent_version": session.lead_consent_version,
             "utm_term": session.utm_term, "utm_content": session.utm_content, "lead_privacy_version": session.lead_privacy_version,
             "completed": session.completed,
             "suggested_plan": session.suggested_plan.name if session.suggested_plan else None,

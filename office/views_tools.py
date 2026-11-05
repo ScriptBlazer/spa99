@@ -1,4 +1,4 @@
-"""Views for the person tools: sticky notes, the approach list, Message and Send guide. Short: validate, call the service in
+"""Views for the person tools: sticky notes, the approach list, Send guide and the Email button. Short: validate, call the service in
 outreach.services (or gold.actions), answer. Notes answer an HTMX request with the notes partial."""
 from django.contrib import messages
 from urllib.parse import urlencode
@@ -142,21 +142,27 @@ def outreach_add(request, pk, kind):
 @editor
 @require_POST
 def message_send(request, pk, kind):
-    """Message a lead or a person: queued email from the site sender, Reply-To the contact address, kept for the timeline."""
-    if kind == "gold":
-        raise Http404
+    """The Email button on a lead, person or Gold page: a plain text email from the logged-in person, queued, kept for the timeline. On a Gold page the first one marks New as Contacted."""
     target = tools.target_for(kind, pk)
     form = MessageForm(request.POST)
     if not form.is_valid():
         messages.error(request, " ".join(_errors(form)))
         return redirect(target.page_url)
-    result, _ = services.send_message(request.user, target.main, form.cleaned_data["message"])
-    if result == services.DONE:
-        messages.success(request, "Your message is on its way. It is in the timeline.")
-    elif result == services.DUPLICATE:
+    blocked = services.email_block(target.main)
+    if blocked:
+        messages.error(request, f"Not sent. {blocked}")
+        return redirect(target.page_url)
+    result, message = services.send_message(request.user, target.main, form.cleaned_data["message"])
+    if result == services.DUPLICATE:
         messages.info(request, "That message was already sent.")
+    elif result != services.DONE:
+        messages.error(request, "The email could not be sent.")
+    elif message.status == message.FAILED:
+        messages.error(request, "The email could not be sent. It shows as failed in the timeline.")
     else:
-        messages.error(request, "The message could not be sent.")
+        messages.success(request, "Your email is on its way. It is in the timeline.")
+        if kind == "gold":
+            gold_actions.whatsapp_sent(target.application, request.user, message.text, via="email")  # first contact: New becomes Contacted, once
     return redirect(target.page_url)
 
 
@@ -200,6 +206,49 @@ def lead_unarchive(request, pk):
     else:
         messages.info(request, "He was not archived.")
     return redirect(_back(request, target.page_url))
+
+
+@editor
+@require_POST
+def lead_email(request, pk):
+    """Change a lead's email (a typo, or a new address he gave), after a bounce or not. POST email. Refused, saying whose it is, when another lead or an account has it."""
+    target = tools.target_for("lead", pk)
+    if target.kind != "lead":
+        return redirect(target.page_url)
+    result, info = services.correct_lead_email(target.main, request.POST.get("email", ""), request.user)
+    if result == services.DONE:
+        messages.success(request, "Email changed.")
+    elif result == services.UNCHANGED:
+        messages.info(request, "That is the address he already has.")
+    elif result == services.TAKEN:
+        who = {"account": info["name"], "gold": f"a Gold application ({info['name']})", "archived": "an archived lead", "chat": "a WhatsApp chat"}.get(info["kind"], f"another lead ({info['name']})")
+        messages.error(request, f"That address already belongs to {who}.")
+    elif result == services.INVALID:
+        messages.error(request, info)
+    else:
+        messages.error(request, "Could not correct this email.")
+    return redirect(target.page_url)
+
+
+@editor
+@require_POST
+def lead_resend(request, pk):
+    """Send the next-morning email to his (corrected) address now, once."""
+    target = tools.target_for("lead", pk)
+    if target.kind != "lead":
+        return redirect(target.page_url)
+    result, info = services.resend_follow_up(target.main, request.user)
+    if result == services.SENT:
+        messages.success(request, "Follow-up sent.")
+    elif result == services.BOUNCED:
+        messages.error(request, "That address still bounces, so nothing was sent. Correct it first.")
+    elif result == services.NO_SENDER:
+        messages.error(request, "Set the sender address in System > Settings first, then try again.")
+    elif result == services.ALREADY:
+        messages.info(request, "The follow-up already went to this address.")
+    else:
+        messages.error(request, f"The follow-up was not sent ({info or 'try again'}).")
+    return redirect(target.page_url)
 
 
 # ---------- the approach list page ----------

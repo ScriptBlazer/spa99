@@ -14,6 +14,8 @@ an event loop, where Django refuses database calls, so the run calls this in a c
   waiting                   Gold applications waiting for a decision
   price SLUG                plan price ex VAT
   assets                    Control Library files
+  clear-lead-mobile EMAIL   blank the mobile on this address's journeys (an older lead, from before the number was required)
+  lead EMAIL                {"exists", "id" (newest journey session with this address), "mobile", "first_name", "consent_version"}
 """
 import argparse
 import json
@@ -93,6 +95,16 @@ def main(argv):
         return {"price": str(Plan.objects.get(slug=args[0]).price_ex_vat)}
     if cmd == "assets":
         return {"count": MediaAsset.objects.count()}
+    if cmd == "clear-lead-mobile":
+        from journey.models import JourneySession
+
+        return {"cleared": JourneySession.objects.filter(lead_email__iexact=args[0]).update(lead_mobile="")}
+    if cmd == "lead":
+        from journey.models import JourneySession
+
+        row = JourneySession.objects.filter(lead_email__iexact=args[0]).order_by("-created_at").first()
+        return {"exists": row is not None, "id": str(row.pk) if row else "", "mobile": row.lead_mobile if row else "", "first_name": row.lead_first_name if row else "",
+                "consent_version": row.lead_consent_version if row else ""}
     raise SystemExit(f"Unknown command: {cmd}")
 
 

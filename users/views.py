@@ -41,9 +41,9 @@ def _message(request, title, text, status=200):
     return render(request, "users/message.html", {"title": title, "text": text}, status=status)
 
 
-def _throttled(request, scope, limit, window):
-    """True (and the caller should stop) when this IP has done too much."""
-    return not hit(scope, client_ip(request) or "unknown", limit, window)
+def _throttled(request, scope, limit, window, lock=False):
+    """True (and the caller should stop) when this IP has done too much. lock=True for guessing (see common.ratelimit.hit)."""
+    return not hit(scope, client_ip(request) or "unknown", limit, window, rolling=True, lock=lock)
 
 
 # ---------- login ----------
@@ -99,7 +99,7 @@ class LoginView(auth_views.LoginView):
         return _forget_journey_cookie(response) if foreign else response
 
     def post(self, request, *args, **kwargs):
-        if _throttled(request, "login", 10, 300):
+        if _throttled(request, "login", 10, 300, lock=True):
             context = {"form": self.get_form_class()(request), "throttled": True, **_login_layout(request)}
             return render(request, self.template_name, context, status=429)
         return super().post(request, *args, **kwargs)
@@ -226,9 +226,18 @@ def register(request):
         initial = {"plan": plan_slug}
         if session and session.lead_email:  # he gave his email at the journey in this browser: pre-fill it, still editable
             initial["email"] = session.lead_email
+            if session.lead_first_name:  # and the first name and mobile from the same step
+                initial["first_name"] = session.lead_first_name
+            if session.lead_mobile:
+                from common import phone
+
+                parts = phone.split(session.lead_mobile)
+                initial["mobile"], initial["mobile_country"] = parts["national"], parts["country"]
         initial.update(invites.prefill(request.session.get(invites.SESSION_KEY)))  # a personal invite wins
         form, status = SignUpForm(initial=initial), 200
-    context = {"form": form, "plans": plans, "selected_plan": plan_slug, "suggested_plan": suggested, "from_journey": bool(session and session.completed),
+    from common import phone
+
+    context = {"form": form, "mobile_countries": phone.countries(), "plans": plans, "selected_plan": plan_slug, "suggested_plan": suggested, "from_journey": bool(session and session.completed),
                "register_sale": sale_services.register_offer(request=request)}
     return render(request, "users/register.html", context, status=status)
 
@@ -362,7 +371,7 @@ def password_change_old(request):
 def account_emails(request):
     """Marketing emails on or off (UK GDPR consent, logged in the person's history). 20 a minute per person."""
     wants_json = "application/json" in request.headers.get("accept", "")
-    if not hit("account-emails", request.user.pk, 20, 60):
+    if not hit("account-emails", request.user.pk, 20, 60, rolling=True):
         if wants_json:
             return JsonResponse({"saved": False}, status=429)
         messages.error(request, "Too many changes. Please try again in a minute.")
@@ -382,7 +391,7 @@ class _PasswordChange(auth_views.PasswordChangeView):
     form_class = ChangePasswordForm
 
     def post(self, request, *args, **kwargs):
-        if _throttled(request, "password-change", 10, 3600):
+        if _throttled(request, "password-change", 10, 3600, lock=True):
             return _message(request, "Please wait", "Too many attempts. Please try again later.", status=429)
         return super().post(request, *args, **kwargs)
 

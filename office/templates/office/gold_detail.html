@@ -52,8 +52,9 @@
       <div class="o-actions-rail">{% include "office/_gold_actions.html" %}</div>
       {% if office_can.can_act and a.can_approve %}<p class="o-sub">He gets an email to set up his account. The link lasts 14 days.{% if a.potential in final_waits and not a.sent_back %} The potential is {{ a.potential|capfirst }}, so a final approver confirms first.{% endif %}</p>{% endif %}
       {% if a.person_id and office_can.can_see_all %}<a class="o-quiet" href="{% url 'office_person' a.person_id %}">Open his account</a>{% endif %}
+      {% include "office/_channels.html" with secondary=True %}{# both channels are secondary here, so Approve stays the one primary; outside can_edit so a reader still sees a live thread #}
+      {% include "office/_details.html" with gold=True %}{# the one Add or Change for the number; a reader sees the value #}
       {% if office_can.can_edit %}<div class="o-actions-more" data-gold-more>
-        {% if office_can.can_act and a.can_respond %}<button type="button" class="btn btn-secondary" data-gold-open="respond" aria-haspopup="dialog">Respond</button>{% endif %}
         {% if guide_available %}<button type="button" class="btn btn-secondary" data-gold-open="guide" aria-haspopup="dialog" data-send-guide>{% include "office/_icon.html" with name="paper-plane" %}Send guide</button>
         {% else %}<button type="button" class="btn btn-secondary o-btn-off" aria-disabled="true" aria-describedby="guide-hint" data-send-guide>{% include "office/_icon.html" with name="paper-plane" %}Send guide</button>{% endif %}
       </div>
@@ -70,6 +71,6 @@
   <div class="o-bar-actions">{% include "office/_gold_actions.html" with bar=True %}</div>
 </div>
 {% endif %}
-{% if office_can.can_edit %}{% include "office/_gold_dialogs.html" %}{% if outreach.can_add and not outreach.on_list %}{% include "office/_outreach_dialog.html" with who=a.name|first_word %}{% endif %}{% endif %}
+{% if office_can.can_edit %}{% include "office/_mobile_dialog.html" %}{% include "office/_email_dialog.html" %}{% include "office/_gold_dialogs.html" %}{% if outreach.can_add and not outreach.on_list %}{% include "office/_outreach_dialog.html" with who=a.name|first_word %}{% endif %}{% endif %}
 {% endwith %}
 {% endblock %}

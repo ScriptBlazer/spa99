@@ -4,7 +4,7 @@ import copy
 from django import forms
 from django.core.exceptions import ValidationError
 
-from common.validators import normalise_email, normalise_uk_mobile, password_problems, validate_adult, validate_person_name
+from common.validators import normalise_email, normalise_mobile, password_problems, validate_adult, validate_person_name
 
 from users.forms import SignUpForm
 
@@ -29,6 +29,7 @@ class GoldApplicationForm(forms.Form):
     last_name = forms.CharField(max_length=200)
     email = forms.CharField(max_length=254)
     mobile = forms.CharField(max_length=40)
+    mobile_country = forms.CharField(max_length=2, required=False)  # ISO code of the country select (default GB); a number typed with + or 00 wins
     industry = IndustryField(choices=[], error_messages={"required": "Choose at least one."})
     industry_other = forms.CharField(max_length=100, required=False)
     property_link = forms.ChoiceField(choices=[], required=False)  # only for industry Property (see clean())
@@ -97,7 +98,7 @@ class GoldApplicationForm(forms.Form):
         return normalise_email(self.cleaned_data["email"])
 
     def clean_mobile(self):
-        return normalise_uk_mobile(self.cleaned_data["mobile"])
+        return normalise_mobile(self.cleaned_data["mobile"], self.data.get("mobile_country"))
 
     def clean_company(self):
         return " ".join(self.cleaned_data["company"].split())
@@ -139,6 +140,7 @@ class GoldSetupForm(forms.Form):
         max_length=40, required=False,
         widget=forms.TextInput(attrs={"data-validate": "required mobile", "autocomplete": "tel", "inputmode": "tel"}),
     )
+    mobile_country = forms.CharField(required=False, max_length=2, widget=forms.HiddenInput())
 
     def __init__(self, *args, application=None, mobile_editable=False, **kwargs):
         super().__init__(*args, **kwargs)
@@ -146,19 +148,24 @@ class GoldSetupForm(forms.Form):
         self.mobile_editable = mobile_editable
         if mobile_editable:
             self.fields["mobile"].required = True
-            self.initial.setdefault("mobile", application.mobile)
+            from common import phone
+
+            parts = phone.split(application.mobile) if application.mobile else {"national": "", "country": "GB"}
+            self.initial.setdefault("mobile", parts["national"])
+            self.initial.setdefault("mobile_country", parts["country"])
             self.fields["mobile"].widget.attrs.setdefault("data-validate", "required mobile")
         else:
             del self.fields["mobile"]
+            del self.fields["mobile_country"]
 
     def clean_date_of_birth(self):
         return validate_adult(self.cleaned_data["date_of_birth"])
 
     def clean_mobile(self):
-        mobile = normalise_uk_mobile(self.cleaned_data["mobile"])
-        from users.models import User
+        mobile = normalise_mobile(self.cleaned_data["mobile"], self.data.get("mobile_country"))
+        from . import invites
 
-        if User.objects.filter(mobile=mobile).exists():
+        if invites.mobile_taken(mobile, self.application):  # the unverified account this invite replaces holds its own mobile: that is his, so it is allowed
             raise ValidationError("That mobile number is already registered.")
         return mobile
 
@@ -197,8 +204,3 @@ class DeclineForm(forms.Form):
         if data.get("email_applicant") and not data.get("email_message"):
             self.add_error("email_message", "Write the message to send, or untick Email the applicant.")
         return data
-
-
-class RespondForm(forms.Form):
-    message = _text("Message", 5, MESSAGE_MAX, "Write the message for the applicant.")
-

@@ -1,0 +1,10 @@
+{% comment %}The Email button (lead, person and Gold pages): it opens the Email pop-up (_email_dialog.html). `em` is the page's `email_msg` context, `wa` its `whatsapp`, `primary` which channel is the one primary (see reach_primary).
+Always shown, plainly labelled. Disabled with its reason when he has no valid address or it bounced; for a reader, disabled and "View only." (said once: WhatsApp's own line covers it when it shows one).{% endcomment %}
+<div class="o-channel" data-email-button>
+  {% if em.can_send and not em.blocked %}
+  <button type="button" class="btn {% if primary == 'email' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-email-btn" data-dialog-open="email" aria-haspopup="dialog" data-email-open>{% include "office/_icon.html" with name="envelope" %}<span>Email</span></button>
+  {% else %}
+  <button type="button" class="btn btn-secondary btn-block o-email-btn o-btn-off" aria-disabled="true" aria-describedby="{% if wa.state == 'view_only' and not em.blocked %}wa-hint{% else %}em-hint{% endif %}" data-email-off>{% include "office/_icon.html" with name="envelope" %}<span>Email</span></button>
+  {% if em.blocked %}<p class="o-hint-line" id="em-hint" data-email-reason>{{ em.blocked }}</p>{% elif wa.state != "view_only" %}<p class="o-hint-line" id="em-hint" data-email-reason>View only.</p>{% endif %}
+  {% endif %}
+</div>

@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from common.tasks import enqueue, erase_task_records
@@ -175,7 +176,7 @@ def submit_application(data, session=None):
                 data = {**data, "property_link": rating.PROPERTY_LAWYER}
 
         previous = GoldApplication.objects.filter(email__iexact=email).order_by("created_at").first()
-        person = get_user_model().objects.filter(email__iexact=email).first()
+        person = get_user_model().objects.filter(email__iexact=email, email_verified_at__isnull=False).first()  # an unverified account may carry someone else's address: it is linked when it verifies (link_earlier_data)
         now = timezone.now()
         application = GoldApplication(
             first_name=data["first_name"], last_name=data["last_name"], email=email, mobile=data.get("mobile", ""),
@@ -214,8 +215,18 @@ def resend_approver_email(application):
 # ---------- linking ----------
 
 def link_user_applications(user):
-    """When someone registers with the email of earlier Gold applications, link them (no approval implied)."""
-    return GoldApplication.objects.filter(email__iexact=user.email, user__isnull=True).update(user=user)
+    """When someone registers with the email of earlier Gold applications, link them. A link alone implies no approval, but an application ALREADY approved (it was approved while he had no
+    verified account: it went out as an invite he did not use) gives him Gold now, once, by the same code as the normal activation (gold.invites.activate_approved), and only for a
+    verified account. Returns how many were linked."""
+    waiting = GoldApplication.objects.filter(email__iexact=user.email, user__isnull=True)
+    mine = GoldApplication.objects.filter(email__iexact=user.email, status=GoldApplication.APPROVED).filter(Q(user__isnull=True) | Q(user=user))  # also a row the old code already linked to this unverified account
+    approved = list(mine.values_list("pk", flat=True))
+    linked = waiting.update(user=user)
+    if approved and user.email_verified_at is not None:
+        from . import invites
+
+        invites.activate_approved(user, approved)
+    return linked
 
 
 def approval_token(application):

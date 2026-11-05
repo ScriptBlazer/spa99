@@ -488,3 +488,18 @@ def pick_columns(columns, spec=""):
         else:
             picked.append({"key": key, "label": label or key.replace("_", " ").capitalize(), "css": f"c-{key}", "sortable": False, "active": False, "dir": "", "aria_sort": "none", "url": ""})
     return picked
+
+
+# ---------- the reach out buttons ----------
+
+@register.simple_tag
+def reach_primary(wa, em, secondary=False):
+    """Which channel button is the one primary: "wa", "email" or "". WhatsApp when he can be sent to on it (a chat or ready, staff may send, he has not
+    said STOP), else Email when it can send. Gold (`secondary`) has none, so Approve stays the one primary."""
+    if secondary:
+        return ""
+    if wa.get("state") in ("chat", "ready") and wa.get("can_edit") and not wa.get("opted_out"):
+        return "wa"
+    if em.get("can_send") and not em.get("blocked"):
+        return "email"
+    return ""

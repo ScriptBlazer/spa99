@@ -1,12 +1,12 @@
-{% load office_tags %}{% comment %}"Reach out" card of a person or lead page: Message and Add to the approach list, with their two dialogs (docs/features/office-outreach-design.md sections 3 and 4).
-Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, message{url,to,max,can_send,unsubscribed}. Hidden for read-only people.{% endcomment %}
-{% if message.can_send or outreach.can_add %}
+{% load office_tags %}{% comment %}"Reach out" card of a person or lead page: the WhatsApp and Email buttons and Add to the approach list, with their dialogs (docs/features/office-outreach-design.md sections 3 and 4). Always shown.
+Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, whatsapp{...see office.tools.whatsapp_context}, email_msg{...see office.tools.email_context}, mobile_countries.{% endcomment %}
 {% with who=person.name|default:person.email|first_word %}
 <section class="o-card o-reach" data-person-reach aria-labelledby="reach-h"><h2 id="reach-h" class="o-h3">Reach out</h2>
   <div class="o-reach-actions">
-    {% if message.can_send %}<button type="button" class="btn btn-secondary btn-block" data-dialog-open="message" aria-haspopup="dialog">{% include "office/_icon.html" with name="paper-plane" %}Message</button>{% endif %}
+    {% include "office/_channels.html" %}
     {% if outreach.can_add %}{% if outreach.on_list %}{% include "office/_onlist.html" %}{% else %}<button type="button" class="btn btn-secondary btn-block" data-dialog-open="outreach" aria-haspopup="dialog">{% include "office/_icon.html" with name="list-checks" %}<span class="o-only-wide">Add to {{ outreach.title }}</span><span class="o-only-narrow">Add to list</span></button>{% endif %}{% endif %}
   </div>
+  {% include "office/_details.html" %}
   {% if archive %}{% if archive.archived %}
   <div class="o-archived-state" data-lead-archived>
     <p class="o-onlist o-onlist--archived">{% include "office/_icon.html" with name="archive" %}<span class="o-onlist-text">Archived{% if archive.by %} by {{ archive.by|first_word }}{% endif %}, {{ archive.at|dm }}</span></p>
@@ -15,21 +15,8 @@ Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, mess
   </div>
   {% elif archive.can_edit %}<button type="button" class="o-quiet o-archive-btn o-archive-btn--rail" data-dialog-open="archive" aria-haspopup="dialog">{% include "office/_icon.html" with name="archive" %}Archive lead</button>{% endif %}{% endif %}
 </section>
-{% if message.can_send %}
-<dialog class="fb-modal o-dialog" data-dialog="message" aria-labelledby="od-message-h">
-  <form method="post" action="{{ message.url }}" class="fb-modal-wrap" data-problems data-message>{% csrf_token %}
-    <h2 class="fb-modal-title" id="od-message-h">Message {{ person.name|default:person.email }}</h2>
-    <p class="fb-modal-body">From hello@spa99.uk. His reply comes to the team. Kept in his timeline.</p>
-    {% if message.unsubscribed %}<p class="o-warn" data-unsubscribed-warning>{% include "office/_icon.html" with name="warning" %}Unsubscribed from news. This is a one-to-one message, so it still goes.</p>{% endif %}
-    <label class="fb-modal-field"><span>Message</span>
-      <textarea class="fb-modal-textarea" name="message" rows="6" required minlength="5" maxlength="{{ message.max }}" data-label="Message"></textarea></label>
-    <div class="fb-modal-actions">
-      <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
-      <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Sending">Send message</button>
-    </div>
-  </form>
-</dialog>
-{% endif %}
+{% include "office/_mobile_dialog.html" %}
+{% include "office/_email_dialog.html" %}
 {% if outreach.can_add and not outreach.on_list %}{% include "office/_outreach_dialog.html" with who=who %}{% endif %}
 {% if archive.can_edit and not archive.archived %}
 <dialog class="fb-modal o-dialog" data-dialog="archive" aria-labelledby="od-archive-h">
@@ -51,4 +38,3 @@ Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, mess
 </dialog>
 {% endif %}
 {% endwith %}
-{% endif %}

@@ -196,8 +196,7 @@ def load():
 
     registrations = [
         (metrics.day(created), slug or "none", source)
-        for created, slug, source in InterestRegistration.objects.filter(user__is_staff=False).exclude(plan__slug="gold")  # Gold Card members are not registrations (Moishe, 2026-11-03)
-        .values_list("created_at", "plan__slug", "source")
+        for created, slug, source in InterestRegistration.objects.filter(user__is_staff=False).values_list("created_at", "plan__slug", "source")  # an account, Gold included; an application alone has none
     ]
     registered_emails = {e.lower() for e in User.objects.filter(is_staff=False, email_verified_at__isnull=False).values_list("email", flat=True)}  # verified only: the Leads list agrees
     from outreach.models import ArchivedLead

@@ -1,0 +1,30 @@
+{% extends "system/base.html" %}
+{% comment %}A team member's Office email sender and signature (system/views_team_email.py). No script: Preview posts the form back and the page shows the signature as typed in the sandboxed frame below (srcdoc: the System host forbids framing any of its own pages).{% endcomment %}
+{% block main %}
+{% include "system/_page_header.html" with title="Office email: "|add:person.email description="Who his Office emails come from, and the signature under them. Automatic and system emails are not affected." %}
+<form method="post" action="{% url 'system_team_email' person.pk %}" class="sys-panel" data-system-team-email data-problems aria-label="Office email settings">{% csrf_token %}
+  <div class="sys-group">
+    <p class="sys-note" role="status" data-system-from-now>Right now an email he writes goes <strong>From <span class="mono">{{ from_now }}</span></strong>{% if from_source == "own" %} (his own address){% elif from_source == "set" %} (the sending address below){% else %} (the site address: neither his own address nor a sending address is on @{{ domain }}){% endif %}. Replies go to that address.</p>
+    <div class="sys-row{% if errors.sending_address %} invalid{% endif %}" data-system-field="sending_address">
+      <label for="sending_address">Sending address<small>Only needed when his login address does not end in @{{ domain }}{% if own_ok %}: his own does, so this is not used{% endif %}. Must end in @{{ domain }}. Empty: the site address.</small></label>
+      <div><div class="sys-ctl"><input type="email" id="sending_address" name="sending_address" value="{{ sending_address }}" maxlength="254" autocomplete="off" placeholder="name@{{ domain }}"></div>
+        {% if errors.sending_address %}<p class="sys-error" role="alert" data-problem data-problem-field="sending_address" data-problem-label="Sending address">{{ errors.sending_address }}</p>{% endif %}</div>
+    </div>
+    <div class="sys-row{% if errors.signature %} invalid{% endif %}" data-system-field="signature" data-wide>
+      <label for="signature">Signature<small>HTML (tables, text, links, pictures). Cleaned when saved: scripts, forms and unsafe styles are removed. Empty: a plain "Kind regards" with his name. Pictures: <span class="mono">/static/common/img/email/signature-logo.png</span> and <span class="mono">signature-banner.jpg</span>. To fill it from the design files, run <span class="mono">manage.py fill_signatures</span>.</small></label>
+      <div><div class="sys-ctl"><textarea id="signature" name="signature" rows="14" spellcheck="false" autocomplete="off" class="mono">{{ signature }}</textarea></div>
+        {% if errors.signature %}<p class="sys-error" role="alert" data-problem data-problem-field="signature" data-problem-label="Signature">{{ errors.signature }}</p>{% endif %}</div>
+    </div>
+  </div>
+  <div class="sys-actions-row">
+    <button type="submit" class="sys-btn primary">Save</button>
+    <button type="submit" class="sys-btn" name="preview" value="1" data-system-signature-preview>Preview</button>
+    <a class="sys-btn" href="{% url 'system_team' %}">Back to Team</a>
+  </div>
+</form>
+<section class="sys-panel" aria-label="Signature preview">
+  <h2>Preview</h2>
+  <p class="sys-muted">As it sits in an email. Press Preview to see what is typed above (nothing is saved).{% if not preview_doc %} Nothing to show yet.{% endif %}</p>
+  <iframe title="Signature preview" sandbox srcdoc="{{ preview_doc }}" style="width:100%;height:22rem;border:1px solid #e2ddd0;border-radius:6px;background:#fbf9ec" data-system-signature-frame></iframe>
+</section>
+{% endblock %}

@@ -29,17 +29,15 @@ class PeopleTests(TestCase):
     def setUpTestData(cls):
         seed_all()
 
-    def test_gold_card_members_are_not_counted_as_registered(self):
+    def test_a_gold_member_with_an_account_counts_as_registered_and_an_application_alone_does_not(self):
+        from gold.models import GoldApplication
         from plans.models import Plan
         from users.models import InterestRegistration
 
-        member = User.objects.create_user("member@example.com", "a-long-password-1")
         gold = User.objects.create_user("gold@example.com", "a-long-password-1")
-        InterestRegistration.objects.create(user=member, plan=Plan.objects.get(slug="tier-2"))
         InterestRegistration.objects.create(user=gold, plan=Plan.objects.get(slug="gold"))
-        figures = people.load()
-        self.assertEqual(figures.registered(None, today()), 1)
-        self.assertNotIn("gold", figures.registered_by(None, today(), 1))
+        GoldApplication.objects.create(email="applied@example.com", first_name="A", last_name="B")
+        self.assertEqual(people.load().registered(None, today()), 1)
 
     def test_restart_in_the_same_browser_is_one_person(self):
         first = journey.create_session("Mozilla/5.0 (iPhone) Safari/604.1")
@@ -159,7 +157,7 @@ class SnapshotTests(OfficeTestCase):
         snapshots.build_everything()
         for path in paths:
             self.assertEqual(self.queries(path), empty[path], path)
-            self.assertLessEqual(empty[path], 30, path)
+            self.assertLessEqual(empty[path], 32, path)  # 30 plus the WhatsApp unread count and the Email unread count on the navigation badges
 
     def test_snapshots_are_idempotent_all_ranges_exist_and_the_all_range_has_no_previous_period(self):
         finished_journey()

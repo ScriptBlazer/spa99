@@ -4,7 +4,7 @@ from django import forms
 from django.contrib.auth.forms import AdminUserCreationForm, AuthenticationForm, PasswordChangeForm, UserChangeForm as BaseUserChangeForm
 from django.core.exceptions import ValidationError
 
-from common.validators import normalise_email, normalise_uk_mobile, password_problems, validate_adult, validate_person_name
+from common.validators import normalise_email, normalise_mobile, password_problems, validate_adult, validate_person_name
 
 from .models import User
 
@@ -39,6 +39,7 @@ class SignUpForm(forms.Form):
     last_name = forms.CharField(max_length=200, widget=forms.TextInput(attrs=_attrs("required name", autocomplete="family-name")))
     email = forms.CharField(max_length=254, widget=forms.EmailInput(attrs=_attrs("required email", autocomplete="email")))
     mobile = forms.CharField(max_length=40, widget=forms.TextInput(attrs=_attrs("required mobile", autocomplete="tel", inputmode="tel")))
+    mobile_country = forms.CharField(required=False, max_length=2, widget=forms.HiddenInput())  # ISO code of the country select (default GB); a number typed with + or 00 wins
     password = forms.CharField(
         strip=False,
         widget=forms.PasswordInput(attrs=_attrs("required password", **{"autocomplete": "new-password", "data-password-related": "email,first_name,last_name"})),
@@ -69,7 +70,7 @@ class SignUpForm(forms.Form):
         return normalise_email(self.cleaned_data["email"])
 
     def clean_mobile(self):
-        return normalise_uk_mobile(self.cleaned_data["mobile"])
+        return normalise_mobile(self.cleaned_data["mobile"], self.data.get("mobile_country"))
 
     def clean_date_of_birth(self):
         return validate_adult(self.cleaned_data["date_of_birth"])

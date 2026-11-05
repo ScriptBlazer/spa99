@@ -21,16 +21,18 @@ from django.db.models import OuterRef, Subquery
 from gold import actions as gold_actions
 from gold import approval, audit, invites
 from gold import services as gold_services
-from gold.forms import DeclineForm, RespondForm
+from gold.forms import DeclineForm
 from gold.models import GoldApplication
 from insights.metrics import K
 from journey import services as journey_services
 from journey.models import JourneySession
+from outreach import services as outreach_services
 from outreach.models import ArchivedLead
 from plans import payments
 from plans.models import Plan, SiteSettings
 from common import levels, sorting
 from users import services as user_services
+from whatsapp import services as whatsapp_services
 from users import views as user_views
 from users.models import User
 
@@ -166,7 +168,7 @@ def _is_fragment(request):
 
 
 def _chats_context(person, user=None, email="", filter_key="", filter_id=""):
-    """The "Chats with the assistant" card and what the page shows near the top (how he heard about us)."""
+    """The "Assistant chats" card and what the page shows near the top (how he heard about us)."""
     return {"heard_via": profile.heard_via(person["journeys"]), "chats": profile.chats_card(user, email),
             "chats_all_url": f"{reverse('office_chats')}?{urlencode({filter_key: filter_id})}"}
 
@@ -181,6 +183,7 @@ def person(request, pk):
     if not _is_fragment(request):
         context.update(_chats_context(person, user=user, email=user.email, filter_key="user", filter_id=user.pk))
         context.update(tools.tools_context(tools.Target("person", user.pk, user=user), request.user))
+        context["unclaimed_chats"] = whatsapp_services.unclaimed_for_user(user)  # named beside Export and Delete: they do not include these
     return render(request, "office/_timeline.html" if _is_fragment(request) else "office/person.html", context)
 
 
@@ -254,7 +257,7 @@ def person_setup_cancel(request, pk):
 def person_export(request, pk):
     """UK GDPR: everything we hold about this person, as a JSON download."""
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
-    response = JsonResponse(user_services.export_user_data(user), json_dumps_params={"indent": 2})
+    response = JsonResponse(user_services.export_user_data(user, include_chats=True), json_dumps_params={"indent": 2})
     response["Content-Disposition"] = f'attachment; filename="spa99-person-{user.public_id}.json"'
     return response
 
@@ -268,8 +271,12 @@ def person_delete(request, pk):
         messages.error(request, "A staff account cannot be deleted here.")
         return redirect("office_person", pk=user.pk)
     name = user.get_full_name() or user.email
-    user_services.delete_user_data(user)
+    unclaimed = whatsapp_services.unclaimed_for_user(user)  # chats on his number that nothing links to him: delete does not reach them
+    user_services.delete_user_data(user, include_chats=True)  # staff-run: his WhatsApp chats go too
     messages.success(request, f"{name} and their data were deleted.")
+    if unclaimed:
+        messages.warning(request, "Not deleted, because nothing links " + ("it" if len(unclaimed) == 1 else "them") + " to him: the WhatsApp chat with "
+                         + ", ".join(f"{c['name']} ({c['phone']})" for c in unclaimed) + ". Open it in WhatsApp and use Delete this chat if it is his.")
     return redirect("office_people")
 
 
@@ -330,6 +337,8 @@ def lead_export(request, pk):
     body = {"email": data["email"], "sessions": journey_services.export_lead(data["email"]),
             "emails": journey_services.export_lead_emails(data["email"]),
             "chats": chat_services.export_conversations(email=data["email"]),
+            "staff_emails": outreach_services.export_messages([data["email"]]),
+            "whatsapp": whatsapp_services.export_for(whatsapp_services.contacts_for_person(None, {data["email"]})),
             "gold_applications": gold_services.export_applications(data["email"])}
     response = JsonResponse(body, json_dumps_params={"indent": 2})
     response["Content-Disposition"] = 'attachment; filename="spa99-lead.json"'
@@ -343,6 +352,7 @@ def lead_delete(request, pk):
     session, (kind, data) = _lead_session(pk)
     if kind == "account":
         return redirect("office_person", pk=data.pk)
+    whatsapp_services.erase_person(None, {data["email"]})  # his chats, messages and files (found by his address, never by a number): before the journeys lose it
     cleared = journey_services.erase_lead_data(data["email"])
     from outreach.services import erase_email
 
@@ -397,7 +407,7 @@ def chats(request):
 
 
 def _chats_person(request):
-    """Who the Chats list is narrowed to, from ?user= (account id) or ?lead= (a lead's opaque session id): {user, email, label, url} or None."""
+    """Who the Assistant list is narrowed to, from ?user= (account id) or ?lead= (a lead's opaque session id): {user, email, label, url} or None."""
     try:
         if request.GET.get("user"):
             user = get_object_or_404(User, pk=request.GET["user"])
@@ -441,12 +451,12 @@ def gold(request):
     return _varied(render(request, _fragment(request, "office/gold.html", "office/_gold_rows.html"), context))
 
 
-GOLD_FORMS = ("decline", "respond", "note")  # ?do= on the application page opens that form (the approver email's Decline and Respond links)
+GOLD_FORMS = ("decline", "note", "email")  # ?do= on the application page opens that form (the approver email's Decline link); ?do=respond goes to his WhatsApp chat, or opens the email pop-up when he has no mobile
 
 
 def _can_open(application, name):
-    """The forms offered right now: Decline while waiting, Respond while open, a note any time."""
-    return {"decline": application.status in GoldApplication.WAITING, "respond": application.status in gold_actions.OPEN, "note": True}.get(name, False)
+    """The forms offered right now: Decline while waiting, a note any time."""
+    return {"decline": application.status in GoldApplication.WAITING, "note": True, "email": True}.get(name, False)
 
 
 def _gold_page(request, application, status=200, open_form="", form=None):
@@ -456,7 +466,7 @@ def _gold_page(request, application, status=200, open_form="", form=None):
     opened = ""
     if form is not None:
         opened = open_form
-    elif open_form in GOLD_FORMS and acts:
+    elif open_form in GOLD_FORMS and (acts or (open_form == "email" and tools.can_edit(request.user))):
         opened = open_form if _can_open(application, open_form) else ""
         if not opened:
             messages.info(request, "This application has already been decided, so that is not available now.")
@@ -484,6 +494,8 @@ def _email_token(request, application):
 @never_cache
 def gold_application(request, pk):
     application = get_object_or_404(GoldApplication, pk=pk)
+    if request.GET.get("do") == "respond":  # the approver email's Respond link
+        return _respond(application)
     return _gold_page(request, application, open_form=request.GET.get("do", ""))
 
 
@@ -509,6 +521,11 @@ def _approve_channel(request, application):
     return audit.EMAIL_LINK if approval.approve_token_is_valid(request.POST.get("token", ""), application) else audit.OFFICE
 
 
+NEEDS_STAFF_TEXT = ("{first} is approved, but NO invite was sent. Someone registered on this email and never verified it, and that account has a membership set up on it, so it must not be "
+                    "replaced. Next step: ask him to open the verification email for that account (Gold is then added to it automatically). If it is not his account, "
+                    "check the membership on the person's page first, then ask a developer to sort it out.")
+
+
 @approver
 @require_POST
 def gold_approve(request, pk):
@@ -518,8 +535,9 @@ def gold_approve(request, pk):
         text = {approval.AWAITING: "Sent for final approval.",
                 invites.INVITED: f"{first} is approved. His invite is on its way.",
                 invites.ACTIVATED: f"{first} is approved. Gold was added to his existing account.",
+                invites.NEEDS_STAFF: NEEDS_STAFF_TEXT.format(first=first),
                 invites.SKIPPED: "Nothing changed: it was already decided, or Gold could not be activated."}[result]
-        messages.success(request, text) if result != invites.SKIPPED else messages.warning(request, text)
+        messages.success(request, text) if result not in (invites.SKIPPED, invites.NEEDS_STAFF) else messages.warning(request, text)
     return _act(request, pk, run)
 
 
@@ -565,6 +583,8 @@ def gold_final_confirm(request, pk):
             messages.success(request, f"{first} is approved. His invite is on its way.")
         elif result == invites.ACTIVATED:
             messages.success(request, f"{first} is approved. Gold was added to his existing account.")
+        elif result == invites.NEEDS_STAFF:
+            messages.warning(request, NEEDS_STAFF_TEXT.format(first=first))
         else:
             messages.warning(request, "Nothing changed: it is not waiting for final approval any more.")
     return _final_act(request, pk, run)
@@ -593,7 +613,8 @@ def gold_resend(request, pk):
         if invites.resend_invite(application, request.user, channel=audit.OFFICE) == invites.INVITED:
             messages.success(request, "A new invite is on its way. The old link no longer works.")
         else:
-            messages.warning(request, "No invite was sent: only approved applicants without an account get one.")
+            messages.warning(request, NEEDS_STAFF_TEXT.format(first=application.first_name or "He") if invites.blocking_account(application) is not None
+                             else "No invite was sent: only approved applicants without an account get one.")
     return _act(request, pk, run)
 
 
@@ -622,18 +643,17 @@ def gold_decline(request, pk):
     return _form_act(request, pk, "decline", DeclineForm, run)
 
 
-@approver
-@require_POST
+def _respond(application):
+    """Respond opens his WhatsApp chat when he has a mobile, otherwise his Gold page with the Email pop-up open (a GET: it only reads)."""
+    if tools.mobile_and_name(tools.Target("gold", application.pk, application=application))[0]:
+        return redirect("office_gold_whatsapp", pk=application.pk)
+    return redirect(f"{reverse('office_gold_application', args=[application.pk])}?do=email")
+
+
+@reader
 def gold_respond(request, pk):
-    def run(application, data):
-        result, _ = gold_actions.respond(application, request.user, data["message"], channel=audit.OFFICE)
-        if result == gold_actions.DONE:
-            messages.success(request, f"Your message is on its way to {application.first_name or 'him'}. It is in the history.")
-        elif result == gold_actions.DUPLICATE:
-            messages.info(request, "That message was already sent.")
-        else:
-            messages.warning(request, "Nothing sent: this application was already decided.")
-    return _form_act(request, pk, "respond", RespondForm, run)
+    """The old Respond URL (any method): see `_respond`."""
+    return _respond(get_object_or_404(GoldApplication, pk=pk))
 
 
 # ---------- change password (team members; the member area is for members only) ----------

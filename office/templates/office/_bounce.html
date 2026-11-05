@@ -1,0 +1,27 @@
+{% comment %}Lead page: a bounced address (docs/features/office-outreach.md "Bounced lead emails"). The one Correct / Change the email dialog lives here (once per page); Details (_details.html) opens it too, bounced or not. Keys: bounce{bounced, email, notice, can_edit, correct_url, resend_url, can_resend, sent}.
+The notice and Correct the email show while the address bounces; Resend follow-up shows once staff corrected it (the follow-up never reached the new address).{% endcomment %}
+{% if bounce.bounced %}
+<div class="o-callout o-callout--calm o-bounce" data-bounce-notice role="note">
+  <p><strong>Possible fake</strong></p>
+  <p>{{ bounce.notice }}</p>
+  {% if bounce.can_edit %}<p><button type="button" class="btn btn-secondary btn-sm" data-dialog-open="correct-email" aria-haspopup="dialog" data-correct-email>Correct the email</button></p>{% endif %}
+</div>
+{% elif bounce.can_resend %}
+<div class="o-callout o-callout--calm o-bounce" data-bounce-resend>
+  <p>The email was changed. The follow-up has not gone to the new address yet.</p>
+  <form method="post" action="{{ bounce.resend_url }}">{% csrf_token %}<button type="submit" class="btn btn-primary btn-sm" data-working-text="Sending">Resend follow-up</button></form>
+</div>
+{% endif %}
+{% if bounce.can_edit %}
+<dialog class="fb-modal o-dialog" data-dialog="correct-email" aria-labelledby="od-correct-email-h">
+  <form method="post" action="{{ bounce.correct_url }}" class="fb-modal-wrap">{% csrf_token %}
+    <h2 class="fb-modal-title" id="od-correct-email-h">{% if bounce.bounced %}Correct the email{% else %}Change the email{% endif %}</h2>
+    <p class="fb-modal-body">Now: {{ bounce.email }}. {% if bounce.bounced %}Fix a typo here. {% endif %}His journeys, notes and history move to the new address.{% if bounce.bounced %} The old one stays on the bounce list.{% endif %}</p>
+    <label class="fb-modal-field"><span>New email</span><input class="fb-modal-input" type="email" name="email" value="" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="email" required></label>
+    <div class="fb-modal-actions">
+      <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
+      <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Saving">Save</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}

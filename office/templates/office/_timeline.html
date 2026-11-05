@@ -2,8 +2,8 @@
 {% for d in timeline_days %}<h3 class="o-subhead" data-timeline-day>{{ d.day|day_label }}</h3>
 <ol class="o-timeline">{% for e in d.items %}
   <li class="o-tl" data-timeline-item data-kind="{{ e.kind }}">
-    <p class="o-tl-line"><span class="o-tl-what">{% if e.href %}<a href="{{ e.href }}">{{ e.label }}</a>{% else %}{{ e.label|short_by }}{% endif %}</span></p>
-    {% if e.detail %}{% if e.kind == 'email' and e.detail != 'Sent' %}<p class="o-tl-meta o-danger">{% include "office/_icon.html" with name="warning" %}{{ e.detail }}</p>
+    <p class="o-tl-line"><span class="o-tl-what">{% if e.kind == 'whatsapp' or e.kind == 'whatsapp_failed' or e.kind == 'whatsapp_stop' %}<span class="o-tl-icon{% if e.kind == 'whatsapp_failed' %} o-danger{% endif %}">{% include "office/_icon.html" with name="whatsapp" %}</span>{% endif %}{% if e.href %}<a href="{{ e.href }}">{{ e.label }}</a>{% else %}{{ e.label|short_by }}{% endif %}</span></p>
+    {% if e.detail %}{% if e.kind == 'whatsapp_failed' or e.kind == 'email' and e.detail != 'Sent' %}<p class="o-tl-meta o-danger">{% include "office/_icon.html" with name="warning" %}{{ e.detail }}</p>
     {% else %}<p class="o-tl-meta o-tl-detail o-clamp" style="--lines: 3" data-clamp>{{ e.detail|linebreaksbr }}</p><button type="button" class="o-quiet o-clamp-more" data-clamp-more hidden>Read more</button>{% endif %}{% endif %}
     <p class="o-tl-meta">{{ e.time }}</p>
     {% if e.restore_url %}<form class="o-tl-restore" method="post" action="{{ e.restore_url }}" data-note-restore>{% csrf_token %}<button type="submit" class="btn btn-secondary btn-sm" data-working-text="Restoring">Restore</button></form>{% endif %}

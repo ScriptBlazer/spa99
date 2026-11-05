@@ -127,7 +127,7 @@
     <div class="o-rowlist" data-region="activity">
       {% for e in data.activity %}
       <a class="o-feed-row" {% if e.href %}href="{{ e.href }}"{% endif %} data-activity-item data-kind="{{ e.kind }}">
-        <span class="o-feed-dot" aria-hidden="true">{% if e.kind == "lead" %}{% include "office/_icon.html" with name="envelope" %}{% elif e.kind == "registered" %}{% include "office/_icon.html" with name="person-plus" %}{% elif e.kind == "verified" %}{% include "office/_icon.html" with name="check" %}{% elif e.kind == "journey_finished" %}{% include "office/_icon.html" with name="flag" %}{% else %}{% include "office/_icon.html" with name="gold" %}{% endif %}</span>
+        <span class="o-feed-dot" aria-hidden="true">{% if e.kind == "lead" %}{% include "office/_icon.html" with name="address-book" %}{% elif e.kind == "registered" %}{% include "office/_icon.html" with name="person-plus" %}{% elif e.kind == "verified" %}{% include "office/_icon.html" with name="check" %}{% elif e.kind == "journey_finished" %}{% include "office/_icon.html" with name="flag" %}{% else %}{% include "office/_icon.html" with name="gold" %}{% endif %}</span>
         <span class="o-feed-text"><span class="o-feed-who">{{ e.who }}</span> {{ e.label }}{% if e.detail %}<span class="o-feed-detail"> &middot; {{ e.detail }}</span>{% endif %}</span>
         <span class="o-latest-when">{{ e.at|relative }}</span>
       </a>

@@ -111,7 +111,7 @@ html:not(.js) [data-note-compose], html:not(.js) .o-notes-open { display: none; 
 .o-actions-more .btn { flex: none; min-height: var(--control-h); gap: var(--space-2); padding-inline: var(--space-3); }
 .o-actions-more .btn:only-child { grid-column: 1 / -1; }
 .o-actions-more .o-icon { width: 1.125rem; height: 1.125rem; }
-.office .btn.o-btn-off, .office .btn.o-btn-off:hover { background: var(--office-sunken); color: var(--office-muted); box-shadow: none; cursor: not-allowed; }
+.office .btn.o-btn-off, .office .btn.o-btn-off:hover { background: var(--office-sunken); color: var(--office-muted); box-shadow: none; cursor: not-allowed; opacity: 1; }   /* opacity 1: .btn[aria-disabled] dims to 0.4, which left the label at 1.82; muted on sunken is 5.38 (2026-11-04) */
 .o-hint-line { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--office-muted); max-width: none; }
 .o-hint-line a { color: inherit; text-underline-offset: 0.25em; }
 .o-addlist { gap: var(--space-2); }
@@ -125,9 +125,7 @@ html:not(.js) [data-note-compose], html:not(.js) .o-notes-open { display: none; 
 .o-reach .btn { gap: var(--space-2); }
 .o-reach .btn .o-icon { width: 1.125rem; height: 1.125rem; }
 @media (max-width: 63.99em) {
-  .o-reach-actions { grid-template-columns: 1fr 1fr; }
   .o-detail--person .o-reach { order: 0; }
-  .o-reach .btn { padding-inline: var(--space-2); }
 }
 .o-onlist { display: flex; align-items: center; gap: var(--space-2); min-height: 2.75rem; font-size: var(--text-sm); font-weight: 500; max-width: none; }
 .o-onlist .o-icon { width: 1.125rem; height: 1.125rem; flex: none; }
@@ -185,3 +183,7 @@ button.o-chip { border: 0; font-family: inherit; }
 @media (min-width: 64em) { .o-nav-list a > span:not(.o-badge-count) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
 
 @media (prefers-reduced-motion: reduce) { .o-note, .o-note-x, .o-row.is-leaving { transition: none; } }
+
+/* bounced lead email: the notice sits clear of the badges above it */
+.o-bounce { margin-block: var(--space-3) var(--space-2); }
+.o-bounce p { max-width: none; }

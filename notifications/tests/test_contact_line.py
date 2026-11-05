@@ -16,5 +16,10 @@ class ContactLineTests(TestCase):
         self.assertNotIn("Questions? Reply to this email or write to", email["text"])
 
     def test_other_emails_keep_it(self):
-        email = preview_email("office_message", "Hello", "")
+        email = preview_email("gold_respond", "Hello", "")
         self.assertIn("Questions? Reply to this email or write to", email["html"])
+
+    def test_a_personal_office_email_leaves_it_out_too(self):
+        """2026-11-04: an Office email comes from a named person and carries his signature (hello@ is in it), so the footer has no contact line either."""
+        email = preview_email("office_message", "Hello", "")
+        self.assertNotIn("Questions? Reply to this email or write to", email["html"])

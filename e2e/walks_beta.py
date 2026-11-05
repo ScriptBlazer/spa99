@@ -17,7 +17,7 @@ from . import mailbox
 from .kit import (
     CONTROL, OFFICE, PASSWORD, PORT, RESET_PASSWORD, SITE, STAFF, STRICT_CONTROL, STRICT_SITE, SYSTEM, UNLOCK_CODE,
     NEW_PASSWORD, apply_gold, answer_journey, dbtool, fill_date_of_birth, form_errors, gold_fill_you, gold_to_last_screen, manage,
-    close_problems, gold_open_about, problems_modal, register_member, sign_in, sign_in_fails, strict_server_up, tick, verify_email_link,
+    close_problems, gold_open_about, open_register, problems_modal, register_member, sign_in, sign_in_fails, strict_server_up, tick, verify_email_link,
 )
 from .kit import approve_on_application_page
 from .walks import body_text, confirm_office_modal, wav_bytes
@@ -296,7 +296,7 @@ def beta_signup(w):
         assert dbtool("user", email)["count"] == 1
     with w.step("Register the same email in other capitals with other details: refused clearly, still one account", page):
         second = w.page()
-        second.goto(f"{SITE}/register/")
+        open_register(second)
         second.locator("label.plan-chip", has_text="Tier 2").first.click()
         second.locator("#id_first_name").fill("Other")
         second.locator("#id_last_name").fill("Person")
@@ -612,7 +612,7 @@ def beta_journey(w):
 # ---------- J. Bad input and hostile text ----------
 
 def _fill_register(page, email, first, last, mob, plan="Tier 1", password=PASSWORD):
-    page.goto(f"{SITE}/register/")
+    open_register(page)
     page.locator("label.plan-chip", has_text=plan).first.click()
     page.locator("#id_first_name").fill(first)
     page.locator("#id_last_name").fill(last)
@@ -630,7 +630,7 @@ def beta_bad_input(w):
     baseline = {}
     with w.step("Register: empty form is refused with several clear messages and creates nothing", page):
         baseline["registrations"] = dbtool("registrations")["count"]
-        page.goto(f"{SITE}/register/")
+        open_register(page)
         page.locator("#register-form button[type=submit]").click()
         lines = problems_modal(page)
         assert len(lines) >= 4 and "register/sent" not in page.url, f"The problems dialog says: {lines}"
@@ -640,7 +640,7 @@ def beta_bad_input(w):
         assert dbtool("registrations")["count"] == baseline["registrations"]
     for label, overrides, expected in (
         ("a bad email", {"email": "not-an-email"}, "valid email"),
-        ("a bad UK mobile", {"mob": "12345"}, "valid uk mobile"),
+        ("a bad mobile", {"mob": "12345"}, "valid mobile number"),  # Register has a country select now: the words are not UK only
         ("a 300 character first name", {"first": "A" * 300}, "too long"),
     ):
         with w.step(f"Register: {label} is refused with a clear message", page):
@@ -654,7 +654,7 @@ def beta_bad_input(w):
             assert "register/sent" not in page.url
             assert dbtool("registrations")["count"] == baseline["registrations"]
     with w.step("Register: straight to the server with nothing valid (no page): 400, not a crash, nothing created", page):
-        page.goto(f"{SITE}/register/")
+        open_register(page)
         response = post_direct(page, SITE, "/register/", form={"email": "x", "first_name": "", "mobile": "1", "password": "a"})
         assert response.status == 400, f"A bad direct sign-up answered {response.status} (expected 400)"
         assert dbtool("registrations")["count"] == baseline["registrations"]
@@ -697,7 +697,7 @@ def beta_bad_input(w):
         close_problems(gold)
         gold.wait_for_selector("[data-error-for=email][data-state=error]")
         text = " ".join(form_errors(gold)).lower()
-        assert "valid email" in text and "valid uk mobile" in text, f"The form says: {form_errors(gold)}"
+        assert "valid email" in text and "valid mobile" in text, f"The form says: {form_errors(gold)}"  # the Gold form has a country select now: the words are not UK only
         gold_fill_you(gold, "A" * 300, "Goldbad", "beta-goldbad@example.com", mobile(904))
         gold.locator("[data-primary]").click()
         assert any("too long" in line.lower() for line in problems_modal(gold))

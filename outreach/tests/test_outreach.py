@@ -1,11 +1,12 @@
 """Sticky notes (one set per person), the guide, the approach list and Message. Mocked: sync queue, in-memory media and mail."""
 from io import StringIO
+from unittest import mock
 
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
-from django.test import Client
+from django.test import Client, override_settings
 from django.utils import timezone
 
 from common import levels
@@ -198,19 +199,97 @@ class ApproachListTests(Base):
         self.assertEqual((main, addresses, user), ("other@example.com", {"other@example.com"}, None))
 
 
-class MessageTests(Base):
-    def test_message_is_queued_recorded_in_the_timeline_and_warns_when_unsubscribed(self):
-        session = lead("hugo@example.com")
-        optout.unsubscribe("hugo@example.com")
-        page = call(self.reader, "get", f"/leads/{session.pk}/")
-        self.assertTrue(page.context["message"]["unsubscribed"])
-        self.assertEqual(call(self.reader, "post", f"/leads/{session.pk}/message/", {"message": "Hello there"}).status_code, 403)
-        call(self.approver, "post", f"/leads/{session.pk}/message/", {"message": "Hello there Hugo"})
-        call(self.approver, "post", f"/leads/{session.pk}/message/", {"message": "Hello there Hugo"})  # double submit
+@override_settings(EMAIL_SENDING_DOMAIN="spa99.uk", DEFAULT_FROM_EMAIL="Spa 99 <hello@spa99.uk>")
+class EmailButtonTests(Base):
+    """The Email button and its pop-up: a plain text email from the logged-in person (From and Reply-To his address, his signature), kept in the timeline. Mocked: mail goes to the test outbox."""
+
+    def setUp(self):
+        super().setUp()
+        self.approver.first_name = "Barry"
+        self.approver.email = "barry@spa99.uk"
+        self.approver.save()
+        self.session = lead("hugo@example.com")
+        self.url = f"/leads/{self.session.pk}/message/"
+        mail.outbox.clear()
+
+    def send(self, text="Hello Hugo, thanks for your interest.", user=None, url=None):
+        return call(user or self.approver, "post", url or self.url, {"message": text})
+
+    def test_only_an_approver_or_admin_can_send(self):
+        self.assertEqual(self.send(user=self.reader).status_code, 403)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(self.send(user=self.admin).status_code, 302)
         self.assertEqual(len(mail.outbox), 1)
+
+    def test_from_and_reply_to_are_the_logged_in_person_with_his_signature(self):
+        from notifications.models import StaffSender
+
+        StaffSender.objects.create(user=self.approver, signature_html='<table><tr><td style="color: #492E21">Barry Cohen | Manager</td></tr></table>')
+        self.send()
         sent = mail.outbox[0]
-        self.assertEqual((sent.to, sent.from_email), (["hugo@example.com"], "Spa 99 <from@example.test>"))
-        self.assertIn("Hello there Hugo", sent.body)
-        timeline = call(self.reader, "get", f"/leads/{session.pk}/").context["person"]["timeline"]
-        self.assertIn(("Message sent by approver@example.test", "Hello there Hugo"), [(t["label"], t["detail"]) for t in timeline])
-        self.assertEqual(PersonMessage.objects.count(), 1)
+        self.assertEqual(sent.from_email, '"Barry, Spa 99" <barry@spa99.uk>')
+        self.assertEqual(sent.reply_to, ["barry@spa99.uk"])
+        self.assertEqual(sent.to, ["hugo@example.com"])
+        self.assertIn("Hello Hugo, thanks for your interest.", sent.body)
+        self.assertIn("Barry Cohen | Manager", sent.alternatives[0][0])
+        self.assertNotIn("Kind regards", sent.alternatives[0][0])
+        self.assertNotIn("Questions? Reply to this email or write to", sent.alternatives[0][0])
+
+    def test_without_a_signature_it_ends_kind_regards_with_his_name_and_a_login_off_the_domain_falls_back(self):
+        outside = make_team_member("barry@bmlgroup.example", levels.OFFICE, approver=True)  # not on the sending domain, no sending address set
+        self.send(user=outside)
+        sent = mail.outbox[0]
+        self.assertEqual(sent.from_email, "Spa 99 <hello@spa99.uk>")
+        self.assertEqual(sent.reply_to, [SiteSettings.load().contact_address])  # the hello@ fallback: replies go to the contact address
+        self.assertIn("Kind regards", sent.alternatives[0][0])
+
+    def test_it_is_kept_as_a_person_message_and_shows_in_the_timeline_and_a_double_click_sends_once(self):
+        self.send()
+        self.send()  # the same text again at once
+        self.assertEqual(len(mail.outbox), 1)
+        row = PersonMessage.objects.get()
+        self.assertEqual((row.email, row.author, row.status, row.text), ("hugo@example.com", self.approver, PersonMessage.SENT, "Hello Hugo, thanks for your interest."))
+        self.assertTrue(row.subject)
+        timeline = call(self.reader, "get", f"/leads/{self.session.pk}/").context["person"]["timeline"]
+        self.assertIn(("Email sent by Barry (barry@spa99.uk)", "Hello Hugo, thanks for your interest."), [(t["label"], t["detail"]) for t in timeline])
+
+    def test_a_failed_send_shows_failed_in_the_timeline_and_the_toast_says_so(self):
+        from django.contrib.messages import get_messages
+
+        with mock.patch("django.core.mail.EmailMultiAlternatives.send", side_effect=OSError("mail server down")):
+            response = self.send()
+        self.assertEqual(PersonMessage.objects.get().status, PersonMessage.FAILED)
+        self.assertIn("could not be sent", " ".join(str(m) for m in get_messages(response.wsgi_request)))
+        timeline = call(self.reader, "get", f"/leads/{self.session.pk}/").context["person"]["timeline"]
+        self.assertIn("Email failed by Barry (barry@spa99.uk)", [t["label"] for t in timeline])
+
+    def test_a_bounced_address_is_refused_plainly_and_the_button_is_off_with_the_reason(self):
+        from django.contrib.messages import get_messages
+
+        from notifications.models import EmailSuppression
+
+        now = timezone.now()
+        EmailSuppression.objects.create(email="hugo@example.com", reason=EmailSuppression.HARD_BOUNCE, first_seen=now, last_seen=now)
+        response = self.send()
+        self.assertEqual((PersonMessage.objects.count(), len(mail.outbox)), (0, 0))
+        self.assertIn("This address bounced", " ".join(str(m) for m in get_messages(response.wsgi_request)))
+        page = call(self.approver, "get", f"/leads/{self.session.pk}/")
+        self.assertContains(page, "data-email-off")
+        self.assertContains(page, "This address bounced, so he cannot be emailed.")
+
+    def test_on_a_gold_page_the_first_email_marks_new_as_contacted_once_with_a_responded_event(self):
+        application = self.application(email="gold@example.com")
+        url = f"/gold/{application.pk}/message/"
+        self.send(url=url)
+        self.send("A second note to him, a bit later.", url=url)
+        application.refresh_from_db()
+        self.assertEqual(application.status, "contacted")
+        events = application.events.filter(action=ApplicationEvent.RESPONDED)
+        self.assertEqual((events.count(), events.first().meta), (1, {"email": True}))
+
+    def test_respond_opens_whatsapp_with_a_mobile_else_the_gold_page_with_the_email_pop_up(self):
+        with_mobile = self.application(email="mob@example.com", mobile="+447400123456")
+        self.assertEqual(call(self.approver, "get", f"/gold/{with_mobile.pk}/respond/")["Location"], f"/gold/{with_mobile.pk}/whatsapp/")
+        none = self.application(email="nomob@example.com", mobile="")
+        self.assertEqual(call(self.approver, "get", f"/gold/{none.pk}/?do=respond")["Location"], f"/gold/{none.pk}/?do=email")
+        self.assertContains(call(self.approver, "get", f"/gold/{none.pk}/?do=email"), 'data-dialog="email" data-open')

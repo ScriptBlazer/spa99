@@ -55,8 +55,13 @@ written by hand:
   `whatsapp_number` is empty and the old `discount_contact_url` is a `https://wa.me/<digits>` link, the digits are copied into it
   (the saved message keeps the default from the migration). Never overwrites a number or message that is already set.
 
-- (invite email opens, 2026-10-30) the Privacy notice "Emails" part gets the line about the tracking pixel in invitation emails,
-  and "Last updated" goes to 30 October 2026: each only while it still has exactly the previous wording.
+- (Privacy notice, 2026-10-30 to 2026-11-04) line by line on what is saved, so an admin's edits elsewhere stay: the invitation pixel line, the
+  journey tick wording (email and WhatsApp, "opening and offers"), the WhatsApp block (part 2), the two part 3 lines, "Last updated" (3 November 2026;
+  only if it still has an older date) and the privacy version (to 2026-11-03, only from 2026-10-26 or older). A line whose old wording was edited
+  by hand is not changed and is listed as "Left alone".
+
+- (WhatsApp, 2026-11-03) the journey "Not you? Use another email" button (`journey` page, `not_you` row) becomes "Not you? Start again" (it now
+  clears name, email and mobile): only while it still has exactly the old wording.
 
 Not a migration, on purpose. `--dry-run` shows what would change and saves nothing. Safe to run twice."""
 import re
@@ -168,7 +173,8 @@ def backfill():
     changed.update(_legal_pages())
     changed.update(_barry_changes_2026_10_29())
     changed.update(_whatsapp_and_gold_2026_10_29())
-    changed.update(_invite_open_privacy_2026_10_30())
+    changed.update(_privacy_notice_2026_11_04())
+    changed.update(_not_you_start_again_2026_11_03())
     return changed
 
 
@@ -349,24 +355,70 @@ def _legal_pages():
     return changed
 
 
-def _invite_open_privacy_2026_10_30():
-    """2026-10-30: invitation emails carry an open-tracking pixel, so the privacy notice says so. Exact old wording only."""
+LEFT_ALONE = "Left alone (edited by hand, change it in Control): "  # a changed-count key with this start is printed as "Left alone", not "Changed"
+
+
+def _edit_privacy_section(page, key, edits, changed, label):
+    """Apply each (name, old text, new text) to the saved body only where the old text is still in it, one counted line per edit.
+    Text an admin changed elsewhere is never touched; an edit whose old text is gone is reported as left alone."""
+    for section in Section.objects.filter(page=page, key=key):
+        body = section.body
+        for name, old, new in edits:
+            if new in body:
+                continue  # already says it
+            if old in body:
+                body = body.replace(old, new, 1)
+                changed[f"content.Section (privacy {key}: {name})"] += 1
+            else:
+                changed[f"{LEFT_ALONE}privacy {key}: {name}"] += 1
+        if body != section.body:
+            section.body = body
+            section.save()
+
+
+def _privacy_notice_2026_11_04():
+    """Privacy notice, applied line by line to what is saved (the old wording is the real text on origin/main), so a part an admin edited
+    elsewhere still gets the new lines and keeps their edit. Covers 2026-10-30 (invitation email pixel line) and 2026-11-03/04 (WhatsApp:
+    the journey tick, the WhatsApp block in part 2, the withdrawal and basis lines in part 3, "Last updated", the privacy version)."""
     from content import legal
 
     changed = Counter()
     page = Page.objects.filter(key="privacy").first()
     if page is None:
         return changed
-    new_body = dict((key, body) for key, _, body, _, _ in content_seed.PAGES["privacy"][2])["part_2"]
-    old_body = new_body.replace(legal.INVITE_OPEN_LINE + "\n", "")
-    for section in Section.objects.filter(page=page, key="part_2", body=old_body):
-        section.body = new_body
-        section.save()
-        changed["content.Section (privacy notice: invite email opens)"] += 1
-    for section in Section.objects.filter(page=page, key="updated", body="28 October 2026"):
+    mailbox = "- Emails you send us, kept in our mailbox.\n"
+    _edit_privacy_section(page, "part_2", [
+        ("invitation email pixel line", mailbox, legal.INVITE_OPEN_LINE + "\n" + mailbox),
+        ("the journey tick says email and WhatsApp", "a tick to say Spa 99 may email you about opening. We keep",
+         "a tick to say Spa 99 may email and WhatsApp you about opening and offers. We keep"),
+        ("WhatsApp block", "### Our team", legal.WHATSAPP_BLOCK + "\n### Our team"),
+    ], changed, "part_2")
+    _edit_privacy_section(page, "part_3", [
+        ("news about opening and offers", "send news about the opening and to understand", "send news about the opening and offers, and to understand"),
+        ("withdrawing stops WhatsApp too", "we then stop emailing you and delete the address.", "we then stop emailing and WhatsApping you and delete the address."),
+    ], changed, "part_3")
+    for section in Section.objects.filter(page=page, key="updated", body__in=["30 October 2026", "28 October 2026", "26 October 2026"]):
         section.body = legal.PRIVACY_UPDATED
         section.save()
         changed["content.Section (privacy notice: last updated)"] += 1
+    from plans.models import SiteSettings
+
+    site = SiteSettings.load()
+    says_it = Section.objects.filter(page=page, key="part_2", body__contains=legal.WHATSAPP_BLOCK).exists()
+    if site.privacy_version in ("2026-10-26", "2026-10-23", "draft-1") and says_it:  # the notice now says it: new sign-ups record the new version (nobody is asked to accept again; old records stay as they were)
+        site.privacy_version = legal.PRIVACY_VERSION
+        site.save()
+        changed["plans.SiteSettings (privacy version)"] += 1
+    return changed
+
+
+def _not_you_start_again_2026_11_03():
+    """2026-11-03: "Not you? Use another email" becomes "Not you? Start again", exact old wording only (a row edited by hand is left alone)."""
+    changed = Counter()
+    for section in Section.objects.filter(page__key="journey", key="not_you", cta_label="Not you? Use another email"):
+        section.cta_label = "Not you? Start again"
+        section.save()
+        changed["content.Section (journey: Not you? Start again)"] += 1
     return changed
 
 
@@ -797,9 +849,12 @@ class Command(BaseCommand):
             if dry_run:
                 transaction.set_rollback(True)
         prefix = "Would change" if dry_run else "Changed"
-        if not changed:
+        if not any(not name.startswith(LEFT_ALONE) for name in changed):
             self.stdout.write("Nothing to change.")
         for name, count in sorted(changed.items()):
-            self.stdout.write(f"{prefix} {count} x {name}")
+            if name.startswith(LEFT_ALONE):
+                self.stdout.write(name)
+            else:
+                self.stdout.write(f"{prefix} {count} x {name}")
         if dry_run:
             self.stdout.write("Dry run: nothing was saved.")

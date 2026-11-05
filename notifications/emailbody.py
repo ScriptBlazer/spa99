@@ -224,8 +224,8 @@ SPECS = {spec.key: spec for spec in [
     EmailSpec(
         "office_message", "A message from the team (to a lead or a member)", {**_FIRST, "message": "What the team member wrote (line breaks kept)"},
         {"first_name": "James", "message": "Thank you for your interest in Spa 99. We would love to tell you more about the membership."},
-        "Hello {first_name},\n\n{message}\n\nYou can reply to this email and it will reach the team.",
-        subject_placeholders=_FIRST),
+        "Hello {first_name},\n\n{message}\n\nYou can simply reply to this email.",
+        subject_placeholders=_FIRST, default_footer="no_contact"),  # a personal email from a named person: the reply goes to him, so no "write to hello@" line
     EmailSpec(
         "lead_next_morning", "Next-morning email to a new lead (from the sender set above, replies reach them)",
         {**_FIRST, "sender_name": "The name of the automatic emails sender (set in System > Emails)"},

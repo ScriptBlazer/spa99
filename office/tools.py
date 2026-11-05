@@ -1,4 +1,4 @@
-"""The person tools shared by the lead, person and Gold application pages: sticky notes, the approach list and Message. One
+"""The person tools shared by the lead, person and Gold application pages: sticky notes, the approach list and the Email button. One
 person = a set of addresses (outreach.people.resolve), so the same notes show on all three pages. The views stay thin and call
 these; the services are in outreach.services."""
 from django.db.models.functions import Lower
@@ -77,11 +77,54 @@ def outreach_context(target, user):
                          "added_by": entry.added_by_label if entry else "", "added_at": entry.added_at.isoformat() if entry else ""}}
 
 
-def message_context(target, user):
-    if target.kind == "gold":
-        return {}
-    return {"message": {"url": target.url("message"), "to": target.main, "max": MESSAGE_MAX, "can_send": can_edit(user),
-                        "unsubscribed": services.is_unsubscribed(target.addresses, target.user)}}
+def mobile_and_name(target):
+    """(mobile, first name) known for this person: the account's, else the one given at the email step or typed by staff, else the Gold
+    application's. The name is the newest one given even when there is no mobile. '' when there is none."""
+    application = target.application
+    if target.user is not None and target.user.mobile:
+        return target.user.mobile, target.user.first_name or ""
+    sessions = (JourneySession.objects.filter(is_bot=False).annotate(k=Lower("lead_email")).filter(k__in=list(target.addresses)).order_by("-created_at")) if target.addresses else []
+    sessions = list(sessions)
+    mobile = next((s.lead_mobile for s in sessions if s.lead_mobile), "")
+    name = (next((s.lead_first_name for s in sessions if s.lead_first_name), "") or (target.user.first_name if target.user is not None else "")
+            or (application.first_name if application is not None and application.first_name else ""))
+    if mobile:
+        return mobile, name
+    if application is not None and application.mobile:
+        return application.mobile, name
+    return "", name
+
+
+def display_name(target):
+    """The person's name for a sentence on a page: his full name, the applicant's, the lead's first name, else the address."""
+    if target.user is not None:
+        return target.user.get_full_name() or target.user.email
+    if target.application is not None and target.application.full_name:
+        return target.application.full_name
+    return mobile_and_name(target)[1] or target.main
+
+
+def whatsapp_context(target, user):
+    """`whatsapp` for the lead, person and Gold pages (design brief section 6): {configured, has_mobile, mobile, first_name, contact_url (opens his chat),
+    start_url, edit_url (POST first_name, mobile_country, mobile on a lead; mobile_country, mobile on a person or Gold page), can_send, can_edit, has_chat, window_open, window_closes_at,
+    opted_out, unread, thread_url}, plus `mobile_countries` for the add-a-mobile dialog."""
+    from common import phone
+    from whatsapp import services as whatsapp
+
+    mobile, first = mobile_and_name(target)
+    edit = target.url("contact") if target.kind == "lead" else target.url("mobile")  # person and Gold: POST mobile_country, mobile
+    return {"whatsapp": whatsapp.page_context(mobile, user, can_edit(user), target.url("whatsapp"), edit, first, target), "mobile_countries": phone.countries()}
+
+
+def email_context(target, user):
+    """`email_msg` for the lead, person and Gold pages (the Email button and its pop-up): {url, to, name, max, can_send, blocked (why he cannot be emailed, or ''), unsubscribed, from_label,
+    reply_to}. `from_label` is the logged-in person's From line and `reply_to` where his reply goes (notifications.sender)."""
+    from notifications import sender as sender_mod
+
+    sender = sender_mod.sender_for(user)
+    reply = sender.address if sender.source != "site" else SiteSettings.load().contact_address
+    return {"email_msg": {"url": target.url("message"), "to": target.main, "name": display_name(target), "max": MESSAGE_MAX, "can_send": can_edit(user), "blocked": services.email_block(target.main),
+                          "unsubscribed": services.is_unsubscribed(target.addresses, target.user), "from_label": f"{sender.name} <{sender.address}>", "reply_to": reply}}
 
 
 def archive_context(target, user):
@@ -94,9 +137,21 @@ def archive_context(target, user):
                         "reason_max": REASON_MAX, "can_edit": can_edit(user)}}
 
 
+def bounce_context(target, user):
+    """The lead page only: `bounce` {bounced, email, notice, can_edit, correct_url, resend_url, can_resend, sent}. `can_resend`: staff corrected the address
+    (so the follow-up never went to it) and it does not bounce now."""
+    if target.kind != "lead":
+        return {}
+    bounced = services.is_bounced(target.main)
+    state = services.follow_up_state(target.main)
+    editor = can_edit(user)
+    return {"bounce": {"bounced": bounced, "email": target.main, "notice": services.BOUNCE_NOTICE, "can_edit": editor, "correct_url": target.url("email"), "resend_url": target.url("resend"),
+                       "can_resend": bool(editor and state["corrected"] and not state["sent"] and not bounced), "sent": state["sent"]}}
+
+
 def tools_context(target, user):
-    """Everything the three pages add to their context: notes_*, outreach and message, and `archive` on the lead page."""
-    return {**notes_context(target, user), **outreach_context(target, user), **message_context(target, user), **archive_context(target, user)}
+    """Everything the three pages add to their context: notes_*, outreach and whatsapp, and `archive` on the lead page."""
+    return {**notes_context(target, user), **outreach_context(target, user), **whatsapp_context(target, user), **email_context(target, user), **archive_context(target, user), **bounce_context(target, user)}
 
 
 def outreach_rows(entries):

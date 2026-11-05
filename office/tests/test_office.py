@@ -184,7 +184,7 @@ class StoredFigureTests(OfficeTestCase):
         rollup.run()
         for path in paths:
             self.assertEqual(self.queries(path), empty[path], path)
-            self.assertLessEqual(empty[path], 30, path)
+            self.assertLessEqual(empty[path], 32, path)  # 30 plus the WhatsApp unread count and the Email unread count on the navigation badges
 
     def test_dashboard_and_analytics_json_shapes(self):
         finished_journey()

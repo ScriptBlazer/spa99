@@ -133,24 +133,31 @@ def _skip(row, reason, now):
 
 
 def _first_name(email):
+    """The first name he gave at the email step (or staff typed), else his Gold application's, else ''."""
     from gold.models import GoldApplication
+    from journey.models import JourneySession
+
+    lead = JourneySession.objects.filter(lead_email__iexact=email, is_bot=False).exclude(lead_first_name="").order_by("-created_at").first()
+    if lead is not None:
+        return lead.lead_first_name
 
     application = GoldApplication.objects.filter(email__iexact=email).exclude(first_name="").order_by("created_at").first()
     return application.first_name if application else ""
 
 
-def send_one(row, site, now):
-    """Send (or skip) one claimed row. Returns 'sent' or the skip reason. Never raises."""
+def send_one(row, site, now, force=False):
+    """Send (or skip) one claimed row. Returns 'sent' or the skip reason. Never raises. `force` is staff pressing Resend follow-up on a corrected
+    address: it ignores the automatic switch and the "too late" rule (everything else, a bounce, an unsubscribe, the sender address, still counts)."""
     from mailings import tokens
     from notifications import emailsettings
     from notifications.models import EmailLog
     from notifications.services import send_templated, subject_for
 
-    if not site.lead_next_morning_on:
+    if not site.lead_next_morning_on and not force:
         return _skip(row, SKIP_OFF, now)
     if emailsettings.options_for(TEMPLATE).sender == SENDER_PERSON and not site.auto_sender:  # the email's own sender setting (Person by default)
         return _skip(row, SKIP_NO_SENDER, now)
-    if row.due_at < now - TOO_LATE:
+    if row.due_at < now - TOO_LATE and not force:
         return _skip(row, SKIP_LATE, now)
     reason = skip_reason(row.email, site, now)
     if reason:

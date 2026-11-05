@@ -44,6 +44,12 @@ class JourneySession(BaseModel):
     lead_at = models.DateTimeField(null=True, blank=True, help_text="When the address was given (and the 'we may email you about opening' line accepted).")
     lead_privacy_version = models.CharField(max_length=20, blank=True, help_text="Privacy notice version in force when the address was given.")
 
+    # First name and mobile at the same step (docs/features/whatsapp.md). Blank for leads from before 2026-11-03. db_default: the
+    # previous release can still insert rows on this schema (rollback rule).
+    lead_first_name = models.CharField(max_length=100, blank=True, default="", db_default="", help_text="Given at the email step (or typed by staff). Personal data.")
+    lead_mobile = models.CharField(max_length=20, blank=True, default="", db_default="", db_index=True, help_text="E.164. Given at the email step (or typed by staff). Personal data.")
+    lead_consent_version = models.CharField(max_length=20, blank=True, default="", db_default="", help_text="Version of the consent wording ticked at the gate (journey.copy.CONSENT_VERSION).")
+
     # A Gold application points back at the session (GoldApplication.journey_session); see session.gold_applications.
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="journey_sessions"

@@ -9,6 +9,8 @@ import { initSwap } from './office-swap.js';
 import { initCounts } from './office-dashboard.js';
 import { initTools } from './office-tools.js';
 import { initClamp } from './office-clamp.js';
+import { initPush } from './office-push.js';
+import { initMobileDialog } from './office-mobile.js';
 
 initButtons();
 initFeedback();
@@ -19,3 +21,6 @@ initSwap();
 initCounts();
 initTools();
 initClamp();
+initPush();
+initMobileDialog();
+if (document.querySelector('[data-wa-app]')) import('./office-whatsapp.js').then((m) => m.initWhatsApp());

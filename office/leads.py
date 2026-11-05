@@ -169,8 +169,11 @@ def filtered_queryset(filters):
         queryset = queryset.annotate(archived_at=Subquery(_archived().values("archived_at")[:1]))
     if filters.get("sort") == "status":
         queryset = queryset.annotate(status_rank=_status_rank())
-    for word in filters["q"].lower().split():
-        queryset = queryset.filter(email_key__contains=word)
+    queryset = queryset.annotate(name_key=Lower("lead_first_name")) if filters["q"] else queryset
+    for word in filters["q"].lower().split():  # each word is part of the address, the first name or the mobile (digits, a leading 0 ignored)
+        digits = "".join(ch for ch in word if ch.isdigit()).lstrip("0")
+        match = Q(email_key__contains=word) | Q(name_key__contains=word)
+        queryset = queryset.filter(match | (Q(lead_mobile__contains=digits) if len(digits) >= 3 else Q(pk__in=[])))
     if filters["tier"]:
         queryset = queryset.filter(suggested_plan__slug=filters["tier"])
     if filters["potential"]:
@@ -242,6 +245,9 @@ def build_rows(page_sessions):
     for key, label in _heard_answers().filter(ak__in=emails).order_by("session__created_at").values_list("ak", "options__label"):
         heard[key] = label  # the newest answering journey wins
     archived = {a.email: a for a in ArchivedLead.objects.filter(email__in=emails)}
+    from outreach.services import bounced_set
+
+    bounced = bounced_set(emails)  # Possible fake: a permanent bounce on the suppression list (one query for the page)
     out = []
     for page_row in page_sessions:
         session = loaded[page_row.pk]
@@ -250,12 +256,12 @@ def build_rows(page_sessions):
         referrer, utm, medium, campaign, device = firsts.get(page_row.email_key, ("", "", "", "", ""))
         host = profile.referrer_host(referrer)
         out.append({
-            "id": str(session.pk), "email": page_row.email_key, "first_seen": lists_iso(session.lead_at or session.created_at),
+            "id": str(session.pk), "email": page_row.email_key, "name": session.lead_first_name, "mobile": session.lead_mobile, "first_seen": lists_iso(session.lead_at or session.created_at),
             "last_seen": lists_iso(session.last_seen_at), "journeys": page_row.journeys_n or 1, "finished": session.completed,
             "tier": session.suggested_plan.name if session.suggested_plan_id else "", "tier_slug": session.suggested_plan.slug if session.suggested_plan_id else "",
             "potential": session.gold_potential, "score": session.gold_score, "industries": labels.get("industry", []),
             "answers": labels, "summary": summary_lines(labels), "heard_via": heard.get(page_row.email_key, ""),
-            "via_chat": page_row.email_key in chatted,
+            "via_chat": page_row.email_key in chatted, "bounced": page_row.email_key in bounced,
             "source": {"host": host, "utm_source": utm, "utm_medium": medium, "utm_campaign": campaign, "device": device,
                        "label": utm or host or "Direct", "campaign": campaign},
             "registered": page_row.has_account, "account_id": str(accounts[page_row.email_key]) if page_row.email_key in accounts else "",
@@ -296,9 +302,9 @@ def csv_response(filters, user_id=None):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="spa99-leads.csv"'
     writer = csv.writer(response)
-    writer.writerow(["email", "status", "first_seen", "last_seen", "journeys", "best_fit", "gold_potential", "gold_score", "industries",
+    writer.writerow(["email", "first_name", "mobile", "status", "first_seen", "last_seen", "journeys", "best_fit", "gold_potential", "gold_score", "industries",
                      "when", "how_often", "facilities", "company", "heard_via", "gave_email_in_chat", "source", "campaign", "device", "applied_for_gold",
-                     "consent_given_at", "consent_privacy_version"])
+                     "consent_given_at", "consent_privacy_version", "consent_wording_version"])
     queryset = filtered_queryset(filters)
     offset = 0
     while True:
@@ -310,10 +316,10 @@ def csv_response(filters, user_id=None):
         for row in build_rows(chunk):
             a, s = row["answers"], consent[row["email"]]
             writer.writerow([lists.safe_cell(x) for x in (
-                row["email"], row["status"], row["first_seen"], row["last_seen"], row["journeys"], row["tier"], row["potential"], row["score"] or "",
+                row["email"], row["name"], row["mobile"], row["status"], row["first_seen"], row["last_seen"], row["journeys"], row["tier"], row["potential"], row["score"] or "",
                 "; ".join(row["industries"]), "; ".join(a.get("time", [])), "; ".join(a.get("frequency", [])), "; ".join(a.get("facilities", [])),
                 "; ".join(a.get("company", [])), row["heard_via"], "yes" if row["via_chat"] else "no", row["source"]["label"], row["source"]["campaign"], row["source"]["device"],
-                "yes" if row["gold_applied"] else "no", lists_iso(s.lead_at), s.lead_privacy_version)])
+                "yes" if row["gold_applied"] else "no", lists_iso(s.lead_at), s.lead_privacy_version, s.lead_consent_version)])
     return response
 
 

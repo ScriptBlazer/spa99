@@ -31,6 +31,10 @@
 }
 
 {$OFFICE_DOMAIN} {
+	# WhatsApp photos and PDFs sent from the chat are at most 16 MB (whatsapp/services.py); this keeps anything bigger away from the app.
+	request_body {
+		max_size 20MB
+	}
 	import app
 }
 

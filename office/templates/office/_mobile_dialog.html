@@ -1,0 +1,18 @@
+{% comment %}The Add a mobile / Change the mobile dialog (lead, person and Gold pages), opened from the Details rows (_details.html); on a lead it is Change the details, with the first name. Keys: whatsapp (office.tools.whatsapp_context), mobile_countries, archive (lead page only: adds the first name field).{% endcomment %}
+{% if whatsapp.can_edit and whatsapp.edit_url %}
+<dialog class="fb-modal o-dialog" data-dialog="mobile" aria-labelledby="od-mobile-h">
+  <form method="post" action="{{ whatsapp.edit_url }}" class="fb-modal-wrap" data-mobile-form data-start-url="{{ whatsapp.start_url }}" novalidate>{% csrf_token %}
+    <h2 class="fb-modal-title" id="od-mobile-h">{% if archive %}Change the details{% elif whatsapp.has_mobile %}Change the mobile{% else %}Add a mobile{% endif %}</h2>
+    <p class="fb-modal-body">{% if archive %}His name and number, so the team can WhatsApp him. Leave the number empty to keep the one he has.{% else %}So the team can WhatsApp him.{% endif %}</p>
+    {% if archive %}<label class="fb-modal-field"><span>First name</span><input class="fb-modal-input" type="text" name="first_name" value="{{ whatsapp.first_name }}" maxlength="100" autocomplete="off" autocapitalize="words" enterkeyhint="next"></label>{% endif %}
+    <label class="fb-modal-field"><span>Country</span><select class="fb-modal-input" name="mobile_country" autocomplete="off">{% for c in mobile_countries %}<option value="{{ c.iso }}"{% if c.iso == "GB" %} selected{% endif %}>{{ c.name }} ({{ c.dial }})</option>{% endfor %}</select></label>
+    <label class="fb-modal-field"><span>Mobile</span><input class="fb-modal-input" type="tel" inputmode="tel" name="mobile" value="" autocomplete="off" enterkeyhint="done" aria-describedby="od-mobile-hint od-mobile-err" data-label="Mobile"></label>
+    <p class="o-mobile-hint" id="od-mobile-hint">Choose the country, then the number. A leading 0 is fine.{% if whatsapp.has_mobile %} Now: {{ whatsapp.mobile }}.{% endif %}</p>
+    <p class="o-field-error--inline" id="od-mobile-err" data-mobile-error role="alert" hidden></p>
+    <div class="fb-modal-actions">
+      <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
+      <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Saving">Save</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}

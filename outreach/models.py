@@ -103,12 +103,17 @@ class OutreachEntry(UUIDModel):
 
 
 class PersonMessage(UUIDModel):
-    """A one-to-one email an Office user wrote to a lead or a person. The text is kept so the timeline can show it."""
+    """A one-to-one email an Office user wrote to a lead or a person (the Email button). The text is kept so the timeline can show it; `status` says whether it went."""
+
+    QUEUED, SENT, FAILED = "queued", "sent", "failed"
+    STATUS_CHOICES = [(QUEUED, "Queued"), (SENT, "Sent"), (FAILED, "Failed")]
 
     email = models.CharField(max_length=254, db_index=True, help_text="Lower case. Where it was sent.")
     text = models.TextField()
     author = _person()
     author_label = models.CharField(max_length=254, blank=True)
+    subject = models.CharField(max_length=300, blank=True, default="", db_default="", help_text="The subject it went with.")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=SENT, db_default=SENT, help_text="Rows from before this column count as sent.")
     sent_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
@@ -116,6 +121,28 @@ class PersonMessage(UUIDModel):
 
     def __str__(self):
         return f"message to {self.email}"
+
+
+class PersonEdit(UUIDModel):
+    """Staff added or fixed a person's first name, mobile or (a lead's) email (lead page, person page): one line of the timeline, "Mobile added by X" /
+    "Email changed by X". Erased with the person (the values are personal data)."""
+
+    FIRST_NAME, MOBILE, EMAIL = "first_name", "mobile", "email"
+    WHAT_CHOICES = [(FIRST_NAME, "First name"), (MOBILE, "Mobile"), (EMAIL, "Email")]
+
+    email = models.CharField(max_length=254, db_index=True, help_text="Lower case. The person's main address when it was changed.")
+    what = models.CharField(max_length=12, choices=WHAT_CHOICES)
+    before = models.CharField(max_length=254, blank=True)
+    after = models.CharField(max_length=254, blank=True)
+    by = _person()
+    by_label = models.CharField(max_length=254, blank=True)
+    at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["-at", "-id"]
+
+    def __str__(self):
+        return f"{self.what} edit on {self.email}"
 
 
 # ---------- archived leads (round 2, R6) ----------

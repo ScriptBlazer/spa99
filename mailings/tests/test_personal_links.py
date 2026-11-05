@@ -144,6 +144,9 @@ class PersonalSendTests(PersonalBase):
             "first_name": "Al", "last_name": "Smith", "email": "al@example.com", "password": "a-long-test-password-1", "mobile": "+447912345678",
             "date_of_birth": datetime.date(1990, 1, 1), "plan": "tier-2"}).user
         invite.refresh_from_db()
+        self.assertEqual(invite.status, Invite.OPENED)  # registering alone proves nothing (an unverified account may be a stranger's): the confirm link does
+        user_services.verify_email(user_services.tokens.make_verify_token(user))
+        invite.refresh_from_db()
         self.assertEqual((invite.status, invite.registered_user), (Invite.REGISTERED, user))
 
     def test_preview_and_test_use_sample_values(self):

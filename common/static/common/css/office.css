@@ -12,6 +12,7 @@
 @import "office-lists.css";
 @import "office-leads.css";
 @import "office-outreach.css";
+@import "office-whatsapp.css";
 
 /* The site-wide cross-document view transition is off in the Office (it threw "Transition was skipped"). */
 @view-transition { navigation: none; }
@@ -62,10 +63,10 @@
   .o-nav-list .o-icon { box-sizing: content-box; width: 1.5rem; height: 1.5rem; padding: 4px 16px; border-radius: var(--office-pill); transition: background-color var(--office-dur-lift) var(--ease-soft); }
   .o-nav-list a[aria-current="page"] .o-icon { background: var(--office-sunken); }
   .o-nav-list .o-badge-count { position: absolute; top: 0.375rem; left: calc(50% + 0.5rem); min-width: 1.125rem; height: 1.125rem; padding: 0 5px; border: 2px solid var(--office-surface); box-sizing: content-box; }
-  /* five slots at most: Home, Leads, People, Gold, More (Analytics, Chats and Invited live in the More sheet) */
+  /* five slots at most: Home, Leads, WhatsApp, Gold, More (Registered, Analytics, the Assistant and Invited live in the More sheet) */
   .o-nav-list li { min-width: 0; }
   .o-nav-list li:has([data-office-nav-item="leads"]) { order: 1; }
-  .o-nav-list li:has([data-office-nav-item="people"]) { order: 2; }
+  .o-nav-list li:has([data-office-nav-item="whatsapp"]) { order: 2; }
   .o-nav-list li:has([data-office-nav-item="gold"]) { order: 3; }
   .o-nav-more { display: block; order: 4; }
   .o-nav-list:has(.o-nav-more) li[data-nav-overflow] { display: none; }
@@ -127,7 +128,7 @@
 
 /* ---------- main ---------- */
 .o-main { padding: var(--space-3) var(--page-margin) var(--space-5); max-width: 80rem; }
-/* Big screens (Moishe 2026-10-30): only the list pages (People, Leads, Invited, Gold, Chats) get more width, so every column
+/* Big screens (Moishe 2026-10-30): only the list pages (People, Leads, Invited, Gold, Assistant) get more width, so every column
    fits without being cut off. Dashboard, Analytics and the rest grow only a little (88rem) at the normal text size (full width looked too big). */
 @media (min-width: 100em) { .o-main { max-width: 88rem; } }
 @media (min-width: 100em) { :is([data-office-section="people"], [data-office-section="leads"], [data-office-section="invited"], [data-office-section="gold"], [data-office-section="chats"]) .o-main { max-width: 100rem; } }

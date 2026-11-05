@@ -221,6 +221,9 @@ class InviteToListTests(ListFixtures):
         client.get("/register/")
         user = self._register()
         invite.refresh_from_db()
+        self.assertEqual((invite.status, invite.registered_user), (Invite.OPENED, None))  # registering alone proves nothing: an unverified account may be a stranger's
+        user_services.verify_email(user_services.tokens.make_verify_token(user))  # the confirm link proves the address
+        invite.refresh_from_db()
         self.assertEqual((invite.status, invite.registered_user), (Invite.REGISTERED, user))
         other = Invite.objects.get(email="bo@example.com")
         Client().get(f"/invite/{other.token}/")

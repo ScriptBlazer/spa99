@@ -139,22 +139,18 @@ class DeclineTests(ActionsTestCase):
 
 
 class RespondAndNoteTests(ActionsTestCase):
-    def test_respond_emails_with_reply_to_sets_contacted_and_stays_open(self):
+    def test_whatsapp_sent_marks_contacted_once_with_an_audit_event_and_stays_open(self):
         application = self.application()
-        office(self.approver, f"/gold/{application.pk}/respond/", {"message": "Which properties do you own?\nPlease list them."})
+        self.assertTrue(actions.whatsapp_sent(application, self.approver))
         application.refresh_from_db()
         self.assertEqual(application.status, "contacted")
-        message = mail.outbox[0]
-        self.assertEqual((message.to, message.reply_to), (["dan@example.com"], ["hello@example.test"]))
-        self.assertIn("Which properties do you own?\nPlease list them.", message.body)
         responded = events(application, "responded")[0]
-        self.assertEqual((responded.message, responded.from_status, responded.to_status, responded.actor), ("Which properties do you own?\nPlease list them.", "new", "contacted", self.approver))
-        self.assertEqual(events(application, "email_sent")[-1].meta["template"], "gold_respond")
-        office(self.approver, f"/gold/{application.pk}/respond/", {"message": "Which properties do you own?\nPlease list them."})  # double submit
-        self.assertEqual((len(events(application, "responded")), len(mail.outbox)), (1, 1))
+        self.assertEqual((responded.from_status, responded.to_status, responded.actor, responded.meta), ("new", "contacted", self.approver, {"whatsapp": True}))
+        self.assertFalse(actions.whatsapp_sent(application, self.approver))  # later messages change nothing
+        self.assertEqual((len(events(application, "responded")), mail.outbox), (1, []))  # no email: it went by WhatsApp
         self.assertEqual(invites.approve_and_invite(application, self.approver, channel="office"), invites.INVITED)  # still open for a decision
 
-    def test_a_note_is_internal_only_and_respond_is_closed_once_decided(self):
+    def test_a_note_is_internal_only_and_stays_possible_once_decided(self):
         application = self.application()
         office(self.approver, f"/gold/{application.pk}/note/", {"note": "He replied by phone: owns 12 flats"})
         note = StickyNote.objects.get()  # a sticky note on the person, not a history line
@@ -162,7 +158,7 @@ class RespondAndNoteTests(ActionsTestCase):
         self.assertEqual((mail.outbox, GoldApplication.objects.get(pk=application.pk).status), ([], "new"))
         self.assertEqual(office(self.approver, f"/gold/{application.pk}/note/", {"note": " "}).status_code, 302)  # refused with a toast
         invites.decline_application(application, self.approver, REASON, channel="office")
-        self.assertEqual(actions.respond(application, self.approver, "Hello again")[0], actions.CLOSED)
+        self.assertFalse(actions.whatsapp_sent(application, self.approver))  # decided: nothing to mark
         self.assertEqual(outreach_services.add_note("dan@example.com", self.approver, "Closed, noted for the file")[0], outreach_services.DONE)  # notes any time
 
 
@@ -176,12 +172,12 @@ class PermissionAndLinkTests(ActionsTestCase):
             self.assertContains(page, "&lt;script&gt;alert(1)&lt;/script&gt;<br>second line")  # escaped, line breaks kept (sticky note)
             self.assertNotContains(page, "data-gold-open")
             before = ApplicationEvent.objects.count()
-            for action, data in (("decline", {"reason": REASON}), ("respond", {"message": "Hello there"}), ("note", {"note": "A note"})):
+            for action, data in (("decline", {"reason": REASON}), ("note", {"note": "A note"})):
                 if action == "note" and user is self.final:
                     continue  # an Admin-level final approver may add notes (office.permissions.can_edit)
                 self.assertEqual(office(user, f"/gold/{application.pk}/{action}/", data).status_code, 403)
             self.assertEqual(ApplicationEvent.objects.count(), before)
-        self.assertContains(office(self.approver, f"/gold/{application.pk}/"), 'data-gold-open="respond"')
+        self.assertContains(office(self.approver, f"/gold/{application.pk}/"), 'data-gold-open="decline"')
 
     def test_the_approver_email_links_open_the_office_forms(self):
         gold_services.submit_application(application_data())
@@ -189,13 +185,13 @@ class PermissionAndLinkTests(ActionsTestCase):
         decline = next(line.split(": ")[1] for line in email.body.splitlines() if line.startswith("Decline"))
         respond = next(line.split(": ")[1] for line in email.body.splitlines() if line.startswith("Respond"))
         self.assertTrue(decline.endswith("?do=decline") and respond.endswith("?do=respond"))
-        self.assertIn("?do=respond", email.alternatives[0][0])
+        self.assertIn("?do=respond", email.alternatives[0][0])  # the link stays in the email; it now opens his WhatsApp chat
         path = lambda url: "/" + url.split("/", 3)[3]  # noqa: E731
         self.assertContains(office(self.approver, path(decline)), 'data-gold-dialog="decline" data-open')
-        self.assertContains(office(self.approver, path(respond)), 'data-gold-dialog="respond" data-open')
+        self.assertEqual(office(self.approver, path(respond)).url, f"/gold/{GoldApplication.objects.get().pk}/whatsapp/")
         application = GoldApplication.objects.get()
         invites.decline_application(application, self.approver, REASON, channel="office")
-        decided = office(self.approver, path(respond))
+        decided = office(self.approver, path(decline))
         self.assertNotContains(decided, "data-open")  # already decided: no form, a calm note instead
         self.assertContains(decided, "already been decided")
 
@@ -253,11 +249,11 @@ class HardeningTests(ActionsTestCase):
     def test_a_form_error_after_someone_else_decided_redirects_with_a_warning(self):
         application = self.application()
         invites.decline_application(application, self.reader, REASON, channel="office")
-        response = office(self.approver, f"/gold/{application.pk}/respond/", {"message": "x"})
+        response = office(self.approver, f"/gold/{application.pk}/decline/", {"reason": "x"})  # a form mistake on an application decided meanwhile
         self.assertEqual(response.status_code, 302)
         follow = Client(HTTP_HOST=OFFICE)
         follow.force_login(self.approver)
-        self.assertContains(follow.post(f"/gold/{application.pk}/respond/", {"message": "x"}, follow=True), "Already decided by someone else")
+        self.assertContains(follow.post(f"/gold/{application.pk}/decline/", {"reason": "x"}, follow=True), "Already decided by someone else")
 
     def test_export_has_the_declined_email_text_and_all_email_results_are_logged(self):
         application = self.application()

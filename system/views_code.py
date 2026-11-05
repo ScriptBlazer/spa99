@@ -43,7 +43,7 @@ def _read(request):
 
 
 def _limited(request):
-    return None if hit("system-code", request.user.pk, LIMIT, WINDOW) else JsonResponse(
+    return None if hit("system-code", request.user.pk, LIMIT, WINDOW, lock=True) else JsonResponse(
         {"ok": False, "message": "Too many requests. Please wait a moment."}, status=429, headers={"Retry-After": str(WINDOW)})
 
 

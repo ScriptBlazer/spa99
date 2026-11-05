@@ -5,7 +5,7 @@ from simple_history.models import HistoricalRecords
 
 from common.ids import format_public_code, generate_public_code
 from common.models import BaseModel
-from common.validators import normalise_email, normalise_uk_mobile
+from common.validators import normalise_email, normalise_mobile
 
 from .managers import UserManager
 
@@ -53,12 +53,12 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         super().clean()
         self.email = normalise_email(self.email)
         if self.mobile:
-            self.mobile = normalise_uk_mobile(self.mobile)
+            self.mobile = normalise_mobile(self.mobile)
 
     def save(self, *args, **kwargs):
         self.email = (self.email or "").strip().lower()
         # Always stored as E.164 so uniqueness holds across formats; blank must be NULL (unique), not "".
-        self.mobile = normalise_uk_mobile(self.mobile) if self.mobile else None
+        self.mobile = normalise_mobile(self.mobile) if self.mobile else None
         if not self.public_id:
             self.public_id = self._new_public_id()
         super().save(*args, **kwargs)

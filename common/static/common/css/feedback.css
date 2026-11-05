@@ -19,7 +19,7 @@
   --fb-hover: var(--color-hairline-inverse);
   --fb-bar: 0px;
 }
-body.on-dark .toasts, body:has([data-journey]) .toasts { --fb-surface: var(--color-espresso-raised); }
+body.on-dark .toasts, body:not(.office):has([data-journey]) .toasts { --fb-surface: var(--color-espresso-raised); } /* the public journey only: Office pages also carry data-journey */
 body.member .toasts { --fb-bar: var(--member-tabbar-h); }
 body.member--sub .toasts, body.m-typing .toasts { --fb-bar: 0px; }
 

@@ -48,7 +48,7 @@ KINDS = {
     SystemEvent.PAYMENTS_OPENED: ("change", "payments", "ok"), SystemEvent.PAYMENTS_SCHEDULED: ("change", "payments", "ok"),
     SystemEvent.PAYMENTS_CLOSED: ("change", "payments", "ok"), SystemEvent.PAYMENTS_CANCELLED: ("change", "payments", "ok"),
     SystemEvent.SALE_RESTORED: ("change", "payments", "ok"), SystemEvent.SETUP_EDITED: ("change", "payments", "ok"), SystemEvent.SETUP_MANUAL: ("change", "payments", "ok"), SystemEvent.SETUP_CANCELLED: ("change", "payments", "ok"),
-    SystemEvent.LAUNCHED: ("change", "launch", "ok"),
+    SystemEvent.LAUNCHED: ("change", "launch", "ok"), SystemEvent.CHAT_DELETED: ("change", "changes", "ok"),
 }
 CATEGORIES = [("change", "Changes"), ("security", "Security"), ("undo", "Undos"), ("failure", "Failures")]
 EVENT_SECTION_LABELS = {"security": "Security", "changes": "Change log", "payments": "Payments", "launch": "Launch"}

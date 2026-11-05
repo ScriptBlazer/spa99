@@ -1,0 +1,42 @@
+{% comment %}The notifications sheet (design brief section 7). office-push.js fills the state; every state is here, one is shown. Opens from the person menu.{% endcomment %}
+<dialog class="o-sheet o-wa-notify" data-notify-sheet aria-labelledby="wa-notify-h" data-state="off">
+  <div class="o-wa-tpl-top"><h2 id="wa-notify-h">Notifications</h2><button type="button" class="o-wa-x" data-notify-close aria-label="Close">{% include "office/_icon.html" with name="x" %}</button></div>
+  <div data-notify-for="off">
+    <p>Turn on notifications for new messages on this device.</p>
+    <button type="button" class="btn btn-primary btn-block" data-notify-on data-working-text="Asking your phone">Turn on notifications</button>
+  </div>
+  <div data-notify-for="on" hidden>
+    <p><strong>On for this device.</strong></p>
+    <div class="o-wa-notify-row"><button type="button" class="btn btn-secondary" data-notify-test data-working-text="Sending">Send a test</button><button type="button" class="o-quiet" data-notify-off>Turn off</button></div>
+  </div>
+  <div data-notify-for="muted" hidden>
+    <p>Muted. Messages still arrive here. You get no notifications on any device.</p>
+  </div>
+  <div data-notify-for="blocked" hidden>
+    <p>Blocked by your browser. Allow notifications for <span data-notify-host>this site</span> in its settings, then come back.</p>
+    <p class="o-wa-fine" data-notify-ios hidden>On iPhone: Settings, Notifications, Spa 99 Office.</p>
+  </div>
+  <div data-notify-for="ios" hidden>
+    <p class="o-wa-install-title">Add the Office to your Home Screen, to get notifications.</p>
+    <ol class="o-wa-steps">
+      <li>Tap Share {% include "office/_icon.html" with name="share" %}</li>
+      <li>Choose Add to Home Screen</li>
+      <li>Open Spa 99 Office from your Home Screen</li>
+    </ol>
+  </div>
+  <div data-notify-for="unsupported" hidden>
+    <p>This browser cannot show notifications. Messages still update here.</p>
+  </div>
+  <div data-notify-for="unconfigured" hidden>
+    <p>Notifications are not set up on the server yet.</p>
+  </div>
+  <div class="o-wa-notify-install" data-notify-install hidden>
+    <p>Install the Office for notifications.</p>
+    <button type="button" class="btn btn-secondary" data-install-now>Install</button>
+  </div>
+  <label class="o-wa-switch" data-notify-mute-row hidden>
+    <input type="checkbox" role="switch" data-notify-mute>
+    <span class="o-wa-switch-track" aria-hidden="true"></span>
+    <span>Mute all notifications</span>
+  </label>
+</dialog>

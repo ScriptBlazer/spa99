@@ -14,6 +14,7 @@ from django.views.decorators.http import require_GET, require_safe
 
 from content import services as content
 from journey import services as journey_services
+from common import phone
 from journey.copy import GATE as JOURNEY_GATE
 from journey.models import Option, Question
 from gold.models import GoldApplication
@@ -174,7 +175,7 @@ def journey(request, slug=""):
     shown = memberships_visible(request)
     config = {
         "slugs": JOURNEY_SLUGS, "resultSlug": JOURNEY_RESULT_SLUG, "base": reverse("journey"),
-        "copy": _copy("journey", keys), "gate": JOURNEY_GATE, "facilityImages": services.journey_facility_images(),
+        "copy": _copy("journey", keys), "gate": {**JOURNEY_GATE, "countries": phone.countries()}, "facilityImages": services.journey_facility_images(),
         "iconSprite": static("common/img/icons.svg"),
         "lastSuggestion": journey_services.last_suggestion(session) if session is not None else None,
         "urls": {"restart": reverse("journey:restart"), "lead": reverse("journey:lead"), "privacy": reverse("privacy"), "register": reverse("register"), "goldApply": reverse("gold_apply"), "home": reverse("home"),
@@ -208,7 +209,7 @@ def gold_apply(request, slug=""):
         "slugs": GOLD_SLUGS, "sentSlug": GOLD_SENT_SLUG, "base": reverse("gold_apply"),
         "copy": _copy("gold-apply", keys), "open": SiteSettings.load().register_interest_open,
         "journeyCopy": _copy("journey", ["continue", "skip", "back", "prefer_not", "screen_1", "screen_2", "screen_3"]),
-        "facilityImages": services.journey_facility_images(), "iconSprite": static("common/img/icons.svg"),
+        "facilityImages": services.journey_facility_images(), "iconSprite": static("common/img/icons.svg"), "countries": phone.countries(),
         "urls": {"home": reverse("home"), "privacy": reverse("privacy"), "terms": reverse("terms"),
                  "whatsappBusiness": short_url("gold", msg="gold_business"),  # '' while no WhatsApp link is set: the note and button are hidden
                  "journey": reverse("journey_page", args=[JOURNEY_SLUGS[1]])},

@@ -1,5 +1,6 @@
 """Round 2 of the office outreach: list sorting, Gold delete, approach list tabs, archived leads, restore a note, the next-morning email.
 Mocked: sync queue and in-memory mail."""
+import json
 from datetime import datetime, time, timedelta, timezone as tz
 from unittest import mock
 from zoneinfo import ZoneInfo
@@ -16,7 +17,7 @@ from notifications.models import EmailBounce, EmailLog
 from office import leads as lead_lists
 from office.tests.test_leads import lead, verify
 from outreach import nextmorning, services
-from outreach.models import ArchivedLead, NextMorningEmail, NoteEvent, OutreachEntry, StickyNote
+from outreach.models import ArchivedLead, NextMorningEmail, NoteEvent, OutreachEntry, PersonEdit, StickyNote
 from outreach.tests.test_outreach import Base, call
 from plans.models import SiteSettings
 from system.models import SystemChange
@@ -318,3 +319,134 @@ class NextMorningTests(Base):
         job = Schedule.objects.get(name="lead-next-morning")
         self.assertEqual((job.func, job.schedule_type, job.minutes), ("outreach.nextmorning.scheduled", Schedule.MINUTES, 15))
 
+
+
+@override_settings(DEFAULT_FROM_EMAIL="Spa 99 <hello@spa99.test>")
+class BouncedLeadTests(Base):
+    """Possible fake (a permanent bounce on the suppression list), Correct the email, Resend follow-up."""
+
+    def setUp(self):
+        super().setUp()
+        self.site = SiteSettings.load()
+        self.site.auto_email_from_name, self.site.auto_email_from_address = "Barry Lobenstein", "barry@spa99.test"
+        self.site.save()  # the automatic switch stays OFF: the resend must work anyway
+        self.now = timezone.now()
+
+    def suppress(self, email, reason="hard_bounce"):
+        from notifications.models import EmailSuppression
+
+        EmailSuppression.objects.create(email=email, reason=reason, first_seen=self.now, last_seen=self.now)
+
+    def test_the_tag_shows_for_a_permanent_bounce_only_and_costs_no_extra_queries_per_row(self):
+        a, b, c = lead("typo@example.com"), lead("spam@example.com"), lead("fine@example.com")
+        self.suppress("typo@example.com")
+        self.suppress("spam@example.com", "complaint")
+        rows = {r["email"]: r["bounced"] for r in lead_lists.page({**lead_lists.filters_from(self._request()), "range": "all"}, 1)[0]}
+        self.assertEqual(rows, {"typo@example.com": True, "spam@example.com": False, "fine@example.com": False})
+        html = call(self.reader, "get", "/leads/").content.decode()
+        self.assertEqual(html.count("data-possible-fake"), 1)
+        page = call(self.reader, "get", f"/leads/{a.pk}/")
+        self.assertIn("This email bounced, so it may not be real.", page.content.decode())
+        self.assertNotIn("data-bounce-notice", call(self.reader, "get", f"/leads/{b.pk}/").content.decode())  # a complaint is not a bounce
+        self.assertNotIn("data-bounce-notice", call(self.reader, "get", f"/leads/{c.pk}/").content.decode())
+
+    def _request(self):
+        from django.test import RequestFactory
+
+        request = RequestFactory().get("/leads/")
+        request.user = self.reader
+        return request
+
+    def test_correcting_the_email_moves_his_journeys_and_notes_is_audited_and_clears_the_tag(self):
+        session = lead("typo@example.com")
+        self.suppress("typo@example.com")
+        services.add_note("typo@example.com", self.approver, "Called, no answer")
+        self.assertEqual(call(self.reader, "post", f"/leads/{session.pk}/email/", {"email": "fixed@example.com"}).status_code, 403)  # view only
+        answer = call(self.approver, "post", f"/leads/{session.pk}/email/", {"email": " Fixed@Example.com "})
+        self.assertEqual(answer.status_code, 302)
+        session.refresh_from_db()
+        self.assertEqual(session.lead_email, "fixed@example.com")
+        self.assertEqual(StickyNote.objects.get().email, "fixed@example.com")
+        edit = PersonEdit.objects.get()
+        self.assertEqual((edit.what, edit.before, edit.after, edit.email), ("email", "typo@example.com", "fixed@example.com", "fixed@example.com"))
+        page = call(self.reader, "get", f"/leads/{session.pk}/")
+        self.assertNotIn("data-bounce-notice", page.content.decode())
+        self.assertIn(f"Email changed by {self.approver.email}", [e["label"] for e in page.context["person"]["timeline"]])
+        from notifications.models import EmailSuppression
+
+        self.assertTrue(EmailSuppression.objects.filter(email="typo@example.com").exists())  # the old address stays on the list
+
+    def test_the_lead_page_has_one_email_send_dialog_and_a_separate_correct_email_one(self):
+        session = lead("fine@example.com")
+        html = call(self.approver, "get", f"/leads/{session.pk}/").content.decode()
+        self.assertIn("data-consent-text", html)  # the wording he ticked reaches the page
+        self.assertEqual(html.count('data-dialog="email"'), 1)
+        self.assertEqual(html.count('data-dialog="correct-email"'), 1)
+        send = html.split('data-dialog="email"')[1].split("</dialog>")[0]
+        self.assertIn('name="message"', send)  # the send form, not the correct-email one
+        self.assertNotIn('type="email"', send)
+
+    def test_a_taken_address_is_refused_and_says_whose(self):
+        first, other = lead("typo@example.com"), lead("other@example.com")
+        JourneySession.objects.filter(pk=other.pk).update(lead_first_name="Olly")
+        answer = call(self.approver, "post", f"/leads/{first.pk}/email/", {"email": "other@example.com"}, follow=True)
+        self.assertIn("another lead (Olly)", " ".join(str(m) for m in answer.context["messages"]))
+        user = user_services.register_interest(cleaned(email="member@example.com", first_name="Mia", last_name="Member")).user
+        result, owner = services.correct_lead_email("typo@example.com", "member@example.com", self.approver)
+        self.assertEqual((result, owner["kind"], owner["name"]), (services.TAKEN, "account", "Mia Member"))
+        self.assertEqual(services.correct_lead_email("typo@example.com", "not an email", self.approver)[0], services.INVALID)
+        first.refresh_from_db()
+        self.assertEqual(first.lead_email, "typo@example.com")
+        self.assertFalse(PersonEdit.objects.exists())
+        del user
+
+    def test_resend_sends_once_with_the_switch_off_and_not_while_bounced_or_without_a_sender(self):
+        session = lead("typo@example.com")
+        self.suppress("typo@example.com")
+        call(self.approver, "post", f"/leads/{session.pk}/email/", {"email": "fixed@example.com"})
+        page = call(self.approver, "get", f"/leads/{session.pk}/").content.decode()
+        self.assertIn("data-bounce-resend", page)
+        self.assertNotIn("data-bounce-resend", call(self.reader, "get", f"/leads/{session.pk}/").content.decode())  # view only: no button
+        self.assertNotIn("data-bounce-resend", call(self.approver, "get", f"/leads/{lead('x@example.com').pk}/").content.decode())
+        self.assertEqual(call(self.reader, "post", f"/leads/{session.pk}/resend/").status_code, 403)
+        self.suppress("fixed@example.com")  # still bouncing
+        self.assertEqual(services.resend_follow_up("fixed@example.com", self.approver)[0], services.BOUNCED)
+        from notifications.models import EmailSuppression
+
+        EmailSuppression.objects.filter(email="fixed@example.com").delete()
+        SiteSettings.objects.update(auto_email_from_address="")
+        self.assertEqual(services.resend_follow_up("fixed@example.com", self.approver)[0], services.NO_SENDER)
+        SiteSettings.objects.update(auto_email_from_address="barry@spa99.test")
+        self.assertFalse(SiteSettings.load().lead_next_morning_on)
+        mail.outbox.clear()
+        self.assertEqual(services.resend_follow_up("fixed@example.com", self.approver)[0], services.SENT)
+        self.assertEqual((len(mail.outbox), mail.outbox[0].to), (1, ["fixed@example.com"]))
+        self.assertEqual(services.resend_follow_up("fixed@example.com", self.approver)[0], services.ALREADY)  # once
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Next-morning email sent", str(call(self.reader, "get", f"/leads/{session.pk}/").context["timeline_days"]))
+
+
+class StaffEmailExportTests(Base):
+    def test_staff_email_text_is_in_both_exports_and_an_unverified_account_gets_none(self):
+        from outreach.models import PersonMessage
+
+        PersonMessage.objects.create(email="acc@example.com", text="Hello Acc", author_label="Barry", subject="Hi")
+        session = lead("acc@example.com")
+        lead_export = call(self.admin, "get", f"/leads/{session.pk}/export/")
+        self.assertEqual([m["text"] for m in json.loads(lead_export.content)["staff_emails"]], ["Hello Acc"])
+        user = user_services.register_interest(cleaned(email="acc@example.com")).user
+        self.assertEqual(user_services.export_user_data(user)["staff_emails"], [])  # not proven his yet
+        type(user).objects.filter(pk=user.pk).update(email_verified_at=timezone.now())
+        user.refresh_from_db()
+        mine = user_services.export_user_data(user)["staff_emails"]
+        self.assertEqual((mine[0]["text"], mine[0]["written_by"]), ("Hello Acc", "Barry"))
+
+
+class SendMessageGuardTests(Base):
+    def test_resending_after_a_failure_sends_but_a_repeat_of_a_good_one_does_not(self):
+        with mock.patch("outreach.services.enqueue", side_effect=RuntimeError("queue down")):
+            result, first = services.send_message(self.approver, "a@example.com", "Hello there")
+        self.assertEqual((result, first.status), (services.DONE, "failed"))
+        with mock.patch("outreach.services.enqueue"):
+            self.assertEqual(services.send_message(self.approver, "a@example.com", "Hello there")[0], services.DONE)  # not "already sent"
+            self.assertEqual(services.send_message(self.approver, "a@example.com", "Hello there")[0], services.DUPLICATE)
