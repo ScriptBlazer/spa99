@@ -1,5 +1,5 @@
 {% load office_tags text_tags %}{% for p in rows %}
-<tr class="o-row" data-person-row data-journey="{{ p.journey }}">
+<tr class="o-row" data-press data-person-row data-journey="{{ p.journey }}">
   <td class="c-name" data-col="name"><a class="o-rowlink" href="{% url 'office_person' p.id %}">{% truncated p.name %}</a><span class="o-cell-sub o-email-sub">{% truncated p.email %}</span></td>
   <td class="c-email o-email-col" data-col="email">{% truncated p.email %}</td>
   <td class="c-plan" data-col="plan">{{ p.plan }}</td>
@@ -9,7 +9,7 @@
   <td class="c-payment" data-col="payment">{{ p.payment }}</td>
   <td class="c-journey" data-col="journey">{{ p.journey|journey_label }}</td>
   <td class="c-date num" data-col="registered"><span class="o-only-wide">{{ p.registered|dt }}</span><span class="o-only-narrow">{{ p.registered|relative }}</span></td>
-  <td class="c-gold" data-col="gold">{% if p.gold_application_id %}<a class="o-goldlink" href="{% url 'office_gold_application' p.gold_application_id %}">Gold</a>{% endif %}</td>
+  <td class="c-gold" data-col="gold">{% if p.gold_application_id %}<a class="o-goldlink o-badge o-badge--st-applied" href="{% url 'office_gold_application' p.gold_application_id %}" data-gold-applied>Applied</a>{% endif %}</td>
 </tr>
 {% empty %}<tr class="o-empty-row" data-empty><td colspan="10"><p>{% if filters.q or filters.plan or filters.verified or filters.marketing or filters.sale or filters.payment %}No one matches that. Try fewer filters.{% else %}No one approved yet.{% endif %}</p></td></tr>{% endfor %}
-{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="10"><a class="btn btn-secondary btn-sm" href="{{ more_url }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}
+{% include "office/_list_foot.html" with cols="10" %}

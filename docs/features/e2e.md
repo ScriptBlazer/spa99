@@ -94,8 +94,14 @@ Exit code is 0 only if every step passed. A summary prints in the terminal; the 
 
 ## Files
 
-`scripts/e2e.sh` (workspace, server, run, cleanup), `e2e/settings.py`, `e2e/run.py` (runner), `e2e/walks.py` (walk-throughs 1 to 9), `e2e/walks_beta.py` (10 to 24), `e2e/settings_strict.py` (the second server), `e2e/kit.py` (steps, screenshots, error collection, sign-in, register, journey, Gold helpers), `e2e/mailbox.py` (also reads each part of an email and counts by subject), `e2e/dbtool.py` (team accounts and database facts, including Gold history, invites, audit events and ageing an application, in a child process because Playwright's sync API blocks Django's database calls), `e2e/report.py`. `requirements-dev.txt` adds `playwright`.
+`scripts/e2e.sh` (workspace, server, run, cleanup), `e2e/settings.py`, `e2e/run.py` (runner), `e2e/walks.py` (walk-throughs 1 to 9), `e2e/walks_beta.py` (10 to 24), `e2e/walks_office2.py` (25 to 29, Office 2), `e2e/settings_strict.py` (the second server), `e2e/kit.py` (steps, screenshots, error collection, sign-in, register, journey, Gold helpers), `e2e/mailbox.py` (also reads each part of an email and counts by subject), `e2e/dbtool.py` (team accounts and database facts, including Gold history, invites, audit events and ageing an application, in a child process because Playwright's sync API blocks Django's database calls), `e2e/report.py`. `requirements-dev.txt` adds `playwright`.
 
 ## Not verified at build time
 
 Walk-throughs 10 to 24 were written in a sandbox that cannot start Chrome. Their server-side expectations (status codes, refusals, emails, escaping, limits, audit events, the strict server settings, the email checks on real emails, `scripts/e2e.sh` starting both servers) were proven without a browser through Django's test client and the email reader; the clicks and selectors were written against the real templates and scripts and have not run. Expect some selector tuning on the first real run.
+
+## Office 2 walk-throughs (25 to 29, `e2e/walks_office2.py`)
+
+25 phone Home (cards, rings and their links, no greeting, range stays All, five tabs, Revenue, person menu, computer side by side). 26 approvals (approve, strip of the same height, undo, decline, Back to waiting, Registered line and tables). 27 Leads to the Approach list and back with Undo, Archive with a reason, the wa.me link, tap feedback. 28 group send to leads: sender dropdown, confirm showing who moves, the add-your-number link and its page at 375 by 667, a bounce coming back. 29 Leads loading itself on a phone and Back returning to the row.
+
+They use two browser windows at once, so they need a normal Chromium, not `--single-process`. **Unrun:** these walks were written and the first step of 25 was run, but the whole set has not been run to the end (the single-process browser used at build time cannot open a second window). Run `scripts/e2e.sh --only 25,26,27,28,29`. Walks 25 to 29 may need a selector adjusted on first run. Walks for the removed WhatsApp chat were already gone.

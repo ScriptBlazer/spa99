@@ -70,9 +70,10 @@ def row(reg):
             "decline_url": _url("office_approval_decline", user.pk), "undo_url": _url("office_approval_undo", user.pk)}
 
 
-def page(status, number, size, q="", plan=""):
-    """(rows, has_next) for one page of one list."""
-    start = (number - 1) * size
+def page(status, number, size, q="", plan="", shift=0):
+    """(rows, has_next) for one page of one list. `shift`: how many rows of the earlier pages have left this list since they were shown (decided on this very page, each left as an Undo strip), so
+    the next page carries on from the right place instead of skipping the people who moved up."""
+    start = max((number - 1) * size - max(shift, 0), 0)
     found = list(queryset(status, q, plan)[start:start + size + 1])
     return [row(r) for r in found[:size]], len(found) > size
 

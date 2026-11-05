@@ -10,8 +10,9 @@ from . import report
 from .kit import PORT, REPORT_DIR, Walk, run_walk, setup_staff
 from .walks import WALKS as CORE_WALKS
 from .walks_beta import BETA_WALKS
+from .walks_office2 import OFFICE2_WALKS
 
-WALKS = CORE_WALKS + BETA_WALKS
+WALKS = CORE_WALKS + BETA_WALKS + OFFICE2_WALKS
 
 
 def server_is_up():

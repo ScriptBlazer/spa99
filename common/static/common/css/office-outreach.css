@@ -115,6 +115,8 @@ html:not(.js) [data-note-compose], html:not(.js) .o-notes-open { display: none; 
 .o-hint-line { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--office-muted); max-width: none; }
 .o-hint-line a { color: inherit; text-underline-offset: 0.25em; }
 .o-addlist { gap: var(--space-2); }
+.o-reach-actions .o-addlist, .o-detail-rail .o-card > .o-addlist { display: flex; justify-content: center; justify-self: center; margin-inline: auto; }   /* a quiet link under the two reach out buttons */
+@media (hover: none) { .o-addlist { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.25em; } }   /* there is no hover to reveal it */
 .o-addlist .o-icon { width: 1.125rem; height: 1.125rem; }
 .o-attach { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--office-radius); background: var(--office-sunken); color: var(--office-text); font-size: var(--text-sm); max-width: none; }
 .o-attach .o-icon { width: 1.125rem; height: 1.125rem; color: var(--office-muted); }
@@ -142,8 +144,8 @@ button.o-chip { border: 0; font-family: inherit; }
 /* ---------- the Approach list page ---------- */
 .o-outreach-sub { margin-bottom: var(--space-3); }
 .o-seg-count { color: var(--office-muted); font-variant-numeric: tabular-nums; margin-left: 0.25em; }
-.o-filters--outreach .o-seg { min-width: 21rem; }   /* Open / Registered / Done */
-@media (max-width: 63.99em) { .o-filters--outreach .o-seg { width: 100%; min-width: 0; } }
+.o-filters--outreach .o-seg { min-width: 14rem; }   /* Open / Done */
+@media (max-width: 63.99em) { .o-filters--outreach .o-seg { flex: 1 1 12rem; min-width: 0; } }
 @media (max-width: 23.99em) { .o-filters--outreach .o-seg-item { padding-inline: var(--space-1); font-size: var(--text-sm); } }
 .o-list--outreach .c-reason { max-width: 18rem; color: var(--office-text); }
 .o-list--outreach .o-reg-tag { vertical-align: middle; }
@@ -157,13 +159,16 @@ button.o-chip { border: 0; font-family: inherit; }
 .o-row-actions form { position: relative; z-index: 1; margin: 0; }
 .o-row-done { gap: var(--space-1); }
 .o-row-done .o-icon { width: 1rem; height: 1rem; }
+@media (pointer: coarse) { .o-row-done { min-height: 2.75rem; } }
 .o-row.is-leaving { opacity: 0; scale: 0.96; pointer-events: none; transition: opacity var(--office-dur-swap) var(--ease-soft), scale var(--office-dur-swap) var(--ease-soft); }
 .o-list--outreach .o-rowname { font-weight: 600; }
 @media (max-width: 63.99em) {
   .o-list--outreach .o-row td.c-action { display: block; order: 8; flex: 0 0 100%; width: auto; margin-top: var(--space-2); text-align: left; }
-  .o-list--outreach .o-row-actions { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2); }
-  .o-list--outreach .o-row-actions:has(form:only-child) { grid-template-columns: auto; justify-content: end; }
-  .o-list--outreach .o-row-done { width: 100%; min-height: 2.75rem; }
+  .o-list--outreach .o-row-actions { display: flex; flex-wrap: nowrap; align-items: center; justify-content: flex-start; gap: 0 var(--space-2); }
+  .o-list--outreach .o-row-done { padding-inline: var(--space-3); white-space: nowrap; }
+  .o-list--outreach .o-row-actions .o-quiet { padding-inline: var(--space-1); white-space: nowrap; }   /* Mark done, then two quiet links to its right */
+  .o-list--outreach .o-row-actions .o-row-first-quiet { margin-left: auto; }
+  .o-list--outreach .o-row-actions form:only-child { margin-left: 0; }
   .o-list--outreach .o-row-remove { padding-inline: var(--space-2); }
   .o-list--outreach .o-row td.c-name { position: relative; order: 1; flex: 0 0 100%; }   /* the row link covers the title and the email only */
   .o-list--outreach .c-name .o-cell-sub { display: block; font-weight: 400; }

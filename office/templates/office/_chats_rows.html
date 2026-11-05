@@ -1,0 +1,11 @@
+{% load office_tags text_tags %}    {% for c in rows %}
+      <tr class="o-row" data-press>
+        <td class="c-date"><span class="o-only-wide">{{ c.created_at|dt }}</span><span class="o-only-narrow">{{ c.created_at|dm }}, {{ c.created_at|date:"H:i" }}</span></td>
+        <td class="c-question"><a class="o-rowlink" href="{% url 'office_chat' c.pk %}">{% truncated c.preview lines=2 %}</a></td>
+        <td class="c-who">{% if c.user %}{% truncated c.user.email %}{% elif c.lead_email %}{% truncated c.lead_email %}{% else %}Anonymous{% endif %}</td>
+        <td class="c-count num">{{ c.message_count }}<span class="o-only-narrow"> message{{ c.message_count|pluralize }}</span></td>
+        {% if show_cost %}<td class="c-cost num">{{ c.total_cost_pence|floatformat:2 }}p</td>{% endif %}
+        <td class="c-note">{% if c.ended_off_topic %}Closed: off-topic{% endif %}{% if c.ended_by_cap %} Stopped by the spending cap{% endif %}</td>
+      </tr>
+    {% empty %}<tr class="o-empty-row"><td colspan="{{ show_cost|yesno:"6,5" }}"><p>No chats yet.</p></td></tr>{% endfor %}
+{% include "office/_list_foot.html" with cols=show_cost|yesno:"6,5" label="Older chats" %}

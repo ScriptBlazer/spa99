@@ -265,7 +265,7 @@ def outreach_page(request):
     sort, direction = listing.sort_from(request.GET, state)
     emailed = "1" if request.GET.get("emailed") == "1" else ""
     page = lists.page_number(request)
-    found, has_next = lists.cut(listing.queryset(state, sort, direction, bool(emailed)), page, 25)
+    found, has_next = lists.cut(listing.queryset(state, sort, direction, bool(emailed)), page, 25, lists.shift_from(request))
     counts = listing.counts()
     tabs = [{"state": name, "count": counts[name], "active": name == state, "url": f"{reverse('office_outreach')}?{urlencode({'state': name, **({'emailed': '1'} if emailed else {})})}"} for name in STATES]
     more = urlencode({"state": state, "sort": sort, "dir": direction, "page": page + 1, **({"emailed": "1"} if emailed else {})})

@@ -4,7 +4,8 @@
  *                     [data-morph] parts (rings, sparkline paths, funnel bars) from their old values, push the URL, Back works.
  *   Filters           search (300ms) and filters fetch the page and put its rows and its sortable head into the table (and, where the form says data-full, its tiles and total line).
  *   Sorting           a click on a table head (a plain link) does the same for that URL; the phone's Sort radios sit in the same form and keep step with it.
- *   Show more         appends the next page of rows; Show earlier (a person's timeline) adds the next 20 events.
+ *   Show more         appends the next page of rows (office-more.js does it by itself as the last row comes near); Show earlier (a person's timeline) adds the next 20 events.
+ *   Phone Home        the range stays on All: below 64em the dashboard asks for range=all (the server cannot see the screen, and a saved range would stick).
  *   Actions           Approve, Decline, Resend post in the background, show the server's message as a toast and refresh the page parts.
  * If anything fails the plain link or form still works. The chart script listens for 'office:series'. */
 import { toastsFromDocument } from './feedback.js';
@@ -119,11 +120,35 @@ function setRows(tbody, html, append) {
   if (append) { tbody.querySelector('[data-more-row]')?.remove(); tbody.append(template.content); } else tbody.replaceChildren(template.content);
 }
 
-/** The table head again from a fetched page: aria-sort and the links follow the order that was asked for. */
+/** The table head again from a fetched page: aria-sort and the links follow the order that was asked for (one head for each table card). */
 function swapHead(doc) {
-  const fresh = doc.querySelector('[data-list-card] thead');
-  const old = document.querySelector('[data-list-card] thead');
-  if (fresh && old) old.replaceWith(document.importNode(fresh, true));
+  const fresh = [...doc.querySelectorAll('[data-list-card] thead')];
+  [...document.querySelectorAll('[data-list-card] thead')].forEach((old, at) => { if (fresh[at]) old.replaceWith(document.importNode(fresh[at], true)); });
+}
+
+/** Load the next rows of a list: `link` is its "Show more" link. The rows (and the next "Show more" row, or "That is everyone.") replace the row the link sat in.
+ *  Used by a click on the link and by office-more.js as the row comes near. A list whose rows can leave it (Approvals, the Approach list) says how many have left (data-left). */
+export async function loadMoreRows(link) {
+  const list = link.closest('[data-office-list]');
+  if (!list) throw new Error('no list');
+  const url = new URL(link.href, location.href);
+  const left = Number(list.dataset.left) || 0;   // rows of the earlier pages that have left the list (decided, done, archived): the next page carries on from the right place
+  if (left) url.searchParams.set('shift', String(left));
+  const { text } = await fetchDoc(url.pathname + url.search, { 'HX-Request': 'true' });
+  setRows(list, text, true);
+  list.dataset.loaded = url.searchParams.get('page') || '';
+  document.dispatchEvent(new CustomEvent('office:more', { detail: { list } }));
+}
+
+/** Every list on the page from a fetched page: the rows of the list with the same name (Registered has two tables), back to the first page. */
+function swapLists(doc) {
+  doc.querySelectorAll('[data-office-list]').forEach((fresh) => {
+    const old = document.querySelector(`[data-office-list="${fresh.dataset.officeList}"]`);
+    if (!old) return;
+    setRows(old, fresh.innerHTML, false);
+    delete old.dataset.loaded;
+    delete old.dataset.left;
+  });
 }
 
 /** The phone's Sort radios and the quiet "Sort: X" button show what the fetched page is sorted by (the order may have come from a table head). */
@@ -158,10 +183,9 @@ function lists() {
       const { text } = await fetchDoc(url);   // the whole page: its rows, its sortable head and (data-full) its other parts
       if (mine !== run) return;
       const doc = parse(text);
-      const fresh = doc.querySelector('[data-office-list]');
-      if (!fresh) throw new Error('no list in the answer');
+      if (!doc.querySelector('[data-office-list]')) throw new Error('no list in the answer');
       swapHead(doc);
-      setRows(tbody, fresh.innerHTML, false);
+      swapLists(doc);
       if (full) {   // every other [data-region] (summary tiles, the total line) is replaced in place
         doc.querySelectorAll('[data-region]:not([data-office-list])').forEach((next) => {
           const old = document.querySelector(`[data-region="${next.dataset.region}"]`);
@@ -215,15 +239,12 @@ function lists() {
   });
   document.addEventListener('click', async (event) => {
     const more = event.target.closest?.('[data-show-more]');
-    if (!more) return;
+    if (!more || more.getAttribute('aria-busy') === 'true') return;
     event.preventDefault();
     const label = more.textContent;
     more.setAttribute('aria-busy', 'true');
     more.textContent = more.dataset.workingText || 'Loading';
-    try {
-      const { text } = await fetchDoc(more.href, { 'HX-Request': 'true' });
-      setRows(tbody, text, true);
-    } catch { more.textContent = label; more.removeAttribute('aria-busy'); }
+    try { await loadMoreRows(more); } catch { more.textContent = label; more.removeAttribute('aria-busy'); }
   });
 }
 
@@ -287,6 +308,22 @@ function actions() {
   });
 }
 
+// ---------- phone Home: the range stays on All ----------
+
+/** Below 64em the range picker is not there, so the page must not show a saved 7 or 30 days with no way to change it. The server cannot see the screen width, so hiding the bar with CSS
+ *  is not enough: ask for All here (the answer is remembered in the session, as any range is). */
+function phoneHome() {
+  if (!document.querySelector('[data-office-dashboard]')) return;
+  const phone = window.matchMedia('(max-width: 63.99em)');
+  const ask = () => {
+    if (!phone.matches || !shown || shown === 'all') return;
+    syncRange('all');
+    go(rangeUrl('all'), false);
+  };
+  ask();
+  phone.addEventListener('change', ask);
+}
+
 // ---------- start ----------
 
 export function initSwap() {
@@ -302,6 +339,7 @@ export function initSwap() {
   document.addEventListener('click', (event) => { if (event.target.closest?.('[data-retry]')) go(failedUrl || location.href, false); });
   window.addEventListener('popstate', () => { if (forms().length) go(location.pathname + location.search, false); });
   lists();
+  phoneHome();
   sorting();
   timeline();
   actions();

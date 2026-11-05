@@ -1,35 +1,53 @@
 {% extends "office/base.html" %}
 {% load office_tags %}
 {% block title %}Revenue | Spa 99 Office{% endblock %}
-{% block header_left %}<a class="o-back" href="{% url 'office_dashboard' %}">{% include "office/_icon.html" with name="chevron-left" %}<span>Home</span></a>{% endblock %}
+{% block header_left %}<a class="o-back o-back--icon" href="{% url 'office_dashboard' %}" data-back-home>{% include "office/_icon.html" with name="chevron-left" %}<span class="sr-only">Home</span></a><span class="o-title">Revenue</span>{% endblock %}
 {% block main %}
-{% comment %}Revenue (Barry's view). An estimate, never money received. Context: see office.views_approvals.revenue_page. Whole pounds for display only (`pounds`): the figures are exact pence.
-The Possible panel (people still waiting) is never added to the approved total. Minimal markup: design in docs/features/office-2-design.md section 3.{% endcomment %}
+{% comment %}Revenue (Barry's view). An estimate, never money received (docs/features/office-2-design.md section 3). Context: see office.views_approvals.revenue_page. Whole pounds are for display only (`pounds`): the figures are exact pence, and no rounded figure is ever added up.
+The Possible panel (people still waiting) is never added to the approved figures and is a different material (sunken, no shadow, no big number) so it cannot be read as part of the money.
+The four-figure grid (_revenue_grid.html) is one component, used everywhere on the page. The by-plan cards are the phone's; the one table below replaces them on a computer.{% endcomment %}
 <h1 class="sr-only">Revenue</h1>
 {% with a=revenue.approved w=revenue.waiting %}
-<section class="o-card" data-revenue-total>
-  <p class="o-sub">Estimate from approved people</p>
-  <p class="o-stat-lg" data-revenue-year>{{ a.year_ex|pounds }}</p>
-  <p class="o-sub">A year, excluding VAT. Not money received.</p>
-  {% if empty %}<p class="o-sub" data-revenue-empty>Nothing approved yet, so there is nothing to estimate.</p>{% endif %}
-  <table class="o-list" data-revenue-grid><thead><tr><th></th><th>A year</th><th>A month</th></tr></thead>
-    <tbody><tr><th scope="row">Excluding VAT</th><td>{{ a.year_ex|pounds }}</td><td>{{ a.month_ex|pounds }}</td></tr>
-    <tr><th scope="row">Including VAT</th><td>{{ a.year_inc|pounds }}</td><td>{{ a.month_inc|pounds }}</td></tr></tbody></table>
-</section>
-{% for r in a.by_plan %}{% if r.count %}
-<section class="o-card" data-revenue-plan="{{ r.slug }}">
-  <h2 class="o-h3">{{ r.name }} <span class="o-count">{{ r.count|num }} member{{ r.count|pluralize }}</span></h2>
-  <table class="o-list"><tbody><tr><th scope="row">Excluding VAT</th><td>{{ r.year_ex|pounds }}</td><td>{{ r.month_ex|pounds }}</td></tr><tr><th scope="row">Including VAT</th><td>{{ r.year_inc|pounds }}</td><td>{{ r.month_inc|pounds }}</td></tr></tbody></table>
-  <p class="o-sub">{% if r.kind == "gold" %}{{ revenue.gold_fee_pence|pounds }} + VAT a year for each member{% else %}Average {{ r.avg_year_ex|pounds }} a year for each member{% endif %}</p>
-</section>
-{% endif %}{% endfor %}
-<section class="o-card o-possible" data-revenue-possible>
-  <h2 class="o-h3">Possible, from those waiting</h2>
-  <p class="o-sub">Not counted above. Only if they are approved.</p>
-  <table class="o-list"><tbody><tr><th scope="row">Excluding VAT</th><td>{{ w.year_ex|pounds }}</td><td>{{ w.month_ex|pounds }}</td></tr><tr><th scope="row">Including VAT</th><td>{{ w.year_inc|pounds }}</td><td>{{ w.month_inc|pounds }}</td></tr></tbody></table>
-  {% for r in w.by_plan %}{% if r.count %}<p class="o-sub">{{ r.name }}, {{ r.count|num }} waiting ... {{ r.year_ex|pounds }}</p>{% endif %}{% endfor %}
-  <a class="o-quiet" href="{{ approvals_url }}">See who is waiting</a>
-</section>
+<div class="o-revenue" data-revenue>
+  <section class="o-card o-rev-total" data-revenue-total aria-labelledby="rev-total-h">
+    <h2 id="rev-total-h" class="o-rev-label">Estimate from approved people</h2>
+    <p class="o-stat-lg" data-revenue-year>{{ a.year_ex|pounds }}</p>
+    <p class="o-sub">A year, excluding VAT. Not money received.</p>
+    {% if empty %}<p class="o-sub" data-revenue-empty>Nothing approved yet, so there is nothing to estimate.</p>{% endif %}
+    {% include "office/_revenue_grid.html" with b=a %}
+  </section>
+
+  <div class="o-rev-plans" data-revenue-plans>
+    {% for r in a.by_plan %}{% if r.count %}
+    <section class="o-card" data-revenue-plan="{{ r.slug }}" aria-labelledby="rev-plan-{{ r.slug }}">
+      <header class="o-rev-head"><h2 id="rev-plan-{{ r.slug }}" class="o-h3">{{ r.name }}</h2><span class="o-rev-count">{{ r.count|num }} member{{ r.count|pluralize }}</span></header>
+      {% include "office/_revenue_grid.html" with b=r %}
+      <p class="o-sub o-rev-foot">{% if r.kind == "gold" %}{{ revenue.gold_fee_pence|pounds }} + VAT a year for each member{% else %}Average {{ r.avg_year_ex|pounds }} a year for each member{% endif %}</p>
+    </section>
+    {% endif %}{% endfor %}
+  </div>
+
+  {# The computer's table: one row a plan, then the whole. It replaces the plan cards above 64em and is never shown on a phone. #}
+  <section class="o-card o-rev-table" data-revenue-table aria-labelledby="rev-table-h">
+    <h2 id="rev-table-h" class="o-h3">By plan and tier</h2>
+    <table class="o-list o-list--revenue">
+      <thead><tr><th scope="col">Plan</th><th scope="col" class="num">Members</th><th scope="col" class="num">Year, excl. VAT</th><th scope="col" class="num">Month, excl. VAT</th><th scope="col" class="num">Year, incl. VAT</th><th scope="col" class="num">Month, incl. VAT</th><th scope="col" class="num">Average a member a year</th></tr></thead>
+      <tbody>
+        {% for r in a.by_plan %}{% if r.count %}<tr data-revenue-row="{{ r.slug }}"><th scope="row">{{ r.name }}{% if r.kind == "gold" %}<span class="o-cell-sub">{{ revenue.gold_fee_pence|pounds }} + VAT</span>{% endif %}</th><td class="num">{{ r.count|num }}</td><td class="num o-ex">{{ r.year_ex|pounds }}</td><td class="num o-ex">{{ r.month_ex|pounds }}</td><td class="num">{{ r.year_inc|pounds }}</td><td class="num">{{ r.month_inc|pounds }}</td><td class="num">{{ r.avg_year_ex|pounds }}</td></tr>{% endif %}{% endfor %}
+        <tr class="o-rev-all" data-revenue-row="all"><th scope="row">All</th><td class="num">{{ a.count|num }}</td><td class="num o-ex">{{ a.year_ex|pounds }}</td><td class="num o-ex">{{ a.month_ex|pounds }}</td><td class="num">{{ a.year_inc|pounds }}</td><td class="num">{{ a.month_inc|pounds }}</td><td class="num">{{ a.avg_year_ex|pounds }}</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="o-rev-possible" data-revenue-possible aria-labelledby="rev-possible-h">
+    <h2 id="rev-possible-h" class="o-h3">Possible, from those waiting</h2>
+    <p class="o-sub">Not counted above. Only if they are approved.</p>
+    {% include "office/_revenue_grid.html" with b=w %}
+    <ul class="o-rev-waiting">{% for r in w.by_plan %}{% if r.count %}<li data-revenue-waiting="{{ r.slug }}"><span>{{ r.name }}, {{ r.count|num }} waiting</span><span class="num">{{ r.year_ex|pounds }}</span></li>{% endif %}{% endfor %}</ul>
+    <a class="o-quiet" href="{{ approvals_url }}" data-press>See who is waiting{% include "office/_icon.html" with name="chevron-right" %}</a>
+  </section>
+
+  <p class="o-sub o-rev-note" data-revenue-note>An estimate for 12 months at today's prices. Each member counts at his own price, including a kept sale price. VAT at {{ revenue.vat_rate|floatformat:"-2" }}%.</p>
+</div>
 {% endwith %}
-<p class="o-sub" data-revenue-note>An estimate for 12 months at today's prices. Each member counts at his own price, including a kept sale price. VAT at {{ revenue.vat_rate|floatformat:"-2" }}%.</p>
 {% endblock %}

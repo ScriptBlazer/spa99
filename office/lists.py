@@ -25,11 +25,18 @@ def page_number(request):
         return 1
 
 
-def cut(queryset, page, size=None):
+def shift_from(request):
+    """?shift=N: how many rows of the earlier pages have left this list since they were shown (done, archived, decided). The page's script sends it when it loads more, so the next
+    page carries on from the right place instead of skipping the rows that moved up. 0 when absent or not a number."""
+    value = request.GET.get("shift", "")
+    return min(int(value), 100_000) if value.isdigit() else 0
+
+
+def cut(queryset, page, size=None, shift=0):
     """(rows of this page, has_next): fetches one extra row instead of counting. `size` defaults to System > Defaults > People
-    and Gold lists rows per page (views pass it from their per-request copy)."""
+    and Gold lists rows per page (views pass it from their per-request copy). `shift`: see shift_from."""
     size = size or defaults.get().list_page_size
-    start = (page - 1) * size
+    start = max((page - 1) * size - shift, 0)
     rows = list(queryset[start:start + size + 1])
     return rows[:size], len(rows) > size
 

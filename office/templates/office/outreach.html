@@ -28,4 +28,24 @@
     <tbody data-region="list" data-office-list="outreach">{% include "office/_outreach_rows.html" %}</tbody>
   </table>
 </div>
+{% if can_edit %}
+{# Archive from the list: the shared archive dialog, kept for its optional reason (quick chips as on the lead page). The script points the form at the row's own address (office-tools.js). #}
+<dialog class="fb-modal o-dialog" data-dialog="archive" aria-labelledby="od-archive-h">
+  <form method="post" action="" class="fb-modal-wrap" data-problems data-outreach-archive>{% csrf_token %}
+    <h2 class="fb-modal-title" id="od-archive-h">Archive <span data-archive-who>him</span>?</h2>
+    <p class="fb-modal-body">He leaves the list and Leads, and nothing is sent to him. You can undo it straight after.</p>
+    <div class="o-chips" role="group" aria-label="Quick reasons">
+      <button type="button" class="o-chip" data-reason-chip aria-pressed="false">Test</button>
+      <button type="button" class="o-chip" data-reason-chip aria-pressed="false">Duplicate</button>
+      <button type="button" class="o-chip" data-reason-chip aria-pressed="false">Not a fit</button>
+    </div>
+    <label class="fb-modal-field"><span>Reason (optional)</span>
+      <input class="fb-modal-input" type="text" name="reason" maxlength="300" autocomplete="off" data-label="Reason" data-reason-input></label>
+    <div class="fb-modal-actions">
+      <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
+      <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Archiving">Archive</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
 {% endblock %}

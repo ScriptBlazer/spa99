@@ -36,10 +36,11 @@ def approvals_page(request):
     status, decided_at, decided_by, href, approve_url, decline_url, undo_url}], has_next, page, more_url, q, plan, plans, note, gold_waiting, gold_url, section."""
     status, number = approvals.status_from(request.GET), lists.page_number(request)
     q, plan = request.GET.get("q", "").strip(), request.GET.get("plan", "")
-    rows, has_next = approvals.page(status, number, defaults.get(request).list_page_size, q, plan)
+    rows, has_next = approvals.page(status, number, defaults.get(request).list_page_size, q, plan, lists.shift_from(request))
     stored = counts.read()
     query = request.GET.copy()
     query["page"] = number + 1
+    query.pop("shift", None)  # the page's script adds it when it loads more
     context = {"status": status, "tabs": _tabs(status, stored, request), "counts": stored["memberships"], "rows": rows, "has_next": has_next, "page": number,
                "more_url": f"{request.path}?{query.urlencode()}", "q": q, "plan": plan, "plans": list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order").values("slug", "name")),
                "note": approvals.NOTE, "gold_waiting": stored["gold"]["waiting"], "gold_url": f"{reverse('office_gold')}?status=waiting", "section": "approvals"}

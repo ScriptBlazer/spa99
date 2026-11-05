@@ -1,0 +1,47 @@
+/* Office 2: the press every tappable thing shares, and the lists that load themselves (docs/features/office-2-design.md, "The press, used everywhere" and "Auto-loading on scroll").
+   Tokens only. Hover only under (hover: hover) and (pointer: fine). Reduced motion keeps the tone and drops the scale: it is feedback, not movement. */
+
+/* ---------- the press ---------- */
+[data-press] { -webkit-touch-callout: none; transition: background-color var(--office-dur-lift) var(--ease-soft), transform var(--office-dur-lift) var(--ease-soft), box-shadow var(--office-dur-lift) var(--ease-soft); }
+/* On press the tone arrives at once; on release it fades back over the lift time. :active alone barely shows on iOS, so office-press.js also sets .is-pressed (kept at least 120ms). */
+[data-press].is-pressed, [data-press]:active { background-color: var(--office-sunken); transition: none; }
+@media (prefers-reduced-motion: no-preference) { [data-press]:not(.o-row).is-pressed, [data-press]:not(.o-row):active { transform: scale(0.99); } }
+/* a table row has its tone on the cells; a phone card is the row itself */
+.o-row[data-press].is-pressed td, .o-row[data-press]:active td { background: var(--office-sunken); }
+@media (max-width: 63.99em) { .o-row[data-press].is-pressed, .o-row[data-press]:active { background: var(--office-sunken); } .o-row[data-press].is-pressed td { background: none; } }
+@media (max-width: 63.99em) and (prefers-reduced-motion: no-preference) { .o-row[data-press].is-pressed { transform: scale(0.99); } }
+/* a control inside a row does not press the row, and a row with nothing to open has no press and no pointer cursor */
+.o-row:not([data-press]), .o-feed-row:not([href]) { cursor: default; }
+.o-row[data-press], .o-pair-link, [data-press] { cursor: pointer; }
+.o-card--link[data-press].is-pressed, .o-card--link[data-press]:active { background-color: var(--office-sunken); }
+.o-leadsum-tile[data-press].is-pressed, .o-leadsum-tile[data-press]:active { background-color: var(--office-taupe-track); }   /* a tile is already on the sunken tone, so it darkens one step */
+.o-wait-row[data-press] { position: relative; }
+.o-wait-row[data-press] .o-wait-link::after { content: ""; position: absolute; inset: 0; border-radius: var(--office-radius); }   /* the whole row, not only the words */
+.o-approvals-line[data-press].is-pressed, .o-approvals-line[data-press]:active { background-color: var(--office-taupe-track); }
+@media (hover: hover) and (pointer: fine) { .o-approvals-line:hover { background: var(--office-taupe-track); } .o-pair-link[href]:hover { background: var(--office-sunken); } }
+@media (prefers-reduced-motion: reduce) { [data-press], .o-approvals-line { transition: none; } }
+
+/* ---------- lists that load themselves ---------- */
+/* The Show more link is what shows without script. With script a list loads its next rows when its last row comes near (office-more.js sets data-auto on the card) and the link goes. */
+[data-list-card][data-auto] [data-show-more] { display: none; }
+.o-more-row td, .o-more-row, .o-end-row td, .o-end-row { scroll-margin-bottom: calc(var(--office-tabbar-h) + env(safe-area-inset-bottom) + var(--space-5)); }
+.o-end-row td, li.o-end-row { padding: var(--space-4) var(--space-3); text-align: center; font-size: var(--text-sm); color: var(--office-muted); height: auto; }
+.o-list .o-end-row td { background: none; }
+.o-more-row td, li.o-more-row { text-align: center; }
+[data-list-card][data-auto] .o-more-row td, [data-list-card][data-auto] li.o-more-row { min-height: 3.25rem; height: 3.25rem; padding-block: 0; }
+.o-load { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: 3.25rem; font-size: var(--text-sm); color: var(--office-muted); }
+.o-load[hidden], .o-load-fail[hidden] { display: none; }
+.o-load-dots { display: inline-flex; gap: var(--space-2); }
+.o-load-dots i { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--office-muted); opacity: 0.25; animation: o-breathe 1200ms ease-in-out infinite; }   /* opacity only: no spinner, BRAND bans rotation */
+.o-load-dots i:nth-child(2) { animation-delay: 160ms; }
+.o-load-dots i:nth-child(3) { animation-delay: 320ms; }
+@keyframes o-breathe { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+.o-load-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .o-load-dots { display: none; }
+  .o-load-word { position: static; width: auto; height: auto; overflow: visible; clip: auto; }   /* the word "Loading" in place of the dots */
+}
+.o-load-fail { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 3.25rem; font-size: var(--text-sm); color: var(--office-muted); }
+.o-load-fail .o-quiet { color: var(--office-text); text-decoration: underline; text-underline-offset: 0.25em; }
+/* restoring a long list after a visit to a person: hidden for the moment it takes to load the rows he had, so the page does not jump */
+[data-list-card][data-restoring] { opacity: 0; }

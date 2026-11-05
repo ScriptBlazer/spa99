@@ -1,15 +1,19 @@
-{% load office_tags %}{% comment %}Rows of one approvals list (also the HTMX fragment). Each row: name, email, plan and his own price (excluding VAT), registered, and the decisions as POST forms (the page's script may send them as fetch: X-Requested-With: fetch answers JSON).
+{% load office_tags %}{% comment %}Rows of one approvals list (also the fragment the auto-load fetches). Each row: name and email, plan with his own price (excluding VAT), registered, and the decisions as POST forms (the page's script sends them in the background).
 Waiting: Decline and Approve. Approved and Declined: Back to waiting. Nothing is asked and nothing reaches the member.{% endcomment %}
 {% for r in rows %}
-<li class="o-approval" data-approval-row="{{ r.id }}" data-status="{{ r.status }}">
-  <a class="o-rowlink" href="{{ r.href }}"><span class="o-latest-name">{{ r.name }}</span> <span class="o-cell-sub">{{ r.email }}</span></a>
-  <p class="o-cell-sub">{{ r.plan }}{% if r.month_pence is not None %}, {{ r.month_pence|pounds }} a month{% if r.sale %} (sale price){% endif %}{% endif %}, registered {{ r.registered|relative }}{% if r.decided_by %} · {{ r.status|capfirst }} by {{ r.decided_by|first_word }}{% endif %}</p>
+<tr class="o-row o-approval" data-approval-row="{{ r.id }}" data-status="{{ r.status }}" data-press>
+  <td class="c-name" data-col="name"><a class="o-rowlink" href="{{ r.href }}">{{ r.name }}</a><span class="o-cell-sub o-approval-email">{{ r.email }}</span></td>
+  <td class="c-plan" data-col="plan">{{ r.plan }}{% if r.month_pence is not None %}, {{ r.month_pence|pounds }} a month{% if r.sale %} (sale price){% endif %}{% endif %}<span class="o-only-narrow">,</span></td>
+  <td class="c-date" data-col="registered"><span class="o-only-wide">{{ r.registered|relative }}</span><span class="o-only-narrow">registered {{ r.registered|relative:True }}</span></td>
+  {% if status != "waiting" %}<td class="c-decided" data-col="decided">{{ r.status|capfirst }}{% if r.decided_by %} by {{ r.decided_by|first_word }}{% endif %}{% if r.decided_at %}, {{ r.decided_at|dm }}{% endif %}</td>{% endif %}
+  <td class="c-action" data-col="action"><div class="o-approval-actions">
   {% if r.status == "waiting" %}
-  <form method="post" action="{{ r.decline_url }}" data-decision="decline">{% csrf_token %}<button type="submit" class="btn btn-secondary btn-sm">Decline</button></form>
-  <form method="post" action="{{ r.approve_url }}" data-decision="approve">{% csrf_token %}<button type="submit" class="btn btn-primary btn-sm">Approve</button></form>
+    <form method="post" action="{{ r.decline_url }}" data-decision="decline">{% csrf_token %}<button type="submit" class="btn o-decide o-decide--decline">Decline</button></form>
+    <form method="post" action="{{ r.approve_url }}" data-decision="approve">{% csrf_token %}<button type="submit" class="btn btn-secondary o-decide o-decide--approve">{% include "office/_icon.html" with name="check" %}Approve</button></form>
   {% else %}
-  <form method="post" action="{{ r.undo_url }}" data-decision="undo">{% csrf_token %}<input type="hidden" name="from" value="{{ r.status }}"><button type="submit" class="o-quiet">Back to waiting</button></form>
+    <form method="post" action="{{ r.undo_url }}" data-decision="undo">{% csrf_token %}<input type="hidden" name="from" value="{{ r.status }}"><button type="submit" class="o-quiet o-back-to-waiting">Back to waiting</button></form>
   {% endif %}
-</li>
-{% empty %}<li class="o-empty-row" data-empty><p>{% if q or plan %}No one matches that.{% elif status == "waiting" %}No one is waiting. New registrations appear here.{% elif status == "approved" %}No one approved yet.{% else %}No one declined.{% endif %}</p></li>{% endfor %}
-{% if has_next %}<li class="o-more-row" data-more-row><a class="btn btn-secondary btn-sm" href="{{ more_url }}" data-show-more data-working-text="Loading">Show more</a></li>{% endif %}
+  </div></td>
+</tr>
+{% empty %}<tr class="o-empty-row" data-empty><td colspan="5"><p>{% if q or plan %}No one matches that.{% elif status == "waiting" %}No one is waiting. New registrations appear here.{% elif status == "approved" %}No one approved yet.{% else %}No one declined.{% endif %}</p>{% if q or plan %} <a class="o-quiet" href="{% url 'office_approvals' %}?status={{ status }}" data-clear>Clear</a>{% endif %}</td></tr>{% endfor %}
+{% include "office/_list_foot.html" with cols="5" %}

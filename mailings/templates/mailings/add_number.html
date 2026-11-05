@@ -9,7 +9,7 @@ mobile_countries, country (the ISO code shown), consent_text, whatsapp_url (the 
       {% if state == "form" %}
       <h1>Add your number.</h1>
       <p class="signin-lead">So Barry can reach you on WhatsApp.</p>
-      <form method="post" class="form-panel form-stack" novalidate data-add-number>
+      <form method="post" class="signin-fields" novalidate data-add-number>
         {% csrf_token %}
         {% include "common/_field_static.html" with id="add-number-email" label="Email" value=email %}
         <div class="mobile-row">
@@ -24,8 +24,8 @@ mobile_countries, country (the ISO code shown), consent_text, whatsapp_url (the 
           <label class="check"><input type="checkbox" name="consent" id="id_consent" value="on"{% if form.consent.value %} checked{% endif %}><span>{{ consent_text }}</span></label>
           <p class="feedback" data-error-for="consent" aria-live="polite" data-state="{% if form.consent.errors %}error{% else %}hint{% endif %}">{% if form.consent.errors %}{{ form.consent.errors|join:" " }}{% endif %}</p>
         </div>
-        <div class="form-submit"><button type="submit" class="btn btn-primary btn-block" data-working-text="Saving">Add my number</button></div>
-        <p class="small"><a href="{% url 'privacy' %}">How we use your details</a></p>
+        <button type="submit" class="btn btn-primary btn-block" data-working-text="Saving">Add my number</button>
+        <p class="small signin-privacy"><a class="btn-quiet small" href="{% url 'privacy' %}">How we use your details</a></p>
       </form>
       {% elif state == "done" %}
       <h1>Thank you.</h1>

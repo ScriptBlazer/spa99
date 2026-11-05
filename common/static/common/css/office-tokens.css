@@ -54,6 +54,7 @@
   --office-header-h: 3.5rem;
   --office-tabbar-h: 4rem;
   --office-ring: 6rem;
+  --office-ring-pair: 7.5rem;                                 /* Office 2: two rings to a card on Home; --office-ring is too small for money on a phone and too big for a third of the page on a computer */
   --office-ring-stroke: 10px;
   --office-spark-h: 3rem;
   --office-chart-h: 15rem;

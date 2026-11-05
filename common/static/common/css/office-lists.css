@@ -57,7 +57,8 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 .o-rowlink::after { content: ""; position: absolute; inset: 0; border-radius: var(--office-radius); }
 .o-rowlink:focus-visible { outline: none; }
 .o-rowlink:focus-visible::after { outline: 2px solid var(--office-text); outline-offset: -2px; }
-.o-goldlink { position: relative; z-index: 1; font-weight: 600; color: var(--office-gold-text); text-underline-offset: 0.25em; }
+.o-goldlink { position: relative; z-index: 1; font-weight: 600; text-decoration: none; }
+.o-goldlink.o-badge { display: inline-flex; }
 .c-action form { position: relative; z-index: 1; margin: 0; }
 .o-sub { display: block; }
 @media (hover: hover) and (pointer: fine) { .o-row:hover td { background: var(--office-sunken); } }
@@ -127,8 +128,8 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
   .o-row .c-invite .o-sub { display: inline; margin-left: var(--space-2); }
   .o-row .c-date { order: 9; flex: none; margin-left: auto; font-size: var(--text-sm); color: var(--office-muted); }
   .o-list .o-row td.c-marketing, .o-list .o-row td.c-sale, .o-list .o-row td.c-journey, .o-list .o-row td.c-action, .o-list .o-row td.c-lists { display: none; }   /* beats the zebra rule's display: block */
-  /* People: "Gold" is a plain pill here, so the card has one target; the application is one tap away on the person page */
-  .o-goldlink { display: inline-flex; align-items: center; height: 1.375rem; padding: 0 10px; border-radius: var(--office-pill); background: var(--color-gold); color: var(--office-text); font-size: var(--office-text-xs); font-weight: 600; text-decoration: none; pointer-events: none; }
+  /* People: "Applied" is a plain tag here, so the card has one target; the application is one tap away on his person page */
+  .o-goldlink { pointer-events: none; }
   /* Chats: the question is the title, two lines at most */
   .o-row .c-question { order: 1; flex: 0 0 100%; font-size: var(--text-base); font-weight: 600; }
   .o-row .c-who { order: 2; min-width: 0; max-width: 100%; }

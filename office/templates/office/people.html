@@ -3,11 +3,12 @@
 {% block title %}Registered | Spa 99 Office{% endblock %}
 {% block main %}
 <h1 class="sr-only">Registered</h1>
-{% if approvals_line %}<a class="o-card o-approvals-line" href="{{ approvals_line.url }}" data-approvals-line data-press>{{ approvals_line.text }}</a>{% endif %}
-<nav class="o-seg o-seg--counts" aria-label="Table" data-table-switch>
-  <a class="o-seg-item{% if not table %} is-active{% endif %}" href="{% url 'office_people' %}">All</a>
-  <a class="o-seg-item{% if table == 'membership' %} is-active{% endif %}" href="{% url 'office_people' %}?table=membership" data-table="membership">Membership <span class="o-count">{{ counts.approved|num }}</span></a>
-  <a class="o-seg-item{% if table == 'gold' %} is-active{% endif %}" href="{% url 'office_people' %}?table=gold" data-table="gold">Gold <span class="o-count">{{ counts.gold_members|num }}</span></a>
+{% if approvals_line %}<a class="o-approvals-line" href="{{ approvals_line.url }}" data-approvals-line data-press><span>{{ approvals_line.text }}</span>{% include "office/_icon.html" with name="chevron-right" %}</a>{% endif %}
+{# Computer: All, Membership, Gold. Phone: one table at a time, so All steps aside and Membership is the default (stacked tables cannot work with a list that loads itself). #}
+<nav class="o-seg o-seg--counts o-seg--tables" aria-label="Table" data-table-switch>
+  <a class="o-seg-item o-seg-all{% if not table %} is-active{% endif %}" href="{% url 'office_people' %}" data-table-all><span>All</span></a>
+  <a class="o-seg-item{% if table == 'membership' %} is-active{% endif %}" href="{% url 'office_people' %}?table=membership" data-table="membership"{% if table == 'membership' %} aria-current="page"{% endif %}><span>Membership</span> <span class="o-count">{{ counts.approved|num }}</span></a>
+  <a class="o-seg-item{% if table == 'gold' %} is-active{% endif %}" href="{% url 'office_people' %}?table=gold" data-table="gold"{% if table == 'gold' %} aria-current="page"{% endif %}><span>Gold</span> <span class="o-count">{{ counts.gold_members|num }}</span></a>
 </nav>
 <form class="o-filters" method="get" action="{% url 'office_people' %}" data-filter-form data-list="people" role="search" aria-label="Find registered people">
   <div class="o-filters-bar">
@@ -57,7 +58,7 @@
 </form>
 {% for t in tables %}
 <div class="o-card o-tablecard" data-list-card data-table-card="{{ t.key }}">
-  <h2 class="o-h3">{{ t.title }}</h2>
+  <h2 class="o-h3 o-table-title">{{ t.title }} <span class="o-count-muted">{% if t.key == "gold" %}{{ counts.gold_members|num }}{% else %}{{ counts.approved|num }}{% endif %}</span></h2>
   <table class="o-list o-list--people">
     <caption class="sr-only">{{ t.title }}: registered people</caption>
     <thead><tr>{% include "office/_sort_head.html" with columns=t.columns %}</tr></thead>

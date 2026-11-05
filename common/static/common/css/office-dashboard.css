@@ -1,22 +1,25 @@
 /* Office Dashboard (docs/design/OFFICE.md section 4). DOM order is the phone order; the desktop grid places the cards.
    Plain counts. Rings and sparklines are server-rendered SVG; a metric keeps its colour everywhere. */
-.o-dash { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.o-dash { --shift: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.o-dash:has(.o-cards-approval) { --shift: 1; }   /* the three cards take row 2 when there are any; everything else moves down one row */
 .o-greeting h1 { font-size: var(--text-xl); }
 .o-greeting .o-lead { margin-top: var(--space-2); }
+/* Phone (office-2-design.md section 1): no greeting, no Gold applications, no Waiting for you, no Hot leads. The range stays on All (office-swap.js asks for it). */
+@media (max-width: 63.99em) { .o-dash > .o-greeting, .o-dash > .o-gold-tile, .o-dash > .o-waiting, .o-dash > .o-hot { display: none; } }
 @media (min-width: 64em) {
   .o-dash { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gutter); }
   .o-greeting { grid-column: 1 / -1; grid-row: 1; }
-  .o-greeting h1 { font-size: var(--text-2xl); }
-  .o-rings { grid-column: 1 / span 8; grid-row: 2; }
-  .o-gold-tile { grid-column: 9 / span 4; grid-row: 2; }
-  .o-leads { grid-column: 1 / span 4; grid-row: 3; }
-  .o-hot { grid-column: 5 / span 8; grid-row: 3; }
-  .o-wants { grid-column: 1 / -1; grid-row: 4; }
-  .o-waiting { grid-column: 1 / span 7; grid-row: 5; }
-  .o-latest { grid-column: 8 / span 5; grid-row: 5; }
-  .o-activity { grid-column: 1 / span 7; grid-row: 6 / span 2; }
-  .o-stat[data-stat="visitors"] { grid-column: 8 / span 5; grid-row: 6; }
-  .o-stat[data-stat="page_views"] { grid-column: 8 / span 5; grid-row: 7; }
+  .o-cards-approval { grid-column: 1 / -1; grid-row: 2; }
+  .o-rings { grid-column: 1 / span 8; grid-row: calc(2 + var(--shift)); }
+  .o-gold-tile { grid-column: 9 / span 4; grid-row: calc(2 + var(--shift)); }
+  .o-leads { grid-column: 1 / span 4; grid-row: calc(3 + var(--shift)); }
+  .o-hot { grid-column: 5 / span 8; grid-row: calc(3 + var(--shift)); }
+  .o-wants { grid-column: 1 / -1; grid-row: calc(4 + var(--shift)); }
+  .o-waiting { grid-column: 1 / span 7; grid-row: calc(5 + var(--shift)); }
+  .o-latest { grid-column: 8 / span 5; grid-row: calc(5 + var(--shift)); }
+  .o-activity { grid-column: 1 / span 7; grid-row: calc(6 + var(--shift)) / span 2; }
+  .o-stat[data-stat="visitors"] { grid-column: 8 / span 5; grid-row: calc(6 + var(--shift)); }
+  .o-stat[data-stat="page_views"] { grid-column: 8 / span 5; grid-row: calc(7 + var(--shift)); }
 }
 
 /* ---------- the journey: three single rings, the count in the middle ---------- */

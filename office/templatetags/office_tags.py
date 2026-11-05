@@ -242,6 +242,32 @@ def ring_arcs(percent):
     return {"goal": 1, "first": f"{100 - first:g}", "second": f"{100 - second:g}", "on": 1 if first else 0, "on2": 1 if second else 0}
 
 
+@register.filter
+def ring_of(total, word):
+    """Line 3 under a ring: 'of 12 applied', or 'none yet' with nothing to be a share of."""
+    return f"of {_int(total):,} {word}" if _int(total) else "none yet"
+
+
+@register.filter
+def ring_of_pounds(pence):
+    """Line 3 under a money ring: 'of £224k possible', or 'none yet'."""
+    return f"of {pounds_compact(pence)} possible" if _pounds_exact(pence) else "none yet"
+
+
+@register.simple_tag
+def share_arcs(value, of):
+    """Offset for a two-ring card ("x of y"), in pathLength units (0 = full lap). Drawing only: the figures shown are the stored ones. A share above zero never draws
+    thinner than 2% (it would not show); nothing to draw (no total, or none yet) is a closed track with no arc, so no round cap leaves a dot. `none` is True with no total (line 3 says so)."""
+    try:
+        total, part = float(of or 0), float(value or 0)
+    except (TypeError, ValueError):
+        total, part = 0.0, 0.0
+    if total <= 0 or part <= 0:
+        return {"first": "100", "on": 0, "none": total <= 0}
+    share = min(max(part / total * 100, 2.0), 100.0)
+    return {"first": f"{100 - share:.2f}".rstrip("0").rstrip("."), "on": 1, "none": False}
+
+
 PERIODS = {   # how a change line names the period before: (reference, the word for "new")
     "today": ("yesterday", "today"), "7d": ("last week", "this week"), "30d": ("the 30 days before", "this month"),
 }

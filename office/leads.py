@@ -283,10 +283,10 @@ def lists_iso(value):
     return value.isoformat() if value else ""
 
 
-def page(filters, number, size=None):
-    """(rows, has_next) for one page, DB-side. `size` defaults to System > Defaults > Leads rows per page."""
+def page(filters, number, size=None, shift=0):
+    """(rows, has_next) for one page, DB-side. `size` defaults to System > Defaults > Leads rows per page. `shift`: rows of earlier pages that have left the list (lists.shift_from)."""
     size = size or defaults.get().leads_page_size
-    start = (number - 1) * size
+    start = max((number - 1) * size - shift, 0)
     found = list(filtered_queryset(filters)[start:start + size + 1])
     return build_rows(found[:size]), len(found) > size
 

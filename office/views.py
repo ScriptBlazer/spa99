@@ -111,16 +111,20 @@ def analytics_pages(request):
 
 # ---------- people ----------
 
-def _more_url(request, page):
-    """The address of the next page of a long list, filters kept: what the phone's auto-load fetches when the "Show more" row comes into view (the HX-Request header asks for the rows only)."""
+def _more_url(request, page, table=""):
+    """The address of the next page of a long list, filters kept: what the auto-load fetches when the "Show more" row comes into view (the HX-Request header asks for the rows only).
+    `table` names the table of Registered it belongs to, so each of the two stacked tables loads its own rows."""
     query = request.GET.copy()
     query["page"] = page + 1
+    query.pop("shift", None)  # the page's script adds it when it loads more
+    if table:
+        query["table"] = table
     return f"{request.path}?{query.urlencode()}"
 
 
 def _people_table(request, filters, table, page, size):
     rows, has_next = lists.people_page(filters, page, size, table)
-    return {"key": table, "title": "Gold" if table == "gold" else "Membership", "rows": rows, "has_next": has_next, "page": page, "more_url": _more_url(request, page),
+    return {"key": table, "title": "Gold" if table == "gold" else "Membership", "rows": rows, "has_next": has_next, "page": page, "more_url": _more_url(request, page, table),
             "columns": lists.people_columns(filters, request, table), "empty": "No Gold members yet." if table == "gold" else "No one approved yet."}
 
 
@@ -305,7 +309,7 @@ def person_delete(request, pk):
 @never_cache
 def leads(request):
     filters, number = lead_lists.filters_from(request), lists.page_number(request)
-    rows, has_next = lead_lists.page(filters, number, defaults.get(request).leads_page_size)
+    rows, has_next = lead_lists.page(filters, number, defaults.get(request).leads_page_size, lists.shift_from(request))
     filtered = lead_lists.is_filtered(filters, request)
     summary = selectors.leads_summary(filters["range"], request)
     stored = counts.read()
@@ -388,7 +392,7 @@ def invited(request):
     filters, number = invited_lists.filters_from(request), lists.page_number(request)
     rows, has_next = invited_lists.page(filters, number, defaults.get(request).list_page_size)
     context = {"rows": rows, "has_next": has_next, "page": number, "filters": filters, "columns": invited_lists.columns_for(filters, request), "filtered": invited_lists.is_filtered(filters),
-               "states": invited_lists.STATE_LABELS, "section": "invited", "groups_url": settings.SYSTEM_URL + reverse("system_groups", urlconf="config.urls_system"), "default_state": invited_lists.DEFAULT_STATE}
+               "states": invited_lists.STATE_LABELS, "section": "invited", "more_url": _more_url(request, number), "groups_url": settings.SYSTEM_URL + reverse("system_groups", urlconf="config.urls_system"), "default_state": invited_lists.DEFAULT_STATE}
     return _varied(render(request, _fragment(request, "office/invited.html", "office/_invited_rows.html"), context))
 
 
@@ -419,9 +423,9 @@ def chats(request):
     page = lists.page_number(request)
     rows, has_next = lists.cut(queryset, page, defaults.get(request).list_page_size)
     more = urlencode({**({k: v for k, v in (request.GET.items()) if k in ("user", "lead")}), "sort": sort, "dir": direction, "page": page + 1})
-    return render(request, "office/chats.html", {"rows": rows, "has_next": has_next, "page": page, "section": "chats", "person": person, "show_cost": show_cost,
-                                                 "columns": sorting.header_columns(columns, sort, direction, request.path, request.GET), "sort": sort, "dir": direction,
-                                                 "more_url": f"{request.path}?{more}"})
+    context = {"rows": rows, "has_next": has_next, "page": page, "section": "chats", "person": person, "show_cost": show_cost,
+               "columns": sorting.header_columns(columns, sort, direction, request.path, request.GET), "sort": sort, "dir": direction, "more_url": f"{request.path}?{more}"}
+    return _varied(render(request, _fragment(request, "office/chats.html", "office/_chats_rows.html"), context))  # HX-Request: the rows only (the phone's auto-load)
 
 
 def _chats_person(request):
@@ -462,7 +466,7 @@ def gold(request):
     filters, page = lists.gold_filters(request), lists.page_number(request)
     rows, has_next = lists.gold_page(filters, page, defaults.get(request).list_page_size)
     stored = selectors.counters(K.GOLD_APPLICATIONS, K.GOLD_BY_STATUS)
-    context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "columns": lists.gold_columns(filters, request), "section": "gold",
+    context = {"rows": rows, "has_next": has_next, "page": page, "more_url": _more_url(request, page), "filters": filters, "columns": lists.gold_columns(filters, request), "section": "gold",
                "final_approver_missing": approval.final_approver_missing(),
                "total_applications": stored.get((K.GOLD_APPLICATIONS, ""), 0), "waiting": selectors.waiting_count(stored),
                "awaiting_final_count": stored.get((K.GOLD_BY_STATUS, "awaiting_final"), 0)}

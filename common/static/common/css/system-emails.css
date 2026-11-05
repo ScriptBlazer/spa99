@@ -336,3 +336,9 @@ body.system {
 .se-custom-footer[hidden] { display: none; }
 .se-custom-footer .sys-row { display: grid; gap: var(--sys-1); padding-block: 0; }
 .se-custom-footer .sys-row > label { position: relative; z-index: 1; }
+
+/* Sender (Office 2): one native select, name first so a long address is cut at its end; the help line under it says where replies go */
+.system .se-sender select, .system .se-field select[name="sender_user"] { width: 100%; max-width: 28rem; text-overflow: ellipsis; }
+.se-sender .se-choice { margin-top: var(--sys-2); }
+/* The send pop-up for a send that moves people: who stays and who moves, in plain lines above the table */
+.system .se-moves { display: grid; gap: var(--sys-1); margin: 0 0 var(--sys-3); padding: 0; list-style: none; font-size: var(--sys-fs); font-weight: 500; }

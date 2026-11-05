@@ -92,10 +92,26 @@ async function confirmSend({ url, opener, when = '' }) {
     const td = tr.insertCell(); td.textContent = value;
     tr.prepend(th);
   }
+  // A send that moves people (leads with no mobile go to Archived) says who moves, in plain counts, before anything else.
+  let details = table;
+  if (d.moves) {
+    const lines = [
+      `${fmt(d.moves.stay)} ${plural(d.moves.stay, 'has a mobile and stays', 'have a mobile and stay')} in Leads, tagged Emailed.`,
+      `${fmt(d.moves.archive)} ${plural(d.moves.archive, 'has no mobile and moves', 'have no mobile and move')} to Archived, reason "${d.moves.reason}".`,
+      d.moves.bounced,
+    ].filter(Boolean);
+    const list = document.createElement('ul');
+    list.className = 'se-moves';
+    list.dataset.seMoves = '';
+    for (const line of lines) { const item = document.createElement('li'); item.textContent = line; list.append(item); }
+    details = document.createElement('div');
+    details.append(list, table);
+  }
+  const who = d.moves ? `${fmt(n)} ${plural(n, 'lead', 'leads')}` : `${fmt(n)} ${plural(n, 'person', 'people')}`;
   const ok = await confirmModal({
-    title: when ? `Schedule '${d.title}' to ${fmt(n)} ${plural(n, 'person', 'people')}?` : `Send '${d.title}' to ${fmt(n)} ${plural(n, 'person', 'people')}?`,
+    title: when ? `Schedule '${d.title}' to ${who}?` : (d.moves ? `Send to ${who}?` : `Send '${d.title}' to ${who}?`),
     body: when ? 'You can cancel until then.' : 'This cannot be unsent.',
-    details: table, confirmLabel: when ? 'Schedule' : `Send to ${fmt(n)}`, tone: IS_LIVE ? 'danger' : 'neutral', opener,
+    details, confirmLabel: when ? 'Schedule' : `Send to ${fmt(n)}`, tone: IS_LIVE ? 'danger' : 'neutral', opener,
   });
   return ok ? { count: n } : null;
 }

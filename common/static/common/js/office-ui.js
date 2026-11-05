@@ -10,7 +10,6 @@ export function initOfficeUi() {
   segmented();
   filterSheet();
   sortControls();
-  navSheet();
   wants();
   wantsScope();
 }
@@ -106,18 +105,6 @@ function sortControls() {
   window.matchMedia('(max-width: 63.99em)').addEventListener('change', (event) => {
     if (!event.matches) document.querySelectorAll('dialog[data-sort-sheet][open]').forEach((sheet) => sheet.close());
   });
-}
-
-/** The tab bar's "More" button opens a sheet with the tabs that do not fit five slots. Esc closes it (native), so does a tap on the backdrop or a link; focus goes back to the button. */
-function navSheet() {
-  const sheet = document.querySelector('[data-nav-sheet]');
-  const button = document.querySelector('[data-nav-more]');
-  if (!sheet || !button) return;
-  button.addEventListener('click', () => { sheet.showModal(); button.setAttribute('aria-expanded', 'true'); });
-  sheet.addEventListener('click', (event) => { if (event.target === sheet || event.target.closest('a')) sheet.close(); });
-  sheet.addEventListener('close', () => { button.setAttribute('aria-expanded', 'false'); button.focus({ preventScroll: true }); });
-  // rotating to a wide screen hides the sheet by CSS: close it so the page is not left behind an invisible modal
-  window.matchMedia('(max-width: 63.99em)').addEventListener('change', (event) => { if (!event.matches && sheet.open) sheet.close(); });
 }
 
 /** Dashboard "What people want": the plus is a <details> summary (works without JS); this keeps aria-expanded true and animates the card's height. */
