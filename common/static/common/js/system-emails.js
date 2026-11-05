@@ -482,7 +482,9 @@ function initComposer(form) {
     },
     locked: () => showLocked('System locked. Unlock it in another tab, then upload the image again.'),
   });
-  const params = () => new URLSearchParams({ subject: fields.subject.value, blocks: builder.json(), kind: kind(), group: group() });
+  const senderSelect = form.elements.sender_user;
+  const footerSelect = form.elements.footer_mode;
+  const params = () => new URLSearchParams({ subject: fields.subject.value, blocks: builder.json(), kind: kind(), group: group(), sender_user: senderSelect?.value || '', footer_mode: footerSelect?.value || '' });
   const preview = previewPane(form, {
     url: form.dataset.previewUrl, params,
     nothing: () => (builder.count ? '' : 'Add a part to see the preview.'),
@@ -577,6 +579,7 @@ function initComposer(form) {
 
   $$('input[name="group"]', form).forEach((r) => r.addEventListener('change', () => { syncOptions(); dirty = true; count = null; countError = ''; countChosen(); paintCount(); refreshBar(); preview.soon(); }));
   $$('.se-group-opts select, .se-group-opts input', form).forEach((el) => el.addEventListener('change', () => { dirty = true; const key = el.closest('.se-group[data-group]').dataset.group; if (key === group()) countChosen(); else countCard(key, false); }));
+  [senderSelect, footerSelect].forEach((el) => el?.addEventListener('change', () => { dirty = true; preview.soon(); }));
   $$('input[name="kind"]', form).forEach((r) => r.addEventListener('change', () => { dirty = true; help(); countAll(); refreshBar(); preview.soon(); }));
   $$('input[name="when"]', form).forEach((r) => r.addEventListener('change', () => {
     if (later() && !date.value) { const d = new Date(); d.setDate(d.getDate() + 1); date.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -681,7 +684,7 @@ function initComposer(form) {
       result = await call(`${base}${id}/test/`);
     } else {
       testButton.setAttribute('aria-disabled', 'true');
-      result = await call(form.dataset.testUrl, { body: { subject: fields.subject.value, blocks: builder.json(), kind: kind(), name: nameField?.value || '' } });
+      result = await call(form.dataset.testUrl, { body: { subject: fields.subject.value, blocks: builder.json(), kind: kind(), name: nameField?.value || '', sender_user: senderSelect?.value || '', footer_mode: footerSelect?.value || '' } });
     }
     refreshBar();
     if (result.locked) return showLocked('System locked. Unlock it in another tab, then send the test again.');

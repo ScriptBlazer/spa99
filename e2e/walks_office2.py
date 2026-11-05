@@ -224,7 +224,15 @@ def office2_group_send(w):
         dev.goto(f"{SYSTEM}/emails/mailings/new/?start=barry_invitation")
         dev.wait_for_selector("select[name=sender_user]")
         assert dev.locator("select[name=sender_user] option").count() >= 2
-        dev.frame_locator("iframe[data-se-frame]").get_by_text("Add your number").first.wait_for()   # the preview is a frame: its words are not in the page's own text
+        frame = dev.frame_locator("iframe[data-se-frame]")
+        frame.get_by_text("Add your number").first.wait_for()   # the preview is a frame: its words are not in the page's own text
+        assert dev.locator("select[name=footer_mode]").input_value() == "no_contact"
+        assert frame.get_by_text("Questions? Reply").count() == 0, "Barry's invitation should start without the contact line"
+        dev.locator("select[name=footer_mode]").select_option("shared")   # the preview follows the Footer choice, both ways
+        frame.get_by_text("Questions? Reply").first.wait_for()
+        dev.locator("select[name=footer_mode]").select_option("no_contact")
+        frame.get_by_text("Questions? Reply").first.wait_for(state="detached")
+        assert frame.get_by_text("Unsubscribe").count() >= 1, "the unsubscribe link must stay"
         dev.locator("label.se-group-card:has(input[name=group][value=leads])").click()   # All leads: this walk checks both those with a mobile and those without
         dev.locator("[data-se-save-draft]").click()
         dev.wait_for_url(re.compile(r"/emails/mailings/[0-9a-f-]{36}/"))

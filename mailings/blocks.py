@@ -88,6 +88,7 @@ STARTERS = {
         "kind": "news",
         "group": "leads_no_number",
         "archive_no_number": True,
+        "footer_mode": "no_contact",  # replies reach Barry, so no "write to hello@" line
         "sender_local_part": "barry",  # the Sender select starts on the team member whose address is barry@ (nothing is picked when nobody matches: hello@)
         "blocks": [
             {"type": PARAGRAPH, "text": "Hi,\n\nI would very much like you to join Spa 99. I approve each member personally, and those I approve receive special discounts and prices."},

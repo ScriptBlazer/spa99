@@ -270,7 +270,7 @@ class MailingForm(forms.ModelForm):
 
     class Meta:
         model = Mailing
-        fields = ["name", "subject", "body", "kind", "group", "sender_user", "archive_no_number"]
+        fields = ["name", "subject", "body", "kind", "group", "sender_user", "footer_mode", "archive_no_number"]
         field_classes = {"sender_user": SenderChoiceField}
 
     block_errors = None  # {"_": [...], "<index>": {field: [...]}} for the parts, when parts were posted
@@ -280,6 +280,10 @@ class MailingForm(forms.ModelForm):
         self.fields["body"].required = False
         self.fields["sender_user"].queryset = sender_queryset(self.instance.sender_user_id if self.instance else None)
         self.fields["archive_no_number"].required = False
+        self.fields["footer_mode"].required = False  # a form without it is the shared footer
+
+    def clean_footer_mode(self):
+        return self.cleaned_data.get("footer_mode") or d.FOOTER_SHARED
 
     def clean_kind(self):
         kind = self.cleaned_data["kind"]

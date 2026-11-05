@@ -70,6 +70,13 @@
           {% if form.archive_no_number.errors %}<p class="sys-error" role="alert">{{ form.archive_no_number.errors|join:" " }}</p>{% endif %}
         </fieldset>
 
+        <fieldset class="se-block se-sender" data-system-field="footer_mode">
+          <legend>Footer</legend>
+          <select name="footer_mode" id="{{ form.footer_mode.id_for_label }}" aria-label="Footer">{% for value, label in form.footer_mode.field.choices %}{% if value %}<option value="{{ value }}"{% if value == form.footer_mode.value %} selected{% endif %}>{{ label }}</option>{% endif %}{% endfor %}</select>
+          <p class="sys-muted se-help">The contact line is "Questions? Reply to this email or write to hello@". The unsubscribe link always stays.</p>
+          {% if form.footer_mode.errors %}<p class="sys-error" role="alert">{{ form.footer_mode.errors|join:" " }}</p>{% endif %}
+        </fieldset>
+
         <div class="se-count" data-se-count role="status" aria-live="polite"></div>
 
         <div class="se-block se-message">

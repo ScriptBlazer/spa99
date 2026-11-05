@@ -22,6 +22,7 @@ from notifications import emailbody, ses
 from notifications import sender as sender_mod
 from notifications.models import EmailLog, NotificationTemplate
 from notifications.seed import DEFAULT_SUBJECTS
+from notifications import emailsettings
 from notifications.services import send_templated, subject_for
 from system.models import SystemEvent
 
@@ -507,7 +508,7 @@ def _send_one(mailing, group, recipient):
             context["personal_links"] = blocks.personal_links(f"{settings.SITE_URL}/invite/{invite.token}/")
             headers = {**(headers or {}), **invites.open_tracking_headers(invite)}
             log = send_templated("mailing", [recipient.email], subject_line(mailing.subject, recipient.first_name), context,
-                                 headers=headers, body=mailing.body, blocks=mailing.blocks, subject_email=recipient.email, **_sender_args(mailing))
+                                 headers=headers, body=mailing.body, blocks=mailing.blocks, subject_email=recipient.email, options=footer_options(mailing.footer_mode), **_sender_args(mailing))
         elif mailing.automatic_key == "invite":
             if invite is None:
                 _finish_row(mailing, recipient, MailingRecipient.FAILED, "No invite row")
@@ -518,7 +519,7 @@ def _send_one(mailing, group, recipient):
                                  headers=headers, subject_email=recipient.email, **_sender_args(mailing))
         else:
             log = send_templated("mailing", [recipient.email], subject_line(mailing.subject, recipient.first_name), context,
-                                 headers=headers, body=mailing.body, blocks=mailing.blocks, subject_email=recipient.email, **_sender_args(mailing))
+                                 headers=headers, body=mailing.body, blocks=mailing.blocks, subject_email=recipient.email, options=footer_options(mailing.footer_mode), **_sender_args(mailing))
     except Exception as error:  # noqa: BLE001 - one bad address must not stop the others
         logger.error("Mailing %s: a send failed (%s)", mailing.pk, type(error).__name__)
         _finish_row(mailing, recipient, MailingRecipient.FAILED, type(error).__name__)
@@ -532,6 +533,11 @@ def _send_one(mailing, group, recipient):
         return "throttled"
     else:
         _finish_row(mailing, recipient, MailingRecipient.FAILED, _reason_word(log))
+
+
+def footer_options(mode):
+    """The email settings of a group send with its own footer choice (an automatic email keeps its own settings)."""
+    return emailsettings.options_for("mailing", {"footer_mode": mode})
 
 
 def _sender_args(mailing):

@@ -15,6 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from common import emaildefaults as d
 from common.ratelimit import hit
 from mailings import automatic as auto_emails, blocks as mailing_blocks, images, invites, lists, segments, sending, tokens
 from mailings import saved as templates_store
@@ -288,6 +289,7 @@ def _starter_fields(start):
     starter = STARTERS.get(start.key, {}) if start.key else {}
     return {"name": start.name, "subject": start.subject, "kind": start.kind, "group": start.group,
             "archive_no_number": bool(starter.get("archive_no_number")),  # Barry's invitation moves leads with no mobile once sent
+            "footer_mode": starter.get("footer_mode", d.FOOTER_SHARED),  # ... has no contact line in its footer
             "sender_user": sender_mod.candidate_by_local_part(starter.get("sender_local_part"))}  # ... and goes out as Barry
 
 
@@ -319,7 +321,7 @@ def _mailing_preview(mailing):
     if mailing.automatic_key:
         row = logic.template_row(mailing.automatic_key)
         return preview_email(mailing.automatic_key, row.subject if row else DEFAULT_SUBJECTS[mailing.automatic_key][0], row.body if row else "", extra, sender_user=mailing.sender_user_id or None)
-    return preview_email("mailing", mailing.subject, mailing.body, extra, blocks=mailing.blocks, sender_user=mailing.sender_user_id or "")
+    return preview_email("mailing", mailing.subject, mailing.body, extra, blocks=mailing.blocks, sender_user=mailing.sender_user_id or "", posted={"footer_mode": mailing.footer_mode})
 
 
 @unlocked
@@ -352,6 +354,22 @@ def mailing_count(request):
 
 @unlocked
 @require_POST
+def _posted_footer(request):
+    """The footer choice on the form: the shared footer unless it is one of the group send's own choices."""
+    mode = request.POST.get("footer_mode", "")
+    return mode if mode in dict(Mailing._meta.get_field("footer_mode").choices) else d.FOOTER_SHARED
+
+
+def _posted_sender(request):
+    """The Sender on the form, or "" (hello@) when it is not a real id."""
+    value = request.POST.get("sender_user", "")
+    try:
+        Mailing._meta.get_field("sender_user").target_field.to_python(value)
+    except ValidationError:
+        return ""
+    return value
+
+
 def mailing_preview(request):
     """Preview of what is typed on the mailing form with the sample name: {"ok", "subject", "html", "text", "errors"}. With a `blocks`
     field (JSON) the parts are previewed and part problems come back as errors.blocks = {"_": [...], "<index>": {field: [...]}}."""
@@ -369,7 +387,7 @@ def mailing_preview(request):
     if errors:
         return JsonResponse({"ok": False, "errors": errors, "subject": "", "html": "", "text": ""})
     extra = logic.mailing_extra(request.POST.get("kind", Mailing.NEWS), request.POST.get("group", ""))
-    return JsonResponse({"ok": True, "errors": {}, **preview_email("mailing", subject, body, extra, blocks=parts, sender_user=request.POST.get("sender_user", ""))})
+    return JsonResponse({"ok": True, "errors": {}, **preview_email("mailing", subject, body, extra, blocks=parts, sender_user=_posted_sender(request), posted={"footer_mode": _posted_footer(request)})})
 
 
 @unlocked
@@ -386,7 +404,7 @@ def mailing_image_upload(request):
     return JsonResponse({"ok": True, "id": str(image.pk), "url": image.url, "width": image.width, "height": image.height})
 
 
-def _send_test(request, back, subject, kind, group, body, parts, label, detail):
+def _send_test(request, back, subject, kind, group, body, parts, label, detail, sender_user="", footer_mode=d.FOOTER_SHARED):
     """Send one mailing's wording to the signed-in developer only (their own first name; News tests carry a real unsubscribe link).
     Needs only a subject and wording that passes the checks: no Who, no saved mailing."""
     errors = sending.wording_errors(subject, body, parts)
@@ -399,8 +417,9 @@ def _send_test(request, back, subject, kind, group, body, parts, label, detail):
     if kind in Mailing.MARKETING:  # a real unsubscribe link for the developer's own address
         context["unsubscribe_url"] = tokens.unsubscribe_url(request.user.email)
         headers = tokens.list_unsubscribe_headers(context["unsubscribe_url"])
+    from_email, reply_to = sender_mod.from_and_reply(sender_user)  # the test comes from the Sender chosen, so it shows what people will see
     log = send_templated("mailing", [request.user.email], "[Test] " + sending.subject_line(subject, request.user.first_name),
-                         context, headers=headers, body=body, blocks=parts, subject_email=request.user.email)
+                         context, headers=headers, body=body, blocks=parts, subject_email=request.user.email, from_email=from_email, reply_to=reply_to, options=sending.footer_options(footer_mode))
     ok = log.status == EmailLog.SENT
     audit.log_event(SystemEvent.EMAIL_TEST, request, user=request.user, outcome=SystemEvent.OK if ok else SystemEvent.FAILED,
                     detail={**detail, "status": log.status}, sentence=f"{request.user.email} sent themselves a test of the mailing '{label}' ({log.status})")
@@ -436,7 +455,7 @@ def mailing_test(request, pk):
     if mailing.automatic_key:
         return _send_automatic_test(request, mailing)
     return _send_test(request, reverse("system_mailing", args=[mailing.pk]), mailing.subject, mailing.kind, mailing.group, mailing.body,
-                      mailing.blocks, mailing.name, {"mailing": str(mailing.pk)})
+                      mailing.blocks, mailing.name, {"mailing": str(mailing.pk)}, sender_user=mailing.sender_user_id or "", footer_mode=mailing.footer_mode)
 
 
 @unlocked
@@ -455,7 +474,7 @@ def mailing_test_posted(request):
     kind = kind if kind in (Mailing.NEWS, Mailing.SERVICE) else Mailing.NEWS
     subject = request.POST.get("subject", "")
     return _send_test(request, reverse("system_mailing_new"), subject, kind, request.POST.get("group", ""), request.POST.get("body", ""), parts,
-                      request.POST.get("name") or subject, {"unsaved": True})
+                      request.POST.get("name") or subject, {"unsaved": True}, sender_user=_posted_sender(request), footer_mode=_posted_footer(request))
 
 
 def _mailing_action(request, pk, action, done):

@@ -184,6 +184,55 @@ class GroupSendToLeadsTests(Base):
         self.assertEqual([(r["email"], r["bounced"]) for r in rows], [("none@example.com", True)])  # back in Leads, shown as Possible fake
 
 
+class GroupSendFooterTests(Base):
+    """A group send chooses its footer: with or without the "Questions? Reply..." line. The unsubscribe link stays either way."""
+
+    LINE = "Questions? Reply to this email"
+
+    def client_and_mail(self):
+        from system.tests.test_system import make_user, unlocked_client
+
+        return unlocked_client(make_user())
+
+    def test_the_shared_footer_keeps_the_line_and_the_other_choice_leaves_it_out_but_keeps_unsubscribe(self):
+        lead("a@example.com")
+        self.send()
+        self.assertIn(self.LINE, mail.outbox[0].body)
+        mail.outbox.clear()
+        lead("b@example.com")
+        self.send(footer_mode="no_contact", name="Without")
+        sent = {m.to[0]: m for m in mail.outbox}
+        self.assertTrue(sent)
+        for message in sent.values():
+            html = message.alternatives[0][0]
+            self.assertNotIn(self.LINE, message.body)
+            self.assertNotIn(self.LINE, html)
+            self.assertIn("Unsubscribe", message.body)
+
+    def test_barrys_starter_opens_without_the_line_and_a_blank_email_opens_with_it(self):
+        client = self.client_and_mail()
+        self.assertEqual(client.get("/emails/mailings/new/?start=barry_invitation").context["form"]["footer_mode"].value(), "no_contact")
+        self.assertEqual(client.get("/emails/mailings/new/").context["form"]["footer_mode"].value(), "shared")
+
+    def test_the_preview_follows_the_choice_and_an_unknown_choice_is_the_shared_footer(self):
+        client = self.client_and_mail()
+        def preview(mode):
+            return client.post("/emails/mailings/preview/", {"subject": "Hi", "body": "Hello", "kind": "news", "group": "leads", "footer_mode": mode}).json()["text"]
+        self.assertIn(self.LINE, preview("shared"))
+        self.assertNotIn(self.LINE, preview("no_contact"))
+        self.assertIn(self.LINE, preview("nonsense"))
+
+    def test_a_test_send_uses_the_footer_and_the_sender_on_the_form(self):
+        barry = staff("barry@spa99.test")
+        client = self.client_and_mail()
+        client.post("/emails/mailings/test/", {"subject": "Hi", "body": "Hello", "kind": "news", "sender_user": str(barry.pk), "footer_mode": "no_contact"})
+        self.assertEqual(mail.outbox[-1].from_email, '"Barry, Spa 99" <barry@spa99.test>')
+        self.assertNotIn(self.LINE, mail.outbox[-1].body)
+        client.post("/emails/mailings/test/", {"subject": "Hi", "body": "Hello", "kind": "news", "sender_user": "not-a-person"})
+        self.assertIn("hello@spa99.test", mail.outbox[-1].from_email)
+        self.assertIn(self.LINE, mail.outbox[-1].body)
+
+
 class AddNumberTests(Base):
     def url(self, email):
         return addnumber.link_for(email).replace("http://testserver", "")
