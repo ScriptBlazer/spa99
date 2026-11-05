@@ -242,8 +242,6 @@ def lead_resend(request, pk):
         messages.success(request, "Follow-up sent.")
     elif result == services.BOUNCED:
         messages.error(request, "That address still bounces, so nothing was sent. Correct it first.")
-    elif result == services.NO_SENDER:
-        messages.error(request, "Set the sender address in System > Settings first, then try again.")
     elif result == services.ALREADY:
         messages.info(request, "The follow-up already went to this address.")
     else:
@@ -260,19 +258,20 @@ STATES = listing.STATES
 @require_GET
 @never_cache
 def outreach_page(request):
-    """Context: rows[{id, name, email, mobile, source, href, reason, added_by, added_at, done_at, done_by, registered_at, done_url,
-    remove_url}], has_next, page, state (open|registered|done), states, tabs[{state, count, url, active}], counts{open, registered, done},
-    open_count, registered_count, done_count, columns (the sortable header, see common.sorting), sort, dir, more_url, title, can_edit, section."""
+    """Context: rows[{id, name, email, mobile, source, href, reason, emailed_at, bounced, is_lead, added_by, added_at, done_at, done_by, done_url, remove_url, to_leads_url, archive_url}], has_next, page,
+    state (open|done), states, tabs[{state, count, url, active}], counts{open, done}, open_count, done_count, emailed (the Emailed filter, "1" or ""), columns (the sortable header, see common.sorting),
+    sort, dir, more_url, title, can_edit, section. Registering takes someone off the list by itself: there is no Registered tab. A fragment request (HX-Request) answers the rows only; ?page=N loads more."""
     state = listing.state_from(request.GET)
     sort, direction = listing.sort_from(request.GET, state)
+    emailed = "1" if request.GET.get("emailed") == "1" else ""
     page = lists.page_number(request)
-    found, has_next = lists.cut(listing.queryset(state, sort, direction), page, 25)
+    found, has_next = lists.cut(listing.queryset(state, sort, direction, bool(emailed)), page, 25)
     counts = listing.counts()
-    tabs = [{"state": name, "count": counts[name], "active": name == state, "url": f"{reverse('office_outreach')}?state={name}"} for name in STATES]
-    more = urlencode({"state": state, "sort": sort, "dir": direction, "page": page + 1})
-    context = {"rows": tools.outreach_rows(found), "has_next": has_next, "page": page, "state": state, "states": STATES, "tabs": tabs, "counts": counts,
+    tabs = [{"state": name, "count": counts[name], "active": name == state, "url": f"{reverse('office_outreach')}?{urlencode({'state': name, **({'emailed': '1'} if emailed else {})})}"} for name in STATES]
+    more = urlencode({"state": state, "sort": sort, "dir": direction, "page": page + 1, **({"emailed": "1"} if emailed else {})})
+    context = {"rows": tools.outreach_rows(found), "has_next": has_next, "page": page, "state": state, "states": STATES, "tabs": tabs, "counts": counts, "emailed": emailed,
                "title": SiteSettings.load().outreach_title, "section": "outreach", "can_edit": request.user.is_authenticated and tools.can_edit(request.user),
-               "open_count": counts["open"], "registered_count": counts["registered"], "done_count": counts["done"],
+               "open_count": counts["open"], "done_count": counts["done"],
                "columns": sorting.header_columns(listing.columns(state), sort, direction, request.path, request.GET), "sort": sort, "dir": direction,
                "more_url": f"{request.path}?{more}"}
     response = render(request, "office/_outreach_rows.html" if request.headers.get("HX-Request") else "office/outreach.html", context)
@@ -295,6 +294,52 @@ def outreach_remove(request, pk):
     services.remove_entry(get_object_or_404(OutreachEntry, pk=pk))
     messages.success(request, "Removed.")
     return redirect("office_outreach")
+
+
+def _list_reply(request, ok, message, **extra):
+    """A fetch (X-Requested-With: fetch, or Accept: application/json) gets {ok, message, ...}; otherwise a toast and back to the list."""
+    if request.headers.get("x-requested-with") == "fetch" or "application/json" in request.headers.get("accept", ""):
+        return JsonResponse({"ok": ok, "message": message, **extra}, status=200 if ok else 400)
+    (messages.success if ok else messages.error)(request, message)
+    return redirect("office_outreach")
+
+
+@editor
+@require_POST
+def outreach_to_leads(request, pk):
+    """Back to Leads: a lead entry comes off the list and he shows in Leads again. No confirm: the answer carries `undo` = {url, reason} (POST url with reason puts him back on the list)."""
+    entry = get_object_or_404(OutreachEntry, pk=pk)
+    result, email, reason = services.entry_to_leads(entry)
+    if result != services.DONE:
+        return _list_reply(request, False, "Only a lead can go back to Leads.")
+    return _list_reply(request, True, "Moved back to Leads.", undo={"url": reverse("office_outreach_undo_move"), "email": email, "reason": reason, "archived": False})
+
+
+@editor
+@require_POST
+def outreach_archive(request, pk):
+    """Archive from the list: the lead is archived (POST reason, optional, 300) and leaves the list. The answer carries `undo` (see outreach_to_leads)."""
+    entry = get_object_or_404(OutreachEntry, pk=pk)
+    form = ArchiveForm(request.POST)
+    if not form.is_valid():
+        return _list_reply(request, False, " ".join(_errors(form)))
+    reason = entry.reason
+    result, email = services.entry_archive(entry, request.user, form.cleaned_data["reason"])
+    if result not in (services.DONE, services.ALREADY):
+        return _list_reply(request, False, "Only a lead can be archived from here.")
+    return _list_reply(request, True, "Archived.", undo={"url": reverse("office_outreach_undo_move"), "email": email, "reason": reason, "archived": True})
+
+
+@editor
+@require_POST
+def outreach_undo_move(request):
+    """Undo Back to Leads or Archive: POST email, reason, archived ("1" when he was archived): he comes back from Archived if needed and goes back on the list with the same reason."""
+    email = (request.POST.get("email") or "").strip().lower()
+    if request.POST.get("archived") in ("1", "true", "yes"):
+        services.unarchive_lead(email, request.user)
+    result, _ = services.add_to_list(request.user, lead_email=email, reason=request.POST.get("reason", ""))
+    ok = result in (services.DONE, services.ALREADY)
+    return _list_reply(request, ok, "Back on the list." if ok else "He could not be put back on the list.")
 
 
 # ---------- adding or fixing a number (the Details rows) and marking a Gold application Contacted ----------

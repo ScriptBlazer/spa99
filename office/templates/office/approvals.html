@@ -1,0 +1,20 @@
+{% extends "office/base.html" %}
+{% load office_tags %}
+{% block title %}Approvals | Spa 99 Office{% endblock %}
+{% block header_left %}<a class="o-back" href="{% url 'office_dashboard' %}">{% include "office/_icon.html" with name="chevron-left" %}<span>Home</span></a>{% endblock %}
+{% block main %}
+{% comment %}Barry's membership approval lists. Context: see office.views_approvals.approvals_page. Minimal markup; the design is in docs/features/office-2-design.md section 4.{% endcomment %}
+<h1 class="sr-only">Approvals</h1>
+<p class="o-sub" data-approvals-note>{{ note }}</p>
+<nav class="o-seg o-seg--counts" aria-label="Approval lists" data-approval-tabs>{% for t in tabs %}<a class="o-seg-item{% if t.active %} is-active{% endif %}" href="{{ t.url }}"{% if t.active %} aria-current="page"{% endif %} data-tab="{{ t.status }}">{{ t.label }} <span class="o-count">{{ t.count|num }}</span></a>{% endfor %}</nav>
+<form class="o-filters" method="get" action="{% url 'office_approvals' %}" role="search" aria-label="Find people" data-filter-form data-list="approvals">
+  <input type="hidden" name="status" value="{{ status }}">
+  <div class="o-search"><label for="f-q" class="sr-only">Search name or email</label>{% include "office/_icon.html" with name="search" %}<input id="f-q" type="search" name="q" value="{{ q }}" placeholder="Search name or email" autocomplete="off" enterkeyhint="search" data-search></div>
+  <select name="plan" class="o-select" aria-label="Plan"><option value="">All plans</option>{% for p in plans %}<option value="{{ p.slug }}"{% if plan == p.slug %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select>
+  <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button>
+</form>
+{% if gold_waiting %}<p><a class="o-quiet" href="{{ gold_url }}" data-gold-link>Gold applications: {{ gold_waiting|num }} waiting</a></p>{% endif %}
+<div class="o-card o-tablecard" data-list-card>
+  <ul class="o-rowlist" data-region="list" data-office-list="approvals">{% include "office/_approvals_rows.html" %}</ul>
+</div>
+{% endblock %}

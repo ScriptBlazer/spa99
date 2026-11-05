@@ -1,0 +1,35 @@
+{% extends "office/base.html" %}
+{% load office_tags %}
+{% block title %}Revenue | Spa 99 Office{% endblock %}
+{% block header_left %}<a class="o-back" href="{% url 'office_dashboard' %}">{% include "office/_icon.html" with name="chevron-left" %}<span>Home</span></a>{% endblock %}
+{% block main %}
+{% comment %}Revenue (Barry's view). An estimate, never money received. Context: see office.views_approvals.revenue_page. Whole pounds for display only (`pounds`): the figures are exact pence.
+The Possible panel (people still waiting) is never added to the approved total. Minimal markup: design in docs/features/office-2-design.md section 3.{% endcomment %}
+<h1 class="sr-only">Revenue</h1>
+{% with a=revenue.approved w=revenue.waiting %}
+<section class="o-card" data-revenue-total>
+  <p class="o-sub">Estimate from approved people</p>
+  <p class="o-stat-lg" data-revenue-year>{{ a.year_ex|pounds }}</p>
+  <p class="o-sub">A year, excluding VAT. Not money received.</p>
+  {% if empty %}<p class="o-sub" data-revenue-empty>Nothing approved yet, so there is nothing to estimate.</p>{% endif %}
+  <table class="o-list" data-revenue-grid><thead><tr><th></th><th>A year</th><th>A month</th></tr></thead>
+    <tbody><tr><th scope="row">Excluding VAT</th><td>{{ a.year_ex|pounds }}</td><td>{{ a.month_ex|pounds }}</td></tr>
+    <tr><th scope="row">Including VAT</th><td>{{ a.year_inc|pounds }}</td><td>{{ a.month_inc|pounds }}</td></tr></tbody></table>
+</section>
+{% for r in a.by_plan %}{% if r.count %}
+<section class="o-card" data-revenue-plan="{{ r.slug }}">
+  <h2 class="o-h3">{{ r.name }} <span class="o-count">{{ r.count|num }} member{{ r.count|pluralize }}</span></h2>
+  <table class="o-list"><tbody><tr><th scope="row">Excluding VAT</th><td>{{ r.year_ex|pounds }}</td><td>{{ r.month_ex|pounds }}</td></tr><tr><th scope="row">Including VAT</th><td>{{ r.year_inc|pounds }}</td><td>{{ r.month_inc|pounds }}</td></tr></tbody></table>
+  <p class="o-sub">{% if r.kind == "gold" %}{{ revenue.gold_fee_pence|pounds }} + VAT a year for each member{% else %}Average {{ r.avg_year_ex|pounds }} a year for each member{% endif %}</p>
+</section>
+{% endif %}{% endfor %}
+<section class="o-card o-possible" data-revenue-possible>
+  <h2 class="o-h3">Possible, from those waiting</h2>
+  <p class="o-sub">Not counted above. Only if they are approved.</p>
+  <table class="o-list"><tbody><tr><th scope="row">Excluding VAT</th><td>{{ w.year_ex|pounds }}</td><td>{{ w.month_ex|pounds }}</td></tr><tr><th scope="row">Including VAT</th><td>{{ w.year_inc|pounds }}</td><td>{{ w.month_inc|pounds }}</td></tr></tbody></table>
+  {% for r in w.by_plan %}{% if r.count %}<p class="o-sub">{{ r.name }}, {{ r.count|num }} waiting ... {{ r.year_ex|pounds }}</p>{% endif %}{% endfor %}
+  <a class="o-quiet" href="{{ approvals_url }}">See who is waiting</a>
+</section>
+{% endwith %}
+<p class="o-sub" data-revenue-note>An estimate for 12 months at today's prices. Each member counts at his own price, including a kept sale price. VAT at {{ revenue.vat_rate|floatformat:"-2" }}%.</p>
+{% endblock %}

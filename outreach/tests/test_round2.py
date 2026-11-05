@@ -77,22 +77,22 @@ class GoldDeleteTests(Base):
 
 
 class ApproachListTests(Base):
-    def test_registered_tab_counts_and_done_is_unaffected(self):
+    def test_registering_takes_a_lead_off_the_list_by_itself_and_done_is_unaffected(self):
         lead("a@example.com"), lead("b@example.com"), lead("c@example.com")
         for who in ("a", "b", "c"):
             services.add_to_list(self.admin, lead_email=f"{who}@example.com")
-        user = user_services.register_interest(cleaned(email="A@example.com")).user  # unverified: still open
+        user = user_services.register_interest(cleaned(email="A@example.com")).user  # unverified: still on the list
         counts = lambda: {k: v for k, v in call(self.admin, "get", "/outreach/").context["counts"].items()}
-        self.assertEqual(counts(), {"open": 3, "registered": 0, "done": 0})
-        verify(user)
-        self.assertEqual(counts(), {"open": 2, "registered": 1, "done": 0})
-        page = call(self.admin, "get", "/outreach/?state=registered").context
-        self.assertEqual([(r["email"], bool(r["registered_at"])) for r in page["rows"]], [("a@example.com", True)])
+        self.assertEqual(counts(), {"open": 3, "done": 0})
+        verify(user)  # his account is proven after he was added: he has left the list, nothing was rewritten
+        self.assertEqual(counts(), {"open": 2, "done": 0})
+        self.assertEqual(sorted(r["email"] for r in call(self.admin, "get", "/outreach/").context["rows"]), ["b@example.com", "c@example.com"])
+        self.assertEqual(OutreachEntry.objects.filter(lead_email="a@example.com").count(), 1)  # the row is still there (no data rewrite)
         entry = OutreachEntry.objects.get(lead_email="b@example.com")
         services.mark_done(entry, self.admin)
-        self.assertEqual(counts(), {"open": 1, "registered": 1, "done": 1})
+        self.assertEqual(counts(), {"open": 1, "done": 1})
         self.assertEqual(len(call(self.admin, "get", "/outreach/?state=done").context["rows"]), 1)
-
+        self.assertEqual(call(self.admin, "get", "/outreach/?state=registered").context["state"], "open")  # the old tab is gone
 
     def test_someone_already_registered_when_added_stays_open(self):
         lead("early@example.com")
@@ -100,9 +100,9 @@ class ApproachListTests(Base):
         verify(user)
         services.add_to_list(self.admin, user=user)
         counts = call(self.admin, "get", "/outreach/").context["counts"]
-        self.assertEqual((counts["open"], counts["registered"]), (1, 0))
+        self.assertEqual(counts["open"], 1)
         row = call(self.admin, "get", "/outreach/").context["rows"][0]
-        self.assertEqual(row["registered_at"], "")
+        self.assertEqual(row["source"], "Person")
 
 
 class ArchiveTests(Base):
@@ -221,8 +221,7 @@ class NextMorningTests(Base):
     def test_settings_rules_domain_address_and_since(self):
         site = SiteSettings.load()
         site.auto_email_from_address, site.lead_next_morning_on = "", True
-        with self.assertRaises(Exception):
-            site.full_clean()
+        site.full_clean()  # no sender address is needed any more: the email goes from hello@ unless a staff member is picked on its page
         site.auto_email_from_address = "barry@other.com"
         with self.assertRaises(Exception):
             site.full_clean()
@@ -414,9 +413,7 @@ class BouncedLeadTests(Base):
         from notifications.models import EmailSuppression
 
         EmailSuppression.objects.filter(email="fixed@example.com").delete()
-        SiteSettings.objects.update(auto_email_from_address="")
-        self.assertEqual(services.resend_follow_up("fixed@example.com", self.approver)[0], services.NO_SENDER)
-        SiteSettings.objects.update(auto_email_from_address="barry@spa99.test")
+        SiteSettings.objects.update(auto_email_from_address="")  # no sender address at all: it still goes, from hello@
         self.assertFalse(SiteSettings.load().lead_next_morning_on)
         mail.outbox.clear()
         self.assertEqual(services.resend_follow_up("fixed@example.com", self.approver)[0], services.SENT)

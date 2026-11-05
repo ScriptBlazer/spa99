@@ -38,6 +38,13 @@ def add(email, reason, feedback_id="", detail=""):
             mark_bounced(email)
         except Exception:  # noqa: BLE001 - the suppression itself is what matters
             logger.exception("Could not mark invites as bounced")
+        if reason == EmailSuppression.HARD_BOUNCE:  # a lead the group email archived for having no number comes back to Leads, now flagged Possible fake
+            try:
+                from outreach.services import return_bounced_lead
+
+                return_bounced_lead(email)
+            except Exception:  # noqa: BLE001 - the suppression itself is what matters
+                logger.exception("Could not bring a bounced lead back to Leads")
     return recorded
 
 

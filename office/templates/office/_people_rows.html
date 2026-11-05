@@ -11,5 +11,5 @@
   <td class="c-date num" data-col="registered"><span class="o-only-wide">{{ p.registered|dt }}</span><span class="o-only-narrow">{{ p.registered|relative }}</span></td>
   <td class="c-gold" data-col="gold">{% if p.gold_application_id %}<a class="o-goldlink" href="{% url 'office_gold_application' p.gold_application_id %}">Gold</a>{% endif %}</td>
 </tr>
-{% empty %}<tr class="o-empty-row" data-empty><td colspan="10"><p>No one matches that. Try fewer filters.</p></td></tr>{% endfor %}
-{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="10"><a class="btn btn-secondary btn-sm" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}
+{% empty %}<tr class="o-empty-row" data-empty><td colspan="10"><p>{% if filters.q or filters.plan or filters.verified or filters.marketing or filters.sale or filters.payment %}No one matches that. Try fewer filters.{% else %}No one approved yet.{% endif %}</p></td></tr>{% endfor %}
+{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="10"><a class="btn btn-secondary btn-sm" href="{{ more_url }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}

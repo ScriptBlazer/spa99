@@ -115,3 +115,90 @@ def sign_off(user):
 def preview_html(user):
     """What the settings page shows as the sign-off: safe to put in the page (cleaned HTML, or an escaped sign-off)."""
     return mark_safe(sign_off(user)[0])  # cleaned by clean_signature above, or built from an escaped name
+
+
+# ---------- the sender chosen for an automatic email or a group send (Office 2) ----------
+# A dropdown of staff who can send as themselves, plus hello@ as the default. The choice is stored as the staff member (a user id), never as typed text, so nobody can send as an
+# address that is not a team member's. A member who has left, or has no sending-domain address any more, falls back to hello@: an email never fails because a person left.
+
+SITE_LABEL = f"{BRAND} <hello@>"
+
+
+def staff_candidates():
+    """[(user, Sender)] active team members who can send as themselves (own login or sending address on the sending domain), by first name then email. Anyone with a team level
+    (a staff flag or a superuser, active)."""
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+
+    users = get_user_model().objects.filter(is_active=True).filter(Q(is_staff=True) | Q(is_superuser=True)).order_by("first_name", "email")
+    out = []
+    for user in users:
+        sender = sender_for(user)
+        if sender.source != "site":
+            out.append((user, sender))
+    return out
+
+
+def choice_label(user, sender):
+    """`Barry Lobenstein <barry@spa99.uk>`: name first, then the address (two people can share a first name)."""
+    name = full_name(user) or first_name(user) or sender.address
+    return f"{name} <{sender.address}>"
+
+
+def site_choice():
+    """The default option: `Spa 99 <hello@spa99.uk>`."""
+    return formataddr((BRAND, site_address())) if site_address() else BRAND
+
+
+def sender_choices():
+    """[(value, label)] for the Sender select: "" (hello@) first, then one option per staff member (value = his user id as text)."""
+    return [("", site_choice())] + [(str(user.pk), choice_label(user, sender)) for user, sender in staff_candidates()]
+
+
+def chosen(user_or_id):
+    """(Sender, why) for a stored choice. `why` is '' when the choice is used as picked, 'site' when none was picked, or 'gone' when the person picked can no longer send (left, deactivated or no
+    sending-domain address): hello@ is used and the page says so."""
+    site = Sender(clean_address(site_address()), BRAND, "site")
+    if user_or_id in (None, ""):
+        return site, "site"
+    from django.contrib.auth import get_user_model
+
+    user = user_or_id if hasattr(user_or_id, "pk") else get_user_model().objects.filter(pk=user_or_id).first()
+    if user is None or not user.is_active or not (user.is_staff or user.is_superuser):
+        return site, "gone"
+    found = sender_for(user)
+    return (found, "") if found.source != "site" else (site, "gone")
+
+
+def from_and_reply(user_or_id):
+    """(from_email, reply_to list or None) for a stored choice. hello@ gives (None, None): the caller's default, the site sender with the contact address as Reply-To. A person gives his
+    address with his display name, and Reply-To is that same address, so a reply reaches him."""
+    found, why = chosen(user_or_id)
+    if found.source == "site":
+        return None, None
+    return format_address(found.address, found.name), [found.address]
+
+
+def gone_note(user_or_id):
+    """The warning the page shows when the person picked can no longer send, else ''."""
+    if user_or_id in (None, ""):
+        return ""
+    found, why = chosen(user_or_id)
+    if why != "gone":
+        return ""
+    from django.contrib.auth import get_user_model
+
+    user = user_or_id if hasattr(user_or_id, "pk") else get_user_model().objects.filter(pk=user_or_id).first()
+    who = (full_name(user) or first_name(user) or "The person picked") if user is not None else "The person picked"
+    return f"{who} has no @{sending_domain()} address now. This sends from hello@ until you choose."
+
+
+def sign_name(user_or_id, fallback=""):
+    """The first name that signs an automatic email sent as a chosen staff member (the next-morning email's "Best wishes, Barry"). `fallback` when hello@ is used or he can no longer send."""
+    found, why = chosen(user_or_id or None)
+    if found.source == "site":
+        return fallback
+    from django.contrib.auth import get_user_model
+
+    user = user_or_id if hasattr(user_or_id, "pk") else get_user_model().objects.filter(pk=user_or_id).first()
+    return first_name(user) or fallback

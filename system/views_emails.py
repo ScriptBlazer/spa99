@@ -19,6 +19,7 @@ from mailings import automatic as auto_emails, blocks as mailing_blocks, images,
 from mailings import saved as templates_store
 from mailings.models import ContactList, Invite, Mailing, MailingTemplate
 from notifications import emailbody, emailsettings, ses
+from notifications import sender as sender_mod
 from notifications.models import EmailLog
 from notifications.seed import DEFAULT_SUBJECTS
 from notifications.services import fill_subject, preview_email, send_templated
@@ -234,7 +235,8 @@ def _mailing_page(request, form, mailing, status=200, start=None):
                "block_max_parts": mailing_blocks.MAX_PARTS, "image_upload_url": reverse("system_mailing_image_upload"),
                "image_max_bytes": images.MAX_BYTES, "image_view_base": f"{settings.SITE_URL}/email-image/", "starters": templates_store.choices(), "starter_details": cards,
                "start_cards": [("", "Blank", "An empty email with one paragraph.")] + [(d["id"], d["name"], d["description"]) for d in cards], "start": str(start.pk) if start else "",
-               "template_save_url": reverse("system_template_save")}
+               "template_save_url": reverse("system_template_save"),
+               "sender_note": sender_mod.gone_note(mailing.sender_user_id) if mailing else ""}
     return page(request, "system/emails_mailing_form.html", "emails", context, status=status)
 
 
@@ -265,7 +267,12 @@ def mailing_edit(request, pk=None):
 
 def _starter_fields(start):
     """Form values for the chosen saved template (New mailing, ?start=<template id or key>)."""
-    return {"name": start.name, "subject": start.subject, "kind": start.kind, "group": start.group} if start else {}
+    if not start:
+        return {}
+    from mailings.blocks import STARTERS
+
+    return {"name": start.name, "subject": start.subject, "kind": start.kind, "group": start.group,
+            "archive_no_number": bool(start.key and STARTERS.get(start.key, {}).get("archive_no_number"))}  # Barry's invitation moves leads with no mobile once sent
 
 
 @unlocked
@@ -295,8 +302,8 @@ def _mailing_preview(mailing):
     extra = logic.mailing_extra(mailing.kind, mailing.group)
     if mailing.automatic_key:
         row = logic.template_row(mailing.automatic_key)
-        return preview_email(mailing.automatic_key, row.subject if row else DEFAULT_SUBJECTS[mailing.automatic_key][0], row.body if row else "", extra)
-    return preview_email("mailing", mailing.subject, mailing.body, extra, blocks=mailing.blocks)
+        return preview_email(mailing.automatic_key, row.subject if row else DEFAULT_SUBJECTS[mailing.automatic_key][0], row.body if row else "", extra, sender_user=mailing.sender_user_id or None)
+    return preview_email("mailing", mailing.subject, mailing.body, extra, blocks=mailing.blocks, sender_user=mailing.sender_user_id or "")
 
 
 @unlocked
@@ -346,7 +353,7 @@ def mailing_preview(request):
     if errors:
         return JsonResponse({"ok": False, "errors": errors, "subject": "", "html": "", "text": ""})
     extra = logic.mailing_extra(request.POST.get("kind", Mailing.NEWS), request.POST.get("group", ""))
-    return JsonResponse({"ok": True, "errors": {}, **preview_email("mailing", subject, body, extra, blocks=parts)})
+    return JsonResponse({"ok": True, "errors": {}, **preview_email("mailing", subject, body, extra, blocks=parts, sender_user=request.POST.get("sender_user", ""))})
 
 
 @unlocked
@@ -372,6 +379,7 @@ def _send_test(request, back, subject, kind, group, body, parts, label, detail):
     context, headers = {"first_name": request.user.first_name, **logic.mailing_extra(kind, group)}, None
     if mailing_blocks.has_personal(parts):  # a test shows the sample link (it explains itself), not a real one
         context["personal_links"] = mailing_blocks.sample_links()
+    context.update({"whatsapp_number": sending.whatsapp_display(), "add_number_link": f"{settings.SITE_URL}/example-link/"})  # the Journey leads placeholders, with a sample link
     if kind in Mailing.MARKETING:  # a real unsubscribe link for the developer's own address
         context["unsubscribe_url"] = tokens.unsubscribe_url(request.user.email)
         headers = tokens.list_unsubscribe_headers(context["unsubscribe_url"])

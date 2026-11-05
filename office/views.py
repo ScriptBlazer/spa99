@@ -37,7 +37,7 @@ from users.models import User
 
 from system import defaults
 
-from . import lists, profile, selectors, tools
+from . import approvals, counts, lists, profile, selectors, tools
 from .forms import ManualSetupForm
 from . import invited as invited_lists
 from . import leads as lead_lists
@@ -79,7 +79,8 @@ def _remembered_range(request, key, allowed, default):  # `default` comes from S
 def dashboard(request):
     data = selectors.dashboard(_remembered_range(request, "office_range_dashboard", selectors.DASHBOARD_RANGES, defaults.get(request).dashboard_range), request)
     warning = payments.staff_warning() if levels.at_least(request.user, levels.ADMIN) else None
-    return render(request, "office/dashboard.html", {"data": data, "greeting": _greeting(request.user), "section": "dashboard", "payment_warning": warning})
+    cards = counts.cards() if tools.can_edit(request.user) else None  # Waiting, Approved and Revenue: Barry's view only (Approver or Admin and up)
+    return render(request, "office/dashboard.html", {"data": data, "greeting": _greeting(request.user), "section": "dashboard", "payment_warning": warning, "cards": cards})
 
 
 @reader
@@ -110,17 +111,39 @@ def analytics_pages(request):
 
 # ---------- people ----------
 
+def _more_url(request, page):
+    """The address of the next page of a long list, filters kept: what the phone's auto-load fetches when the "Show more" row comes into view (the HX-Request header asks for the rows only)."""
+    query = request.GET.copy()
+    query["page"] = page + 1
+    return f"{request.path}?{query.urlencode()}"
+
+
+def _people_table(request, filters, table, page, size):
+    rows, has_next = lists.people_page(filters, page, size, table)
+    return {"key": table, "title": "Gold" if table == "gold" else "Membership", "rows": rows, "has_next": has_next, "page": page, "more_url": _more_url(request, page),
+            "columns": lists.people_columns(filters, request, table), "empty": "No Gold members yet." if table == "gold" else "No one approved yet."}
+
+
 @reader
 @require_GET
 @never_cache
 def people(request):
+    """Registered. `table`: "" shows both tables (computer), "membership" or "gold" one (phone). Context: tables [{key, title, rows, has_next, page, more_url, columns}], table, rows/has_next/page/
+    more_url/columns (the first shown table, for the fragment), filters, plans, counts (membership waiting/approved/declined/total, gold_members, registered_total), approvals_line, total_registered.
+    A fragment request (HX-Request) answers rows only, for the one table asked (membership when none): `_people_rows.html` or `_people_gold_rows.html`; ?page=N loads the next rows."""
     filters, page = lists.people_filters(request), lists.page_number(request)
-    rows, has_next = lists.people_page(filters, page, defaults.get(request).list_page_size)
-    total = selectors.counters(K.REGISTRATIONS).get((K.REGISTRATIONS, ""), 0)
-    context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "columns": lists.people_columns(filters, request), "total_registered": total,
-               "plans": list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order").values("slug", "name")), "section": "people",
+    size = defaults.get(request).list_page_size
+    shown = [filters["table"]] if filters["table"] else list(lists.TABLES)
+    tables = [_people_table(request, filters, key, page, size) for key in shown]
+    first = tables[0]
+    stored = counts.read()
+    approvals_line = approvals.line(stored["memberships"]) if tools.can_edit(request.user) else None
+    context = {"tables": tables, "table": filters["table"], "rows": first["rows"], "has_next": first["has_next"], "page": page, "more_url": first["more_url"], "columns": first["columns"],
+               "filters": filters, "total_registered": stored["registered_total"], "counts": {**stored["memberships"], "gold_members": stored["gold_members"], "registered_total": stored["registered_total"]},
+               "approvals_line": approvals_line, "plans": list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order").values("slug", "name")), "section": "people",
                "sale_options": lists.SALE_OPTIONS, "payment_options": lists.PAYMENT_OPTIONS}
-    return _varied(render(request, _fragment(request, "office/people.html", "office/_people_rows.html"), context))
+    rows_template = "office/_people_gold_rows.html" if first["key"] == "gold" else "office/_people_rows.html"
+    return _varied(render(request, _fragment(request, "office/people.html", rows_template), context))
 
 
 @admin
@@ -255,7 +278,8 @@ def person_setup_cancel(request, pk):
 def person_export(request, pk):
     """UK GDPR: everything we hold about this person, as a JSON download."""
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
-    response = JsonResponse(user_services.export_user_data(user), json_dumps_params={"indent": 2})
+    body = {**user_services.export_user_data(user), "membership_review": approvals.export_for(user)}  # Barry's review of him: staff exports only, never the member's own download
+    response = JsonResponse(body, json_dumps_params={"indent": 2})
     response["Content-Disposition"] = f'attachment; filename="spa99-person-{user.public_id}.json"'
     return response
 
@@ -284,7 +308,9 @@ def leads(request):
     rows, has_next = lead_lists.page(filters, number, defaults.get(request).leads_page_size)
     filtered = lead_lists.is_filtered(filters, request)
     summary = selectors.leads_summary(filters["range"], request)
-    context = {"rows": rows, "has_next": has_next, "page": number, "filters": filters, "columns": lead_lists.columns_for(filters, request), "filtered": filtered, "summary": summary,
+    stored = counts.read()
+    context = {"rows": rows, "has_next": has_next, "page": number, "more_url": _more_url(request, number), "tiles": {"leads_total": stored.get("leads_total", 0), "registered_total": stored["registered_total"]},
+               "filters": filters, "columns": lead_lists.columns_for(filters, request), "filtered": filtered, "summary": summary,
                "archived_view": filters["view"] == "archived", "archived_count": ArchivedLead.objects.count(),
                "total_leads": None if filtered else summary.get("leads_total"), "choices": lead_lists.filter_choices(), "section": "leads",
                "site_defaults": defaults.get(request)}

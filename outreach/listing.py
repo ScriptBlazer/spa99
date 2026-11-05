@@ -1,10 +1,10 @@
-"""The approach list query: three states worked out in the database (R5), sortable columns (R1) and the per-tab counts.
+"""The approach list query: two tabs worked out in the database (R5), sortable columns (R1) and the per-tab counts.
 
-open        not done, and he has no verified account that came AFTER he was added
-registered  not done, and his account was verified after the entry was added (`registered_at` = User.email_verified_at > added_at): Barry
-            marks him done as usual. Someone who was already registered when he was added to the list stays Open (he did not register
-            because of the approach)
+open        not done, and he has not registered since he was added. REGISTERING TAKES HIM OFF THE LIST (Office 2): an entry whose account was verified AFTER it was added is simply
+            left out here, and in every count, by this lookup. Nothing is rewritten on live. Someone who was already registered when he was added stays (he was added on purpose).
 done        marked done (whatever happened to his account since)
+
+The old Registered tab is gone. "Has a verified account" and `registered_at` (User.email_verified_at) are worked out the same way as before, only to leave those rows out.
 
 "Has a verified account" is read four ways, the first that answers wins: the entry's own user, the user of his Gold application,
 a verified account whose email equals the lead address (any case), one that equals the application's email (any case). All plain
@@ -18,8 +18,8 @@ from users.models import User
 
 from .models import OutreachEntry
 
-OPEN, REGISTERED, DONE = "open", "registered", "done"
-STATES = (OPEN, REGISTERED, DONE)
+OPEN, DONE = "open", "done"
+STATES = (OPEN, DONE)
 TIEBREAK = ("-added_at", "-pk")
 
 
@@ -55,7 +55,6 @@ def columns(state):
         Column("from", "From", _FROM, css="c-from"),
         Column("reason", "Reason", NullIf(Lower("reason"), Value("")), css="c-reason"),
         Column("done", "Done", "done_at", first=sorting.DESC, css="c-added") if state == DONE else Column("added", "Added", "added_at", first=sorting.DESC, css="c-added"),
-        Column("registered", "Registered", "registered_at", first=sorting.DESC, hidden=state != REGISTERED),
     ]
 
 
@@ -68,20 +67,23 @@ def sort_from(get, state):
     return sorting.resolve(columns(state), get, "done" if state == DONE else "added", sorting.DESC)[:2]
 
 
-def queryset(state, sort=None, direction=None):
+def queryset(state, sort=None, direction=None, emailed=False):
+    """`emailed`: only people a person or a group send has emailed (the Emailed filter)."""
+    from django.db.models import Exists
+
+    from .services import emailed_q
+
     found = with_state(OutreachEntry.objects.select_related("user", "gold_application"))
     if state == DONE:
         found = found.filter(done_at__isnull=False)
     else:
-        found = found.filter(AFTER_ADDED if state == REGISTERED else NOT_AFTER_ADDED, done_at__isnull=True)
+        found = found.filter(NOT_AFTER_ADDED, done_at__isnull=True)
+    if emailed:
+        found = found.annotate(email_key=Coalesce("user__email", "gold_application__email", "lead_email")).annotate(email_lower=Lower("email_key")).filter(emailed_q(OuterRef("email_lower")))
     default = "done" if state == DONE else "added"
     return found.order_by(*sorting.ordering_from(columns(state), {"sort": sort, "dir": direction}, default, TIEBREAK))
 
 
 def counts():
-    """{open, registered, done}: one query."""
-    found = with_state(OutreachEntry.objects.all()).aggregate(
-        open=Count("pk", filter=Q(done_at__isnull=True) & NOT_AFTER_ADDED),
-        registered=Count("pk", filter=Q(done_at__isnull=True) & AFTER_ADDED),
-        done=Count("pk", filter=Q(done_at__isnull=False)))
-    return found
+    """{open, done}: one query. Someone who registered since he was added is not counted as open (he has left the list); a done entry stays in Done."""
+    return with_state(OutreachEntry.objects.all()).aggregate(open=Count("pk", filter=Q(done_at__isnull=True) & NOT_AFTER_ADDED), done=Count("pk", filter=Q(done_at__isnull=False)))

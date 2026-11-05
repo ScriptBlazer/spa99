@@ -1,0 +1,15 @@
+{% load office_tags %}{% comment %}Rows of one approvals list (also the HTMX fragment). Each row: name, email, plan and his own price (excluding VAT), registered, and the decisions as POST forms (the page's script may send them as fetch: X-Requested-With: fetch answers JSON).
+Waiting: Decline and Approve. Approved and Declined: Back to waiting. Nothing is asked and nothing reaches the member.{% endcomment %}
+{% for r in rows %}
+<li class="o-approval" data-approval-row="{{ r.id }}" data-status="{{ r.status }}">
+  <a class="o-rowlink" href="{{ r.href }}"><span class="o-latest-name">{{ r.name }}</span> <span class="o-cell-sub">{{ r.email }}</span></a>
+  <p class="o-cell-sub">{{ r.plan }}{% if r.month_pence is not None %}, {{ r.month_pence|pounds }} a month{% if r.sale %} (sale price){% endif %}{% endif %}, registered {{ r.registered|relative }}{% if r.decided_by %} · {{ r.status|capfirst }} by {{ r.decided_by|first_word }}{% endif %}</p>
+  {% if r.status == "waiting" %}
+  <form method="post" action="{{ r.decline_url }}" data-decision="decline">{% csrf_token %}<button type="submit" class="btn btn-secondary btn-sm">Decline</button></form>
+  <form method="post" action="{{ r.approve_url }}" data-decision="approve">{% csrf_token %}<button type="submit" class="btn btn-primary btn-sm">Approve</button></form>
+  {% else %}
+  <form method="post" action="{{ r.undo_url }}" data-decision="undo">{% csrf_token %}<input type="hidden" name="from" value="{{ r.status }}"><button type="submit" class="o-quiet">Back to waiting</button></form>
+  {% endif %}
+</li>
+{% empty %}<li class="o-empty-row" data-empty><p>{% if q or plan %}No one matches that.{% elif status == "waiting" %}No one is waiting. New registrations appear here.{% elif status == "approved" %}No one approved yet.{% else %}No one declined.{% endif %}</p></li>{% endfor %}
+{% if has_next %}<li class="o-more-row" data-more-row><a class="btn btn-secondary btn-sm" href="{{ more_url }}" data-show-more data-working-text="Loading">Show more</a></li>{% endif %}

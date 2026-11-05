@@ -41,6 +41,9 @@ class Mailing(BaseModel):
     finished_at = models.DateTimeField(null=True, blank=True)
     error = models.CharField(max_length=300, blank=True, help_text="Why it failed or could not start.")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    sender_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                    help_text="The staff member this goes out as (a @spa99.uk address). Empty = hello@. If he has no such address by the time it sends, hello@ is used.")
+    archive_no_number = models.BooleanField(default=False, db_default=False, help_text="Leads group only: each lead this reached who has no mobile moves to Archived, reason 'Emailed, no number'.")
     # Counts, set when sending starts (total) and after every batch (the rest). The recipient rows are the truth.
     total_count = models.PositiveIntegerField(default=0)
     sent_count = models.PositiveIntegerField(default=0)

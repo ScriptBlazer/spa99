@@ -77,18 +77,12 @@ class VersionedForm(forms.ModelForm):
 class EmailsForm(VersionedForm):
     class Meta:
         model = SiteSettings
-        fields = ["gold_approver_cc", "contact_email", "auto_email_from_name", "auto_email_from_address", "lead_next_morning_on", "lead_next_morning_at", "lead_next_morning_min_hours"]
+        fields = ["gold_approver_cc", "contact_email", "lead_next_morning_on", "lead_next_morning_at", "lead_next_morning_min_hours"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name in ("lead_next_morning_at", "lead_next_morning_min_hours"):
             self.fields[name].required = False  # a post without them (older forms, scripts) keeps the saved value
-
-    def clean_auto_email_from_name(self):
-        name = self.cleaned_data.get("auto_email_from_name") or ""
-        if "\r" in name or "\n" in name:
-            raise forms.ValidationError("Keep the sender name on one line.")
-        return name.strip()
 
     def clean_lead_next_morning_at(self):
         return self.cleaned_data.get("lead_next_morning_at") or self.instance.lead_next_morning_at

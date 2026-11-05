@@ -251,7 +251,10 @@ SPECS = {spec.key: spec for spec in [
     EmailSpec("gold_sent_back", "Sent back (to approvers)", {}, {}, editable=False,
               subject_placeholders={"name": "The applicant's name"}),
     # A group mailing's body is typed per mailing; this only supplies the placeholders, the layout and the preview samples.
-    EmailSpec("mailing", "Group mailing", {**_FIRST}, {"first_name": "James"}, listed=False, subject_placeholders=_FIRST),
+    EmailSpec("mailing", "Group mailing",
+              {**_FIRST, "whatsapp_number": "The site's WhatsApp number (System > Settings). Journey leads only",
+               "add_number_link": "Each lead's own add-your-number link. Journey leads only"},
+              {"first_name": "James", "whatsapp_number": "+44 7441 919990", "add_number_link": _SAMPLE_URL}, listed=False, subject_placeholders=_FIRST),
 ]}
 
 
@@ -357,7 +360,7 @@ def _html_value(name, value):
     if isinstance(value, Rich):
         return value.html
     value = "" if value is None else str(value)
-    if name.endswith("_url") and value.startswith(("http://", "https://")):
+    if name.endswith(("_url", "_link")) and value.startswith(("http://", "https://")):
         return mark_safe(f'<a href="{escape(value)}" style="{LINK_STYLE}">{escape(value)}</a>')
     return conditional_escape(value)
 

@@ -18,6 +18,8 @@ from django.utils import timezone
 from gold.models import GoldApplication
 from journey.models import JourneySession
 from notifications.models import EmailSuppression
+from outreach.models import ArchivedLead
+from outreach.services import approach_entries
 from plans.models import Plan
 from users.models import User
 
@@ -94,7 +96,8 @@ def _applicants(params):
 
 def _leads(params):
     """One row per journey session that left an address; people with an account, bots and linked sessions are out."""
-    qs = JourneySession.objects.filter(is_bot=False, user__isnull=True).exclude(lead_email="")
+    qs = JourneySession.objects.filter(is_bot=False, user__isnull=True).exclude(lead_email="").annotate(lead_key=Lower("lead_email"))
+    qs = qs.exclude(Exists(ArchivedLead.objects.filter(email=OuterRef("lead_key")))).exclude(Exists(approach_entries(OuterRef("lead_key"))))  # the people the Leads page lists
     if params.get("date_from"):
         qs = qs.filter(lead_at__date__gte=params["date_from"])
     if params.get("date_to"):
@@ -270,6 +273,16 @@ def _lead_queryset(params, allowed, invite_rules=False):
     if invite_rules:  # an invitation or a personal link: not twice to someone whose invite is still waiting
         qs = qs.exclude(Exists(Invite.objects.filter(email=OuterRef("r_email"), status__in=Invite.PENDING, expires_at__gt=timezone.now())))
     return qs
+
+
+def lead_split(params, kind, personal=False):
+    """(with a mobile, without one) among the different addresses a send to the Journey leads would reach: what the confirm shows when the send moves leads with no mobile to Archived.
+    A lead has a mobile when any journey of his address holds one, or a Gold application of his does."""
+    from outreach.services import has_mobile_q
+
+    qs = queryset("leads", params, kind, personal).annotate(has_mobile=has_mobile_q("r_email"))
+    with_mobile = qs.filter(has_mobile=True).order_by().values("r_email").distinct().count()
+    return with_mobile, qs.filter(has_mobile=False).order_by().values("r_email").distinct().count()
 
 
 def count(group_key, params, kind, personal=False):

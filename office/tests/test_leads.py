@@ -203,7 +203,7 @@ class LeadFigureTests(OfficeTestCase):
         JourneySession.objects.filter(pk=hot.pk).update(gold_potential="high")
         rollup.run()
         data = get(staff("Office", "o@example.com"), "/dashboard.json?range=7d").json()
-        self.assertEqual((data["leads_new"], data["leads_new_previous"], data["leads_registered"], data["hot_leads"]), (3, 0, 1, 1))
+        self.assertEqual((data["leads_new"], data["leads_new_previous"], data["hot_leads"]), (3, 0, 1))  # no "went on to register" figure any more (office.counts holds the true totals)
         self.assertEqual(get(staff("Office", "p@example.com"), "/dashboard.json?range=30d").json()["leads_new"], 4)
         self.assertTrue(data["insights_leads"])
         self.assertEqual(data["insights_leads"][0]["options"][0]["of_total"], 3)  # one vote per lead not registered

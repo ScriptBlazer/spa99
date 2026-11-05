@@ -1,0 +1,10 @@
+{% load office_tags text_tags %}{% comment %}Rows of the Gold table of Registered (Gold-plan members): Name and email, Approved, Verified, Marketing, Registered. No Plan, no Gold column.{% endcomment %}{% for p in rows %}
+<tr class="o-row" data-person-row data-journey="{{ p.journey }}">
+  <td class="c-name" data-col="name"><a class="o-rowlink" href="{% url 'office_person' p.id %}">{% truncated p.name %}</a><span class="o-cell-sub o-email-sub">{% truncated p.email %}</span></td>
+  <td class="c-date num" data-col="approved">{% if p.gold_approved_at %}<span class="o-only-wide">{{ p.gold_approved_at|dt }}</span><span class="o-only-narrow">{{ p.gold_approved_at|relative }}</span>{% endif %}</td>
+  <td class="c-verified" data-col="verified">{% if p.verified %}Verified{% else %}Not yet{% endif %}</td>
+  <td class="c-marketing" data-col="marketing"><span class="o-only-wide">{% if p.marketing %}Yes{% else %}No{% endif %}</span></td>
+  <td class="c-date num" data-col="registered"><span class="o-only-wide">{{ p.registered|dt }}</span><span class="o-only-narrow">{{ p.registered|relative }}</span></td>
+</tr>
+{% empty %}<tr class="o-empty-row" data-empty><td colspan="5"><p>No Gold members yet.</p></td></tr>{% endfor %}
+{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="5"><a class="btn btn-secondary btn-sm" href="{{ more_url }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}

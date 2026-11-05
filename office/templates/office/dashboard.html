@@ -46,6 +46,22 @@
     </div>
   </section>
 
+  {# The three approval cards (Barry's view: only for the Approver permission or Admin and up). True totals, they ignore the range. Context: cards {waiting, approved, revenue, registered_total, leads_total}
+     (office.counts.cards): each ring {value, of}; revenue rings are pence (excluding VAT) with `possible`. Minimal markup: the phone design is in docs/features/office-2-design.md section 1. #}
+  {% if cards %}
+  <section class="o-cards-approval" data-reveal data-approval-cards aria-label="Approval and revenue">
+    <div class="o-card" data-card="waiting"><h2 class="o-h3">Waiting for approval</h2>
+      <a href="{% url 'office_gold' %}?status=waiting" data-ring="gold">{{ cards.waiting.gold.value|num }} Gold waiting, of {{ cards.waiting.gold.of|num }} applied</a>
+      <a href="{% url 'office_approvals' %}?status=waiting" data-ring="memberships">{{ cards.waiting.memberships.value|num }} Memberships waiting, of {{ cards.waiting.memberships.of|num }} registered</a></div>
+    <div class="o-card" data-card="approved"><h2 class="o-h3">Approved</h2>
+      <a href="{% url 'office_gold' %}?status=approved" data-ring="gold">{{ cards.approved.gold.value|num }} Gold approved, of {{ cards.approved.gold.of|num }} applied</a>
+      <a href="{% url 'office_people' %}?table=membership" data-ring="memberships">{{ cards.approved.memberships.value|num }} Memberships approved, of {{ cards.approved.memberships.of|num }} registered</a></div>
+    <a class="o-card o-card--link" href="{% url 'office_revenue' %}" data-card="revenue"><h2 class="o-h3">Revenue</h2><p class="o-sub">12-month estimate, excluding VAT</p>
+      <span data-ring="gold">{{ cards.revenue.gold.value|pounds_compact }} Gold, of {{ cards.revenue.gold.of|pounds_compact }} possible</span>
+      <span data-ring="memberships">{{ cards.revenue.memberships.value|pounds_compact }} Memberships, of {{ cards.revenue.memberships.of|pounds_compact }} possible</span></a>
+  </section>
+  {% endif %}
+
   {# Gold waiting #}
   <section class="o-gold-tile" data-reveal data-office-gold-waiting aria-labelledby="gold-tile-h">
     <p class="o-gold-label"><span class="o-gold-dot" aria-hidden="true"></span><span id="gold-tile-h">Gold applications</span></p>
@@ -78,7 +94,7 @@
     </div>
   </section>
 
-  {# Leads: stored figures (snapshot). New leads, and how many of them went on to register. #}
+  {# Leads: stored figures (snapshot): new leads in the range. #}
   <section class="o-card o-leads" data-reveal data-office-leads aria-labelledby="leads-h">
     <h2 id="leads-h" class="o-h3"><span class="o-lead-dot" aria-hidden="true"></span>Leads</h2>
     <div class="o-leads-body" data-region="leads-card" data-fade>
@@ -90,14 +106,6 @@
         {% if change %}<p class="o-delta" data-leads-delta>{{ change }}</p>{% endif %}
         {% else %}<p class="o-leads-label o-leads-label--muted">No new leads in this range.</p>{% endif %}
       </div>
-      {% if data.leads_new %}
-      {% ratio data.leads_registered data.leads_new as reg_share %}
-      <div class="o-leads-reg" data-leads-registered>
-        <p class="o-leads-num o-leads-num--sm">{{ data.leads_registered|num }}</p>
-        <p class="o-delta">of {{ data.leads_new|num }} lead{{ data.leads_new|pluralize }} {{ data.leads_new|pluralize:"has,have" }} registered</p>
-        <span class="o-lbar" role="presentation"><span class="o-lbar-fill" data-morph="leads-bar" style="--share: {{ reg_share }}"></span></span>
-      </div>
-      {% endif %}
       <a class="o-quiet o-more" href="{% url 'office_leads' %}?range={{ data.range }}">See all leads</a>
     </div>
   </section>

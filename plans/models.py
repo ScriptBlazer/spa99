@@ -299,12 +299,9 @@ class SiteSettings(BaseModel):
         self._was_next_morning_on = self.lead_next_morning_on
 
     def clean(self):
-        """Cross-field rules (forms, undo and the code view all go through full_clean): a slot is at least as long as the step;
-        the next-morning email needs a sender address."""
+        """Cross-field rules (forms, undo and the code view all go through full_clean): a slot is at least as long as the step."""
         if self.slot_length_minutes and self.slot_step_minutes and self.slot_length_minutes < self.slot_step_minutes:
             raise ValidationError({"slot_length_minutes": "A slot cannot be shorter than the step between slots."})
-        if self.lead_next_morning_on and not (self.auto_email_from_address or "").strip():
-            raise ValidationError({"lead_next_morning_on": "Set the automatic emails sender address first."})
 
     @classmethod
     def load(cls):

@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from common.tasks import enqueue
 from notifications import emailbody, ses
+from notifications import sender as sender_mod
 from notifications.models import EmailLog, NotificationTemplate
 from notifications.seed import DEFAULT_SUBJECTS
 from notifications.services import send_templated, subject_for
@@ -497,6 +498,8 @@ def _send_one(mailing, group, recipient):
             headers = tokens.list_unsubscribe_headers(url)
         else:
             context["notice"] = f"You are receiving this message {group.reason}."
+        if mailing.group == "leads":  # each lead's own add-your-number link and the site's WhatsApp number (the placeholders of Barry's invitation)
+            context.update(_lead_values(recipient.email))
         if mailing.has_personal_links:
             if invite is None:
                 _finish_row(mailing, recipient, MailingRecipient.FAILED, "No invite row")
@@ -504,7 +507,7 @@ def _send_one(mailing, group, recipient):
             context["personal_links"] = blocks.personal_links(f"{settings.SITE_URL}/invite/{invite.token}/")
             headers = {**(headers or {}), **invites.open_tracking_headers(invite)}
             log = send_templated("mailing", [recipient.email], subject_line(mailing.subject, recipient.first_name), context,
-                                 headers=headers, body=mailing.body, blocks=mailing.blocks, subject_email=recipient.email)
+                                 headers=headers, body=mailing.body, blocks=mailing.blocks, subject_email=recipient.email, **_sender_args(mailing))
         elif mailing.automatic_key == "invite":
             if invite is None:
                 _finish_row(mailing, recipient, MailingRecipient.FAILED, "No invite row")
@@ -512,22 +515,68 @@ def _send_one(mailing, group, recipient):
             context.update(_invite_context(invite))
             headers = {**(headers or {}), **invites.open_tracking_headers(invite)}
             log = send_templated("invite", [recipient.email], subject_for("invite", first_name=context["first_name"] or "there"), context,
-                                 headers=headers, subject_email=recipient.email)
+                                 headers=headers, subject_email=recipient.email, **_sender_args(mailing))
         else:
             log = send_templated("mailing", [recipient.email], subject_line(mailing.subject, recipient.first_name), context,
-                                 headers=headers, body=mailing.body, blocks=mailing.blocks, subject_email=recipient.email)
+                                 headers=headers, body=mailing.body, blocks=mailing.blocks, subject_email=recipient.email, **_sender_args(mailing))
     except Exception as error:  # noqa: BLE001 - one bad address must not stop the others
         logger.error("Mailing %s: a send failed (%s)", mailing.pk, type(error).__name__)
         _finish_row(mailing, recipient, MailingRecipient.FAILED, type(error).__name__)
         return
     if log.status == EmailLog.SENT:
         _finish_row(mailing, recipient, MailingRecipient.SENT, "", sent_at=log.sent_at, message_id=log.message_id)
+        _after_sent(mailing, recipient)
     elif log.status == EmailLog.SUPPRESSED:
         _finish_row(mailing, recipient, MailingRecipient.SKIPPED, "On the suppression list (bounce or complaint)")
     elif _transient(log) and _back_off(MailingRecipient, recipient.pk, recipient.attempts):
         return "throttled"
     else:
         _finish_row(mailing, recipient, MailingRecipient.FAILED, _reason_word(log))
+
+
+def _sender_args(mailing):
+    """{from_email, reply_to} for a mailing sent as a chosen staff member (hello@ when none, or when he can no longer send: nothing fails because a person left). Worked out once per mailing object."""
+    if not mailing.sender_user_id:
+        return {}
+    if not hasattr(mailing, "_from_reply"):
+        mailing._from_reply = sender_mod.from_and_reply(mailing.sender_user_id)
+    from_email, reply_to = mailing._from_reply
+    return {"from_email": from_email, "reply_to": reply_to} if from_email else {}
+
+
+def whatsapp_display():
+    """The site's WhatsApp number (System > Settings, digits) as people read it: `+44 7441 919990`. Empty while none is set."""
+    import phonenumbers
+
+    from plans.models import SiteSettings
+
+    digits = (SiteSettings.load().whatsapp_number or "").strip()
+    if not digits:
+        return ""
+    try:
+        return phonenumbers.format_number(phonenumbers.parse(f"+{digits}", None), phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+    except phonenumbers.NumberParseException:
+        return f"+{digits}"
+
+
+def _lead_values(email):
+    """{whatsapp_number, add_number_link} for one lead: the site's WhatsApp number, and his own signed add-your-number link."""
+    from .addnumber import link_for
+
+    return {"whatsapp_number": whatsapp_display(), "add_number_link": link_for(email)}
+
+
+def _after_sent(mailing, recipient):
+    """What happens to a lead once the email actually went (per recipient, never for a skip or a failure): with the mailing's switch on, a lead with no mobile moves to Archived. Never raises:
+    the send is done and recorded, and this must not undo it."""
+    if not (mailing.archive_no_number and mailing.group == "leads"):
+        return
+    try:
+        from outreach import services as outreach
+
+        outreach.archive_after_group_email(recipient.email)
+    except Exception:  # noqa: BLE001
+        logger.exception("Mailing %s: could not archive a lead after the send", mailing.pk)
 
 
 def _invite_context(invite):
@@ -599,16 +648,24 @@ def confirm_details(mailing):
         subject = row.subject if row else DEFAULT_SUBJECTS[mailing.automatic_key][0]
     else:
         title, subject = mailing.name, mailing.subject
+    moves = None
+    if valid and mailing.group == "leads" and mailing.archive_no_number:  # this send moves people: say who, in plain counts
+        with_mobile, without = segments.lead_split(params, mailing.kind, mailing.has_personal_links)
+        moves = {"stay": with_mobile, "archive": without, "reason": "Emailed, no number", "bounced": "Anyone whose email bounces stays in Leads as Possible fake."}
     return {"count": people, "title": title, "subject": subject, "to": segments.to_label(mailing.group, params), "skipped": skipped,
-            "skipped_why": why, "kind": mailing.get_kind_display().split(" (")[0], **sender_details()}
+            "skipped_why": why, "kind": mailing.get_kind_display().split(" (")[0], "moves": moves, **sender_details(mailing)}
 
 
-def sender_details():
-    """The From address, the Reply-To (only when it differs) and who delivers the mail: the last rows of every send pop-up."""
+def sender_details(mailing=None):
+    """The From address, the Reply-To (only when it differs) and who delivers the mail: the last rows of every send pop-up. A mailing sent as a chosen staff member shows him (hello@ when he can no longer send)."""
     from email.utils import parseaddr
 
     from plans.models import SiteSettings
 
     sender = settings.DEFAULT_FROM_EMAIL
     reply = (SiteSettings.load().contact_address or "").strip()
+    if mailing is not None and mailing.sender_user_id:
+        from_email, reply_to = sender_mod.from_and_reply(mailing.sender_user_id)
+        if from_email:
+            return {"from": from_email, "reply_to": reply_to[0], "through": ses.through_label()}
     return {"from": sender, "reply_to": reply if reply and reply.lower() != parseaddr(sender)[1].lower() else "", "through": ses.through_label()}

@@ -28,6 +28,35 @@ def num(value):
     return f"{_int(value):,}"
 
 
+def _pounds_exact(pence):
+    """Whole pounds from pence, rounded half up: the ONLY place a money figure is rounded (the stored and summed figures are exact pence)."""
+    from decimal import ROUND_HALF_UP, Decimal
+
+    try:
+        return int((Decimal(pence or 0) / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    except (TypeError, ValueError, ArithmeticError):
+        return 0
+
+
+@register.filter
+def pounds(pence):
+    """Pence as whole pounds with a comma: 59700 -> £597, 995000 -> £9,950, 15021300 -> £150,213. Rounded for display only."""
+    return f"£{_pounds_exact(pence):,}"
+
+
+@register.filter
+def pounds_compact(pence):
+    """For a ring: whole pounds up to £9,999 (£9,950), then £57.5k, £150k, and from £1m £1.25m."""
+    whole = _pounds_exact(pence)
+    if whole < 10_000:
+        return f"£{whole:,}"
+    for size, suffix in ((1_000_000, "m"), (1_000, "k")):
+        if whole >= size:
+            text = f"{whole / size:.2f}" if size == 1_000_000 else f"{whole / size:.1f}"
+            return f"£{text.rstrip('0').rstrip('.')}{suffix}"
+    return f"£{whole:,}"
+
+
 @register.filter
 def compact(value):
     """Counts: 1,204 · 12.4k · 1.2m (compact from 10,000, one decimal)."""

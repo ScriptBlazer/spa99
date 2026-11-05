@@ -7,13 +7,13 @@
 {# Open and Done: two options do not need a filter sheet, so the same control sits in the bar on phone and desktop. #}
 <form class="o-filters o-filters--outreach" method="get" action="{% url 'office_outreach' %}" data-filter-form data-full data-list="outreach" aria-label="Show open or done">
   <div class="o-filters-bar">
-    <fieldset class="o-seg" style="--n: 3; --i: {% if state == 'registered' %}1{% elif state == 'done' %}2{% else %}0{% endif %}" data-default="open">
+    <fieldset class="o-seg" style="--n: 2; --i: {% if state == 'done' %}1{% else %}0{% endif %}" data-default="open">
       <legend class="sr-only">Show</legend>
       <span class="o-seg-thumb" aria-hidden="true"></span>
       <label class="o-seg-item"><input type="radio" name="state" value="open"{% if state == "open" %} checked{% endif %}><span>Open <span class="o-seg-count" data-region="outreach-open">{{ open_count|num }}</span></span></label>
-      <label class="o-seg-item"><input type="radio" name="state" value="registered"{% if state == "registered" %} checked{% endif %}><span>Registered <span class="o-seg-count" data-region="outreach-registered">{{ registered_count|num }}</span></span></label>
       <label class="o-seg-item"><input type="radio" name="state" value="done"{% if state == "done" %} checked{% endif %}><span>Done <span class="o-seg-count" data-region="outreach-done">{{ done_count|num }}</span></span></label>
     </fieldset>
+    <label class="o-chip{% if emailed %} is-on{% endif %}" data-emailed-filter><input type="checkbox" name="emailed" value="1"{% if emailed %} checked{% endif %}><span>Emailed</span></label>
     <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button>
   </div>
   {# One line under the tabs: how many on this tab, and (phone only: the heads sort from 64em) the quiet Sort button with its small sheet. #}

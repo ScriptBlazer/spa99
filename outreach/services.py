@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from django.db import IntegrityError, transaction
 from django.db.models import Q
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from common.tasks import enqueue
@@ -116,6 +117,10 @@ def restore_note(note, actor):
 # ---------- the approach list ----------
 
 def open_entries(addresses, user, application):
+    """The person's entries that are on the list now: open, and not left behind by registering (an entry whose account was verified AFTER he was added no longer counts: registering takes him
+    off the list, and nothing is rewritten for that: this lookup, and the list, simply leave such rows out)."""
+    from . import listing
+
     query = Q(lead_email__in=list(addresses)) | Q(gold_application__email__in=list(addresses))
     for address in addresses:
         query |= Q(user__email__iexact=address) | Q(gold_application__email__iexact=address)
@@ -123,7 +128,7 @@ def open_entries(addresses, user, application):
         query |= Q(user=user) | Q(gold_application__user=user)
     if application is not None:
         query |= Q(gold_application=application)
-    return OutreachEntry.objects.filter(query, done_at__isnull=True)
+    return listing.with_state(OutreachEntry.objects.filter(query, done_at__isnull=True)).filter(listing.NOT_AFTER_ADDED)
 
 
 def add_to_list(actor, user=None, lead_email="", application=None, reason=""):
@@ -255,6 +260,188 @@ def unarchive_lead(email, actor):
         LeadArchiveEvent.objects.create(email=email, kind=LeadArchiveEvent.RESTORED, by=_actor(actor), by_label=label(actor))
     _figures_changed()
     return DONE
+
+
+# ---------- the approach list and Leads: who is where ----------
+
+def approach_entries(email_expr):
+    """OutreachEntry rows (open or done) that put this lead address on the approach list: a lead entry, or a Gold application of the same address. Used inside Exists(): `email_expr` is the
+    outer row's lower-cased address (OuterRef). A lead on the list is not in Leads; taking the entry away (Back to Leads) puts him back."""
+    return OutreachEntry.objects.annotate(application_key=Lower("gold_application__email")).filter(Q(lead_email=email_expr) | Q(application_key=email_expr))
+
+
+def has_mobile_q(email_expr):
+    """Exists(): the address has a mobile: any journey of his holds one, or a Gold application of his does."""
+    from django.db.models import Exists
+
+    from journey.models import JourneySession
+
+    sessions = JourneySession.objects.filter(is_bot=False).exclude(lead_mobile="").annotate(k=Lower("lead_email")).filter(k=email_expr)
+    applications = GoldApplication.objects.exclude(mobile="").annotate(k=Lower("email")).filter(k=email_expr)
+    return Exists(sessions) | Exists(applications)
+
+
+def has_mobile(email):
+    from django.db.models import OuterRef  # noqa: F401 - for readers: the same test, one address
+
+    email = (email or "").strip().lower()
+    from journey.models import JourneySession
+
+    return (JourneySession.objects.filter(is_bot=False, lead_email__iexact=email).exclude(lead_mobile="").exists()
+            or GoldApplication.objects.filter(email__iexact=email).exclude(mobile="").exists())
+
+
+def entry_to_leads(entry):
+    """Back to Leads: a LEAD entry (an address, no account, no Gold application) is taken off the list, so he shows in Leads again. Returns (DONE | MISSING, lead_email, reason)."""
+    if not entry.lead_email:
+        return MISSING, "", ""
+    email, reason = entry.lead_email, entry.reason
+    entry.delete()
+    _figures_changed()
+    return DONE, email, reason
+
+
+def entry_archive(entry, actor, reason=""):
+    """Archive from the list: the lead is put away (the usual Archive, with its optional reason) and the entry goes, so he is on neither list. Returns (result, lead_email)."""
+    if not entry.lead_email:
+        return MISSING, ""
+    email = entry.lead_email
+    with transaction.atomic():
+        result, _ = archive_lead(email, actor, reason)
+        if result in (DONE, ALREADY):
+            entry.delete()
+    return result, email
+
+
+EMAILED_NO_NUMBER = "Emailed, no number"
+GROUP_EMAIL_LABEL = "Group email"
+
+
+def archive_after_group_email(email):
+    """A group send reached this lead: with no mobile he moves to Archived, reason "Emailed, no number", "by" the group email (not a person). A lead with a mobile stays. Already archived: nothing
+    changes. Returns DONE, ALREADY or UNCHANGED (he has a mobile)."""
+    email = (email or "").strip().lower()
+    if not email or has_mobile(email):
+        return UNCHANGED
+    with transaction.atomic():
+        if ArchivedLead.objects.filter(email=email).exists():
+            return ALREADY
+        try:
+            with transaction.atomic():
+                ArchivedLead.objects.create(email=email, reason=EMAILED_NO_NUMBER, archived_by=None, archived_by_label=GROUP_EMAIL_LABEL)
+        except IntegrityError:
+            return ALREADY
+        LeadArchiveEvent.objects.create(email=email, kind=LeadArchiveEvent.ARCHIVED, reason=EMAILED_NO_NUMBER, by=None, by_label=GROUP_EMAIL_LABEL)
+    _figures_changed()
+    return DONE
+
+
+def return_bounced_lead(email):
+    """A permanent bounce arrived for this address. If he was archived by the group email for having no number, he comes back to Leads (where he shows Possible fake). Only rows archived for that
+    reason come back: someone a person archived stays archived. Returns True when he came back."""
+    email = (email or "").strip().lower()
+    with transaction.atomic():
+        row = ArchivedLead.objects.filter(email=email, reason=EMAILED_NO_NUMBER, archived_by_label=GROUP_EMAIL_LABEL).first()
+        if row is None:
+            return False
+        row.delete()
+        LeadArchiveEvent.objects.create(email=email, kind=LeadArchiveEvent.RESTORED, by=None, by_label="Bounce")
+    _figures_changed()
+    return True
+
+
+# ---------- the add-your-number link (the public page, mailings.addnumber) ----------
+
+USED, REGISTERED = "used", "registered"
+SELF_LABEL = "His own link"
+
+
+def add_number_state(email):
+    """What the link page shows for this address: "open" (he can give a number), "used" (he already has a number, or has registered), "ended" (no journey of his is left)."""
+    from journey.models import JourneySession
+    from users.models import User
+
+    email = (email or "").strip().lower()
+    if not JourneySession.objects.filter(lead_email__iexact=email, is_bot=False).exists():
+        return "ended"
+    if User.objects.filter(email__iexact=email, email_verified_at__isnull=False).exists() or has_mobile(email):
+        return "used"
+    return "open"
+
+
+def add_number_from_link(email, mobile, country=None):
+    """He opened his personal link and gave a mobile. `email` comes only from the signed token. Writes the number on his journeys (the same place staff write it), records "Mobile added by His own link" in
+    his timeline (a PersonEdit), records the consent version he ticked, brings him back from Archived, and puts him on the approach list with the source. Refused with nothing changed: no journey
+    of his address left (MISSING), an account has taken the address (REGISTERED), he already has a number (USED), the number is on someone else (INVALID, `taken`), the number is not valid (INVALID).
+    Returns (result, info). Does not say whose number it is."""
+    from django.core.exceptions import ValidationError
+
+    from common.validators import normalise_mobile
+    from journey.copy import CONSENT_VERSION
+    from journey.models import JourneySession
+    from users.models import User
+
+    email = (email or "").strip().lower()
+    sessions = list(JourneySession.objects.filter(lead_email__iexact=email, is_bot=False))
+    if not sessions:
+        return MISSING, ""
+    if User.objects.filter(email__iexact=email, email_verified_at__isnull=False).exists():
+        return REGISTERED, ""
+    if any(s.lead_mobile for s in sessions) or GoldApplication.objects.filter(email__iexact=email).exclude(mobile="").exists():
+        return USED, ""
+    try:
+        number = normalise_mobile(str(mobile or "").strip(), country)
+    except ValidationError as error:
+        return INVALID, error.messages[0]
+    if owner_of_phone(number, exclude_email=email):
+        return INVALID, "taken"
+    with transaction.atomic():
+        for session in sessions:
+            session.lead_mobile = number
+            session.lead_consent_version = CONSENT_VERSION
+            session.save(update_fields=["lead_mobile", "lead_consent_version", "updated_at"])
+        PersonEdit.objects.create(email=email, what=PersonEdit.MOBILE, before="", after=number, by=None, by_label=SELF_LABEL)
+        if ArchivedLead.objects.filter(email=email).delete()[0]:
+            LeadArchiveEvent.objects.create(email=email, kind=LeadArchiveEvent.RESTORED, by=None, by_label=SELF_LABEL)
+        if not open_entries({email}, None, None).exists():
+            try:
+                with transaction.atomic():
+                    OutreachEntry.objects.create(lead_email=email, reason="Gave his number through the group email link", added_by=None, added_by_label=SELF_LABEL)
+            except IntegrityError:  # a double submit that raced past the check: he is on the list
+                pass
+    _figures_changed()
+    return DONE, number
+
+
+# ---------- the Emailed tag ----------
+
+def emailed_at(addresses):
+    """{address: the latest time a person or a group send emailed him}: the Email pop-up (PersonMessage sent) or a group send (a MailingRecipient sent). The automatic emails do not count.
+    Two queries for a page of addresses."""
+    from django.db.models import Max
+
+    from mailings.models import MailingRecipient
+
+    wanted = {(a or "").strip().lower() for a in addresses if a}
+    if not wanted:
+        return {}
+    found = {}
+    for address, at in PersonMessage.objects.filter(email__in=wanted, status=PersonMessage.SENT).values_list("email").annotate(at=Max("sent_at")).order_by().values_list("email", "at"):
+        found[address] = at
+    for address, at in MailingRecipient.objects.filter(email__in=wanted, status__in=(MailingRecipient.SENT, MailingRecipient.BOUNCED), sent_at__isnull=False).values_list("email").annotate(at=Max("sent_at")).order_by().values_list("email", "at"):
+        if address not in found or at > found[address]:
+            found[address] = at
+    return found
+
+
+def emailed_q(email_expr):
+    """Exists(): the address was emailed by a person or a group send (for the Emailed filter)."""
+    from django.db.models import Exists
+
+    from mailings.models import MailingRecipient
+
+    return (Exists(PersonMessage.objects.filter(email=email_expr, status=PersonMessage.SENT))
+            | Exists(MailingRecipient.objects.filter(email=email_expr, status=MailingRecipient.SENT, sent_at__isnull=False)))
 
 
 # ---------- erasure and the timeline ----------
@@ -576,11 +763,9 @@ def follow_up_state(email):
 
 
 def resend_follow_up(email, actor):
-    """Send the next-morning email to this address now, once (after a correction). Works with the automatic switch off, but needs the sender
-    address; not while the address is still bounced. Returns SENT, BOUNCED, NO_SENDER, ALREADY (it went before), MISSING or NOT_SENT (info: why)."""
-    from common.emaildefaults import SENDER_PERSON
+    """Send the next-morning email to this address now, once (after a correction). Works with the automatic switch off; not while the address is still bounced. A missing sender
+    is no reason to refuse: it goes from hello@. Returns SENT, BOUNCED, ALREADY (it went before), MISSING or NOT_SENT (info: why)."""
     from journey.models import JourneySession
-    from notifications import emailsettings
     from plans.models import SiteSettings
 
     from . import nextmorning
@@ -591,8 +776,6 @@ def resend_follow_up(email, actor):
     if is_bounced(email):
         return BOUNCED, ""
     site, now = SiteSettings.load(), timezone.now()
-    if emailsettings.options_for(nextmorning.TEMPLATE).sender == SENDER_PERSON and not site.auto_sender:
-        return NO_SENDER, ""
     with transaction.atomic():
         row = NextMorningEmail.objects.filter(email=email).first()
         if row is not None and row.sent_at:

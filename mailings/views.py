@@ -4,13 +4,15 @@ from django.contrib.auth.decorators import login_not_required
 from django.http import FileResponse, Http404
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods
 
+from common import phone
 from common.audit import client_ip
 from common.ratelimit import hit
 from system import defaults
 
-from . import invites, optout, tokens
+from . import addnumber, invites, optout, tokens
 from .models import MailingImage
 
 
@@ -79,3 +81,44 @@ def email_image(request, image_id, ext=""):
     response["Cache-Control"] = "public, max-age=31536000, immutable"
     response["X-Content-Type-Options"] = "nosniff"
     return response
+
+
+def _add_number_page(request, state, email="", form=None, status=200):
+    from pages.links import short_url
+
+    context = {"state": state, "email": email, "form": form, "mobile_countries": phone.countries(), "consent_text": addnumber.CONSENT_TEXT, "whatsapp_url": short_url("email"),
+               "country": (form.data.get("mobile_country") if form is not None and form.is_bound else "") or phone.DEFAULT_COUNTRY}
+    response = render(request, "mailings/add_number.html", context, status=status)
+    response["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
+
+@login_not_required  # PUBLIC: the personal link in the group email to leads. The signed token is the proof; the page trusts nothing typed, only the address inside the token.
+@never_cache
+@require_http_methods(["GET", "POST"])
+def add_number(request, token):
+    """GET shows his address (read only) and asks for a country and mobile, and the consent tick. POST saves it (`outreach.services.add_number_from_link`).
+    States: `form`, `done` (saved), `used` (his number is already with us, or he registered: nothing is changed), `ended` (expired or tampered link, one answer for both). Rate limited."""
+    from outreach import services as outreach
+
+    if not hit("add-number", client_ip(request) or "unknown", 30, 600, rolling=True):
+        return _message(request, "Please wait", "Too many attempts. Please try again in a few minutes.", status=429)
+    email = addnumber.read_token(token)
+    if email is None:
+        return _add_number_page(request, "ended", status=400)
+    form = addnumber.AddNumberForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        result, info = outreach.add_number_from_link(email, form.cleaned_data["mobile"], request.POST.get("mobile_country"))
+        if result == outreach.DONE:
+            return _add_number_page(request, "done", email)
+        if result in (outreach.USED, outreach.REGISTERED):
+            return _add_number_page(request, "used", email)
+        if result == outreach.MISSING:
+            return _add_number_page(request, "ended", status=400)
+        form.add_error("mobile", addnumber.TAKEN_TEXT if info == "taken" else info)  # a taken number says so plainly, never whose
+        return _add_number_page(request, "form", email, form, status=400)
+    if request.method == "POST":
+        return _add_number_page(request, "form", email, form, status=400)
+    if outreach.add_number_state(email) != "open":  # a GET for someone who has a number (or an account) already shows the thank-you, and changes nothing
+        return _add_number_page(request, "used", email)
+    return _add_number_page(request, "form", email, form)

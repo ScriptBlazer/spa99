@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import pwa, views, views_tools as t
+from . import pwa, views, views_approvals as ap, views_tools as t
 
 urlpatterns = [
     path("manifest.webmanifest", pwa.manifest, name="office_manifest"),  # the Office as an installable app (public file, no secrets)
@@ -28,6 +28,11 @@ urlpatterns = [
     path("invited/export.csv", views.invited_csv, name="office_invited_csv"),
     path("chats/", views.chats, name="office_chats"),
     path("chats/<uuid:pk>/", views.chat_detail, name="office_chat"),
+    path("approvals/", ap.approvals_page, name="office_approvals"),  # Barry's membership approval lists (Approver or Admin and up)
+    path("approvals/<uuid:pk>/approve/", ap.approval_decide, {"action": "approve"}, name="office_approval_approve"),
+    path("approvals/<uuid:pk>/decline/", ap.approval_decide, {"action": "decline"}, name="office_approval_decline"),
+    path("approvals/<uuid:pk>/undo/", ap.approval_decide, {"action": "undo"}, name="office_approval_undo"),
+    path("revenue/", ap.revenue_page, name="office_revenue"),
     path("password/", views.OfficePasswordView.as_view(), name="office_password"),
     path("gold/", views.gold, name="office_gold"),
     path("gold/<uuid:pk>/", views.gold_application, name="office_gold_application"),
@@ -58,6 +63,9 @@ urlpatterns = [
     path("outreach/", t.outreach_page, name="office_outreach"),
     path("outreach/<uuid:pk>/done/", t.outreach_done, name="office_outreach_done"),
     path("outreach/<uuid:pk>/remove/", t.outreach_remove, name="office_outreach_remove"),
+    path("outreach/<uuid:pk>/to-leads/", t.outreach_to_leads, name="office_outreach_to_leads"),  # Back to Leads (a lead entry)
+    path("outreach/<uuid:pk>/archive/", t.outreach_archive, name="office_outreach_archive"),  # Archive from the list (POST reason, optional)
+    path("outreach/undo/", t.outreach_undo_move, name="office_outreach_undo_move"),  # Undo either one
     path("people/<uuid:pk>/outreach/", t.outreach_add, {"kind": "person"}, name="office_person_outreach_add"),
     path("leads/<uuid:pk>/outreach/", t.outreach_add, {"kind": "lead"}, name="office_lead_outreach_add"),
     path("gold/<uuid:pk>/outreach/", t.outreach_add, {"kind": "gold"}, name="office_gold_outreach_add"),
