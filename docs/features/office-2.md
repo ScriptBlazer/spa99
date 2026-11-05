@@ -29,6 +29,7 @@ Gold shows £199 + VAT everywhere it appears, in the Office and on the public si
 ## Leads
 - Shows everyone with no account, not archived and not on the Approach list. No number filters: new leads must give a mobile, and existing ones with none move to Archived after the group email.
 - Top cards: Leads and Registered only, true totals, tappable. Hot leads goes.
+- Add to Approach list is one tap: no box, no reason (Moishe, 2026-11-05).
 - Added to the Approach list = gone from Leads. From the list he can go back to Leads or to Archive.
 - Phone: scrolling loads more by itself with a loading animation until the end. Show More no longer hidden behind the nav. Applies to every long list.
 - Whole rows tappable everywhere, with visible tap feedback.

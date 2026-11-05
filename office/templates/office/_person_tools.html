@@ -4,7 +4,7 @@ Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, what
 <section class="o-card o-reach" data-person-reach aria-labelledby="reach-h"><h2 id="reach-h" class="o-h3">Reach out</h2>
   <div class="o-reach-actions">
     {% include "office/_channels.html" %}
-    {% if outreach.can_add %}{% if outreach.on_list %}{% include "office/_onlist.html" %}{% else %}<button type="button" class="o-quiet o-addlist" data-dialog-open="outreach" aria-haspopup="dialog">{% include "office/_icon.html" with name="list-checks" %}Add to {{ outreach.title }}</button>{% endif %}{% endif %}
+    {% if outreach.can_add %}{% if outreach.on_list %}{% include "office/_onlist.html" %}{% else %}{% include "office/_addlist.html" %}{% endif %}{% endif %}
   </div>
   {% include "office/_details.html" %}
   {% if archive %}{% if archive.archived %}
@@ -17,7 +17,6 @@ Keys: outreach{on_list,add_url,reason_max,title,can_add,added_by,added_at}, what
 </section>
 {% include "office/_mobile_dialog.html" %}
 {% include "office/_email_dialog.html" %}
-{% if outreach.can_add and not outreach.on_list %}{% include "office/_outreach_dialog.html" with who=who %}{% endif %}
 {% if archive.can_edit and not archive.archived %}
 <dialog class="fb-modal o-dialog" data-dialog="archive" aria-labelledby="od-archive-h">
   <form method="post" action="{{ archive.archive_url }}" class="fb-modal-wrap" data-problems data-lead-archive>{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">

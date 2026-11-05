@@ -1,0 +1,2 @@
+{% comment %}Add to the Approach list: one tap, straight away, no box and no reason (Moishe, 2026-11-05). Keys: outreach{add_url,title}. The server answers with a toast and the page shows "On the list".{% endcomment %}
+<form method="post" action="{{ outreach.add_url }}" class="o-addlist-form" data-outreach-add>{% csrf_token %}<button type="submit" class="o-quiet o-addlist" data-working-text="Adding">{% include "office/_icon.html" with name="list-checks" %}Add to {{ outreach.title }}</button></form>

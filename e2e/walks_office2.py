@@ -175,7 +175,6 @@ def office2_leads_list(w):
     with w.step("Add him to the Approach list: he leaves Leads and shows on the list", page):
         lead_url = page.url
         page.locator(".o-addlist").click()
-        page.locator("dialog[data-dialog=outreach][open] button[type=submit]").click()
         page.wait_for_selector("[data-on-outreach]")
         page.goto(f"{OFFICE}/leads/?range=all")
         assert page.locator("[data-lead-row]", has_text=email).count() == 0

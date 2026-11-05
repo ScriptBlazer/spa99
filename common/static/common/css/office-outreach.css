@@ -114,6 +114,7 @@ html:not(.js) [data-note-compose], html:not(.js) .o-notes-open { display: none; 
 .office .btn.o-btn-off, .office .btn.o-btn-off:hover { background: var(--office-sunken); color: var(--office-muted); box-shadow: none; cursor: not-allowed; opacity: 1; }   /* opacity 1: .btn[aria-disabled] dims to 0.4, which left the label at 1.82; muted on sunken is 5.38 (2026-11-04) */
 .o-hint-line { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--office-muted); max-width: none; }
 .o-hint-line a { color: inherit; text-underline-offset: 0.25em; }
+.o-addlist-form { display: contents; }   /* the form is only there to post: the button sits in the layout as before */
 .o-addlist { gap: var(--space-2); }
 .o-reach-actions .o-addlist, .o-detail-rail .o-card > .o-addlist { display: flex; justify-content: center; justify-self: center; margin-inline: auto; }   /* a quiet link under the two reach out buttons */
 @media (hover: none) { .o-addlist { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.25em; } }   /* there is no hover to reveal it */

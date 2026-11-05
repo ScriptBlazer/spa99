@@ -47,7 +47,7 @@ Started ≥ Finished always (same people). Registered can exceed Finished (someo
 
 ## Leads (2026-10-26)
 
-A lead is an email given at the journey gate; "new leads" counts addresses by the day of their first `lead_at`, "went on to register" counts those whose address has an account now. Journeys with that email join the account when the email is verified (see `office-leads.md`); counts merge from the next snapshot.
+A lead is an email given at the journey gate; "new leads" counts addresses by the day of their first `lead_at` that are still on the Leads list (no account, not archived, not on the Approach list), "went on to register" counts those whose address has an account now. Journeys with that email join the account when the email is verified (see `office-leads.md`); counts merge from the next snapshot.
 
 People are worked out in `insights/people.py` by the snapshot job only; run `rebuild_metrics` once to apply the 2026-10-27 rule to existing snapshots.
 

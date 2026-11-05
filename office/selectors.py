@@ -97,7 +97,7 @@ def tier_pair(insights):
 
 def lead_block(figures, now, before):
     """The Leads keys of the Dashboard snapshot (merged into its payload), from the same Figures as everything else.
-    A lead is an email address given at the journey gate (cohort: first given in the range). There is no "went on to register" figure any more: the
+    A lead is an email address given at the journey gate (cohort: first given in the range), still on the Leads list (no account, not archived, not on the Approach list). There is no "went on to register" figure any more: the
     true totals (Leads, Registered) are office.counts. `hot_leads` is the current number of hot leads (High potential, no account, no Gold
     application). `insights_leads` has the shape of `insights`, one vote per lead that has not registered (latest finished
     journey in the range)."""
@@ -117,7 +117,9 @@ def lead_block(figures, now, before):
                    for i, (d, n) in enumerate(ranked, 1)]
         insights.append({"key": key, "title": title, "sentence": f"{options[0]['label']}: {options[0]['value']} of {voters} leads.",
                          "top": options[0], "runner_up": options[1] if len(options) > 1 else None, "options": options})
-    return {"leads_new": figures.new_lead_count(*now), "leads_new_previous": None if before is None else figures.new_lead_count(*before),
+    # Home's card must agree with the Leads list: someone who has since registered, or is on the Approach list, is no longer a lead (Moishe, 2026-11-05)
+    current = set(leads.lead_queryset("all").values_list("email_key", flat=True))
+    return {"leads_new": len(figures.new_leads(*now) & current), "leads_new_previous": None if before is None else len(figures.new_leads(*before) & current),
             "hot_leads": leads.hot_leads_queryset().count(), "insights_leads": insights}
 
 
