@@ -222,6 +222,9 @@ class GroupSendFooterTests(Base):
         self.assertNotIn(self.LINE, preview("no_contact"))
         self.assertIn(self.LINE, preview("nonsense"))
 
+    def test_the_preview_only_answers_a_post(self):
+        self.assertEqual(self.client_and_mail().get("/emails/mailings/preview/").status_code, 405)
+
     def test_a_test_send_uses_the_footer_and_the_sender_on_the_form(self):
         barry = staff("barry@spa99.test")
         client = self.client_and_mail()
@@ -231,6 +234,19 @@ class GroupSendFooterTests(Base):
         client.post("/emails/mailings/test/", {"subject": "Hi", "body": "Hello", "kind": "news", "sender_user": "not-a-person"})
         self.assertIn("hello@spa99.test", mail.outbox[-1].from_email)
         self.assertIn(self.LINE, mail.outbox[-1].body)
+
+
+class AddNumberIsNotAnInviteTests(Base):
+    def test_the_button_does_not_apply_the_invite_rules_so_a_lead_with_a_waiting_invite_is_still_counted(self):
+        from mailings import blocks, segments
+        from mailings.models import Invite
+
+        lead("a@example.com"), lead("b@example.com")
+        Invite.objects.create(batch_id="00000000-0000-0000-0000-000000000001", email="b@example.com", status=Invite.SENT, expires_at=timezone.now() + timedelta(days=5))
+        m = Mailing(blocks=[{"type": blocks.BUTTON, "label": "Add", "url": "", "link": blocks.LINK_ADD_NUMBER}])
+        self.assertFalse(m.has_personal_links)
+        self.assertEqual(segments.count("leads_no_number", {}, Mailing.NEWS, m.has_personal_links), 2)  # the send: what the pop-up says and what the page now says
+        self.assertEqual(segments.count("leads_no_number", {}, Mailing.NEWS, True), 1)  # what the page wrongly showed
 
 
 class AddNumberTests(Base):

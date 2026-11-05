@@ -352,8 +352,6 @@ def mailing_count(request):
     return JsonResponse({"count": segments.count(group, params, kind, personal), "errors": {}})
 
 
-@unlocked
-@require_POST
 def _posted_footer(request):
     """The footer choice on the form: the shared footer unless it is one of the group send's own choices."""
     mode = request.POST.get("footer_mode", "")
@@ -370,6 +368,8 @@ def _posted_sender(request):
     return value
 
 
+@unlocked
+@require_POST
 def mailing_preview(request):
     """Preview of what is typed on the mailing form with the sample name: {"ok", "subject", "html", "text", "errors"}. With a `blocks`
     field (JSON) the parts are previewed and part problems come back as errors.blocks = {"_": [...], "<index>": {field: [...]}}."""
