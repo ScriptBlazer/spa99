@@ -32,7 +32,6 @@ from plans import payments
 from plans.models import Plan, SiteSettings
 from common import levels, sorting
 from users import services as user_services
-from whatsapp import services as whatsapp_services
 from users import views as user_views
 from users.models import User
 
@@ -183,7 +182,6 @@ def person(request, pk):
     if not _is_fragment(request):
         context.update(_chats_context(person, user=user, email=user.email, filter_key="user", filter_id=user.pk))
         context.update(tools.tools_context(tools.Target("person", user.pk, user=user), request.user))
-        context["unclaimed_chats"] = whatsapp_services.unclaimed_for_user(user)  # named beside Export and Delete: they do not include these
     return render(request, "office/_timeline.html" if _is_fragment(request) else "office/person.html", context)
 
 
@@ -257,7 +255,7 @@ def person_setup_cancel(request, pk):
 def person_export(request, pk):
     """UK GDPR: everything we hold about this person, as a JSON download."""
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
-    response = JsonResponse(user_services.export_user_data(user, include_chats=True), json_dumps_params={"indent": 2})
+    response = JsonResponse(user_services.export_user_data(user), json_dumps_params={"indent": 2})
     response["Content-Disposition"] = f'attachment; filename="spa99-person-{user.public_id}.json"'
     return response
 
@@ -271,12 +269,8 @@ def person_delete(request, pk):
         messages.error(request, "A staff account cannot be deleted here.")
         return redirect("office_person", pk=user.pk)
     name = user.get_full_name() or user.email
-    unclaimed = whatsapp_services.unclaimed_for_user(user)  # chats on his number that nothing links to him: delete does not reach them
-    user_services.delete_user_data(user, include_chats=True)  # staff-run: his WhatsApp chats go too
+    user_services.delete_user_data(user)
     messages.success(request, f"{name} and their data were deleted.")
-    if unclaimed:
-        messages.warning(request, "Not deleted, because nothing links " + ("it" if len(unclaimed) == 1 else "them") + " to him: the WhatsApp chat with "
-                         + ", ".join(f"{c['name']} ({c['phone']})" for c in unclaimed) + ". Open it in WhatsApp and use Delete this chat if it is his.")
     return redirect("office_people")
 
 
@@ -338,7 +332,6 @@ def lead_export(request, pk):
             "emails": journey_services.export_lead_emails(data["email"]),
             "chats": chat_services.export_conversations(email=data["email"]),
             "staff_emails": outreach_services.export_messages([data["email"]]),
-            "whatsapp": whatsapp_services.export_for(whatsapp_services.contacts_for_person(None, {data["email"]})),
             "gold_applications": gold_services.export_applications(data["email"])}
     response = JsonResponse(body, json_dumps_params={"indent": 2})
     response["Content-Disposition"] = 'attachment; filename="spa99-lead.json"'
@@ -352,7 +345,6 @@ def lead_delete(request, pk):
     session, (kind, data) = _lead_session(pk)
     if kind == "account":
         return redirect("office_person", pk=data.pk)
-    whatsapp_services.erase_person(None, {data["email"]})  # his chats, messages and files (found by his address, never by a number): before the journeys lose it
     cleared = journey_services.erase_lead_data(data["email"])
     from outreach.services import erase_email
 
@@ -451,7 +443,7 @@ def gold(request):
     return _varied(render(request, _fragment(request, "office/gold.html", "office/_gold_rows.html"), context))
 
 
-GOLD_FORMS = ("decline", "note", "email")  # ?do= on the application page opens that form (the approver email's Decline link); ?do=respond goes to his WhatsApp chat, or opens the email pop-up when he has no mobile
+GOLD_FORMS = ("decline", "note", "email")  # ?do= on the application page opens that form (the approver email's Decline link); ?do=respond goes to his WhatsApp link (wa.me), or opens the email pop-up when he has no mobile
 
 
 def _can_open(application, name):
@@ -644,9 +636,10 @@ def gold_decline(request, pk):
 
 
 def _respond(application):
-    """Respond opens his WhatsApp chat when he has a mobile, otherwise his Gold page with the Email pop-up open (a GET: it only reads)."""
-    if tools.mobile_and_name(tools.Target("gold", application.pk, application=application))[0]:
-        return redirect("office_gold_whatsapp", pk=application.pk)
+    """Respond goes to wa.me when he has a mobile, otherwise to his Gold page with the Email pop-up open (a GET: it only reads, and it marks nothing as contacted)."""
+    link = tools.wa_link(tools.mobile_and_name(tools.Target("gold", application.pk, application=application))[0])
+    if link:
+        return redirect(link)
     return redirect(f"{reverse('office_gold_application', args=[application.pk])}?do=email")
 
 

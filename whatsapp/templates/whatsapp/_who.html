@@ -1,2 +1,0 @@
-{% load whatsapp_tags %}<span class="o-wa-avatar o-wa-avatar--sm{% if 'Gold' in contact.labels %} o-wa-avatar--gold{% endif %}" aria-hidden="true">{% with i=contact.name|wa_initials %}{% if contact.has_name and i %}{{ i }}{% else %}{% include "office/_icon.html" with name="mobile" %}{% endif %}{% endwith %}</span>
-<span class="o-wa-whotext"><span class="o-wa-whoname">{{ contact.name }}</span><span class="o-wa-whonum">{{ contact.phone }}</span></span>

@@ -311,6 +311,46 @@ def timeline_entries(addresses):
     return out
 
 
+def _office_url(name, *args):
+    from django.urls import reverse
+
+    return reverse(name, args=args, urlconf="config.urls_office")
+
+
+def owner_of_phone(phone, exclude_email="", exclude_user=None):
+    """Who already has this number ({name, url}), or None. The same number is never kept on two people (an account, a lead's journeys or a Gold application)."""
+    from journey.models import JourneySession
+    from users.models import User
+
+    if not phone:
+        return None
+    users = User.objects.filter(mobile=phone)
+    if exclude_user is not None:
+        users = users.exclude(pk=exclude_user.pk)
+    other = users.filter(interest__isnull=False).first() or users.first()
+    if other is not None:
+        return {"name": other.get_full_name() or other.email, "url": _office_url("office_person", other.pk) if hasattr(other, "interest") else ""}
+    sessions = JourneySession.objects.filter(lead_mobile=phone, is_bot=False).exclude(lead_email="")
+    if exclude_email:
+        sessions = sessions.exclude(lead_email__iexact=exclude_email)
+    if exclude_user is not None and exclude_user.email:
+        sessions = sessions.exclude(lead_email__iexact=exclude_user.email)
+    found = sessions.order_by("-created_at").first()
+    if found is not None:
+        return {"name": found.lead_first_name or found.lead_email.lower(), "url": _office_url("office_lead", found.pk)}
+    applications = GoldApplication.objects.filter(mobile=phone)  # a Gold applicant's number counts too; a person's own application does not
+    if exclude_email:
+        applications = applications.exclude(email__iexact=exclude_email)
+    if exclude_user is not None:
+        applications = applications.exclude(user=exclude_user)
+        if exclude_user.email:
+            applications = applications.exclude(email__iexact=exclude_user.email)
+    gold = applications.order_by("-created_at").first()
+    if gold is not None:
+        return {"name": gold.full_name or gold.email.lower(), "url": _office_url("office_gold_application", gold.pk)}
+    return None
+
+
 # ---------- first name and mobile typed by staff (lead page, person page) ----------
 
 def _edit(main, what, before, after, actor):
@@ -325,7 +365,6 @@ def set_lead_contact(email, actor, first_name=None, mobile=None, mobile_country=
 
     from common.validators import normalise_mobile
     from journey.models import JourneySession
-    from whatsapp import services as whatsapp
 
     main = (email or "").strip().lower()
     sessions = list(JourneySession.objects.filter(lead_email__iexact=main, is_bot=False))
@@ -344,7 +383,7 @@ def set_lead_contact(email, actor, first_name=None, mobile=None, mobile_country=
             new_mobile = normalise_mobile(text, mobile_country) if text else ""
         except ValidationError as error:
             errors["mobile"], new_mobile = error.messages[0], current_mobile
-        owner = whatsapp.owner_of_phone(new_mobile, exclude_email=main) if new_mobile and "mobile" not in errors else None
+        owner = owner_of_phone(new_mobile, exclude_email=main) if new_mobile and "mobile" not in errors else None
         if owner:
             errors["mobile"], errors["owner"] = f"This number is already on {owner['name']}.", owner
     if errors:
@@ -367,14 +406,13 @@ def set_person_mobile(user, actor, mobile, mobile_country=None):
     from django.core.exceptions import ValidationError
 
     from common.validators import normalise_mobile
-    from whatsapp import services as whatsapp
 
     text = (mobile or "").strip()
     try:
         new = normalise_mobile(text, mobile_country) if text else ""
     except ValidationError as error:
         return INVALID, {"mobile": error.messages[0]}
-    owner = whatsapp.owner_of_phone(new, exclude_user=user) if new else None
+    owner = owner_of_phone(new, exclude_user=user) if new else None
     if owner:
         return INVALID, {"mobile": f"This number is already on {owner['name']}.", "owner": owner}
     before = user.mobile or ""
@@ -394,7 +432,6 @@ def set_gold_mobile(application, actor, mobile, mobile_country=None):
 
     from common.validators import normalise_mobile
     from journey.models import JourneySession
-    from whatsapp import services as whatsapp
 
     if application.user_id and application.user.email_verified_at:  # an unverified account is not him (the page shows the application's number): its mobile is left alone
         return set_person_mobile(application.user, actor, mobile, mobile_country)
@@ -404,7 +441,7 @@ def set_gold_mobile(application, actor, mobile, mobile_country=None):
     except ValidationError as error:
         return INVALID, {"mobile": error.messages[0]}
     email = (application.email or "").strip().lower()
-    owner = whatsapp.owner_of_phone(new, exclude_email=email) if new else None
+    owner = owner_of_phone(new, exclude_email=email) if new else None
     if owner:
         return INVALID, {"mobile": f"This number is already on {owner['name']}.", "owner": owner}
     sessions = list(JourneySession.objects.filter(lead_email__iexact=email, is_bot=False).exclude(lead_mobile="")) if email else []
@@ -442,14 +479,13 @@ def is_bounced(email):
 
 
 def owner_of_email(new, exclude=""):
-    """Who already holds this address: {"kind": "account"|"lead"|"gold"|"archived"|"chat", "name", "url"} or None. An account (any, verified or not), another lead's journeys,
-    a Gold application, an archived lead, or a WhatsApp chat linked to it as a lead address."""
+    """Who already holds this address: {"kind": "account"|"lead"|"gold"|"archived", "name", "url"} or None. An account (any, verified or not), another lead's journeys,
+    a Gold application or an archived lead."""
     from django.urls import reverse
 
     from gold.models import GoldApplication
     from journey.models import JourneySession
     from users.models import User
-    from whatsapp.models import Contact
 
     user = User.objects.filter(email__iexact=new).first()
     if user is not None:
@@ -463,8 +499,6 @@ def owner_of_email(new, exclude=""):
         return {"kind": "gold", "name": application.full_name or new, "url": reverse("office_gold_application", args=[application.pk], urlconf="config.urls_office")}
     if ArchivedLead.objects.filter(email=new).exists():
         return {"kind": "archived", "name": new, "url": ""}
-    if Contact.objects.filter(lead_email__iexact=new).exists():
-        return {"kind": "chat", "name": new, "url": ""}
     return None
 
 
@@ -486,7 +520,7 @@ def _move_follow_up(old, new, bounced):
 
 def correct_lead_email(old, new, actor):
     """Change a lead's address (a typo or a new one he gave; after a bounce or not): written on every journey that left the old one, and his notes, messages, list entries and history follow it.
-    Refused when the new address already belongs to another lead, an account, a Gold application, an archived lead or a chat (the answer says whose), or when the old one is on a Gold application. The old address stays on the suppression
+    Refused when the new address already belongs to another lead, an account, a Gold application, or an archived lead (the answer says whose), or when the old one is on a Gold application. The old address stays on the suppression
     list if it was on it. Audited ("Email changed by X"). Returns (DONE | UNCHANGED | INVALID | TAKEN | MISSING, info): info is the message for INVALID, or
     the owner {kind, name, url} for TAKEN."""
     from django.core.exceptions import ValidationError
@@ -497,7 +531,6 @@ def correct_lead_email(old, new, actor):
     from journey.models import JourneySession
     from mailings.models import EmailOptOut
     from notifications.models import EmailLog
-    from whatsapp import services as whatsapp
 
     old = (old or "").strip().lower()
     try:
@@ -531,7 +564,6 @@ def correct_lead_email(old, new, actor):
             EmailLog.objects.filter(to__iexact=old).update(to=new)
             EmailLog.objects.filter(subject_email__iexact=old).update(subject_email=new)
         _edit(new, PersonEdit.EMAIL, old, new, actor)
-    whatsapp.move_address(old, new)  # his WhatsApp chats that hold the old lead address take the new one
     _figures_changed()
     return DONE, ""
 

@@ -3,7 +3,7 @@ outreach.services (or gold.actions), answer. Notes answer an HTMX request with t
 from django.contrib import messages
 from urllib.parse import urlencode
 
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.cache import patch_vary_headers
@@ -19,7 +19,7 @@ from outreach.models import OutreachEntry, StickyNote
 from plans.models import SiteSettings
 
 from . import lists, tools
-from .forms import ArchiveForm, MessageForm, OutreachAddForm, StickyNoteForm
+from .forms import ArchiveForm, ContactForm, MessageForm, OutreachAddForm, StickyNoteForm
 from system import defaults
 from .permissions import admin, editor, reader
 
@@ -295,3 +295,79 @@ def outreach_remove(request, pk):
     services.remove_entry(get_object_or_404(OutreachEntry, pk=pk))
     messages.success(request, "Removed.")
     return redirect("office_outreach")
+
+
+# ---------- adding or fixing a number (the Details rows) and marking a Gold application Contacted ----------
+
+def _contact_reply(request, target, result, errors):
+    """The Details dialog (fetch) gets 200 with {ok, result, errors{field: text, owner{name, url}}}; any other POST a toast and back to the page."""
+    ok = result in (services.DONE, services.UNCHANGED)
+    if request.headers.get("accept", "").startswith("application/json") or request.headers.get("x-requested-with") == "fetch":
+        return JsonResponse({"ok": ok, "result": result, "errors": errors}, status=200 if ok or request.headers.get("x-requested-with") == "fetch" else 400)
+    if ok:
+        messages.success(request, "Saved." if result == services.DONE else "Nothing changed.")
+    else:
+        messages.error(request, " ".join(v for k, v in errors.items() if k != "owner"))
+    return redirect(target.page_url)
+
+
+def _contact_form(request, target):
+    """(data, early reply): the validated ContactForm, or the reply to give when it is invalid."""
+    form = ContactForm(request.POST)
+    if not form.is_valid():
+        return None, _contact_reply(request, target, services.INVALID, {"mobile": "That doesn't look like a valid mobile number."})
+    return form.cleaned_data, None
+
+
+@editor
+@require_POST
+def lead_contact(request, pk):
+    """Add or fix a lead's first name and mobile. POST first_name, mobile_country (ISO, default GB), mobile. Blank keeps what is there."""
+    target = tools.target_for("lead", pk)
+    if target.kind != "lead":
+        return redirect(target.page_url)
+    data, early = _contact_form(request, target)
+    if early:
+        return early
+    result, errors = services.set_lead_contact(target.main, request.user, first_name=data["first_name"] or None, mobile=data["mobile"] or None, mobile_country=data["mobile_country"])
+    return _contact_reply(request, target, result, errors)
+
+
+@editor
+@require_POST
+def person_mobile(request, pk):
+    """Add or fix a registered person's mobile. POST mobile_country, mobile."""
+    target = tools.target_for("person", pk)
+    data, early = _contact_form(request, target)
+    if early:
+        return early
+    if not data["mobile"]:
+        return _contact_reply(request, target, services.UNCHANGED, {})
+    result, errors = services.set_person_mobile(target.user, request.user, data["mobile"], data["mobile_country"])
+    return _contact_reply(request, target, result, errors)
+
+
+@editor
+@require_POST
+def gold_mobile(request, pk):
+    """Add or fix a Gold applicant's mobile. POST mobile_country, mobile."""
+    target = tools.target_for("gold", pk)
+    data, early = _contact_form(request, target)
+    if early:
+        return early
+    if not data["mobile"]:
+        return _contact_reply(request, target, services.UNCHANGED, {})
+    result, errors = services.set_gold_mobile(target.application, request.user, data["mobile"], data["mobile_country"])
+    return _contact_reply(request, target, result, errors)
+
+
+@editor
+@require_POST
+def gold_contacted(request, pk):
+    """"Mark contacted" on a Gold page: New becomes Contacted, with an audit event. The WhatsApp button is a wa.me link, which cannot prove a message went, so staff say so themselves."""
+    target = tools.target_for("gold", pk)
+    if gold_actions.whatsapp_sent(target.application, request.user):
+        messages.success(request, "Marked as contacted.")
+    else:
+        messages.info(request, "Nothing changed: it is not waiting for a first contact.")
+    return redirect(target.page_url)

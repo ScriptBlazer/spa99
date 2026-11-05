@@ -1,8 +1,10 @@
 from django.urls import path
 
-from . import views, views_tools as t
+from . import pwa, views, views_tools as t
 
 urlpatterns = [
+    path("manifest.webmanifest", pwa.manifest, name="office_manifest"),  # the Office as an installable app (public file, no secrets)
+    path("sw.js", pwa.service_worker, name="office_sw"),
     path("", views.dashboard, name="office_dashboard"),
     path("dashboard.json", views.dashboard_json, name="office_dashboard_json"),
     path("analytics/", views.analytics, name="office_analytics"),
@@ -70,4 +72,9 @@ urlpatterns = [
     path("leads/<uuid:pk>/email/", t.lead_email, name="office_lead_email"),
     path("leads/<uuid:pk>/resend/", t.lead_resend, name="office_lead_resend"),
     path("gold/<uuid:pk>/delete/", t.gold_delete, name="office_gold_delete"),
+    # add or fix a number (the Details rows), and mark a Gold application Contacted by hand
+    path("leads/<uuid:pk>/contact/", t.lead_contact, name="office_lead_contact"),
+    path("people/<uuid:pk>/mobile/", t.person_mobile, name="office_person_mobile"),
+    path("gold/<uuid:pk>/mobile/", t.gold_mobile, name="office_gold_mobile"),
+    path("gold/<uuid:pk>/contacted/", t.gold_contacted, name="office_gold_contacted"),
 ]

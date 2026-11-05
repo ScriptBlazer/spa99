@@ -12,7 +12,7 @@
 @import "office-lists.css";
 @import "office-leads.css";
 @import "office-outreach.css";
-@import "office-whatsapp.css";
+@import "office-reach.css";
 
 /* The site-wide cross-document view transition is off in the Office (it threw "Transition was skipped"). */
 @view-transition { navigation: none; }
@@ -66,7 +66,6 @@
   /* five slots at most: Home, Leads, WhatsApp, Gold, More (Registered, Analytics, the Assistant and Invited live in the More sheet) */
   .o-nav-list li { min-width: 0; }
   .o-nav-list li:has([data-office-nav-item="leads"]) { order: 1; }
-  .o-nav-list li:has([data-office-nav-item="whatsapp"]) { order: 2; }
   .o-nav-list li:has([data-office-nav-item="gold"]) { order: 3; }
   .o-nav-more { display: block; order: 4; }
   .o-nav-list:has(.o-nav-more) li[data-nav-overflow] { display: none; }

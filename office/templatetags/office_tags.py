@@ -494,11 +494,11 @@ def pick_columns(columns, spec=""):
 
 @register.simple_tag
 def reach_primary(wa, em, secondary=False):
-    """Which channel button is the one primary: "wa", "email" or "". WhatsApp when he can be sent to on it (a chat or ready, staff may send, he has not
-    said STOP), else Email when it can send. Gold (`secondary`) has none, so Approve stays the one primary."""
+    """Which channel button is the one primary: "wa", "email" or "". WhatsApp when he has a mobile and the viewer can act, else Email when it can send. Gold (`secondary`) has none,
+    so Approve stays the one primary."""
     if secondary:
         return ""
-    if wa.get("state") in ("chat", "ready") and wa.get("can_edit") and not wa.get("opted_out"):
+    if wa.get("state") == "mobile" and wa.get("can_edit"):
         return "wa"
     if em.get("can_send") and not em.get("blocked"):
         return "email"

@@ -24,7 +24,7 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
 <script type="module" src="{% static 'common/js/office.js' %}"></script>
 {% block head_extra %}{% endblock %}
 </head>
-<body class="office" data-office-section="{{ section }}" data-wa-unread="{{ whatsapp_unread|default:0 }}" {% block body_attrs %}{% endblock %}>
+<body class="office" data-office-section="{{ section }}" {% block body_attrs %}{% endblock %}>
 {% include "office/_icons.html" %}
 <a class="skip-link" href="#office-main">Skip to content</a>
 <span class="o-sentinel" data-office-sentinel aria-hidden="true"></span>
@@ -38,7 +38,6 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
     {% if office_can.can_see_all %}<li data-nav-overflow><a href="{% url 'office_analytics' %}" data-office-nav-item="analytics"{% if section == "analytics" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="analytics" %}<span>Analytics</span></a></li>{% endif %}
     {% if office_can.can_see_all %}<li data-nav-overflow><a href="{% url 'office_people' %}" data-office-nav-item="people"{% if section == "people" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="people" %}<span>Registered</span></a></li>{% endif %}
     {% if office_can.can_see_all %}<li><a href="{% url 'office_leads' %}" data-office-nav-item="leads"{% if section == "leads" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="address-book" %}<span>Leads</span></a></li>{% endif %}
-    {% if office_can.can_see_all %}<li><a href="{% url 'office_whatsapp' %}" data-office-nav-item="whatsapp"{% if section == "whatsapp" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="whatsapp" %}<span>WhatsApp</span><span class="o-badge-count" data-region="nav-badge" data-office-badge="whatsapp">{% if whatsapp_unread %}{% if whatsapp_unread > 99 %}99+{% else %}{{ whatsapp_unread }}{% endif %}<span class="sr-only"> unread</span>{% endif %}</span></a></li>{% endif %}
     {% if office_can.can_outreach %}<li data-nav-overflow><a href="{% url 'office_outreach' %}" data-office-nav-item="outreach"{% if section == "outreach" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="list-checks" %}<span>{{ office_outreach_title }}</span></a></li>{% endif %}
     {% if office_can.can_export %}<li data-nav-overflow><a href="{% url 'office_invited' %}" data-office-nav-item="invited"{% if section == "invited" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="person-plus" %}<span>Invited</span></a></li>{% endif %}
     {% if office_can.can_see_all %}<li data-nav-overflow><a href="{% url 'office_chats' %}" data-office-nav-item="chats"{% if section == "chats" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="chat" %}<span>Assistant</span></a></li>{% endif %}
@@ -61,12 +60,10 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
 </dialog>
 {% endif %}
 
-{% if office_can.can_see_all %}{% include "whatsapp/_notify_sheet.html" %}{% endif %}
-
 <div class="o-body">
   <header class="o-header" data-office-header>
     <div class="o-header-left">
-      {% block header_left %}{% include "common/_mark.html" %}<span class="o-title">{% block header_title %}{% if section == "dashboard" %}Dashboard{% elif section == "analytics" %}Analytics{% elif section == "people" %}Registered{% elif section == "leads" %}Leads{% elif section == "gold" %}Gold{% elif section == "chats" %}Assistant{% elif section == "whatsapp" %}WhatsApp{% elif section == "email" %}Email{% elif section == "invited" %}Invited{% elif section == "outreach" %}{{ office_outreach_title }}{% endif %}{% endblock %}</span>{% endblock %}
+      {% block header_left %}{% include "common/_mark.html" %}<span class="o-title">{% block header_title %}{% if section == "dashboard" %}Dashboard{% elif section == "analytics" %}Analytics{% elif section == "people" %}Registered{% elif section == "leads" %}Leads{% elif section == "gold" %}Gold{% elif section == "chats" %}Assistant{% elif section == "email" %}Email{% elif section == "invited" %}Invited{% elif section == "outreach" %}{{ office_outreach_title }}{% endif %}{% endblock %}</span>{% endblock %}
     </div>
     <div class="o-header-right">
       {% block header_range %}{% endblock %}
@@ -75,7 +72,6 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
         <div class="o-menu">
           <p class="o-menu-name">{{ office_person.name }}</p>
           <p class="o-menu-role">{{ office_person.role }}</p>
-          {% if office_can.can_see_all %}<button type="button" class="o-menu-item o-menu-item--row" data-notify-open aria-haspopup="dialog">{% include "office/_icon.html" with name="bell" %}<span>Notifications</span><span class="o-menu-state" data-notify-state>Off</span></button>{% endif %}
           <a class="o-menu-item" href="{% url 'office_password' %}" data-change-password>Change password</a>
           <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit" class="o-menu-item">Sign out</button></form>
         </div>

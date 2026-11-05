@@ -185,10 +185,10 @@ class PermissionAndLinkTests(ActionsTestCase):
         decline = next(line.split(": ")[1] for line in email.body.splitlines() if line.startswith("Decline"))
         respond = next(line.split(": ")[1] for line in email.body.splitlines() if line.startswith("Respond"))
         self.assertTrue(decline.endswith("?do=decline") and respond.endswith("?do=respond"))
-        self.assertIn("?do=respond", email.alternatives[0][0])  # the link stays in the email; it now opens his WhatsApp chat
+        self.assertIn("?do=respond", email.alternatives[0][0])  # the link stays in the email; it now opens wa.me, or the Email pop-up with no mobile
         path = lambda url: "/" + url.split("/", 3)[3]  # noqa: E731
         self.assertContains(office(self.approver, path(decline)), 'data-gold-dialog="decline" data-open')
-        self.assertEqual(office(self.approver, path(respond)).url, f"/gold/{GoldApplication.objects.get().pk}/whatsapp/")
+        self.assertEqual(office(self.approver, path(respond)).url, "https://wa.me/447912345678")  # he gave a mobile: wa.me
         application = GoldApplication.objects.get()
         invites.decline_application(application, self.approver, REASON, channel="office")
         decided = office(self.approver, path(decline))

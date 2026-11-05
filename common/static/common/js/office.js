@@ -9,7 +9,7 @@ import { initSwap } from './office-swap.js';
 import { initCounts } from './office-dashboard.js';
 import { initTools } from './office-tools.js';
 import { initClamp } from './office-clamp.js';
-import { initPush } from './office-push.js';
+import { initApp } from './office-app.js';
 import { initMobileDialog } from './office-mobile.js';
 
 initButtons();
@@ -21,6 +21,5 @@ initSwap();
 initCounts();
 initTools();
 initClamp();
-initPush();
+initApp();
 initMobileDialog();
-if (document.querySelector('[data-wa-app]')) import('./office-whatsapp.js').then((m) => m.initWhatsApp());

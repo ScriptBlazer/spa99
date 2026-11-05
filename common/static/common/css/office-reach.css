@@ -1,0 +1,30 @@
+/* The reach out buttons and the Details rows on lead, person and Gold pages, and the timeline icon (docs/features/office-2.md). Kept from the removed WhatsApp chat styles. */
+/* always stacked, one channel a row: "Open WhatsApp chat" with its icon and count needs about 215px and half of a 335px card is 163px */
+.o-channels { display: grid; gap: var(--space-2); grid-column: 1 / -1; min-width: 0; }
+.o-channel { display: grid; gap: var(--space-1); align-content: start; min-width: 0; }
+.o-wa-btn { gap: var(--space-2); }
+.o-channel > .o-hint-line { margin: 0; text-align: center; }
+.o-channel > .o-hint-line .o-quiet { display: inline-flex; vertical-align: middle; min-height: 2.25rem; color: var(--office-text); text-decoration: underline; text-underline-offset: 0.2em; }
+@media (pointer: coarse) { .o-channel > .o-hint-line .o-quiet { min-height: 2.75rem; } }
+.o-channel-note { margin: 0; }
+.o-detail-rail .o-channels { margin-top: var(--space-3); }
+.o-channels + .o-actions-more { margin-top: var(--space-2); }
+.o-field-error--inline { display: block; margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--office-danger); }
+.o-field-error--inline a { color: inherit; text-underline-offset: 0.2em; }
+/* Details in the Reach out card: label left, plain value, a quiet Add or Change on the right. Rows wrap on a narrow card; every control is a full tap target */
+.o-details { margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--office-sunken); }
+.o-details-h { margin: 0 0 var(--space-1); font-size: var(--text-sm); font-weight: 600; color: var(--office-muted); }
+.o-details-rows { display: grid; margin: 0; }
+.o-details-rows > div { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 2.75rem; }
+.o-details-rows dt { flex: none; font-size: var(--text-sm); color: var(--office-muted); }
+.o-details-rows dd { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; column-gap: var(--space-2); min-width: 0; margin: 0; text-align: right; overflow-wrap: anywhere; }
+.o-details-rows .o-quiet { min-height: 2.75rem; padding-inline: var(--space-2); flex: none; color: var(--office-muted); }
+.o-mobile-hint { margin: var(--space-1) 0 0; color: var(--office-muted); font-size: var(--text-sm); }
+.o-dialog .o-mobile-parts { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+
+/* ---------- timeline lines ---------- */
+.o-tl-what { display: inline-flex; align-items: baseline; gap: var(--space-2); }
+.o-tl-icon { display: inline-flex; align-self: center; color: var(--office-muted); }
+.o-tl-icon .o-icon { width: 1rem; height: 1rem; }
+.o-tl-icon.o-danger { color: var(--office-danger); }
+.o-tl[data-kind="whatsapp_failed"] .o-tl-what { color: var(--office-danger); }

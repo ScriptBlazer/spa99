@@ -71,18 +71,6 @@
   --office-dur-thumb: 400ms;
   --office-dur-lift: 250ms;
 
-  /* ---------- WhatsApp chat (docs/features/whatsapp-design.md section 0, approved 2026-11-03). One new colour, the rest aliases. ---------- */
-  --office-wa-wall: var(--office-sunken);        /* thread wall: espresso 10.13, muted 5.38 */
-  --office-wa-in: var(--office-surface);         /* incoming bubble: espresso 12.19, muted 6.47 */
-  --office-wa-out: #F6E1C8;                      /* NEW: outgoing bubble, gold 35% over surface: espresso 9.74, muted 5.17, gold-text 4.61, danger 7.18 */
-  --office-wa-inset: rgb(73 46 33 / 0.07);       /* code, quote, PDF card inside a bubble */
-  --office-wa-pattern: 0.6;                      /* opacity of the swan layer on the wall (decoration) */
-  --office-wa-tick: var(--color-control-line);   /* queued, sent, delivered: 3.15 on out, 3.94 on surface */
-  --office-wa-tick-read: var(--office-text);     /* read: 9.74 on out */
-  --office-wa-list-w: clamp(19rem, 26vw, 24rem); /* chat list pane */
-  --office-wa-bubble-max: 36rem;                 /* longest bubble, desktop */
-  --office-wa-avatar: 3rem;                      /* list avatar (2.5rem in the thread header) */
-  --office-wa-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;  /* code only; the brand has no mono */
 
   /* ---------- surface names: the shared components (buttons, fields, messages) follow these (below) ---------- */
 }

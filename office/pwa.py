@@ -1,4 +1,4 @@
-"""The Office web app: the manifest and the service worker, served from the Office host root so the scope can be "/". Office URLconf only: the
+"""The Office as an installable app: the manifest and a service worker that does nothing else (no push), served from the Office host root so the scope can be "/". Office URLconf only: the
 public site, Control and System never serve or link them. Both are public files (no secrets in them); a manifest is fetched without cookies."""
 import json
 
@@ -27,7 +27,7 @@ def manifest(request):
 @login_not_required  # PUBLIC on purpose: the browser fetches the worker without cookies; it holds no secrets
 @require_GET
 def service_worker(request):
-    response = render(request, "whatsapp/sw.js", {"icon": static("common/img/app/icon-192.png"), "badge": static("common/img/app/badge-96.png")}, content_type="application/javascript")
+    response = render(request, "office/sw.js", content_type="application/javascript")
     response["Service-Worker-Allowed"] = "/"
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response

@@ -104,16 +104,25 @@ def display_name(target):
     return mobile_and_name(target)[1] or target.main
 
 
+def wa_link(mobile):
+    """`https://wa.me/<digits>` for a stored E.164 mobile, '' when there is none. Digits only, no plus: that is the form wa.me wants."""
+    digits = "".join(ch for ch in (mobile or "") if ch.isdigit())
+    return f"https://wa.me/{digits}" if digits else ""
+
+
 def whatsapp_context(target, user):
-    """`whatsapp` for the lead, person and Gold pages (design brief section 6): {configured, has_mobile, mobile, first_name, contact_url (opens his chat),
-    start_url, edit_url (POST first_name, mobile_country, mobile on a lead; mobile_country, mobile on a person or Gold page), can_send, can_edit, has_chat, window_open, window_closes_at,
-    opted_out, unread, thread_url}, plus `mobile_countries` for the add-a-mobile dialog."""
+    """`whatsapp` for the lead, person and Gold pages: {state ("mobile" or "none"), wa_link (https://wa.me/<digits>, "" with no mobile), has_mobile, mobile, first_name, edit_url (POST
+    first_name, mobile_country, mobile on a lead; mobile_country, mobile on a person or Gold page), can_edit, can_add_number, reason}, plus `mobile_countries` for the add-a-mobile dialog.
+    The button is a plain link: nothing here says a message was sent, because a wa.me click cannot be proven."""
     from common import phone
-    from whatsapp import services as whatsapp
 
     mobile, first = mobile_and_name(target)
-    edit = target.url("contact") if target.kind == "lead" else target.url("mobile")  # person and Gold: POST mobile_country, mobile
-    return {"whatsapp": whatsapp.page_context(mobile, user, can_edit(user), target.url("whatsapp"), edit, first, target), "mobile_countries": phone.countries()}
+    edit = target.url("contact") if target.kind == "lead" else target.url("mobile")
+    link = wa_link(mobile)
+    editor = can_edit(user)
+    return {"whatsapp": {"state": "mobile" if link else "none", "wa_link": link, "has_mobile": bool(link), "mobile": mobile or "", "first_name": first, "edit_url": edit, "can_edit": bool(editor),
+                         "can_add_number": bool(editor and not link), "reason": "" if link else ("Add a number to WhatsApp him." if editor else "No mobile on file.")},
+            "mobile_countries": phone.countries()}
 
 
 def email_context(target, user):
