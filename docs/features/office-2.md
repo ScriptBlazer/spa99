@@ -27,7 +27,7 @@ Estimated annual. Gold = count x 199. Memberships = each member's actual price i
 Gold shows £199 + VAT everywhere it appears, in the Office and on the public site. Moishe has decided this is fine (2026-11-05); membership prices already read excluding VAT.
 
 ## Leads
-- Shows everyone with no account and not on the Approach list. Filters: "Has a number" and "No number".
+- Shows everyone with no account, not archived and not on the Approach list. No number filters: new leads must give a mobile, and existing ones with none move to Archived after the group email.
 - Top cards: Leads and Registered only, true totals, tappable. Hot leads goes.
 - Added to the Approach list = gone from Leads. From the list he can go back to Leads or to Archive.
 - Phone: scrolling loads more by itself with a loading animation until the end. Show More no longer hidden behind the nav. Applies to every long list.
@@ -52,7 +52,7 @@ Gold shows £199 + VAT everywhere it appears, in the Office and on the public si
 ## Emails
 - Every automatic email and group send can choose its sender: a dropdown of staff with a @spa99.uk address, default hello@. Select, not type.
 - Group send to all leads, default wording from Barry, editable: asks them to join, which he personally approves for special discounts and prices, to WhatsApp him, and to give the number they have WhatsApp on. Includes an add-your-number link. Unsubscribe link stays.
-- Leads stay in Leads after the send, tagged Emailed.
+- After the send (Barry's method, 2026-11-05): leads the email reached with no mobile move to Archived, reason "Emailed, no number". Bounced ones stay in Leads with Possible fake. Leads with a mobile stay. Adding a number moves him to the Approach list. Lead totals drop accordingly.
 - **Add-your-number link:** a personal signed link to a small page with his email filled in. Saves the mobile, moves him to the Approach list. Refuses a taken number, tampered or expired link. No sign-in.
 
 ## Not doing
