@@ -114,6 +114,7 @@
 .o-back { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 2.75rem; padding-right: var(--space-3); color: var(--office-text); text-decoration: none; }
 .o-back .o-icon { width: 1.5rem; height: 1.5rem; }
 .o-header-right { display: flex; align-items: center; gap: var(--space-3); }
+@media (max-width: 63.99em) { .o-header { padding-top: 0.25rem; } }   /* a little air above the logo and the initials (Moishe, 2026-11-05) */
 @media (min-width: 64em) {
   .o-header { padding-inline: var(--space-5); }
   .o-header-left .mark { display: none; }

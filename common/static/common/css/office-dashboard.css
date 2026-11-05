@@ -174,10 +174,9 @@
 }
 
 /* ---------- Leads, Hot leads, Recent activity (OFFICE-LEADS 2): stored figures and two short lists ---------- */
-.o-leads { --pad-y: var(--space-4); --pad-x: var(--space-4); position: relative; }
-@media (max-width: 47.99em) { .o-leads { --pad-x: var(--space-3); } }
-@media (min-width: 64em) { .o-leads { --pad-y: var(--space-5); --pad-x: var(--space-5); } }
-.o-leads-body .o-more { position: absolute; top: calc(var(--pad-y) - 0.4375rem); right: var(--pad-x); }   /* top right, level with the title: no empty space under the figure (Moishe, 2026-11-05). 0.4375rem centres the 2.75rem tap target on the title line. */
+.o-leads-body { display: flex; justify-content: space-between; align-items: flex-end; align-items: last baseline; gap: var(--space-3); }   /* See all leads: bottom right, on the line of "gave their email" (Moishe, 2026-11-05) */
+.o-leads-new { min-width: 0; }
+.o-leads-body .o-more { flex: none; margin-block: -0.75rem; }   /* keeps the 2.75rem tap target without making the card taller */
 .o-leads .o-h3 { display: flex; align-items: center; gap: var(--space-2); }
 .o-lead-dot { width: 0.625rem; height: 0.625rem; flex: none; border-radius: 50%; background: var(--office-teal); }
 .o-leads-new, .o-leads-reg { display: grid; gap: var(--space-1); }
@@ -188,7 +187,7 @@
 .o-leads-label--muted { font-weight: 400; color: var(--office-muted); }
 .o-lbar { display: block; height: 0.625rem; margin-top: var(--space-2); border-radius: var(--office-pill); background: var(--office-clay-track); overflow: hidden; }
 .o-lbar-fill { display: block; height: 100%; width: max(calc(var(--share, 0) * 100%), 0.375rem); border-radius: var(--office-pill); background: var(--office-clay); transition: width var(--office-dur-morph) var(--ease-soft); }
-.o-leads-body .o-more { margin-top: 0; padding-inline: 0; }
+.o-leads-body .o-more { padding-inline: 0; }
 .js .o-leads.is-visible:not(.is-settled) .o-lbar-fill { animation: o-lbar-grow var(--office-dur-spark) var(--ease-soft) backwards; }
 @keyframes o-lbar-grow { from { width: 0.375rem; } }
 
@@ -213,7 +212,7 @@
 @media (hover: hover) and (pointer: fine) { .o-feed-row[href]:hover { background: var(--office-sunken); } }
 /* phone: the time goes under the text, so an email is never squeezed into a sliver */
 @media (max-width: 47.99em) {
-  .o-feed-row { display: grid; grid-template-columns: var(--office-feed-dot) minmax(0, 1fr); grid-template-areas: "dot text" ". when"; column-gap: var(--space-3); align-items: start; }
+  .o-feed-row { display: grid; grid-template-columns: var(--office-feed-dot) minmax(0, 1fr); grid-template-areas: "dot text" ". when"; column-gap: var(--space-2); padding-inline: 0; align-items: start; }   /* the icon lines up with the card title (Moishe, 2026-11-05) */
   .o-feed-dot { grid-area: dot; }
   .o-feed-text { grid-area: text; overflow-wrap: break-word; }
   .o-feed-row .o-latest-when { grid-area: when; text-align: left; }

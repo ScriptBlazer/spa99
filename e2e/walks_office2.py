@@ -46,6 +46,11 @@ def office2_home_tabs(w):
         for selector in (".o-greeting", ".o-gold-tile", ".o-waiting", ".o-hot", ".o-rings", ".o-range--header"):
             assert not page.locator(selector).first.is_visible(), f"{selector} shows on a phone"
         assert page.locator("a[href^='http']").count() == 0, "a link to another site is on Home"
+    with w.step("Lower Home on a phone: See all leads sits on the line of its words, bottom right; the initials have air above them", page):
+        assert page.locator("[data-person-menu] summary").bounding_box()["y"] >= 8
+        page.locator(".o-leads").scroll_into_view_if_needed()
+        words, link = page.locator(".o-leads-label").bounding_box(), page.locator(".o-leads .o-more").bounding_box()
+        assert abs((words["y"] + words["height"] / 2) - (link["y"] + link["height"] / 2)) < 4 and link["x"] > words["x"] + words["width"], (words, link)
     with w.step("The phone asks for All: a saved 7 days does not stick", page):
         page.goto(f"{OFFICE}/?range=7d")
         page.wait_for_function("() => document.querySelector('[data-range-form] input:checked')?.value === 'all'")

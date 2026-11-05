@@ -51,7 +51,7 @@
   --office-stat-lg: clamp(3rem, 3vw + 2rem, 4.5rem);          /* the Analytics hero number */
   --office-text-xs: 0.75rem;                                  /* ticks, badges, tab labels, table heads only */
   --office-nav-w: 15.5rem;
-  --office-header-h: 3.5rem;
+  --office-header-h: 3.75rem;
   --office-tabbar-h: 4rem;
   --office-ring: 6rem;
   --office-ring-pair: 7.5rem;                                 /* Office 2: two rings to a card on Home; --office-ring is too small for money on a phone and too big for a third of the page on a computer */
