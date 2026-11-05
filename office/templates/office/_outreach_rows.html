@@ -8,8 +8,8 @@
   {% else %}<td class="c-added" data-col="added"><span class="o-only-narrow">Added by </span>{{ r.added_by|first_word }}, {{ r.added_at|dm }}</td>{% endif %}
   <td class="c-action" data-col="action">{% if can_edit %}<div class="o-row-actions">
     {% if not r.done_at %}<form method="post" action="{{ r.done_url }}" data-outreach-act="done">{% csrf_token %}<button type="submit" class="btn btn-secondary btn-sm o-row-done" data-working-text="Saving">{% include "office/_icon.html" with name="check" %}Mark done</button></form>{% endif %}
-    {% if r.is_lead %}<form method="post" action="{{ r.to_leads_url }}" data-outreach-act="to-leads" class="o-row-first-quiet">{% csrf_token %}<button type="submit" class="o-quiet" data-working-text="Moving">Back to Leads</button></form>
-    <button type="button" class="o-quiet" data-dialog-open="archive" aria-haspopup="dialog" data-archive-url="{{ r.archive_url }}" data-archive-name="{{ r.name|first_word }}">Archive</button>
+    {% if r.is_lead %}{% if not r.done_at %}<form method="post" action="{{ r.to_leads_url }}" data-outreach-act="to-leads" class="o-row-first-quiet">{% csrf_token %}<button type="submit" class="o-quiet" data-working-text="Moving">Back to Leads</button></form>
+    <button type="button" class="o-quiet" data-dialog-open="archive" aria-haspopup="dialog" data-archive-url="{{ r.archive_url }}" data-archive-name="{{ r.name|first_word }}">Archive</button>{% endif %}
     {% else %}<form method="post" action="{{ r.remove_url }}" data-outreach-act="remove" class="o-row-first-quiet">{% csrf_token %}<button type="submit" class="o-quiet o-row-remove" data-confirm data-confirm-title="Take {{ r.name|first_word }} off the list?" data-confirm-body="Nothing is sent to him." data-confirm-label="Remove" data-confirm-cancel="Keep">Remove</button></form>{% endif %}
   </div>{% endif %}</td>
 </tr>

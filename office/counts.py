@@ -32,7 +32,7 @@ from gold.models import GoldApplication
 from insights.models import OfficeSnapshot
 from plans.models import Plan, SiteSettings, Subscription
 from plans.sales import sale_price
-from users.models import InterestRegistration
+from users.models import InterestRegistration, User
 
 from .models import MembershipReview
 
@@ -128,9 +128,10 @@ def revenue():
         row["count"] += 1
         row["year_pence"] += pence
     users, emails = {u for u, _ in held}, {e for _, e in held if e}
+    staff_emails = {e.strip().lower() for e in User.objects.filter(is_staff=True).values_list("email", flat=True) if e}  # one query, not one per application
     for application in GoldApplication.objects.filter(status__in=(GoldApplication.APPROVED, *GOLD_WAITING)).select_related("user").only("status", "user_id", "email", "user__is_staff"):
-        if application.user is not None and application.user.is_staff:
-            continue  # a staff member's own application
+        if (application.user is not None and application.user.is_staff) or (application.email or "").strip().lower() in staff_emails:
+            continue  # a staff member's own application (by his account or by his address)
         if application.user_id in users or (application.email or "").strip().lower() in emails:
             continue  # he is on a Tier: counted once, there
         bucket = APPROVED if application.status == GoldApplication.APPROVED else WAITING

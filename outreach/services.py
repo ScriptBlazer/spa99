@@ -327,7 +327,7 @@ def entry_archive(entry, actor, reason=""):
     with transaction.atomic():
         result, _ = archive_lead(email, actor, reason)
         if result in (DONE, ALREADY):
-            entry.delete()
+            OutreachEntry.objects.filter(lead_email=email).delete()  # his older Done entries too, or they would keep him out of Leads after Unarchive
     return result, email
 
 

@@ -176,6 +176,8 @@ class RevenueTests(Base):
             approvals.decide(person.pk, "approved", self.approver)
         pending, _ = gold_services.submit_application(application_data(email="staffer@example.com"))
         GoldApplication.objects.filter(pk=pending.pk).update(status="approved", user=staff)  # a staff member's own Gold application is not revenue either
+        other, _ = gold_services.submit_application(application_data(email="STAFFER@example.com"))
+        GoldApplication.objects.filter(pk=other.pk).update(status="approved", user=None)  # no account link, but his (staff) address
         row = next(r for r in self.figures()["revenue"]["approved"]["by_plan"] if r["slug"] == "tier-2")
         self.assertEqual(row["count"], 1)
         self.assertEqual(row["year_pence"], counts.to_pence(Plan.objects.get(slug="tier-2").price_ex_vat) * 12)
@@ -237,6 +239,12 @@ class RegisteredAndLeadsTests(Base):
         result = outreach.entry_to_leads(OutreachEntry.objects.get(done_at__isnull=True))
         self.assertEqual((result[0], OutreachEntry.objects.count()), (outreach.DONE, 0))
         self.assertEqual([r["email"] for r in call(self.reader, "get", "/leads/").context["rows"]], ["a@example.com"])  # really back in Leads
+        outreach.add_to_list(self.admin, lead_email="a@example.com")  # Archive from the list does the same: an older Done entry must not keep him out of Leads
+        outreach.mark_done(OutreachEntry.objects.get(), self.admin)
+        outreach.add_to_list(self.admin, lead_email="a@example.com")
+        outreach.entry_archive(OutreachEntry.objects.get(done_at__isnull=True), self.admin)
+        outreach.unarchive_lead("a@example.com", self.admin)
+        self.assertEqual(([r["email"] for r in call(self.reader, "get", "/leads/").context["rows"]], OutreachEntry.objects.count()), (["a@example.com"], 0))
         user = user_services.register_interest(cleaned(email="b@example.com")).user
         outreach.add_to_list(self.admin, user=user, reason="first")
         verify(user)  # registering takes him off the list (the row stays, hidden)
