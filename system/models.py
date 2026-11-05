@@ -274,7 +274,7 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
     leads_sort = models.CharField("Leads: sort", max_length=12, default="last_seen")
     leads_page_size = _number("Leads: rows per page", 25, 5, 200)
     list_page_size = _number("People and Gold lists: rows per page", 50, 5, 200)
-    dashboard_range = models.CharField("Dashboard: default range", max_length=5, default="7d")
+    dashboard_range = models.CharField("Dashboard: default range", max_length=5, default="all")
     analytics_range = models.CharField("Analytics: default range", max_length=5, default="30d")
     dashboard_hot_leads = _number("Dashboard: hot leads shown", 5, 1, 50)
     dashboard_activity = _number("Dashboard: activity shown", 10, 1, 50)

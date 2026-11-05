@@ -79,7 +79,7 @@
   body[data-under-home] [data-office-nav-item="dashboard"] { color: var(--office-text); }
   body[data-under-home] [data-office-nav-item="dashboard"] .o-icon { background: var(--office-sunken); }
   body[data-office-detail] .o-nav { display: none; }
-  .o-main { padding-bottom: calc(var(--office-tabbar-h) + env(safe-area-inset-bottom) + var(--space-5)); }
+  body .o-main { padding-bottom: calc(var(--office-tabbar-h) + env(safe-area-inset-bottom) + var(--space-5)); }   /* `body`: the plain .o-main padding further down must not win, or the end of every page sits behind the tab bar */
   body[data-office-detail] .o-main { padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom)); }
   body[data-has-bar] .o-main { padding-bottom: calc(var(--control-h) + var(--space-5) * 2 + env(safe-area-inset-bottom)); }
 }

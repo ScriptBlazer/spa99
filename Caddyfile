@@ -31,9 +31,10 @@
 }
 
 {$OFFICE_DOMAIN} {
-	# The Office takes no file uploads any more (the WhatsApp chat's photos and PDFs are gone), only small forms; this keeps anything bigger away from the app.
+	# The Office pages take only small forms (the WhatsApp chat's photos and PDFs are gone), but the Django admin on this host has file fields (Plan, Section and Facility images, the Gold
+	# guide: up to 5 MB). 6 MB leaves room for the form around a 5 MB file and keeps anything bigger away from the app.
 	request_body {
-		max_size 2MB
+		max_size 6MB
 	}
 	import app
 }

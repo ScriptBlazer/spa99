@@ -29,4 +29,3 @@
 .o-tl-icon { display: inline-flex; align-self: center; color: var(--office-muted); }
 .o-tl-icon .o-icon { width: 1rem; height: 1rem; }
 .o-tl-icon.o-danger { color: var(--office-danger); }
-.o-tl[data-kind="whatsapp_failed"] .o-tl-what { color: var(--office-danger); }

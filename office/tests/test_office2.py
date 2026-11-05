@@ -164,6 +164,22 @@ class RevenueTests(Base):
         approvals.decide(user.pk, "approved", self.approver)
         row = next(r for r in self.figures()["revenue"]["approved"]["by_plan"] if r["slug"] == "tier-2")
         self.assertEqual(row["year_pence"], 35000 * 12)
+        self.assertEqual(approvals.row(InterestRegistration.objects.get(user=user))["month_pence"], 35000)  # the Approvals row uses the same price rule
+
+    def test_cancelled_subscriptions_and_staff_registrations_are_left_out_of_revenue(self):
+        from datetime import date
+
+        cancelled, staff, kept = self.member("cancelled@example.com"), self.member("staffer@example.com"), self.member("kept@example.com")
+        Subscription.objects.create(registration=cancelled.interest, plan=cancelled.interest.plan, start_date=date(2026, 12, 1), agreed_price_ex_vat=Decimal("50.00"), status=Subscription.CANCELLED)
+        type(staff).objects.filter(pk=staff.pk).update(is_staff=True)
+        for person in (cancelled, staff, kept):
+            approvals.decide(person.pk, "approved", self.approver)
+        pending, _ = gold_services.submit_application(application_data(email="staffer@example.com"))
+        GoldApplication.objects.filter(pk=pending.pk).update(status="approved", user=staff)  # a staff member's own Gold application is not revenue either
+        row = next(r for r in self.figures()["revenue"]["approved"]["by_plan"] if r["slug"] == "tier-2")
+        self.assertEqual(row["count"], 1)
+        self.assertEqual(row["year_pence"], counts.to_pence(Plan.objects.get(slug="tier-2").price_ex_vat) * 12)
+        self.assertEqual(next(r for r in self.figures()["revenue"]["approved"]["by_plan"] if r["slug"] == "gold")["count"], 0)
 
 
 class RegisteredAndLeadsTests(Base):
@@ -212,6 +228,23 @@ class RegisteredAndLeadsTests(Base):
         counts.refresh_approvals()
         tiles = call(self.admin, "get", "/leads/").context["tiles"]
         self.assertEqual(tiles, {"leads_total": 1, "registered_total": 1})  # one lead left (b), one registered (a); "went on to register" is gone
+
+    def test_back_to_leads_removes_older_done_entries_and_adding_again_revives_an_entry_hidden_by_registering(self):
+        lead("a@example.com")
+        outreach.add_to_list(self.admin, lead_email="a@example.com")
+        outreach.mark_done(OutreachEntry.objects.get(), self.admin)
+        outreach.add_to_list(self.admin, lead_email="a@example.com")  # a second, open entry beside the done one
+        result = outreach.entry_to_leads(OutreachEntry.objects.get(done_at__isnull=True))
+        self.assertEqual((result[0], OutreachEntry.objects.count()), (outreach.DONE, 0))
+        self.assertEqual([r["email"] for r in call(self.reader, "get", "/leads/").context["rows"]], ["a@example.com"])  # really back in Leads
+        user = user_services.register_interest(cleaned(email="b@example.com")).user
+        outreach.add_to_list(self.admin, user=user, reason="first")
+        verify(user)  # registering takes him off the list (the row stays, hidden)
+        self.assertEqual(call(self.admin, "get", "/outreach/").context["counts"]["open"], 0)
+        result, entry = outreach.add_to_list(self.admin, user=user, reason="again")
+        self.assertEqual((result, OutreachEntry.objects.count(), entry.reason), (outreach.DONE, 1, "again"))
+        self.assertEqual(call(self.admin, "get", "/outreach/").context["counts"]["open"], 1)  # visible again
+        self.assertEqual(outreach.add_to_list(self.admin, user=user)[0], outreach.ALREADY)
 
     def test_the_emailed_tag_and_filters_follow_a_person_or_group_send_and_a_bounce_replaces_it_with_possible_fake(self):
         from mailings.models import Mailing, MailingRecipient

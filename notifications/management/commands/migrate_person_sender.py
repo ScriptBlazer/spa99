@@ -4,7 +4,7 @@ Before: one address for all automatic emails (System > Emails, `auto_email_from_
 as (`NotificationTemplate.sender_user`), hello@ when none. Until this has run, emails keep behaving as they did (the old person sender still works), so running it is a tidy-up, not a rescue.
 
 For every email that uses the person sender (its own setting, or its built-in default: the next-morning email): the staff member whose login or sending address is that address becomes its
-sender, and its old Site/Person setting is cleared. An email whose address matches nobody is left exactly as it is and listed, so nothing changes silently. Safe to run twice (a second run
+sender, and its old Site/Person setting is set to Site. An email whose address matches nobody is left exactly as it is and listed, so nothing changes silently. Safe to run twice (a second run
 finds nothing to do). The old address setting and the old Site/Person column stay in the database until a later release removes them.
 
     manage.py migrate_person_sender --dry-run     then without --dry-run."""
@@ -40,7 +40,7 @@ class Command(BaseCommand):
             moved += 1
             if not dry_run:
                 with transaction.atomic():
-                    row.sender_user, row.sender = match, ""
+                    row.sender_user, row.sender = match, "site"  # "site", not blank: a blank would fall back to the email's built-in person default if the Sender were ever cleared
                     row._history_user = None
                     row.save(update_fields=["sender_user", "sender", "updated_at"])
         self.stdout.write(f"{moved} email(s) {'would be moved' if dry_run else 'moved'}, {unmatched} left. The old address setting stays until a later release removes it.")

@@ -88,6 +88,7 @@ STARTERS = {
         "kind": "news",
         "group": "leads",
         "archive_no_number": True,
+        "sender_local_part": "barry",  # the Sender select starts on the team member whose address is barry@ (nothing is picked when nobody matches: hello@)
         "blocks": [
             {"type": PARAGRAPH, "text": "Hello {first_name},\n\nI would very much like you to join Spa 99. I approve each member personally, and those I approve receive special discounts and prices."},
             {"type": PARAGRAPH, "text": "Please WhatsApp me on {whatsapp_number}."},

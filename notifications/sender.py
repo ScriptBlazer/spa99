@@ -139,6 +139,15 @@ def staff_candidates():
     return out
 
 
+def candidate_by_local_part(local_part):
+    """The id (text) of the team member who can send as `<local_part>@...`, or "" when nobody matches (the select then stays on hello@)."""
+    wanted = (local_part or "").strip().lower()
+    for user, sender in staff_candidates():
+        if wanted and sender.address.partition("@")[0] == wanted:
+            return str(user.pk)
+    return ""
+
+
 def choice_label(user, sender):
     """`Barry Lobenstein <barry@spa99.uk>`: name first, then the address (two people can share a first name)."""
     name = full_name(user) or first_name(user) or sender.address

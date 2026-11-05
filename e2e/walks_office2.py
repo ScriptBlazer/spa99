@@ -7,7 +7,7 @@ import json
 import re
 
 from . import mailbox
-from .kit import OFFICE, PASSWORD, SITE, STAFF, SYSTEM, UNLOCK_CODE, answer_journey, dbtool, manage, no_horizontal_overflow, register_member, sign_in
+from .kit import OFFICE, PASSWORD, SITE, STAFF, SYSTEM, UNLOCK_CODE, answer_journey, dbtool, manage, no_horizontal_overflow, register_member, sign_in, tick
 
 BARRY = STAFF["barry"]["email"]
 DEV = STAFF["dev"]
@@ -26,8 +26,12 @@ def _shell(code):
     return output
 
 
+# Playwright's headless browser says "HeadlessChrome", which the site counts as a bot (a bot is never a lead): a normal browser's user agent.
+VISITOR_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+
 def _lead(w, email, mobile="07400 123451"):
-    page = w.page()
+    page = w.page(user_agent=VISITOR_AGENT)
     answer_journey(page, email=email, mobile=mobile)
     page.context.close()
 
@@ -39,7 +43,7 @@ def office2_home_tabs(w):
         page.wait_for_selector("[data-approval-cards]")
         assert page.locator("[data-approval-cards] .o-pair").count() == 3
         assert page.locator("[data-approval-cards] .o-pair-link[data-ring]").count() == 6
-        for selector in (".o-greeting", ".o-gold-tile", ".o-waiting", ".o-hot", ".o-range--header"):
+        for selector in (".o-greeting", ".o-gold-tile", ".o-waiting", ".o-hot", ".o-rings", ".o-range--header"):
             assert not page.locator(selector).first.is_visible(), f"{selector} shows on a phone"
         assert page.locator("a[href^='http']").count() == 0, "a link to another site is on Home"
     with w.step("The phone asks for All: a saved 7 days does not stick", page):
@@ -75,8 +79,10 @@ def office2_home_tabs(w):
     desktop = _barry(w, 1440, 900, mobile=False)
     with w.step("Computer: the cards sit side by side under the greeting, with the range bar", desktop):
         desktop.goto(f"{OFFICE}/")
+        desktop.wait_for_function("() => [...document.querySelectorAll('[data-card]')].every((el) => el.getAnimations().length === 0)")  # the rise (a short move up) has finished
         boxes = [desktop.locator(f"[data-card={name}]").bounding_box() for name in ("waiting", "approved", "revenue")]
-        assert boxes[0]["y"] == boxes[1]["y"] == boxes[2]["y"], boxes
+        assert max(b["y"] for b in boxes) - min(b["y"] for b in boxes) < 0.5, boxes  # same top edge (the cards are one row)
+        assert boxes[0]["x"] < boxes[1]["x"] < boxes[2]["x"], boxes
         assert desktop.locator(".o-range--header").is_visible() and desktop.locator(".o-greeting").is_visible()
 
 
@@ -97,8 +103,8 @@ def office2_approvals(w):
         rows = page.locator("[data-approval-row]")
         target = page.locator("[data-approval-row]", has_text="Ann Approval")
         height = target.bounding_box()["height"]
-        after = page.locator("[data-approval-row]", has_text="Ben Approval")
-        before_y = after.bounding_box()["y"] if rows.count() > 1 else None
+        after = target.locator("xpath=following-sibling::tr[1]")   # the row under his thumb
+        before_y = after.bounding_box()["y"] if after.count() else None
         waiting_before = int(page.locator("[data-tab=waiting] [data-tab-count]").inner_text().replace(",", ""))
         target.locator("[data-decision=approve] button").click()
         page.wait_for_selector("[data-approval-row].o-approval--strip")
@@ -154,7 +160,7 @@ def office2_leads_list(w):
         assert page.locator("[data-hot-tile], [data-went-on-to-register]").count() == 0
         row = page.locator("[data-lead-row]", has_text=email)
         row.click()  # anywhere on the row
-        page.wait_for_url(re.compile(r"/leads/"))
+        page.wait_for_url(re.compile(r"/leads/[0-9a-f-]{36}/"))
     with w.step("The WhatsApp button is a wa.me link with the number in digits; Email beside it; Add to list is a quiet link", page):
         link = page.locator("a[data-whatsapp-open]")
         assert link.get_attribute("href") == "https://wa.me/447400123451", link.get_attribute("href")
@@ -193,12 +199,13 @@ def office2_leads_list(w):
 
 
 def office2_group_send(w):
-    with_mobile, without = "office2-has@example.test", "office2-none@example.test"
-    _lead(w, with_mobile)
-    _lead(w, without)
-    dbtool("clear-lead-mobile", without)
+    with_mobile, without, bounce = "office2-has@example.test", "office2-none@example.test", "office2-bounce@example.test"
+    _lead(w, with_mobile, "07400 123453")
+    _lead(w, without, "07400 123454")
+    _lead(w, bounce, "07400 123455")
+    dbtool("clear-lead-mobile", without)   # these two gave a number at the gate (it is required); an older lead has none
+    dbtool("clear-lead-mobile", bounce)
     dev = w.page(width=1440, height=1000)
-    sign_in(dev, f"{SYSTEM}", DEV["email"], PASSWORD) if False else None
     dev.goto(f"{SYSTEM}/dev-login/")
     dev.locator("input[name=username]").fill(DEV["email"])
     dev.locator("input[name=password]").fill(PASSWORD)
@@ -209,23 +216,24 @@ def office2_group_send(w):
         dev.locator("[data-system-unlock] input[name=code]").fill(UNLOCK_CODE)
         with dev.expect_navigation():
             dev.locator("[data-system-unlock] button[type=submit]").click()
-    with w.step("Barry's invitation: the sender is a dropdown, the button is the Add your number link", dev):
+    with w.step("Barry's invitation: the sender is a dropdown, the button is the Add your number link (preview is a frame)", dev):
         dev.goto(f"{SYSTEM}/emails/mailings/new/?start=barry_invitation")
         dev.wait_for_selector("select[name=sender_user]")
         assert dev.locator("select[name=sender_user] option").count() >= 2
-        assert "Add your number" in dev.locator("[data-se-preview], .se-preview").first.inner_text()
-        dev.locator("[data-se-send], button:has-text('Save draft')").first.click()
+        dev.frame_locator("iframe[data-se-frame]").get_by_text("Add your number").first.wait_for()   # the preview is a frame: its words are not in the page's own text
+        dev.locator("[data-se-save-draft]").click()
         dev.wait_for_url(re.compile(r"/emails/mailings/[0-9a-f-]{36}/"))
     with w.step("Send asks first and says who moves: those with a mobile stay, those without go to Archived", dev):
-        dev.locator("[data-se-confirm-send], button:has-text('Send to')").first.click()
+        dev.wait_for_selector("[data-se-bar] [data-se-send]:not([aria-disabled='true'])")   # the count has come back
+        dev.locator("[data-se-bar] [data-se-send]").click()
         dev.wait_for_selector("dialog.fb-modal[open] [data-se-moves]")
         text = dev.locator("dialog.fb-modal[open] [data-se-moves]").inner_text()
-        assert "stay in Leads" in text or "stays in Leads" in text
-        assert "Archived" in text and "Emailed, no number" in text
+        assert "stay in Leads" in text or "stays in Leads" in text, text
+        assert "Archived" in text and "Emailed, no number" in text, text
         dev.locator("dialog.fb-modal[open] [data-fb-ok]").click()
-        dev.wait_for_timeout(2500)
-    message = mailbox.wait_for(with_mobile, "A word from Barry")
-    link = mailbox.link(message, "/add-number/")
+        dev.wait_for_url(re.compile(r"/emails/mailings/[0-9a-f-]{36}/$"))   # the detail page: sending has started
+    mailbox.wait_for(with_mobile, "A word from Barry")
+    mailbox.wait_for(without, "A word from Barry")
     barry = _barry(w, 1440, 900, mobile=False)
     with w.step("The one with a mobile stays in Leads tagged Emailed; the one without is in Archived (Group email)", barry):
         barry.goto(f"{OFFICE}/leads/?range=all&emailed=1")
@@ -234,28 +242,27 @@ def office2_group_send(w):
         archived = barry.locator("[data-lead-row]", has_text=without).inner_text()
         assert "Emailed, no number" in archived and "Group email" in archived, archived
     with w.step("His own link opens the add-your-number page; he adds a number and lands on the Approach list", barry):
-        public = w.page(width=375, height=667, mobile=True)
-        mail = mailbox.wait_for(without, "A word from Barry") if mailbox.find(without, "A word from Barry") else None
-        link = mailbox.link(mail, "/add-number/") if mail else link
+        link = mailbox.link(mailbox.wait_for(without, "A word from Barry"), "/add-number/")
+        public = w.page(width=375, height=667, mobile=True, user_agent=VISITOR_AGENT)
         public.goto(link)
         public.wait_for_selector("[data-add-number]")
-        assert public.locator("button[type=submit]").bounding_box()["y"] < 667, "the button is below the fold at 375 by 667"
+        assert public.locator("[data-add-number] button[type=submit]").bounding_box()["y"] < 667, "the button is below the fold at 375 by 667"
         public.locator("#id_mobile").fill("07911 123499")
-        public.locator("#id_consent").check()
-        public.locator("button[type=submit]").click()
+        tick(public, "consent")
+        public.locator("[data-add-number] button[type=submit]").click()
         public.wait_for_selector("h1:has-text('Thank you.')")
         barry.goto(f"{OFFICE}/outreach/")
-        assert barry.locator("[data-outreach-row]").filter(has_text=re.compile("office2-")).count() >= 1
+        assert barry.locator("[data-outreach-row]", has_text=without).count() == 1, "he is not on the Approach list"
         barry.goto(f"{OFFICE}/leads/?view=archived")
-        assert barry.locator("[data-lead-row]", has_text=link and (without if mail else with_mobile)).count() == 0
-    with w.step("A bounce after the send brings an archived lead back to Leads as Possible fake", barry):
-        out = _shell(
-            "from outreach import services as s\nfrom notifications import suppression\nfrom notifications.models import EmailSuppression\n"
-            "from outreach.models import ArchivedLead\nfrom django.contrib.auth import get_user_model\n"
-            "s.archive_after_group_email('office2-bounce@example.test')\n"
-            "suppression.add('office2-bounce@example.test', EmailSuppression.HARD_BOUNCE)\n"
-            "s.return_bounced_lead('office2-bounce@example.test')\nprint('ARCH', ArchivedLead.objects.filter(email='office2-bounce@example.test').count())")
-        assert "ARCH 0" in out, out
+        assert barry.locator("[data-lead-row]", has_text=without).count() == 0, "he is still in Archived"
+    with w.step("A permanent bounce after the send brings an archived lead back to Leads as Possible fake", barry):
+        barry.goto(f"{OFFICE}/leads/?view=archived")
+        assert barry.locator("[data-lead-row]", has_text=bounce).count() == 1, "the one with no number was not archived by the send"
+        _shell(f"from notifications import suppression\nfrom notifications.models import EmailSuppression\nsuppression.add('{bounce}', EmailSuppression.HARD_BOUNCE)\nprint('BOUNCED')")
+        barry.goto(f"{OFFICE}/leads/?view=archived")
+        assert barry.locator("[data-lead-row]", has_text=bounce).count() == 0, "he is still archived after the bounce"
+        barry.goto(f"{OFFICE}/leads/?range=all")
+        assert barry.locator("[data-lead-row]", has_text=bounce).locator("[data-possible-fake]").count() == 1, "he is not back in Leads as Possible fake"
 
 
 def office2_autoload(w):
@@ -290,7 +297,11 @@ def office2_autoload(w):
     with w.step("No sideways scroll, and the last row clears the tab bar", page):
         ok, wide, inner = no_horizontal_overflow(page)
         assert ok, f"{wide}px in {inner}px"
-        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        for _ in range(12):  # scrolling to the bottom loads more rows, which makes the page longer: keep going until the end row is there and the page is at its very bottom
+            page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
+            page.wait_for_timeout(500)
+            if page.locator("[data-end-row]").count() == 1 and page.evaluate("() => scrollY + innerHeight >= document.documentElement.scrollHeight - 2"):
+                break
         end = page.locator("[data-end-row]").bounding_box()
         bar = page.locator("[data-office-nav]").bounding_box()
         assert end["y"] + end["height"] <= bar["y"] + 1, (end, bar)

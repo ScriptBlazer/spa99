@@ -149,9 +149,25 @@ def add_to_list(actor, user=None, lead_email="", application=None, reason=""):
         try:
             with transaction.atomic():
                 entry = OutreachEntry.objects.create(reason=reason, added_by=_actor(actor), added_by_label=label(actor), **target)
-        except IntegrityError:  # a double submit that raced past the check
-            return ALREADY, OutreachEntry.objects.filter(**target, done_at__isnull=True).first()
+        except IntegrityError:  # an open entry for this target exists: a double submit that raced past the check, or one hidden because he registered after he was added
+            return _revive_or_already(target, actor, reason)
     _figures_changed()  # a lead on the list is not in Leads: the stored Leads total follows
+    return DONE, entry
+
+
+def _revive_or_already(target, actor, reason):
+    """The target already has an open entry. If the list shows it, he is already on it (ALREADY). If registering hid it (see `open_entries`), put it back as a fresh add: new time, adder and reason,
+    so staff adding him again really gets him on the list. Returns (DONE | ALREADY, entry)."""
+    from . import listing
+
+    entry = OutreachEntry.objects.filter(**target, done_at__isnull=True).first()
+    if entry is None:
+        return ALREADY, None
+    if listing.with_state(OutreachEntry.objects.filter(pk=entry.pk)).filter(listing.NOT_AFTER_ADDED).exists():
+        return ALREADY, entry
+    entry.added_at, entry.added_by, entry.added_by_label, entry.reason = timezone.now(), _actor(actor), label(actor), reason
+    entry.save(update_fields=["added_at", "added_by", "added_by_label", "reason"])
+    _figures_changed()
     return DONE, entry
 
 
@@ -298,7 +314,7 @@ def entry_to_leads(entry):
     if not entry.lead_email:
         return MISSING, "", ""
     email, reason = entry.lead_email, entry.reason
-    entry.delete()
+    OutreachEntry.objects.filter(lead_email=email).delete()  # his older Done entries too: any row (open or done) keeps a lead out of Leads (see approach_entries)
     _figures_changed()
     return DONE, email, reason
 

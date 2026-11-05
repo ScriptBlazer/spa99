@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -22,13 +23,26 @@ from notifications import emailbody, emailsettings, ses
 from notifications import sender as sender_mod
 from notifications.models import EmailLog
 from notifications.seed import DEFAULT_SUBJECTS
-from notifications.services import fill_subject, preview_email, send_templated
+from notifications.services import fill_subject, preview_email as _preview_email, send_templated
 
 from . import audit, emails as logic, services
 from .models import SystemEvent
 from .permissions import unlocked
 from .forms import FooterForm
 from .views import _edit_site, form_status, page, saved
+
+
+FONT_FILES = ("signika-latin.woff2", "figtree-latin.woff2")
+
+
+def preview_email(*args, **kwargs):
+    """The email as it would look, for the preview frames. A real email names its two fonts on the public site (a mail app has no site of its own); the preview frame is a page of the System host,
+    and a font from another host needs that host's permission (CORS), which the browser refuses: the preview showed a console error and a fallback font. The preview reads the same files from the
+    System host instead (the file the email names is the same one). What is sent is not touched."""
+    result = _preview_email(*args, **kwargs)
+    for name in FONT_FILES:
+        result["html"] = result["html"].replace(f"{settings.SITE_URL}/static/common/fonts/{name}", static(f"common/fonts/{name}"))
+    return result
 
 
 def _wants_json(request):
@@ -271,8 +285,10 @@ def _starter_fields(start):
         return {}
     from mailings.blocks import STARTERS
 
+    starter = STARTERS.get(start.key, {}) if start.key else {}
     return {"name": start.name, "subject": start.subject, "kind": start.kind, "group": start.group,
-            "archive_no_number": bool(start.key and STARTERS.get(start.key, {}).get("archive_no_number"))}  # Barry's invitation moves leads with no mobile once sent
+            "archive_no_number": bool(starter.get("archive_no_number")),  # Barry's invitation moves leads with no mobile once sent
+            "sender_user": sender_mod.candidate_by_local_part(starter.get("sender_local_part"))}  # ... and goes out as Barry
 
 
 @unlocked

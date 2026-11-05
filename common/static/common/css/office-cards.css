@@ -25,6 +25,16 @@ html.js:not(.no-reveal) .o-pair[data-draw]:not(.is-visible) .o-pair-arc { stroke
 .js .o-pair[data-draw].is-visible .o-pair-arc { animation: o-ring-draw var(--office-dur-ring) var(--ease-soft) backwards; }
 @media (min-width: 64em) { .js .o-pair[data-draw].is-visible [data-ring="memberships"] .o-pair-arc { animation-delay: 100ms; } }
 @media (prefers-reduced-motion: reduce) { .o-pair .o-pair-arc { animation: none !important; } }
+/* phone: compact, so all three cards fit on one screen above the tab bar (Moishe, 2026-11-05) */
+@media (max-width: 63.99em) {
+  .o-cards-approval { gap: var(--space-3); }
+  .o-card.o-pair { gap: var(--space-2); padding: var(--space-3); --office-ring-pair: 4.25rem; }
+  .o-pair-title { font-size: var(--text-base); }
+  .o-pair-sub { margin-top: calc(var(--space-1) * -1); font-size: var(--office-text-xs); }
+  .o-pair-link { gap: var(--space-1); padding: 0; }
+  .o-pair-num { font-size: 1.0625rem; }
+  .o-pair-text { gap: 0; font-size: 0.8125rem; }
+}
 
 /* ---------- navigation pieces for the new pages ---------- */
 .o-back--icon { padding-right: 0; min-width: 2.75rem; }

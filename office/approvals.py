@@ -12,7 +12,6 @@ from django.urls import reverse
 from django.utils import timezone
 
 from gold import audit
-from plans.sales import sale_price
 from users.models import InterestRegistration
 
 from . import counts
@@ -31,7 +30,7 @@ def status_from(get):
 
 def queryset(status, q="", plan=""):
     """The people in one list, newest first (waiting: by when they registered; approved and declined: by when Barry decided)."""
-    found = counts.with_review(counts.membership_people()).filter(review_status=status).select_related("user", "plan", "review")
+    found = counts.with_review(counts.membership_people()).annotate(agreed=counts.agreed_subquery()).filter(review_status=status).select_related("user", "plan", "review")
     for word in (q or "").split():
         found = found.filter(Q(user__email__icontains=word) | Q(user__first_name__icontains=word) | Q(user__last_name__icontains=word))
     if plan:
@@ -39,15 +38,6 @@ def queryset(status, q="", plan=""):
     if status == WAITING:
         return found.order_by("-created_at", "-pk")
     return found.annotate(decided_at=Coalesce("review__at", "created_at")).order_by("-decided_at", "-pk")
-
-
-def price_of(reg):
-    """His own price, a month, in pence excluding VAT, and whether it is a kept sale price (the Waiting row reads "Tier 2, £249 a month (sale price)"). The list price when he holds no sale."""
-    if reg.plan is None:
-        return None, False
-    if reg.sale_percent_off and not reg.sale_expired_at:
-        return counts.to_pence(sale_price(reg.plan, reg.sale_percent_off)), True
-    return counts.to_pence(reg.plan.price_ex_vat), False
 
 
 def _url(name, *args):
@@ -61,7 +51,7 @@ def row(reg):
         review = reg.review
     except MembershipReview.DoesNotExist:
         review = None
-    pence, sale = price_of(reg)
+    pence, sale = counts.month_pence(reg)
     status = getattr(reg, "review_status", WAITING)
     return {"id": str(user.pk), "name": user.get_full_name() or user.email, "email": user.email, "plan": reg.plan.name if reg.plan_id else "", "plan_slug": reg.plan.slug if reg.plan_id else "",
             "month_pence": pence, "sale": sale, "registered": reg.created_at.isoformat(), "status": status,

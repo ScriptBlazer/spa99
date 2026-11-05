@@ -30,7 +30,7 @@ class LegalPageTests(TestCase):
                 self.assertContains(response, "16930909")
                 self.assertContains(response, "40 Wellington Avenue, London N15 6AS")
                 self.assertContains(response, 'href="mailto:desk@example.com"')
-                self.assertContains(response, "Last updated 3 November 2026" if path == "/privacy/" else "Last updated 26 October 2026")
+                self.assertContains(response, "Last updated 5 November 2026" if path == "/privacy/" else "Last updated 26 October 2026")
                 self.assertNotContains(response, "To be supplied")
                 self.assertNotContains(response, "{contact}")
 
@@ -164,7 +164,7 @@ class InviteOpenNoticeTests(TestCase):
         call_command("backfill_site_data", stdout=StringIO())
         self.assertIn("tracking pixel", rows.get(key="part_2").body)
         self.assertIn("### WhatsApp", rows.get(key="part_2").body)
-        self.assertEqual(rows.get(key="updated").body, "3 November 2026")
+        self.assertEqual(rows.get(key="updated").body, "5 November 2026")
         rows.filter(key="part_2").update(body="Edited by hand.")
         call_command("backfill_site_data", stdout=StringIO())
         self.assertEqual(rows.get(key="part_2").body, "Edited by hand.")
@@ -181,6 +181,22 @@ class InviteOpenNoticeTests(TestCase):
         self.assertIn("privacy part_2: WhatsApp block", out.getvalue())
         self.assertEqual(rows.get(key="part_2").body, old)
         call_command("backfill_site_data", stdout=StringIO())
-        self.assertIn("Reply STOP", rows.get(key="part_2").body)
-        self.assertEqual(rows.get(key="updated").body, "3 November 2026")
-        self.assertEqual(SiteSettings.load().privacy_version, "2026-11-03")  # new sign-ups record it; nobody is asked to accept again
+        self.assertIn("from their own phone", rows.get(key="part_2").body)
+        self.assertEqual(rows.get(key="updated").body, legal.PRIVACY_UPDATED)
+        self.assertEqual(SiteSettings.load().privacy_version, legal.PRIVACY_VERSION)  # new sign-ups record it; nobody is asked to accept again
+
+    def test_backfill_replaces_the_twilio_whatsapp_wording_and_a_dry_run_changes_nothing(self):
+        seed_all()
+        rows = Section.objects.filter(page__key="privacy")
+        old = rows.get(key="part_2").body.replace(legal.WHATSAPP_BLOCK, legal.OLD_WHATSAPP_BLOCK)
+        rows.filter(key="part_2").update(body=old)
+        rows.filter(key="updated").update(body="5 November 2026")
+        SiteSettings.objects.filter(singleton_key="site").update(privacy_version="2026-11-03")
+        call_command("backfill_site_data", "--dry-run", stdout=StringIO())
+        self.assertEqual(rows.get(key="part_2").body, old)
+        call_command("backfill_site_data", stdout=StringIO())
+        body = rows.get(key="part_2").body
+        self.assertNotIn("Twilio", body)
+        self.assertNotIn("Reply STOP", body)
+        self.assertEqual(body.count("### WhatsApp"), 1)
+        self.assertEqual(SiteSettings.load().privacy_version, legal.PRIVACY_VERSION)

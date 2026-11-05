@@ -5,7 +5,7 @@
 .o-greeting h1 { font-size: var(--text-xl); }
 .o-greeting .o-lead { margin-top: var(--space-2); }
 /* Phone (office-2-design.md section 1): no greeting, no Gold applications, no Waiting for you, no Hot leads. The range stays on All (office-swap.js asks for it). */
-@media (max-width: 63.99em) { .o-dash > .o-greeting, .o-dash > .o-gold-tile, .o-dash > .o-waiting, .o-dash > .o-hot { display: none; } }
+@media (max-width: 63.99em) { .o-dash > .o-greeting, .o-dash > .o-gold-tile, .o-dash > .o-waiting, .o-dash > .o-hot, .o-dash > .o-rings { display: none; } }
 @media (min-width: 64em) {
   .o-dash { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gutter); }
   .o-greeting { grid-column: 1 / -1; grid-row: 1; }
@@ -174,7 +174,10 @@
 }
 
 /* ---------- Leads, Hot leads, Recent activity (OFFICE-LEADS 2): stored figures and two short lists ---------- */
-.o-leads-body { display: grid; gap: var(--space-4); }
+.o-leads { --pad-y: var(--space-4); --pad-x: var(--space-4); position: relative; }
+@media (max-width: 47.99em) { .o-leads { --pad-x: var(--space-3); } }
+@media (min-width: 64em) { .o-leads { --pad-y: var(--space-5); --pad-x: var(--space-5); } }
+.o-leads-body .o-more { position: absolute; top: calc(var(--pad-y) - 0.4375rem); right: var(--pad-x); }   /* top right, level with the title: no empty space under the figure (Moishe, 2026-11-05). 0.4375rem centres the 2.75rem tap target on the title line. */
 .o-leads .o-h3 { display: flex; align-items: center; gap: var(--space-2); }
 .o-lead-dot { width: 0.625rem; height: 0.625rem; flex: none; border-radius: 50%; background: var(--office-teal); }
 .o-leads-new, .o-leads-reg { display: grid; gap: var(--space-1); }

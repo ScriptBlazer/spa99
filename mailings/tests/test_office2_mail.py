@@ -110,13 +110,21 @@ class SenderTests(Base):
         self.assertFalse(NotificationTemplate.objects.filter(sender_user__isnull=False).exists())  # a dry run writes nothing
         call_command("migrate_person_sender", stdout=StringIO())
         row = NotificationTemplate.objects.get(key="lead_next_morning")
-        self.assertEqual((row.sender_user, row.sender), (barry, ""))
+        self.assertEqual((row.sender_user, row.sender), (barry, "site"))
         out = StringIO()
         call_command("migrate_person_sender", stdout=out)
         self.assertIn("0 email(s) moved", out.getvalue())  # safe to run twice
 
 
 class GroupSendToLeadsTests(Base):
+    def test_barrys_starter_opens_with_barry_as_the_sender_and_other_starters_stay_on_hello(self):
+        from system.tests.test_system import make_user, unlocked_client
+
+        barry = staff("barry@spa99.test")
+        client = unlocked_client(make_user())
+        self.assertEqual(str(client.get("/emails/mailings/new/?start=barry_invitation").context["form"]["sender_user"].value()), str(barry.pk))
+        self.assertFalse(client.get("/emails/mailings/new/?start=booking_open").context["form"]["sender_user"].value())
+
     def test_barrys_starter_and_the_confirm_say_who_will_move_and_the_placeholders_are_filled_per_lead(self):
         from mailings import blocks
         from system.tests.test_system import make_user, unlocked_client

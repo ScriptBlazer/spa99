@@ -13,6 +13,7 @@ REVENUE ("approved" and "waiting" are the same two words as above; declined coun
   Gold         the number of Gold applications x Plan.annual_fee of the Gold plan (never a typed 199), excluding VAT. An applicant who holds a non-declined Tier registration is not counted
                here: he is counted at his Tier.
   Memberships  each member's own monthly price x 12, excluding VAT: an active subscription's agreed price when it has one, else the kept sale price (while it is held), else the plan's price.
+  Left out      declined people, a staff member's own registration or Gold application (a test), and a registration whose subscription is cancelled (and not active again).
   Possible     the same sums for the people still waiting. Never added to the approved figures.
 Everything is kept in whole pence (integers), excluding VAT, in the stored snapshot; VAT is added when it is shown, from the VAT setting, and nothing is rounded until display.
 
@@ -23,7 +24,7 @@ WHERE THE NUMBERS LIVE
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import transaction
-from django.db.models import Count, OuterRef, Subquery, Value
+from django.db.models import Count, Exists, OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -75,13 +76,29 @@ def gold_counts():
 
 # ---------- revenue (whole pence, excluding VAT) ----------
 
-def _member_month_pence(plan, sale_percent, sale_expired, agreed):
-    """One member's monthly price in pence: his active subscription's agreed price, else the kept sale price, else the plan price."""
+def agreed_subquery():
+    """Annotation for a registration queryset: the agreed price of his active subscription (None when he has none). Used as `.annotate(agreed=agreed_subquery())`."""
+    return Subquery(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.ACTIVE).order_by("-created_at").values("agreed_price_ex_vat")[:1])
+
+
+def agreed_price(reg):
+    """The same figure for one registration: the annotation when the queryset carried it, else one query."""
+    if hasattr(reg, "agreed"):
+        return reg.agreed
+    return Subscription.objects.filter(registration=reg, status=Subscription.ACTIVE).order_by("-created_at").values_list("agreed_price_ex_vat", flat=True).first()
+
+
+def month_pence(reg):
+    """THE price rule, used by Revenue and by the Approvals rows: one member's monthly price in pence, excluding VAT, and whether it is a kept sale price.
+    His active subscription's agreed price, else the kept sale price (while held), else the plan's price. (None, False) when he has no plan."""
+    if reg.plan is None:
+        return None, False
+    agreed = agreed_price(reg)
     if agreed is not None:
-        return to_pence(agreed)
-    if sale_percent and not sale_expired:
-        return to_pence(sale_price(plan, sale_percent))
-    return to_pence(plan.price_ex_vat)
+        return to_pence(agreed), False
+    if reg.sale_percent_off and not reg.sale_expired_at:
+        return to_pence(sale_price(reg.plan, reg.sale_percent_off)), True
+    return to_pence(reg.plan.price_ex_vat), False
 
 
 def _blank(bucket_plans):
@@ -97,20 +114,23 @@ def revenue():
     layout = [{"slug": p.slug, "name": p.name, "kind": "tier"} for p in tiers] + [{"slug": GOLD_SLUG, "name": gold_plan.name if gold_plan else "Gold Card", "kind": "gold"}]
     buckets = {APPROVED: _blank(layout), WAITING: _blank(layout)}
     rows_by_slug = {bucket: {row["slug"]: row for row in data["by_plan"]} for bucket, data in buckets.items()}
-    agreed = Subquery(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.ACTIVE).order_by("-created_at").values("agreed_price_ex_vat")[:1])
+    cancelled = Exists(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.CANCELLED))
+    active = Exists(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.ACTIVE))
     held = []  # (user id, lower email) of everyone holding a non-declined Tier registration: his Gold application is not added on top
-    for reg in with_review(InterestRegistration.objects.filter(plan__kind=Plan.MONTHLY).select_related("plan", "user")).annotate(agreed=agreed).iterator():
-        if reg.review_status == DECLINED:
-            continue
+    for reg in with_review(InterestRegistration.objects.filter(plan__kind=Plan.MONTHLY).select_related("plan", "user")).annotate(agreed=agreed_subquery(), has_cancelled=cancelled, has_active=active).iterator():
+        if reg.review_status == DECLINED or reg.user.is_staff or (reg.has_cancelled and not reg.has_active):
+            continue  # not revenue: declined, a staff member's own (test) registration, or a membership whose subscription was cancelled
         held.append((reg.user_id, (reg.user.email or "").strip().lower()))
         row = rows_by_slug[reg.review_status].get(reg.plan.slug)
         if row is None:
             continue
-        pence = _member_month_pence(reg.plan, reg.sale_percent_off, reg.sale_expired_at, reg.agreed) * 12
+        pence = month_pence(reg)[0] * 12
         row["count"] += 1
         row["year_pence"] += pence
     users, emails = {u for u, _ in held}, {e for _, e in held if e}
-    for application in GoldApplication.objects.filter(status__in=(GoldApplication.APPROVED, *GOLD_WAITING)).only("status", "user_id", "email"):
+    for application in GoldApplication.objects.filter(status__in=(GoldApplication.APPROVED, *GOLD_WAITING)).select_related("user").only("status", "user_id", "email", "user__is_staff"):
+        if application.user is not None and application.user.is_staff:
+            continue  # a staff member's own application
         if application.user_id in users or (application.email or "").strip().lower() in emails:
             continue  # he is on a Tier: counted once, there
         bucket = APPROVED if application.status == GoldApplication.APPROVED else WAITING
