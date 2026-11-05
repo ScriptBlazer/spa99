@@ -12,7 +12,8 @@ A Tier member who also applied for Gold counts in both Waiting figures (two diff
 REVENUE ("approved" and "waiting" are the same two words as above; declined counts in neither)
   Gold         the number of Gold applications x Plan.annual_fee of the Gold plan (never a typed 199), excluding VAT. An applicant who holds a non-declined Tier registration is not counted
                here: he is counted at his Tier.
-  Memberships  each member's own monthly price x 12, excluding VAT: an active subscription's agreed price when it has one, else the kept sale price (while it is held), else the plan's price.
+  Memberships  each member's own first 12 months, excluding VAT: an active subscription's agreed price x 12 when it has one; else, while a kept sale price is held, the sale's months at the
+               sale price and the rest of the 12 at the plan's price (a sale of 12 months or more is 12 at the sale price); else the plan's price x 12.
   Left out      declined people, a staff member's own registration or Gold application (a test), and a registration whose subscription is cancelled (and not active again).
   Possible     the same sums for the people still waiting. Never added to the approved figures.
 Everything is kept in whole pence (integers), excluding VAT, in the stored snapshot; VAT is added when it is shown, from the VAT setting, and nothing is rounded until display.
@@ -101,6 +102,17 @@ def month_pence(reg):
     return to_pence(reg.plan.price_ex_vat), False
 
 
+def year_pence(reg):
+    """One member's first 12 months in pence, excluding VAT (the module text). A kept sale only lasts its own months: John on 20% off for 6 months is 6 at the sale price and 6 at the plan's."""
+    month, on_sale = month_pence(reg)
+    if month is None:
+        return 0
+    if not on_sale:
+        return month * 12
+    sale_months = min(reg.sale_months or 1, 12)  # no months on the snapshot: 1, as the rest of the site reads it
+    return month * sale_months + to_pence(reg.plan.price_ex_vat) * (12 - sale_months)
+
+
 def _blank(bucket_plans):
     return {"count": 0, "year_pence": 0, "by_plan": [{"slug": p["slug"], "name": p["name"], "kind": p["kind"], "count": 0, "year_pence": 0} for p in bucket_plans]}
 
@@ -124,7 +136,7 @@ def revenue():
         row = rows_by_slug[reg.review_status].get(reg.plan.slug)
         if row is None:
             continue
-        pence = month_pence(reg)[0] * 12
+        pence = year_pence(reg)
         row["count"] += 1
         row["year_pence"] += pence
     users, emails = {u for u, _ in held}, {e for _, e in held if e}

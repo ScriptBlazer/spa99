@@ -129,7 +129,9 @@ class RevenueTests(Base):
         approved = {r["slug"]: r for r in data["approved"]["by_plan"]}
         kept = int((Decimal(tier2.price_ex_vat) * (100 - sale.interest.sale_percent_off) / 100 * 100).quantize(Decimal(1)))
         self.assertEqual(approved["tier-2"]["count"], 2)
-        self.assertEqual(approved["tier-2"]["year_pence"], (int(tier2.price_ex_vat * 100) + kept) * 12)  # his own price, the kept sale price included
+        months = sale.interest.sale_months
+        full = int(tier2.price_ex_vat * 100)
+        self.assertEqual(approved["tier-2"]["year_pence"], full * 12 + kept * months + full * (12 - months))  # his own price: the kept sale price for the sale's months only
         self.assertEqual((approved["gold"]["count"], approved["gold"]["year_pence"]), (1, int(Plan.objects.get(slug="gold").annual_fee * 100)))  # the fee comes from the plan
         self.assertEqual(data["waiting"]["by_plan"][0]["count"] + sum(r["count"] for r in data["waiting"]["by_plan"][1:]), 1)  # only the one waiting person
         self.assertEqual(data["approved"]["year_pence"], sum(r["year_pence"] for r in data["approved"]["by_plan"]))  # the total is the sum of exact pence, never of rounded figures
@@ -182,6 +184,39 @@ class RevenueTests(Base):
         self.assertEqual(row["count"], 1)
         self.assertEqual(row["year_pence"], counts.to_pence(Plan.objects.get(slug="tier-2").price_ex_vat) * 12)
         self.assertEqual(next(r for r in self.figures()["revenue"]["approved"]["by_plan"] if r["slug"] == "gold")["count"], 0)
+
+
+class RevenueSaleMonthsTests(Base):
+    """A kept sale price counts only for the sale's months, then the plan's price (John: 20% off for 6 months is 6 at the sale price and 6 at the full price)."""
+
+    def john(self, percent=20, months=6):
+        user = self.member("john@example.com", plan="tier-2")
+        InterestRegistration.objects.filter(user=user).update(sale_percent_off=percent, sale_months=months, sale_name="Launch")
+        return InterestRegistration.objects.select_related("plan").get(user=user)
+
+    def test_six_months_at_the_sale_price_then_six_at_the_full_price(self):
+        reg = self.john()
+        full = int(reg.plan.price_ex_vat * 100)
+        sale = int((Decimal(reg.plan.price_ex_vat) * 80).quantize(Decimal(1)))
+        self.assertEqual(counts.year_pence(reg), sale * 6 + full * 6)
+
+    def test_a_sale_of_twelve_months_or_more_is_twelve_at_the_sale_price(self):
+        reg = self.john(months=24)
+        self.assertEqual(counts.year_pence(reg), counts.month_pence(reg)[0] * 12)
+
+    def test_no_months_on_the_snapshot_reads_as_one(self):
+        reg = self.john(months=None)
+        self.assertEqual(counts.year_pence(reg), counts.month_pence(reg)[0] + int(reg.plan.price_ex_vat * 100) * 11)
+
+    def test_an_expired_sale_is_the_full_price_all_year(self):
+        reg = self.john()
+        reg.sale_expired_at = timezone.now()
+        self.assertEqual(counts.year_pence(reg), int(reg.plan.price_ex_vat * 100) * 12)
+
+    def test_an_agreed_price_is_that_price_all_year(self):
+        reg = self.john()
+        Subscription.objects.create(registration=reg, plan=reg.plan, source=Subscription.MANUAL, start_date=timezone.localdate(), agreed_price_ex_vat=Decimal("100.00"))
+        self.assertEqual(counts.year_pence(reg), 10000 * 12)
 
 
 class RegisteredAndLeadsTests(Base):

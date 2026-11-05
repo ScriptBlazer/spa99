@@ -47,7 +47,7 @@ The four-figure grid (_revenue_grid.html) is one component, used everywhere on t
     <a class="o-quiet" href="{{ approvals_url }}" data-press>See who is waiting{% include "office/_icon.html" with name="chevron-right" %}</a>
   </section>
 
-  <p class="o-sub o-rev-note" data-revenue-note>An estimate for 12 months at today's prices. Each member counts at his own price, including a kept sale price. VAT at {{ revenue.vat_rate|floatformat:"-2" }}%.</p>
+  <p class="o-sub o-rev-note" data-revenue-note>An estimate for each member's first 12 months at today's prices. A kept sale price counts only for the sale's months, then the full price. VAT at {{ revenue.vat_rate|floatformat:"-2" }}%.</p>
 </div>
 {% endwith %}
 {% endblock %}
