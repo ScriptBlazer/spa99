@@ -133,7 +133,7 @@ class GroupSendToLeadsTests(Base):
         lead("has@example.com"), lead("none@example.com")
         with_mobile("has@example.com")
         starter = blocks.STARTERS["barry_invitation"]
-        self.assertEqual((starter["subject"], starter["kind"], starter["group"], starter["archive_no_number"]), ("A word from Barry at Spa 99", "news", "leads", True))
+        self.assertEqual((starter["subject"], starter["kind"], starter["group"], starter["archive_no_number"]), ("A word from Barry at Spa 99", "news", "leads_no_number", True))
         self.assertEqual(blocks.clean(starter["blocks"])[1], {})
         m = Mailing.objects.create(name="B", subject="S", kind="news", group="leads", blocks=blocks.clean(starter["blocks"])[0], archive_no_number=True)
         client = unlocked_client(make_user())
@@ -144,7 +144,8 @@ class GroupSendToLeadsTests(Base):
             sending.start(m, None)
         sending.run_mailing(m.pk)
         message = next(x for x in mail.outbox if x.to == ["has@example.com"])
-        self.assertIn("+44 7441 919990", message.body)
+        self.assertIn("Please add your number and name", message.body)
+        self.assertNotIn("WhatsApp me", message.body)
         link = next(line for line in message.body.splitlines() if "/add-number/" in line)
         self.assertEqual(addnumber.read_token(link.rsplit("/add-number/", 1)[1].strip("/")), "has@example.com")  # his own link
 
@@ -193,22 +194,36 @@ class AddNumberTests(Base):
         JourneySession.objects.filter(pk=self.session.pk).update(lead_mobile="")
 
     def post(self, email="a@example.com", **data):
-        return self.client.post(self.url(email), {"mobile_country": "GB", "mobile": "07911 123456", "consent": "on", **data})
+        return self.client.post(self.url(email), {"first_name": "Sam", "mobile_country": "GB", "mobile": "07911 123456", "consent": "on", **data})
 
     def test_the_page_shows_his_address_read_only_and_saves_the_number_audits_it_unarchives_and_adds_him_to_the_list(self):
         services.archive_lead("a@example.com", None, "Emailed, no number")
         page = self.client.get(self.url("a@example.com"))
         self.assertContains(page, "a@example.com")
         self.assertEqual(page["X-Robots-Tag"], "noindex, nofollow")
-        self.assertContains(self.post(), "Barry will be in touch on WhatsApp")
+        self.assertContains(self.post(), "A member of our staff will be in touch")
         self.assertEqual(JourneySession.objects.get(pk=self.session.pk).lead_mobile, "+447911123456")
-        edit = PersonEdit.objects.get()
+        self.assertEqual(JourneySession.objects.get(pk=self.session.pk).lead_first_name, "Sam")
+        edit = PersonEdit.objects.get(what=PersonEdit.MOBILE)
         self.assertEqual((edit.what, edit.after, edit.by_label), ("mobile", "+447911123456", "His own link"))
         self.assertFalse(ArchivedLead.objects.exists())
         entry = OutreachEntry.objects.get()
         self.assertEqual((entry.lead_email, entry.added_by_label), ("a@example.com", "His own link"))
         self.assertContains(self.post(mobile="07911 123457"), "already with us")  # used link: nothing changes
-        self.assertEqual(PersonEdit.objects.count(), 1)
+        self.assertEqual(PersonEdit.objects.filter(what=PersonEdit.MOBILE).count(), 1)
+
+    def test_the_name_is_required(self):
+        self.assertContains(self.post(first_name=""), "Please add your name.", status_code=400)
+        self.assertEqual(JourneySession.objects.get(pk=self.session.pk).lead_mobile, "")
+
+    def test_leads_with_no_number_reaches_only_leads_with_no_mobile_and_no_dates(self):
+        from mailings import segments
+
+        lead("has@example.com")
+        with_mobile("has@example.com")
+        self.assertEqual([row[0] for row in segments.rows("leads_no_number", {}, Mailing.NEWS)], ["a@example.com"])
+        self.assertEqual(segments.GROUPS["leads_no_number"].params, ())
+        self.assertEqual(segments.lead_split({}, Mailing.NEWS, False, "leads_no_number"), (0, 1))
 
     def test_a_tampered_or_expired_link_is_refused_in_the_same_words_and_a_taken_number_does_not_say_whose(self):
         good = addnumber.make_token("a@example.com")

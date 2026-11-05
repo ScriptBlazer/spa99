@@ -86,14 +86,13 @@ STARTERS = {
         "name": "Barry's invitation",
         "subject": "A word from Barry at Spa 99",
         "kind": "news",
-        "group": "leads",
+        "group": "leads_no_number",
         "archive_no_number": True,
         "sender_local_part": "barry",  # the Sender select starts on the team member whose address is barry@ (nothing is picked when nobody matches: hello@)
         "blocks": [
-            {"type": PARAGRAPH, "text": "Hello {first_name},\n\nI would very much like you to join Spa 99. I approve each member personally, and those I approve receive special discounts and prices."},
-            {"type": PARAGRAPH, "text": "Please WhatsApp me on {whatsapp_number}."},
-            {"type": PARAGRAPH, "text": "Or, if it is easier, give me the number you have WhatsApp on and I will message you."},
-            {"type": BUTTON, "label": "Add your number", "url": "", "link": LINK_ADD_NUMBER},
+            {"type": PARAGRAPH, "text": "Hi,\n\nI would very much like you to join Spa 99. I approve each member personally, and those I approve receive special discounts and prices."},
+            {"type": PARAGRAPH, "text": "Please add your number and name, and a member of our staff will be in touch with you about custom prices and deals."},
+            {"type": BUTTON, "label": "Add your number and name", "url": "", "link": LINK_ADD_NUMBER},
             {"type": PARAGRAPH, "text": "Barry\nSpa 99"},
         ],
     },

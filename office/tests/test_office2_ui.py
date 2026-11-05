@@ -62,4 +62,4 @@ class ListsTests(Base):
         lead("x@example.com")
         page = Client().get(f"/add-number/{make_token('x@example.com')}/")
         self.assertContains(page, "signin-fields")
-        self.assertContains(page, "Add your number.")
+        self.assertContains(page, "Add your number and name.")

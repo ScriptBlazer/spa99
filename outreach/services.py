@@ -399,8 +399,8 @@ def add_number_state(email):
     return "open"
 
 
-def add_number_from_link(email, mobile, country=None):
-    """He opened his personal link and gave a mobile. `email` comes only from the signed token. Writes the number on his journeys (the same place staff write it), records "Mobile added by His own link" in
+def add_number_from_link(email, mobile, country=None, first_name=""):
+    """He opened his personal link and gave his name and a mobile. `email` comes only from the signed token. Writes the number on his journeys (the same place staff write it), records "Mobile added by His own link" in
     his timeline (a PersonEdit), records the consent version he ticked, brings him back from Archived, and puts him on the approach list with the source. Refused with nothing changed: no journey
     of his address left (MISSING), an account has taken the address (REGISTERED), he already has a number (USED), the number is on someone else (INVALID, `taken`), the number is not valid (INVALID).
     Returns (result, info). Does not say whose number it is."""
@@ -425,12 +425,17 @@ def add_number_from_link(email, mobile, country=None):
         return INVALID, error.messages[0]
     if owner_of_phone(number, exclude_email=email):
         return INVALID, "taken"
+    name = " ".join(str(first_name or "").replace("\x00", "").split())[:100]
+    current_name = next((s.lead_first_name for s in sessions if s.lead_first_name), "")
     with transaction.atomic():
         for session in sessions:
             session.lead_mobile = number
             session.lead_consent_version = CONSENT_VERSION
-            session.save(update_fields=["lead_mobile", "lead_consent_version", "updated_at"])
+            session.lead_first_name = name or session.lead_first_name
+            session.save(update_fields=["lead_mobile", "lead_consent_version", "lead_first_name", "updated_at"])
         PersonEdit.objects.create(email=email, what=PersonEdit.MOBILE, before="", after=number, by=None, by_label=SELF_LABEL)
+        if name and name != current_name:
+            PersonEdit.objects.create(email=email, what=PersonEdit.FIRST_NAME, before=current_name, after=name, by=None, by_label=SELF_LABEL)
         if ArchivedLead.objects.filter(email=email).delete()[0]:
             LeadArchiveEvent.objects.create(email=email, kind=LeadArchiveEvent.RESTORED, by=None, by_label=SELF_LABEL)
         if not open_entries({email}, None, None).exists():

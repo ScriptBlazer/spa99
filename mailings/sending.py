@@ -498,7 +498,7 @@ def _send_one(mailing, group, recipient):
             headers = tokens.list_unsubscribe_headers(url)
         else:
             context["notice"] = f"You are receiving this message {group.reason}."
-        if mailing.group == "leads":  # each lead's own add-your-number link and the site's WhatsApp number (the placeholders of Barry's invitation)
+        if segments.is_lead_group(mailing.group):  # each lead's own add-your-number link and the site's WhatsApp number (the placeholders of Barry's invitation)
             context.update(_lead_values(recipient.email))
         if mailing.has_personal_links:
             if invite is None:
@@ -569,7 +569,7 @@ def _lead_values(email):
 def _after_sent(mailing, recipient):
     """What happens to a lead once the email actually went (per recipient, never for a skip or a failure): with the mailing's switch on, a lead with no mobile moves to Archived. Never raises:
     the send is done and recorded, and this must not undo it."""
-    if not (mailing.archive_no_number and mailing.group == "leads"):
+    if not (mailing.archive_no_number and segments.is_lead_group(mailing.group)):
         return
     try:
         from outreach import services as outreach
@@ -649,8 +649,8 @@ def confirm_details(mailing):
     else:
         title, subject = mailing.name, mailing.subject
     moves = None
-    if valid and mailing.group == "leads" and mailing.archive_no_number:  # this send moves people: say who, in plain counts
-        with_mobile, without = segments.lead_split(params, mailing.kind, mailing.has_personal_links)
+    if valid and segments.is_lead_group(mailing.group) and mailing.archive_no_number:  # this send moves people: say who, in plain counts
+        with_mobile, without = segments.lead_split(params, mailing.kind, mailing.has_personal_links, mailing.group)
         moves = {"stay": with_mobile, "archive": without, "reason": "Emailed, no number", "bounced": "Anyone whose email bounces stays in Leads as Possible fake."}
     return {"count": people, "title": title, "subject": subject, "to": segments.to_label(mailing.group, params), "skipped": skipped,
             "skipped_why": why, "kind": mailing.get_kind_display().split(" (")[0], "moves": moves, **sender_details(mailing)}

@@ -54,6 +54,7 @@ Gold shows £199 + VAT everywhere it appears, in the Office and on the public si
 - Every automatic email and group send can choose its sender: a dropdown of staff with a @spa99.uk address, default hello@. Select, not type.
 - Group send to all leads, default wording from Barry, editable: asks them to join, which he personally approves for special discounts and prices, to WhatsApp him, and to give the number they have WhatsApp on. Includes an add-your-number link. Unsubscribe link stays.
 - After the send (Barry's method, 2026-11-05): leads the email reached with no mobile move to Archived, reason "Emailed, no number". Bounced ones stay in Leads with Possible fake. Leads with a mobile stay. Adding a number moves him to the Approach list. Lead totals drop accordingly.
+- **Audiences (Moishe, 2026-11-05):** Leads with no number (all of them, no dates; Barry's invitation starts here) and All leads (with or without a mobile, optional dates; "Journey leads" before).
 - **Add-your-number link:** a personal signed link to a small page with his email filled in. Saves the mobile, moves him to the Approach list. Refuses a taken number, tampered or expired link. No sign-in.
 
 ## Not doing

@@ -37,9 +37,10 @@ def link_for(email):
 
 
 class AddNumberForm(forms.Form):
+    first_name = forms.CharField(max_length=100, error_messages={"required": "Please add your name.", "max_length": "Please keep your name to 100 characters."})
     mobile_country = forms.CharField(required=False, max_length=2)
     mobile = forms.CharField(max_length=40, error_messages={"required": GATE["errors"]["mobile"]})
-    consent = forms.BooleanField(error_messages={"required": "Please tick this so Barry can message you."})
+    consent = forms.BooleanField(error_messages={"required": "Please tick this so we can message you."})
 
     def clean_mobile(self):
         try:
@@ -49,4 +50,4 @@ class AddNumberForm(forms.Form):
 
 
 CONSENT_TEXT = GATE["consent"]
-TAKEN_TEXT = "That number is already with us. Please check it, or message us on WhatsApp."
+TAKEN_TEXT = "That number is already with us. Please check it."

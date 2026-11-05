@@ -52,7 +52,7 @@ const SPECS = {
     fields: [
       { name: 'label', label: 'Label', control: 'line', place: true, hint: 'Short, like Book your visit. You can use {first_name}.' },
       { name: 'link', label: 'Link to', control: 'select', options: LINK_CHOICES, fallback: 'url',
-        hint: 'A personal link is made for each person, so you can see who opened it and who registered. Only for uploaded lists and journey leads. Add your number is for journey leads only: it opens a small page where he gives the mobile he uses on WhatsApp.' },
+        hint: 'A personal link is made for each person, so you can see who opened it and who registered. Only for uploaded lists and leads. Add your number is for leads only: it opens a small page where he gives the mobile he uses on WhatsApp.' },
       { name: 'url', label: 'Web address', showWhen: 'url', control: 'url', hint: 'A full address (https://...) or a page on the site, like /memberships/.' },
     ],
   },

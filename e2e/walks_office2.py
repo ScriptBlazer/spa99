@@ -225,6 +225,7 @@ def office2_group_send(w):
         dev.wait_for_selector("select[name=sender_user]")
         assert dev.locator("select[name=sender_user] option").count() >= 2
         dev.frame_locator("iframe[data-se-frame]").get_by_text("Add your number").first.wait_for()   # the preview is a frame: its words are not in the page's own text
+        dev.locator("label.se-group-card:has(input[name=group][value=leads])").click()   # All leads: this walk checks both those with a mobile and those without
         dev.locator("[data-se-save-draft]").click()
         dev.wait_for_url(re.compile(r"/emails/mailings/[0-9a-f-]{36}/"))
     with w.step("Send asks first and says who moves: those with a mobile stay, those without go to Archived", dev):
@@ -251,6 +252,7 @@ def office2_group_send(w):
         public.goto(link)
         public.wait_for_selector("[data-add-number]")
         assert public.locator("[data-add-number] button[type=submit]").bounding_box()["y"] < 667, "the button is below the fold at 375 by 667"
+        public.locator("#id_first_name").fill("Sam")
         public.locator("#id_mobile").fill("07911 123499")
         tick(public, "consent")
         public.locator("[data-add-number] button[type=submit]").click()

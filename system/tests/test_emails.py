@@ -270,7 +270,7 @@ class GroupsAndListsViewTests(TestCase):
     def test_the_groups_tab_shows_automatic_groups_with_counts_and_the_tabs_are_in_order(self):
         page = self.client.get("/emails/groups/")
         self.assertEqual([g["key"] for g in page.context["automatic_groups"]],
-                         ["everyone", "tier", "gold", "opted_in", "unconfirmed", "between", "applicants", "leads"])
+                         ["everyone", "tier", "gold", "opted_in", "unconfirmed", "between", "applicants", "leads_no_number", "leads"])
         self.assertEqual(next(g for g in page.context["automatic_groups"] if g["key"] == "everyone")["count"], 1)
         html = page.content.decode()
         order = [html.index(f'data-tab="{t}"') for t in ("automatic", "mailings", "groups", "templates", "suppressions")]

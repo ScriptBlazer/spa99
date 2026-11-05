@@ -97,7 +97,7 @@ def _add_number_page(request, state, email="", form=None, status=200):
 @never_cache
 @require_http_methods(["GET", "POST"])
 def add_number(request, token):
-    """GET shows his address (read only) and asks for a country and mobile, and the consent tick. POST saves it (`outreach.services.add_number_from_link`).
+    """GET shows his address (read only) and asks for his name, a country and mobile, and the consent tick. POST saves it (`outreach.services.add_number_from_link`).
     States: `form`, `done` (saved), `used` (his number is already with us, or he registered: nothing is changed), `ended` (expired or tampered link, one answer for both). Rate limited."""
     from outreach import services as outreach
 
@@ -108,7 +108,7 @@ def add_number(request, token):
         return _add_number_page(request, "ended", status=400)
     form = addnumber.AddNumberForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        result, info = outreach.add_number_from_link(email, form.cleaned_data["mobile"], request.POST.get("mobile_country"))
+        result, info = outreach.add_number_from_link(email, form.cleaned_data["mobile"], request.POST.get("mobile_country"), form.cleaned_data["first_name"])
         if result == outreach.DONE:
             return _add_number_page(request, "done", email)
         if result in (outreach.USED, outreach.REGISTERED):

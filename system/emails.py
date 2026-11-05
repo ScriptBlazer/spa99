@@ -304,11 +304,11 @@ class MailingForm(forms.ModelForm):
         for name, messages in errors.items():
             for message in messages:
                 self.add_error(name, message)
-        if data.get("archive_no_number") and data.get("group") != "leads":
-            self.add_error("archive_no_number", "Only a send to the Journey leads can move leads to Archived.")
+        if data.get("archive_no_number") and not segments.is_lead_group(data.get("group")):
+            self.add_error("archive_no_number", "Only a send to leads can move leads to Archived.")
         parts_text = json.dumps(self.cleaned_blocks) if "blocks" in self.data and hasattr(self, "cleaned_blocks") else (data.get("body") or "")
-        if data.get("group") != "leads" and (mailing_blocks.uses_add_number(getattr(self, "cleaned_blocks", None)) or "{add_number_link}" in parts_text or "{whatsapp_number}" in parts_text):
-            self.add_error(None, "The add-your-number link and the WhatsApp number are for a send to the Journey leads only.")
+        if not segments.is_lead_group(data.get("group")) and (mailing_blocks.uses_add_number(getattr(self, "cleaned_blocks", None)) or "{add_number_link}" in parts_text or "{whatsapp_number}" in parts_text):
+            self.add_error(None, "The add-your-number link and the WhatsApp number are for a send to leads only.")
         if data.get("group"):
             self.params, group_errors = segments.clean_params(data["group"], self.data)
             for name, messages in group_errors.items():
