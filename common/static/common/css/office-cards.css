@@ -8,10 +8,10 @@
 .o-card.o-pair { padding: var(--space-4) var(--space-3) var(--space-3); }
 @media (min-width: 64em) { .o-card.o-pair { padding: var(--space-4); } }   /* not the usual --space-5, or the rings shrink */
 .o-pair-title { margin: 0; }
-.o-pair-sub { margin: calc(var(--space-2) * -1) 0 0; font-size: var(--text-sm); color: var(--office-muted); max-width: none; }   /* "12-month estimate, excluding VAT": it never goes */
+.o-pair-sub { order: 1; margin: 0; font-size: var(--text-sm); color: var(--office-muted); max-width: none; text-align: center; }   /* "12-month estimate, excluding VAT": it never goes */
 .o-pair-rings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); min-width: 0; }
-.o-pair-link { --c: var(--office-ochre); --t: var(--office-ochre-track); display: grid; justify-items: center; align-content: start; gap: var(--space-3); min-width: 0; padding: var(--space-2) var(--space-1); border-radius: var(--office-radius); color: inherit; text-decoration: none; text-align: center; }
-.o-pair-link[data-ring="memberships"] { --c: var(--office-clay); --t: var(--office-clay-track); }   /* Gold is always left and Memberships right, so the eye learns the places */
+.o-pair-link { --c: var(--color-gold); --t: var(--office-ochre-track); display: grid; justify-items: center; align-content: start; gap: var(--space-3); min-width: 0; padding: var(--space-2) var(--space-1); border-radius: var(--office-radius); color: inherit; text-decoration: none; text-align: center; }
+.o-pair-link[data-ring="memberships"] { --c: var(--office-teal-3); --t: var(--office-teal-tint); }   /* Gold is always left and Memberships right, so the eye learns the places */
 .o-pair-link:focus-visible { outline: 2px solid var(--office-text); outline-offset: 2px; }
 .o-pair-fig { position: relative; display: grid; place-items: center; width: min(var(--office-ring-pair), 100%); aspect-ratio: 1; }
 .o-pair .o-ring-svg { --rsw: 7.5; }   /* thinner than the journey rings: two big rings at 10.4 felt heavy */
@@ -28,9 +28,10 @@ html.js:not(.no-reveal) .o-pair[data-draw]:not(.is-visible) .o-pair-arc { stroke
 /* phone: compact, so all three cards fit on one screen above the tab bar (Moishe, 2026-11-05) */
 @media (max-width: 63.99em) {
   .o-cards-approval { gap: var(--space-3); }
-  .o-card.o-pair { gap: var(--space-2); padding: var(--space-3); --office-ring-pair: 4.25rem; }
+  .o-card.o-pair { gap: var(--space-2); padding: var(--space-3); --office-ring-pair: 4.5rem; }
+  .o-pair .o-ring-svg { --rsw: 11; }   /* a small ring needs a thicker line (Moishe, 2026-11-05) */
   .o-pair-title { font-size: var(--text-base); }
-  .o-pair-sub { margin-top: calc(var(--space-1) * -1); font-size: var(--office-text-xs); }
+  .o-pair-sub { font-size: var(--office-text-xs); }
   .o-pair-link { gap: var(--space-1); padding: 0; }
   .o-pair-num { font-size: 1.0625rem; }
   .o-pair-text { gap: 0; font-size: 0.8125rem; }
