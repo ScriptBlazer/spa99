@@ -10,7 +10,6 @@ Status: agreed with Moishe, building on `feature/office-2`. One branch, one push
   3. **Revenue:** Gold and memberships, a 12-month estimate.
 - Everything is tappable: Waiting rings open the approval lists, Approved rings open the approved lists on Registered and Gold, Revenue opens the Revenue page.
 - Computer: the cards side by side.
-- A small link to the Spa 99 website at the top of Home, not in the nav.
 
 ## Membership approval (Barry's view only)
 - Approve moves to Approved, Decline moves to Declined. **The customer's membership and emails never change.**
@@ -25,10 +24,10 @@ Five, no More: Home, Approach list, Analytics, Leads, Revenue. Assistant hidden 
 Estimated annual. Gold = count x 199. Memberships = each member's actual price including a kept sale price. **All prices are excluding VAT.** Show ex and inc VAT, by plan and tier, monthly and yearly, members counted, average per member, and possible revenue from those waiting. Clearly labelled an estimate.
 
 ## VAT wording
-Gold shows £199 + VAT wherever the Office shows it. Public site prices are not changed in this branch: UK rules generally require consumer prices to include VAT, so Moishe checks with his accountant first.
+Gold shows £199 + VAT everywhere it appears, in the Office and on the public site. Moishe has decided this is fine (2026-11-05); membership prices already read excluding VAT.
 
 ## Leads
-- Shows everyone with no account and not on the Approach list. A "Has a number" filter.
+- Shows everyone with no account and not on the Approach list. Filters: "Has a number" and "No number".
 - Top cards: Leads and Registered only, true totals, tappable. Hot leads goes.
 - Added to the Approach list = gone from Leads. From the list he can go back to Leads or to Archive.
 - Phone: scrolling loads more by itself with a loading animation until the end. Show More no longer hidden behind the nav. Applies to every long list.
@@ -47,7 +46,7 @@ Gold shows £199 + VAT wherever the Office shows it. Public site prices are not 
 - Remove the WhatsApp tab, chat, templates, media, voice, Link it, push and PWA notifications from the Office. Installing the Office as an app stays.
 - The WhatsApp button opens `wa.me` to that person. Mobile needed; otherwise the Details row to add one.
 - Live chats: copy kept in the RDS snapshot, tables dropped (they hold foreign keys to users that would block deleting staff and members).
-- 020 number: a small signed webhook answers anyone messaging it with one line pointing to the site's WhatsApp number. Stores nothing. Status webhook goes.
+- 020 number: nothing answers it. Moishe accepts this (2026-11-05). Both Twilio webhooks go; Moishe clears them at Twilio.
 - System > Settings WhatsApp number must be the old number.
 
 ## Emails
@@ -57,4 +56,4 @@ Gold shows £199 + VAT wherever the Office shows it. Public site prices are not 
 - **Add-your-number link:** a personal signed link to a small page with his email filled in. Saves the mobile, moves him to the Approach list. Refuses a taken number, tampered or expired link. No sign-in.
 
 ## Not doing
-Bigger WhatsApp button on the website. A tag for people who registered without the questions. Business profile logo (Moishe, not code).
+A link to the website from the Office. Bigger WhatsApp button on the website. A tag for people who registered without the questions. Business profile logo (Moishe, not code).
