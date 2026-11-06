@@ -9,6 +9,7 @@ nothing Postgres-only (`select_for_update` is ignored by SQLite)."""
 import logging
 import time
 from datetime import datetime, time as dt_time, timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -428,7 +429,30 @@ def active_subscription(registration):
     return Subscription.objects.filter(registration=registration, status=Subscription.ACTIVE).first()
 
 
-def set_up_manually(registration, user, plan, start_date, agreed_price=None, note=""):
+def holds_sale_price(registration, plan, agreed_price):
+    """Is this agreed price exactly the member's kept sale price on this plan? A deleted sale has no link left, so only a sale still linked can say it does not cover the plan."""
+    if not registration.sale_percent_off or registration.sale_expired_at or (registration.sale_id and not sales.covers(registration.sale, plan)):
+        return False
+    return sales.sale_price(plan, registration.sale_percent_off) == agreed_price
+
+
+def _agreed_months(registration, plan, agreed_price, months):
+    """How long an agreed price lasts, stored on the subscription. What staff typed wins. Left empty, an agreed price that is exactly the sale price takes that sale's months:
+    the member's kept sale first, else the sale live now that covers the plan. Any other agreed price has no end (None)."""
+    if agreed_price is None:
+        return None
+    if months:
+        return months
+    agreed_price = Decimal(str(agreed_price))
+    if holds_sale_price(registration, plan, agreed_price):
+        return registration.sale_months or 1  # the same reading of "no months" as the rest of the site
+    live = sales.live_sale()
+    if sales.covers(live, plan) and sales.sale_price(plan, live) == agreed_price:
+        return live.months_at_price or 1
+    return None
+
+
+def set_up_manually(registration, user, plan, start_date, agreed_price=None, note="", agreed_months=None):
     """Office: a member who pays directly, outside the website. Creates the Subscription (source manual) and marks the member set up,
     so the close job never lapses them. One active subscription per member (database constraint): a second click is refused, not
     duplicated. Nothing is charged. Returns the Subscription."""
@@ -440,7 +464,7 @@ def set_up_manually(registration, user, plan, start_date, agreed_price=None, not
             if Subscription.objects.filter(registration=row, status=Subscription.ACTIVE).exists():
                 raise ValidationError("This member already has an active membership.")
             sub = Subscription(registration=row, plan=plan, source=Subscription.MANUAL, start_date=start_date, agreed_price_ex_vat=agreed_price,
-                               billing_note=note.strip(), created_by=user)
+                               agreed_months=_agreed_months(row, plan, agreed_price, agreed_months), billing_note=note.strip(), created_by=user)
             sub._history_user = user
             sub.full_clean(exclude=["external_id"])
             sub.save()
@@ -452,18 +476,21 @@ def set_up_manually(registration, user, plan, start_date, agreed_price=None, not
     return sub
 
 
-def edit_manual(sub, user, plan, start_date, agreed_price, note):
+def edit_manual(sub, user, plan, start_date, agreed_price, note, agreed_months=None):
     if sub.status != Subscription.ACTIVE or sub.source != Subscription.MANUAL:
         raise ValidationError("Only an active manual membership can be edited.")
     if plan is None or plan.kind == Plan.ONE_OFF:
         raise ValidationError("Choose a membership plan.")
-    old = {"plan": sub.plan.slug, "start_date": sub.start_date.isoformat(), "agreed_price_ex_vat": str(sub.agreed_price_ex_vat) if sub.agreed_price_ex_vat is not None else None}
+    old = {"plan": sub.plan.slug, "start_date": sub.start_date.isoformat(), "agreed_price_ex_vat": str(sub.agreed_price_ex_vat) if sub.agreed_price_ex_vat is not None else None, "agreed_months": sub.agreed_months}
     note_changed = sub.billing_note != note.strip()
+    same_price = plan.pk == sub.plan_id and (Decimal(str(agreed_price)) if agreed_price is not None else None) == sub.agreed_price_ex_vat
+    # Price and plan unchanged: the box says what he wants, so empty clears the months. Changed: work them out again.
+    sub.agreed_months = (agreed_months or None if agreed_price is not None else None) if same_price else _agreed_months(sub.registration, plan, agreed_price, agreed_months)
     sub.plan, sub.start_date, sub.agreed_price_ex_vat, sub.billing_note = plan, start_date, agreed_price, note.strip()
     sub._history_user = user
     sub.full_clean(exclude=["external_id"])
     sub.save()
-    new = {"plan": plan.slug, "start_date": start_date.isoformat(), "agreed_price_ex_vat": str(agreed_price) if agreed_price is not None else None}
+    new = {"plan": plan.slug, "start_date": start_date.isoformat(), "agreed_price_ex_vat": str(agreed_price) if agreed_price is not None else None, "agreed_months": sub.agreed_months}
     _log("setup_edited", user, f"{user.email} edited the manual membership of {sub.registration.user.public_id}",
          {"subscription": str(sub.pk), "member": sub.registration.user.public_id, "old": old, "new": new, "billing_note_changed": note_changed})  # the note text stays on the subscription (erased with the member)
     return sub

@@ -235,7 +235,7 @@ def _setup_result(request, user, action):
 def person_setup(request, pk):
     """Set up a membership manually (a member who pays directly). Admin and up; audited; one active membership per member."""
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
-    return _setup_result(request, user, lambda d: payments.set_up_manually(user.interest, request.user, d["plan"], d["start_date"], d["agreed_price"], d["billing_note"]))
+    return _setup_result(request, user, lambda d: payments.set_up_manually(user.interest, request.user, d["plan"], d["start_date"], d["agreed_price"], d["billing_note"], d["agreed_months"]))
 
 
 @admin
@@ -262,7 +262,7 @@ def person_setup_edit(request, pk):
     if sub is None:
         messages.error(request, "There is no active membership to edit.")
         return redirect("office_person", pk=user.pk)
-    return _setup_result(request, user, lambda d: payments.edit_manual(sub, request.user, d["plan"], d["start_date"], d["agreed_price"], d["billing_note"]))
+    return _setup_result(request, user, lambda d: payments.edit_manual(sub, request.user, d["plan"], d["start_date"], d["agreed_price"], d["billing_note"], d["agreed_months"]))
 
 
 @admin

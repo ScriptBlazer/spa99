@@ -699,6 +699,9 @@ class Subscription(BaseModel):
     agreed_price_ex_vat = models.DecimalField(
         "agreed price ex VAT", max_digits=8, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal("0"))],
         help_text="Per month, for the record and invoicing. It may differ from the list price. No payment is taken by the website.")
+    agreed_months = models.PositiveSmallIntegerField(
+        "months at the agreed price", null=True, blank=True, validators=[MinValueValidator(1)],
+        help_text="How many months the agreed price lasts, then the plan's price (John: 20% off for 6 months is 6). Empty: the agreed price has no end.")
     billing_note = models.TextField(blank=True)
     external_id = models.CharField(max_length=100, null=True, blank=True, unique=True, help_text="Stripe subscription id (later).")
     created_by = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")

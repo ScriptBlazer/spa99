@@ -12,7 +12,7 @@ A Tier member who also applied for Gold counts in both Waiting figures (two diff
 REVENUE ("approved" and "waiting" are the same two words as above; declined counts in neither)
   Gold         the number of Gold applications x Plan.annual_fee of the Gold plan (never a typed 199), excluding VAT. An applicant who holds a non-declined Tier registration is not counted
                here: he is counted at his Tier.
-  Memberships  each member's own first 12 months, excluding VAT: an active subscription's agreed price x 12 when it has one; else, while a kept sale price is held, the sale's months at the
+  Memberships  each member's own first 12 months, excluding VAT: an active subscription's agreed price, for its stored months and then the plan's price (no months stored: x 12); else, while a kept sale price is held, the sale's months at the
                sale price and the rest of the 12 at the plan's price (a sale of 12 months or more is 12 at the sale price); else the plan's price x 12.
   Left out      declined people, a staff member's own registration or Gold application (a test), and a registration whose subscription is cancelled (and not active again).
   Possible     the same sums for the people still waiting. Never added to the approved figures.
@@ -82,6 +82,16 @@ def agreed_subquery():
     return Subquery(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.ACTIVE).order_by("-created_at").values("agreed_price_ex_vat")[:1])
 
 
+def agreed_months_subquery():
+    """Annotation next to `agreed_subquery`: how many months that agreed price lasts (None: no end)."""
+    return Subquery(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.ACTIVE).order_by("-created_at").values("agreed_months")[:1])
+
+
+def agreed_plan_price_subquery():
+    """Annotation next to `agreed_subquery`: the list price of the plan on that subscription, which may not be the plan he registered for."""
+    return Subquery(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.ACTIVE).order_by("-created_at").values("plan__price_ex_vat")[:1])
+
+
 def agreed_price(reg):
     """The same figure for one registration: the annotation when the queryset carried it, else one query."""
     if hasattr(reg, "agreed"):
@@ -102,15 +112,26 @@ def month_pence(reg):
     return to_pence(reg.plan.price_ex_vat), False
 
 
+def _agreed_terms(reg):
+    """(months the agreed price lasts, the price per month in pounds after that) from his active subscription."""
+    if hasattr(reg, "agreed_for"):
+        return reg.agreed_for, reg.agreed_plan_price
+    return Subscription.objects.filter(registration=reg, status=Subscription.ACTIVE).order_by("-created_at").values_list("agreed_months", "plan__price_ex_vat").first() or (None, None)
+
+
 def year_pence(reg):
-    """One member's first 12 months in pence, excluding VAT (the module text). A kept sale only lasts its own months: John on 20% off for 6 months is 6 at the sale price and 6 at the plan's."""
+    """One member's first 12 months in pence, excluding VAT (the module text). A reduced price only lasts its own months: John on 20% off for 6 months is 6 at that price and 6 at the plan's,
+    whether the price is his kept sale or an agreed price on his subscription. Everything here is stored on his rows, so nothing looks back through time."""
     month, on_sale = month_pence(reg)
     if month is None:
         return 0
-    if not on_sale:
+    if on_sale:
+        months, after = reg.sale_months or 1, reg.plan.price_ex_vat  # no months on the snapshot: 1, as the rest of the site reads it
+    else:
+        months, after = _agreed_terms(reg)  # no months: no agreed price, or an agreed price with no end
+    if not months or months >= 12:
         return month * 12
-    sale_months = min(reg.sale_months or 1, 12)  # no months on the snapshot: 1, as the rest of the site reads it
-    return month * sale_months + to_pence(reg.plan.price_ex_vat) * (12 - sale_months)
+    return month * months + to_pence(after) * (12 - months)
 
 
 def _blank(bucket_plans):
@@ -129,7 +150,7 @@ def revenue():
     cancelled = Exists(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.CANCELLED))
     active = Exists(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.ACTIVE))
     held = []  # (user id, lower email) of everyone holding a non-declined Tier registration: his Gold application is not added on top
-    for reg in with_review(InterestRegistration.objects.filter(plan__kind=Plan.MONTHLY).select_related("plan", "user")).annotate(agreed=agreed_subquery(), has_cancelled=cancelled, has_active=active).iterator():
+    for reg in with_review(InterestRegistration.objects.filter(plan__kind=Plan.MONTHLY).select_related("plan", "user")).annotate(agreed=agreed_subquery(), agreed_for=agreed_months_subquery(), agreed_plan_price=agreed_plan_price_subquery(), has_cancelled=cancelled, has_active=active).iterator():
         if reg.review_status == DECLINED or reg.user.is_staff or (reg.has_cancelled and not reg.has_active):
             continue  # not revenue: declined, a staff member's own (test) registration, or a membership whose subscription was cancelled
         held.append((reg.user_id, (reg.user.email or "").strip().lower()))

@@ -46,4 +46,4 @@ Status: **notes for later phases** (Stripe payments, booking system). Decided by
 
 ## Sales after launch (decided 2026-10-29)
 
-After payments open, a sale is "pay now". At checkout, a member pays the sale price if a sale is live at the moment the Checkout Session is created. Record which sale was applied on the subscription. There is no register-and-keep window for sales after launch.
+After payments open, a sale is "pay now". At checkout, a member pays the sale price if a sale is live at the moment the Checkout Session is created. Record which sale was applied on the subscription, with `agreed_price_ex_vat` and `agreed_months` filled, so Revenue counts it from stored data. There is no register-and-keep window for sales after launch.

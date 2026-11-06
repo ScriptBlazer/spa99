@@ -371,7 +371,7 @@ def _export_interest(user):
             "notices": [{"kind": n.kind, "status": n.status, "sent_at": _plain(n.sent_at)} for n in interest.payment_notices.order_by("created_at")],
             "subscriptions": [
                 {"plan": s.plan.name, "source": s.source, "status": s.status, "start_date": _plain(s.start_date),
-                 "agreed_price_ex_vat": str(s.agreed_price_ex_vat) if s.agreed_price_ex_vat is not None else None, "billing_note": s.billing_note,
+                 "agreed_price_ex_vat": str(s.agreed_price_ex_vat) if s.agreed_price_ex_vat is not None else None, "agreed_months": s.agreed_months, "billing_note": s.billing_note,
                  "created_at": s.created_at.isoformat(), "cancelled_at": _plain(s.cancelled_at)}
                 for s in interest.subscriptions.select_related("plan").order_by("created_at")],
         },

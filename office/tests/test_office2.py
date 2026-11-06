@@ -1,7 +1,10 @@
 """Office 2, server side: Barry's membership approval, the counts and Revenue, Leads and the approach list, the Registered lists, the wa.me button. Mocked: sync queue, in-memory mail."""
+from datetime import timedelta
 from decimal import Decimal
+from io import StringIO
 
 from django.core import mail
+from django.core.management import call_command
 from django.test import Client
 from django.utils import timezone
 
@@ -16,7 +19,9 @@ from office.tests.test_leads import lead, verify
 from office.tests.test_office import OFFICE, OfficeTestCase
 from outreach import services as outreach
 from outreach.models import ArchivedLead, OutreachEntry
-from plans.models import Plan, Subscription
+from plans import payments
+from plans.models import Plan, Sale, Subscription
+from plans.sales import sale_price
 from plans.tests.helpers import make_team_member
 from users import services as user_services
 from users.models import InterestRegistration
@@ -339,3 +344,152 @@ class InstallableAppTests(Base):
         self.assertNotIn(b"showNotification", worker.content)  # no push, and no fetch handler: it never holds a page or staff data
         self.assertNotIn(b"addEventListener('fetch'", worker.content)
         self.assertEqual(Client().get("/sw.js").status_code, 404)  # the public site does not serve it
+
+
+class RevenueAgreedMonthsTests(Base):
+    """A reduced price lasts its own months however it was recorded, and those months are stored on the subscription."""
+
+    def john(self, percent=20, months=6):
+        user = self.member("john.months@example.com", plan="tier-2")
+        InterestRegistration.objects.filter(user=user).update(sale_percent_off=percent, sale_months=months, sale_name="Launch")
+        return InterestRegistration.objects.select_related("plan", "user").get(user=user)
+
+    def setup(self, reg, price, months=None):
+        return payments.set_up_manually(reg, self.admin, reg.plan, timezone.localdate(), price, "", months)
+
+    def test_the_sale_price_as_the_agreed_price_stores_the_sales_months_and_revenue_uses_them(self):
+        reg = self.john()
+        price = sale_price(reg.plan, 20)
+        sub = self.setup(reg, price)
+        self.assertEqual(Subscription.objects.get(pk=sub.pk).agreed_months, 6)
+        full = int(reg.plan.price_ex_vat * 100)
+        self.assertEqual(counts.year_pence(InterestRegistration.objects.select_related("plan").get(pk=reg.pk)), int(price * 100) * 6 + full * 6)
+
+    def test_the_months_typed_win_and_another_agreed_price_has_no_end(self):
+        reg = self.john()
+        self.assertEqual(self.setup(reg, sale_price(reg.plan, 20), 3).agreed_months, 3)
+        other = InterestRegistration.objects.select_related("plan").get(user=self.member("other.months@example.com", plan="tier-2"))
+        self.assertIsNone(self.setup(other, Decimal("100.00")).agreed_months)
+        self.assertEqual(counts.year_pence(InterestRegistration.objects.select_related("plan").get(pk=other.pk)), 120000)
+
+    def test_a_sale_live_at_set_up_gives_its_months_when_nothing_is_kept(self):
+        reg = InterestRegistration.objects.select_related("plan").get(user=self.member("live.months@example.com", plan="tier-2"))
+        now = timezone.now()
+        sale = Sale.objects.create(name="Spring", percent_off=50, months_at_price=3, starts_at=now - timedelta(hours=1), ends_at=now + timedelta(days=1))
+        sale.plans.add(reg.plan)
+        self.assertEqual(self.setup(reg, sale_price(reg.plan, 50)).agreed_months, 3)
+
+    def test_the_stored_total_matches_and_editing_the_sale_later_changes_nothing(self):
+        reg = self.john()
+        price = sale_price(reg.plan, 20)
+        self.setup(reg, price)
+        before = counts.year_pence(InterestRegistration.objects.select_related("plan").get(pk=reg.pk))
+        Sale.objects.all().delete()
+        self.assertEqual(counts.year_pence(InterestRegistration.objects.select_related("plan").get(pk=reg.pk)), before)
+        row = next(r for r in counts.revenue()["waiting"]["by_plan"] if r["slug"] == "tier-2")
+        self.assertEqual(row["year_pence"], before)
+
+    def test_the_rest_of_the_year_is_at_the_plan_on_the_subscription(self):
+        reg = self.john()
+        tier3 = Plan.objects.get(slug="tier-3")
+        payments.set_up_manually(reg, self.admin, tier3, timezone.localdate(), Decimal("100.00"), "", 6)
+        fresh = InterestRegistration.objects.select_related("plan").get(pk=reg.pk)
+        expected = 10000 * 6 + int(tier3.price_ex_vat * 100) * 6
+        self.assertEqual(counts.year_pence(fresh), expected)
+        self.assertEqual(next(r for r in counts.revenue()["waiting"]["by_plan"] if r["slug"] == "tier-2")["year_pence"], expected)
+
+    def test_editing_only_the_note_leaves_the_months_and_empty_clears_them(self):
+        reg = self.john()
+        price = sale_price(reg.plan, 20)
+        sub = self.setup(reg, price, 3)
+        payments.edit_manual(sub, self.admin, reg.plan, sub.start_date, price, "a note", 3)
+        self.assertEqual(Subscription.objects.get(pk=sub.pk).agreed_months, 3)
+        payments.edit_manual(sub, self.admin, reg.plan, sub.start_date, price, "a note", None)
+        self.assertIsNone(Subscription.objects.get(pk=sub.pk).agreed_months)
+
+    def test_a_sale_going_live_later_does_not_touch_an_edit_of_the_note(self):
+        reg = InterestRegistration.objects.select_related("plan").get(user=self.member("later.months@example.com", plan="tier-2"))
+        price = sale_price(reg.plan, 50)
+        sub = self.setup(reg, price)
+        now = timezone.now()
+        sale = Sale.objects.create(name="Later", percent_off=50, months_at_price=3, starts_at=now - timedelta(hours=1), ends_at=now + timedelta(days=1))
+        sale.plans.add(reg.plan)
+        payments.edit_manual(sub, self.admin, reg.plan, sub.start_date, price, "a note", None)
+        self.assertIsNone(Subscription.objects.get(pk=sub.pk).agreed_months)
+
+    def test_changing_the_price_on_an_edit_works_the_months_out_again(self):
+        reg = self.john()
+        sub = self.setup(reg, Decimal("100.00"))
+        self.assertIsNone(sub.agreed_months)
+        payments.edit_manual(sub, self.admin, reg.plan, sub.start_date, sale_price(reg.plan, 20), "", None)
+        self.assertEqual(Subscription.objects.get(pk=sub.pk).agreed_months, 6)
+
+    def test_months_without_a_price_are_not_stored(self):
+        self.assertIsNone(self.setup(self.john(), None, 6).agreed_months)
+
+    def test_a_kept_sale_that_does_not_cover_the_plan_gives_no_months(self):
+        reg = self.john()
+        now = timezone.now()
+        sale = Sale.objects.create(name="Tier 2 only", percent_off=20, months_at_price=6, starts_at=now - timedelta(days=9), ends_at=now - timedelta(days=8))
+        sale.plans.add(reg.plan)
+        InterestRegistration.objects.filter(pk=reg.pk).update(sale=sale)
+        reg = InterestRegistration.objects.select_related("plan", "sale").get(pk=reg.pk)
+        tier3 = Plan.objects.get(slug="tier-3")
+        sub = payments.set_up_manually(reg, self.admin, tier3, timezone.localdate(), sale_price(tier3, 20), "")
+        self.assertIsNone(sub.agreed_months)
+
+    def test_the_backfill_uses_a_sale_live_at_set_up_and_lists_a_reduced_price_it_cannot_read(self):
+        now = timezone.now()
+        reg = InterestRegistration.objects.select_related("plan").get(user=self.member("window.months@example.com", plan="tier-2"))
+        sale = Sale.objects.create(name="Past", percent_off=50, months_at_price=3, starts_at=now - timedelta(days=5), ends_at=now - timedelta(days=4))
+        sale.plans.add(reg.plan)
+        sub = Subscription.objects.create(registration=reg, plan=reg.plan, start_date=timezone.localdate(), agreed_price_ex_vat=sale_price(reg.plan, 50))
+        Subscription.objects.filter(pk=sub.pk).update(created_at=now - timedelta(days=4, hours=12))
+        odd = InterestRegistration.objects.select_related("plan").get(user=self.member("odd.months@example.com", plan="tier-2"))
+        unclear = Subscription.objects.create(registration=odd, plan=odd.plan, start_date=timezone.localdate(), agreed_price_ex_vat=Decimal("1.00"))
+        out = StringIO()
+        call_command("backfill_agreed_months", stdout=out)
+        self.assertEqual(Subscription.objects.get(pk=sub.pk).agreed_months, 3)
+        self.assertIn(f"LOOK AT  subscription {unclear.pk}", out.getvalue())
+
+    def test_the_report_leaves_out_people_revenue_does_not_count(self):
+        now = timezone.now()
+        declined = self.member("declined.months@example.com", plan="tier-2")
+        cancelled = self.member("cancelled.months@example.com", plan="tier-2")
+        paying = self.member("paying.months@example.com", plan="tier-2")
+        counted = self.member("counted.months@example.com", plan="tier-2")
+        sale = Sale.objects.create(name="Report", percent_off=10, months_at_price=2, starts_at=now - timedelta(days=2), ends_at=now - timedelta(hours=1))
+        sale.plans.add(counted.interest.plan)
+        InterestRegistration.objects.filter(user__in=[declined, cancelled, paying, counted]).update(created_at=now - timedelta(days=1))
+        MembershipReview.objects.create(registration=declined.interest, status=counts.DECLINED)
+        Subscription.objects.create(registration=cancelled.interest, plan=cancelled.interest.plan, start_date=timezone.localdate(), status=Subscription.CANCELLED)
+        Subscription.objects.create(registration=paying.interest, plan=paying.interest.plan, start_date=timezone.localdate(), agreed_price_ex_vat=Decimal("100.00"))
+        out = StringIO()
+        call_command("backfill_agreed_months", dry_run=True, stdout=out)
+        self.assertIn("no sale price stored: 1", out.getvalue())
+        self.assertIn(counted.public_id, out.getvalue())
+
+    def test_the_backfill_dry_run_writes_nothing_then_fills_only_the_sale_price(self):
+        reg = self.john()
+        sub = Subscription.objects.create(registration=reg, plan=reg.plan, start_date=timezone.localdate(), agreed_price_ex_vat=sale_price(reg.plan, 20))
+        other = InterestRegistration.objects.get(user=self.member("left.months@example.com", plan="tier-2"))
+        InterestRegistration.objects.filter(pk=other.pk).update(sale_percent_off=20, sale_months=6)
+        left = Subscription.objects.create(registration=other, plan=other.plan, start_date=timezone.localdate(), agreed_price_ex_vat=Decimal("1.00"))
+        out = StringIO()
+        call_command("backfill_agreed_months", dry_run=True, stdout=out)
+        self.assertIn("to fill: 1", out.getvalue())
+        self.assertIsNone(Subscription.objects.get(pk=sub.pk).agreed_months)
+        call_command("backfill_agreed_months", stdout=StringIO())
+        self.assertEqual(Subscription.objects.get(pk=sub.pk).agreed_months, 6)
+        self.assertIsNone(Subscription.objects.get(pk=left.pk).agreed_months)
+
+    def test_the_backfill_reports_a_sale_registration_with_nothing_stored(self):
+        now = timezone.now()
+        user = self.member("gap.months@example.com", plan="tier-2")
+        sale = Sale.objects.create(name="Gap", percent_off=10, months_at_price=2, starts_at=now - timedelta(days=2), ends_at=now - timedelta(hours=1))
+        sale.plans.add(user.interest.plan)
+        InterestRegistration.objects.filter(user=user).update(created_at=now - timedelta(days=1))
+        out = StringIO()
+        call_command("backfill_agreed_months", dry_run=True, stdout=out)
+        self.assertIn("no sale price stored: 1", out.getvalue())
+        self.assertIn(user.public_id, out.getvalue())
