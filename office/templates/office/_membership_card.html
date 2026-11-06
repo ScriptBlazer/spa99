@@ -28,9 +28,9 @@
   <dl class="o-rows" data-manual-subscription>
     <div><dt>Plan</dt><dd>{{ sub.plan.name }}</dd></div>
     <div><dt>Starts</dt><dd>{{ sub.start_date|date:"j M Y" }}</dd></div>
-    <div><dt>Agreed price</dt><dd>{% if sub.agreed_price_ex_vat is not None %}&pound;{{ sub.agreed_price_ex_vat }} ex VAT a month{% else %}Not recorded{% endif %}</dd></div>
+    <div><dt>Agreed price</dt><dd>{% if sub.agreed_price_ex_vat is not None %}&pound;{{ sub.agreed_price_ex_vat }} ex VAT a month{% if sub.agreed_months %}, for {{ sub.agreed_months }} month{{ sub.agreed_months|pluralize }}{% endif %}{% else %}Not recorded{% endif %}</dd></div>
     {% if sub.billing_note %}<div><dt>Billing note</dt><dd>{{ sub.billing_note }}</dd></div>{% endif %}
-    <div><dt>Set up by</dt><dd>{{ sub.created_by.get_full_name|default:sub.created_by.email }}</dd></div>
+    <div><dt>Set up by</dt><dd>{% if sub.created_by %}{{ sub.created_by.get_full_name|default:sub.created_by.email }}{% else %}Not recorded{% endif %}</dd></div>
   </dl>
   {% if office_can.can_setup %}
   <details><summary class="o-quiet">Edit</summary>

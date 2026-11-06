@@ -1,0 +1,5 @@
+{% comment %}The inside of a "Show more" row. The link is what shows with no script (and while a list is not loading itself); with script a list loads its next rows by itself and this link goes (office-more.js sets data-auto on the list card).
+`href` (default more_url), `label` (default Show more). The dots and the failure line are shown by the script; the word "Loading" is what reduced motion shows in place of the dots.{% endcomment %}
+<a class="btn btn-secondary btn-sm" href="{{ href|default:more_url }}" data-show-more data-working-text="Loading">{{ label|default:"Show more" }}</a>
+<span class="o-load" data-load role="status" hidden><span class="o-load-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="o-load-word">Loading</span></span>
+<span class="o-load-fail" data-load-fail hidden>Could not load more. <button type="button" class="o-quiet" data-load-retry>Try again</button></span>

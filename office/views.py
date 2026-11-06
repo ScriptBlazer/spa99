@@ -32,17 +32,16 @@ from plans import payments
 from plans.models import Plan, SiteSettings
 from common import levels, sorting
 from users import services as user_services
-from whatsapp import services as whatsapp_services
 from users import views as user_views
 from users.models import User
 
 from system import defaults
 
-from . import lists, profile, selectors, tools
+from . import analytics_revenue, approvals, counts, lists, profile, selectors, tools
 from .forms import ManualSetupForm
 from . import invited as invited_lists
 from . import leads as lead_lists
-from .permissions import admin, approver, final_approver, reader
+from .permissions import abilities, admin, approver, final_approver, reader
 
 
 def _greeting(user):
@@ -80,7 +79,8 @@ def _remembered_range(request, key, allowed, default):  # `default` comes from S
 def dashboard(request):
     data = selectors.dashboard(_remembered_range(request, "office_range_dashboard", selectors.DASHBOARD_RANGES, defaults.get(request).dashboard_range), request)
     warning = payments.staff_warning() if levels.at_least(request.user, levels.ADMIN) else None
-    return render(request, "office/dashboard.html", {"data": data, "greeting": _greeting(request.user), "section": "dashboard", "payment_warning": warning})
+    cards = counts.cards() if tools.can_edit(request.user) else None  # Waiting, Approved and Revenue: Barry's view only (Approver or Admin and up)
+    return render(request, "office/dashboard.html", {"data": data, "greeting": _greeting(request.user), "section": "dashboard", "payment_warning": warning, "cards": cards})
 
 
 @reader
@@ -89,18 +89,27 @@ def dashboard_json(request):
     return JsonResponse(selectors.dashboard(request.GET.get("range", defaults.get(request).dashboard_range), request))
 
 
+def _with_revenue(request, data):
+    """Analytics is open to every reader, Revenue is not: the Revenue cards' figures are added (to a copy, never to the shared snapshot) only for someone who may see Revenue."""
+    if not abilities(request.user)["can_revenue"]:
+        return data
+    return {**data, "revenue_card": analytics_revenue.build()}
+
+
 @reader
 @require_GET
+@never_cache
 def analytics(request):
     name = _remembered_range(request, "office_range_analytics", selectors.ANALYTICS_RANGES, defaults.get(request).analytics_range)
-    context = {"data": selectors.analytics(name), "pages": selectors.pages(name), "section": "analytics"}
+    context = {"data": _with_revenue(request, selectors.analytics(name)), "pages": selectors.pages(name), "section": "analytics"}
     return render(request, "office/analytics.html", context)
 
 
 @reader
 @require_GET
+@never_cache
 def analytics_data(request):
-    return JsonResponse(selectors.analytics(request.GET.get("range", defaults.get(request).analytics_range), request))
+    return JsonResponse(_with_revenue(request, selectors.analytics(request.GET.get("range", defaults.get(request).analytics_range), request)))
 
 
 @reader
@@ -111,17 +120,43 @@ def analytics_pages(request):
 
 # ---------- people ----------
 
+def _more_url(request, page, table=""):
+    """The address of the next page of a long list, filters kept: what the auto-load fetches when the "Show more" row comes into view (the HX-Request header asks for the rows only).
+    `table` names the table of Registered it belongs to, so each of the two stacked tables loads its own rows."""
+    query = request.GET.copy()
+    query["page"] = page + 1
+    query.pop("shift", None)  # the page's script adds it when it loads more
+    if table:
+        query["table"] = table
+    return f"{request.path}?{query.urlencode()}"
+
+
+def _people_table(request, filters, table, page, size):
+    rows, has_next = lists.people_page(filters, page, size, table)
+    return {"key": table, "title": "Gold" if table == "gold" else "Membership", "rows": rows, "has_next": has_next, "page": page, "more_url": _more_url(request, page, table),
+            "columns": lists.people_columns(filters, request, table), "empty": "No Gold members yet." if table == "gold" else "No one approved yet."}
+
+
 @reader
 @require_GET
 @never_cache
 def people(request):
+    """Registered. `table`: "" shows both tables (computer), "membership" or "gold" one (phone). Context: tables [{key, title, rows, has_next, page, more_url, columns}], table, rows/has_next/page/
+    more_url/columns (the first shown table, for the fragment), filters, plans, counts (membership waiting/approved/declined/total, gold_members, registered_total), approvals_line, total_registered.
+    A fragment request (HX-Request) answers rows only, for the one table asked (membership when none): `_people_rows.html` or `_people_gold_rows.html`; ?page=N loads the next rows."""
     filters, page = lists.people_filters(request), lists.page_number(request)
-    rows, has_next = lists.people_page(filters, page, defaults.get(request).list_page_size)
-    total = selectors.counters(K.REGISTRATIONS).get((K.REGISTRATIONS, ""), 0)
-    context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "columns": lists.people_columns(filters, request), "total_registered": total,
-               "plans": list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order").values("slug", "name")), "section": "people",
+    size = defaults.get(request).list_page_size
+    shown = [filters["table"]] if filters["table"] else list(lists.TABLES)
+    tables = [_people_table(request, filters, key, page, size) for key in shown]
+    first = tables[0]
+    stored = counts.read()
+    approvals_line = approvals.line(stored["memberships"]) if tools.can_edit(request.user) else None
+    context = {"tables": tables, "table": filters["table"], "rows": first["rows"], "has_next": first["has_next"], "page": page, "more_url": first["more_url"], "columns": first["columns"],
+               "filters": filters, "total_registered": stored["registered_total"], "counts": {**stored["memberships"], "gold_members": stored["gold_members"], "registered_total": stored["registered_total"]},
+               "approvals_line": approvals_line, "plans": list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order").values("slug", "name")), "section": "people",
                "sale_options": lists.SALE_OPTIONS, "payment_options": lists.PAYMENT_OPTIONS}
-    return _varied(render(request, _fragment(request, "office/people.html", "office/_people_rows.html"), context))
+    rows_template = "office/_people_gold_rows.html" if first["key"] == "gold" else "office/_people_rows.html"
+    return _varied(render(request, _fragment(request, "office/people.html", rows_template), context))
 
 
 @admin
@@ -183,7 +218,6 @@ def person(request, pk):
     if not _is_fragment(request):
         context.update(_chats_context(person, user=user, email=user.email, filter_key="user", filter_id=user.pk))
         context.update(tools.tools_context(tools.Target("person", user.pk, user=user), request.user))
-        context["unclaimed_chats"] = whatsapp_services.unclaimed_for_user(user)  # named beside Export and Delete: they do not include these
     return render(request, "office/_timeline.html" if _is_fragment(request) else "office/person.html", context)
 
 
@@ -210,7 +244,7 @@ def _setup_result(request, user, action):
 def person_setup(request, pk):
     """Set up a membership manually (a member who pays directly). Admin and up; audited; one active membership per member."""
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
-    return _setup_result(request, user, lambda d: payments.set_up_manually(user.interest, request.user, d["plan"], d["start_date"], d["agreed_price"], d["billing_note"]))
+    return _setup_result(request, user, lambda d: payments.set_up_manually(user.interest, request.user, d["plan"], d["start_date"], d["agreed_price"], d["billing_note"], d["agreed_months"]))
 
 
 @admin
@@ -237,7 +271,7 @@ def person_setup_edit(request, pk):
     if sub is None:
         messages.error(request, "There is no active membership to edit.")
         return redirect("office_person", pk=user.pk)
-    return _setup_result(request, user, lambda d: payments.edit_manual(sub, request.user, d["plan"], d["start_date"], d["agreed_price"], d["billing_note"]))
+    return _setup_result(request, user, lambda d: payments.edit_manual(sub, request.user, d["plan"], d["start_date"], d["agreed_price"], d["billing_note"], d["agreed_months"]))
 
 
 @admin
@@ -257,7 +291,8 @@ def person_setup_cancel(request, pk):
 def person_export(request, pk):
     """UK GDPR: everything we hold about this person, as a JSON download."""
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
-    response = JsonResponse(user_services.export_user_data(user, include_chats=True), json_dumps_params={"indent": 2})
+    body = {**user_services.export_user_data(user), "membership_review": approvals.export_for(user)}  # Barry's review of him: staff exports only, never the member's own download
+    response = JsonResponse(body, json_dumps_params={"indent": 2})
     response["Content-Disposition"] = f'attachment; filename="spa99-person-{user.public_id}.json"'
     return response
 
@@ -271,12 +306,8 @@ def person_delete(request, pk):
         messages.error(request, "A staff account cannot be deleted here.")
         return redirect("office_person", pk=user.pk)
     name = user.get_full_name() or user.email
-    unclaimed = whatsapp_services.unclaimed_for_user(user)  # chats on his number that nothing links to him: delete does not reach them
-    user_services.delete_user_data(user, include_chats=True)  # staff-run: his WhatsApp chats go too
+    user_services.delete_user_data(user)
     messages.success(request, f"{name} and their data were deleted.")
-    if unclaimed:
-        messages.warning(request, "Not deleted, because nothing links " + ("it" if len(unclaimed) == 1 else "them") + " to him: the WhatsApp chat with "
-                         + ", ".join(f"{c['name']} ({c['phone']})" for c in unclaimed) + ". Open it in WhatsApp and use Delete this chat if it is his.")
     return redirect("office_people")
 
 
@@ -287,10 +318,12 @@ def person_delete(request, pk):
 @never_cache
 def leads(request):
     filters, number = lead_lists.filters_from(request), lists.page_number(request)
-    rows, has_next = lead_lists.page(filters, number, defaults.get(request).leads_page_size)
+    rows, has_next = lead_lists.page(filters, number, defaults.get(request).leads_page_size, lists.shift_from(request))
     filtered = lead_lists.is_filtered(filters, request)
     summary = selectors.leads_summary(filters["range"], request)
-    context = {"rows": rows, "has_next": has_next, "page": number, "filters": filters, "columns": lead_lists.columns_for(filters, request), "filtered": filtered, "summary": summary,
+    stored = counts.read()
+    context = {"rows": rows, "has_next": has_next, "page": number, "more_url": _more_url(request, number), "tiles": {"leads_total": stored.get("leads_total", 0), "registered_total": stored["registered_total"]},
+               "filters": filters, "columns": lead_lists.columns_for(filters, request), "filtered": filtered, "summary": summary,
                "archived_view": filters["view"] == "archived", "archived_count": ArchivedLead.objects.count(),
                "total_leads": None if filtered else summary.get("leads_total"), "choices": lead_lists.filter_choices(), "section": "leads",
                "site_defaults": defaults.get(request)}
@@ -338,7 +371,6 @@ def lead_export(request, pk):
             "emails": journey_services.export_lead_emails(data["email"]),
             "chats": chat_services.export_conversations(email=data["email"]),
             "staff_emails": outreach_services.export_messages([data["email"]]),
-            "whatsapp": whatsapp_services.export_for(whatsapp_services.contacts_for_person(None, {data["email"]})),
             "gold_applications": gold_services.export_applications(data["email"])}
     response = JsonResponse(body, json_dumps_params={"indent": 2})
     response["Content-Disposition"] = 'attachment; filename="spa99-lead.json"'
@@ -352,7 +384,6 @@ def lead_delete(request, pk):
     session, (kind, data) = _lead_session(pk)
     if kind == "account":
         return redirect("office_person", pk=data.pk)
-    whatsapp_services.erase_person(None, {data["email"]})  # his chats, messages and files (found by his address, never by a number): before the journeys lose it
     cleared = journey_services.erase_lead_data(data["email"])
     from outreach.services import erase_email
 
@@ -370,7 +401,7 @@ def invited(request):
     filters, number = invited_lists.filters_from(request), lists.page_number(request)
     rows, has_next = invited_lists.page(filters, number, defaults.get(request).list_page_size)
     context = {"rows": rows, "has_next": has_next, "page": number, "filters": filters, "columns": invited_lists.columns_for(filters, request), "filtered": invited_lists.is_filtered(filters),
-               "states": invited_lists.STATE_LABELS, "section": "invited", "groups_url": settings.SYSTEM_URL + reverse("system_groups", urlconf="config.urls_system"), "default_state": invited_lists.DEFAULT_STATE}
+               "states": invited_lists.STATE_LABELS, "section": "invited", "more_url": _more_url(request, number), "groups_url": settings.SYSTEM_URL + reverse("system_groups", urlconf="config.urls_system"), "default_state": invited_lists.DEFAULT_STATE}
     return _varied(render(request, _fragment(request, "office/invited.html", "office/_invited_rows.html"), context))
 
 
@@ -401,9 +432,9 @@ def chats(request):
     page = lists.page_number(request)
     rows, has_next = lists.cut(queryset, page, defaults.get(request).list_page_size)
     more = urlencode({**({k: v for k, v in (request.GET.items()) if k in ("user", "lead")}), "sort": sort, "dir": direction, "page": page + 1})
-    return render(request, "office/chats.html", {"rows": rows, "has_next": has_next, "page": page, "section": "chats", "person": person, "show_cost": show_cost,
-                                                 "columns": sorting.header_columns(columns, sort, direction, request.path, request.GET), "sort": sort, "dir": direction,
-                                                 "more_url": f"{request.path}?{more}"})
+    context = {"rows": rows, "has_next": has_next, "page": page, "section": "chats", "person": person, "show_cost": show_cost,
+               "columns": sorting.header_columns(columns, sort, direction, request.path, request.GET), "sort": sort, "dir": direction, "more_url": f"{request.path}?{more}"}
+    return _varied(render(request, _fragment(request, "office/chats.html", "office/_chats_rows.html"), context))  # HX-Request: the rows only (the phone's auto-load)
 
 
 def _chats_person(request):
@@ -444,14 +475,14 @@ def gold(request):
     filters, page = lists.gold_filters(request), lists.page_number(request)
     rows, has_next = lists.gold_page(filters, page, defaults.get(request).list_page_size)
     stored = selectors.counters(K.GOLD_APPLICATIONS, K.GOLD_BY_STATUS)
-    context = {"rows": rows, "has_next": has_next, "page": page, "filters": filters, "columns": lists.gold_columns(filters, request), "section": "gold",
+    context = {"rows": rows, "has_next": has_next, "page": page, "more_url": _more_url(request, page), "filters": filters, "columns": lists.gold_columns(filters, request), "section": "gold",
                "final_approver_missing": approval.final_approver_missing(),
                "total_applications": stored.get((K.GOLD_APPLICATIONS, ""), 0), "waiting": selectors.waiting_count(stored),
                "awaiting_final_count": stored.get((K.GOLD_BY_STATUS, "awaiting_final"), 0)}
     return _varied(render(request, _fragment(request, "office/gold.html", "office/_gold_rows.html"), context))
 
 
-GOLD_FORMS = ("decline", "note", "email")  # ?do= on the application page opens that form (the approver email's Decline link); ?do=respond goes to his WhatsApp chat, or opens the email pop-up when he has no mobile
+GOLD_FORMS = ("decline", "note", "email")  # ?do= on the application page opens that form (the approver email's Decline link); ?do=respond goes to his WhatsApp link (wa.me), or opens the email pop-up when he has no mobile
 
 
 def _can_open(application, name):
@@ -644,9 +675,10 @@ def gold_decline(request, pk):
 
 
 def _respond(application):
-    """Respond opens his WhatsApp chat when he has a mobile, otherwise his Gold page with the Email pop-up open (a GET: it only reads)."""
-    if tools.mobile_and_name(tools.Target("gold", application.pk, application=application))[0]:
-        return redirect("office_gold_whatsapp", pk=application.pk)
+    """Respond goes to wa.me when he has a mobile, otherwise to his Gold page with the Email pop-up open (a GET: it only reads, and it marks nothing as contacted)."""
+    link = tools.wa_link(tools.mobile_and_name(tools.Target("gold", application.pk, application=application))[0])
+    if link:
+        return redirect(link)
     return redirect(f"{reverse('office_gold_application', args=[application.pk])}?do=email")
 
 

@@ -10,24 +10,40 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from common import emaildefaults as d
 from common.ratelimit import hit
 from mailings import automatic as auto_emails, blocks as mailing_blocks, images, invites, lists, segments, sending, tokens
 from mailings import saved as templates_store
 from mailings.models import ContactList, Invite, Mailing, MailingTemplate
 from notifications import emailbody, emailsettings, ses
+from notifications import sender as sender_mod
 from notifications.models import EmailLog
 from notifications.seed import DEFAULT_SUBJECTS
-from notifications.services import fill_subject, preview_email, send_templated
+from notifications.services import fill_subject, preview_email as _preview_email, send_templated
 
 from . import audit, emails as logic, services
 from .models import SystemEvent
 from .permissions import unlocked
 from .forms import FooterForm
 from .views import _edit_site, form_status, page, saved
+
+
+FONT_FILES = ("signika-latin.woff2", "figtree-latin.woff2")
+
+
+def preview_email(*args, **kwargs):
+    """The email as it would look, for the preview frames. A real email names its two fonts on the public site (a mail app has no site of its own); the preview frame is a page of the System host,
+    and a font from another host needs that host's permission (CORS), which the browser refuses: the preview showed a console error and a fallback font. The preview reads the same files from the
+    System host instead (the file the email names is the same one). What is sent is not touched."""
+    result = _preview_email(*args, **kwargs)
+    for name in FONT_FILES:
+        result["html"] = result["html"].replace(f"{settings.SITE_URL}/static/common/fonts/{name}", static(f"common/fonts/{name}"))
+    return result
 
 
 def _wants_json(request):
@@ -234,7 +250,8 @@ def _mailing_page(request, form, mailing, status=200, start=None):
                "block_max_parts": mailing_blocks.MAX_PARTS, "image_upload_url": reverse("system_mailing_image_upload"),
                "image_max_bytes": images.MAX_BYTES, "image_view_base": f"{settings.SITE_URL}/email-image/", "starters": templates_store.choices(), "starter_details": cards,
                "start_cards": [("", "Blank", "An empty email with one paragraph.")] + [(d["id"], d["name"], d["description"]) for d in cards], "start": str(start.pk) if start else "",
-               "template_save_url": reverse("system_template_save")}
+               "template_save_url": reverse("system_template_save"),
+               "sender_note": sender_mod.gone_note(mailing.sender_user_id) if mailing else ""}
     return page(request, "system/emails_mailing_form.html", "emails", context, status=status)
 
 
@@ -265,7 +282,15 @@ def mailing_edit(request, pk=None):
 
 def _starter_fields(start):
     """Form values for the chosen saved template (New mailing, ?start=<template id or key>)."""
-    return {"name": start.name, "subject": start.subject, "kind": start.kind, "group": start.group} if start else {}
+    if not start:
+        return {}
+    from mailings.blocks import STARTERS
+
+    starter = STARTERS.get(start.key, {}) if start.key else {}
+    return {"name": start.name, "subject": start.subject, "kind": start.kind, "group": start.group,
+            "archive_no_number": bool(starter.get("archive_no_number")),  # Barry's invitation moves leads with no mobile once sent
+            "footer_mode": starter.get("footer_mode", d.FOOTER_SHARED),  # ... has no contact line in its footer
+            "sender_user": sender_mod.candidate_by_local_part(starter.get("sender_local_part"))}  # ... and goes out as Barry
 
 
 @unlocked
@@ -295,8 +320,8 @@ def _mailing_preview(mailing):
     extra = logic.mailing_extra(mailing.kind, mailing.group)
     if mailing.automatic_key:
         row = logic.template_row(mailing.automatic_key)
-        return preview_email(mailing.automatic_key, row.subject if row else DEFAULT_SUBJECTS[mailing.automatic_key][0], row.body if row else "", extra)
-    return preview_email("mailing", mailing.subject, mailing.body, extra, blocks=mailing.blocks)
+        return preview_email(mailing.automatic_key, row.subject if row else DEFAULT_SUBJECTS[mailing.automatic_key][0], row.body if row else "", extra, sender_user=mailing.sender_user_id or None)
+    return preview_email("mailing", mailing.subject, mailing.body, extra, blocks=mailing.blocks, sender_user=mailing.sender_user_id or "", posted={"footer_mode": mailing.footer_mode})
 
 
 @unlocked
@@ -327,6 +352,22 @@ def mailing_count(request):
     return JsonResponse({"count": segments.count(group, params, kind, personal), "errors": {}})
 
 
+def _posted_footer(request):
+    """The footer choice on the form: the shared footer unless it is one of the group send's own choices."""
+    mode = request.POST.get("footer_mode", "")
+    return mode if mode in dict(Mailing._meta.get_field("footer_mode").choices) else d.FOOTER_SHARED
+
+
+def _posted_sender(request):
+    """The Sender on the form, or "" (hello@) when it is not a real id."""
+    value = request.POST.get("sender_user", "")
+    try:
+        Mailing._meta.get_field("sender_user").target_field.to_python(value)
+    except ValidationError:
+        return ""
+    return value
+
+
 @unlocked
 @require_POST
 def mailing_preview(request):
@@ -346,7 +387,7 @@ def mailing_preview(request):
     if errors:
         return JsonResponse({"ok": False, "errors": errors, "subject": "", "html": "", "text": ""})
     extra = logic.mailing_extra(request.POST.get("kind", Mailing.NEWS), request.POST.get("group", ""))
-    return JsonResponse({"ok": True, "errors": {}, **preview_email("mailing", subject, body, extra, blocks=parts)})
+    return JsonResponse({"ok": True, "errors": {}, **preview_email("mailing", subject, body, extra, blocks=parts, sender_user=_posted_sender(request), posted={"footer_mode": _posted_footer(request)})})
 
 
 @unlocked
@@ -363,7 +404,7 @@ def mailing_image_upload(request):
     return JsonResponse({"ok": True, "id": str(image.pk), "url": image.url, "width": image.width, "height": image.height})
 
 
-def _send_test(request, back, subject, kind, group, body, parts, label, detail):
+def _send_test(request, back, subject, kind, group, body, parts, label, detail, sender_user="", footer_mode=d.FOOTER_SHARED):
     """Send one mailing's wording to the signed-in developer only (their own first name; News tests carry a real unsubscribe link).
     Needs only a subject and wording that passes the checks: no Who, no saved mailing."""
     errors = sending.wording_errors(subject, body, parts)
@@ -372,11 +413,13 @@ def _send_test(request, back, subject, kind, group, body, parts, label, detail):
     context, headers = {"first_name": request.user.first_name, **logic.mailing_extra(kind, group)}, None
     if mailing_blocks.has_personal(parts):  # a test shows the sample link (it explains itself), not a real one
         context["personal_links"] = mailing_blocks.sample_links()
+    context.update({"whatsapp_number": sending.whatsapp_display(), "add_number_link": f"{settings.SITE_URL}/example-link/"})  # the Journey leads placeholders, with a sample link
     if kind in Mailing.MARKETING:  # a real unsubscribe link for the developer's own address
         context["unsubscribe_url"] = tokens.unsubscribe_url(request.user.email)
         headers = tokens.list_unsubscribe_headers(context["unsubscribe_url"])
+    from_email, reply_to = sender_mod.from_and_reply(sender_user)  # the test comes from the Sender chosen, so it shows what people will see
     log = send_templated("mailing", [request.user.email], "[Test] " + sending.subject_line(subject, request.user.first_name),
-                         context, headers=headers, body=body, blocks=parts, subject_email=request.user.email)
+                         context, headers=headers, body=body, blocks=parts, subject_email=request.user.email, from_email=from_email, reply_to=reply_to, options=sending.footer_options(footer_mode))
     ok = log.status == EmailLog.SENT
     audit.log_event(SystemEvent.EMAIL_TEST, request, user=request.user, outcome=SystemEvent.OK if ok else SystemEvent.FAILED,
                     detail={**detail, "status": log.status}, sentence=f"{request.user.email} sent themselves a test of the mailing '{label}' ({log.status})")
@@ -412,7 +455,7 @@ def mailing_test(request, pk):
     if mailing.automatic_key:
         return _send_automatic_test(request, mailing)
     return _send_test(request, reverse("system_mailing", args=[mailing.pk]), mailing.subject, mailing.kind, mailing.group, mailing.body,
-                      mailing.blocks, mailing.name, {"mailing": str(mailing.pk)})
+                      mailing.blocks, mailing.name, {"mailing": str(mailing.pk)}, sender_user=mailing.sender_user_id or "", footer_mode=mailing.footer_mode)
 
 
 @unlocked
@@ -431,7 +474,7 @@ def mailing_test_posted(request):
     kind = kind if kind in (Mailing.NEWS, Mailing.SERVICE) else Mailing.NEWS
     subject = request.POST.get("subject", "")
     return _send_test(request, reverse("system_mailing_new"), subject, kind, request.POST.get("group", ""), request.POST.get("body", ""), parts,
-                      request.POST.get("name") or subject, {"unsaved": True})
+                      request.POST.get("name") or subject, {"unsaved": True}, sender_user=_posted_sender(request), footer_mode=_posted_footer(request))
 
 
 def _mailing_action(request, pk, action, done):

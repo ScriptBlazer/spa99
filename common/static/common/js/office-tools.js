@@ -292,20 +292,39 @@ function initReasonChips() {
   });
 }
 
-// ---------- the Approach list page: Mark done and Remove ----------
+// ---------- the Approach list page: Mark done, Remove, Back to Leads and Archive ----------
 
-async function refreshList() {
+/** The parts of the page around the list (counts, totals) from the server; the rows stay as they are, so a list he has scrolled down is not sent back to its first page. `rows`: replace them too (an emptied page). */
+async function refreshList({ rows = false } = {}) {
   const response = await fetch(location.pathname + location.search, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } });
   if (!response.ok) throw new Error(String(response.status));
   const doc = parse(await response.text());
-  const rows = doc.querySelector('[data-office-list]');
+  const fresh = doc.querySelector('[data-office-list]');
   const body = document.querySelector('[data-office-list]');
-  if (!rows || !body) throw new Error('no list');
-  body.replaceChildren(...[...rows.childNodes].map((node) => document.importNode(node, true)));
+  if (!fresh || !body) throw new Error('no list');
+  if (rows) {
+    body.replaceChildren(...[...fresh.childNodes].map((node) => document.importNode(node, true)));
+    delete body.dataset.left;
+    delete body.dataset.loaded;
+  }
   doc.querySelectorAll('[data-region]:not([data-office-list])').forEach((next) => {
     document.querySelector(`[data-region="${next.dataset.region}"]`)?.replaceWith(document.importNode(next, true));
   });
 }
+
+/** A row has left the list: it goes, the next page is told (data-left), and a page left with no rows is fetched again. */
+async function dropRow(row) {
+  const list = row.closest('[data-office-list]');
+  row.remove();
+  if (!list) return;
+  list.dataset.left = String((Number(list.dataset.left) || 0) + 1);
+  if (!list.querySelector('.o-row')) await refreshList({ rows: true });
+  else await refreshList();
+}
+
+const SAVED_NOT = 'That did not save. Please try again.';
+const csrfOf = (form) => form.querySelector('[name="csrfmiddlewaretoken"]')?.value || '';
+const fetchHeaders = { 'X-Requested-With': 'fetch', Accept: 'application/json' };
 
 async function actOnRow(form) {
   const row = form.closest('tr');
@@ -318,8 +337,9 @@ async function actOnRow(form) {
       wait(swapMs()),
     ]);
     if (!response.ok) throw new Error(String(response.status));
-    toastsFromDocument(parse(await response.text()));
-    await refreshList();
+    const doc = parse(await response.text());
+    toastsFromDocument(doc);
+    await dropRow(row);
   } catch {
     row.classList.remove('is-leaving');
     button.disabled = false;
@@ -328,14 +348,74 @@ async function actOnRow(form) {
   }
 }
 
-/** Mark done, Remove (Approach list) and Move back (Archived leads): the row fades, the list is fetched again, the server's toast shows. */
+/** Back to Leads and Archive (from the Approach list): no question. The row goes and a toast says so, with Undo (the server's answer carries what Undo needs). */
+async function moveRow(form, row) {
+  const token = csrfOf(form);
+  row.classList.add('is-leaving');
+  try {
+    const [response] = await Promise.all([
+      fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin', headers: fetchHeaders }),
+      wait(swapMs()),
+    ]);
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data || !data.ok) throw new Error(data?.message || SAVED_NOT);
+    await dropRow(row);
+    toast(data.message, { action: data.undo ? { label: 'Undo', onClick: () => undoMove(data.undo, token) } : undefined });
+  } catch (error) {
+    row.classList.remove('is-leaving');
+    delete form.dataset.submitting;
+    toast(/^\d+$/.test(error.message) ? SAVED_NOT : error.message, { kind: 'error' });
+  }
+}
+
+async function undoMove(undo, token) {
+  const body = new FormData();
+  body.set('csrfmiddlewaretoken', token);
+  body.set('email', undo.email);
+  body.set('reason', undo.reason || '');
+  if (undo.archived) body.set('archived', '1');
+  try {
+    const response = await fetch(undo.url, { method: 'POST', body, credentials: 'same-origin', headers: fetchHeaders });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data || !data.ok) throw new Error(data?.message || SAVED_NOT);
+    await refreshList({ rows: true });   // he is back on the list, wherever he sorts: the list starts again from its first rows
+    toast(data.message);
+  } catch (error) {
+    toast(/^\d+$/.test(error.message) ? SAVED_NOT : error.message, { kind: 'error' });
+  }
+}
+
+/** Mark done, Remove (Approach list), Back to Leads, Archive (its dialog keeps the optional reason) and Move back (Archived leads). */
 function initRowActions() {
+  document.addEventListener('click', (event) => {   // the Archive button names the row's own address for the one shared dialog (the page's dialog script opens it)
+    const open = event.target.closest?.('[data-archive-url]');
+    const form = document.querySelector('form[data-outreach-archive]');
+    if (!open || !form) return;
+    form.action = open.dataset.archiveUrl;
+    const who = form.querySelector('[data-archive-who]');
+    if (who) who.textContent = open.dataset.archiveName || 'him';
+    form.elements.reason.value = '';
+    form.querySelectorAll('[data-reason-chip]').forEach((chip) => chip.setAttribute('aria-pressed', 'false'));
+    form.dataset.row = '';
+    open.closest('tr')?.setAttribute('data-archiving', '');
+  }, true);
   document.addEventListener('submit', (event) => {
+    const archive = event.target.closest?.('form[data-outreach-archive]');
+    if (archive && document.querySelector('[data-office-list]')) {
+      const row = document.querySelector('tr[data-archiving]');
+      if (!row) return;
+      event.preventDefault();
+      row.removeAttribute('data-archiving');
+      archive.closest('dialog')?.close();
+      moveRow(archive, row);
+      return;
+    }
     const form = event.target.closest?.('form[data-outreach-act], form[data-row-act]');
     if (!form || event.defaultPrevented || !document.querySelector('[data-office-list]')) return;
     event.preventDefault();
-    actOnRow(form);
+    if (form.dataset.outreachAct === 'to-leads') moveRow(form, form.closest('tr')); else actOnRow(form);
   }, true);
+  document.addEventListener('close', (event) => { if (event.target.matches?.('dialog[data-dialog="archive"]')) document.querySelector('tr[data-archiving]')?.removeAttribute('data-archiving'); }, true);
 }
 
 export function initTools() {

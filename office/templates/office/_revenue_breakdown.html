@@ -1,0 +1,117 @@
+{% load office_tags %}{% comment %}The full breakdown on Revenue (its figures never change with dates or assumptions; only three lines of wording do when dates are chosen): the page's last card, closed until opened, one sheet when open (who, how the months run, each deal, how it adds up, then the people still waiting in a different material). Every figure is the stored one (`a.detail`, from counts.revenue_view): exact pence, shown with `pounds` or `price_month`, and no rounded figure is ever added up. `a` and `w` are the approved and waiting buckets. The plus is the dashboard's (<details>, works without JS). Order of states: nothing stored yet, nothing approved, Gold only, then the whole sheet; the first two have no plus because it would open nothing.{% endcomment %}
+{% with d=a.detail %}
+<section class="o-card o-bd" data-revenue-breakdown aria-labelledby="rev-bd-h">
+  <h2 id="rev-bd-h" class="o-h3" data-bd-heading>The full breakdown</h2>
+  {% if not d %}
+  <p class="o-sub">The breakdown will be ready after the next hourly update.</p>
+  {% elif not d.groups and not d.gold_count %}
+  <p class="o-sub">Nothing approved yet, so there is nothing to break down.</p>
+  {% else %}
+  <p class="o-sub">{% if date_range.active %}Not limited to the dates above. Who pays what, for how long, and what it comes to over each member's first 12 months.{% else %}Who pays what, for how long, and what it comes to over 12 months.{% endif %}</p>
+  <div class="o-bd-stage" data-wants-stage>
+    <details class="o-bd-details" data-wants-details>
+      <summary class="o-plus" aria-label="The full breakdown" aria-expanded="false">
+        <svg class="o-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>
+      </summary>
+      <div class="o-bd-body" data-bd-body>
+        <p class="o-sub">Every figure here excludes VAT and covers each member's first 12 months.</p>
+        {% if date_range.active %}{% include "office/_revenue_basis.html" %}{% endif %}
+
+        <div class="o-bd-sec" data-bd-who>
+          <h3 class="o-subhead">Who is on what</h3>
+          <div class="o-bd-tiles">
+            <p class="o-bd-tile"><span class="o-bd-num" data-bd-reduced>{{ d.reduced_count|num }}</span><span class="o-bd-lab">On a sale or agreed price</span></p>
+            <p class="o-bd-tile"><span class="o-bd-num" data-bd-full>{{ d.full_count|num }}</span><span class="o-bd-lab">At full price</span></p>
+            <p class="o-bd-tile"><span class="o-bd-num" data-bd-gold>{{ d.gold_count|num }}</span><span class="o-bd-lab">On the Gold Card</span></p>
+          </div>
+          {% if d.lost_count %}<p class="o-sub">Of those at full price, {{ d.lost_count|num }} let a sale price lapse.</p>{% endif %}
+        </div>
+
+        {% if not d.groups %}
+        <p class="o-sub o-bd-sec">No memberships approved yet.</p>
+        {% else %}
+        <div class="o-bd-sec" data-bd-months>
+          <h3 class="o-subhead">How the 12 months run</h3>
+          <p class="o-sub">Month 1 is each member's own first month, not a calendar month. Memberships only. Gold is a yearly fee, added at the end.{% if d.steps|length > 1 %} The figure changes when a reduced price ends.{% endif %}</p>
+          <div class="o-bd-run">
+            <div class="o-bd-bars" aria-hidden="true">
+              {% for m in d.months %}<span class="o-bd-bar" style="--p: {{ m.percent|stringformat:'.2f' }}"><span class="o-bd-col"></span><span class="o-bd-n">{{ m.number }}</span></span>{% endfor %}
+            </div>
+            <div class="o-bd-steps">
+              <p class="o-bd-steps-h">A month</p>
+              <ul class="o-bd-lines">
+                {% for s in d.steps %}<li data-bd-step><span>{% if s.from == s.to %}Month {{ s.from }}{% else %}Months {{ s.from }} to {{ s.to }}{% endif %}</span><span class="num">{{ s.pence|pounds }}</span></li>{% endfor %}
+                <li class="o-bd-last" data-bd-memberships-year><span>All 12 months</span><span class="num">{{ d.memberships_year_pence|pounds }}</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="o-bd-sec" data-bd-deals>
+          <h3 class="o-subhead">Deal by deal</h3>
+          {# The computer's table: one body a deal. It replaces the phone's tiles at 64em and is never shown on a phone. #}
+          <table class="o-list o-list--revenue o-bd-table">
+            <caption class="sr-only">Each deal and the plans on it, over the first 12 months</caption>
+            <thead><tr><th scope="col">Deal and plan</th><th scope="col" class="num">People</th><th scope="col" class="num">A month now</th><th scope="col" class="num">A month after</th><th scope="col" class="num">At this price</th><th scope="col" class="num">After that</th><th scope="col" class="num">First 12 months</th></tr></thead>
+            {% for g in d.groups %}
+            <tbody data-bd-deal>
+              <tr class="o-bd-dealrow"><th scope="row">{% include "office/_revenue_deal.html" with g=g part="title" %}<span class="o-cell-sub">{% include "office/_revenue_deal.html" with g=g part="line" %}</span></th><td class="num">{{ g.count|num }}</td><td></td><td></td><td class="num">{{ g.during_pence|pounds }}</td><td class="num">{% if g.after_total_pence %}{{ g.after_total_pence|pounds }}{% else %}<span class="o-bd-quiet">None</span>{% endif %}</td><td class="num o-bd-year">{{ g.year_pence|pounds }}</td></tr>
+              {% for r in g.rows %}<tr class="o-bd-planrow"><th scope="row">{{ r.name }}{% if r.lost %}<span class="o-cell-sub">{{ r.lost|num }} let a sale price lapse</span>{% endif %}</th><td class="num">{{ r.count|num }}</td><td class="num">{{ r.month_pence|price_month }}</td><td class="num">{% if r.after_pence == r.month_pence or g.kind == "agreed" and not g.lasts %}<span class="o-bd-quiet">Same</span>{% else %}{{ r.after_pence|price_month }}{% endif %}</td><td class="num">{{ r.during_pence|pounds }}</td><td class="num">{% if r.after_total_pence %}{{ r.after_total_pence|pounds }}{% else %}<span class="o-bd-quiet">None</span>{% endif %}</td><td class="num o-bd-year">{{ r.year_pence|pounds }}</td></tr>{% endfor %}
+            </tbody>
+            {% endfor %}
+          </table>
+          {# The phone's tiles: one a deal, its plans inside. #}
+          <div class="o-bd-stack">
+            {% for g in d.groups %}
+            <div class="o-bd-deal" data-bd-deal-tile>
+              <div class="o-rev-head"><h4 class="o-bd-title">{% include "office/_revenue_deal.html" with g=g part="title" %}</h4><span class="o-rev-count">{{ g.count|num }} {% if g.count == 1 %}person{% else %}people{% endif %}</span></div>
+              <p class="o-sub">{% include "office/_revenue_deal.html" with g=g part="line" %}</p>
+              <ul class="o-rev-waiting o-bd-lines">
+                {% if g.after_total_pence %}<li><span>{{ g.months }} month{{ g.months|pluralize }} at this price</span><span class="num">{{ g.during_pence|pounds }}</span></li>
+                <li><span>{{ g.after_months }} month{{ g.after_months|pluralize }} after that</span><span class="num">{{ g.after_total_pence|pounds }}</span></li>{% endif %}
+                <li class="o-bd-last"><span>First 12 months</span><span class="num">{{ g.year_pence|pounds }}</span></li>
+              </ul>
+              <ul class="o-bd-plans">
+                {% for r in g.rows %}<li><span class="o-bd-plan-name">{{ r.name }}, {{ r.count|num }} {% if r.count == 1 %}person{% else %}people{% endif %}</span><span class="num">{{ r.year_pence|pounds }}</span>
+                  <span class="o-bd-plan-sub">{{ r.month_pence|price_month }} a month{% if r.after_pence != r.month_pence %}{% if g.kind != "agreed" or g.lasts %}, then {{ r.after_pence|price_month }}{% endif %}{% endif %}{% if r.lost %}. {{ r.lost|num }} let a sale price lapse.{% endif %}</span></li>{% endfor %}
+              </ul>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="o-bd-sec" data-bd-adds>
+          <h3 class="o-subhead">How it adds up</h3>
+          <div class="o-bd-sum">
+            <p class="o-bd-sumrow" data-bd-sum-memberships><span>Memberships, {{ d.reduced_count|add:d.full_count|num }} {% if d.reduced_count|add:d.full_count == 1 %}person{% else %}people{% endif %}</span><span class="num">{{ d.memberships_year_pence|pounds }}</span></p>
+            {% if d.gold_count %}<p class="o-bd-sumrow" data-bd-sum-gold><span>Gold Card, {{ d.gold_count|num }} at {{ revenue.gold_fee_pence|pounds }}</span><span class="num">+ {{ d.gold_year_pence|pounds }}</span></p>{% endif %}
+            <hr class="o-bd-rule">
+            <div class="o-bd-total" data-bd-sum-total>
+              <p class="o-bd-total-lab">Estimate for the year</p>
+              <p class="o-bd-total-num">{{ a.year_ex|pounds }}</p>
+              <p class="o-bd-total-sub">{% if date_range.active %}The full 12-month estimate, not just the dates above.{% else %}The same figure as the top of this page.{% endif %}</p>
+            </div>
+          </div>
+          <p class="o-sub">Rounded to the nearest pound, so a line can differ by £1.</p>
+        </div>
+
+        {% if w.count %}
+        <div class="o-bd-sec o-bd-waiting" data-bd-waiting>
+          <h3 class="o-subhead">Possible, from those waiting</h3>
+          <p class="o-sub">Not counted in any figure above. Only if they are approved.</p>
+          <ul class="o-rev-waiting">
+            {% for g in w.detail.groups %}<li><span>{% include "office/_revenue_deal.html" with g=g part="title" %}{% if g.kind == "sale" %}, {{ g.percent }}% off for {{ g.lasts }} month{{ g.lasts|pluralize }}{% endif %}, {{ g.count|num }} waiting</span><span class="num">{{ g.year_pence|pounds }}</span></li>{% endfor %}
+            {% for r in w.by_plan %}{% if r.kind == "gold" and r.count %}<li><span>{{ r.name }}, {{ r.count|num }} waiting</span><span class="num">{{ r.year_ex|pounds }}</span></li>{% endif %}{% endfor %}
+          </ul>
+          <a class="o-quiet" href="{{ approvals_url }}" data-press>See who is waiting{% include "office/_icon.html" with name="chevron-right" %}</a>
+        </div>
+        {% endif %}
+
+        <button type="button" class="o-quiet o-bd-close" data-bd-close>Close the breakdown</button>
+      </div>
+    </details>
+  </div>
+  {% endif %}
+</section>
+{% endwith %}

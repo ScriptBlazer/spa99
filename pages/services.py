@@ -219,7 +219,7 @@ def compare_table(cards):
 
     def price(c, inc=False):
         if c["kind"] == Plan.FREE_BY_APPLICATION:
-            return c["annual_fee_inc_text" if inc else "annual_fee_text"]
+            return c["annual_fee_inc_text" if inc else "annual_fee_vat_text"]  # the price cell reads "£199 + VAT a year" (the Including VAT row keeps the figure with VAT in it)
         return f"£{c['price_inc' if inc else 'price_ex_vat']}"
 
     rows = [

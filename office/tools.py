@@ -104,16 +104,25 @@ def display_name(target):
     return mobile_and_name(target)[1] or target.main
 
 
+def wa_link(mobile):
+    """`https://wa.me/<digits>` for a stored E.164 mobile, '' when there is none. Digits only, no plus: that is the form wa.me wants."""
+    digits = "".join(ch for ch in (mobile or "") if ch.isdigit())
+    return f"https://wa.me/{digits}" if digits else ""
+
+
 def whatsapp_context(target, user):
-    """`whatsapp` for the lead, person and Gold pages (design brief section 6): {configured, has_mobile, mobile, first_name, contact_url (opens his chat),
-    start_url, edit_url (POST first_name, mobile_country, mobile on a lead; mobile_country, mobile on a person or Gold page), can_send, can_edit, has_chat, window_open, window_closes_at,
-    opted_out, unread, thread_url}, plus `mobile_countries` for the add-a-mobile dialog."""
+    """`whatsapp` for the lead, person and Gold pages: {state ("mobile" or "none"), wa_link (https://wa.me/<digits>, "" with no mobile), has_mobile, mobile, first_name, edit_url (POST
+    first_name, mobile_country, mobile on a lead; mobile_country, mobile on a person or Gold page), can_edit, can_add_number, reason}, plus `mobile_countries` for the add-a-mobile dialog.
+    The button is a plain link: nothing here says a message was sent, because a wa.me click cannot be proven."""
     from common import phone
-    from whatsapp import services as whatsapp
 
     mobile, first = mobile_and_name(target)
-    edit = target.url("contact") if target.kind == "lead" else target.url("mobile")  # person and Gold: POST mobile_country, mobile
-    return {"whatsapp": whatsapp.page_context(mobile, user, can_edit(user), target.url("whatsapp"), edit, first, target), "mobile_countries": phone.countries()}
+    edit = target.url("contact") if target.kind == "lead" else target.url("mobile")
+    link = wa_link(mobile)
+    editor = can_edit(user)
+    return {"whatsapp": {"state": "mobile" if link else "none", "wa_link": link, "has_mobile": bool(link), "mobile": mobile or "", "first_name": first, "edit_url": edit, "can_edit": bool(editor),
+                         "can_add_number": bool(editor and not link), "reason": "" if link else ("Add a number to WhatsApp him." if editor else "No mobile on file.")},
+            "mobile_countries": phone.countries()}
 
 
 def email_context(target, user):
@@ -155,7 +164,10 @@ def tools_context(target, user):
 
 
 def outreach_rows(entries):
-    """Plain dicts for the approach list page (one per entry): name, contact, where from, link and the two actions."""
+    """Plain dicts for the approach list page (one per entry): name, contact, where from, link and the actions. A lead entry (an address, no account, no Gold application) also gets
+    `is_lead` with `to_leads_url` (Back to Leads) and `archive_url`; other rows (a person, a Gold applicant) keep only Remove. `emailed_at` is set when a person or a group send emailed him."""
+    from outreach.services import bounced_set, emailed_at
+
     rows = []
     entries = list(entries)
     emails = {e.lead_email for e in entries if e.lead_email}
@@ -163,6 +175,8 @@ def outreach_rows(entries):
     for pk, address in (JourneySession.objects.filter(is_bot=False).annotate(k=Lower("lead_email")).filter(k__in=emails)
                         .order_by("created_at").values_list("pk", "lead_email")):
         sessions[address.lower()] = pk  # oldest first, so the newest wins
+    addresses = {(e.user.email if e.user_id else e.gold_application.email if e.gold_application_id else e.lead_email or "").lower() for e in entries}
+    emailed, bounced = emailed_at(addresses), bounced_set(addresses)
     for e in entries:
         mobile = ""
         if e.user_id:
@@ -175,9 +189,13 @@ def outreach_rows(entries):
         else:
             name, email, source = e.lead_email, e.lead_email, "Lead"
             href = reverse("office_lead", args=[sessions[e.lead_email]]) if e.lead_email in sessions else ""
+        key = (email or "").lower()
         rows.append({"id": str(e.pk), "name": name, "email": email, "mobile": mobile, "source": source, "href": href, "reason": e.reason,
-                     "registered_at": e.registered_at.isoformat() if getattr(e, "registered_at", None) and e.registered_at > e.added_at else "",  # only an account verified after he was added
+                     "emailed_at": emailed[key].isoformat() if key in emailed and key not in bounced else "",  # a bounced address shows Possible fake instead
+                     "bounced": key in bounced, "is_lead": source == "Lead",
                      "added_by": e.added_by_label, "added_at": e.added_at.isoformat(), "done_at": e.done_at.isoformat() if e.done_at else "",
                      "done_by": e.done_by_label, "done_url": reverse("office_outreach_done", args=[e.pk]),
-                     "remove_url": reverse("office_outreach_remove", args=[e.pk])})
+                     "remove_url": reverse("office_outreach_remove", args=[e.pk]),
+                     "to_leads_url": reverse("office_outreach_to_leads", args=[e.pk]) if source == "Lead" else "",
+                     "archive_url": reverse("office_outreach_archive", args=[e.pk]) if source == "Lead" else ""})
     return rows

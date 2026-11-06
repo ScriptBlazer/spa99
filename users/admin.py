@@ -26,11 +26,11 @@ class UserAdmin(ExportCsvMixin, SimpleHistoryAdmin, BaseUserAdmin):
                        "is_active", "is_staff", "is_superuser", "groups", "user_permissions")
 
     def delete_model(self, request, obj):
-        services.delete_user_data(obj, include_chats=True)  # full erasure, and the stored figures move with it
+        services.delete_user_data(obj)  # full erasure, and the stored figures move with it
 
     def delete_queryset(self, request, queryset):
         for user in queryset:
-            services.delete_user_data(user, include_chats=True)
+            services.delete_user_data(user)
     fieldsets = (
         (None, {"fields": ("email", "password")}),
         ("Person", {"fields": ("public_id", "first_name", "last_name", "mobile", "date_of_birth")}),

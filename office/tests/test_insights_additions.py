@@ -235,9 +235,9 @@ class InvitedTests(OfficeTestCase):
         self.assertNotContains(get(self.office, "/leads/"), 'data-office-nav-item="invited"')
         self.assertContains(get(self.admin, "/leads/"), 'data-office-nav-item="invited"')
         office_page, admin_page = get(self.office, "/leads/"), get(self.admin, "/leads/")
-        self.assertContains(office_page, "data-nav-sheet")  # phone More sheet
-        self.assertNotContains(office_page, 'href="/invited/"')  # not in the rail and not in the More sheet
-        self.assertContains(admin_page, 'href="/invited/"', count=2)  # rail and More sheet
+        self.assertNotContains(office_page, "data-nav-sheet")  # no More sheet: the phone has five tabs
+        self.assertNotContains(office_page, 'href="/invited/"')  # not in the rail and not in the person menu
+        self.assertContains(admin_page, 'href="/invited/"', count=2)  # rail and the phone's person menu
         self.assertEqual(get(self.office, "/invited/export.csv").status_code, 403)
         response = get(self.admin, "/invited/export.csv")
         self.assertEqual(response.status_code, 200)

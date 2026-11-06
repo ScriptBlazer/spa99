@@ -671,6 +671,7 @@ def beta_bad_input(w):
         page.wait_for_timeout(300)
     office = w.page()
     with w.step("Office: the person page shows the names as plain text and nothing runs", office):
+        assert dbtool("approve-member", "beta-script@example.com")["result"] == "done"  # Registered lists approved people only; a new member waits in Approvals
         sign_in(office, OFFICE, OLIVE["email"], PASSWORD)
         office.goto(f"{OFFICE}/people/")
         row = office.locator("[data-person-row]", has_text="beta-script@example.com").first

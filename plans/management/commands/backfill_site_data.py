@@ -57,8 +57,11 @@ written by hand:
 
 - (Privacy notice, 2026-10-30 to 2026-11-04) line by line on what is saved, so an admin's edits elsewhere stay: the invitation pixel line, the
   journey tick wording (email and WhatsApp, "opening and offers"), the WhatsApp block (part 2), the two part 3 lines, "Last updated" (3 November 2026;
-  only if it still has an older date) and the privacy version (to 2026-11-03, only from 2026-10-26 or older). A line whose old wording was edited
+  only if it still has an older date) and the privacy version (to the current one, only from an older one). On 2026-11-05 the
+  WhatsApp block's Twilio / "Reply STOP" wording is replaced by the plain wording (the Office no longer sends WhatsApp through Twilio) and "Last updated" and the version move to 5 November / 2026-11-05. A line whose old wording was edited
   by hand is not changed and is listed as "Left alone".
+
+- (Office 2, 2026-11-05) the saved Office dashboard default range moves from 7 days to All time (any other choice stays).
 
 - (WhatsApp, 2026-11-03) the journey "Not you? Use another email" button (`journey` page, `not_you` row) becomes "Not you? Start again" (it now
   clears name, email and mobile): only while it still has exactly the old wording.
@@ -175,7 +178,16 @@ def backfill():
     changed.update(_whatsapp_and_gold_2026_10_29())
     changed.update(_privacy_notice_2026_11_04())
     changed.update(_not_you_start_again_2026_11_03())
+    changed.update(_dashboard_all_time_2026_11_05())
     return changed
+
+
+def _dashboard_all_time_2026_11_05():
+    """(Office 2) The Office dashboard opens on All time: a saved default still on the old 7 days moves; any other choice stays."""
+    from system.models import SiteDefaults
+
+    moved = SiteDefaults.objects.filter(dashboard_range="7d").update(dashboard_range="all")
+    return {"system.SiteDefaults (dashboard default range: All time)": moved} if moved else {}
 
 
 OLD_INDUSTRY_TEXT, NEW_INDUSTRY_TEXT = "What do you do?", "What industry are you in?"
@@ -376,9 +388,30 @@ def _edit_privacy_section(page, key, edits, changed, label):
             section.save()
 
 
+def _whatsapp_block(page, changed):
+    """The WhatsApp block of part 2: added when the part has none; the Twilio / "Reply STOP" wording saved on live until 2026-11-05 is swapped for the plain wording. A block an admin edited
+    (it has the heading but not the exact old text) is not touched and is listed as left alone; so is a part with no place to put it."""
+    from content import legal as legal_text
+
+    for section in Section.objects.filter(page=page, key="part_2"):
+        body = section.body
+        if legal_text.WHATSAPP_BLOCK in body:
+            continue
+        if legal_text.OLD_WHATSAPP_BLOCK in body:
+            body, label = body.replace(legal_text.OLD_WHATSAPP_BLOCK, legal_text.WHATSAPP_BLOCK, 1), "WhatsApp block"
+        elif "### WhatsApp" not in body and "### Our team" in body:
+            body, label = body.replace("### Our team", legal_text.WHATSAPP_BLOCK + "\n### Our team", 1), "WhatsApp block"
+        else:
+            changed[f"{LEFT_ALONE}privacy part_2: WhatsApp block"] += 1
+            continue
+        section.body = body
+        section.save()
+        changed[f"content.Section (privacy part_2: {label})"] += 1
+
+
 def _privacy_notice_2026_11_04():
     """Privacy notice, applied line by line to what is saved (the old wording is the real text on origin/main), so a part an admin edited
-    elsewhere still gets the new lines and keeps their edit. Covers 2026-10-30 (invitation email pixel line) and 2026-11-03/04 (WhatsApp:
+    elsewhere still gets the new lines and keeps their edit. Covers 2026-10-30 (invitation email pixel line), 2026-11-03/04 (WhatsApp:
     the journey tick, the WhatsApp block in part 2, the withdrawal and basis lines in part 3, "Last updated", the privacy version)."""
     from content import legal
 
@@ -387,17 +420,17 @@ def _privacy_notice_2026_11_04():
     if page is None:
         return changed
     mailbox = "- Emails you send us, kept in our mailbox.\n"
+    _whatsapp_block(page, changed)
     _edit_privacy_section(page, "part_2", [
         ("invitation email pixel line", mailbox, legal.INVITE_OPEN_LINE + "\n" + mailbox),
         ("the journey tick says email and WhatsApp", "a tick to say Spa 99 may email you about opening. We keep",
          "a tick to say Spa 99 may email and WhatsApp you about opening and offers. We keep"),
-        ("WhatsApp block", "### Our team", legal.WHATSAPP_BLOCK + "\n### Our team"),
     ], changed, "part_2")
     _edit_privacy_section(page, "part_3", [
         ("news about opening and offers", "send news about the opening and to understand", "send news about the opening and offers, and to understand"),
         ("withdrawing stops WhatsApp too", "we then stop emailing you and delete the address.", "we then stop emailing and WhatsApping you and delete the address."),
     ], changed, "part_3")
-    for section in Section.objects.filter(page=page, key="updated", body__in=["30 October 2026", "28 October 2026", "26 October 2026"]):
+    for section in Section.objects.filter(page=page, key="updated", body__in=["3 November 2026", "30 October 2026", "28 October 2026", "26 October 2026"]):
         section.body = legal.PRIVACY_UPDATED
         section.save()
         changed["content.Section (privacy notice: last updated)"] += 1
@@ -405,7 +438,7 @@ def _privacy_notice_2026_11_04():
 
     site = SiteSettings.load()
     says_it = Section.objects.filter(page=page, key="part_2", body__contains=legal.WHATSAPP_BLOCK).exists()
-    if site.privacy_version in ("2026-10-26", "2026-10-23", "draft-1") and says_it:  # the notice now says it: new sign-ups record the new version (nobody is asked to accept again; old records stay as they were)
+    if site.privacy_version in ("2026-11-03", "2026-10-26", "2026-10-23", "draft-1") and says_it:  # the notice now says it: new sign-ups record the new version (nobody is asked to accept again; old records stay as they were)
         site.privacy_version = legal.PRIVACY_VERSION
         site.save()
         changed["plans.SiteSettings (privacy version)"] += 1

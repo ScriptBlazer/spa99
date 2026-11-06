@@ -2,6 +2,7 @@
 
 Everything here reads stored rows or cheap counts (EmailLog has an index on created_at; suppressions are a small table)."""
 import datetime
+import json
 
 from django import forms
 from django.conf import settings
@@ -13,6 +14,7 @@ from common.validators import sending_domain
 from mailings import blocks as mailing_blocks, segments
 from mailings.models import ContactList, EmailOptOut, Invite, Mailing
 from notifications import emailbody, emailsettings, ses
+from notifications import sender as sender_mod
 from notifications.models import EmailBounce, EmailLog, EmailSuppression, NotificationTemplate
 from notifications.seed import DEFAULT_SUBJECTS
 from plans.models import SiteSettings
@@ -116,9 +118,38 @@ def automatic_list():
     return result
 
 
-SETTING_FIELDS = ("footer_mode", "sender", "heading", "button_text", *emailsettings.LINE_FIELDS)  # the per-email settings beside subject and body
+SETTING_FIELDS = ("footer_mode", "sender_user", "heading", "button_text", *emailsettings.LINE_FIELDS)  # the per-email settings beside subject and body
 LINE_DEFAULTS = {"footer_brand_line": d.FOOTER_BRAND, "footer_address_line": d.FOOTER_ADDRESS, "footer_contact_line": d.FOOTER_CONTACT}
-SETTING_DEFAULTS = {"footer_mode": "", "sender": "", "heading": "", "button_text": "", **LINE_DEFAULTS}  # what Reset puts back
+SETTING_DEFAULTS = {"footer_mode": "", "sender": "", "sender_user": None, "heading": "", "button_text": "", **LINE_DEFAULTS}  # what Reset puts back (`sender` is the old Site/Person radio, kept until migrate_person_sender has run)
+
+
+def sender_queryset(current=None):
+    """The users the Sender select may hold: staff who can send as themselves, plus the one already stored (so a draft whose person has left still shows, with a warning, and hello@ is used)."""
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+
+    ids = [user.pk for user, _ in sender_mod.staff_candidates()]
+    return get_user_model().objects.filter(Q(pk__in=ids) | Q(pk=current)) if current else get_user_model().objects.filter(pk__in=ids)
+
+
+def sender_queryset_none():
+    from django.contrib.auth import get_user_model
+
+    return get_user_model().objects.none()
+
+
+class SenderChoiceField(forms.ModelChoiceField):
+    """The Sender select: hello@ first (the empty choice), then each staff member as `Name <address>`. Select only: a value that is not one of these is refused."""
+
+    def __init__(self, queryset=None, **kwargs):
+        for name in ("required", "label", "empty_label", "limit_choices_to", "blank"):
+            kwargs.pop(name, None)
+        # the real queryset is set by the form's __init__ (a query at import time would run before the database is ready)
+        super().__init__(queryset=queryset if queryset is not None else sender_queryset_none(), required=False, empty_label=sender_mod.site_choice(), label="Sender", **kwargs)
+
+    def label_from_instance(self, user):
+        found, why = sender_mod.chosen(user)
+        return sender_mod.choice_label(user, found) if why == "" else f"{sender_mod.full_name(user) or user.email} (no @{sender_mod.sending_domain()} address now: hello@ is used)"
 
 
 class TemplateForm(VersionedForm):
@@ -127,7 +158,7 @@ class TemplateForm(VersionedForm):
     following the default."""
 
     footer_mode = forms.ChoiceField(choices=d.FOOTER_MODES, required=False, widget=forms.RadioSelect)
-    sender = forms.ChoiceField(choices=d.SENDERS, required=False, widget=forms.RadioSelect)
+    sender_user = SenderChoiceField()
 
     class Meta:
         model = NotificationTemplate
@@ -147,7 +178,9 @@ class TemplateForm(VersionedForm):
         if not self.is_bound:
             self.initial["body"] = self.instance.body or spec.default_body  # the editor shows what is sent
             self.initial["footer_mode"] = self.instance.footer_mode or spec.default_footer
-            self.initial["sender"] = self.instance.sender or spec.default_sender
+            self.initial["sender_user"] = self.instance.sender_user_id or legacy_person_user(self.instance, spec)
+        if "sender_user" in self.fields:
+            self.fields["sender_user"].queryset = sender_queryset(self.instance.sender_user_id)
 
     def clean_body(self):
         text = (self.cleaned_data.get("body") or "").replace("\r\n", "\n").replace("\r", "\n").strip()
@@ -157,9 +190,19 @@ class TemplateForm(VersionedForm):
         mode = self.cleaned_data.get("footer_mode") or ""
         return "" if mode == self.spec.default_footer else mode
 
-    def clean_sender(self):
-        sender = self.cleaned_data.get("sender") or ""
-        return "" if sender == self.spec.default_sender else sender
+    @property
+    def changed_data(self):
+        """The old Site/Person radio follows the Sender select, so the two never disagree in the saved row."""
+        changed = list(super().changed_data)
+        if "sender_user" in changed and "sender" not in changed:
+            changed.append("sender")
+        return changed
+
+    def _post_clean(self):
+        if "sender_user" in self.fields and "sender_user" in self.cleaned_data:
+            # a person picked: the old radio is cleared. hello@ picked: it says Site where the email's default was the person sender, so the old default cannot come back.
+            self.instance.sender = "" if self.cleaned_data["sender_user"] else (d.SENDER_SITE if self.spec.default_sender != d.SENDER_SITE else "")
+        super()._post_clean()
 
     def clean(self):
         data = super().clean()
@@ -172,6 +215,20 @@ class TemplateForm(VersionedForm):
             for message in messages:
                 self.add_error(name if name in self.fields else None, message)
         return data
+
+
+def legacy_person_user(row, spec):
+    """Before `migrate_person_sender` has run, an email that uses the old person sender shows the staff member whose address that is, so the select tells the truth. None when it does not use it."""
+    if row.sender_user_id or (row.sender or spec.default_sender) != d.SENDER_PERSON:
+        return None
+    address = (SiteSettings.load().auto_email_from_address or "").strip().lower()
+    return next((user.pk for user, sender in sender_mod.staff_candidates() if sender.address == address), None) if address else None
+
+
+def reply_to_for(value, contact_address):
+    """Where replies go for the chosen sender (the help line under the select): his own address, or the contact address for hello@."""
+    found, why = sender_mod.chosen(value or None)
+    return contact_address if found.source == "site" else found.address
 
 
 def settings_changed(row):
@@ -192,6 +249,7 @@ def edit_context(spec, form, row):
             "default_mode": spec.default_footer, "default_sender": spec.default_sender,
             "site_sender": settings.DEFAULT_FROM_EMAIL, "contact_email": site.contact_address,
             "person_sender": site.auto_sender, "person_address": (site.auto_email_from_address or "").strip(),
+            "sender_note": sender_mod.gone_note(row.sender_user_id), "reply_to": reply_to_for(form["sender_user"].value() if "sender_user" in form.fields else None, site.contact_address),
             "custom_open": spec.editable and form["footer_mode"].value() == d.FOOTER_CUSTOM,
         },
     }
@@ -212,13 +270,20 @@ class MailingForm(forms.ModelForm):
 
     class Meta:
         model = Mailing
-        fields = ["name", "subject", "body", "kind", "group"]
+        fields = ["name", "subject", "body", "kind", "group", "sender_user", "footer_mode", "archive_no_number"]
+        field_classes = {"sender_user": SenderChoiceField}
 
     block_errors = None  # {"_": [...], "<index>": {field: [...]}} for the parts, when parts were posted
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["body"].required = False
+        self.fields["sender_user"].queryset = sender_queryset(self.instance.sender_user_id if self.instance else None)
+        self.fields["archive_no_number"].required = False
+        self.fields["footer_mode"].required = False  # a form without it is the shared footer
+
+    def clean_footer_mode(self):
+        return self.cleaned_data.get("footer_mode") or d.FOOTER_SHARED
 
     def clean_kind(self):
         kind = self.cleaned_data["kind"]
@@ -243,6 +308,11 @@ class MailingForm(forms.ModelForm):
         for name, messages in errors.items():
             for message in messages:
                 self.add_error(name, message)
+        if data.get("archive_no_number") and not segments.is_lead_group(data.get("group")):
+            self.add_error("archive_no_number", "Only a send to leads can move leads to Archived.")
+        parts_text = json.dumps(self.cleaned_blocks) if "blocks" in self.data and hasattr(self, "cleaned_blocks") else (data.get("body") or "")
+        if not segments.is_lead_group(data.get("group")) and (mailing_blocks.uses_add_number(getattr(self, "cleaned_blocks", None)) or "{add_number_link}" in parts_text or "{whatsapp_number}" in parts_text):
+            self.add_error(None, "The add-your-number link and the WhatsApp number are for a send to leads only.")
         if data.get("group"):
             self.params, group_errors = segments.clean_params(data["group"], self.data)
             for name, messages in group_errors.items():

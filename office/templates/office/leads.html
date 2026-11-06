@@ -4,22 +4,17 @@
 {% block main %}
 <h1 class="sr-only">{% if archived_view %}Archived leads{% else %}Leads{% endif %}</h1>
 {% if not archived_view %}
-{# The three tiles are stored figures for the chosen range (snapshot); nothing is added up here. #}
-<section class="o-leadsum" data-leads-summary data-region="leads-summary" data-fade aria-label="Leads in the last {{ summary.range|range_label|lower }}">
-  <div class="o-leadsum-tile" data-leads-new>
-    <p class="o-leadsum-label"><span class="o-only-wide">Leads</span><span class="o-only-narrow">Leads</span></p>
-    <p class="o-leadsum-num">{{ summary.leads_new|num }}</p>
-    <p class="o-leadsum-line">gave their email</p>
-  </div>
-  <div class="o-leadsum-tile" data-leads-registered>
-    <p class="o-leadsum-label"><span class="o-only-wide">Went on to register</span><span class="o-only-narrow">Registered</span></p>
-    <p class="o-leadsum-num">{{ summary.leads_registered|num }}</p>
-    <p class="o-leadsum-line">{% if summary.registered_share_bp is None %}No leads in this range{% else %}{{ summary.registered_share_bp|bp_rate }} of these leads{% endif %}</p>
-  </div>
-  <a class="o-leadsum-tile o-leadsum-tile--link" href="{% url 'office_leads' %}?hot=1&amp;range=all" data-leads-hot>
-    <p class="o-leadsum-label"><span class="o-only-wide">Hot leads</span><span class="o-only-narrow">Hot</span></p>
-    <p class="o-leadsum-num">{{ summary.hot_leads|num }}</p>
-    <p class="o-leadsum-line">High potential</p>
+{# Two tiles, true totals (office.counts: stored, they ignore the range and the filters): Leads (no account, not archived, not on the approach list) and Registered (everyone registered). #}
+<section class="o-leadsum" data-leads-summary data-region="leads-summary" data-fade aria-label="Leads and registered people">
+  <a class="o-leadsum-tile o-leadsum-tile--link" href="{% url 'office_leads' %}" data-leads-total-tile data-press>
+    <p class="o-leadsum-label">Leads</p>
+    <p class="o-leadsum-num">{{ tiles.leads_total|num }}</p>
+    <p class="o-leadsum-line">No account yet</p>
+  </a>
+  <a class="o-leadsum-tile o-leadsum-tile--link" href="{% url 'office_people' %}" data-registered-tile data-press>
+    <p class="o-leadsum-label">Registered</p>
+    <p class="o-leadsum-num">{{ tiles.registered_total|num }}</p>
+    <p class="o-leadsum-line">Have an account</p>
   </a>
 </section>
 {% endif %}
@@ -56,7 +51,7 @@
           <select id="f-industry" name="industry" class="o-select"><option value="">All industries</option>{% for i in choices.industries %}<option value="{{ i.value }}"{% if filters.industry == i.value %} selected{% endif %}>{{ i.label }}</option>{% endfor %}</select></div>
         <div class="o-filter-group"><label class="o-filter-label" for="f-heard">Heard about us</label>
           <select id="f-heard" name="heard" class="o-select"><option value="">Any answer</option>{% for h in choices.heard %}<option value="{{ h.value }}"{% if filters.heard == h.value %} selected{% endif %}>{{ h.label }}</option>{% endfor %}</select></div>
-        <div class="o-filter-group o-filter-group--chip"><label class="o-chip"><input type="checkbox" name="gold" value="yes"{% if filters.gold %} checked{% endif %}><span>Applied for Gold</span></label><label class="o-chip"><input type="checkbox" name="chat" value="1"{% if filters.chat %} checked{% endif %}><span>Gave email to the assistant</span></label></div>
+        <div class="o-filter-group o-filter-group--chip"><label class="o-chip"><input type="checkbox" name="gold" value="yes"{% if filters.gold %} checked{% endif %}><span>Applied for Gold</span></label><label class="o-chip"><input type="checkbox" name="chat" value="1"{% if filters.chat %} checked{% endif %}><span>Gave email to the assistant</span></label><label class="o-chip"><input type="checkbox" name="emailed" value="1"{% if filters.emailed %} checked{% endif %}><span>Emailed</span></label></div>
         {% endif %}
         {% include "office/_sort_group.html" with columns=head_columns dir_value=filters.dir %}
         {% if office_can.can_export %}<a class="btn btn-secondary btn-sm o-export o-export--sheet" href="{% url 'office_leads_csv' %}?{{ request.GET.urlencode }}" data-export-csv data-export-base="{% url 'office_leads_csv' %}">Export CSV</a>{% endif %}

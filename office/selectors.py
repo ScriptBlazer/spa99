@@ -97,8 +97,8 @@ def tier_pair(insights):
 
 def lead_block(figures, now, before):
     """The Leads keys of the Dashboard snapshot (merged into its payload), from the same Figures as everything else.
-    A lead is an email address given at the journey gate (cohort: first given in the range); `leads_registered` = those
-    whose address has an account now. `hot_leads` is the current number of hot leads (High potential, no account, no Gold
+    A lead is an email address given at the journey gate (cohort: first given in the range), still on the Leads list (no account, not archived, not on the Approach list). There is no "went on to register" figure any more: the
+    true totals (Leads, Registered) are office.counts. `hot_leads` is the current number of hot leads (High potential, no account, no Gold
     application). `insights_leads` has the shape of `insights`, one vote per lead that has not registered (latest finished
     journey in the range)."""
     from . import leads
@@ -117,12 +117,14 @@ def lead_block(figures, now, before):
                    for i, (d, n) in enumerate(ranked, 1)]
         insights.append({"key": key, "title": title, "sentence": f"{options[0]['label']}: {options[0]['value']} of {voters} leads.",
                          "top": options[0], "runner_up": options[1] if len(options) > 1 else None, "options": options})
-    return {"leads_new": figures.new_lead_count(*now), "leads_new_previous": None if before is None else figures.new_lead_count(*before),
-            "leads_registered": figures.converted_leads(*now), "hot_leads": leads.hot_leads_queryset().count(), "insights_leads": insights}
+    # Home's card must agree with the Leads list: someone who has since registered, or is on the Approach list, is no longer a lead (Moishe, 2026-11-05)
+    current = set(leads.lead_queryset("all").values_list("email_key", flat=True))
+    return {"leads_new": len(figures.new_leads(*now) & current), "leads_new_previous": None if before is None else len(figures.new_leads(*before) & current),
+            "hot_leads": leads.hot_leads_queryset().count(), "insights_leads": insights}
 
 
 def build_leads(range_name="30d", today=None, figures=None):
-    """The stored figures of the Leads page for a range: the three tiles and the unfiltered total (current leads)."""
+    """The stored figures of the Leads page for a range: new leads in the range and the unfiltered total of leads last seen in it. (The two tiles, Leads and Registered, are true totals: office.counts.)"""
     from insights import people
     from . import leads
 
@@ -130,9 +132,8 @@ def build_leads(range_name="30d", today=None, figures=None):
     today = today or metrics.day()
     figures = figures or people.load()
     window = reader.range_dates(range_name, today)
-    new, converted = figures.new_lead_count(*window), figures.converted_leads(*window)
-    return {"range": range_name, "ranges": list(ANALYTICS_RANGES), "today": today.isoformat(), "leads_new": new, "leads_registered": converted,
-            "registered_share_bp": basis_points(converted, new), "hot_leads": leads.hot_leads_queryset().count(),
+    new = figures.new_lead_count(*window)
+    return {"range": range_name, "ranges": list(ANALYTICS_RANGES), "today": today.isoformat(), "leads_new": new, "hot_leads": leads.hot_leads_queryset().count(),
             "leads_total": leads.lead_queryset(range_name=range_name, today=today).count()}  # same range and rule as the list: addresses with no account
 
 
@@ -407,11 +408,11 @@ def _empty_funnel():
             for i, (k, label) in enumerate(steps)]
 
 
-EMPTY_LEADS = {"leads_new": 0, "leads_new_previous": None, "leads_registered": 0, "hot_leads": 0, "insights_leads": []}
+EMPTY_LEADS = {"leads_new": 0, "leads_new_previous": None, "hot_leads": 0, "insights_leads": []}
 
 
 def empty_leads(range_name):
-    return {"range": range_name, "ranges": list(ANALYTICS_RANGES), "leads_new": 0, "leads_registered": 0, "registered_share_bp": None, "hot_leads": 0, "leads_total": 0}
+    return {"range": range_name, "ranges": list(ANALYTICS_RANGES), "leads_new": 0, "hot_leads": 0, "leads_total": 0}
 
 
 def empty_dashboard(range_name):

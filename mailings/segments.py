@@ -3,7 +3,7 @@
 also needs consent (`User.marketing_consent`; for Gold applicants the application's tick) and leaves out people who
 unsubscribed without an account.
 
-The "Journey leads" group is different: people who left an address at the journey gate and have no account. News only (they
+The "All leads" group (and "Leads with no number", the same people with no mobile yet) is different: people who left an address at the journey gate and have no account. News only (they
 never registered, so a service message has no reason to reach them); the gate tick is their consent.
 
 "Registered" means a person with a registered interest (the early list), not a team account. Tier = the plan they
@@ -18,6 +18,8 @@ from django.utils import timezone
 from gold.models import GoldApplication
 from journey.models import JourneySession
 from notifications.models import EmailSuppression
+from outreach.models import ArchivedLead
+from outreach.services import approach_entries
 from plans.models import Plan
 from users.models import User
 
@@ -94,12 +96,20 @@ def _applicants(params):
 
 def _leads(params):
     """One row per journey session that left an address; people with an account, bots and linked sessions are out."""
-    qs = JourneySession.objects.filter(is_bot=False, user__isnull=True).exclude(lead_email="")
+    qs = JourneySession.objects.filter(is_bot=False, user__isnull=True).exclude(lead_email="").annotate(lead_key=Lower("lead_email"))
+    qs = qs.exclude(Exists(ArchivedLead.objects.filter(email=OuterRef("lead_key")))).exclude(Exists(approach_entries(OuterRef("lead_key"))))  # the people the Leads page lists
     if params.get("date_from"):
         qs = qs.filter(lead_at__date__gte=params["date_from"])
     if params.get("date_to"):
         qs = qs.filter(lead_at__date__lte=params["date_to"])
     return qs
+
+
+def _leads_no_number(params):
+    """Every lead (no dates) who has no mobile yet: not on any journey of his address, and not on a Gold application of his."""
+    from outreach.services import has_mobile_q
+
+    return _leads({}).annotate(has_mobile=has_mobile_q(OuterRef("lead_key"))).filter(has_mobile=False)
 
 
 GROUPS = {g.key: g for g in [
@@ -117,13 +127,15 @@ GROUPS = {g.key: g for g in [
     Group("list", "Uploaded list", "A list you uploaded in Groups. News or an invitation, always with unsubscribe.", REASON_LIST,
           ({"name": "list_id", "type": "choice", "label": "List", "required": True},), people="list", news_only=True,
           kinds=(Mailing.NEWS, Mailing.INVITATION)),
-    Group("leads", "Journey leads", "People who left their email at the journey and have no account. News or an invitation, never a service message.", REASON_LEAD,
+    Group("leads_no_number", "Leads with no number", "Everyone who left their email, has not registered and has no mobile yet. No dates: all of them. News or an invitation, never a service message.", REASON_LEAD,
+          (), people="leads", news_only=True, kinds=(Mailing.NEWS, Mailing.INVITATION)),
+    Group("leads", "All leads", "Everyone who left their email and has not registered, with or without a mobile. News or an invitation, never a service message.", REASON_LEAD,
           ({"name": "date_from", "type": "date", "label": "Given from", "required": False},
            {"name": "date_to", "type": "date", "label": "Given to", "required": False}), people="leads", news_only=True,
           kinds=(Mailing.NEWS, Mailing.INVITATION)),
 ]}
 BUILDERS = {"everyone": _everyone, "tier": _tier, "gold": _gold, "opted_in": _opted_in, "unconfirmed": _unconfirmed,
-            "between": _between, "applicants": _applicants, "leads": _leads, "list": lambda params: ContactListMember.objects.none()}
+            "between": _between, "applicants": _applicants, "leads": _leads, "leads_no_number": _leads_no_number, "list": lambda params: ContactListMember.objects.none()}
 
 
 def param_choices(name):
@@ -179,7 +191,7 @@ def queryset(group_key, params, kind, personal=False):
     if not group.allows(kind):
         return _empty(group)
     if group.people == "leads":
-        return _lead_queryset(params or {}, kind in (Mailing.NEWS, Mailing.INVITATION), kind == Mailing.INVITATION or personal)
+        return _lead_queryset(params or {}, kind in (Mailing.NEWS, Mailing.INVITATION), kind == Mailing.INVITATION or personal, group_key)
     if group.people == "list":
         return _list_queryset(params or {}, kind, personal)
     qs = BUILDERS[group_key](params or {}).annotate(r_email=Lower("email"), r_user_id=F("user_id") if group.people == "applicants" else F("pk"))
@@ -254,15 +266,15 @@ def skipped_summary(group_key, params, kind, personal=False):
             parts.append("news switched off")
         return skipped, _words(parts) if skipped else ""
     base = (BUILDERS[group_key](params or {}).count() if group.people != "leads"
-            else _leads(params or {}).order_by().values(email=Lower("lead_email")).distinct().count())
+            else BUILDERS[group_key](params or {}).order_by().values(email=Lower("lead_email")).distinct().count())
     skipped = max(base - sendable, 0)
     if group.people == "leads" and invite_rules:
         return skipped, "bounced or complained, unsubscribed, already members or already invited" if skipped else ""
     return skipped, ("suppressed, unsubscribed or not opted in" if kind == Mailing.NEWS else "suppressed") if skipped else ""
 
 
-def _lead_queryset(params, allowed, invite_rules=False):
-    qs = (_leads(params) if allowed else JourneySession.objects.none()).annotate(r_email=Lower("lead_email"), first_name=Value("", output_field=CharField()),
+def _lead_queryset(params, allowed, invite_rules=False, group_key="leads"):
+    qs = (BUILDERS[group_key](params) if allowed else JourneySession.objects.none()).annotate(r_email=Lower("lead_email"), first_name=Value("", output_field=CharField()),
                                  r_user_id=Value(None, output_field=UUIDField()))
     qs = qs.exclude(Exists(User.objects.annotate(u_email=Lower("email")).filter(u_email=OuterRef("r_email"))))  # any account, staff included
     qs = qs.exclude(Exists(EmailSuppression.objects.filter(email=OuterRef("r_email"))))
@@ -270,6 +282,22 @@ def _lead_queryset(params, allowed, invite_rules=False):
     if invite_rules:  # an invitation or a personal link: not twice to someone whose invite is still waiting
         qs = qs.exclude(Exists(Invite.objects.filter(email=OuterRef("r_email"), status__in=Invite.PENDING, expires_at__gt=timezone.now())))
     return qs
+
+
+def is_lead_group(group_key):
+    """All leads or Leads with no number: the groups that get the add-your-number link and can move leads to Archived."""
+    group = GROUPS.get(group_key)
+    return bool(group) and group.people == "leads"
+
+
+def lead_split(params, kind, personal=False, group_key="leads"):
+    """(with a mobile, without one) among the different addresses a send to the Journey leads would reach: what the confirm shows when the send moves leads with no mobile to Archived.
+    A lead has a mobile when any journey of his address holds one, or a Gold application of his does."""
+    from outreach.services import has_mobile_q
+
+    qs = queryset(group_key, params, kind, personal).annotate(lead_has_mobile=has_mobile_q(OuterRef("r_email")))
+    with_mobile = qs.filter(lead_has_mobile=True).order_by().values("r_email").distinct().count()
+    return with_mobile, qs.filter(lead_has_mobile=False).order_by().values("r_email").distinct().count()
 
 
 def count(group_key, params, kind, personal=False):
@@ -305,7 +333,7 @@ def overview():
             detail = [(label, _applicants({"status": value}).count()) for value, label in param_choices("status")]
             total = sum(n for _, n in detail)
         elif group.people == "leads":
-            total = _leads({}).order_by().values(email=Lower("lead_email")).distinct().count()
+            total = BUILDERS[group.key]({}).order_by().values(email=Lower("lead_email")).distinct().count()
         else:
             total = BUILDERS[group.key]({}).count()
         rows.append({"key": group.key, "label": group.label, "description": group.description, "count": total, "detail": [d for d in detail if d[1]]})

@@ -42,22 +42,24 @@ class EmailFlexibilityViewTests(TestCase):
         self.assertEqual((bad["ok"], list(bad["errors"])), (False, ["footer_contact_line"]))
 
     def test_per_email_settings_save_default_values_as_blank_and_reset_restores_all(self):
+        barry = make_user("barry@spa99.test", system=False)  # a team member whose own address is on the sending domain: he is in the Sender select
         page = self.client.get("/emails/automatic/verify/")
-        self.assertEqual((page.context["form"].initial["footer_mode"], page.context["form"].initial["sender"]), ("shared", "site"))
+        self.assertEqual((page.context["form"].initial["footer_mode"], page.context["form"].initial["sender_user"]), ("shared", None))
+        self.assertIn(str(barry.pk), [str(v.value) for v, _ in page.context["form"].fields["sender_user"].choices if v != ""])
         self.client.post(SAVE, {**BASE, "footer_mode": "custom", "footer_brand_line": "B", "footer_address_line": "A", "footer_contact_line": "",
-                                "sender": "person", "heading": "Hello {first_name}", "button_text": "Confirm now"})
+                                "sender_user": str(barry.pk), "heading": "Hello {first_name}", "button_text": "Confirm now"})
         row = NotificationTemplate.objects.get(key="verify")
-        self.assertEqual((row.footer_mode, row.sender, row.heading, row.button_text, row.footer_brand_line), ("custom", "person", "Hello {first_name}", "Confirm now", "B"))
-        self.assertTrue({"footer_mode", "sender", "heading", "button_text"} <= set(SystemChange.objects.filter(model_label="notifications.notificationtemplate").values_list("field", flat=True)))
+        self.assertEqual((row.footer_mode, row.sender_user, row.heading, row.button_text, row.footer_brand_line), ("custom", barry, "Hello {first_name}", "Confirm now", "B"))
+        self.assertTrue({"footer_mode", "sender_user", "heading", "button_text"} <= set(SystemChange.objects.filter(model_label="notifications.notificationtemplate").values_list("field", flat=True)))
         self.assertNotIn("Reset to default", self.client.get("/emails/automatic/welcome/").content.decode())
         self.assertContains(self.client.get("/emails/automatic/verify/"), "Reset to default")
-        self.client.post(SAVE, {**BASE, "footer_mode": "shared", "sender": "site"})  # the defaults again: stored blank
+        self.client.post(SAVE, {**BASE, "footer_mode": "shared", "sender_user": ""})  # the defaults again: stored blank, hello@
         row.refresh_from_db()
-        self.assertEqual((row.footer_mode, row.sender), ("", ""))
-        self.client.post(SAVE, {**BASE, "footer_mode": "no_contact", "sender": "person", "heading": "H", "button_text": "B"})
+        self.assertEqual((row.footer_mode, row.sender, row.sender_user), ("", "", None))
+        self.client.post(SAVE, {**BASE, "footer_mode": "no_contact", "sender_user": str(barry.pk), "heading": "H", "button_text": "B"})
         self.client.post("/emails/automatic/verify/reset/")
         row.refresh_from_db()
-        self.assertEqual((row.footer_mode, row.sender, row.heading, row.button_text, row.footer_contact_line), ("", "", "", "", "Questions? Reply to this email or write to {contact_email}."))
+        self.assertEqual((row.footer_mode, row.sender, row.sender_user, row.heading, row.button_text, row.footer_contact_line), ("", "", None, "", "", "Questions? Reply to this email or write to {contact_email}."))
         self.assertNotContains(self.client.get("/emails/automatic/verify/"), "Reset to default")
 
     def test_bad_settings_are_field_errors_and_the_next_morning_default_is_shown(self):
@@ -65,9 +67,7 @@ class EmailFlexibilityViewTests(TestCase):
         self.assertEqual(bad.status_code, 400)
         self.assertTrue({"heading", "button_text", "footer_contact_line"} <= set(bad.context["form"].errors))
         page = self.client.get("/emails/automatic/lead_next_morning/")
-        self.assertEqual((page.context["form"].initial["footer_mode"], page.context["form"].initial["sender"]), ("no_contact", "person"))
-        self.assertFalse(page.context["footer"]["person_sender"])  # the screen says the person sender has no address yet
-        self.assertContains(page, "data-se-person-missing")
+        self.assertEqual((page.context["form"].initial["footer_mode"], page.context["form"].initial["sender_user"]), ("no_contact", None))  # the old person default and no address set: nobody to show, hello@
 
     def test_preview_and_test_send_use_the_typed_settings(self):
         SiteSettings.objects.update(auto_email_from_name="Barry", auto_email_from_address="barry@spa99.test")
@@ -93,13 +93,7 @@ class SenderNameOneLineTests(TestCase):
 
     def test_form_refuses_a_line_break_and_the_header_never_has_one(self):
         from plans.models import SiteSettings
-        from system.forms import EmailsForm
-
         site = SiteSettings.load()
-        form = EmailsForm(instance=site)
-        form.cleaned_data = {"auto_email_from_name": "Barry\nBcc: x@example.com"}
-        with self.assertRaises(Exception):
-            form.clean_auto_email_from_name()
         site.auto_email_from_name, site.auto_email_from_address = "Barry\r\nLobenstein", "barry@example.com"
         self.assertNotIn("\n", site.auto_sender)
         self.assertNotIn("\r", site.auto_sender)

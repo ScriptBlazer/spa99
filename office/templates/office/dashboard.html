@@ -4,7 +4,6 @@
 {% block header_range %}{% include "office/_range.html" with place="header" ranges=data.ranges current=data.range %}{% endblock %}
 {% block main %}
 {# DOM order is the phone order; the desktop grid places the cards (css). Everything is server-rendered: rings, sparklines, numbers. Plain counts, no percent. #}
-{% include "office/_range.html" with place="page" ranges=data.ranges current=data.range %}
 <p class="o-error" data-error hidden role="status"><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
 {% if payment_warning %}<p class="o-error" role="alert" data-payment-warning>{{ payment_warning.count }} member{{ payment_warning.count|pluralize }} will lose their launch price on {{ payment_warning.closes_on }} ({{ payment_warning.days_left }} day{{ payment_warning.days_left|pluralize }} left).
   <a class="o-quiet" href="{% url 'office_people' %}?sale=at_risk">See who</a></p>{% endif %}
@@ -15,6 +14,44 @@
     <p class="o-lead" data-office-what-changed data-region="what-changed" data-fade>{{ data.what_changed|default:"A quiet day so far." }}</p>
   </header>
 
+  {% comment %}Waiting for approval, Approved, Revenue (Barry's view: the Approver permission or Admin and up). True totals: they ignore the range. Context `cards` (office.counts.cards): each ring {value, of}; Revenue rings are pence excluding VAT.
+     Design: docs/features/office-2-design.md section 1. DOM order is the phone order, and the cards sit before the journey.{% endcomment %}
+  {% if cards %}
+  <section class="o-cards-approval" data-approval-cards aria-label="Approval and revenue">
+    {% with w=cards.waiting a=cards.approved r=cards.revenue %}
+    <section class="o-card o-pair" data-reveal data-card="waiting" aria-labelledby="pair-waiting-h">
+      <h2 id="pair-waiting-h" class="o-h3 o-pair-title">Waiting for approval</h2>
+      <div class="o-pair-rings">
+        {% share_arcs w.gold.value w.gold.of as arc %}
+        <a class="o-pair-link" data-ring="gold" data-press href="{% url 'office_gold' %}?status=waiting" aria-label="{{ w.gold.value|num }} Gold application{{ w.gold.value|pluralize }} waiting, of {{ w.gold.of|num }} applied">{% include "office/_ring_fig.html" with arc=arc num=w.gold.value|num l1="Gold" l2="waiting" l3=w.gold.of|ring_of:"applied" %}</a>
+        {% share_arcs w.memberships.value w.memberships.of as arc %}
+        <a class="o-pair-link" data-ring="memberships" data-press href="{% url 'office_approvals' %}?status=waiting" aria-label="{{ w.memberships.value|num }} Membership{{ w.memberships.value|pluralize }} waiting, of {{ w.memberships.of|num }} registered">{% include "office/_ring_fig.html" with arc=arc num=w.memberships.value|num l1="Memberships" l2="waiting" l3=w.memberships.of|ring_of:"registered" %}</a>
+      </div>
+    </section>
+    <section class="o-card o-pair" data-reveal data-card="approved" aria-labelledby="pair-approved-h">
+      <h2 id="pair-approved-h" class="o-h3 o-pair-title">Approved</h2>
+      <div class="o-pair-rings">
+        {% share_arcs a.gold.value a.gold.of as arc %}
+        <a class="o-pair-link" data-ring="gold" data-press href="{% url 'office_gold' %}?status=approved" aria-label="{{ a.gold.value|num }} Gold application{{ a.gold.value|pluralize }} approved, of {{ a.gold.of|num }} applied">{% include "office/_ring_fig.html" with arc=arc num=a.gold.value|num l1="Gold" l2="approved" l3=a.gold.of|ring_of:"applied" %}</a>
+        {% share_arcs a.memberships.value a.memberships.of as arc %}
+        <a class="o-pair-link" data-ring="memberships" data-press href="{% url 'office_people' %}?table=membership" aria-label="{{ a.memberships.value|num }} Membership{{ a.memberships.value|pluralize }} approved, of {{ a.memberships.of|num }} registered">{% include "office/_ring_fig.html" with arc=arc num=a.memberships.value|num l1="Memberships" l2="approved" l3=a.memberships.of|ring_of:"registered" %}</a>
+      </div>
+    </section>
+    <a class="o-card o-card--link o-pair o-pair--revenue" data-reveal data-press data-card="revenue" href="{% url 'office_revenue' %}" 
+       aria-label="Revenue, 12-month estimate excluding VAT. Gold {{ r.gold.value|pounds }} of {{ r.gold.of|pounds }} possible. Memberships {{ r.memberships.value|pounds }} of {{ r.memberships.of|pounds }} possible. Open the Revenue page.">
+      <h2 id="pair-revenue-h" class="o-h3 o-pair-title">Revenue</h2>
+      <p class="o-pair-sub">12-month estimate, excluding VAT</p>
+      <span class="o-pair-rings">
+        {% share_arcs r.gold.value r.gold.of as arc %}
+        <span class="o-pair-link" data-ring="gold">{% include "office/_ring_fig.html" with arc=arc num=r.gold.value|pounds_compact l1="Gold" l2="estimate" l3=r.gold.of|ring_of_pounds %}</span>
+        {% share_arcs r.memberships.value r.memberships.of as arc %}
+        <span class="o-pair-link" data-ring="memberships">{% include "office/_ring_fig.html" with arc=arc num=r.memberships.value|pounds_compact l1="Memberships" l2="estimate" l3=r.memberships.of|ring_of_pounds %}</span>
+      </span>
+    </a>
+    {% endwith %}
+  </section>
+  {% endif %}
+
   {# The journey: three rings, plain counts #}
   <section class="o-card o-rings" data-reveal data-office-rings aria-labelledby="journey-h">
     <h2 id="journey-h" class="o-h3">The journey</h2>
@@ -22,7 +59,7 @@
     <div class="o-ring-row" role="group" data-morph="rings-label" aria-label="{{ sentence }}">
       {% for ring in data.rings %}
       {% ring_arcs ring.percent as arc %}
-      <a class="o-ring-item" href="{% url 'office_analytics' %}#{% if ring.key == 'registrations' %}registrations{% else %}journeys{% endif %}" data-ring="{{ ring.key }}" data-percent="{{ ring.percent|default_if_none:'' }}">
+      <a class="o-ring-item" data-press href="{% url 'office_analytics' %}#{% if ring.key == 'registrations' %}registrations{% else %}journeys{% endif %}" data-ring="{{ ring.key }}" data-percent="{{ ring.percent|default_if_none:'' }}">
         <span class="o-ring-fig">
           <svg class="o-ring-svg" viewBox="0 0 100 100" aria-hidden="true" focusable="false" data-morph="ring-{{ ring.key }}-svg" style="--has: {{ arc.goal }}">
             <g transform="rotate(-90 50 50)">
@@ -65,7 +102,7 @@
     </header>
     <div class="o-rowlist" data-region="waiting-list">
       {% for item in data.waiting.items %}
-      <div class="o-wait-row">
+      <div class="o-wait-row" data-press>
         <a class="o-wait-link" href="{% url 'office_gold_application' item.id %}" data-waiting-item data-potential="{{ item.potential }}">
           <span class="o-wait-name">{{ item.name }}</span>
           {% include "office/_badge.html" with potential=item.potential %}
@@ -78,7 +115,7 @@
     </div>
   </section>
 
-  {# Leads: stored figures (snapshot). New leads, and how many of them went on to register. #}
+  {# Leads: stored figures (snapshot): new leads in the range. #}
   <section class="o-card o-leads" data-reveal data-office-leads aria-labelledby="leads-h">
     <h2 id="leads-h" class="o-h3"><span class="o-lead-dot" aria-hidden="true"></span>Leads</h2>
     <div class="o-leads-body" data-region="leads-card" data-fade>
@@ -90,14 +127,6 @@
         {% if change %}<p class="o-delta" data-leads-delta>{{ change }}</p>{% endif %}
         {% else %}<p class="o-leads-label o-leads-label--muted">No new leads in this range.</p>{% endif %}
       </div>
-      {% if data.leads_new %}
-      {% ratio data.leads_registered data.leads_new as reg_share %}
-      <div class="o-leads-reg" data-leads-registered>
-        <p class="o-leads-num o-leads-num--sm">{{ data.leads_registered|num }}</p>
-        <p class="o-delta">of {{ data.leads_new|num }} lead{{ data.leads_new|pluralize }} {{ data.leads_new|pluralize:"has,have" }} registered</p>
-        <span class="o-lbar" role="presentation"><span class="o-lbar-fill" data-morph="leads-bar" style="--share: {{ reg_share }}"></span></span>
-      </div>
-      {% endif %}
       <a class="o-quiet o-more" href="{% url 'office_leads' %}?range={{ data.range }}">See all leads</a>
     </div>
   </section>
@@ -110,7 +139,7 @@
     </header>
     <div class="o-rowlist" data-region="hot-list">
       {% for l in data.hot_lead_rows %}
-      <a class="o-latest-row o-hot-row" href="{{ l.href }}" data-hot-item>
+      <a class="o-latest-row o-hot-row" href="{{ l.href }}" data-hot-item data-press>
         <span class="o-latest-name">{{ l.email }}</span>
         <span class="o-latest-plan">{% if l.tier %}Suggested {{ l.tier }}{% else %}No suggestion yet{% endif %}</span>
         <span class="o-hot-badge">{% include "office/_badge.html" with potential=l.potential %}</span>
@@ -126,7 +155,7 @@
     <h2 id="activity-h" class="o-h3">Recent activity</h2>
     <div class="o-rowlist" data-region="activity">
       {% for e in data.activity %}
-      <a class="o-feed-row" {% if e.href %}href="{{ e.href }}"{% endif %} data-activity-item data-kind="{{ e.kind }}">
+      <a class="o-feed-row" {% if e.href %}href="{{ e.href }}" data-press{% endif %} data-activity-item data-kind="{{ e.kind }}">
         <span class="o-feed-dot" aria-hidden="true">{% if e.kind == "lead" %}{% include "office/_icon.html" with name="address-book" %}{% elif e.kind == "registered" %}{% include "office/_icon.html" with name="person-plus" %}{% elif e.kind == "verified" %}{% include "office/_icon.html" with name="check" %}{% elif e.kind == "journey_finished" %}{% include "office/_icon.html" with name="flag" %}{% else %}{% include "office/_icon.html" with name="gold" %}{% endif %}</span>
         <span class="o-feed-text"><span class="o-feed-who">{{ e.who }}</span> {{ e.label }}{% if e.detail %}<span class="o-feed-detail"> &middot; {{ e.detail }}</span>{% endif %}</span>
         <span class="o-latest-when">{{ e.at|relative }}</span>
@@ -163,7 +192,7 @@
 
   {# Site visitors and Page views #}
   {% for stat in data.stats %}{% if stat.key == "visitors" or stat.key == "page_views" %}
-  <a class="o-card o-card--link o-stat" href="{% url 'office_analytics' %}#{{ stat.link }}" data-reveal data-stat="{{ stat.key }}" data-direction="{{ stat.direction }}">
+  <a class="o-card o-card--link o-stat" data-press href="{% url 'office_analytics' %}#{{ stat.link }}" data-reveal data-stat="{{ stat.key }}" data-direction="{{ stat.direction }}">
     <span class="o-stat-label" data-stat-label>{{ stat.label }}</span>
     <span class="o-stat-body" data-region="stat-{{ stat.key }}" data-fade>
       <span class="o-stat-value" data-stat-value{% if stat.value < 10000 %} data-count="{{ stat.value }}"{% endif %}>{{ stat.value|compact }}</span>
@@ -186,7 +215,7 @@
     <header class="o-card-head"><h2 id="latest-h">Latest registrations</h2></header>
     <div class="o-rowlist" data-region="latest">
       {% for item in data.latest %}
-      <a class="o-latest-row" href="{% url 'office_person' item.id %}" data-latest-item>
+      <a class="o-latest-row" href="{% url 'office_person' item.id %}" data-latest-item data-press>
         <span class="o-latest-name">{{ item.name }}</span>
         <span class="o-latest-plan">{{ item.plan }}</span>
         <span class="o-latest-when">{{ item.registered|relative }}</span>

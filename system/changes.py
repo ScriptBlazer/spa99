@@ -48,6 +48,9 @@ FIELD_SECTIONS = {
     ("plans.sitesettings", "lead_next_morning_at"): "emails",
     ("plans.sitesettings", "lead_next_morning_min_hours"): "emails",
     ("plans.sitesettings", "vat_rate"): "plans",
+    ("plans.sitesettings", "revenue_start_date"): "revenue",
+    ("plans.sitesettings", "revenue_paying_percent"): "revenue",
+    ("plans.sitesettings", "revenue_dropoff_percent"): "revenue",
     ("plans.sitesettings", "capacity"): "hours",
     ("plans.sitesettings", "slot_length_minutes"): "hours",
     ("plans.sitesettings", "slot_step_minutes"): "hours",
@@ -55,7 +58,7 @@ FIELD_SECTIONS = {
 }
 SECTION_LABELS = {
     "plans": "Plans and pricing", "hours": "Hours and closures", "gold": "Gold rules", "journey": "Journey",
-    "emails": "Emails", "settings": "Settings", "defaults": "Defaults", "team": "Team", "approval": "Approval", "sales": "Sales", "assistant": "Assistant",
+    "emails": "Emails", "settings": "Settings", "defaults": "Defaults", "team": "Team", "approval": "Approval", "revenue": "Revenue", "sales": "Sales", "assistant": "Assistant",
 }
 SKIP_FIELDS = {"id", "created_at", "updated_at", "singleton_key"}
 

@@ -22,13 +22,13 @@ from users.views import LoginView, TeamPasswordView
 from . import approval as approval_service
 from . import audit, changes, codeview, defaults, feed, launch, services, throttle
 from . import team as team_service
-from .forms import ApprovalForm, EmailsForm, SettingsForm
+from .forms import ApprovalForm, EmailsForm, RevenueForm, SettingsForm
 from .forms_rules import RISKY
 from .models import SystemChange, SystemEvent
 from .permissions import signed_in, unlocked
 
 NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", "system_plans"), ("hours", "Hours and closures", "system_hours"),
-       ("gold", "Gold rules", "system_gold"), ("approval", "Approval", "system_approval"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("sales", "Sales", "system_sales"), ("payments", "Payments", "system_payments"), ("launch", "Launch", "system_launch"), ("whatsapp", "WhatsApp", "system_whatsapp"), ("assistant", "Assistant", "system_assistant"),
+       ("gold", "Gold rules", "system_gold"), ("approval", "Approval", "system_approval"), ("revenue", "Revenue", "system_revenue"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("sales", "Sales", "system_sales"), ("payments", "Payments", "system_payments"), ("launch", "Launch", "system_launch"), ("assistant", "Assistant", "system_assistant"),
        ("settings", "Settings", "system_settings"), ("defaults", "Defaults", "system_defaults"), ("team", "Team", "system_team"), ("changes", "Audit log", "system_changes")]
 
 
@@ -324,12 +324,33 @@ def undo_all(request, batch):
     return redirect(safe_next(request, "system_changes"))
 
 
+
+
+def _revenue_context():
+    """What System > Revenue shows from the SAVED settings and the stored Office figures (nothing is worked out here but reading them): `preview` {real_pence: the approved year, excluding VAT;
+    months: the 12 month figures of the first 12 months, memberships only; gold_pence: the Gold Card fees; assumed_pence: the saved "With your assumptions" year; ready: the breakdown and its calendar
+    are stored yet; start: the opening date or else the assumed start date; assumed: no opening date is set, so `start` is the private assumed one; plain: the saved percentages are 100 and 0} and `date_format` for the calendar.
+    The live example is worked out in the browser from the same numbers (system-revenue.js)."""
+    from office import counts
+
+    site = SiteSettings.load()
+    stored = counts.read()["revenue"]
+    approved = counts.revenue_view(stored)["approved"]
+    detail = approved["detail"]
+    preview = {"real_pence": approved["year_ex"], "months": [month["pence"] for month in detail["months"]] if detail else [], "gold_pence": detail["gold_year_pence"] if detail else 0,
+               "assumed_pence": counts.revenue_assumptions(stored)["approved"]["assumed_total_ex"],
+               "ready": bool(detail and ((stored.get("approved") or {}).get("detail") or {}).get("calendar")),
+               "start": site.opening_date or site.revenue_start_date, "assumed": site.opening_date is None,
+               "plain": site.revenue_paying_percent == 100 and site.revenue_dropoff_percent == 0}
+    return {"preview": preview, "date_format": site.flatpickr_date_format}
+
+
 def _edit_site(request, form_class, template, section, extra=None):
     site = SiteSettings.load()
     form = form_class(request.POST or None, instance=site)
     if request.method == "POST" and form.is_valid():
         try:
-            if services.save_form(form, request.user):
+            if services.save_form(form, request.user):  # Revenue's stored dates follow by a signal (insights.signals), so undo and the code view move them too
                 saved(request)
             else:
                 messages.info(request, "Nothing changed.")
@@ -364,6 +385,12 @@ def suppression_remove(request, pk):
     except services.ChangeRefused as error:
         messages.error(request, str(error))
     return redirect("system_suppressions")
+
+
+@unlocked
+@require_http_methods(["GET", "POST"])
+def revenue(request):
+    return _edit_site(request, RevenueForm, "system/revenue.html", "revenue", extra=_revenue_context)
 
 
 @unlocked

@@ -1,0 +1,14 @@
+{% comment %}The shared calendar, range mode: one field that picks a first and a last day (docs/features/calendar.md). Put the assets (_date_picker_assets.html) in `head_extra`.
+Context: id (unique), label, label_class (optional), empty (the field's words while nothing is chosen), from and to (dates or empty, the dates now chosen), min and max (ISO text or empty: the first and last day that can be picked),
+format (the System date format for flatpickr, `date_format` in the Office pages' context), note (optional: a line under the calendar), sheet (true when the page moves this field into a phone sheet: the calendar then lies open in place).
+Without JavaScript the two real date inputs below ARE the control and the Apply button sends them; with it they hide, stay in the form, and the one field takes over. They are named `from` and `to` and always hold ISO dates.
+A single date in an ordinary Django form is not this include: give its input `data-date-picker data-mode="single" data-format="..."` (see system.forms.RevenueForm).{% endcomment %}
+<div class="dp" data-date-picker data-mode="range" data-format="{{ format }}" data-min="{{ min|default_if_none:'' }}" data-max="{{ max|default_if_none:'' }}" data-empty="{{ empty }}"{% if sheet %} data-sheet{% endif %}{% if note %} data-note="{{ note }}"{% endif %}>
+  <label{% if label_class %} class="{{ label_class }}"{% endif %} id="{{ id }}-label" for="{{ id }}-from">{{ label }}</label>
+  <div class="dp-native" data-dp-native>
+    <input type="date" id="{{ id }}-from" name="from" value="{{ from|date:'Y-m-d' }}"{% if min %} min="{{ min }}"{% endif %}{% if max %} max="{{ max }}"{% endif %} aria-label="From" data-dp-from>
+    <span class="dp-native-to" aria-hidden="true">to</span>
+    <input type="date" id="{{ id }}-to" name="to" value="{{ to|date:'Y-m-d' }}"{% if min %} min="{{ min }}"{% endif %}{% if max %} max="{{ max }}"{% endif %} aria-label="To" data-dp-to>
+    <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button>
+  </div>
+</div>

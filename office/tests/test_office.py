@@ -19,6 +19,7 @@ from insights import metrics, rollup
 from insights.metrics import K
 from insights.models import OfficeGoal
 from insights.tests.test_metrics import finished_journey
+from office.models import MembershipReview
 from plans.management.commands.seed_phase1 import seed_all
 from users import services
 from users.tests.test_register import cleaned
@@ -184,7 +185,7 @@ class StoredFigureTests(OfficeTestCase):
         rollup.run()
         for path in paths:
             self.assertEqual(self.queries(path), empty[path], path)
-            self.assertLessEqual(empty[path], 32, path)  # 30 plus the WhatsApp unread count and the Email unread count on the navigation badges
+            self.assertLessEqual(empty[path], 34, path)  # a fixed number; the stored figures (snapshots and the approval counts) are one stored row each
 
     def test_dashboard_and_analytics_json_shapes(self):
         finished_journey()
@@ -221,10 +222,13 @@ class PeopleAndGoldTests(OfficeTestCase):
     def test_people_search_filter_csv_detail_and_gdpr_export(self):
         owner = staff("Owner")
         hugo = services.register_interest(cleaned(plan="tier-2")).user
-        services.register_interest(cleaned(email="=evil@example.com", first_name="=SUM(A1)", mobile="07911111111", plan="tier-1"))
+        evil = services.register_interest(cleaned(email="=evil@example.com", first_name="=SUM(A1)", mobile="07911111111", plan="tier-1")).user
+        for person in (hugo, evil):  # Registered lists approved people: Barry's review says so
+            MembershipReview.objects.create(registration=person.interest, status="approved")
+        rollup.run()
         page = get(owner, "/people/?q=hugo&plan=tier-2").context
         self.assertEqual([r["email"] for r in page["rows"]], ["hugo@example.com"])
-        self.assertEqual(page["total_registered"], 2)  # the stored counter, not a count of the filtered list
+        self.assertEqual(page["total_registered"], 2)  # the stored figure (office.counts), not a count of the filtered list
         self.assertEqual(len(get(owner, "/people/?verified=yes").context["rows"]), 0)
         csv_text = get(owner, "/people/export.csv?plan=tier-1").content.decode()
         self.assertIn("'=SUM(A1)", csv_text)

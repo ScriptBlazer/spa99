@@ -50,4 +50,5 @@ def abilities(user):
     level = levels.level_of(user)
     admin_up = levels.rank(level) >= levels.rank(levels.ADMIN)
     approves = levels.is_approver(user)
-    return {"can_act": approves, "can_final": levels.is_final_approver(user), "can_see_all": level != levels.NONE, "can_export": admin_up, "can_delete": admin_up, "can_delete_gold": admin_up, "can_setup": admin_up, "can_edit": approves or admin_up, "can_outreach": level != levels.NONE}
+    return {"can_act": approves, "can_final": levels.is_final_approver(user), "can_see_all": level != levels.NONE, "can_export": admin_up, "can_delete": admin_up, "can_delete_gold": admin_up, "can_setup": admin_up, "can_edit": approves or admin_up, "can_outreach": level != levels.NONE,
+            "can_approvals": approves or admin_up, "can_revenue": approves or admin_up}  # Barry's view: Approvals and Revenue, their tabs and the Home cards

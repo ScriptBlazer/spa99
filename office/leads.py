@@ -19,6 +19,7 @@ from insights import reader
 from journey.models import JourneySession, Option
 from mailings.models import EmailOptOut
 from outreach.models import ArchivedLead
+from outreach.services import approach_entries, emailed_at, emailed_q
 from users.models import InterestRegistration, User
 
 from system import defaults
@@ -105,14 +106,15 @@ def _archived():
 def lead_queryset(range_name="all", today=None, archived=False):
     """One session per address (its latest), annotated with `has_account`, `has_application` and `journeys_n`. Only addresses
     with NO account: a registered person is not a lead (they are in People). Staff addresses never appear either (counting
-    rule C2). `range_name` is by last seen (7d, 30d, 90d, all). Archived addresses are left out (they are in the Archived view:
+    rule C2), and nobody who is on the approach list (adding him there takes him out of Leads). `range_name` is by last seen (7d, 30d, 90d, all). Archived addresses are left out (they are in the Archived view:
     `archived=True` lists only them); everything that counts leads (list, CSV, tiles, hot leads, snapshots) goes through here."""
     newer = (_gate_sessions().filter(email_key=OuterRef("email_key"))
              .filter(Q(created_at__gt=OuterRef("created_at")) | Q(created_at=OuterRef("created_at"), id__gt=OuterRef("id"))))
     same = _gate_sessions().filter(email_key=OuterRef("email_key")).order_by().values("email_key").annotate(n=Count("id")).values("n")
     queryset = (_gate_sessions().filter(~Exists(newer)).filter(~Exists(_accounts(staff=True)))
                 .annotate(has_account=Exists(_accounts()), has_application=Exists(_applications()), journeys_n=Subquery(same))
-                .filter(has_account=False).filter(Exists(_archived()) if archived else ~Exists(_archived())))
+                .filter(has_account=False).filter(Exists(_archived()) if archived else ~Exists(_archived()))
+                .filter(~Exists(approach_entries(OuterRef("email_key")))))  # on the approach list = gone from Leads (Back to Leads takes the entry away)
     start, _ = reader.range_dates(range_name if range_name in RANGES else "all", today)
     if start is not None:
         queryset = queryset.filter(last_seen_at__gte=timezone.make_aware(datetime.combine(start, time.min)))
@@ -133,7 +135,7 @@ def filters_from(request):
     default_key = "archived" if view else (d.leads_sort if d.leads_sort in SORTS else "last_seen")   # the archive reads newest put away first
     sort, direction, _ = sorting.resolve(_columns(view), get, default_key, sorting.DESC)
     return {"q": get.get("q", "").strip(), "range": range_name if range_name in RANGES else d.leads_range, "tier": get.get("tier", ""), "potential": get.get("potential", "") if get.get("potential") in POTENTIALS else "",
-            "industry": get.get("industry", ""), "heard": get.get("heard", ""), "chat": "1" if get.get("chat") == "1" else "", "gold": "yes" if get.get("gold") in ("yes", "1", "on") else "", "hot": "1" if get.get("hot") == "1" else "",
+            "industry": get.get("industry", ""), "heard": get.get("heard", ""), "chat": "1" if get.get("chat") == "1" else "", "gold": "yes" if get.get("gold") in ("yes", "1", "on") else "", "hot": "1" if get.get("hot") == "1" else "", "emailed": "1" if get.get("emailed") == "1" else "",
             "view": view, "sort": sort, "dir": direction}
 
 
@@ -151,7 +153,7 @@ def is_filtered(filters, request=None):
     """True when anything narrows the list beyond the defaults (System > Defaults). The page shows no count then (counting rule C5).
     Reads the same values as filters_from."""
     d = defaults.get(request)
-    return bool(filters["q"] or filters["tier"] or filters["potential"] or filters["industry"] or filters["heard"] or filters["chat"] or filters["gold"] or filters["hot"]
+    return bool(filters["q"] or filters["tier"] or filters["potential"] or filters["industry"] or filters["heard"] or filters["chat"] or filters["gold"] or filters["hot"] or filters["emailed"]
                 or filters.get("view") or filters["range"] != d.leads_range)
 
 
@@ -186,6 +188,8 @@ def filtered_queryset(filters):
         queryset = queryset.filter(Exists(_chats_with_email()))
     if filters["gold"]:
         queryset = queryset.filter(has_application=True)
+    if filters["emailed"]:  # a person or a group send emailed him (the Emailed tag)
+        queryset = queryset.filter(emailed_q(OuterRef("email_key")))
     if filters["hot"]:  # exactly the Hot leads count: High potential, no account, no Gold application
         queryset = queryset.filter(gold_potential="high", has_application=False)
     key = filters.get("sort") if filters.get("sort") in {c.key for c in columns if c.sortable} else "last_seen"
@@ -248,6 +252,7 @@ def build_rows(page_sessions):
     from outreach.services import bounced_set
 
     bounced = bounced_set(emails)  # Possible fake: a permanent bounce on the suppression list (one query for the page)
+    emailed = emailed_at(emails)  # the Emailed tag: a person or a group send emailed him (two queries for the page)
     out = []
     for page_row in page_sessions:
         session = loaded[page_row.pk]
@@ -262,6 +267,7 @@ def build_rows(page_sessions):
             "potential": session.gold_potential, "score": session.gold_score, "industries": labels.get("industry", []),
             "answers": labels, "summary": summary_lines(labels), "heard_via": heard.get(page_row.email_key, ""),
             "via_chat": page_row.email_key in chatted, "bounced": page_row.email_key in bounced,
+            "emailed_at": lists_iso(emailed.get(page_row.email_key)) if page_row.email_key not in bounced else "",  # a bounced lead shows Possible fake instead: the email did not reach him
             "source": {"host": host, "utm_source": utm, "utm_medium": medium, "utm_campaign": campaign, "device": device,
                        "label": utm or host or "Direct", "campaign": campaign},
             "registered": page_row.has_account, "account_id": str(accounts[page_row.email_key]) if page_row.email_key in accounts else "",
@@ -277,10 +283,10 @@ def lists_iso(value):
     return value.isoformat() if value else ""
 
 
-def page(filters, number, size=None):
-    """(rows, has_next) for one page, DB-side. `size` defaults to System > Defaults > Leads rows per page."""
+def page(filters, number, size=None, shift=0):
+    """(rows, has_next) for one page, DB-side. `size` defaults to System > Defaults > Leads rows per page. `shift`: rows of earlier pages that have left the list (lists.shift_from)."""
     size = size or defaults.get().leads_page_size
-    start = (number - 1) * size
+    start = max((number - 1) * size - shift, 0)
     found = list(filtered_queryset(filters)[start:start + size + 1])
     return build_rows(found[:size]), len(found) > size
 

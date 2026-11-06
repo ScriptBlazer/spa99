@@ -1,0 +1,80 @@
+{% extends "system/base.html" %}
+{% load static office_tags %}
+{% block head_extra %}{% include "common/_date_picker_assets.html" %}
+<link rel="stylesheet" href="{% static 'common/css/system-revenue.css' %}">
+<script defer src="{% static 'common/js/system-revenue.js' %}"></script>{% endblock %}
+{% block main %}{% comment %}System > Revenue (docs/features/office-2-design.md section 3). System language: small, exact, plain. The three tiles are the SAVED figures (the view's `preview`). The live example on the right is worked out in the browser from the same numbers and is hidden without JavaScript.
+The percentages apply at once on save; a new start date queues a refresh of the stored Revenue dates (system.views._edit_site), so the page says "takes a moment".{% endcomment %}
+{% include "system/_page_header.html" with title="Revenue" description="What the Office Revenue page assumes. Percentages apply as soon as you save. A new date takes a moment to reach the figures." %}
+<div class="sys-tiles sys-rev-tiles" data-revenue-tiles>
+  <div class="sys-tile"><div class="l">Real figure</div><div class="v" data-revenue-tile="real">{% if preview.ready %}{{ preview.real_pence|pounds }}{% else %}Not ready{% endif %}</div><div class="m">{% if preview.ready %}A year, excluding VAT. Every approved person paying. Nothing on this page changes it.{% else %}The figures will be ready after the next hourly update.{% endif %}</div></div>
+  <div class="sys-tile"><div class="l">With your assumptions</div><div class="v" data-revenue-tile="assumed">{% if preview.ready %}{{ preview.assumed_pence|pounds }}{% else %}Not ready{% endif %}</div><div class="m">{% if not preview.ready %}The figures will be ready after the next hourly update.{% elif preview.plain %}A year, excluding VAT, as saved. The same as the real figure, so the Office does not show it.{% else %}A year, excluding VAT, as saved. Shown beside the real figure in the Office.{% endif %}</div></div>
+  <div class="sys-tile"><div class="l">Start date in use</div><div class="v" data-revenue-tile="start">{{ preview.start|site_date }}</div><div class="m">{% if preview.assumed %}Assumed, and private. No opening date is set yet.{% else %}The opening date, set in Settings. Public.{% endif %}</div></div>
+</div>
+<p class="sys-note sys-rev-note">The real figure is never changed by anything here. These settings only add a second figure beside it, labelled With your assumptions.</p>
+{{ preview|json_script:"rev-preview" }}
+<form method="post" data-problems data-system-form="revenue" data-system-risky="{{ risky_fields|join:',' }}">{% csrf_token %}
+  {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
+  {{ form.row_token }}
+  <div class="sys-rev-cols">
+    <section class="sys-panel" data-revenue-fields>
+      <div class="sys-group">
+        {% if not preview.assumed %}<p class="sys-note warn" data-revenue-opening-set>The <a href="{% url 'system_settings' %}">opening date</a> is set, so this date is not being used.</p>{% endif %}
+        {% include "system/_field_row.html" with field=form.revenue_start_date %}
+        <dl class="sys-howto">
+          <dt>What it means</dt><dd>The day we assume members start paying, while the spa has no opening date.</dd>
+          <dt>What it changes</dt><dd>When each member's 12 monthly payments fall due, so which dates hold money on the Revenue calendar. It applies only to members with no start date of their own. The Gold Card fee falls due on this day too.</dd>
+          <dt>What it never changes</dt><dd>The real yearly figure, which is the same whatever the date. Anything on the website.</dd>
+          <dt>Example</dt><dd>Set it to 1 February 2027. A member on £400 a month with no start date of his own owes 12 payments, from 1 February 2027 to 1 January 2028. Choose March 2027 on the Revenue page and he adds £400.</dd>
+          <dt>Public or private</dt><dd>This date is private: only the Revenue page uses it. The opening date is public: it is set in Settings and shown on the website. Once the opening date is set, it takes over and this date is ignored.</dd>
+        </dl>
+      </div>
+      <div class="sys-group">
+        {% include "system/_field_row.html" with field=form.revenue_paying_percent unit="%" %}
+        <dl class="sys-howto">
+          <dt>What it means</dt><dd>Of the people counted as approved, the share you expect to really pay. 100% means everyone.</dd>
+          <dt>What it changes</dt><dd>The figure labelled With your assumptions, for memberships and the Gold Card, and the same figure for people waiting.</dd>
+          <dt>What it never changes</dt><dd>The real figure, any price, or anyone's status.</dd>
+          <dt>Example</dt><dd>A real figure of £100,000 at 80% gives £80,000 with your assumptions. The real figure still reads £100,000.</dd>
+        </dl>
+      </div>
+      <div class="sys-group">
+        {% include "system/_field_row.html" with field=form.revenue_dropoff_percent unit="%" %}
+        <dl class="sys-howto">
+          <dt>What it means</dt><dd>Of those paying, the share you expect to leave each month. 0% means nobody leaves.</dd>
+          <dt>What it changes</dt><dd>The figure labelled With your assumptions, for memberships. It builds up: each member's month 1 counts in full, month 2 is reduced once, month 3 twice, and so on.</dd>
+          <dt>What it never changes</dt><dd>The real figure, any price, or the Gold Card, which is one yearly fee.</dd>
+          <dt>Example</dt><dd>£400 a month at 5%: month 1 is £400, month 2 £380, month 3 £361, month 12 about £228. Over 12 months that is about £3,677 instead of £4,800. With 80% paying as well, about £2,942.</dd>
+        </dl>
+      </div>
+    </section>
+    <section class="sys-panel sys-rev-live" data-revenue-live aria-labelledby="rev-live-h" hidden>
+      <header><h2 id="rev-live-h">What your percentages do</h2></header>
+      <div class="sys-pad">
+        <p class="sys-muted">Worked out from the approved figures, as you type. Nothing is saved until you save.</p>
+        <div class="sys-rev-result" data-live-result aria-live="polite">
+          <p class="sys-rev-message" data-live-message hidden></p>
+          <div data-live-rows>
+            <div class="sys-state"><span>Real figure, a year</span><span class="sys-rev-val"><span data-live="real"></span><small>Never changes</small></span></div>
+            <div class="sys-state"><span data-live-label="paying"></span><span class="sys-rev-val" data-live="paid"></span></div>
+            <div class="sys-state"><span data-live-label="dropoff"></span><span class="sys-rev-val" data-live="less"></span></div>
+            <div class="sys-state sys-rev-final"><span>With your assumptions, a year</span><span class="sys-rev-val" data-live="assumed"></span></div>
+            <div class="sys-state"><span>Difference from the real figure</span><span class="sys-rev-val" data-live="difference"></span></div>
+          </div>
+        </div>
+        <table class="sys-table sys-rev-table" data-live-table>
+          <caption class="sr">Month by month, with your assumptions</caption>
+          <thead><tr><th scope="col">Member's month</th><th scope="col" class="sys-num">Real</th><th scope="col" class="sys-num">With your assumptions</th></tr></thead>
+          <tbody data-live-months></tbody>
+          <tbody>
+            <tr data-live-gold><th scope="row">Gold Card fee</th><td class="sys-num" data-live="gold-real"></td><td class="sys-num" data-live="gold-assumed"></td></tr>
+            <tr class="sys-rev-all"><th scope="row">All</th><td class="sys-num" data-live="all-real"></td><td class="sys-num" data-live="all-assumed"></td></tr>
+          </tbody>
+        </table>
+        <p class="sys-muted sys-rev-round" data-live-round>Whole pounds. A line can differ from the total by £1.</p>
+      </div>
+    </section>
+  </div>
+  <div class="sys-inline-save"><button type="submit" class="sys-btn primary">Save</button></div>
+</form>
+{% endblock %}

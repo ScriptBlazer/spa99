@@ -436,6 +436,9 @@ class ScreenTests(PaymentCase):
         admin, office = make_team_member("ad@example.com", levels.ADMIN), make_team_member("of@example.com", levels.OFFICE)
         c = Client(HTTP_HOST="office.localhost")
         c.force_login(office)
+        from office.models import MembershipReview
+
+        MembershipReview.objects.create(registration=holder, status="approved")  # Registered lists approved people only
         rows = c.get("/people/?sale=yes").context["rows"]
         self.assertEqual([r["email"] for r in rows], [holder.user.email])
         self.assertEqual(rows[0]["sale"], "20% for 3 months")

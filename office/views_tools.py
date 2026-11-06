@@ -3,7 +3,7 @@ outreach.services (or gold.actions), answer. Notes answer an HTMX request with t
 from django.contrib import messages
 from urllib.parse import urlencode
 
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.cache import patch_vary_headers
@@ -19,7 +19,7 @@ from outreach.models import OutreachEntry, StickyNote
 from plans.models import SiteSettings
 
 from . import lists, tools
-from .forms import ArchiveForm, MessageForm, OutreachAddForm, StickyNoteForm
+from .forms import ArchiveForm, ContactForm, MessageForm, OutreachAddForm, StickyNoteForm
 from system import defaults
 from .permissions import admin, editor, reader
 
@@ -221,7 +221,7 @@ def lead_email(request, pk):
     elif result == services.UNCHANGED:
         messages.info(request, "That is the address he already has.")
     elif result == services.TAKEN:
-        who = {"account": info["name"], "gold": f"a Gold application ({info['name']})", "archived": "an archived lead", "chat": "a WhatsApp chat"}.get(info["kind"], f"another lead ({info['name']})")
+        who = {"account": info["name"], "gold": f"a Gold application ({info['name']})", "archived": "an archived lead"}.get(info["kind"], f"another lead ({info['name']})")
         messages.error(request, f"That address already belongs to {who}.")
     elif result == services.INVALID:
         messages.error(request, info)
@@ -242,8 +242,6 @@ def lead_resend(request, pk):
         messages.success(request, "Follow-up sent.")
     elif result == services.BOUNCED:
         messages.error(request, "That address still bounces, so nothing was sent. Correct it first.")
-    elif result == services.NO_SENDER:
-        messages.error(request, "Set the sender address in System > Settings first, then try again.")
     elif result == services.ALREADY:
         messages.info(request, "The follow-up already went to this address.")
     else:
@@ -260,19 +258,20 @@ STATES = listing.STATES
 @require_GET
 @never_cache
 def outreach_page(request):
-    """Context: rows[{id, name, email, mobile, source, href, reason, added_by, added_at, done_at, done_by, registered_at, done_url,
-    remove_url}], has_next, page, state (open|registered|done), states, tabs[{state, count, url, active}], counts{open, registered, done},
-    open_count, registered_count, done_count, columns (the sortable header, see common.sorting), sort, dir, more_url, title, can_edit, section."""
+    """Context: rows[{id, name, email, mobile, source, href, reason, emailed_at, bounced, is_lead, added_by, added_at, done_at, done_by, done_url, remove_url, to_leads_url, archive_url}], has_next, page,
+    state (open|done), states, tabs[{state, count, url, active}], counts{open, done}, open_count, done_count, emailed (the Emailed filter, "1" or ""), columns (the sortable header, see common.sorting),
+    sort, dir, more_url, title, can_edit, section. Registering takes someone off the list by itself: there is no Registered tab. A fragment request (HX-Request) answers the rows only; ?page=N loads more."""
     state = listing.state_from(request.GET)
     sort, direction = listing.sort_from(request.GET, state)
+    emailed = "1" if request.GET.get("emailed") == "1" else ""
     page = lists.page_number(request)
-    found, has_next = lists.cut(listing.queryset(state, sort, direction), page, 25)
+    found, has_next = lists.cut(listing.queryset(state, sort, direction, bool(emailed)), page, 25, lists.shift_from(request))
     counts = listing.counts()
-    tabs = [{"state": name, "count": counts[name], "active": name == state, "url": f"{reverse('office_outreach')}?state={name}"} for name in STATES]
-    more = urlencode({"state": state, "sort": sort, "dir": direction, "page": page + 1})
-    context = {"rows": tools.outreach_rows(found), "has_next": has_next, "page": page, "state": state, "states": STATES, "tabs": tabs, "counts": counts,
+    tabs = [{"state": name, "count": counts[name], "active": name == state, "url": f"{reverse('office_outreach')}?{urlencode({'state': name, **({'emailed': '1'} if emailed else {})})}"} for name in STATES]
+    more = urlencode({"state": state, "sort": sort, "dir": direction, "page": page + 1, **({"emailed": "1"} if emailed else {})})
+    context = {"rows": tools.outreach_rows(found), "has_next": has_next, "page": page, "state": state, "states": STATES, "tabs": tabs, "counts": counts, "emailed": emailed,
                "title": SiteSettings.load().outreach_title, "section": "outreach", "can_edit": request.user.is_authenticated and tools.can_edit(request.user),
-               "open_count": counts["open"], "registered_count": counts["registered"], "done_count": counts["done"],
+               "open_count": counts["open"], "done_count": counts["done"],
                "columns": sorting.header_columns(listing.columns(state), sort, direction, request.path, request.GET), "sort": sort, "dir": direction,
                "more_url": f"{request.path}?{more}"}
     response = render(request, "office/_outreach_rows.html" if request.headers.get("HX-Request") else "office/outreach.html", context)
@@ -295,3 +294,125 @@ def outreach_remove(request, pk):
     services.remove_entry(get_object_or_404(OutreachEntry, pk=pk))
     messages.success(request, "Removed.")
     return redirect("office_outreach")
+
+
+def _list_reply(request, ok, message, **extra):
+    """A fetch (X-Requested-With: fetch, or Accept: application/json) gets {ok, message, ...}; otherwise a toast and back to the list."""
+    if request.headers.get("x-requested-with") == "fetch" or "application/json" in request.headers.get("accept", ""):
+        return JsonResponse({"ok": ok, "message": message, **extra}, status=200 if ok else 400)
+    (messages.success if ok else messages.error)(request, message)
+    return redirect("office_outreach")
+
+
+@editor
+@require_POST
+def outreach_to_leads(request, pk):
+    """Back to Leads: a lead entry comes off the list and he shows in Leads again. No confirm: the answer carries `undo` = {url, reason} (POST url with reason puts him back on the list)."""
+    entry = get_object_or_404(OutreachEntry, pk=pk)
+    result, email, reason = services.entry_to_leads(entry)
+    if result != services.DONE:
+        return _list_reply(request, False, "Only a lead can go back to Leads.")
+    return _list_reply(request, True, "Moved back to Leads.", undo={"url": reverse("office_outreach_undo_move"), "email": email, "reason": reason, "archived": False})
+
+
+@editor
+@require_POST
+def outreach_archive(request, pk):
+    """Archive from the list: the lead is archived (POST reason, optional, 300) and leaves the list. The answer carries `undo` (see outreach_to_leads)."""
+    entry = get_object_or_404(OutreachEntry, pk=pk)
+    form = ArchiveForm(request.POST)
+    if not form.is_valid():
+        return _list_reply(request, False, " ".join(_errors(form)))
+    reason = entry.reason
+    result, email = services.entry_archive(entry, request.user, form.cleaned_data["reason"])
+    if result not in (services.DONE, services.ALREADY):
+        return _list_reply(request, False, "Only a lead can be archived from here.")
+    return _list_reply(request, True, "Archived.", undo={"url": reverse("office_outreach_undo_move"), "email": email, "reason": reason, "archived": True})
+
+
+@editor
+@require_POST
+def outreach_undo_move(request):
+    """Undo Back to Leads or Archive: POST email, reason, archived ("1" when he was archived): he comes back from Archived if needed and goes back on the list with the same reason."""
+    email = (request.POST.get("email") or "").strip().lower()
+    if request.POST.get("archived") in ("1", "true", "yes"):
+        services.unarchive_lead(email, request.user)
+    result, _ = services.add_to_list(request.user, lead_email=email, reason=request.POST.get("reason", ""))
+    ok = result in (services.DONE, services.ALREADY)
+    return _list_reply(request, ok, "Back on the list." if ok else "He could not be put back on the list.")
+
+
+# ---------- adding or fixing a number (the Details rows) and marking a Gold application Contacted ----------
+
+def _contact_reply(request, target, result, errors):
+    """The Details dialog (fetch) gets 200 with {ok, result, errors{field: text, owner{name, url}}}; any other POST a toast and back to the page."""
+    ok = result in (services.DONE, services.UNCHANGED)
+    if request.headers.get("accept", "").startswith("application/json") or request.headers.get("x-requested-with") == "fetch":
+        return JsonResponse({"ok": ok, "result": result, "errors": errors}, status=200 if ok or request.headers.get("x-requested-with") == "fetch" else 400)
+    if ok:
+        messages.success(request, "Saved." if result == services.DONE else "Nothing changed.")
+    else:
+        messages.error(request, " ".join(v for k, v in errors.items() if k != "owner"))
+    return redirect(target.page_url)
+
+
+def _contact_form(request, target):
+    """(data, early reply): the validated ContactForm, or the reply to give when it is invalid."""
+    form = ContactForm(request.POST)
+    if not form.is_valid():
+        return None, _contact_reply(request, target, services.INVALID, {"mobile": "That doesn't look like a valid mobile number."})
+    return form.cleaned_data, None
+
+
+@editor
+@require_POST
+def lead_contact(request, pk):
+    """Add or fix a lead's first name and mobile. POST first_name, mobile_country (ISO, default GB), mobile. Blank keeps what is there."""
+    target = tools.target_for("lead", pk)
+    if target.kind != "lead":
+        return redirect(target.page_url)
+    data, early = _contact_form(request, target)
+    if early:
+        return early
+    result, errors = services.set_lead_contact(target.main, request.user, first_name=data["first_name"] or None, mobile=data["mobile"] or None, mobile_country=data["mobile_country"])
+    return _contact_reply(request, target, result, errors)
+
+
+@editor
+@require_POST
+def person_mobile(request, pk):
+    """Add or fix a registered person's mobile. POST mobile_country, mobile."""
+    target = tools.target_for("person", pk)
+    data, early = _contact_form(request, target)
+    if early:
+        return early
+    if not data["mobile"]:
+        return _contact_reply(request, target, services.UNCHANGED, {})
+    result, errors = services.set_person_mobile(target.user, request.user, data["mobile"], data["mobile_country"])
+    return _contact_reply(request, target, result, errors)
+
+
+@editor
+@require_POST
+def gold_mobile(request, pk):
+    """Add or fix a Gold applicant's mobile. POST mobile_country, mobile."""
+    target = tools.target_for("gold", pk)
+    data, early = _contact_form(request, target)
+    if early:
+        return early
+    if not data["mobile"]:
+        return _contact_reply(request, target, services.UNCHANGED, {})
+    result, errors = services.set_gold_mobile(target.application, request.user, data["mobile"], data["mobile_country"])
+    return _contact_reply(request, target, result, errors)
+
+
+@editor
+@require_POST
+def gold_contacted(request, pk):
+    """"Mark contacted" on a Gold page: New becomes Contacted, with an audit event. The WhatsApp button is a wa.me link, which cannot prove a message went, so staff say so themselves."""
+    target = tools.target_for("gold", pk)
+    if gold_actions.whatsapp_sent(target.application, request.user):
+        messages.success(request, "Marked as contacted.")
+    else:
+        messages.info(request, "Nothing changed: it is not waiting for a first contact.")
+    return redirect(target.page_url)

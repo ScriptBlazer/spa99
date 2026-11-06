@@ -12,7 +12,9 @@
 @import "office-lists.css";
 @import "office-leads.css";
 @import "office-outreach.css";
-@import "office-whatsapp.css";
+@import "office-reach.css";
+@import "office-cards.css";
+@import "office-press.css";
 
 /* The site-wide cross-document view transition is off in the Office (it threw "Transition was skipped"). */
 @view-transition { navigation: none; }
@@ -53,7 +55,6 @@
 .o-nav-list a[aria-current="page"] { color: var(--office-text); }
 .o-badge-count { display: inline-flex; align-items: center; justify-content: center; min-width: 1.25rem; height: 1.25rem; padding: 0 6px; border-radius: var(--office-pill); background: var(--color-gold); color: var(--office-text); font-size: var(--office-text-xs); font-weight: 600; line-height: 1; }
 .o-badge-count:empty { display: none; }
-.o-nav-more { display: none; }
 .o-brand, .o-nav-foot { display: none; }
 
 @media (max-width: 63.99em) {
@@ -63,19 +64,22 @@
   .o-nav-list .o-icon { box-sizing: content-box; width: 1.5rem; height: 1.5rem; padding: 4px 16px; border-radius: var(--office-pill); transition: background-color var(--office-dur-lift) var(--ease-soft); }
   .o-nav-list a[aria-current="page"] .o-icon { background: var(--office-sunken); }
   .o-nav-list .o-badge-count { position: absolute; top: 0.375rem; left: calc(50% + 0.5rem); min-width: 1.125rem; height: 1.125rem; padding: 0 5px; border: 2px solid var(--office-surface); box-sizing: content-box; }
-  /* five slots at most: Home, Leads, WhatsApp, Gold, More (Registered, Analytics, the Assistant and Invited live in the More sheet) */
+  /* five tabs, in this order: Home, Approach list, Analytics, Leads, Revenue (office-2-design.md section 2). The rail-only items (Registered, Approvals, Invited, Assistant and, for people who see everything, Gold) are not tabs.
+     No tab badges: the waiting number sits on Home now. */
   .o-nav-list li { min-width: 0; }
-  .o-nav-list li:has([data-office-nav-item="leads"]) { order: 1; }
-  .o-nav-list li:has([data-office-nav-item="whatsapp"]) { order: 2; }
-  .o-nav-list li:has([data-office-nav-item="gold"]) { order: 3; }
-  .o-nav-more { display: block; order: 4; }
-  .o-nav-list:has(.o-nav-more) li[data-nav-overflow] { display: none; }
-  .o-nav-list a > span:not(.o-badge-count), .o-nav-more button > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .o-nav-more button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 100%; height: var(--office-tabbar-h); padding: 0; border: 0; background: none; color: var(--office-muted); font: inherit; font-size: var(--office-text-xs); font-weight: 600; }
-  .o-nav-more button.is-current { color: var(--office-text); }
-  .o-nav-more button.is-current .o-icon, .o-nav-more button[aria-expanded="true"] .o-icon { background: var(--office-sunken); }
+  .o-nav-list li[data-nav-wide] { display: none; }
+  .o-nav-list li[data-nav-slot="1"] { order: 1; }
+  .o-nav-list li[data-nav-slot="2"] { order: 2; }
+  .o-nav-list li[data-nav-slot="3"] { order: 3; }
+  .o-nav-list li[data-nav-slot="4"] { order: 4; }
+  .o-nav-list li[data-nav-slot="5"] { order: 5; }
+  .o-nav-list .o-badge-count { display: none; }
+  .o-nav-list a > span:not(.o-badge-count) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* a page reached from Home (Approvals, Registered, Gold, Invited) keeps the bar and lights Home; aria-current stays on the true page, so assistive tech hears it */
+  body[data-under-home] [data-office-nav-item="dashboard"] { color: var(--office-text); }
+  body[data-under-home] [data-office-nav-item="dashboard"] .o-icon { background: var(--office-sunken); }
   body[data-office-detail] .o-nav { display: none; }
-  .o-main { padding-bottom: calc(var(--office-tabbar-h) + env(safe-area-inset-bottom) + var(--space-4)); }
+  body .o-main { padding-bottom: calc(var(--office-tabbar-h) + env(safe-area-inset-bottom) + var(--space-5)); }   /* `body`: the plain .o-main padding further down must not win, or the end of every page sits behind the tab bar */
   body[data-office-detail] .o-main { padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom)); }
   body[data-has-bar] .o-main { padding-bottom: calc(var(--control-h) + var(--space-5) * 2 + env(safe-area-inset-bottom)); }
 }
@@ -110,6 +114,7 @@
 .o-back { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 2.75rem; padding-right: var(--space-3); color: var(--office-text); text-decoration: none; }
 .o-back .o-icon { width: 1.5rem; height: 1.5rem; }
 .o-header-right { display: flex; align-items: center; gap: var(--space-3); }
+@media (max-width: 63.99em) { .o-header { padding-top: 0.25rem; } }   /* a little air above the logo and the initials (Moishe, 2026-11-05) */
 @media (min-width: 64em) {
   .o-header { padding-inline: var(--space-5); }
   .o-header-left .mark { display: none; }
@@ -122,8 +127,12 @@
 .o-menu { position: absolute; right: 0; top: calc(100% + var(--space-2)); z-index: 30; min-width: 14rem; padding: var(--space-3); background: var(--office-surface); border-radius: var(--office-radius); box-shadow: var(--office-shadow-2); animation: o-fade 120ms var(--ease-soft) both; }
 .o-menu-name { font-weight: 600; }
 .o-menu-role { font-size: var(--text-sm); color: var(--office-muted); }
-.o-menu form { margin-top: var(--space-2); }
-.o-menu-item { display: flex; align-items: center; width: 100%; min-height: 2.75rem; padding: 0; border: 0; background: none; color: var(--office-text); font-weight: 500; text-align: left; }
+.o-menu-group { margin-top: var(--space-2); }
+.o-menu-group form { margin: 0; }
+.o-menu-item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); width: 100%; min-height: 2.75rem; padding: 0; border: 0; background: none; color: var(--office-text); font-size: var(--text-base); font-weight: 500; text-align: left; text-decoration: none; }
+.o-menu-item .o-count { margin-left: auto; }
+@media (min-width: 64em) { .o-menu-phone { display: none; } }   /* the rail has Registered, Gold and Invited */
+@media (pointer: coarse) { .o-disc--btn { width: 2.75rem; height: 2.75rem; } }
 @media (hover: hover) and (pointer: fine) { .o-menu-item:hover { text-decoration: underline; text-underline-offset: 0.25em; } }
 
 /* ---------- main ---------- */
@@ -197,14 +206,6 @@
   .o-nav-list a[aria-current="page"] { outline: 2px solid Highlight; }
   .o-card { border: 1px solid CanvasText; }
 }
-
-/* ---------- the More sheet: the tabs that do not fit five slots ---------- */
-.o-sheet-links { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
-.o-sheet-links a { display: flex; align-items: center; gap: var(--space-3); min-height: 3.5rem; padding-inline: var(--space-3); border-radius: var(--office-radius); color: var(--office-text); font-size: var(--text-base); font-weight: 500; text-decoration: none; }
-.o-sheet-links a > span { flex: 1; }
-.o-sheet-links a > .o-icon:last-child { color: var(--office-muted); }
-.o-sheet-links a[aria-current="page"] { background: var(--office-sunken); }
-@media (min-width: 64em) { .o-navsheet { display: none; } }
 
 /* ---------- Round 2 R3: long text wraps inside its box, and long messages show a few lines with Read more ---------- */
 /* One rule for free text in cards, dialogs and the cells that hold it (a reason, a message, a history line, an address). Names break at spaces first.

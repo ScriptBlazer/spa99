@@ -108,7 +108,7 @@ For the WhatsApp section (`docs/features/whatsapp-design.md`). In `office-tokens
 --office-wa-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;   /* code only; the brand has no mono */
 ```
 
-Also: **Figtree Italic** (`figtree-latin-italic.woff2`, OFL, `@fontsource-variable/figtree` 5.3.0 latin subset), declared in `office-whatsapp.css` only, for `_italic_`. New icons in `_icons.html`: `whatsapp`, `tick`, `ticks`, `clock`, `arrow-down`, `arrow-clockwise`, `file-pdf`, `bell`, `bell-slash`, `share`, `mobile`. The app icons (gold swan on espresso, swan within the central 60%) are in `common/static/common/img/app/` (192, 512, maskable 512, apple-touch 180, white badge 96).
+Also (removed in Office 2 with the chat: the Figtree Italic font file and the white badge 96 push icon). New icons in `_icons.html`: `whatsapp`, `tick`, `ticks`, `clock`, `arrow-down`, `arrow-clockwise`, `file-pdf`, `bell`, `bell-slash`, `share`, `mobile`. The app icons (gold swan on espresso, swan within the central 60%) are in `common/static/common/img/app/` (192, 512, maskable 512, apple-touch 180).
 
 ### 2.3 Type and layout
 
