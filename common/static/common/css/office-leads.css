@@ -39,7 +39,7 @@
 .o-totalline .o-export { margin-left: var(--space-3); }   /* beside the count, not pinned to the far right: the table card is only as wide as its content (Moishe 2026-10-30) */
 .o-export--sheet { display: none; }
 @media (max-width: 63.99em) { .o-export--bar { display: none; } .o-export--sheet { display: inline-flex; } }
-.o-filter-group--chip { align-self: flex-end; }
+.o-filter-group--chip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); align-self: flex-end; }
 .o-filter-group--chip .o-chip { min-height: var(--control-h-compact); }
 @media (min-width: 64em) { .o-filters-slot > .o-filters-body { display: contents; } }   /* the controls wrap in one bar with the search */
 .o-filters-bar .o-search { flex: 1 1 14rem; max-width: 20rem; }

@@ -153,6 +153,20 @@ class SiteSettings(BaseModel):
     slot_step_minutes = models.PositiveSmallIntegerField(default=30, validators=[MinValueValidator(1), MaxValueValidator(1440)])
     booking_notice_minutes = models.PositiveSmallIntegerField(default=10, validators=[MaxValueValidator(1440)])
     opening_date = models.DateField(null=True, blank=True, help_text="Leave empty until fixed.")
+    revenue_start_date = models.DateField(
+        default=datetime.date(2027, 1, 1),
+        help_text="The date Revenue assumes members start paying until the real opening date is set; never shown publicly.")
+    revenue_paying_percent = models.DecimalField(
+        "Paying (%)", max_digits=5, decimal_places=2, default=Decimal("100"), validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
+        help_text="Of the people Revenue counts, the share you expect to become paying members. Only used for the 'With your assumptions' figure.")
+    revenue_dropoff_percent = models.DecimalField(
+        "Leaving each month (%)", max_digits=5, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
+        help_text="Of those paying, the share you expect to leave each month. Only used for the 'With your assumptions' figure.")
+    DATE_DMY, DATE_MDY, DATE_YMD = "dd/mm/yyyy", "mm/dd/yyyy", "yyyy-mm-dd"
+    DATE_FORMATS = {DATE_DMY: ("d/m/Y", "%d/%m/%Y"), DATE_MDY: ("m/d/Y", "%m/%d/%Y"), DATE_YMD: ("Y-m-d", "%Y-%m-%d")}  # value -> (flatpickr, strftime)
+    date_format = models.CharField(
+        max_length=10, choices=[(value, value) for value in DATE_FORMATS], default=DATE_DMY,
+        help_text="How calendars in the Office and System show dates.")
     opening_text = models.CharField(
         max_length=60, default="January 2027", blank=True,
         help_text='Shown as the opening time while the opening date is empty, e.g. "January 2027". Used by the {opening} placeholder in site copy.',
@@ -349,6 +363,16 @@ class SiteSettings(BaseModel):
         """'BML House, 99c Vale Road, London N4 1PR'."""
         town_line = " ".join(part for part in (self.address_town, self.address_postcode) if part)
         return ", ".join(part for part in (self.address_street, town_line) if part)
+
+    @property
+    def flatpickr_date_format(self):
+        """The calendar library's format string for `date_format` (d/m/Y, m/d/Y or Y-m-d)."""
+        return self.DATE_FORMATS.get(self.date_format, self.DATE_FORMATS[self.DATE_DMY])[0]
+
+    @property
+    def strftime_date_format(self):
+        """The same format for Python's strftime."""
+        return self.DATE_FORMATS.get(self.date_format, self.DATE_FORMATS[self.DATE_DMY])[1]
 
     @property
     def opening_label(self):

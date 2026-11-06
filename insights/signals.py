@@ -9,6 +9,30 @@ from . import metrics
 from .metrics import K
 
 
+@receiver(pre_save, sender="plans.SiteSettings", dispatch_uid="insights_site_dates_pre")
+def site_dates_pre_save(sender, instance, update_fields=None, **kwargs):
+    _stash(instance, ["opening_date", "revenue_start_date"])
+
+
+@receiver(post_save, sender="plans.SiteSettings", dispatch_uid="insights_site_dates_post")
+def site_dates_post_save(sender, instance, created, **kwargs):
+    """Revenue's stored due dates follow these two dates, however they were changed (their page, the code view, undo, the admin)."""
+    old = getattr(instance, "_metrics_before", None)
+    if old is not None and (old["opening_date"] != instance.opening_date or old["revenue_start_date"] != instance.revenue_start_date):
+        from office import snapshots
+
+        snapshots.request_refresh()
+
+
+@receiver(post_save, sender="plans.Subscription", dispatch_uid="insights_subscription_post")
+@receiver(post_delete, sender="plans.Subscription", dispatch_uid="insights_subscription_delete")
+def subscription_changed(sender, instance, **kwargs):
+    """A manual set-up, its edit or its cancelling moves Revenue (price, months, start date)."""
+    from office import snapshots
+
+    snapshots.request_refresh()
+
+
 def _stash(instance, fields):
     """Remember the stored values before the save so post_save can tell what changed."""
     old = None

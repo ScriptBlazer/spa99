@@ -1,9 +1,11 @@
 """Office template helpers. Formatting only (British numbers, London dates) and drawing geometry (ring arcs,
 sparkline paths, bar lengths): every figure shown is a stored figure from the selectors, never calculated here."""
 import re
+import threading
 from datetime import date, datetime
 
 from django import template
+from django.core.signals import request_finished, request_started
 from django.utils import timezone
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
@@ -44,6 +46,60 @@ def pounds(pence):
     return f"£{_pounds_exact(pence):,}"
 
 
+_request = threading.local()
+
+
+def _reset_site_format(**kwargs):
+    _request.active, _request.format = True, None
+
+
+def _end_site_format(**kwargs):
+    _request.active, _request.format = False, None
+
+
+request_started.connect(_reset_site_format, dispatch_uid="office_site_date_start")
+request_finished.connect(_end_site_format, dispatch_uid="office_site_date_end")
+
+
+def _site_format():
+    """The `date_format` setting as a strftime string. Read once for a request (a page shows many dates); outside a request, read each time so a changed setting is never stale."""
+    if getattr(_request, "active", False) and getattr(_request, "format", None):
+        return _request.format
+    from plans.models import SiteSettings
+
+    found = SiteSettings.load().strftime_date_format
+    if getattr(_request, "active", False):
+        _request.format = found
+    return found
+
+
+@register.filter
+def site_date(value):
+    """A date (or an ISO 'YYYY-MM-DD' string) in the System's date format setting: 01/03/2027, 03/01/2027 or 2027-03-01. Anything else (None, garbage) is empty."""
+    if isinstance(value, datetime):
+        value = value.date()
+    if isinstance(value, str):
+        try:
+            value = date.fromisoformat(value.strip())
+        except ValueError:
+            return ""
+    if not isinstance(value, date):
+        return ""
+    return value.strftime(_site_format())
+
+
+@register.filter
+def price_month(pence):
+    """A price a month, exact: whole pounds when the pence are 00 (35000 -> £350), otherwise two places (27930 -> £279.30). Never rounded, so a price reads as it was set."""
+    from decimal import Decimal
+
+    try:
+        exact = Decimal(pence or 0) / 100
+    except (TypeError, ValueError, ArithmeticError):
+        return "£0"
+    return f"£{exact:,.0f}" if exact == exact.to_integral_value() else f"£{exact:,.2f}"
+
+
 @register.filter
 def pounds_compact(pence):
     """For a ring: whole pounds up to £9,999 (£9,950), then £57.5k, £150k, and from £1m £1.25m."""
@@ -76,7 +132,7 @@ def bp_rate(value):
     if value in (None, ""):
         return ""
     pct = _int(value) / 100
-    return f"{pct:.1f}%" if pct < 10 else f"{round(pct)}%"
+    return f"{pct:.1f}%" if pct < 10 else f"{int(pct + 0.5)}%"  # half up, as the chart's tooltip rounds
 
 
 @register.filter

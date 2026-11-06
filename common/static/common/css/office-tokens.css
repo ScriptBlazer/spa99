@@ -49,6 +49,7 @@
   /* ---------- type and layout (2.3) ---------- */
   --office-stat: clamp(2.25rem, 1.5vw + 1.75rem, 3.5rem);     /* big numbers: 36px phone, 56px at 1440 */
   --office-stat-lg: clamp(3rem, 3vw + 2rem, 4.5rem);          /* the Analytics hero number */
+  --office-bd-bar-h: 6rem;                                    /* Revenue breakdown: height of the tallest month bar */
   --office-text-xs: 0.75rem;                                  /* ticks, badges, tab labels, table heads only */
   --office-nav-w: 15.5rem;
   --office-header-h: 3.75rem;

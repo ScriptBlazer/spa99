@@ -37,11 +37,11 @@ from users.models import User
 
 from system import defaults
 
-from . import approvals, counts, lists, profile, selectors, tools
+from . import analytics_revenue, approvals, counts, lists, profile, selectors, tools
 from .forms import ManualSetupForm
 from . import invited as invited_lists
 from . import leads as lead_lists
-from .permissions import admin, approver, final_approver, reader
+from .permissions import abilities, admin, approver, final_approver, reader
 
 
 def _greeting(user):
@@ -89,18 +89,27 @@ def dashboard_json(request):
     return JsonResponse(selectors.dashboard(request.GET.get("range", defaults.get(request).dashboard_range), request))
 
 
+def _with_revenue(request, data):
+    """Analytics is open to every reader, Revenue is not: the Revenue cards' figures are added (to a copy, never to the shared snapshot) only for someone who may see Revenue."""
+    if not abilities(request.user)["can_revenue"]:
+        return data
+    return {**data, "revenue_card": analytics_revenue.build()}
+
+
 @reader
 @require_GET
+@never_cache
 def analytics(request):
     name = _remembered_range(request, "office_range_analytics", selectors.ANALYTICS_RANGES, defaults.get(request).analytics_range)
-    context = {"data": selectors.analytics(name), "pages": selectors.pages(name), "section": "analytics"}
+    context = {"data": _with_revenue(request, selectors.analytics(name)), "pages": selectors.pages(name), "section": "analytics"}
     return render(request, "office/analytics.html", context)
 
 
 @reader
 @require_GET
+@never_cache
 def analytics_data(request):
-    return JsonResponse(selectors.analytics(request.GET.get("range", defaults.get(request).analytics_range), request))
+    return JsonResponse(_with_revenue(request, selectors.analytics(request.GET.get("range", defaults.get(request).analytics_range), request)))
 
 
 @reader

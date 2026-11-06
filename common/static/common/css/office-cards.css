@@ -131,9 +131,9 @@ html.js:not(.no-reveal) .o-pair[data-draw]:not(.is-visible) .o-pair-arc { stroke
 .o-rev-possible > * { margin: 0; max-width: none; }
 .o-rev-possible .o-h3 { margin-bottom: 0; }
 .o-rev-possible .o-grid { margin-top: var(--space-2); }
-.o-rev-waiting { display: grid; gap: var(--space-1); margin: var(--space-2) 0; padding: 0; list-style: none; font-size: var(--text-sm); }
-.o-rev-waiting li { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
-.o-rev-waiting .num { font-variant-numeric: tabular-nums; font-weight: 600; }
+.o-rev-waiting, .o-bd-lines { display: grid; gap: var(--space-1); margin: var(--space-2) 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+.o-rev-waiting li, .o-bd-lines li { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.o-rev-waiting .num, .o-bd-lines .num { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .o-rev-possible .o-quiet { gap: var(--space-1); justify-self: start; }
 .o-rev-possible .o-icon { width: 1rem; height: 1rem; }
 .o-rev-note { max-width: var(--measure); }
@@ -144,8 +144,17 @@ html.js:not(.no-reveal) .o-pair[data-draw]:not(.is-visible) .o-pair-arc { stroke
   .o-rev-possible { grid-column: 8 / span 5; grid-row: 1; padding: var(--space-5); }
   .o-rev-plans { display: none; }   /* the table takes the place of the plan cards */
   .o-rev-table { display: block; grid-column: 1 / -1; grid-row: 2; }
-  .o-rev-note { grid-column: 1 / -1; grid-row: 3; }
+  .o-bd { grid-column: 1 / -1; grid-row: 3; }
+  .o-rev-note { grid-column: 1 / -1; grid-row: 4; }
   .o-grid th, .o-grid td { font-size: var(--text-base); }
+}
+/* a small laptop: beside the menu the two top cards are too narrow for their figures, so they stack */
+@media (min-width: 64em) and (max-width: 79.99em) {
+  .o-rev-total, .o-rev-possible { grid-column: 1 / -1; }
+  .o-rev-possible { grid-row: 2; }
+  .o-rev-table { grid-row: 3; }
+  .o-bd { grid-row: 4; }
+  .o-rev-note { grid-row: 5; }
 }
 .o-list--revenue { width: 100%; }
 .o-list--revenue th, .o-list--revenue td { height: 3.25rem; padding: 0 var(--space-3); font-size: var(--text-sm); text-align: left; vertical-align: middle; }
@@ -163,3 +172,89 @@ html.js:not(.no-reveal) .o-pair[data-draw]:not(.is-visible) .o-pair-arc { stroke
 @media (max-width: 63.99em) { .o-main:has(.o-seg-all.is-active) [data-table-card="gold"] { display: none; } }
 /* Registered's Membership table has nine columns: tighter cells so every column, Gold included, fits a 1440 screen without a sideways scroll */
 @media (min-width: 64em) and (max-width: 119.99em) { .o-list--people thead th, .o-list--people td { padding-inline: var(--space-2); } .o-list--people .c-journey, .o-list--people .c-date { font-size: var(--text-sm); } }
+
+/* ---------- Revenue: the full breakdown. A closed card with the dashboard's round plus; open, one sheet (who, the 12 months, deal by deal, how it adds up, then the waiting). Tone and shadow, no borders. ---------- */
+.o-bd { position: relative; min-width: 0; }
+.o-bd .o-h3 { margin-bottom: var(--space-2); padding-right: 3.5rem; scroll-margin-top: calc(var(--office-header-h) + var(--space-3)); }
+.o-bd > .o-sub { max-width: none; }
+.o-bd-stage { min-width: 0; }
+.o-bd-body { display: grid; gap: var(--space-5); margin-top: var(--space-4); min-width: 0; }
+.o-bd-body > * { margin: 0; max-width: none; }
+.o-bd-details[open] .o-bd-body { animation: o-fade var(--office-dur-swap) var(--ease-soft) both; }
+.o-bd-sec { display: grid; gap: var(--space-2); align-content: start; min-width: 0; }
+.o-bd-sec > * { margin: 0; max-width: none; }
+.o-bd .o-subhead { margin: 0; }
+.o-bd-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
+.o-bd-tile { display: grid; gap: var(--space-1); align-content: start; margin: 0; padding: var(--space-3) var(--space-2); border-radius: var(--office-radius); background: var(--office-row-alt); min-width: 0; }
+.o-bd-num { font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); line-height: var(--leading-display); letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; color: var(--office-text); }
+.o-bd-lab { font-size: var(--text-sm); color: var(--office-muted); overflow-wrap: anywhere; }
+.o-bd-run { display: grid; gap: var(--space-4); min-width: 0; }
+.o-bd-bars { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--space-1); align-items: end; }
+.o-bd-bar { display: grid; justify-items: center; gap: var(--space-1); }
+.o-bd-col { align-self: end; width: 100%; height: calc(var(--office-bd-bar-h) * var(--p) / 100); background: var(--office-teal-2); border-radius: var(--space-1) var(--space-1) 0 0; }
+.o-bd-n { font-size: var(--office-text-xs); color: var(--office-muted); font-variant-numeric: tabular-nums; }
+.o-bd-steps-h { margin: 0 0 var(--space-1); font-size: var(--text-sm); font-weight: 600; color: var(--office-muted); }
+.o-bd-lines li > span:first-child, .o-bd-plan-name { overflow-wrap: anywhere; }
+.o-bd-lines .num, .o-bd-plans .num { white-space: nowrap; }
+.o-bd-lines .o-bd-last { font-weight: 600; }
+.o-bd-lines { margin: 0; }
+.o-bd-table { display: none; }
+.o-bd-stack { display: grid; gap: var(--space-3); }
+.o-bd-deal { display: grid; gap: var(--space-2); align-content: start; padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-row-alt); min-width: 0; }
+.o-bd-deal > * { margin: 0; max-width: none; }
+.o-bd-deal .o-rev-head { margin-bottom: 0; }
+.o-bd-title { margin: 0; font-size: var(--text-base); font-weight: 600; overflow-wrap: anywhere; }
+.o-bd-deal .o-rev-waiting { margin: 0; }
+.o-bd-plans { display: grid; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+.o-bd-plans li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-3); align-items: baseline; }
+.o-bd-plans .num { font-variant-numeric: tabular-nums; font-weight: 600; }
+.o-bd-plan-sub { grid-column: 1 / -1; color: var(--office-muted); }
+.o-bd-quiet { color: var(--office-muted); }
+.o-bd-sum { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-caramel-tint); }   /* warm here, grey for the waiting: on purpose. 10.25 espresso, 5.44 muted */
+.o-bd-sum > * { margin: 0; }
+.o-bd-sumrow { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); font-size: var(--text-sm); }
+.o-bd-sumrow .num { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.o-bd-rule { width: 100%; height: 1px; margin: var(--space-1) 0; border: 0; background: var(--color-hairline); }
+.o-bd-total { display: grid; gap: var(--space-1); }
+.o-bd-total > * { margin: 0; }
+.o-bd-total-lab { font-size: var(--text-sm); font-weight: 600; }
+.o-bd-total-num { font-family: var(--font-display); font-weight: 500; font-size: var(--office-stat); line-height: var(--leading-display); letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; color: var(--office-text); }
+.o-bd-total-sub { font-size: var(--text-sm); color: var(--office-muted); }
+.o-bd-waiting { padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-sunken); }   /* the same material as Possible: no shadow, no big number, no total */
+.o-bd-waiting .o-quiet { gap: var(--space-1); justify-self: start; }
+.o-bd-waiting .o-icon { width: 1rem; height: 1rem; }
+.o-bd-close { display: none; justify-self: start; font-weight: 600; text-decoration: underline; text-underline-offset: 0.25em; cursor: pointer; }
+.js .o-bd-close { display: inline-flex; }
+@media (min-width: 64em) {
+  .o-bd-run { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gutter); align-items: start; }
+  .o-bd-bars { grid-column: 1 / span 7; }
+  .o-bd-steps { grid-column: 8 / span 5; }
+  .o-bd-stack { display: none; }
+  .o-bd-table { display: table; }
+  .o-bd-table tbody::before { height: var(--space-3); }
+  .o-bd-table .o-bd-dealrow th, .o-bd-table .o-bd-dealrow td { background: var(--office-row-alt); font-weight: 600; }
+  .o-bd-table .o-bd-dealrow th { border-radius: var(--office-radius) 0 0 var(--office-radius); }
+  .o-bd-table .o-bd-dealrow td:last-child { border-radius: 0 var(--office-radius) var(--office-radius) 0; }
+  .o-bd-table .o-bd-planrow th, .o-bd-table .o-bd-planrow td { font-weight: 400; }
+  .o-bd-table .o-bd-dealrow .o-cell-sub, .o-bd-table .o-bd-planrow .o-cell-sub { font-weight: 400; }
+  .o-bd-table th, .o-bd-table td { height: auto; min-height: 3.25rem; padding-block: var(--space-2); }
+  .o-bd-table .o-bd-year { font-weight: 600; }
+  .o-bd-sum { padding: var(--space-4); }
+  .o-bd-total { justify-items: end; text-align: right; }
+  .o-bd-waiting { padding: var(--space-4); }
+}
+@media (min-width: 64em) and (max-width: 79.99em) { .o-bd-table th, .o-bd-table td { padding-inline: var(--space-2); } }
+@media (prefers-reduced-motion: reduce) { .o-bd-details[open] .o-bd-body { animation: none; } }
+
+/* ---------- Revenue: dates and "With your assumptions" (docs/features/office-2-design.md section 3) ---------- */
+/* The assumption is a different kind of number from the real one: a caramel tint, no shadow, a smaller figure, and always under the real one. */
+.o-rev-total > .o-rev-assumed { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-caramel-tint); color: var(--office-text); display: grid; gap: var(--space-1); }   /* espresso 10.25, muted 5.44 */
+.o-rev-assumed > * { margin: 0; max-width: none; }
+.o-rev-assumed-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-3); }
+.o-rev-assumed-label { margin: 0; font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; letter-spacing: 0; color: var(--office-text); }
+.o-rev-assumed-num { font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); line-height: var(--leading-display); letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--office-text); }
+.o-rev-assumed .o-sub { font-size: var(--text-sm); color: var(--office-text); }
+.o-rev-assumed .o-rev-assumed-why { color: var(--office-muted); }
+.o-rev-assumed-line { margin: var(--space-2) 0 0; padding: var(--space-1) var(--space-2); border-radius: var(--office-radius); background: var(--office-caramel-tint); }
+.o-list--revenue thead th.o-assumed, .o-list--revenue tbody tr td.o-assumed { background: var(--office-caramel-tint); }   /* in either table, the All row too: it must never read as part of a sum */
+.o-list--assumed th, .o-list--assumed td { padding-inline: var(--space-2); }

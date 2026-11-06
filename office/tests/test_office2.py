@@ -1,26 +1,32 @@
 """Office 2, server side: Barry's membership approval, the counts and Revenue, Leads and the approach list, the Registered lists, the wa.me button. Mocked: sync queue, in-memory mail."""
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from io import StringIO
+from unittest import mock
 
 from django.core import mail
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.test import Client
 from django.utils import timezone
 
 from common import levels
+from common.validators import validate_sensible_year
+from office.templatetags.office_tags import bp_rate
 from gold import services as gold_services
 from gold.models import GoldApplication
 from gold.tests.test_gold import application_data
+from insights.models import OfficeSnapshot
 from journey.models import JourneySession
 from office import approvals, counts
 from office.models import MembershipReview, MembershipReviewEvent
+from office.templatetags.office_tags import pounds_compact
 from office.tests.test_leads import lead, verify
 from office.tests.test_office import OFFICE, OfficeTestCase
 from outreach import services as outreach
 from outreach.models import ArchivedLead, OutreachEntry
 from plans import payments
-from plans.models import Plan, Sale, Subscription
+from plans.models import Plan, Sale, SiteSettings, Subscription
 from plans.sales import sale_price
 from plans.tests.helpers import make_team_member
 from users import services as user_services
@@ -189,6 +195,219 @@ class RevenueTests(Base):
         self.assertEqual(row["count"], 1)
         self.assertEqual(row["year_pence"], counts.to_pence(Plan.objects.get(slug="tier-2").price_ex_vat) * 12)
         self.assertEqual(next(r for r in self.figures()["revenue"]["approved"]["by_plan"] if r["slug"] == "gold")["count"], 0)
+
+
+class ManualSetupCardTests(Base):
+    def test_a_set_up_whose_staff_member_has_gone_still_opens_the_person(self):
+        """created_by empties when that staff account is deleted (SET_NULL): the page says so and never breaks."""
+        user = self.member("gone.staff@example.com")
+        Subscription.objects.create(registration=user.interest, plan=user.interest.plan, start_date=timezone.localdate(), created_by=None)
+        page = call(self.admin, "get", f"/people/{user.pk}/")
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Not recorded")
+
+
+class RevenueSafetyTests(Base):
+    """What the review of the Revenue dates found: settings at their limits and changes from any path."""
+
+    def approved(self, email="safe@example.com"):
+        user = self.member(email)
+        approvals.decide(user.pk, "approved", self.approver)
+        return user
+
+    def test_a_monthly_drop_off_of_100_percent_keeps_month_one_and_the_page_opens(self):
+        self.approved()
+        SiteSettings.objects.filter(pk=SiteSettings.load().pk).update(revenue_dropoff_percent=100)
+        data = self.figures()["revenue"]
+        price = 39900
+        self.assertEqual(counts.revenue_assumptions(data)["approved"]["assumed_total_ex"], Decimal(price))
+        self.assertEqual(call(self.approver, "get", "/revenue/").status_code, 200)
+
+    def test_a_far_off_year_never_stops_the_figures_and_the_forms_refuse_it(self):
+        self.assertEqual(counts.add_months(date(9999, 6, 1), 11), date.max)
+        with self.assertRaises(ValidationError):
+            validate_sensible_year(date(9999, 6, 1))
+        self.assertEqual(validate_sensible_year(date(2027, 1, 1)), date(2027, 1, 1))
+
+    def test_any_change_to_the_dates_or_a_set_up_asks_for_a_refresh(self):
+        user = self.member("refresh@example.com")
+        site = SiteSettings.load()
+        with mock.patch("office.snapshots.request_refresh") as refresh:
+            site.save()
+            refresh.assert_not_called()  # nothing that matters changed
+            site.revenue_start_date = date(2027, 3, 1)
+            site.save()
+            self.assertEqual(refresh.call_count, 1)
+            site.opening_date = date(2027, 4, 1)
+            site.save()
+            self.assertEqual(refresh.call_count, 2)
+            sub = Subscription.objects.create(registration=user.interest, plan=user.interest.plan, start_date=date(2027, 1, 1))
+            self.assertEqual(refresh.call_count, 3)
+            sub.delete()
+            self.assertEqual(refresh.call_count, 4)
+
+    def test_analytics_money_is_never_kept_by_the_browser(self):
+        self.assertIn("no-store", call(self.approver, "get", "/analytics/")["Cache-Control"])
+        self.assertIn("no-store", call(self.approver, "get", "/analytics/data/")["Cache-Control"])
+
+    def test_a_half_percent_rounds_up_as_the_tooltip_does(self):
+        self.assertEqual((bp_rate(1250), bp_rate(6250), bp_rate(460)), ("13%", "63%", "4.6%"))
+
+    def test_dates_with_nothing_stored_by_date_show_the_normal_page_and_no_false_zero(self):
+        self.approved()
+        stored = self.figures()
+        for bucket in ("approved", "waiting"):
+            stored["revenue"][bucket]["detail"].pop("calendar", None)
+        OfficeSnapshot.objects.filter(page=counts.PAGE, range=counts.RANGE).update(payload=stored)
+        page = call(self.approver, "get", "/revenue/?from=2027-01-01&to=2027-12-31")
+        self.assertEqual(page.status_code, 200)
+        self.assertIsNone(page.context["range_figures"])
+        self.assertNotContains(page, "Nothing falls due")
+
+
+class RevenueBreakdownTests(Base):
+    """The Revenue breakdown: deals plus Gold equal the stored total, and the page shows only stored figures."""
+
+    def john(self, email, percent=20, months=6, plan="tier-2"):
+        user = self.member(email, plan=plan)
+        InterestRegistration.objects.filter(user=user).update(sale_percent_off=percent, sale_months=months, sale_name="Launch")
+        return user
+
+    def build(self):
+        """Approved: a 6-month sale, a 24-month sale, a lapsed sale (full price), an agreed price, plain full price, one Gold. Waiting: a sale person and Gold."""
+        sale, long_sale, lapsed, agreed, plain, waiting = (self.john("bd.sale@example.com"), self.john("bd.long@example.com", 40, 24, "tier-3"), self.john("bd.lapsed@example.com"),
+                                                          self.member("bd.agreed@example.com"), self.member("bd.plain@example.com", plan="tier-1"), self.john("bd.waiting@example.com"))
+        InterestRegistration.objects.filter(user=lapsed).update(sale_expired_at=timezone.now())
+        Subscription.objects.create(registration=agreed.interest, plan=agreed.interest.plan, start_date=timezone.localdate(), agreed_price_ex_vat=Decimal("350.00"))
+        for user in (sale, long_sale, lapsed, agreed, plain):
+            approvals.decide(user.pk, "approved", self.approver)
+        gold, _ = gold_services.submit_application(application_data(email="bd.gold@example.com"))
+        GoldApplication.objects.filter(pk=gold.pk).update(status="approved")
+        gold_services.submit_application(application_data(email="bd.waitgold@example.com"))
+        del waiting
+        return self.figures()["revenue"]
+
+    def test_deals_plus_gold_equal_the_stored_total_for_approved_and_waiting(self):
+        data = self.build()
+        for bucket in ("approved", "waiting"):
+            detail = data[bucket]["detail"]
+            gold = next(r for r in data[bucket]["by_plan"] if r["kind"] == "gold")["year_pence"]
+            self.assertEqual(sum(g["year_pence"] for g in detail["groups"]) + gold, data[bucket]["year_pence"])
+            self.assertEqual(sum(detail["months"]) + gold, data[bucket]["year_pence"])  # the 12 months read the same sum
+            self.assertEqual(sum(g["count"] for g in detail["groups"]), sum(r["count"] for r in data[bucket]["by_plan"] if r["kind"] == "tier"))
+        view = counts.revenue_view(data, 20)["approved"]["detail"]
+        self.assertEqual(view["memberships_year_pence"] + view["gold_year_pence"], data["approved"]["year_pence"])
+        self.assertEqual(view["reduced_count"] + view["full_count"], sum(g["count"] for g in data["approved"]["detail"]["groups"]))
+
+    def test_a_year_in_real_money(self):
+        """Tier 2 at £399 and Tier 3 at £499, worked out by hand."""
+        def year(user):
+            return counts.year_pence(InterestRegistration.objects.select_related("plan").get(user=user))
+
+        self.assertEqual(year(self.john("t.sale@example.com")), 6 * 31920 + 6 * 39900)
+        self.assertEqual(year(self.john("t.long@example.com", 40, 24, "tier-3")), 12 * 29940)
+        self.assertIsNone(counts.terms(InterestRegistration(plan=None)))
+
+    def agreed(self, email, price, months, plan_slug="tier-2"):
+        user = self.member(email)
+        Subscription.objects.create(registration=user.interest, plan=Plan.objects.get(slug=plan_slug), start_date=timezone.localdate(), agreed_price_ex_vat=Decimal(price), agreed_months=months)
+        approvals.decide(user.pk, "approved", self.approver)
+        return user
+
+    def test_an_agreed_price_with_its_months_splits_the_year_and_twelve_or_more_fills_it(self):
+        self.agreed("a.three@example.com", "350.00", 3)
+        self.agreed("a.twelve@example.com", "300.00", 12)
+        self.agreed("a.long@example.com", "250.00", 24)
+        groups = {g["rows"][0]["month_pence"]: g for g in self.figures()["revenue"]["approved"]["detail"]["groups"]}
+        self.assertEqual((groups[35000]["during_pence"], groups[35000]["after_total_pence"]), (3 * 35000, 9 * 39900))
+        self.assertEqual((groups[30000]["during_pence"], groups[30000]["after_total_pence"]), (12 * 30000, 0))
+        self.assertEqual((groups[25000]["during_pence"], groups[25000]["after_total_pence"], groups[25000]["lasts"]), (12 * 25000, 0, 24))
+
+    def test_the_same_agreed_price_on_two_plans_keeps_each_ones_price_afterwards(self):
+        self.agreed("b.two@example.com", "350.00", 3)
+        self.agreed("b.three@example.com", "350.00", 3, "tier-3")
+        rows = self.figures()["revenue"]["approved"]["detail"]["groups"][0]["rows"]
+        self.assertEqual(sorted((r["count"], r["after_pence"], r["after_total_pence"]) for r in rows), [(1, 39900, 9 * 39900), (1, 49900, 9 * 49900)])
+
+    def test_the_deals_match_each_plans_row(self):
+        data = self.build()
+        for bucket in ("approved", "waiting"):
+            for plan in (p for p in data[bucket]["by_plan"] if p["kind"] == "tier"):
+                rows = [r for g in data[bucket]["detail"]["groups"] for r in g["rows"] if r["slug"] == plan["slug"]]
+                self.assertEqual((sum(r["count"] for r in rows), sum(r["year_pence"] for r in rows)), (plan["count"], plan["year_pence"]))
+
+    def test_a_sale_name_is_escaped_on_the_page(self):
+        user = self.john("x.safe@example.com")
+        InterestRegistration.objects.filter(user=user).update(sale_name="<script>x</script>")
+        approvals.decide(user.pk, "approved", self.approver)
+        self.figures()
+        page = call(self.approver, "get", "/revenue/")
+        self.assertNotContains(page, "<script>x</script>")
+        self.assertContains(page, "&lt;script&gt;x&lt;/script&gt;")
+
+    def test_a_sale_of_twenty_four_months_shows_twelve_inside_the_year(self):
+        data = self.build()
+        view = counts.revenue_view(data, 20)["approved"]["detail"]
+        long_sale = next(g for g in view["groups"] if g["lasts"] == 24)
+        self.assertEqual((long_sale["lasts"], long_sale["months"], long_sale["after_months"], long_sale["after_total_pence"]), (24, 12, 0, 0))
+        page = call(self.approver, "get", "/revenue/")
+        self.assertContains(page, "40% off for 24 months, full price from month 25.")
+
+    def test_a_lost_sale_counts_as_full_price_and_in_lost_count(self):
+        view = counts.revenue_view(self.build(), 20)["approved"]["detail"]
+        full = next(g for g in view["groups"] if g["kind"] == "full")
+        self.assertEqual(full["lost"], 1)
+        self.assertEqual(view["lost_count"], 1)
+        tier2 = next(r for r in full["rows"] if r["slug"] == "tier-2")
+        self.assertEqual((tier2["count"], tier2["lost"], tier2["year_pence"]), (1, 1, tier2["month_pence"] * 12))  # full price all year, the same price each month
+        self.assertContains(call(self.approver, "get", "/revenue/"), "Of those at full price, 1 let a sale price lapse.")
+
+    def test_waiting_people_never_land_in_the_approved_detail(self):
+        data = self.build()
+        approved = counts.revenue_view(data, 20)["approved"]["detail"]
+        self.assertEqual(sum(g["count"] for g in approved["groups"]), 5)  # the five approved Tier members only
+        self.assertEqual(approved["gold_count"], 1)
+        waiting = data["waiting"]["detail"]
+        self.assertEqual(sum(g["count"] for g in waiting["groups"]), 1)
+        page = call(self.approver, "get", "/revenue/")
+        self.assertContains(page, "Not counted in any figure above.")
+        self.assertContains(page, "Launch, 20% off for 6 months, 1 waiting")
+
+    def test_an_old_stored_payload_with_no_detail_shows_no_plus_and_no_error(self):
+        self.build()
+        stored = counts.read()
+        for bucket in ("approved", "waiting"):
+            stored["revenue"][bucket].pop("detail", None)
+        from insights.models import OfficeSnapshot
+
+        OfficeSnapshot.objects.filter(page=counts.PAGE, range=counts.RANGE).update(payload=stored)
+        page = call(self.approver, "get", "/revenue/")
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "The breakdown will be ready after the next hourly update.")
+        self.assertNotContains(page, "data-wants-details")
+
+    def test_nothing_approved_shows_the_line_and_no_plus(self):
+        self.figures()
+        page = call(self.approver, "get", "/revenue/")
+        self.assertContains(page, "Nothing approved yet, so there is nothing to break down.")
+        self.assertNotContains(page, "o-plus")
+
+    def test_the_page_renders_for_an_approver_with_the_stored_pence_and_no_vat_or_rounding_added(self):
+        data = self.build()
+        for user in (self.admin, self.approver):
+            page = call(user, "get", "/revenue/")
+            self.assertEqual(page.status_code, 200)
+            self.assertContains(page, "data-revenue-breakdown")
+            self.assertContains(page, "Estimate for the year")
+        view = page.context["revenue"]["approved"]["detail"]
+        self.assertEqual(view["memberships_year_pence"] + view["gold_year_pence"], data["approved"]["year_pence"])  # exact pence: no VAT, no rounding
+        self.assertEqual(view["groups"][0]["rows"][0]["year_pence"], data["approved"]["detail"]["groups"][0]["rows"][0]["year_pence"])
+        self.assertContains(page, "Agreed price, £350 a month")
+
+    def test_price_month_is_exact(self):
+        from office.templatetags.office_tags import price_month
+
+        self.assertEqual((price_month(35000), price_month(27930), price_month(120000), price_month(0), price_month(5), price_month(None)), ("£350", "£279.30", "£1,200", "£0", "£0.05", "£0"))
 
 
 class RevenueSaleMonthsTests(Base):
@@ -493,3 +712,391 @@ class RevenueAgreedMonthsTests(Base):
         call_command("backfill_agreed_months", dry_run=True, stdout=out)
         self.assertIn("no sale price stored: 1", out.getvalue())
         self.assertIn(user.public_id, out.getvalue())
+
+
+class RevenueCalendarTests(Base):
+    """Money due by date: each member's 12 payments, Gold's one, the range sum and the page's date filter."""
+
+    john, build = RevenueBreakdownTests.john, RevenueBreakdownTests.build  # the same setups, without re-running that class's tests
+
+    def due(self, bucket="approved"):
+        return self.figures()["revenue"][bucket]["detail"]["calendar"]
+
+    def test_a_sale_member_owes_six_at_the_sale_price_then_six_at_full_on_the_right_dates(self):
+        user = self.john("cal.sale@example.com")
+        approvals.decide(user.pk, "approved", self.approver)
+        calendar = self.due()
+        days = ["2027-01-01", "2027-02-01", "2027-03-01", "2027-04-01", "2027-05-01", "2027-06-01", "2027-07-01", "2027-08-01", "2027-09-01", "2027-10-01", "2027-11-01", "2027-12-01"]
+        self.assertEqual(calendar["due"], {"tier-2": {day: {str(number + 1): [31920 if number < 6 else 39900, 1]} for number, day in enumerate(days)}})
+        self.assertEqual((calendar["start"], calendar["assumed"], calendar["first"], calendar["last"]), ("2027-01-01", True, "2027-01-01", "2027-12-01"))
+
+    def test_everything_due_adds_up_to_the_year_for_both_buckets_including_gold(self):
+        data = self.build()
+        for bucket in ("approved", "waiting"):
+            due = data[bucket]["detail"]["calendar"]["due"]
+            self.assertEqual(sum(cell[0] for by_day in due.values() for months in by_day.values() for cell in months.values()), data[bucket]["year_pence"])
+            self.assertGreater(data[bucket]["year_pence"], 0)
+        self.assertIn("gold", data["approved"]["detail"]["calendar"]["due"])
+        self.assertEqual(list(data["waiting"]["detail"]["calendar"]["due"]["gold"].values()), [{"1": [data["gold_fee_pence"], 1]}])
+
+    def test_a_31_january_start_is_clamped_to_the_end_of_each_month(self):
+        from datetime import date
+
+        self.assertEqual([counts.add_months(date(2027, 1, 31), n).isoformat() for n in (0, 1, 2, 3, 12)], ["2027-01-31", "2027-02-28", "2027-03-31", "2027-04-30", "2028-01-31"])
+        self.assertEqual(counts.add_months(date(2027, 12, 15), 1).isoformat(), "2028-01-15")
+        from plans.models import SiteSettings
+
+        SiteSettings.objects.filter(singleton_key="site").update(revenue_start_date=date(2027, 1, 31))
+        approvals.decide(self.member("cal.clamp@example.com").pk, "approved", self.approver)
+        self.assertEqual(list(self.due()["due"]["tier-2"])[:3], ["2027-01-31", "2027-02-28", "2027-03-31"])
+
+    def test_his_subscription_beats_the_opening_date_and_that_beats_the_assumed_date(self):
+        from datetime import date
+
+        from plans.models import SiteSettings
+
+        user = self.member("cal.start@example.com")
+        approvals.decide(user.pk, "approved", self.approver)
+        self.assertEqual((self.due()["start"], self.due()["assumed"], self.due()["first"]), ("2027-01-01", True, "2027-01-01"))
+        SiteSettings.objects.filter(singleton_key="site").update(opening_date=date(2027, 3, 10))
+        calendar = self.due()
+        self.assertEqual((calendar["start"], calendar["assumed"], calendar["first"], calendar["last"]), ("2027-03-10", False, "2027-03-10", "2028-02-10"))
+        Subscription.objects.create(registration=user.interest, plan=user.interest.plan, start_date=date(2027, 5, 20))
+        calendar = self.due()
+        self.assertEqual((calendar["first"], calendar["last"]), ("2027-05-20", "2028-04-20"))
+
+    def test_revenue_between_includes_both_ends_and_an_empty_range_is_zero(self):
+        from datetime import date
+
+        approvals.decide(self.john("cal.range@example.com").pk, "approved", self.approver)
+        data = self.figures()["revenue"]
+        got = counts.revenue_between(data, date(2027, 1, 1), date(2027, 2, 1), 20)["approved"]
+        self.assertEqual((got["payments"], got["total_ex"], got["total_inc"]), (2, Decimal(63840), Decimal(63840) * Decimal("1.2")))
+        row = next(r for r in got["by_plan"] if r["slug"] == "tier-2")
+        self.assertEqual((row["payments"], row["total_ex"]), (2, Decimal(63840)))
+        self.assertEqual([r["slug"] for r in got["by_plan"]], [r["slug"] for r in data["approved"]["by_plan"]])
+        none = counts.revenue_between(data, date(2030, 1, 1), date(2030, 2, 1), 20)
+        self.assertEqual((none["approved"]["payments"], none["approved"]["total_ex"], none["waiting"]["payments"]), (0, 0, 0))
+        self.assertEqual(counts.revenue_between({"approved": {"count": 0, "year_pence": 0, "by_plan": []}}, date(2027, 1, 1), date(2027, 2, 1), 20)["waiting"]["payments"], 0)
+
+    def test_the_page_reads_the_range_refuses_a_backwards_one_and_ignores_garbage(self):
+        approvals.decide(self.john("cal.page@example.com").pk, "approved", self.approver)
+        self.figures()
+        page = call(self.approver, "get", "/revenue/?from=2027-02-01&to=2027-03-31").context
+        self.assertEqual((page["date_range"]["active"], page["range_figures"]["approved"]["payments"], page["date_format"]), (True, 2, "d/m/Y"))
+        self.assertEqual((page["calendar"]["first"], page["calendar"]["last"], page["calendar"]["assumed"]), ("2027-01-01", "2027-12-01", True))
+        only_from = call(self.approver, "get", "/revenue/?from=2027-12-01").context
+        self.assertEqual(only_from["range_figures"]["approved"]["payments"], 1)
+        only_to = call(self.approver, "get", "/revenue/?to=2027-01-01").context
+        self.assertEqual(only_to["range_figures"]["approved"]["payments"], 1)
+        backwards = call(self.approver, "get", "/revenue/?from=2027-03-01&to=2027-02-01").context
+        self.assertEqual((backwards["range_error"], backwards["date_range"]["active"], backwards["range_figures"]), ("The end date can't be before the start date.", False, None))
+        for query in ("", "?from=&to=", "?from=banana&to=2027-99-99"):
+            plain = call(self.approver, "get", f"/revenue/{query}").context
+            self.assertEqual((plain["date_range"]["active"], plain["range_figures"], plain["range_error"]), (False, None, ""))
+
+    def test_an_old_stored_payload_with_no_calendar_still_loads(self):
+        from insights.models import OfficeSnapshot
+
+        approvals.decide(self.john("cal.old@example.com").pk, "approved", self.approver)
+        data = self.figures()
+        for bucket in ("approved", "waiting"):
+            data["revenue"][bucket]["detail"].pop("calendar")
+        data["revenue"]["waiting"].pop("detail")
+        OfficeSnapshot.objects.filter(page=counts.PAGE).update(payload=data)
+        response = call(self.approver, "get", "/revenue/?from=2027-01-01&to=2027-12-31")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((response.context["calendar"]["first"], response.context["range_figures"]), (None, None))  # no false £0: the normal page
+
+    def test_assumptions_equal_the_real_figures_at_100_and_0_and_apply_paying_and_dropoff_exactly(self):
+        from datetime import date
+
+        from plans.models import SiteSettings
+
+        self.build()
+        data = self.figures()["revenue"]
+        plain = counts.revenue_assumptions(data, 20)
+        for bucket in ("approved", "waiting"):
+            self.assertEqual((plain[bucket]["assumed_total_ex"], plain[bucket]["assumed_total_inc"]), (plain[bucket]["total_ex"], plain[bucket]["total_inc"]))
+            self.assertEqual(plain[bucket]["total_ex"], data[bucket]["year_pence"])
+            for row in plain[bucket]["by_plan"]:
+                self.assertEqual(row["assumed_total_ex"], row["total_ex"])
+        # by hand: one member at 39900 a month, 80% paying, 10% leaving each month, first 3 payments; and Gold's fee at 80% with no drop-off
+        stored = {"approved": {"by_plan": [{"slug": "tier-2", "name": "Tier 2", "kind": "tier"}, {"slug": "gold", "name": "Gold", "kind": "gold"}],
+                               "detail": {"calendar": {"due": {"tier-2": {"2027-01-01": {"1": [39900, 1]}, "2027-02-01": {"2": [39900, 1]}, "2027-03-01": {"3": [39900, 1]}},
+                                                                "gold": {"2027-01-01": {"1": [19900, 1]}}}}}}}
+        SiteSettings.objects.filter(singleton_key="site").update(revenue_paying_percent=80, revenue_dropoff_percent=10)
+        got = counts.revenue_between(stored, date(2027, 1, 1), date(2027, 3, 1), 20)["approved"]
+        tier, gold = got["by_plan"]
+        self.assertEqual(tier["assumed_total_ex"], Decimal("86503.2"))  # 39900 x 0.8 x (1 + 0.9 + 0.81)
+        self.assertEqual(gold["assumed_total_ex"], Decimal(19900) * Decimal("0.8"))
+        self.assertEqual((tier["total_ex"], gold["total_ex"]), (Decimal(119700), Decimal(19900)))  # the real figures ignore the assumptions
+        page = call(self.approver, "get", "/revenue/").context["assumptions"]
+        self.assertEqual((page["paying_percent"], page["dropoff_percent"], page["changed"]), (Decimal("80"), Decimal("10"), True))
+
+
+class RevenueDatesPageTests(Base):
+    """The Revenue page's date filter and "With your assumptions": what the page says in each state (the figures themselves are tested above)."""
+
+    john = RevenueBreakdownTests.john
+
+    def setUp(self):
+        super().setUp()
+        approvals.decide(self.john("dates.john@example.com").pk, "approved", self.approver)  # 6 payments at 319.20 then 6 at 399.00, 1 Jan to 1 Dec 2027
+        self.figures()
+
+    def text(self, query="", path="/revenue/"):
+        import html
+
+        return html.unescape(call(self.approver, "get", f"{path}{query}").content.decode())
+
+    def outside_the_form(self, page):
+        return page.split('<div class="o-revenue"', 1)[1]  # everything under the filter
+
+    def assume(self, paying, dropoff):
+        from plans.models import SiteSettings
+
+        SiteSettings.objects.filter(singleton_key="site").update(revenue_paying_percent=paying, revenue_dropoff_percent=dropoff)
+
+    def test_the_default_page_has_the_field_and_no_date_wording_anywhere_else(self):
+        page = self.text()
+        self.assertIn('data-date-picker data-mode="range" data-format="d/m/Y"', page)
+        self.assertIn('data-min="2027-01-01" data-max="2027-12-01"', page)
+        self.assertIn("Money is due from 01/01/2027 to 01/12/2027. Based on an assumed start date.", page)  # the assumed date is in the calendar's note and nowhere else
+        rest = self.outside_the_form(page)
+        for text in ("01/01/2027", "Money due", "Clear dates", "all dates", "any time", "In these dates", "Not limited to the dates", "Each member's own first 12 months, starting when he starts paying"):
+            self.assertNotIn(text, rest)
+        for text in ("Estimate from approved people", "A year, excluding VAT. Not money received.", "A year</th>", "A month</th>", "The same figure as the top of this page.",
+                     "An estimate for each member's first 12 months at today's prices. VAT at 20%.", "By plan and tier</h2>"):
+            self.assertIn(text, rest)
+        self.assertNotIn("With your assumptions", page)  # nothing is changed
+        self.assertNotIn("data-revenue-assumed", page)
+
+    def test_dates_chosen_the_total_reads_what_is_due_and_the_year_and_month_columns_go(self):
+        page = self.text("?from=2027-02-01&to=2027-03-31")
+        card = page.split('data-revenue-total', 1)[1].split("</section>", 1)[0]
+        self.assertIn("Due from approved people", card)
+        self.assertIn('data-revenue-year data-revenue-range>£638<', card)  # two payments of 319.20, exactly 638.40
+        self.assertIn("01/02/2027 to 31/03/2027, excluding VAT. Not money received.", card)
+        self.assertIn("In these dates", card)
+        self.assertIn("2 payments due.", card)
+        self.assertIn("Including VAT</th><td>£766<", card)
+        for text in ("A year", "A month", "Members", "Average"):
+            self.assertNotIn(text, card)
+        self.assertIn("Anyone without his own start date is counted from 01/01/2027, an assumed date until the opening date is set. Change it in System > Revenue.", card)
+        self.assertIn('<span data-revenue-range-line>Money due 01/02/2027 to 31/03/2027</span><a class="o-quiet" href="/revenue/" data-clear>Clear dates</a>', page)
+        table = page.split("data-revenue-table", 1)[1].split("</section>", 1)[0]
+        self.assertIn("By plan and tier, in these dates", table)
+        for head in ("Payments due", "Due, excl. VAT", "Due, incl. VAT"):
+            self.assertIn(head, table)
+        for gone in ("Members", "Month, excl. VAT", "Average a member a year", "With your assumptions"):
+            self.assertNotIn(gone, table)
+        self.assertEqual(table.count("data-revenue-row="), 2)  # Tier 2 (the only plan with payments) and All
+        self.assertIn("An estimate of payments due at today's prices. VAT at 20%.", page)
+        self.assertIn("Possible, from those waiting", page)
+        self.assertIn("Nobody waiting has a payment due in these dates.", page)
+
+    def test_the_breakdown_never_changes_but_three_lines_of_its_wording_do(self):
+        plain, dated = self.text(), self.text("?from=2027-02-01&to=2027-03-31")
+        for page in (plain, dated):
+            self.assertIn("£4,309", page.split("data-bd-sum-total", 1)[1])  # the full year, with or without dates
+        self.assertIn("The same figure as the top of this page.", plain)
+        self.assertNotIn("The full 12-month estimate, not just the dates above.", plain)
+        self.assertNotIn("Not limited to the dates above.", plain)
+        self.assertEqual(plain.count("data-revenue-basis"), 0)
+        self.assertIn("The full 12-month estimate, not just the dates above.", dated)
+        self.assertNotIn("The same figure as the top of this page.", dated)
+        self.assertIn("Not limited to the dates above. Who pays what, for how long, and what it comes to over each member's first 12 months.", dated)
+        self.assertEqual(dated.count("data-revenue-basis"), 2)  # the total card and the breakdown's first section
+
+    def test_a_backwards_range_shows_the_error_and_the_normal_page_with_both_fields_empty(self):
+        page = self.text("?from=2027-03-01&to=2027-02-01")
+        self.assertIn('<p class="o-field-error" role="alert" data-revenue-range-error>The end date can\'t be before the start date. Showing the full estimate instead.</p>', page)
+        self.assertIn("Estimate from approved people", page)
+        self.assertNotIn("Clear dates", page)
+        self.assertNotIn("In these dates", page)
+        self.assertIn('name="from" value=""', page)
+        self.assertIn('name="to" value=""', page)
+        self.assertIn("A year</th>", page)
+
+    def test_with_one_end_in_the_address_the_page_states_the_true_dates(self):
+        self.assertIn("Money due 01/01/2027 to 01/02/2027", self.text("?to=2027-02-01"))  # the start is the first due date
+        only_from = self.text("?from=2027-11-01")
+        self.assertIn("Money due 01/11/2027 to 01/12/2027", only_from)  # the end is the last due date
+        self.assertIn('name="from" value="2027-11-01"', only_from)
+        self.assertIn('name="to" value="2027-12-01"', only_from)
+
+    def test_nothing_due_in_the_dates_says_so_and_drops_the_grid_tile_cards_and_table(self):
+        self.assume(80, 0)
+        page = self.text("?from=2030-01-01&to=2030-02-01")
+        card = page.split('data-revenue-total', 1)[1].split("</section>", 1)[0]
+        self.assertIn("£0<", card)
+        self.assertIn("Nothing falls due from approved people in these dates.", card)
+        for text in ("data-revenue-grid", "data-revenue-assumed", "payments due."):
+            self.assertNotIn(text, card)
+        for text in ("data-revenue-plans", "data-revenue-table"):
+            self.assertNotIn(text, page)
+
+    def assumed_year(self):
+        """John's year with 80% paying and 10% leaving each month, by hand: 31920 for 6 months then 39900 for 6, each month reduced once more than the one before."""
+        from office.templatetags.office_tags import pounds
+
+        return pounds(sum(Decimal(m) * Decimal("0.8") * Decimal("0.9") ** (n - 1) for n, m in enumerate([31920] * 6 + [39900] * 6, start=1)))
+
+    def test_assumed_figures_appear_only_when_changed_and_never_change_the_real_one(self):
+        self.assertNotIn("With your assumptions", self.text())
+        self.assertNotIn("With your assumptions", self.text("?from=2027-02-01&to=2027-03-31"))
+        self.assume(80, 10)
+        page = self.text()
+        card = page.split("data-revenue-total", 1)[1].split("</section>", 1)[0]
+        self.assertIn("Real figure, from approved people", card)
+        self.assertIn('data-revenue-year>£4,309<', card)  # the real figure is exactly what it was
+        self.assertIn("A year, excluding VAT. Every approved person paying. Not money received.", card)
+        self.assertIn(f'<p class="o-rev-assumed-num">{self.assumed_year()}</p>', card)
+        self.assertIn("If 80% of them pay and 10% leave each month. Your own guess. The real figure does not change.", card)
+        self.assertNotIn("Due 01/", card)
+        table = page.split("data-revenue-table", 1)[1].split("</section>", 1)[0]
+        self.assertIn("With your assumptions, year, excl. VAT", table)
+        self.assertEqual(table.count('<td class="num o-assumed">'), 2)  # Tier 2 and the All row, both tinted
+        self.assertIn("With your assumptions, a year, excl. VAT", page.split("data-revenue-plans", 1)[1])  # the phone cards and the Possible panel say a year
+        self.assertNotIn("With your assumptions", self.outside_the_form(page).split("data-revenue-breakdown", 1)[1].split("data-bd-waiting", 1)[0])  # the breakdown is never touched
+
+    def test_the_assumption_names_what_is_changed_and_the_dates_when_there_are_dates(self):
+        self.assume(80, 0)
+        self.assertIn("If 80% of them pay. Your own guess.", self.text())
+        self.assertNotIn("leave each month", self.text())
+        self.assume(100, 5)
+        self.assertIn("If 5% leave each month. Your own guess.", self.text())
+        self.assume(80, 10)
+        page = self.text("?from=2027-01-01&to=2027-12-31")
+        card = page.split("data-revenue-total", 1)[1].split("</section>", 1)[0]
+        self.assertIn("Real figure, due from approved people", card)
+        self.assertIn("01/01/2027 to 31/12/2027, excluding VAT. Every approved person paying. Not money received.", card)
+        self.assertIn(f'<p class="o-rev-assumed-num">{self.assumed_year()}</p>', card)  # the whole calendar is the whole year
+        self.assertIn("Due 01/01/2027 to 31/12/2027.", card)
+        table = page.split("data-revenue-table", 1)[1].split("</section>", 1)[0]
+        self.assertIn("With your assumptions, excl. VAT", table)
+        self.assertIn("With your assumptions, incl. VAT", table)
+        self.assertIn("With your assumptions, excl. VAT", page.split("data-revenue-plans", 1)[1])
+
+    def test_assumed_figures_wait_for_the_stored_calendar(self):
+        from insights.models import OfficeSnapshot
+
+        self.assume(80, 10)
+        data = self.figures()
+        for bucket in ("approved", "waiting"):
+            (data["revenue"][bucket].get("detail") or {}).pop("calendar", None)
+        OfficeSnapshot.objects.filter(page=counts.PAGE).update(payload=data)
+        page = self.text()
+        self.assertNotIn("With your assumptions", page)  # they would read 0 until the next hourly update
+        self.assertNotIn("data-filter-form", page)  # and with no calendar there is nothing to choose between: no filter
+        self.assertIn("Estimate from approved people", page)
+
+    def test_a_sale_name_is_escaped_in_the_breakdown(self):
+        InterestRegistration.objects.filter(sale_name="Launch").update(sale_name="<b>Spring</b> & co")
+        self.figures()
+        raw = call(self.approver, "get", "/revenue/?from=2027-01-01&to=2027-12-31").content.decode()
+        self.assertIn("&lt;b&gt;Spring&lt;/b&gt; &amp; co", raw)
+        self.assertNotIn("<b>Spring", raw)
+
+    def test_site_date_follows_the_date_format_setting(self):
+        from datetime import date
+
+        from django.template import Context, Template
+
+        from plans.models import SiteSettings
+
+        def shown(value):
+            return Template("{% load office_tags %}{{ v|site_date }}").render(Context({"v": value}))
+
+        for setting, expected in (("dd/mm/yyyy", "01/03/2027"), ("mm/dd/yyyy", "03/01/2027"), ("yyyy-mm-dd", "2027-03-01")):
+            SiteSettings.objects.filter(singleton_key="site").update(date_format=setting)
+            self.assertEqual((shown("2027-03-01"), shown(date(2027, 3, 1))), (expected, expected), setting)
+        self.assertEqual((shown(""), shown(None), shown("banana")), ("", "", ""))
+        SiteSettings.objects.filter(singleton_key="site").update(date_format="mm/dd/yyyy")
+        page = self.text("?from=2027-02-01&to=2027-03-31")
+        self.assertIn("Money due 02/01/2027 to 03/31/2027", page)
+        self.assertIn('data-format="m/d/Y"', page)
+        self.assertIn('name="from" value="2027-02-01"', page)  # the form always carries ISO dates
+
+
+class AnalyticsRevenueTests(Base):
+    """The short Revenue section on Analytics: two donut cards for those who may see Revenue, nothing at all for anyone else."""
+    john = RevenueBreakdownTests.john
+    build = RevenueBreakdownTests.build
+
+    def test_an_approver_sees_both_cards_with_the_right_total_and_a_link_to_revenue(self):
+        data = self.build()
+        total = data["approved"]["year_pence"]
+        for user in (self.approver, self.admin):
+            page = call(user, "get", "/analytics/")
+            self.assertEqual(page.status_code, 200)
+            self.assertContains(page, "Revenue by plan")
+            self.assertContains(page, "Who is on what price")
+            self.assertContains(page, 'class="o-quiet o-seelink" href="/revenue/"', count=2)
+            self.assertContains(page, f'<span class="o-donut-total o-donut-total--money">{pounds_compact(total)}</span><span class="o-donut-word">a year</span>', html=True)
+            self.assertContains(page, "first 12 months. The dates above don", count=2)
+            self.assertEqual(page.context["data"]["revenue_card"]["plan"]["total_pence"], total)
+
+    def test_a_plain_reader_gets_neither_card_nor_any_figure_in_page_or_json(self):
+        data = self.build()
+        page = call(self.reader, "get", "/analytics/")
+        self.assertEqual(page.status_code, 200)
+        for text in ("Revenue by plan", "Who is on what price", "See Revenue", "revenue_card", "chart-revenue"):
+            self.assertNotContains(page, text)
+        self.assertNotIn("revenue_card", page.context["data"])
+        body = call(self.reader, "get", "/analytics/data/")
+        self.assertEqual(body.status_code, 200)
+        self.assertNotIn("revenue_card", body.json())
+        self.assertNotContains(body, str(data["approved"]["year_pence"]))
+        self.assertIn("revenue_card", call(self.approver, "get", "/analytics/data/").json())
+
+    def test_the_shared_snapshot_is_not_changed_by_adding_the_cards(self):
+        self.build()
+        call(self.approver, "get", "/analytics/")
+        self.assertNotIn("revenue_card", call(self.reader, "get", "/analytics/data/").json())
+
+    def test_percents_and_counts_for_a_known_mix(self):
+        from office import analytics_revenue
+
+        stored = {"revenue": {"approved": {"count": 7, "year_pence": 1_000_000, "by_plan": [
+            {"slug": "tier-1", "name": "Tier 1", "kind": "tier", "count": 1, "year_pence": 100_001},
+            {"slug": "tier-2", "name": "Tier 2", "kind": "tier", "count": 4, "year_pence": 600_000},
+            {"slug": "tier-3", "name": "Tier 3", "kind": "tier", "count": 0, "year_pence": 0},
+            {"slug": "gold", "name": "Gold Card", "kind": "gold", "count": 2, "year_pence": 299_999}],
+            "detail": {"groups": [{"kind": "sale", "count": 2}, {"kind": "sale", "count": 1}, {"kind": "agreed", "count": 1}, {"kind": "full", "count": 1}], "months": [0] * 12}}}}
+        card = analytics_revenue.build(stored)
+        self.assertEqual([(r["label"], r["value"], r["share_bp"]) for r in card["plan"]["rows"]], [("Tier 1", 100_001, 1000), ("Tier 2", 600_000, 6000), ("Gold Card", 299_999, 3000)])
+        self.assertEqual(card["plan"]["summary"], "Tier 2 brings in £6,000 of £10,000 a year.")
+        self.assertEqual(card["price"]["members"], 5)
+        self.assertEqual([(r["label"], r["value"], r["share_bp"]) for r in card["price"]["rows"]], [("On a sale price", 3, 6000), ("On an agreed price", 1, 2000), ("At full price", 1, 2000)])
+        self.assertEqual(card["price"]["summary"], "3 of 5 members are on a sale price.")
+
+    def test_the_real_figures_match_the_stored_ones(self):
+        data = self.build()
+        from office import analytics_revenue
+
+        card = analytics_revenue.build(counts.read())
+        self.assertEqual(card["plan"]["total_pence"], data["approved"]["year_pence"])
+        self.assertEqual(card["price"]["members"], sum(r["count"] for r in data["approved"]["by_plan"] if r["kind"] == "tier"))
+        self.assertEqual(sum(r["value"] for r in card["plan"]["rows"]), data["approved"]["year_pence"])  # exact pence, not rounded pounds
+
+    def test_an_old_payload_or_nothing_approved_shows_the_empty_state_with_no_error(self):
+        self.build()
+        stored = counts.read()
+        for bucket in ("approved", "waiting"):
+            stored["revenue"][bucket].pop("detail", None)
+        OfficeSnapshot.objects.filter(page=counts.PAGE, range=counts.RANGE).update(payload=stored)
+        for path in ("/analytics/", "/analytics/data/"):
+            self.assertEqual(call(self.approver, "get", path).status_code, 200)
+        page = call(self.approver, "get", "/analytics/")
+        self.assertContains(page, "Revenue by plan")
+        self.assertContains(page, "Nothing approved yet.")
+        self.assertContains(page, 'data-chart="revenue-plan" data-empty-text="Nothing approved yet." data-empty')
+        self.assertEqual(call(self.reader, "get", "/analytics/").status_code, 200)
+
+    def test_nothing_approved_at_all_is_the_empty_state(self):
+        self.figures()
+        page = call(self.approver, "get", "/analytics/")
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, 'data-chart="revenue-price" data-empty-text="No Tier members approved yet." data-empty')

@@ -15,6 +15,7 @@ urlpatterns = [
     path("changes/export.csv", views.audit_export, name="system_audit_export"),
     path("changes/<uuid:pk>/undo/", views.undo, name="system_undo"),
     path("changes/batch/<uuid:batch>/undo/", views.undo_all, name="system_undo_batch"),
+    path("revenue/", views.revenue, name="system_revenue"),
     path("approval/", views.approval, name="system_approval"),
     path("approval/approvers/add/", views.approval_add, {"role": "approver"}, name="system_approval_approvers_add"),
     path("approval/approvers/<uuid:pk>/remove/", views.approval_remove, {"role": "approver"}, name="system_approval_approvers_remove"),

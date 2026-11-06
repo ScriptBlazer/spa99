@@ -1,6 +1,7 @@
 """Office forms: the manual membership set-up (Admin and up)."""
 from django import forms
 
+from common.validators import validate_sensible_year
 from plans.models import Plan
 
 
@@ -14,6 +15,9 @@ class ManualSetupForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["plan"].queryset = Plan.objects.exclude(kind=Plan.ONE_OFF).order_by("order")  # memberships, Gold included
+
+    def clean_start_date(self):
+        return validate_sensible_year(self.cleaned_data.get("start_date"))
 
 
 class CappedText(forms.CharField):

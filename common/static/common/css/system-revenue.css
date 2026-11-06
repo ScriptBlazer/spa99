@@ -1,0 +1,41 @@
+/* System > Revenue (docs/features/office-2-design.md section 3). System tokens only, no new ones. Loaded by the page through head_extra. */
+/* Three tiles: the lines are long, so three columns from 48em and one below (the global .sys-tiles keeps two on a phone). */
+.sys-tiles.sys-rev-tiles { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 48em) { .sys-tiles.sys-rev-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.sys-rev-tiles .sys-tile .m { max-width: 56ch; }
+.sys-rev-note { margin-bottom: var(--sys-4); }
+
+/* Two columns. Not .sys-cols: below 64em that moves its last child above the fields being typed in. Here the example always follows the fields. */
+.sys-rev-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sys-4); align-items: start; }
+.sys-rev-cols > .sys-panel + .sys-panel { margin-top: 0; }
+@media (min-width: 64em) {
+  .sys-rev-cols { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); }
+  .sys-rev-cols > .sys-rev-live { position: sticky; top: calc(var(--sys-top-h) + var(--sys-4)); }
+}
+
+/* The instructions under each field. */
+.sys-howto { display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: var(--sys-2); margin-top: var(--sys-3); }
+.sys-howto dt { font-weight: 500; color: var(--sys-text-2); }
+.sys-howto dd { color: var(--sys-text); max-width: 72ch; }
+.sys-group > .sys-note + .sys-row { margin-top: var(--sys-2); }
+@media (max-width: 47.99em) {
+  .sys-howto { grid-template-columns: minmax(0, 1fr); }
+  .sys-howto dt:not(:first-child) { margin-top: var(--sys-2); }
+}
+
+/* The live example. */
+.sys-rev-result { margin-top: var(--sys-3); }
+.sys-rev-message { padding: var(--sys-2) var(--sys-3); border-radius: var(--sys-radius); background: var(--sys-subtle); color: var(--sys-text); }
+.sys-rev-val { display: grid; justify-items: end; text-align: right; font-family: var(--sys-mono); font-size: var(--sys-fs); }
+.sys-rev-val small { color: var(--sys-text-3); font-family: var(--sys-font); font-size: var(--sys-fs-sm); }
+.sys-rev-final { font-weight: 600; font-size: var(--sys-fs-md); }
+.sys-rev-final .sys-rev-val { font-size: var(--sys-fs-md); }
+.sys-rev-result .sys-state { gap: var(--sys-3); align-items: baseline; }
+.sys-rev-table { margin-top: var(--sys-4); }
+.sys-rev-table th { white-space: normal; }
+.sys-rev-table tbody th { font-weight: 400; color: var(--sys-text); background: none; font-size: var(--sys-fs); }
+.sys-rev-table .sys-rev-all th, .sys-rev-table .sys-rev-all td { font-weight: 600; border-top: 1px solid var(--sys-line); }
+.sys-rev-table tbody tr:hover td, .sys-rev-table tbody tr:hover th { background: none; }
+.sys-rev-table td:first-child { background: none; }
+.sys-rev-table th:first-child, .sys-rev-table td:first-child { position: static; }
+.sys-rev-round { margin-top: var(--sys-2); font-size: var(--sys-fs-sm); }

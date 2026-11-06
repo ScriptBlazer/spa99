@@ -299,6 +299,8 @@ function start() {
     },
     plan: donut('plan', (d) => d.registrations_by_plan, 'value', 'clay', 'Registrations'),
     suggested: donut('suggested', (d) => d.suggested_plan, 'value', 'clay', 'Suggested'),
+    'revenue-plan': donut('revenue-plan', (d) => d.revenue_card.plan.rows, 'value', 'clay', 'A year', (v) => `£${nf.format(Math.round(v / 100))}`, (d) => !!d.revenue_card),   // Approvers only: the figures are in the page's data only for them. Pence, shown as whole pounds.
+    'revenue-price': donut('revenue-price', (d) => d.revenue_card.price.rows, 'value', 'clay', 'Members', undefined, (d) => !!d.revenue_card),
     'answers-time': donut('answers-time', (d) => d.journey_answers.time, 'count', 'teal', 'Answers'),
     'answers-frequency': donut('answers-frequency', (d) => d.journey_answers.frequency, 'count', 'teal', 'Answers'),
     'answers-company': donut('answers-company', (d) => d.journey_answers.company, 'count', 'teal', 'Answers'),
@@ -328,8 +330,9 @@ function start() {
   };
   const i0 = (pts) => pts[0].dataIndex;
 
-  function donut(key, pick, field, hue, rowLabel) {
+  function donut(key, pick, field, hue, rowLabel, fmt = (v) => nf.format(v), has = () => true) {
     return {
+      has,
       empty: (d) => !pick(d).some((i) => i[field] > 0),
       make(d) {
         const rows = rampRows(pick(d), hue, field).filter((r) => r.value > 0);
@@ -341,7 +344,7 @@ function start() {
             animation: reducedQuery.matches ? false : { duration: T.ms, easing: 'easeOutQuint', animateRotate: true, animateScale: false },
           }),
           plugins: [],
-          tip: (pts) => { const r = rows[pts[0].dataIndex]; return { title: r.label, rows: [{ label: rowLabel, value: `${nf.format(r.value)} · ${rate(r.share_bp)}`, color: r.color }] }; },
+          tip: (pts) => { const r = rows[pts[0].dataIndex]; return { title: r.label, rows: [{ label: rowLabel, value: `${fmt(r.value)} · ${rate(r.share_bp)}`, color: r.color }] }; },
         };
       },
     };
@@ -389,6 +392,7 @@ function start() {
 
   function sync(key, d) {
     const entry = charts.get(key); const spec = specs[key]; if (!entry && !spec) return;
+    if (spec.has && !spec.has(d)) return;   // the data has no figures for this card (a reader's, or an old payload): leave the card as it is
     const box = entry?.box || root.querySelector(`[data-chart="${key}"]`);
     const empty = spec.empty(d);
     box.toggleAttribute('data-empty', empty);
@@ -413,6 +417,7 @@ function start() {
     if (charts.has(key)) return;
     const box = root.querySelector(`[data-chart="${key}"]`); if (!box) return;
     const d = readData(); const spec = specs[key]; if (!spec) return;
+    if (spec.has && !spec.has(d)) return;
     box.toggleAttribute('data-empty', spec.empty(d));
     if (spec.empty(d)) return; // an empty range keeps its one-line state; a later range creates the chart
     const cfg = spec.make(d);

@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from common.jsonshape import has_non_ascii_digit
+from common.validators import validate_sensible_year
 from notifications import emailsettings
 from plans.models import FINAL_POTENTIAL_CHOICES, SiteSettings, normalise_whatsapp_number
 
@@ -147,12 +148,55 @@ class ApprovalForm(VersionedForm):
 
 LAUNCH_HELP = {
     "opening_date": "Shown as the month and year of opening. Leave empty until fixed.",
+    "date_format": "How calendars in the Office and System show dates.",
     "opening_text": "Shown as the opening time while there is no opening date, e.g. January 2027.",
     "register_interest_open": "People can register their interest.",
     "journey_email_gate": "Ask for an email at the end of the questionnaire.",
     "memberships_public": "Shows the Memberships page and prices. Off for the soft launch.",
     "booking_open": "Marks booking as live: hides the \"booking not open yet\" line and tells the assistant. The booking system itself comes later.",
 }
+
+
+class RevenueForm(VersionedForm):
+    """System > Revenue: when Revenue assumes members start paying (until the real opening date is set), and the two assumptions behind its "With your assumptions" figure.
+    The page explains each setting itself (system/revenue.html), so the fields carry no help text. The date uses the shared calendar, one day (common/static/common/js/date-picker.js)."""
+
+    PERCENT_MESSAGE = "Type a number from 0 to 100."
+    LABELS = {"revenue_start_date": "Assumed start date", "revenue_paying_percent": "How many actually pay", "revenue_dropoff_percent": "Monthly drop-off"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, label in self.LABELS.items():
+            self.fields[name].label, self.fields[name].help_text = label, ""
+        date_field = self.fields["revenue_start_date"]
+        date_field.error_messages.update(required="Choose a date.", invalid="Choose a date.")
+        date_field.widget.attrs.update({"data-date-picker": True, "data-mode": "single", "data-format": self.instance.flatpickr_date_format, "data-empty": "Choose a date"})
+        for name in ("revenue_paying_percent", "revenue_dropoff_percent"):
+            field = self.fields[name]
+            field.widget.attrs.update({"min": 0, "max": 100, "step": "0.01"})
+            field.min_value, field.max_value = 0, 100
+            field.error_messages.update({key: self.PERCENT_MESSAGE for key in ("required", "invalid", "max_digits", "max_decimal_places", "max_whole_digits")})
+
+    def _percent(self, name):
+        value = self.cleaned_data.get(name)
+        if value is not None and not 0 <= value <= 100:
+            raise forms.ValidationError(self.PERCENT_MESSAGE)
+        return value
+
+    def clean_revenue_start_date(self):
+        value = self.cleaned_data.get("revenue_start_date")
+        return value if value == self.instance.revenue_start_date else validate_sensible_year(value)  # a date already saved never blocks saving the other fields
+
+    def clean_revenue_paying_percent(self):
+        return self._percent("revenue_paying_percent")
+
+    def clean_revenue_dropoff_percent(self):
+        return self._percent("revenue_dropoff_percent")
+
+    class Meta:
+        model = SiteSettings
+        fields = ["revenue_start_date", "revenue_paying_percent", "revenue_dropoff_percent"]
+        widgets = {"revenue_start_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}
 
 
 class WhatsappNumberField(forms.CharField):
@@ -176,6 +220,7 @@ class SettingsForm(VersionedForm):
                                                      "If you type +44 or a leading 0 it is tidied for you. Empty = the WhatsApp buttons are hidden.")
         self.fields["whatsapp_message"].required = False  # empty = the link opens the chat with no message ready
         self.fields["whatsapp_rate_message"].required = False  # empty = the general message is used
+        self.fields["date_format"].required = False  # a post without it keeps the saved format
         self.fields["code_theme_default"].required = False  # a post without it (older forms, scripts) keeps the saved theme
         for name, low, high in (("lock_idle_minutes", 1, 240), ("max_sign_in_hours", 1, 72)):
             self.fields[name].widget.attrs.update({"min": low, "max": high})
@@ -186,7 +231,10 @@ class SettingsForm(VersionedForm):
         value = self.cleaned_data.get("opening_date")
         if value and value != self.instance.opening_date and value < timezone.localdate():
             raise forms.ValidationError("The opening date cannot be in the past.")
-        return value
+        return value if value == self.instance.opening_date else validate_sensible_year(value)
+
+    def clean_date_format(self):
+        return self.cleaned_data.get("date_format") or self.instance.date_format
 
     def clean_code_theme_default(self):
         return self.cleaned_data.get("code_theme_default") or self.instance.code_theme_default
@@ -199,7 +247,7 @@ class SettingsForm(VersionedForm):
 
     class Meta:
         model = SiteSettings
-        fields = ["opening_date", "opening_text", "register_interest_open", "memberships_public", "journey_email_gate", "booking_open",  # subscribe_open hidden until card payments (Moishe 2026-10-29)
+        fields = ["opening_date", "date_format", "opening_text", "register_interest_open", "memberships_public", "journey_email_gate", "booking_open",  # subscribe_open hidden until card payments (Moishe 2026-10-29)
                   "join_wording", "show_leil_shishi", "vat_rate", "whatsapp_number", "whatsapp_message", "whatsapp_rate_message", "outreach_list_name", "lock_idle_minutes", "max_sign_in_hours", "code_theme_default"]
         widgets = {"opening_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}
         field_classes = {"whatsapp_number": WhatsappNumberField}

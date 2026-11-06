@@ -91,7 +91,7 @@
 @media (min-width: 64em) { .o-plus { top: var(--space-4); right: var(--space-4); } }
 .o-plus::-webkit-details-marker { display: none; }
 .o-plus-icon { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; transition: transform var(--office-dur-thumb) var(--ease-soft); }
-.o-wants-details[open] .o-plus-icon { transform: rotate(45deg); }
+.o-wants-details[open] .o-plus-icon, .o-bd-details[open] .o-plus-icon { transform: rotate(45deg); }
 @media (hover: hover) and (pointer: fine) { .o-plus:hover { background: var(--office-taupe-track); } }
 /* open: the six tiles give way to every option (no JS needed) */
 .o-wants:has(.o-wants-details[open]) [data-tiles] { display: none; }
