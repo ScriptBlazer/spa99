@@ -180,6 +180,13 @@ def office2_leads_list(w):
         assert page.locator("[data-lead-row]", has_text=email).count() == 0
         page.goto(f"{OFFICE}/outreach/")
         assert page.locator("[data-outreach-row]", has_text=email).count() == 1
+    with w.step("The Approach list: a press anywhere on the card opens the person, on a phone and a computer", page):
+        for viewer in (page, _barry(w, 1440, 900, mobile=False)):
+            viewer.goto(f"{OFFICE}/outreach/")
+            box = viewer.locator("[data-outreach-row]", has_text=email).locator(".c-added").bounding_box()
+            viewer.mouse.click(box["x"] + 5, box["y"] + box["height"] / 2)   # a real press at that spot: the link over the card takes it, so a locator click would refuse
+            viewer.wait_for_url(lambda url: "/outreach/" not in url)
+        page.goto(f"{OFFICE}/outreach/")
     with w.step("Back to Leads from the list, with Undo; then Archive with a reason", page):
         row = page.locator("[data-outreach-row]", has_text=email)
         row.locator("[data-outreach-act=to-leads] button").click()
