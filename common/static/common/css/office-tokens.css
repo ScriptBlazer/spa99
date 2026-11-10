@@ -17,6 +17,9 @@
   --office-bar-strong: rgb(255 253 249 / 0.94);  /* phone decision bar */
   --office-overlay: rgb(73 46 33 / 0.32);        /* modal and sheet backdrop */
   --office-toast-edge: rgb(73 46 33 / 0.08);     /* approved 2026-10-25, FEEDBACK: 1px edge of a toast, decoration only */
+  --office-row-hover: #F3EFEA;                   /* a list row under the pointer: clearly lighter than sunken, a step past the striped rows (Moishe 2026-11-10) */
+  --office-row-button: #EBDCC8;                  /* buttons inside list rows: a light brown, espresso 9.2 (Moishe 2026-11-10) */
+  --office-row-button-hover: #E2CEB5;            /* the same button under the pointer: espresso 8.1 */
   --office-caramel-tint: #F3E8DB;                /* caramel at 18%: "Medium" badge, espresso 10.25 */
   --office-note: var(--color-cream);             /* office outreach (2026-11-03, proposed): the paper of a sticky note, an alias, no new colour. Espresso 10.95, muted 5.81, danger 8.07 */
   --office-note-tilt: 0.6deg;                    /* the most a note leans (static, so reduced motion needs no override) */
