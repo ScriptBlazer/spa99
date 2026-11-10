@@ -2,8 +2,8 @@
 {% load office_tags %}
 {% block title %}Leads | Spa 99 Office{% endblock %}
 {% block main %}
-<h1 class="sr-only">{% if archived_view %}Archived leads{% else %}Leads{% endif %}</h1>
-{% if not archived_view %}
+<h1 class="sr-only">{% if archived_view %}Archived leads{% elif fakes_view %}Possible fakes{% else %}Leads{% endif %}</h1>
+{% if not archived_view and not fakes_view %}
 {# Two tiles, true totals (office.counts: stored, they ignore the range and the filters): Leads (no account, not archived, not on the approach list) and Registered (everyone registered). #}
 <section class="o-leadsum" data-leads-summary data-region="leads-summary" data-fade aria-label="Leads and registered people">
   <a class="o-leadsum-tile o-leadsum-tile--link" href="{% url 'office_leads' %}" data-leads-total-tile data-press>
@@ -18,20 +18,20 @@
   </a>
 </section>
 {% endif %}
-{% if archived_view %}{% pick_columns columns "email=Lead,best_fit,potential,reason,archived,action" as head_columns %}{% else %}{% pick_columns columns "" as head_columns %}{% endif %}
+{% if archived_view %}{% pick_columns columns "email=Lead,best_fit,potential,reason,archived,action" as head_columns %}{% elif fakes_view %}{% pick_columns columns "email=Lead,best_fit,potential,last_seen,action" as head_columns %}{% else %}{% pick_columns columns "" as head_columns %}{% endif %}
 
 <form class="o-filters" method="get" action="{% url 'office_leads' %}" data-filter-form data-full data-list="leads" role="search" aria-label="Find leads">
   <div class="o-filters-bar">
     <div class="o-search">
       <label for="f-q" class="sr-only">Search email</label>
       {% include "office/_icon.html" with name="search" %}
-      {% if filters.hot %}<input type="hidden" name="hot" value="1">{% endif %}{% if archived_view %}<input type="hidden" name="view" value="archived">{% endif %}
+      {% if filters.hot %}<input type="hidden" name="hot" value="1">{% endif %}{% if archived_view or fakes_view %}<input type="hidden" name="view" value="{{ filters.view }}">{% endif %}
       <input id="f-q" type="search" name="q" value="{{ filters.q }}" placeholder="Search email" autocomplete="off" enterkeyhint="search" data-search>
     </div>
-    <button type="button" class="btn btn-secondary btn-sm o-filters-open" data-filters-open hidden>{% include "office/_icon.html" with name="sliders" %}{% if archived_view %}Sort{% else %}Filters{% endif %}</button>
+    <button type="button" class="btn btn-secondary btn-sm o-filters-open" data-filters-open hidden>{% include "office/_icon.html" with name="sliders" %}{% if archived_view or fakes_view %}Sort{% else %}Filters{% endif %}</button>
     <div class="o-filters-slot" data-filters-slot>
       <div class="o-filters-body" data-filter-body>
-        {% if not archived_view %}
+        {% if not archived_view and not fakes_view %}
         <div class="o-filter-group"><span class="o-filter-label" id="l-range">Last seen</span>
           <fieldset class="o-seg" aria-labelledby="l-range" style="--n: 4; --i: {% index_of summary.ranges filters.range %}" data-default="{{ site_defaults.leads_range }}">
             <span class="o-seg-thumb" aria-hidden="true"></span>
@@ -59,21 +59,24 @@
     </div>
   </div>
   {# No count when a filter is on: it would be a sum on page load (C5). #}
-  <p class="o-totalline" data-region="leads-total">{% if archived_view %}{% if filters.q %}<span data-filtered>Filtered</span> <a class="o-quiet" href="{% url 'office_leads' %}?view=archived" data-clear>Clear</a>{% else %}{% if page == 1 and not has_next %}{% with n=rows|length %}<span data-total>{{ n|num }} archived lead{{ n|pluralize }}</span>{% endwith %}{% else %}<span data-total>{{ archived_count|num }} archived leads</span>{% endif %}{% endif %}
+  <p class="o-totalline" data-region="leads-total">{% if fakes_view %}{% if filters.q %}<span data-filtered>Filtered</span> <a class="o-quiet" href="{% url 'office_leads' %}?view=fakes" data-clear>Clear</a>{% else %}{% if page == 1 and not has_next %}{% with n=rows|length %}<span data-total>{{ n|num }} possible fake{{ n|pluralize }}</span>{% endwith %}{% else %}<span data-total>{{ fakes_count|num }} possible fakes</span>{% endif %}{% endif %}
+    <a class="o-quiet" href="{% url 'office_leads' %}" data-back-to-leads>{% include "office/_icon.html" with name="chevron-left" %}Back to Leads</a>
+    {% elif archived_view %}{% if filters.q %}<span data-filtered>Filtered</span> <a class="o-quiet" href="{% url 'office_leads' %}?view=archived" data-clear>Clear</a>{% else %}{% if page == 1 and not has_next %}{% with n=rows|length %}<span data-total>{{ n|num }} archived lead{{ n|pluralize }}</span>{% endwith %}{% else %}<span data-total>{{ archived_count|num }} archived leads</span>{% endif %}{% endif %}
     <a class="o-quiet" href="{% url 'office_leads' %}" data-back-to-leads>{% include "office/_icon.html" with name="chevron-left" %}Back to Leads</a>
     {% else %}{% if filtered %}<span data-filtered>Filtered</span> <a class="o-quiet" href="{% url 'office_leads' %}" data-clear>Clear</a>{% else %}<span data-total>{{ total_leads|num }} leads</span>{% endif %}
-    <a class="o-quiet o-archived-link" href="{% url 'office_leads' %}?view=archived" data-archived-link>{% include "office/_icon.html" with name="archive" %}Archived <span class="o-archived-count">{{ archived_count|default:0|num }}</span></a>{% endif %}
+    <a class="o-quiet o-archived-link" href="{% url 'office_leads' %}?view=archived" data-archived-link>{% include "office/_icon.html" with name="archive" %}Archived <span class="o-archived-count">{{ archived_count|default:0|num }}</span></a>
+    <a class="o-quiet o-archived-link" href="{% url 'office_leads' %}?view=fakes" data-fakes-link>{% include "office/_icon.html" with name="flag" %}Possible fakes <span class="o-archived-count" data-fakes-count>{{ fakes_count|default:0|num }}</span></a>{% endif %}
     <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button>
     {% if office_can.can_export %}<a class="btn btn-secondary btn-sm o-export o-export--bar" href="{% url 'office_leads_csv' %}?{{ request.GET.urlencode }}" data-export-csv data-export-base="{% url 'office_leads_csv' %}">Export CSV</a>{% endif %}</p>
   <dialog class="o-sheet" data-filter-sheet aria-labelledby="sheet-h">
-    <div class="o-sheet-head"><h2 id="sheet-h">{% if archived_view %}Sort{% else %}Filters{% endif %}</h2></div>
+    <div class="o-sheet-head"><h2 id="sheet-h">{% if archived_view or fakes_view %}Sort{% else %}Filters{% endif %}</h2></div>
     <div data-sheet-slot></div>
     <button type="button" class="btn btn-primary btn-block" data-sheet-close>Show results</button>
   </dialog>
 </form>
 <div class="o-card o-tablecard" data-list-card>
-  <table class="o-list {% if archived_view %}o-list--archived{% else %}o-list--leads{% endif %}">
-    <caption class="sr-only">{% if archived_view %}Archived leads{% else %}Leads{% endif %}</caption>
+  <table class="o-list {% if archived_view %}o-list--archived{% elif fakes_view %}o-list--fakes{% else %}o-list--leads{% endif %}">
+    <caption class="sr-only">{% if archived_view %}Archived leads{% elif fakes_view %}Possible fakes{% else %}Leads{% endif %}</caption>
     <thead><tr>{% include "office/_sort_head.html" with columns=head_columns %}</tr></thead>
     <tbody data-region="list" data-office-list="leads">{% include "office/_leads_rows.html" %}</tbody>
   </table>

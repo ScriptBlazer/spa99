@@ -6,7 +6,7 @@ WHAT THE WORDS MEAN
   waiting / approved / declined (membership)   Barry's review of the registration (office.MembershipReview). No row = waiting.
   waiting / approved / declined (Gold)         the Gold application's own status. Waiting = new, contacted or awaiting final approval (the same rows as the Gold Waiting list).
   Registered total    every registration, Gold-plan members included: the true total.
-  Leads total         the Leads list: no account, not archived, not on the approach list.
+  Leads total         the Leads list: no account, not archived, not on the approach list, not a Possible fake.
 A Tier member who also applied for Gold counts in both Waiting figures (two different decisions), but Revenue counts him once, at the plan he is on.
 
 REVENUE ("approved" and "waiting" are the same two words as above; declined counts in neither)
@@ -355,7 +355,7 @@ def compute_leads():
     """The Leads total (the list's own query, so the two always agree). The heavy part: only the job and the first read build it."""
     from . import leads
 
-    return {"leads_total": leads.lead_queryset("all").count()}
+    return {"leads_total": leads.lead_queryset("all", fakes="out").count(), "fakes_total": leads.lead_queryset("all", fakes="only").count()}
 
 
 def compute_all():
@@ -378,7 +378,8 @@ def refresh_approvals():
     try:
         with transaction.atomic():
             stored = OfficeSnapshot.objects.filter(page=PAGE, range=RANGE).values_list("payload", flat=True).first() or {}
-            payload = {**compute_approvals(), "leads_total": stored.get("leads_total") if "leads_total" in stored else compute_leads()["leads_total"]}
+            kept = {k: stored[k] for k in ("leads_total", "fakes_total") if k in stored}
+            payload = {**compute_approvals(), **(kept if len(kept) == 2 else compute_leads())}
             _write(payload)
     except Exception:  # noqa: BLE001
         logging.getLogger("spa99.office").exception("Could not refresh the approval counts")
@@ -388,7 +389,7 @@ def empty():
     """What a page shows before the first snapshot exists (a fresh database): zeros and `updating`, never worked out while the page loads."""
     zero = {"total": 0, "waiting": 0, "approved": 0, "declined": 0}
     bucket = {"count": 0, "year_pence": 0, "by_plan": []}
-    return {"memberships": dict(zero), "gold": dict(zero), "registered_total": 0, "gold_members": 0, "leads_total": 0, "updating": True,
+    return {"memberships": dict(zero), "gold": dict(zero), "registered_total": 0, "gold_members": 0, "leads_total": 0, "fakes_total": 0, "updating": True,
             "revenue": {"gold_fee_pence": 0, "approved": dict(bucket), "waiting": dict(bucket)}}
 
 

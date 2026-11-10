@@ -18,7 +18,8 @@ from gold.models import ApplicationEvent, GoldApplication
 from insights import reader
 from journey.models import JourneySession, Option
 from mailings.models import EmailOptOut
-from outreach.models import ArchivedLead
+from notifications.models import EmailSuppression
+from outreach.models import ArchivedLead, GenuineLead
 from outreach.services import approach_entries, emailed_at, emailed_q
 from users.models import InterestRegistration, User
 
@@ -46,7 +47,7 @@ COLUMNS = [
 ]
 ARCHIVED_COLUMN = Column("archived", "Archived", "archived_at", first=sorting.DESC, css="num")
 SORTS = tuple(c.key for c in COLUMNS if c.sortable)
-VIEWS = ("", "archived")
+VIEWS = ("", "archived", "fakes")
 TIEBREAK = ("-last_seen_at", "-created_at", "-id")
 RANGES = ("7d", "30d", "90d", "all")
 POTENTIALS = ("high", "medium", "low")
@@ -103,11 +104,18 @@ def _archived():
     return ArchivedLead.objects.filter(email=OuterRef("email_key"))
 
 
-def lead_queryset(range_name="all", today=None, archived=False):
+def _fake():
+    """Possible fake: a permanent bounce on the suppression list (a spam complaint does not count) and not marked as genuine. EmailSuppression.email and email_key are both lower case,
+    so a corrected address (a new, clean one) matches nothing and the lead leaves the tab by itself."""
+    return Exists(EmailSuppression.objects.filter(email=OuterRef("email_key"), reason=EmailSuppression.HARD_BOUNCE)) & ~Exists(GenuineLead.objects.filter(email=OuterRef("email_key")))
+
+
+def lead_queryset(range_name="all", today=None, archived=False, fakes="all"):
     """One session per address (its latest), annotated with `has_account`, `has_application` and `journeys_n`. Only addresses
     with NO account: a registered person is not a lead (they are in People). Staff addresses never appear either (counting
     rule C2), and nobody who is on the approach list (adding him there takes him out of Leads). `range_name` is by last seen (7d, 30d, 90d, all). Archived addresses are left out (they are in the Archived view:
-    `archived=True` lists only them); everything that counts leads (list, CSV, tiles, hot leads, snapshots) goes through here."""
+    `archived=True` lists only them). `fakes`: "out" leaves out the Possible fakes (the Leads list and its total), "only" lists only them (an archived lead is never in it: archived wins), "all" (default) leaves the
+    rule alone for the callers that never had it. Everything that counts leads (list, CSV, tiles, hot leads, snapshots) goes through here."""
     newer = (_gate_sessions().filter(email_key=OuterRef("email_key"))
              .filter(Q(created_at__gt=OuterRef("created_at")) | Q(created_at=OuterRef("created_at"), id__gt=OuterRef("id"))))
     same = _gate_sessions().filter(email_key=OuterRef("email_key")).order_by().values("email_key").annotate(n=Count("id")).values("n")
@@ -115,6 +123,10 @@ def lead_queryset(range_name="all", today=None, archived=False):
                 .annotate(has_account=Exists(_accounts()), has_application=Exists(_applications()), journeys_n=Subquery(same))
                 .filter(has_account=False).filter(Exists(_archived()) if archived else ~Exists(_archived()))
                 .filter(~Exists(approach_entries(OuterRef("email_key")))))  # on the approach list = gone from Leads (Back to Leads takes the entry away)
+    if fakes == "only":
+        queryset = queryset.filter(_fake())
+    elif fakes == "out":
+        queryset = queryset.filter(~_fake())
     start, _ = reader.range_dates(range_name if range_name in RANGES else "all", today)
     if start is not None:
         queryset = queryset.filter(last_seen_at__gte=timezone.make_aware(datetime.combine(start, time.min)))
@@ -123,7 +135,7 @@ def lead_queryset(range_name="all", today=None, archived=False):
 
 def hot_leads_queryset():
     """High Gold potential, no account, no Gold application (declined or not: he has applied)."""
-    return lead_queryset().filter(gold_potential="high", has_application=False)
+    return lead_queryset(fakes="out").filter(gold_potential="high", has_application=False)  # a Possible fake is hidden everywhere Leads are listed (Moishe, 2026-11-10)
 
 
 def filters_from(request):
@@ -131,8 +143,8 @@ def filters_from(request):
     (default descending), `view` is "" or "archived"."""
     get, d = request.GET, defaults.get(request)
     range_name = get.get("range", d.leads_range)
-    view = "archived" if get.get("view") == "archived" else ""
-    default_key = "archived" if view else (d.leads_sort if d.leads_sort in SORTS else "last_seen")   # the archive reads newest put away first
+    view = get.get("view") if get.get("view") in ("archived", "fakes") else ""
+    default_key = "archived" if view == "archived" else "last_seen" if view else (d.leads_sort if d.leads_sort in SORTS else "last_seen")   # the archive reads newest put away first
     sort, direction, _ = sorting.resolve(_columns(view), get, default_key, sorting.DESC)
     return {"q": get.get("q", "").strip(), "range": range_name if range_name in RANGES else d.leads_range, "tier": get.get("tier", ""), "potential": get.get("potential", "") if get.get("potential") in POTENTIALS else "",
             "industry": get.get("industry", ""), "heard": get.get("heard", ""), "chat": "1" if get.get("chat") == "1" else "", "gold": "yes" if get.get("gold") in ("yes", "1", "on") else "", "hot": "1" if get.get("hot") == "1" else "", "emailed": "1" if get.get("emailed") == "1" else "",
@@ -140,7 +152,7 @@ def filters_from(request):
 
 
 def _columns(view):
-    return COLUMNS + ([ARCHIVED_COLUMN] if view == "archived" else [])
+    return COLUMNS + ([ARCHIVED_COLUMN] if view == "archived" else [])  # the fakes tab reuses the main columns (Lead, Best fit, Potential, Last seen)
 
 
 def columns_for(filters, request):
@@ -165,8 +177,9 @@ def _status_rank():
 
 def filtered_queryset(filters):
     archived = filters.get("view") == "archived"
+    fakes = filters.get("view") == "fakes"
     columns = _columns(filters.get("view", ""))
-    queryset = lead_queryset("all" if archived else filters["range"], archived=archived)  # the archive is everyone put away, whenever last seen
+    queryset = lead_queryset("all" if archived or fakes else filters["range"], archived=archived, fakes="only" if fakes else "out" if not archived else "all")  # the archive and the fakes are everyone, whenever last seen
     if archived:
         queryset = queryset.annotate(archived_at=Subquery(_archived().values("archived_at")[:1]))
     if filters.get("sort") == "status":
@@ -249,9 +262,10 @@ def build_rows(page_sessions):
     for key, label in _heard_answers().filter(ak__in=emails).order_by("session__created_at").values_list("ak", "options__label"):
         heard[key] = label  # the newest answering journey wins
     archived = {a.email: a for a in ArchivedLead.objects.filter(email__in=emails)}
-    from outreach.services import bounced_set
+    from outreach.services import bounced_set, genuine_set
 
-    bounced = bounced_set(emails)  # Possible fake: a permanent bounce on the suppression list (one query for the page)
+    bounced = bounced_set(emails)  # a permanent bounce on the suppression list (one query for the page)
+    genuine = genuine_set(bounced)  # marked as genuine by staff: no Possible fake tag
     emailed = emailed_at(emails)  # the Emailed tag: a person or a group send emailed him (two queries for the page)
     out = []
     for page_row in page_sessions:
@@ -266,7 +280,7 @@ def build_rows(page_sessions):
             "tier": session.suggested_plan.name if session.suggested_plan_id else "", "tier_slug": session.suggested_plan.slug if session.suggested_plan_id else "",
             "potential": session.gold_potential, "score": session.gold_score, "industries": labels.get("industry", []),
             "answers": labels, "summary": summary_lines(labels), "heard_via": heard.get(page_row.email_key, ""),
-            "via_chat": page_row.email_key in chatted, "bounced": page_row.email_key in bounced,
+            "via_chat": page_row.email_key in chatted, "bounced": page_row.email_key in bounced and page_row.email_key not in genuine, "genuine": page_row.email_key in genuine,
             "emailed_at": lists_iso(emailed.get(page_row.email_key)) if page_row.email_key not in bounced else "",  # a bounced lead shows Possible fake instead: the email did not reach him
             "source": {"host": host, "utm_source": utm, "utm_medium": medium, "utm_campaign": campaign, "device": device,
                        "label": utm or host or "Direct", "campaign": campaign},
@@ -274,7 +288,7 @@ def build_rows(page_sessions):
             "gold_applied": page_row.has_application, "status": status_of(page_row.has_account, statuses.get(page_row.email_key, [])),
             "href": _url("office_lead", session.pk), "unsubscribed": page_row.email_key in unsubscribed,
             "archived": {"at": lists_iso(put_away.archived_at), "by": put_away.archived_by_label, "reason": put_away.reason} if put_away else None,
-            "archive_url": _url("office_lead_archive", session.pk), "unarchive_url": _url("office_lead_unarchive", session.pk),
+            "archive_url": _url("office_lead_archive", session.pk), "unarchive_url": _url("office_lead_unarchive", session.pk), "genuine_url": _url("office_lead_genuine", session.pk),
         })
     return out
 

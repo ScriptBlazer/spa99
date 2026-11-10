@@ -186,12 +186,13 @@ Moishe wants automatic emails fully editable in System.
 # Bounced lead emails (agreed 2026-11-03, on feature/whatsapp)
 
 When a lead's email address has a **permanent bounce** (it is on the suppression list as a bounce; spam complaints do not count):
-- **Leads list:** the row shows a tag **Possible fake**. A Leads filter is optional, only if cheap.
+- **Leads list:** a bounced lead is not in the main Leads list. He is in the **Possible fakes** tab beside Archived (see office-2.md), where the row has Mark as genuine. The tag **Possible fake** shows on his page and on the approach list.
 - **Lead page:** a clear notice near the top: "This email bounced, so it may not be real. Remove the lead if it looks like spam, or correct the address if it's a typo and resend the follow-up."
 - **Correct the email** (`can_edit`, audited in the timeline): updates the address on his journeys. It is also reachable without a bounce: the lead page's Details row (Reach out card) has Email, Change, which opens the same dialog titled "Change the email" (see whatsapp.md, Details rows); the first name and mobile Change are there too. Refused if that address already belongs to another lead or an account (say whose). The bounced address stays on the suppression list. The tag goes because the new address is clean.
 - **Resend follow-up:** after a correction, one button sends the next-morning email to the new address straight away (from the System sender, once per address, recorded in his timeline). Works with the automatic switch off, but needs a sender address set; otherwise the button explains. No resend while the address is still bounced.
 - **Remove the lead** stays as it is today, and Archive stays available.
-- Figures: a Possible fake lead still counts until removed or archived.
+- Figures (changed 2026-11-10, decision 2A): a Possible fake is left out of the Leads total on Leads and Home (`compute_leads`, same query as the list). Hot leads, Home's new-leads figure and Analytics' leads total leave him out too; only Analytics' new-leads count and the insights still count him.
+- **Mark as genuine** (`outreach.GenuineLead`, lower-case email unique; by, at; same permission as Archive; a line in his timeline, `LeadArchiveEvent` kinds `genuine` / `ungenuine`): moves him back to Leads for good, a later bounce does not send him back. The suppression list is never touched, so his address stays blocked from email (1A) and the lead page keeps the bounce notice. Undo is on his page and puts him back in the tab while the address still bounces. A snapshot refresh is asked for on a bounce, a mark and an undo.
 - Tests mocked.
 
 

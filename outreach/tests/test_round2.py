@@ -341,9 +341,10 @@ class BouncedLeadTests(Base):
         self.suppress("typo@example.com")
         self.suppress("spam@example.com", "complaint")
         rows = {r["email"]: r["bounced"] for r in lead_lists.page({**lead_lists.filters_from(self._request()), "range": "all"}, 1)[0]}
-        self.assertEqual(rows, {"typo@example.com": True, "spam@example.com": False, "fine@example.com": False})
-        html = call(self.reader, "get", "/leads/").content.decode()
-        self.assertEqual(html.count("data-possible-fake"), 1)
+        self.assertEqual(rows, {"spam@example.com": False, "fine@example.com": False})  # a bounced lead is only in the Possible fakes tab
+        fakes = {r["email"]: r["bounced"] for r in lead_lists.page({**lead_lists.filters_from(self._request()), "view": "fakes"}, 1)[0]}
+        self.assertEqual(fakes, {"typo@example.com": True})
+        self.assertEqual(call(self.reader, "get", "/leads/").content.decode().count("data-possible-fake"), 0)
         page = call(self.reader, "get", f"/leads/{a.pk}/")
         self.assertIn("This email bounced, so it may not be real.", page.content.decode())
         self.assertNotIn("data-bounce-notice", call(self.reader, "get", f"/leads/{b.pk}/").content.decode())  # a complaint is not a bounce

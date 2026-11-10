@@ -210,6 +210,39 @@ def lead_unarchive(request, pk):
 
 @editor
 @require_POST
+def lead_genuine(request, pk):
+    """Mark a bounced lead as genuine: back to Leads for good. The address stays blocked from email. Same permission as Archive."""
+    target = tools.target_for("lead", pk)
+    if target.kind != "lead":
+        return redirect(target.page_url)
+    result = services.mark_genuine(target.main, request.user)
+    if result == services.DONE:
+        messages.success(request, "Marked as genuine. He is back in Leads.")
+    elif result == services.ALREADY:
+        messages.info(request, "He is already marked as genuine.")
+    elif result == services.ARCHIVED_LEAD:
+        messages.info(request, "He is archived. Move him back to Leads first.")
+    else:
+        messages.info(request, "His email has not bounced.")
+    return redirect(_back(request, target.page_url))
+
+
+@editor
+@require_POST
+def lead_ungenuine(request, pk):
+    """Undo Mark as genuine (a bounced address makes him a Possible fake again)."""
+    target = tools.target_for("lead", pk)
+    if target.kind != "lead":
+        return redirect(target.page_url)
+    if services.unmark_genuine(target.main, request.user) == services.DONE:
+        messages.success(request, "Undone. If his email still bounces he is a Possible fake again.")
+    else:
+        messages.info(request, "He was not marked as genuine.")
+    return redirect(_back(request, target.page_url))
+
+
+@editor
+@require_POST
 def lead_email(request, pk):
     """Change a lead's email (a typo, or a new address he gave), after a bounce or not. POST email. Refused, saying whose it is, when another lead or an account has it."""
     target = tools.target_for("lead", pk)

@@ -135,3 +135,10 @@ The pages follow `office-2-design.md`. What is where:
 
 ### Seen and not seen
 Seen in Chromium (`--single-process --no-zygote --disable-gpu`) against a throwaway server and database, at 375 and 1440: Home, Revenue, Approvals, Leads, Registered, Approach list, add-your-number, a lead page, the System group send form. No sideways scroll on any, no console errors other than the known view-transition message. Clicked on a phone size: range stays All, approve and undo (strip height, counts), Leads loads by itself and Back returns to the row, the pressed tone, add-your-number saved a number and moved the lead to the Approach list. Not seen: a real iPhone, the group-send confirm modal itself, the Back to Leads and Archive toasts, the bounce return, and the new e2e walks (see `e2e.md`).
+
+
+## Leads: Possible fakes tab (2026-11-10)
+
+- `?view=fakes` on Leads, a tab beside Archived with its count (stored in the counts snapshot as `fakes_total`). A lead is a possible fake when his address has a permanent bounce on the suppression list (a complaint does not count) and he is not marked genuine. The bounce webhook decides; no cron. Archived wins; a lead on the approach list is in neither.
+- Main Leads, its total and the Home tile leave fakes out (`lead_queryset(fakes="out")`). Correcting the email takes him out of the tab by itself: the new address has no bounce row.
+- Same search, sort and CSV as Archived. Mark as genuine (row and lead page, only while he is a fake and not archived; Archive's permission) and Undo on his page: see the bounce section of office-outreach.md. Hot leads, Home's new-leads figure and Analytics' leads total leave fakes out too (`fakes="out"`); only Analytics' new-leads count and the insights still include them.

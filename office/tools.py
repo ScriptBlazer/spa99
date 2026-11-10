@@ -147,15 +147,20 @@ def archive_context(target, user):
 
 
 def bounce_context(target, user):
-    """The lead page only: `bounce` {bounced, email, notice, can_edit, correct_url, resend_url, can_resend, sent}. `can_resend`: staff corrected the address
+    """The lead page only: `bounce` {bounced, fake (bounced and not marked genuine), genuine, can_mark, genuine_url, ungenuine_url, email, notice, can_edit, correct_url, resend_url, can_resend, sent}. `can_resend`: staff corrected the address
     (so the follow-up never went to it) and it does not bounce now."""
     if target.kind != "lead":
         return {}
     bounced = services.is_bounced(target.main)
+    genuine = services.genuine_row(target.main)
+    fake = bounced and genuine is None
+    archived = services.archived_row(target.main) is not None
     state = services.follow_up_state(target.main)
     editor = can_edit(user)
     return {"bounce": {"bounced": bounced, "email": target.main, "notice": services.BOUNCE_NOTICE, "can_edit": editor, "correct_url": target.url("email"), "resend_url": target.url("resend"),
-                       "can_resend": bool(editor and state["corrected"] and not state["sent"] and not bounced), "sent": state["sent"]}}
+                       "can_resend": bool(editor and state["corrected"] and not state["sent"] and not bounced), "sent": state["sent"],
+                       "fake": fake, "genuine": bool(bounced and genuine), "genuine_by": genuine.marked_by_label if genuine else "", "can_mark": bool(editor and fake and not archived),
+                       "genuine_url": target.url("genuine"), "ungenuine_url": target.url("ungenuine")}}
 
 
 def tools_context(target, user):
@@ -166,7 +171,7 @@ def tools_context(target, user):
 def outreach_rows(entries):
     """Plain dicts for the approach list page (one per entry): name, contact, where from, link and the actions. A lead entry (an address, no account, no Gold application) also gets
     `is_lead` with `to_leads_url` (Back to Leads) and `archive_url`; other rows (a person, a Gold applicant) keep only Remove. `emailed_at` is set when a person or a group send emailed him."""
-    from outreach.services import bounced_set, emailed_at
+    from outreach.services import bounced_set, emailed_at, genuine_set
 
     rows = []
     entries = list(entries)
@@ -177,6 +182,7 @@ def outreach_rows(entries):
         sessions[address.lower()] = pk  # oldest first, so the newest wins
     addresses = {(e.user.email if e.user_id else e.gold_application.email if e.gold_application_id else e.lead_email or "").lower() for e in entries}
     emailed, bounced = emailed_at(addresses), bounced_set(addresses)
+    genuine = genuine_set(bounced)  # marked genuine: no Possible fake tag
     for e in entries:
         mobile = ""
         if e.user_id:
@@ -192,7 +198,7 @@ def outreach_rows(entries):
         key = (email or "").lower()
         rows.append({"id": str(e.pk), "name": name, "email": email, "mobile": mobile, "source": source, "href": href, "reason": e.reason,
                      "emailed_at": emailed[key].isoformat() if key in emailed and key not in bounced else "",  # a bounced address shows Possible fake instead
-                     "bounced": key in bounced, "is_lead": source == "Lead",
+                     "bounced": key in bounced and key not in genuine, "is_lead": source == "Lead",
                      "added_by": e.added_by_label, "added_at": e.added_at.isoformat(), "done_at": e.done_at.isoformat() if e.done_at else "",
                      "done_by": e.done_by_label, "done_url": reverse("office_outreach_done", args=[e.pk]),
                      "remove_url": reverse("office_outreach_remove", args=[e.pk]),

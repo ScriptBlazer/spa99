@@ -528,7 +528,7 @@ class RegisteredAndLeadsTests(Base):
         from notifications.models import EmailSuppression
 
         suppression.add("a@example.com", EmailSuppression.HARD_BOUNCE)
-        rows = {r["email"]: r for r in call(self.reader, "get", "/leads/").context["rows"]}
+        rows = {r["email"]: r for r in call(self.reader, "get", "/leads/?view=fakes").context["rows"]}  # a bounced lead is in Possible fakes, not the main list
         self.assertEqual((rows["a@example.com"]["bounced"], rows["a@example.com"]["emailed_at"]), (True, ""))
         outreach.add_to_list(self.admin, lead_email="b@example.com")
         self.assertEqual([r["email"] for r in call(self.reader, "get", "/outreach/?emailed=1").context["rows"]], ["b@example.com"])

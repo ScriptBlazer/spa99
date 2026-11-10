@@ -1,0 +1,10 @@
+{% load office_tags text_tags %}{% comment %}The Possible fakes view of Leads: leads whose email has a permanent bounce and who are not marked as genuine. Columns: Lead, Best fit, Potential, Last seen, Mark as genuine. Like Move back in Archived, there is no confirm: the row fades and a toast says so (office-tools.js, data-row-act).{% endcomment %}{% for l in rows %}
+<tr class="o-row" data-press data-lead-row data-fake-row data-status="{{ l.status }}">
+  <td class="c-name" data-col="email"><a class="o-rowlink" href="{{ l.href }}">{% truncated l.email %}</a></td>
+  <td class="c-tier" data-col="tier">{% if l.tier %}<span class="o-only-narrow">Best fit </span>{{ l.tier }}{% else %}<span class="o-unrated">None yet</span>{% endif %}</td>
+  <td class="c-potential" data-col="potential">{% include "office/_lead_potential.html" with potential=l.potential %}</td>
+  <td class="num c-date" data-col="last_seen"><span class="o-only-wide">{{ l.last_seen|relative }}</span><span class="o-only-narrow">Seen {{ l.last_seen|relative:True }}</span></td>
+  <td class="c-action" data-col="action">{% if office_can.can_edit %}<form method="post" action="{{ l.genuine_url }}" data-row-act="genuine">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="btn btn-secondary btn-sm o-row-move" data-working-text="Moving">Mark as genuine</button></form>{% endif %}</td>
+</tr>
+{% empty %}<tr class="o-empty-row" data-empty><td colspan="5"><p>{% if filters.q %}No possible fake matches that.{% else %}No possible fakes. A lead whose email bounces for good waits here.{% endif %}</p> <a class="o-quiet" href="{% url 'office_leads' %}" data-back-to-leads>Back to Leads</a></td></tr>{% endfor %}
+{% include "office/_list_foot.html" with cols="5" %}

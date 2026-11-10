@@ -12,7 +12,7 @@ from gold import audit
 from gold.models import ApplicationEvent, GoldApplication
 
 from . import people
-from .models import (MESSAGE_MAX, NOTE_MAX, REASON_MAX, ArchivedLead, LeadArchiveEvent, NextMorningEmail, NoteEvent, OutreachEntry, PersonEdit,
+from .models import (MESSAGE_MAX, NOTE_MAX, REASON_MAX, ArchivedLead, GenuineLead, LeadArchiveEvent, NextMorningEmail, NoteEvent, OutreachEntry, PersonEdit,
                      PersonMessage, StickyNote)
 
 logger = logging.getLogger("spa99.outreach")
@@ -496,7 +496,7 @@ def erase_email(email):
     return (StickyNote.objects.filter(email=email).delete()[0] + PersonMessage.objects.filter(email=email).delete()[0]
             + OutreachEntry.objects.filter(lead_email=email).delete()[0] + ArchivedLead.objects.filter(email=email).delete()[0]
             + LeadArchiveEvent.objects.filter(email=email).delete()[0] + NextMorningEmail.objects.filter(email=email).delete()[0]
-            + PersonEdit.objects.filter(email=email).delete()[0])
+            + PersonEdit.objects.filter(email=email).delete()[0] + GenuineLead.objects.filter(email=email).delete()[0])
 
 
 def timeline_entries(addresses):
@@ -523,7 +523,7 @@ def timeline_entries(addresses):
         detail = f"{edit.before} to {edit.after}" if edit.what == PersonEdit.EMAIL else (edit.after or edit.before)
         out.append((edit.at, "person_edit", f"{noun} {verb} by {edit.by_label or 'someone'}", detail, ""))
     for event in LeadArchiveEvent.objects.filter(email__in=addresses):
-        verb = "Archived" if event.kind == LeadArchiveEvent.ARCHIVED else "Moved back"
+        verb = {LeadArchiveEvent.ARCHIVED: "Archived", LeadArchiveEvent.GENUINE: "Marked as genuine", LeadArchiveEvent.UNGENUINE: "Genuine mark undone"}.get(event.kind, "Moved back")
         out.append((event.at, f"lead_{event.kind}", f"{verb} by {event.by_label or 'someone'}", event.reason, ""))
     for row in NextMorningEmail.objects.filter(email__in=addresses):
         if row.sent_at:
@@ -684,7 +684,8 @@ def set_gold_mobile(application, actor, mobile, mobile_country=None):
 
 # ---------- bounced lead emails: Possible fake, correct the address, send the follow-up again ----------
 
-TAKEN, BOUNCED, NO_SENDER, SENT, NOT_SENT = "taken", "bounced", "no_sender", "sent", "not_sent"
+TAKEN, BOUNCED, NO_SENDER, SENT, NOT_SENT, NOT_FAKE = "taken", "bounced", "no_sender", "sent", "not_sent", "not_fake"
+ARCHIVED_LEAD = "archived_lead"
 BOUNCE_NOTICE = "This email bounced, so it may not be real. Remove the lead if it looks like spam, or correct the address if it's a typo and resend the follow-up."
 
 
@@ -700,6 +701,52 @@ def bounced_set(addresses):
 
 def is_bounced(email):
     return bool(bounced_set([email]))
+
+
+def genuine_set(addresses):
+    """The lower-cased addresses among `addresses` that staff marked as genuine. One query."""
+    wanted = {(a or "").strip().lower() for a in addresses if a}
+    return set(GenuineLead.objects.filter(email__in=wanted).values_list("email", flat=True)) if wanted else set()
+
+
+def figures_changed():
+    _figures_changed()
+
+
+def genuine_row(email):
+    return GenuineLead.objects.filter(email=(email or "").strip().lower()).first()
+
+
+def mark_genuine(email, actor):
+    """Staff decided a bounced lead is real: he goes back to Leads for good (a later bounce of the same address does not send him back). The suppression list is not touched, so the address
+    stays blocked from email. Records "Marked as genuine by X". Returns DONE, ALREADY (already marked), NOT_FAKE (his address has not bounced) or MISSING."""
+    email = (email or "").strip().lower()
+    if not email:
+        return MISSING
+    if archived_row(email):
+        return ARCHIVED_LEAD  # an archived lead is in Archived, never a Possible fake: move him back first
+    if not is_bounced(email):
+        return NOT_FAKE
+    with transaction.atomic():
+        try:
+            with transaction.atomic():
+                GenuineLead.objects.create(email=email, marked_by=_actor(actor), marked_by_label=label(actor))
+        except IntegrityError:
+            return ALREADY
+        LeadArchiveEvent.objects.create(email=email, kind=LeadArchiveEvent.GENUINE, by=_actor(actor), by_label=label(actor))
+    _figures_changed()
+    return DONE
+
+
+def unmark_genuine(email, actor):
+    """Undo Mark as genuine: if his address still bounces he is a Possible fake again. Returns DONE, or ALREADY when he was not marked."""
+    email = (email or "").strip().lower()
+    with transaction.atomic():
+        if not GenuineLead.objects.filter(email=email).delete()[0]:
+            return ALREADY
+        LeadArchiveEvent.objects.create(email=email, kind=LeadArchiveEvent.UNGENUINE, by=_actor(actor), by_label=label(actor))
+    _figures_changed()
+    return DONE
 
 
 def owner_of_email(new, exclude=""):
@@ -779,6 +826,7 @@ def correct_lead_email(old, new, actor):
         for model, field in ((StickyNote, "email"), (PersonMessage, "email"), (OutreachEntry, "lead_email"), (PersonEdit, "email"), (ArchivedLead, "email"), (LeadArchiveEvent, "email")):
             model.objects.filter(**{field: old}).update(**{field: new})
         _move_follow_up(old, new, bounced)
+        GenuineLead.objects.filter(email=old).delete()  # the mark was about the bouncing address: the new one has not bounced, and erasing him must leave nothing behind
         if EmailOptOut.objects.filter(email=old).exists():  # he asked us to stop: that follows him (the old one stays, as the record of the request)
             EmailOptOut.objects.get_or_create(email=new, defaults={"source": "moved"})
         chat_services.move_lead_email(old, new)  # an Ask us chat where he gave the old address

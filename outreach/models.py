@@ -165,11 +165,27 @@ class ArchivedLead(UUIDModel):
         return f"archived {self.email}"
 
 
-class LeadArchiveEvent(UUIDModel):
-    """One line of a lead's timeline: "Archived by X" or "Moved back by X". Append-only in practice; erased with the address."""
+class GenuineLead(UUIDModel):
+    """Staff checked a lead whose email bounced and decided he is real ("Mark as genuine"): he stays in Leads, never in Possible fakes, even if the
+    same address bounces again. One row per lower-cased address; Undo deletes the row. The address stays on the suppression list (no email goes to it)."""
 
-    ARCHIVED, RESTORED = "archived", "restored"
-    KIND_CHOICES = [(ARCHIVED, "Archived"), (RESTORED, "Moved back")]
+    email = models.CharField(max_length=254, unique=True, help_text="Lower case.")
+    marked_by = _person()
+    marked_by_label = models.CharField(max_length=254, blank=True)
+    marked_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-marked_at", "-id"]
+
+    def __str__(self):
+        return f"genuine {self.email}"
+
+
+class LeadArchiveEvent(UUIDModel):
+    """One line of a lead's timeline: "Archived by X", "Moved back by X", "Marked as genuine by X" or its undo. Append-only in practice; erased with the address."""
+
+    ARCHIVED, RESTORED, GENUINE, UNGENUINE = "archived", "restored", "genuine", "ungenuine"
+    KIND_CHOICES = [(ARCHIVED, "Archived"), (RESTORED, "Moved back"), (GENUINE, "Marked as genuine"), (UNGENUINE, "Genuine mark undone")]
 
     email = models.CharField(max_length=254, db_index=True, help_text="Lower case.")
     kind = models.CharField(max_length=10, choices=KIND_CHOICES)

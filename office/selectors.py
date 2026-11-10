@@ -118,7 +118,7 @@ def lead_block(figures, now, before):
         insights.append({"key": key, "title": title, "sentence": f"{options[0]['label']}: {options[0]['value']} of {voters} leads.",
                          "top": options[0], "runner_up": options[1] if len(options) > 1 else None, "options": options})
     # Home's card must agree with the Leads list: someone who has since registered, or is on the Approach list, is no longer a lead (Moishe, 2026-11-05)
-    current = set(leads.lead_queryset("all").values_list("email_key", flat=True))
+    current = set(leads.lead_queryset("all", fakes="out").values_list("email_key", flat=True))  # nor a Possible fake (2026-11-10)
     return {"leads_new": len(figures.new_leads(*now) & current), "leads_new_previous": None if before is None else len(figures.new_leads(*before) & current),
             "hot_leads": leads.hot_leads_queryset().count(), "insights_leads": insights}
 
@@ -134,7 +134,7 @@ def build_leads(range_name="30d", today=None, figures=None):
     window = reader.range_dates(range_name, today)
     new = figures.new_lead_count(*window)
     return {"range": range_name, "ranges": list(ANALYTICS_RANGES), "today": today.isoformat(), "leads_new": new, "hot_leads": leads.hot_leads_queryset().count(),
-            "leads_total": leads.lead_queryset(range_name=range_name, today=today).count()}  # same range and rule as the list: addresses with no account
+            "leads_total": leads.lead_queryset(range_name=range_name, today=today, fakes="out").count()}  # same range and rule as the list: addresses with no account, not a Possible fake
 
 
 # ---------- dashboard ----------

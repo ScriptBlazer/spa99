@@ -325,6 +325,7 @@ def leads(request):
     context = {"rows": rows, "has_next": has_next, "page": number, "more_url": _more_url(request, number), "tiles": {"leads_total": stored.get("leads_total", 0), "registered_total": stored["registered_total"]},
                "filters": filters, "columns": lead_lists.columns_for(filters, request), "filtered": filtered, "summary": summary,
                "archived_view": filters["view"] == "archived", "archived_count": ArchivedLead.objects.count(),
+               "fakes_view": filters["view"] == "fakes", "fakes_count": stored.get("fakes_total", 0),
                "total_leads": None if filtered else summary.get("leads_total"), "choices": lead_lists.filter_choices(), "section": "leads",
                "site_defaults": defaults.get(request)}
     return _varied(render(request, _fragment(request, "office/leads.html", "office/_leads_rows.html"), context))
