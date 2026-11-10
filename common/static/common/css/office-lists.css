@@ -62,6 +62,12 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 .c-action form { position: relative; z-index: 1; margin: 0; }
 .o-sub { display: block; }
 @media (hover: hover) and (pointer: fine) { .o-row:hover td { background: var(--office-sunken); } }
+/* a button in a hovered row would vanish into the row's tint (both sunken), so it lifts to the card's colour with a soft edge (Moishe 2026-11-10) */
+@media (hover: hover) and (pointer: fine) {
+  .o-row:hover .btn-secondary, .o-row:hover .o-chip { background: var(--office-surface); box-shadow: inset 0 0 0 1px var(--color-control-line); }
+  .o-row .btn-secondary:hover { background: var(--office-taupe-track); box-shadow: none; }
+  .o-row:hover .o-decide--decline:hover { background: var(--office-surface); }   /* Decline is words until hovered: its own tint would match the row */
+}
 .o-empty-row td, .o-more-row td { height: auto; padding: var(--space-4); text-align: center; }
 .o-empty-row tr:hover td, .o-empty-row:hover td, .o-more-row:hover td { background: none; }
 .o-empty-row p { color: var(--office-muted); margin-inline: auto; }
