@@ -358,8 +358,33 @@ def compute_leads():
     return {"leads_total": leads.lead_queryset("all", fakes="out").count(), "fakes_total": leads.lead_queryset("all", fakes="only").count()}
 
 
+def compute_assistant_cost(now=None):
+    """Assistant spend for the Developer-only card on the Assistant page: all time, this calendar month and today (London), each as {"pence": "<decimal string>", "chats": n}, plus the
+    staff-test share of all time ("test_pence", "test_chats"). Every conversation counts, staff tests included: it is real money. Two aggregate queries, run only by the background job."""
+    from django.db.models import Count, Q, Sum
+
+    from chat.models import Conversation
+
+    now = timezone.localtime(now) if now is not None else timezone.localtime()
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)  # London midnight (an aware datetime in the current zone)
+    month_start = day_start.replace(day=1)
+    month, today = Q(created_at__gte=month_start), Q(created_at__gte=day_start)
+
+    row = Conversation.objects.aggregate(
+        all_pence=Sum("total_cost_pence"), all_chats=Count("pk"),
+        month_pence=Sum("total_cost_pence", filter=month), month_chats=Count("pk", filter=month),
+        today_pence=Sum("total_cost_pence", filter=today), today_chats=Count("pk", filter=today),
+    )
+    tests = Conversation.objects.filter(staff_test=True).aggregate(pence=Sum("total_cost_pence"), chats=Count("pk"))
+
+    def part(name):
+        return {"pence": str(row[f"{name}_pence"] or Decimal(0)), "chats": row[f"{name}_chats"]}
+
+    return {"all": part("all"), "month": part("month"), "today": part("today"), "test_pence": str(tests["pence"] or Decimal(0)), "test_chats": tests["chats"]}
+
+
 def compute_all():
-    return {**compute_approvals(), **compute_leads()}
+    return {**compute_approvals(), **compute_leads(), "assistant_cost": compute_assistant_cost()}
 
 
 def _write(payload):
@@ -380,9 +405,27 @@ def refresh_approvals():
             stored = OfficeSnapshot.objects.filter(page=PAGE, range=RANGE).values_list("payload", flat=True).first() or {}
             kept = {k: stored[k] for k in ("leads_total", "fakes_total") if k in stored}
             payload = {**compute_approvals(), **(kept if len(kept) == 2 else compute_leads())}
+            if "assistant_cost" in stored:
+                payload["assistant_cost"] = stored["assistant_cost"]  # the hourly job owns this one
             _write(payload)
     except Exception:  # noqa: BLE001
         logging.getLogger("spa99.office").exception("Could not refresh the approval counts")
+
+
+def refresh_memberships():
+    """An approval click: update only the membership counts in the stored row (one grouped count over registrations, the same numbers as `_by_status`), in the caller's transaction. Revenue,
+    Gold and the rest stay as stored until the queued snapshot refresh. No stored row yet: the whole row is built once, as before. Never raises past the decision."""
+    import logging
+
+    try:
+        with transaction.atomic():
+            row = OfficeSnapshot.objects.select_for_update().filter(page=PAGE, range=RANGE).first()  # a job writing the row at the same moment waits, so nothing is overwritten
+            if row is None or not row.payload:
+                return refresh_approvals()  # nothing stored yet (a brand-new database): build the whole row once, as before
+            payload = {**row.payload, "memberships": _by_status(membership_people())}
+            OfficeSnapshot.objects.filter(pk=row.pk).update(payload=payload, updated_at=timezone.now())
+    except Exception:  # noqa: BLE001
+        logging.getLogger("spa99.office").exception("Could not refresh the membership counts")
 
 
 def empty():

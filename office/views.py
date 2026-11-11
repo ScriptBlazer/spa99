@@ -1,6 +1,7 @@
 """Office views. Short: data comes from office.selectors (stored figures) and office.lists (source lists); actions call
 the existing services. Permissions are decorators on every view (see office.permissions)."""
 from datetime import datetime
+from decimal import Decimal
 from urllib.parse import urlencode, urlparse
 
 from django.conf import settings
@@ -9,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import dateformat, timezone
 from django.utils.decorators import method_decorator
 from django.utils.cache import patch_vary_headers
 from django.views.decorators.cache import never_cache
@@ -30,18 +31,18 @@ from outreach import services as outreach_services
 from outreach.models import ArchivedLead
 from plans import payments
 from plans.models import Plan, SiteSettings
-from common import levels, sorting
+from common import levels, pagination, sorting
 from users import services as user_services
 from users import views as user_views
 from users.models import User
 
 from system import defaults
 
-from . import analytics_revenue, approvals, counts, lists, profile, selectors, tools
+from . import activity, analytics_revenue, approvals, counts, lists, profile, selectors, tools
 from .forms import ManualSetupForm
 from . import invited as invited_lists
 from . import leads as lead_lists
-from .permissions import abilities, admin, approver, final_approver, reader
+from .permissions import abilities, admin, approver, developer, final_approver, reader
 
 
 def _greeting(user):
@@ -331,6 +332,48 @@ def leads(request):
     return _varied(render(request, _fragment(request, "office/leads.html", "office/_leads_rows.html"), context))
 
 
+@developer
+@require_GET
+@never_cache
+def activity_page(request):
+    """Activity (Developer and up): a mini dashboard (range, tiles, day by day, who did what, by type) over a list of every staff action, newest first. Read only; never note text or
+    message bodies. Closed, the list is the 8 newest (a preview). "See all" (?all=1) shows the whole list, 10 rows a page (activity.OPEN_PAGE_SIZE, ?page=N, the count of pages from the stored total):
+    page 1 is rows 1 to 10 and every page stands on its own, with the shared pagination. `?fragment=1` (what the pager script asks for) answers with just the list and the pager.
+    Context: data (activity.dashboard), data_json, top, rest, has_rest, show_all, toggle_query, pager, filters, filtered, staff [(key, label)], groups, ranges,
+    date_format, dates_text, list_title, top_part."""
+    name = _remembered_range(request, "office_range_activity", selectors.ACTIVITY_RANGES, defaults.get(request).activity_range)
+    filters = activity.filters_from(request, name)
+    data = activity.dashboard(filters)
+    title = (SiteSettings.objects.values_list("outreach_list_name", flat=True).first() or "").strip() or "Approach list"  # what the approach list is called (Settings)
+    show_all = request.GET.get("all") == "1"  # "See all": the page again with the whole list, a page at a time
+    top, rest, pager, has_rest = [], [], None, False
+    if show_all:
+        size = activity.OPEN_PAGE_SIZE
+        pages = pagination.num_pages(data["total"], size)   # the stored total, not a count over the sources
+        number = pagination.clamp(request.GET.get("page"), pages)
+        base = request.GET.copy()
+        for key in ("shift", "fragment"):
+            base.pop(key, None)
+        rest, has_rest = activity.page(filters, (number - 1) * size, size, day_counts=data["day_counts"], title=title)   # a page starts with its own day heading
+        pager = pagination.pager(number, pages, base, anchor="#list")
+    else:
+        top, has_rest = activity.page(filters, size=activity.TOP, day_counts=data["day_counts"], title=title)
+    toggle = request.GET.copy()
+    for key in ("all", "page", "shift", "fragment"):
+        toggle.pop(key, None)
+    if not show_all:
+        toggle["all"] = "1"
+    dates = [d for d in (filters["from"], filters["to"] or filters["from"]) if d]
+    context = {"top": top, "rest": rest, "top_part": "rest" if rest else "top", "has_rest": has_rest, "show_all": show_all, "toggle_query": toggle.urlencode(), "pager": pager, "filters": filters,
+               "filtered": activity.is_filtered(filters), "groups": activity.GROUPS, "section": "activity", "list_title": title,
+               "data": data}
+    if request.GET.get("fragment") == "1":   # the pager script: only the list and the pager (same access check, it is the same view)
+        return render(request, "office/_activity_list.html", context)
+    context.update({"data_json": activity.chart_data(data), "staff": activity.staff_choices(), "ranges": selectors.ACTIVITY_RANGES,
+                    "date_format": SiteSettings.load().flatpickr_date_format, "dates_text": " to ".join(dict.fromkeys(dateformat.format(d, "j M") for d in dates))})
+    return render(request, "office/activity.html", context)
+
+
 @admin
 @require_GET
 def leads_csv(request):
@@ -434,8 +477,20 @@ def chats(request):
     rows, has_next = lists.cut(queryset, page, defaults.get(request).list_page_size)
     more = urlencode({**({k: v for k, v in (request.GET.items()) if k in ("user", "lead")}), "sort": sort, "dir": direction, "page": page + 1})
     context = {"rows": rows, "has_next": has_next, "page": page, "section": "chats", "person": person, "show_cost": show_cost,
+               "cost_card": _cost_card(show_cost and not request.headers.get("HX-Request")),
                "columns": sorting.header_columns(columns, sort, direction, request.path, request.GET), "sort": sort, "dir": direction, "more_url": f"{request.path}?{more}"}
     return _varied(render(request, _fragment(request, "office/chats.html", "office/_chats_rows.html"), context))  # HX-Request: the rows only (the phone's auto-load)
+
+
+def _cost_card(wanted):
+    """The Developer-only spend card from the stored figures (office.counts, built by the hourly job): None for anyone else (the store is not even read), {"missing": True} before the first build."""
+    if not wanted:
+        return None
+    stored = counts.read().get("assistant_cost")
+    rate = Decimal(str(settings.CHAT_GBP_PER_USD)).normalize()
+    stored = stored or {}
+    tiles = [{"key": key, "label": label, "hue": hue, **(stored.get(key) or {})} for key, label, hue in (("all", "Total cost", "slate"), ("month", "This month", "sage"), ("today", "Today", "ochre"))]
+    return {"missing": not stored, "rate": f"{rate:f}", "tiles": tiles, "test_pence": stored.get("test_pence"), "test_chats": stored.get("test_chats", 0)}
 
 
 def _chats_person(request):

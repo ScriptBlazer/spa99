@@ -24,7 +24,7 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
 <script type="module" src="{% static 'common/js/office.js' %}"></script>
 {% block head_extra %}{% endblock %}
 </head>
-<body class="office" data-office-section="{{ section }}"{% if office_can.can_see_all %}{% if section == "approvals" or section == "people" or section == "invited" or section == "gold" %} data-under-home{% endif %}{% endif %} {% block body_attrs %}{% endblock %}>
+<body class="office" data-office-section="{{ section }}"{% if office_can.can_see_all %}{% if section == "approvals" or section == "people" or section == "invited" or section == "gold" or section == "activity" %} data-under-home{% endif %}{% endif %} {% block body_attrs %}{% endblock %}>
 {% include "office/_icons.html" %}
 <a class="skip-link" href="#office-main">Skip to content</a>
 <span class="o-sentinel" data-office-sentinel aria-hidden="true"></span>
@@ -45,16 +45,17 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
     {% if office_can.can_export %}<li data-nav-wide><a href="{% url 'office_invited' %}" data-office-nav-item="invited"{% if section == "invited" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="person-plus" %}<span>Invited</span></a></li>{% endif %}
     {% if office_can.can_see_all %}<li data-nav-wide><a href="{% url 'office_chats' %}" data-office-nav-item="chats"{% if section == "chats" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="chat" %}<span>Assistant</span></a></li>{% endif %}
     <li{% if office_can.can_see_all %} data-nav-wide{% else %} data-nav-slot="1"{% endif %}><a href="{% url 'office_gold' %}" data-office-nav-item="gold"{% if section == "gold" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="gold" %}<span>Gold</span><span class="o-badge-count" data-region="nav-badge" data-office-badge="gold">{% if office_waiting %}{{ office_waiting }}<span class="sr-only"> waiting</span>{% endif %}</span></a></li>
+    {% if office_can.can_activity %}<li data-nav-wide><a href="{% url 'office_activity' %}" data-office-nav-item="activity"{% if section == "activity" %} aria-current="page"{% endif %}>{% include "office/_icon.html" with name="history" %}<span>Activity</span></a></li>{% endif %}
   </ul>
   <div class="o-nav-foot">
-    <div class="o-who"><span class="o-disc" aria-hidden="true">{{ office_person.initials }}</span><span class="o-who-text"><span class="o-who-name">{{ office_person.name }}</span><span class="o-who-role">{{ office_person.role }}</span></span></div>
+    <div class="o-who"><span class="o-who-text"><span class="o-who-name">{{ office_person.name }}</span><span class="o-who-role">{{ office_person.role }}</span><span class="o-who-version" data-office-version>Version {{ app_version }}</span></span></div>
   </div>
 </nav>
 
 <div class="o-body">
   <header class="o-header" data-office-header>
     <div class="o-header-left">
-      {% block header_left %}{% include "common/_mark.html" %}<span class="o-title">{% block header_title %}{% if section == "dashboard" %}<span class="o-only-wide">Dashboard</span><span class="o-only-narrow">Home</span>{% elif section == "analytics" %}Analytics{% elif section == "people" %}Registered{% elif section == "leads" %}Leads{% elif section == "gold" %}Gold{% elif section == "chats" %}Assistant{% elif section == "email" %}Email{% elif section == "invited" %}Invited{% elif section == "approvals" %}Approvals{% elif section == "revenue" %}Revenue{% elif section == "outreach" %}{{ office_outreach_title }}{% endif %}{% endblock %}</span>{% endblock %}
+      {% block header_left %}{% include "common/_mark.html" %}<span class="o-title">{% block header_title %}{% if section == "dashboard" %}<span class="o-only-wide">Dashboard</span><span class="o-only-narrow">Home</span>{% elif section == "analytics" %}Analytics{% elif section == "people" %}Registered{% elif section == "leads" %}Leads{% elif section == "gold" %}Gold{% elif section == "chats" %}Assistant{% elif section == "email" %}Email{% elif section == "invited" %}Invited{% elif section == "approvals" %}Approvals{% elif section == "revenue" %}Revenue{% elif section == "outreach" %}{{ office_outreach_title }}{% elif section == "activity" %}Activity{% endif %}{% endblock %}</span>{% endblock %}
     </div>
     <div class="o-header-right">
       {% block header_range %}{% endblock %}
@@ -67,6 +68,7 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
             <a class="o-menu-item" href="{% url 'office_people' %}" data-menu-registered>Registered</a>
             <a class="o-menu-item" href="{% url 'office_gold' %}" data-menu-gold><span>Gold</span><span data-region="menu-badge">{% if office_waiting %}<span class="o-count">{{ office_waiting }}<span class="sr-only"> waiting</span></span>{% endif %}</span></a>
             {% if office_can.can_export %}<a class="o-menu-item" href="{% url 'office_invited' %}" data-menu-invited>Invited</a>{% endif %}
+            {% if office_can.can_activity %}<a class="o-menu-item" href="{% url 'office_activity' %}" data-menu-activity>Activity</a>{% endif %}
           </div>{% endif %}
           <div class="o-menu-group">
             <a class="o-menu-item" href="{% url 'office_password' %}" data-change-password>Change password</a>

@@ -85,7 +85,7 @@ def line(members):
 
 def decide(user_pk, to_status, actor):
     """Move one person to `to_status` (approved, declined, or waiting for Undo). Audited: a MembershipReviewEvent with who and when. Returns (DONE | UNCHANGED | MISSING, row dict or None).
-    Never touches the membership. Refreshes the stored counts (and Revenue) right away."""
+    Never touches the membership. Updates the stored membership counts right away; Revenue and the rest follow in the queued snapshot refresh."""
     if to_status not in STATUSES:
         return MISSING, None
     with transaction.atomic():
@@ -103,7 +103,7 @@ def decide(user_pk, to_status, actor):
         MembershipReviewEvent.objects.create(registration=reg, from_status=before, to_status=to_status, by=actor if getattr(actor, "pk", None) else None, by_label=audit.label_for(actor))
         reg.review_status = to_status
         reg.review = review
-    counts.refresh_approvals()
+    counts.refresh_memberships()  # just the waiting/approved/declined counts; Revenue and the rest follow in the queued refresh below
     from . import snapshots
 
     snapshots.request_refresh()  # the hourly figures follow within moments (the Home cards read the stored row refreshed above)

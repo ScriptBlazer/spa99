@@ -1,0 +1,54 @@
+/* Office > Activity: a mini dashboard over a list. It is built from parts that already exist (the range bar, KPI tiles, donut, bars, columns and the Dashboard feed rows).
+   This file holds only the additions approved in docs/design/OFFICE.md (Activity): .o-bars--stack, .o-day, .o-feed-person, and the page's own layout. Tokens only.
+   (.o-kpi--teal and .o-kpi--plum are in office-analytics.css, next to the other tiles; the donut's own swatches are in office-charts.js.) */
+
+/* The range bar: When is a full-width seg on a phone, one row with Dates, Staff member and Type (the last two to the right) from 64em. */
+.o-filters--activity .o-filter-group--when { flex: 1 1 100%; min-width: 0; }
+.o-filters--activity .o-filter-group--when .o-seg { width: 100%; min-width: 0; }
+.o-filters--activity .o-seg-item { padding-inline: var(--space-1); font-size: var(--text-sm); }
+.o-datechip { font-size: var(--text-sm); min-width: 0; overflow-wrap: anywhere; }
+.o-datechip:empty { display: none; }
+@media (max-width: 63.99em) {
+  .o-when-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }   /* the label stays for a screen reader */
+  .o-filters--activity .o-filters-bar { align-items: center; }
+}
+@media (min-width: 64em) {
+  .o-filters--activity .o-filter-group--when { flex: 0 0 auto; }
+  .o-filters--activity .o-filter-group--when .o-seg { width: 22rem; }
+  .o-filters--activity .o-filter-group--right { margin-left: auto; }
+  .o-datechip { display: none; }
+}
+
+/* Who did what: each bar is split into the type colours (hard stops from the server, scaled to the bar's length), on the same pill and track. */
+.o-bars--stack li::after { background: var(--stack, var(--c)); }
+.o-bars--stack { --c: var(--office-slate); --t: var(--office-slate-track); }
+
+/* The list */
+.o-list-activity { position: relative; }   /* the round plus (.o-plus) sits at the card's top right, like What people want */
+.o-list-activity .o-card-head { margin-bottom: var(--space-2); }
+@media (min-width: 48em) { .o-list-count { margin-right: var(--space-3); } }   /* the same inset the day headings get here, so the total sits right above the day counts */   /* the total lines up with the day counts below it (Moishe 2026-11-11) */
+.o-list-count { margin-left: auto; font-size: var(--text-sm); font-weight: 700; color: var(--office-text); font-variant-numeric: tabular-nums; }
+.o-day { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin: var(--space-4) 0 var(--space-1); font-size: var(--text-sm); font-weight: 600; color: var(--office-text); }
+.o-day:first-child { margin-top: var(--space-2); }
+.o-day-count { font-weight: 400; font-variant-numeric: tabular-nums; color: var(--office-muted); }
+@media (min-width: 48em) { .o-day { padding-inline: var(--space-3); } }
+.o-feed-person { font-weight: 500; }
+@media (hover: hover) and (pointer: fine) { .o-feed-row[href]:hover .o-feed-person { text-decoration: underline; } }
+.o-list-activity .o-feed-detail { display: block; }
+@media (min-width: 64em) { .o-list-activity .o-feed-text { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; } }   /* a whole sentence, not one line */
+.o-list-activity .o-feed-row[data-group="approvals"] .o-feed-dot { background: var(--office-clay-tint); }
+.o-list-activity .o-feed-row[data-group="leads"] .o-feed-dot { background: var(--office-teal-tint); }
+.o-list-activity .o-feed-row[data-group="notes"] .o-feed-dot { background: var(--office-sage-tint); }
+.o-list-activity .o-feed-row[data-group="emails"] .o-feed-dot { background: var(--office-slate-tint); }
+.o-list-activity .o-feed-row[data-group="gold"] .o-feed-dot { background: var(--office-ochre-tint); }
+.o-list-activity .o-feed-row[data-group="memberships"] .o-feed-dot { background: var(--office-plum-tint); }
+.o-list-activity .o-empty-line { padding: var(--space-3) 0; }
+.o-list-activity .o-empty-line .o-quiet { min-height: 2.75rem; display: inline-flex; align-items: center; }
+/* "See all" at the bottom of the list card: words, underlined on hover, a 44px target (Moishe 2026-11-11) */
+.o-act-more { display: flex; justify-content: flex-start; margin: var(--space-3) 0 0; }   /* left, its text in line with the day headings and the row icons (Moishe 2026-11-11) */
+.o-act-toggle { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 var(--space-3); color: var(--office-text); font-size: var(--text-sm); font-weight: 600; text-decoration: none; text-underline-offset: 0.2em; }
+.o-act-toggle:focus-visible { outline: 2px solid var(--office-text); outline-offset: 2px; border-radius: var(--radius-sm); }
+@media (hover: hover) and (pointer: fine) { .o-act-toggle:hover { text-decoration: underline; } }
+.o-act-rest { scroll-margin-top: var(--space-5); }
+#list { scroll-margin-top: calc(var(--office-header-h) + var(--space-3)); }   /* the page links and "See all" land on the card, just below the sticky header */
+.o-list-activity .pager { --pager-color: var(--office-text); }   /* the shared pagination (pagination.css), in the Office text colour */

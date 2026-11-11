@@ -194,6 +194,9 @@ function lists() {
           if (clone.hasAttribute('data-fade') && !reduced()) clone.classList.add('o-fade-in');
           old.replaceWith(clone);
         });
+        const series = doc.getElementById('office-series'); const here = document.getElementById('office-series');   // a page with charts (Activity): the charts morph to the new figures
+        if (series && here) { here.textContent = series.textContent; document.dispatchEvent(new CustomEvent('office:series')); }
+        document.dispatchEvent(new CustomEvent('office:filtered', { detail: { doc } }));
         document.title = doc.title;
       }
       syncSortControls(doc);

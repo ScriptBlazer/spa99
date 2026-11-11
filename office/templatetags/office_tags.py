@@ -327,7 +327,8 @@ def share_arcs(value, of):
 PERIODS = {   # how a change line names the period before: (reference, the word for "new")
     "today": ("yesterday", "today"), "7d": ("last week", "this week"), "30d": ("the 30 days before", "this month"),
 }
-ANALYTICS_PERIODS = {"7d": "the previous 7 days", "30d": "the previous 30 days", "90d": "the previous 90 days"}
+ANALYTICS_PERIODS = {"7d": "the previous 7 days", "30d": "the previous 30 days", "90d": "the previous 90 days",
+                     "week": "last week", "month": "last month", "custom": "the days before"}  # the last three are Activity's
 
 
 @register.simple_tag
@@ -361,7 +362,7 @@ def change_ana(value, previous_values, range_name):
     if diff == 0:
         return f"Same as {ref}"
     if diff > 0:
-        return f"New in the last {ref.split()[-2]} days" if previous == 0 else f"+{diff:,} on {ref}"
+        return f"New in the last {ref.split()[-2]} days" if previous == 0 and range_name in ("7d", "30d", "90d") else f"+{diff:,} on {ref}"
     return f"{-diff:,} fewer than {ref}"
 
 
@@ -466,7 +467,7 @@ def index_of(items, value):
 
 @register.filter
 def range_label(value):
-    return {"today": "Today", "7d": "7 days", "30d": "30 days", "90d": "90 days", "all": "All time"}.get(value, value)
+    return {"today": "Today", "7d": "7 days", "30d": "30 days", "90d": "90 days", "all": "All time", "week": "This week", "month": "This month"}.get(value, value)
 
 
 @register.simple_tag
@@ -614,3 +615,17 @@ def reach_primary(wa, em, secondary=False):
     if em.get("can_send") and not em.get("blocked"):
         return "email"
     return ""
+
+
+@register.filter
+def cost_pence(value):
+    """An assistant cost stored in pence, shown in pounds to three places so it reads as a fraction of a pound: 2.10p is "£0.021",
+    0.35p "£0.004", 123.4p "£1.234" (Moishe 2026-11-11). Half rounds up."""
+    from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+
+    try:
+        pence = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return ""
+    return f"£{(pence / 100).quantize(Decimal('0.001'), rounding=ROUND_HALF_UP):,}"
+

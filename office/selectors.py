@@ -16,6 +16,7 @@ from system import defaults
 
 DASHBOARD_RANGES = ("today", "7d", "30d", "all")
 ANALYTICS_RANGES = ("7d", "30d", "90d", "all")
+ACTIVITY_RANGES = ("week", "month", "30d", "all")  # Activity: This week (from Monday 00:00 London), This month, 30 days, All time
 WEEKLY_AFTER_DAYS = 120  # 'all' sends weekly points once history is longer than this
 JOURNEY_QUESTIONS = ("time", "frequency", "facilities", "company", "heard_via")
 

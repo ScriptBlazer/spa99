@@ -406,3 +406,17 @@ Copy: short, calm, British, no exclamation marks.
 - **Final approvers** get "Confirm approval" and "Send back for review". Send back opens the shared centred modal with an optional note (counter, max `note_max`), then posts; without JS the rail shows a plain note box. Phone decision bar: Send back (left), Confirm approval (right).
 - **Filter**: the segmented control keeps its four items; a small "Awaiting final (N)" chip (a radio in the same `status` group) sits beside the totals line, shown while N > 0 or selected. Selected, the segmented thumb hides.
 - **One-tap page** (`gold_final.html`) matches the approve page: name, potential and status pills, property line, who approved, Confirm approval, then a note box and Send back for review.
+
+## Activity: a mini dashboard (2026-11-11)
+Developer and above. One idea: what the team did in a period, and who did it. Built only from parts that already exist (the `o-seg` range and filter bar, `_kpi.html` tiles, the donut and keylist, `o-bars`, the "Where people stop" columns, the Dashboard feed rows). The range and filters (When, Dates, Staff member, Type) apply to the tiles, charts and list. Brief: `activity-brief` (the designer's); the feature doc is `docs/features/office-activity.md`. Menu: Activity is the last rail item, after Gold; icon `history`.
+
+Type colours, the same everywhere on the page (decoration; the words always carry the type): Approvals clay `check`, Leads and people teal `address-book`, Notes sage `note`, Emails slate `envelope`, Gold ochre `gold`, Memberships plum `coin`.
+
+**Additions approved on 2026-11-11** (no new tokens):
+- `.o-kpi--teal` and `.o-kpi--plum` (office-analytics.css): built like `.o-kpi--sage` from the `-tint` tokens.
+- `.o-bars--stack` (office-activity.css): the bar is split into type segments, a CSS `linear-gradient` of hard stops from server shares, on the same 0.625rem pill and track. An `sr-only` line says the split.
+- `.o-day` (office-activity.css): the day heading in the list, `--text-sm` 600, the true count of that day on the right in muted text.
+- `.o-feed-person` (office-activity.css): the person in a feed sentence, weight 500, underlined on row hover (fine pointer only).
+- Per-row donut swatches: a keylist row carries its own `swatch` (the type hue) instead of `ramp_rows`, and the `donut()` spec in `office-charts.js` takes the colours from the rows when they give a `hue`.
+- The tint behind a row's icon (`.o-feed-dot`) follows the type, six rules in office-activity.css.
+- Pagination (shared, 2026-11-11): `common/_pagination.html` + `pagination.css` + `common/pagination.py`, for any numbered list (used on Activity after "See all" and on the System audit log). Quiet text links, a small pill on the current page, 44px targets, centred; Previous, numbers with gaps (1 … 4 5 6 … 20), Next; on a phone Previous, "Page 4 of 20", Next. Colour is `currentColor`, tuned by `--pager-color`, `--pager-size`, `--pager-fill`. Seamless paging: a pager given `target="#id"` is swapped in place by `common/js/pager.js` (list and pager only, address pushed, Back works, scroll only if the heading is off the top, normal load on failure); Activity and the System audit log use it. How to use: the header comment of the template. Not used on the other Office lists, which keep "Show more".

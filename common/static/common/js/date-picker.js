@@ -228,6 +228,7 @@
       refresh();
     };
 
+    if (!single) root.addEventListener('dp:clear', () => { if (inst) inst.clear(); writeNative([]); showText(); refresh(); });   // a page can empty the dates without opening the calendar (Activity: picking a range)
     if (form) {
       form.addEventListener('submit', () => {
         if (single) return;

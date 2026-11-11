@@ -1,49 +1,34 @@
-"""The rolling limiter and its lock, on the real database cache with a mocked clock (nothing real is called)."""
+"""The rolling limiter and its lock, on the RateHit table with a mocked clock (nothing real is called)."""
 import time
 from contextlib import contextmanager
-from datetime import timedelta
 from unittest import mock
 
-from django.core.cache import cache
-from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
-from django.utils import timezone
 
 from common.ratelimit import hit
 from mailings import tokens
 from users.models import User
 
-DB_CACHE = {"default": {"BACKEND": "django.core.cache.backends.db.DatabaseCache", "LOCATION": "rl_roll_cache"}}
 HOUR = 3600
 
 
 class Clock:
-    """Moves time.time (the limiter and the cache's own expiry) and the database cache's tz_now together."""
+    """Moves time.time (the limiter's clock) with a real epoch."""
 
     def __init__(self):
-        start = time.time()  # a real epoch: the database cache turns its expiry into a date
-        self.now, self.start, self.real = start, start, timezone.now()
+        self.now = time.time()
 
     def advance(self, seconds):
         self.now += seconds
 
     @contextmanager
     def patched(self):
-        with mock.patch("time.time", lambda: self.now), mock.patch(
-                "django.core.cache.backends.db.tz_now", lambda: self.real + timedelta(seconds=self.now - self.start)):
+        with mock.patch("time.time", lambda: self.now):
             yield self
 
 
-@override_settings(CACHES=DB_CACHE)
 class RollingLimiterTests(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        with override_settings(CACHES=DB_CACHE):
-            call_command("createcachetable", "rl_roll_cache", verbosity=0)
-
     def setUp(self):
-        cache.clear()
         self.clock = Clock()
 
     def test_honest_traffic_every_half_hour_is_never_refused(self):
@@ -103,16 +88,9 @@ class RollingLimiterTests(TestCase):
             self.assertEqual([hit("t", "ip", 3, 60) for _ in range(4)], [True, True, True, False])
 
 
-@override_settings(CACHES=DB_CACHE, ALLOWED_HOSTS=["testserver"])
+@override_settings(ALLOWED_HOSTS=["testserver"])
 class RateLimitedViewsTests(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        with override_settings(CACHES=DB_CACHE):
-            call_command("createcachetable", "rl_roll_cache", verbosity=0)
-
     def setUp(self):
-        cache.clear()
         self.clock = Clock()
 
     def test_login_walk_eleven_wrong_passwords_then_the_right_one_is_refused_even_past_the_first_window(self):

@@ -4,7 +4,7 @@
         <td class="c-question"><a class="o-rowlink" href="{% url 'office_chat' c.pk %}">{% truncated c.preview lines=2 %}</a></td>
         <td class="c-who">{% if c.user %}{% truncated c.user.email %}{% elif c.lead_email %}{% truncated c.lead_email %}{% else %}Anonymous{% endif %}</td>
         <td class="c-count num">{{ c.message_count }}<span class="o-only-narrow"> message{{ c.message_count|pluralize }}</span></td>
-        {% if show_cost %}<td class="c-cost num">{{ c.total_cost_pence|floatformat:2 }}p</td>{% endif %}
+        {% if show_cost %}<td class="c-cost num">{{ c.total_cost_pence|cost_pence }}</td>{% endif %}
         <td class="c-note">{% if c.ended_off_topic %}Closed: off-topic{% endif %}{% if c.ended_by_cap %} Stopped by the spending cap{% endif %}</td>
       </tr>
     {% empty %}<tr class="o-empty-row"><td colspan="{{ show_cost|yesno:"6,5" }}"><p>No chats yet.</p></td></tr>{% endfor %}

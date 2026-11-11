@@ -16,8 +16,23 @@ def heartbeat():
 FAILED_TASK_DAYS = 30  # failed background jobs stay visible in the admin this long (successful ones: Q_CLUSTER save_limit)
 
 
+RATE_HIT_BATCH = 1000
+
+
+def prune_rate_hits(batch=RATE_HIT_BATCH):
+    """Delete expired rate-limit rows in small batches (short transactions, never one huge delete). Returns the number removed."""
+    from common.models import RateHit
+
+    removed = 0
+    while True:
+        ids = list(RateHit.objects.filter(expires_at__lt=timezone.now()).values_list("pk", flat=True)[:batch])
+        if not ids:
+            return removed
+        removed += RateHit.objects.filter(pk__in=ids).delete()[0]
+
+
 def housekeeping():
-    """Daily clean-up so tables never grow forever: expired sessions, old failed jobs, quiet wrong-try counters, the bounce log after a year, and the
+    """Daily clean-up so tables never grow forever: expired sessions, expired rate-limit counters, old failed jobs, quiet wrong-try counters, the bounce log after a year, and the
     System audit log when SYSTEM_AUDIT_RETENTION_DAYS is set (0 = keep forever). Each part runs even if another fails."""
     from datetime import timedelta
     import time
@@ -35,6 +50,7 @@ def housekeeping():
     jobs = {
         "sessions": lambda: Session.objects.filter(expire_date__lt=now).delete()[0],
         "failed_jobs": lambda: Failure.objects.filter(stopped__lt=now - timedelta(days=FAILED_TASK_DAYS)).delete()[0],
+        "rate_hits": prune_rate_hits,
         "wrong_tries": lambda: WrongTries.objects.filter(last_at__lt=time.time() - QUIET_SECONDS).delete()[0],
         "email_bounces": lambda: bouncelog.prune(),
         "audit": lambda: audit.prune(settings.SYSTEM_AUDIT_RETENTION_DAYS) if settings.SYSTEM_AUDIT_RETENTION_DAYS else "kept",

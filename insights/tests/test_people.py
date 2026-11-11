@@ -227,6 +227,29 @@ class FreshnessTests(OfficeTestCase):
             snapshots._queue()
         queued.assert_not_called()
 
+    def test_the_queue_check_uses_the_flag_and_a_stale_flag_never_blocks_for_good(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from insights.models import SnapshotRefresh
+
+        self.assertFalse(snapshots._already_waiting())  # no row
+        with mock.patch("common.tasks.enqueue") as queued:
+            snapshots._queue()
+            snapshots._queue()  # a burst: one job
+            self.assertEqual(queued.call_count, 1)
+            self.assertTrue(snapshots._already_waiting())
+            SnapshotRefresh.objects.filter(key="snapshots").update(queued_at=None)  # the job started
+            snapshots._queue()
+            self.assertEqual(queued.call_count, 2)
+            SnapshotRefresh.objects.filter(key="snapshots").update(queued_at=timezone.now() - timedelta(minutes=3))  # a lost job (older than 2 minutes)
+            self.assertFalse(snapshots._already_waiting())
+            snapshots._queue()
+            self.assertEqual(queued.call_count, 3)
+            SnapshotRefresh.objects.filter(key="snapshots").update(queued_at=timezone.now() - timedelta(minutes=1))
+            self.assertTrue(snapshots._already_waiting())
+
     def test_previous_total_is_distinct_people_and_a_browser_linked_twice_takes_the_latest_account(self):
         first = finished_journey()
         user_a = User.objects.create_user("a@example.com", "a-long-password-1")

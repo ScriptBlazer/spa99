@@ -1,0 +1,23 @@
+/* Pagination (common/_pagination.html): quiet text links, a small pill on the current page, centred. Colour is the surrounding text colour (currentColor), so it is native in Office and in System.
+   Set --pager-color, --pager-size or --pager-fill on a parent to tune it. Tokens only. A phone shows Previous, "Page 4 of 20" and Next; the numbers come from 40em. */
+.pager { display: flex; justify-content: center; margin: var(--space-4) 0 0; color: var(--pager-color, currentColor); font-size: var(--pager-size, var(--text-sm)); font-variant-numeric: tabular-nums; }
+.pager-list { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 0; margin: 0; padding: 0; list-style: none; }
+.pager-link, .pager-gap, .pager-status { display: inline-flex; align-items: center; justify-content: center; min-width: 2.75rem; min-height: 2.75rem; padding-inline: var(--space-2); box-sizing: border-box; }
+.pager-link { position: relative; isolation: isolate; color: inherit; text-decoration: none; text-underline-offset: 0.2em; font-weight: 500; -webkit-tap-highlight-color: transparent; }
+.pager-link[aria-current="page"] { font-weight: 600; }
+.pager-link[aria-current="page"]::before { content: ""; position: absolute; inset: 0.5rem 0.125rem; z-index: -1; border-radius: 999px; background: var(--pager-fill, color-mix(in srgb, currentColor 12%, transparent)); }   /* a small pill inside the 44px target */
+.pager-link[aria-disabled="true"] { opacity: 0.4; cursor: default; }
+.pager-link:focus-visible { outline: 2px solid currentColor; outline-offset: 0; border-radius: var(--radius-sm); }
+.pager-gap { min-width: 1.75rem; opacity: 0.6; }
+.pager-edge .pager-link { padding-inline: var(--space-3); }
+.pager-status { padding-inline: var(--space-2); white-space: nowrap; opacity: 0.8; }
+@media (hover: hover) and (pointer: fine) { .pager-link[href]:hover { text-decoration: underline; } }
+.pager-num { display: none; }
+@media (min-width: 40em) {
+  .pager-num { display: flex; }
+  .pager-status { display: none; }
+}
+
+/* Seamless paging (pager.js): a light busy state on the list while the next page loads */
+[data-page-loading] { opacity: 0.55; transition: opacity 0.15s ease-out; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { [data-page-loading] { transition: none; } }

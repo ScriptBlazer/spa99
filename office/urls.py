@@ -32,6 +32,7 @@ urlpatterns = [
     path("approvals/<uuid:pk>/approve/", ap.approval_decide, {"action": "approve"}, name="office_approval_approve"),
     path("approvals/<uuid:pk>/decline/", ap.approval_decide, {"action": "decline"}, name="office_approval_decline"),
     path("approvals/<uuid:pk>/undo/", ap.approval_decide, {"action": "undo"}, name="office_approval_undo"),
+    path("activity/", views.activity_page, name="office_activity"),  # every staff action (Developer and up)
     path("revenue/", ap.revenue_page, name="office_revenue"),
     path("password/", views.OfficePasswordView.as_view(), name="office_password"),
     path("gold/", views.gold, name="office_gold"),

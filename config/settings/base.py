@@ -14,6 +14,7 @@ from common.settings_helpers import build_databases, build_media_storage, descri
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ENV = load_env(BASE_DIR)
 PRIVATE_DIR = ENV.private_dir
+APP_VERSION = os.environ.get("APP_VERSION") or ENV.get("APP_VERSION", "") or "dev"  # the release tag (docker-compose sets it from APP_TAG); shown in the Office rail only
 
 # Sentry: off when SENTRY_DSN is empty. Environment tag defaults to "live" under the prod settings, else "dev".
 _default_sentry_environment = "live" if os.environ.get("DJANGO_SETTINGS_MODULE", "").endswith(".prod") else "dev"

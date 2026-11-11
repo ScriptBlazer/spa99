@@ -50,3 +50,16 @@ class LoginEvent(BaseModel):
 
     def __str__(self):
         return f"{self.event} {self.attempted_email or self.user_id} {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class RateHit(models.Model):
+    """One rate-limit counter (common.ratelimit). Small and short-lived: the nightly housekeeping deletes rows past `expires_at`.
+    `key` is the same string the limiter always used. Fixed window: `count`. Rolling and lock modes: `data` = {"times": [...], "locked_until": float}."""
+
+    key = models.CharField(max_length=200, unique=True)
+    expires_at = models.DateTimeField(db_index=True)
+    count = models.PositiveIntegerField(default=0)
+    data = models.JSONField(null=True, blank=True)
+
+    def __str__(self):
+        return self.key

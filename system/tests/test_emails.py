@@ -23,6 +23,8 @@ from users.models import InterestRegistration
 from plans.models import Plan
 
 User = get_user_model()
+from common.models import RateHit  # noqa: E402
+
 LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "emails-tests"}}
 UUID = "00000000-0000-0000-0000-000000000000"
 PATHS = ["/emails/", "/emails/suppressions/", "/emails/bounces/", "/emails/automatic/", "/emails/automatic/verify/", "/emails/mailings/", "/emails/mailings/new/",
@@ -218,6 +220,7 @@ class MailingViewTests(TestCase):
         self.assertEqual((len(mail.outbox), Mailing.objects.get().status, MailingRecipient.objects.count()), (0, "draft", 0))
         self.assertEqual(self.client.post(url, {"confirm": "yes", "expected_count": "3"}, HTTP_ACCEPT="application/json").status_code, 200)
         self.assertEqual(len(mail.outbox), 3)
+        RateHit.objects.all().delete()  # this test makes 7 posts; the 6-per-10-minutes limit (now really enforced in tests) is not what it checks
         again = self.client.post(url, {"confirm": "yes", "expected_count": "3"}, HTTP_ACCEPT="application/json")  # a double click
         self.assertEqual(again.status_code, 400)
         self.assertEqual(len(mail.outbox), 3)

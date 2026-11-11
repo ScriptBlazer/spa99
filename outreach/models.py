@@ -78,7 +78,7 @@ class OutreachEntry(UUIDModel):
     added_by = _person()
     added_by_label = models.CharField(max_length=254, blank=True)
     added_at = models.DateTimeField(default=timezone.now, db_index=True)
-    done_at = models.DateTimeField(null=True, blank=True)
+    done_at = models.DateTimeField(null=True, blank=True, db_index=True)
     done_by = _person()
     done_by_label = models.CharField(max_length=254, blank=True)
 

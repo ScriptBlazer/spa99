@@ -12,6 +12,7 @@
 @import "office-lists.css";
 @import "office-leads.css";
 @import "office-outreach.css";
+@import "office-activity.css";
 @import "office-reach.css";
 @import "office-cards.css";
 @import "office-press.css";
@@ -98,6 +99,7 @@
   .o-who-text { display: grid; min-width: 0; line-height: 1.3; }
   .o-who-name { font-size: var(--text-sm); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .o-who-role { font-size: var(--text-sm); color: var(--office-muted); }
+  .o-who-version { margin-top: var(--space-2); font-size: var(--office-text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--color-text-muted); }   /* the filter-label style; --color-text-muted is the lightest existing grey that passes 4.5:1 on the rail (5.37; taupe is 2.95) */
   .o-nav-foot .o-quiet { justify-self: start; color: var(--office-muted); }
   .o-body { margin-left: var(--office-nav-w); }
 }

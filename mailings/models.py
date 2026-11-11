@@ -198,7 +198,7 @@ class Invite(BaseModel):
 
     class Meta:
         ordering = ["-created_at", "email"]
-        indexes = [models.Index(fields=["batch_id", "status"])]
+        indexes = [models.Index(fields=["batch_id", "status"]), models.Index(_f.Upper("email"), name="invite_email_upper"), models.Index(_f.Lower("email"), name="invite_email_lower")]
 
     def __str__(self):
         return f"{self.email} ({self.status})"
@@ -264,7 +264,7 @@ class ContactListMember(BaseModel):
     class Meta:
         ordering = ["email"]
         constraints = [models.UniqueConstraint(fields=["list", "email"], name="mailings_member_once")]
-        indexes = [models.Index(fields=["email"])]
+        indexes = [models.Index(fields=["email"]), models.Index(_f.Upper("email"), name="listmember_email_upper"), models.Index(_f.Lower("email"), name="listmember_email_lower")]
 
     def __str__(self):
         return self.email

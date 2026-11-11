@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models.functions import Upper
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
@@ -200,6 +201,7 @@ class GoldApplication(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [models.Index(Upper("email"), name="gold_app_email_upper")]
 
     def __str__(self):
         return f"{self.reference} {self.first_name} {self.last_name}"

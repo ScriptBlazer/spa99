@@ -87,6 +87,18 @@ class ApprovalTests(Base):
         self.assertEqual(MembershipReviewEvent.objects.count(), 3)
         self.assertEqual(call(self.approver, "post", f"/approvals/{user.pk}/undo/", HTTP_X_REQUESTED_WITH="fetch").json()["result"], "unchanged")
 
+    def test_a_decision_updates_the_membership_counts_at_once_without_a_revenue_recount_and_still_asks_for_a_refresh(self):
+        first, second = self.member("a@example.com"), self.member("b@example.com")
+        self.figures()
+        with mock.patch.object(counts, "revenue") as revenue, mock.patch("office.snapshots.request_refresh") as ask:
+            approvals.decide(first.pk, "approved", self.approver)
+            self.assertEqual(counts.read()["memberships"], {"total": 2, "waiting": 1, "approved": 1, "declined": 0})
+            approvals.decide(second.pk, "declined", self.approver)
+            self.assertEqual(counts.read()["memberships"], {"total": 2, "waiting": 0, "approved": 1, "declined": 1})
+        revenue.assert_not_called()
+        ask.assert_called()
+        self.assertEqual(counts.read()["memberships"], counts._by_status(counts.membership_people()))
+
     def test_only_an_approver_or_admin_sees_or_decides_and_gold_members_are_not_in_the_list(self):
         user, gold = self.member("a@example.com"), self.member("g@example.com", plan="gold")
         for who, code in ((self.reader, 403), (self.approver, 200), (self.admin, 200)):

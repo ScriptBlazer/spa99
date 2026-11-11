@@ -276,6 +276,7 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
     list_page_size = _number("People and Gold lists: rows per page", 50, 5, 200)
     dashboard_range = models.CharField("Dashboard: default range", max_length=5, default="all")
     analytics_range = models.CharField("Analytics: default range", max_length=5, default="30d")
+    activity_range = models.CharField("Activity: default range", max_length=5, default="week")
     dashboard_hot_leads = _number("Dashboard: hot leads shown", 5, 1, 50)
     dashboard_activity = _number("Dashboard: activity shown", 10, 1, 50)
     dashboard_gold_waiting = _number("Dashboard: Gold waiting shown", 5, 1, 50)
@@ -361,7 +362,7 @@ class SiteDefaults(UUIDModel, TimeStampedModel):
         from office import leads, selectors
 
         allowed = {"leads_range": leads.RANGES, "leads_sort": leads.SORTS,
-                   "dashboard_range": selectors.DASHBOARD_RANGES, "analytics_range": selectors.ANALYTICS_RANGES}
+                   "dashboard_range": selectors.DASHBOARD_RANGES, "analytics_range": selectors.ANALYTICS_RANGES, "activity_range": selectors.ACTIVITY_RANGES}
         errors = {name: "Pick one of the choices." for name, choices in allowed.items() if getattr(self, name) not in choices}
         if errors:
             raise ValidationError(errors)

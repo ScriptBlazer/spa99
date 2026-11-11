@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from common import pagination
 from notifications.models import EmailBounce, EmailSuppression
 from pages import clicks
 from plans.models import SiteSettings
@@ -208,6 +209,7 @@ def change_log(request):
                "link_query": "&".join(part for part in (filters, f"page={number}" if number > 1 else "") if part),
                "drawer": feed.entry_detail(entry) if entry else None, "filters_set": bool(filters),
                "active_filters": sum(bool(v) for v in (params["user"], params["section"], params["category"], params["range"] or params["date_from"] or params["date_to"])),
+               "pager": pagination.pager(number, result["page"]["num_pages"], filters, anchor="#au-count"),
                "chain": audit.stored_status()}  # the stored result only: a full verify per page load is too costly
     return page(request, "system/changes.html", "changes", context)
 

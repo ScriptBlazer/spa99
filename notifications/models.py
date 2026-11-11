@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Upper
 from django.utils import timezone
 from django.db.models import Q
 from simple_history.models import HistoricalRecords
@@ -73,7 +74,7 @@ class EmailLog(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
-        indexes = [models.Index(fields=["-created_at"])]
+        indexes = [models.Index(fields=["-created_at"]), models.Index(Upper("subject_email"), name="emaillog_subj_email_upper")]
 
     def __str__(self):
         return f"{self.template} to {self.to} ({self.status})"

@@ -5,6 +5,7 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.core.exceptions import ValidationError
 from django.test import Client, RequestFactory, TestCase
 from django.utils import timezone
 
@@ -38,6 +39,15 @@ class CodeValueTests(TestCase):
         self.assertEqual((d.gold_invite_days, d.gold_approval_days, d.register_invite_days, d.office_session_days, d.email_confirm_hours),
                          (14, 14, 30, 30, 24))
         self.assertEqual(SiteDefaults.objects.count(), 1)
+        self.assertEqual(d.activity_range, "week")
+
+    def test_the_activity_range_is_a_choice_with_its_own_labels(self):
+        self.assertEqual(forms_defaults.choice_fields()["activity_range"], [("week", "This week"), ("month", "This month"), ("30d", "30 days"), ("all", "All time")])
+        self.assertEqual(forms_defaults.hint("activity_range"), "Default: This week")
+        row = SiteDefaults.load()
+        row.activity_range = "90d"
+        with self.assertRaises(ValidationError):
+            row.clean()
 
     def test_every_field_on_the_page_has_a_hint_and_a_group(self):
         self.assertEqual(sorted(forms_defaults.FIELDS), sorted(f.name for f in SiteDefaults._meta.fields if f.editable and f.name not in ("id", "created_at", "updated_at")))

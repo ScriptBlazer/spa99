@@ -142,3 +142,7 @@ Seen in Chromium (`--single-process --no-zygote --disable-gpu`) against a throwa
 - `?view=fakes` on Leads, a tab beside Archived with its count (stored in the counts snapshot as `fakes_total`). A lead is a possible fake when his address has a permanent bounce on the suppression list (a complaint does not count) and he is not marked genuine. The bounce webhook decides; no cron. Archived wins; a lead on the approach list is in neither.
 - Main Leads, its total and the Home tile leave fakes out (`lead_queryset(fakes="out")`). Correcting the email takes him out of the tab by itself: the new address has no bounce row.
 - Same search, sort and CSV as Archived. Mark as genuine (row and lead page, only while he is a fake and not archived; Archive's permission) and Undo on his page: see the bounce section of office-outreach.md. Hot leads, Home's new-leads figure and Analytics' leads total leave fakes out too (`fakes="out"`); only Analytics' new-leads count and the insights still include them.
+
+## Activity (2026-11-11)
+
+- `/activity/`, Developer level and above only: one read-only list of every staff action, filterable by staff member, type and dates. See office-activity.md.
