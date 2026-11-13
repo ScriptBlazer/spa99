@@ -1,6 +1,7 @@
 """Sending email. Every send is logged (EmailLog). A failure is logged, never raised, so a broken mail server
 cannot break a sign-up or a Gold application."""
 import logging
+from dataclasses import replace
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
@@ -111,7 +112,7 @@ def _staff_sample_context(key):
     }
 
 
-def preview_email(key, subject, body, extra=None, blocks=None, posted=None, shared=None):
+def preview_email(key, subject, body, extra=None, blocks=None, posted=None, shared=None, sender_user=None):
     """The email as it would look with the sample values: {"subject", "html", "text", "from"}. `body` blank = the default; `extra` is added to
     the context (the unsubscribe link and notice of a News mailing); `posted` holds footer, sender, heading and button settings typed on
     the edit screen and not saved yet; `shared` (brand, address, contact) is the shared footer typed on the Footer tab."""
@@ -120,18 +121,26 @@ def preview_email(key, subject, body, extra=None, blocks=None, posted=None, shar
     ctx = {**base_context(), "subject": fill_subject(subject, values), "url": f"{settings.SITE_URL}/example-link/",
            **_staff_sample_context(key), **(extra or {})}
     options = emailsettings.options_for(key, posted, shared)
+    if sender_user is not None:  # a group send's own sender (the staff member picked on its form), whatever the email's own setting says
+        options = replace(options, sender_user=str(sender_user) if sender_user else None)
     if blocks:  # a personal-link button shows the sample link in a preview
         from mailings import blocks as mailing_blocks
 
         ctx.setdefault("personal_links", mailing_blocks.sample_links())
     html, text = render_email(key, ctx, body=body if body and body.strip() else spec.default_body, values=values, blocks=blocks, options=options)
-    return {"subject": ctx["subject"], "html": html, "text": text, "from": _from_label(options)}
+    return {"subject": ctx["subject"], "html": html, "text": text, "from": _from_label(options), "reply_to": _reply_label(options)}
 
 
 def _from_label(options):
     """Who the email comes from, in words, for the preview ('Spa 99 <hello@...>' or the person)."""
     from_email, _ = emailsettings.sender_for(options, SiteSettings.load())
     return from_email or settings.DEFAULT_FROM_EMAIL
+
+
+def _reply_label(options):
+    """Where a reply goes: the chosen person's own address, or the contact address."""
+    _, reply_to = emailsettings.sender_for(options, SiteSettings.load())
+    return (reply_to or [SiteSettings.load().contact_address])[0]
 
 
 def fill_subject(text, values):

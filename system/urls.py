@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import views, views_code as c, views_defaults as d, views_faq as fq, views_assistant as asst, views_emails as e, views_rules as r, views_sales as sl, views_payments as pay, views_launch as lc, views_whatsapp as wa, views_team_email as te
+from . import views, views_code as c, views_defaults as d, views_faq as fq, views_assistant as asst, views_emails as e, views_rules as r, views_sales as sl, views_payments as pay, views_launch as lc, views_team_email as te
 from .permissions import unlocked
 
 urlpatterns = [
@@ -15,6 +15,7 @@ urlpatterns = [
     path("changes/export.csv", views.audit_export, name="system_audit_export"),
     path("changes/<uuid:pk>/undo/", views.undo, name="system_undo"),
     path("changes/batch/<uuid:batch>/undo/", views.undo_all, name="system_undo_batch"),
+    path("revenue/", views.revenue, name="system_revenue"),
     path("approval/", views.approval, name="system_approval"),
     path("approval/approvers/add/", views.approval_add, {"role": "approver"}, name="system_approval_approvers_add"),
     path("approval/approvers/<uuid:pk>/remove/", views.approval_remove, {"role": "approver"}, name="system_approval_approvers_remove"),
@@ -81,9 +82,6 @@ urlpatterns = [
     path("payments/schedule/cancel/", pay.payments_cancel_schedule, name="system_payments_cancel_schedule"),
     path("payments/close/", pay.payments_close, name="system_payments_close"),
     path("launch/", lc.launch_page, name="system_launch"),
-    path("whatsapp/", wa.whatsapp_page, name="system_whatsapp"),
-    path("whatsapp/check/", wa.whatsapp_check, name="system_whatsapp_check"),
-    path("whatsapp/sync/", wa.whatsapp_sync, name="system_whatsapp_sync"),
     path("sales/", sl.sale_list, name="system_sales"),
     path("sales/new/", sl.sale_edit, name="system_sale_new"),
     path("sales/<uuid:pk>/", sl.sale_edit, name="system_sale_edit"),

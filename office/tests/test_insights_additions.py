@@ -235,9 +235,9 @@ class InvitedTests(OfficeTestCase):
         self.assertNotContains(get(self.office, "/leads/"), 'data-office-nav-item="invited"')
         self.assertContains(get(self.admin, "/leads/"), 'data-office-nav-item="invited"')
         office_page, admin_page = get(self.office, "/leads/"), get(self.admin, "/leads/")
-        self.assertContains(office_page, "data-nav-sheet")  # phone More sheet
-        self.assertNotContains(office_page, 'href="/invited/"')  # not in the rail and not in the More sheet
-        self.assertContains(admin_page, 'href="/invited/"', count=2)  # rail and More sheet
+        self.assertNotContains(office_page, "data-nav-sheet")  # no More sheet: the phone has five tabs
+        self.assertNotContains(office_page, 'href="/invited/"')  # not in the rail and not in the person menu
+        self.assertContains(admin_page, 'href="/invited/"', count=2)  # rail and the phone's person menu
         self.assertEqual(get(self.office, "/invited/export.csv").status_code, 403)
         response = get(self.admin, "/invited/export.csv")
         self.assertEqual(response.status_code, 200)
@@ -270,6 +270,6 @@ class ChatCostTests(OfficeTestCase):
             user = staff(role, f"{role.lower()}@example.com")
             for path in ("/chats/", f"/chats/{conversation.pk}/"):
                 body = get(user, path).content.decode()
-                self.assertEqual("Cost" in body or "12.35p" in body or "7.50p" in body, sees, (role, path))
-        self.assertContains(get(staff("Developer", "d2@example.com"), "/chats/"), "12.35p")
-        self.assertContains(get(staff("Developer", "d3@example.com"), f"/chats/{conversation.pk}/"), "7.50p")
+                self.assertEqual("Cost" in body or "£0.123" in body or "£0.075" in body, sees, (role, path))
+        self.assertContains(get(staff("Developer", "d2@example.com"), "/chats/"), "£0.123")
+        self.assertContains(get(staff("Developer", "d3@example.com"), f"/chats/{conversation.pk}/"), "£0.075")

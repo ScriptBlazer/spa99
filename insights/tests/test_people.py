@@ -157,7 +157,7 @@ class SnapshotTests(OfficeTestCase):
         snapshots.build_everything()
         for path in paths:
             self.assertEqual(self.queries(path), empty[path], path)
-            self.assertLessEqual(empty[path], 32, path)  # 30 plus the WhatsApp unread count and the Email unread count on the navigation badges
+            self.assertLessEqual(empty[path], 34, path)  # a fixed number: the stored snapshots and the approval cards are one stored row each
 
     def test_snapshots_are_idempotent_all_ranges_exist_and_the_all_range_has_no_previous_period(self):
         finished_journey()
@@ -165,7 +165,7 @@ class SnapshotTests(OfficeTestCase):
         first = sorted(OfficeSnapshot.objects.values_list("page", "range", "payload"), key=str)
         snapshots.build_everything()
         self.assertEqual(first, sorted(OfficeSnapshot.objects.values_list("page", "range", "payload"), key=str))
-        self.assertEqual(OfficeSnapshot.objects.count(), 4 + 4 + 4 + 4)
+        self.assertEqual(OfficeSnapshot.objects.count(), 4 + 4 + 4 + 4 + 1)  # dashboard, analytics, pages and leads per range, plus the one counts row (office.counts)
         everything = selectors.dashboard("all")
         self.assertEqual(everything["range"], "all")
         self.assertTrue(all(r["previous"] is None and r["change"] is None for r in everything["rings"]))
@@ -226,6 +226,29 @@ class FreshnessTests(OfficeTestCase):
         with mock.patch("office.snapshots._already_waiting", return_value=True), mock.patch("common.tasks.enqueue") as queued:
             snapshots._queue()
         queued.assert_not_called()
+
+    def test_the_queue_check_uses_the_flag_and_a_stale_flag_never_blocks_for_good(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from insights.models import SnapshotRefresh
+
+        self.assertFalse(snapshots._already_waiting())  # no row
+        with mock.patch("common.tasks.enqueue") as queued:
+            snapshots._queue()
+            snapshots._queue()  # a burst: one job
+            self.assertEqual(queued.call_count, 1)
+            self.assertTrue(snapshots._already_waiting())
+            SnapshotRefresh.objects.filter(key="snapshots").update(queued_at=None)  # the job started
+            snapshots._queue()
+            self.assertEqual(queued.call_count, 2)
+            SnapshotRefresh.objects.filter(key="snapshots").update(queued_at=timezone.now() - timedelta(minutes=3))  # a lost job (older than 2 minutes)
+            self.assertFalse(snapshots._already_waiting())
+            snapshots._queue()
+            self.assertEqual(queued.call_count, 3)
+            SnapshotRefresh.objects.filter(key="snapshots").update(queued_at=timezone.now() - timedelta(minutes=1))
+            self.assertTrue(snapshots._already_waiting())
 
     def test_previous_total_is_distinct_people_and_a_browser_linked_twice_takes_the_latest_account(self):
         first = finished_journey()

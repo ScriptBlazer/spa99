@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from insights.metrics import K
 
 from . import selectors
@@ -26,4 +28,4 @@ def office(request):
 
     name = (SiteSettings.objects.values_list("outreach_list_name", flat=True).first() or "").strip()  # one light read; no row = the default
     return {"office_outreach_title": name or "Approach list", "office_waiting": selectors.waiting_count(selectors.counters(K.GOLD_BY_STATUS)), "office_can": abilities(request.user),
-            "office_person": _person(request.user)}
+            "office_person": _person(request.user), "app_version": settings.APP_VERSION}

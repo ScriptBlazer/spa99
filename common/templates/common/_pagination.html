@@ -1,0 +1,25 @@
+{% comment %}
+Pagination: one quiet, centred control for any numbered list. Previous, the page numbers with gaps (1 … 4 5 6 … 20), Next. On a phone: Previous, "Page 4 of 20", Next.
+HOW TO USE
+  View:      from common import pagination
+             pages = pagination.num_pages(total, size)            # total from a stored count where there is one
+             number = pagination.clamp(request.GET.get("page"), pages)   # garbage is 1, past the end is the last page
+             context["pager"] = pagination.pager(number, pages, request.GET, anchor="#list")   # the query is kept, `page=` replaced; the anchor is optional
+  Template:  <link rel="stylesheet" href="{% static 'common/css/pagination.css' %}"> in the page's head, then
+             {% include "common/_pagination.html" with pager=pager %}      (optional: label="Audit log pages", the nav's aria-label; default "Pages")
+  Seamless paging: also pass target="#list-id" (what to swap; optional scroll="#heading-id", the element to bring into view when it is above the screen, default the target) and load
+             <script type="module" src="{% static 'common/js/pager.js' %}"></script> on the page. A click then swaps just that target and the pager (the view may answer ?fragment=1 with only those), pushes the
+             address, handles Back, scrolls only if the heading is off the top, and falls back to a normal load on failure. Anything else that changes with the page: mark it data-page-part
+             (replaced, by position, from the answer). A page that handles popstate itself marks an element data-page-host. Without script the links are plain links.
+  It draws nothing for one page. Every item is a real link (so it works without script); Previous on page 1 and Next on the last page are greyed spans, not links.
+  Colour: it uses the surrounding text colour (currentColor). To tune it from a page, set --pager-color, --pager-size or --pager-fill (the current page's pill) on a parent.
+{% endcomment %}{% if pager.items %}<nav class="pager" aria-label="{{ label|default:'Pages' }}"{% if target %} data-page-target="{{ target }}"{% if scroll %} data-page-scroll="{{ scroll }}"{% endif %}{% endif %}>
+  <ul class="pager-list">
+    {% for item in pager.items %}{% if item.kind == "prev" %}<li class="pager-edge">{% if item.disabled %}<span class="pager-link" aria-disabled="true">{{ item.label }}</span>{% else %}<a class="pager-link" href="{{ item.href }}" rel="prev">{{ item.label }}</a>{% endif %}</li>
+    <li class="pager-status">Page {{ pager.number }} of {{ pager.num_pages }}</li>
+    {% elif item.kind == "next" %}<li class="pager-edge">{% if item.disabled %}<span class="pager-link" aria-disabled="true">{{ item.label }}</span>{% else %}<a class="pager-link" href="{{ item.href }}" rel="next">{{ item.label }}</a>{% endif %}</li>
+    {% elif item.kind == "gap" %}<li class="pager-num pager-gap" aria-hidden="true">{{ item.label }}</li>
+    {% else %}<li class="pager-num">{% if item.current %}<span class="pager-link" aria-current="page">{{ item.label }}</span>{% else %}<a class="pager-link" href="{{ item.href }}" aria-label="Page {{ item.label }}">{{ item.label }}</a>{% endif %}</li>
+    {% endif %}{% endfor %}
+  </ul>
+</nav>{% endif %}

@@ -101,7 +101,7 @@ Title everywhere = `outreach_list_name` from System, or "Approach list" while em
 
 - Gold: a quiet full-width row in the Decision card under Send guide: `o-quiet` button with `i-list-checks`, "Add to Approach list".
 - Person and lead: in the new **Reach out** rail card (section 4), second button: `btn btn-secondary btn-block`, `i-list-checks`, "Add to Approach list".
-- Opens a small `fb-modal.o-dialog[data-dialog=outreach]`: title "Add Daniel to the Approach list?", reason chips (choosing first): "High potential", "Asked to talk", "Big business" (`.o-chip`, tapping one fills the field, tap again clears), then `fb-modal-field` "Reason (optional)", textarea 2 rows, `maxlength=200`. Actions **Cancel** / **Add to list** (primary). Toast "Added to the Approach list."
+- (Replaced 2026-11-05) One tap: he goes on the list straight away, no box and no reason.
 - **Already on the list:** the button is replaced by a state row `.o-onlist`: `i-check`, "On the Approach list", `--text-sm` meta "Moishe, 3 Nov", and `o-quiet` link "View" to the page. If the entry is done: "Approached 4 Nov by Barry", no link button. A second add (race) returns the same state with toast "Already on the Approach list."
 - Row action on lists: not in this round (no cheap spot without a hover menu).
 

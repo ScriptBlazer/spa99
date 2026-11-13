@@ -1,0 +1,260 @@
+/* Office 2 (docs/features/office-2-design.md): the three two-ring cards on Home, the Revenue page, the approval lists and the Registered line and tables.
+   Brand and Office tokens only; the one addition is --office-ring-pair (office-tokens.css). Cards are tone and soft shadow, never a border or a side stripe. */
+
+/* ---------- Home: Waiting for approval, Approved, Revenue ---------- */
+.o-cards-approval { display: grid; gap: var(--space-4); min-width: 0; }
+@media (min-width: 80em) { .o-cards-approval { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gutter); } }   /* below 80em a third of the page leaves rings about 70px wide: they stack */
+.o-pair { display: grid; align-content: start; gap: var(--space-3); padding: var(--space-4) var(--space-3) var(--space-3); }
+.o-card.o-pair { padding: var(--space-4) var(--space-3) var(--space-3); }
+@media (min-width: 64em) { .o-card.o-pair { padding: var(--space-4); } }   /* not the usual --space-5, or the rings shrink */
+.o-pair-title { margin: 0; }
+.o-pair-sub { order: 1; margin: 0; font-size: var(--text-sm); color: var(--office-muted); max-width: none; text-align: center; }   /* "12-month estimate, excluding VAT": it never goes */
+.o-pair-rings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); min-width: 0; }
+.o-pair-link { --c: var(--color-gold); --t: var(--office-ochre-track); display: grid; justify-items: center; align-content: start; gap: var(--space-3); min-width: 0; padding: var(--space-2) var(--space-1); border-radius: var(--office-radius); color: inherit; text-decoration: none; text-align: center; }
+.o-pair-link[data-ring="memberships"] { --c: var(--office-teal-3); --t: var(--office-teal-tint); }   /* Gold is always left and Memberships right, so the eye learns the places */
+.o-pair-link:focus-visible { outline: 2px solid var(--office-text); outline-offset: 2px; }
+.o-pair-fig { position: relative; display: grid; place-items: center; width: min(var(--office-ring-pair), 100%); aspect-ratio: 1; }
+.o-pair .o-ring-svg { --rsw: 7.5; }   /* thinner than the journey rings: two big rings at 10.4 felt heavy */
+.o-pair-num { position: relative; font-family: var(--font-display); font-weight: 500; font-size: 1.5rem; line-height: 1; letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--office-text); }
+.o-pair-text { display: grid; gap: 2px; min-width: 0; font-size: var(--text-sm); line-height: 1.25; }   /* three short lines, so every ring in every card lines up */
+.o-pair-l1 { font-weight: 600; color: var(--office-text); }
+.o-pair-l2, .o-pair-l3 { color: var(--office-muted); }
+.o-pair-l3 { white-space: nowrap; }
+/* the arcs draw once a session (Home is opened many times a day): office-dashboard.js sets data-draw; both rings of a card together on a phone, 100ms apart on a computer */
+html.js:not(.no-reveal) .o-pair[data-draw]:not(.is-visible) .o-pair-arc { stroke-dashoffset: 100; }
+.js .o-pair[data-draw].is-visible .o-pair-arc { animation: o-ring-draw var(--office-dur-ring) var(--ease-soft) backwards; }
+@media (min-width: 64em) { .js .o-pair[data-draw].is-visible [data-ring="memberships"] .o-pair-arc { animation-delay: 100ms; } }
+@media (prefers-reduced-motion: reduce) { .o-pair .o-pair-arc { animation: none !important; } }
+/* phone: compact, so all three cards fit on one screen above the tab bar (Moishe, 2026-11-05) */
+@media (max-width: 63.99em) {
+  .o-cards-approval { gap: var(--space-3); }
+  .o-card.o-pair { gap: var(--space-2); padding: var(--space-3); --office-ring-pair: 4.5rem; }
+  .o-pair .o-ring-svg { --rsw: 11; }   /* a small ring needs a thicker line (Moishe, 2026-11-05) */
+  .o-pair-title { font-size: var(--text-base); }
+  .o-pair-sub { font-size: var(--office-text-xs); }
+  .o-pair-link { gap: var(--space-1); padding: 0; }
+  .o-pair-num { font-size: 1.0625rem; }
+  .o-pair-text { gap: 0; font-size: 0.8125rem; }
+}
+
+/* ---------- navigation pieces for the new pages ---------- */
+.o-back--icon { padding-right: 0; min-width: 2.75rem; }
+.o-header-left .o-back--icon + .o-title { margin-left: calc(var(--space-1) * -1); }
+@media (min-width: 64em) { .o-header-left .o-back--icon { display: none; } }   /* the rail has Revenue and Approvals; Home is one click away */
+
+/* ---------- the counts tabs: Waiting, Approved, Declined (and Membership, Gold on Registered). Below 48em the count stacks under the label. ---------- */
+.o-seg--counts { --n: 3; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); margin-bottom: var(--space-3); }
+.o-seg--counts .o-seg-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-height: 3.25rem; padding: 0 var(--space-1); color: var(--office-muted); text-decoration: none; transition: background-color var(--office-dur-lift) var(--ease-soft), color var(--office-dur-lift) var(--ease-soft); }
+.o-seg--counts .o-seg-item.is-active { background: var(--office-surface); box-shadow: var(--office-shadow-1); border-radius: var(--office-pill); color: var(--office-text); }
+.o-seg--counts .o-count { min-width: 0; height: auto; padding: 0; background: none; color: inherit; font-size: var(--text-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+.o-seg--counts .o-seg-item:focus-visible { outline: 2px solid var(--office-text); outline-offset: -2px; border-radius: var(--office-pill); }
+@media (min-width: 48em) { .o-seg--counts .o-seg-item { flex-direction: row; gap: var(--space-2); min-height: calc(var(--control-h-compact) - 6px); padding: 0 var(--space-3); } .o-seg--counts { max-width: 28rem; } }
+@media (hover: hover) and (pointer: fine) { .o-seg--counts .o-seg-item:not(.is-active):hover { color: var(--office-text); } }
+/* Registered: the All tab is for a computer; a phone shows one table at a time and Membership is the default */
+.o-seg--tables { --n: 2; }
+.o-seg--tables .o-seg-all { display: none; }
+.o-seg--tables .o-seg-all.is-active ~ [data-table="membership"] { background: var(--office-surface); box-shadow: var(--office-shadow-1); border-radius: var(--office-pill); color: var(--office-text); }
+@media (min-width: 64em) {
+  .o-seg--tables { --n: 3; }
+  .o-seg--tables .o-seg-all { display: flex; }
+  .o-seg--tables .o-seg-all.is-active ~ [data-table="membership"] { background: none; box-shadow: none; color: var(--office-muted); }
+  .o-seg--tables[data-table-switch] { max-width: 24rem; }
+}
+
+/* ---------- Registered: the approvals line and the two tables ---------- */
+.o-approvals-line { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 3.25rem; margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--office-radius); background: var(--office-sunken); color: var(--office-text); font-size: var(--text-base); font-weight: 600; text-decoration: none; transition: background-color var(--office-dur-lift) var(--ease-soft); }
+.o-approvals-line .o-icon { color: var(--office-muted); }
+.o-table-title { display: flex; align-items: baseline; gap: var(--space-2); margin: 0; padding: var(--space-3) var(--space-3) var(--space-2); }
+.o-table-title .o-count-muted { margin-left: 0; }
+@media (max-width: 63.99em) { .o-table-title { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }   /* the tabs above already name the table */
+[data-table-card] + [data-table-card] { margin-top: var(--space-4); }
+@media (max-width: 63.99em) { .o-list--people .o-goldlink { font-weight: 600; } }   /* "Applied" is a plain tag on a phone: the row keeps one target */
+
+/* ---------- Approvals ---------- */
+.o-approvals-note { margin-bottom: var(--space-3); max-width: var(--measure); }   /* it never collapses and shows on all three tabs: it is what lets him tap freely */
+.o-approvals-gold { margin: var(--space-2) 0 var(--space-3); }
+.o-approvals-gold .o-quiet { gap: var(--space-1); }
+.o-approvals-gold .o-icon { width: 1rem; height: 1rem; }
+.o-list--approvals .c-action { text-align: right; width: 1px; white-space: nowrap; }
+.o-approval-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.o-approval-actions form { position: relative; z-index: 1; margin: 0; }   /* the controls sit above the row link */
+.o-decide { gap: var(--space-2); min-height: var(--control-h-compact); padding: 0 var(--space-4); }
+.o-decide .o-icon { width: 1.125rem; height: 1.125rem; }
+.o-decide--decline { background: none; color: var(--office-muted); }   /* not red and not espresso: nothing bad happens to him, and a dark bar in every card would be loud */
+.o-decide--approve { background: var(--office-sunken); border-color: transparent; color: var(--office-text); }
+.o-decide[disabled] { opacity: 0.5; }
+@media (hover: hover) and (pointer: fine) { .o-decide--decline:hover { color: var(--office-text); background: var(--office-sunken); } .o-decide--approve:hover { background: var(--office-taupe-track); } }
+.o-back-to-waiting { padding-inline: var(--space-2); color: var(--office-muted); }
+@media (max-width: 63.99em) {
+  .o-list--approvals .o-row { gap: var(--space-1) var(--space-2); align-items: baseline; }
+  .o-list--approvals .o-row td.c-name { order: 1; flex: 0 0 100%; }
+  .o-list--approvals .o-row td.c-plan, .o-list--approvals .o-row td.c-date { order: 3; flex: none; margin-left: 0; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-list--approvals .o-row { column-gap: var(--space-1); }
+  .o-list--approvals .o-row td.c-decided { order: 4; flex: 0 0 100%; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-list--approvals .o-row td.c-action { display: block; order: 8; flex: 0 0 100%; width: auto; margin-top: var(--space-2); }
+  .o-list--approvals .o-approval-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }   /* equal columns, Approve under the right thumb */
+  .o-list--approvals .o-approval-actions .o-decide { width: 100%; min-height: var(--control-h); }
+  .o-list--approvals .o-approval-actions:has(.o-back-to-waiting) { display: block; }
+  .o-list--approvals .o-back-to-waiting { min-height: 2.75rem; }
+  .o-list--approvals thead th { display: none; }
+}
+@media (min-width: 64em) { .o-list--approvals .c-action { padding-right: var(--space-3); } .o-list--approvals .c-plan, .o-list--approvals .c-date, .o-list--approvals .c-decided { color: var(--office-muted); } }
+/* the Undo strip replaces the row in place, at the row's own height (the script fixes it before the swap): if it shrank, the next row would jump under his thumb */
+.o-row.o-approval--strip { background: var(--office-sunken); box-shadow: none; transform: none; }
+.o-list .o-approval--strip td.o-strip-cell { padding: 0 var(--space-3); background: var(--office-sunken); }
+.o-strip { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); width: 100%; }
+.o-strip-text { margin: 0; font-size: var(--text-base); font-weight: 500; overflow-wrap: anywhere; }
+.o-strip-undo { margin: 0; flex: none; }
+.o-strip-btn { min-height: 2.75rem; padding-inline: var(--space-2); font-weight: 600; text-decoration: underline; text-underline-offset: 0.25em; }
+@media (max-width: 63.99em) { .o-list .o-row.o-approval--strip td.o-strip-cell { display: block; flex: 1 1 auto; padding: 0; } }
+
+/* ---------- Revenue ---------- */
+.o-revenue { display: grid; gap: var(--space-4); min-width: 0; }
+.o-stat-lg { font-family: var(--font-display); font-weight: 500; font-size: var(--office-stat-lg); line-height: var(--leading-display); letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; color: var(--office-text); overflow-wrap: normal; }
+.o-rev-total { display: grid; gap: var(--space-2); align-content: start; }
+.o-rev-total > * { margin: 0; max-width: none; }
+.o-rev-label { font-family: var(--font-body); font-size: var(--text-sm); font-weight: 500; color: var(--office-muted); letter-spacing: 0; }
+.o-card .o-rev-label { font-size: var(--text-sm); }
+.o-rev-plans { display: grid; gap: var(--space-4); min-width: 0; }
+.o-rev-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); }
+.o-rev-head .o-h3 { margin: 0; }
+.o-rev-count { font-size: var(--text-sm); color: var(--office-muted); white-space: nowrap; }
+.o-rev-foot { margin-top: var(--space-3); max-width: none; }
+/* the four-figure grid: three columns, tabular, right aligned. Excluding VAT is the bold row: it is the number all prices are stated in. */
+.o-grid { width: 100%; margin-top: var(--space-3); border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.o-grid th, .o-grid td { padding: var(--space-1) 0 var(--space-1) var(--space-3); text-align: right; font-size: var(--text-sm); font-weight: 400; white-space: nowrap; }
+.o-grid thead th { color: var(--office-muted); font-weight: 500; }
+.o-grid tbody th { padding-left: 0; text-align: left; color: var(--office-muted); font-weight: 400; white-space: nowrap; }
+.o-grid .o-grid-ex th, .o-grid .o-grid-ex td { font-weight: 600; color: var(--office-text); }
+.o-rev-total .o-grid { margin-top: var(--space-3); }
+.o-rev-possible { display: grid; gap: var(--space-2); align-content: start; padding: var(--space-4) var(--space-3); border-radius: var(--office-radius-lg); background: var(--office-sunken); }   /* a different material: no shadow, no big number, so it cannot be read as part of the money */
+.o-rev-possible > * { margin: 0; max-width: none; }
+.o-rev-possible .o-h3 { margin-bottom: 0; }
+.o-rev-possible .o-grid { margin-top: var(--space-2); }
+.o-rev-waiting, .o-bd-lines { display: grid; gap: var(--space-1); margin: var(--space-2) 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+.o-rev-waiting li, .o-bd-lines li { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.o-rev-waiting .num, .o-bd-lines .num { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.o-rev-possible .o-quiet { gap: var(--space-1); justify-self: start; }
+.o-rev-possible .o-icon { width: 1rem; height: 1rem; }
+.o-rev-note { max-width: var(--measure); }
+.o-rev-table { display: none; }
+@media (min-width: 64em) {
+  .o-revenue { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gutter); align-items: stretch; }
+  .o-rev-total { grid-column: 1 / span 7; grid-row: 1; }
+  .o-rev-possible { grid-column: 8 / span 5; grid-row: 1; padding: var(--space-5); }
+  .o-rev-plans { display: none; }   /* the table takes the place of the plan cards */
+  .o-rev-table { display: block; grid-column: 1 / -1; grid-row: 2; }
+  .o-bd { grid-column: 1 / -1; grid-row: 3; }
+  .o-rev-note { grid-column: 1 / -1; grid-row: 4; }
+  .o-grid th, .o-grid td { font-size: var(--text-base); }
+}
+/* a small laptop: beside the menu the two top cards are too narrow for their figures, so they stack */
+@media (min-width: 64em) and (max-width: 79.99em) {
+  .o-rev-total, .o-rev-possible { grid-column: 1 / -1; }
+  .o-rev-possible { grid-row: 2; }
+  .o-rev-table { grid-row: 3; }
+  .o-bd { grid-row: 4; }
+  .o-rev-note { grid-row: 5; }
+}
+.o-list--revenue { width: 100%; }
+.o-list--revenue th, .o-list--revenue td { height: 3.25rem; padding: 0 var(--space-3); font-size: var(--text-sm); text-align: left; vertical-align: middle; }
+.o-list--revenue thead th { position: static; background: var(--office-sunken); white-space: normal; }
+.o-list--revenue .num { text-align: right; font-variant-numeric: tabular-nums; }
+.o-list--revenue tbody th { font-weight: 600; }
+.o-list--revenue .o-ex { font-weight: 600; }
+.o-list--revenue .o-rev-all th, .o-list--revenue .o-rev-all td { font-weight: 700; background: var(--office-sunken); }
+.o-list--revenue .o-rev-all th { border-radius: var(--office-radius) 0 0 var(--office-radius); }
+.o-list--revenue .o-rev-all td:last-child { border-radius: 0 var(--office-radius) var(--office-radius) 0; }
+.o-list--revenue tbody tr:nth-child(even) td { background: none; }
+.o-list--revenue .o-cell-sub { font-weight: 400; }
+
+/* Registered on a phone: one table at a time. With "All" chosen (a computer's view) Membership is the default and the Gold card waits behind its tab. */
+@media (max-width: 63.99em) { .o-main:has(.o-seg-all.is-active) [data-table-card="gold"] { display: none; } }
+/* Registered's Membership table has nine columns: tighter cells so every column, Gold included, fits a 1440 screen without a sideways scroll */
+@media (min-width: 64em) and (max-width: 119.99em) { .o-list--people thead th, .o-list--people td { padding-inline: var(--space-2); } .o-list--people .c-journey, .o-list--people .c-date { font-size: var(--text-sm); } }
+
+/* ---------- Revenue: the full breakdown. A closed card with the dashboard's round plus; open, one sheet (who, the 12 months, deal by deal, how it adds up, then the waiting). Tone and shadow, no borders. ---------- */
+.o-bd { position: relative; min-width: 0; }
+.o-bd .o-h3 { margin-bottom: var(--space-2); padding-right: 3.5rem; scroll-margin-top: calc(var(--office-header-h) + var(--space-3)); }
+.o-bd > .o-sub { max-width: none; }
+.o-bd-stage { min-width: 0; }
+.o-bd-body { display: grid; gap: var(--space-5); margin-top: var(--space-4); min-width: 0; }
+.o-bd-body > * { margin: 0; max-width: none; }
+.o-bd-details[open] .o-bd-body { animation: o-fade var(--office-dur-swap) var(--ease-soft) both; }
+.o-bd-sec { display: grid; gap: var(--space-2); align-content: start; min-width: 0; }
+.o-bd-sec > * { margin: 0; max-width: none; }
+.o-bd .o-subhead { margin: 0; }
+.o-bd-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
+.o-bd-tile { display: grid; gap: var(--space-1); align-content: start; margin: 0; padding: var(--space-3) var(--space-2); border-radius: var(--office-radius); background: var(--office-row-alt); min-width: 0; }
+.o-bd-num { font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); line-height: var(--leading-display); letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; color: var(--office-text); }
+.o-bd-lab { font-size: var(--text-sm); color: var(--office-muted); overflow-wrap: anywhere; }
+.o-bd-run { display: grid; gap: var(--space-4); min-width: 0; }
+.o-bd-bars { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--space-1); align-items: end; }
+.o-bd-bar { display: grid; justify-items: center; gap: var(--space-1); }
+.o-bd-col { align-self: end; width: 100%; height: calc(var(--office-bd-bar-h) * var(--p) / 100); background: var(--office-teal-2); border-radius: var(--space-1) var(--space-1) 0 0; }
+.o-bd-n { font-size: var(--office-text-xs); color: var(--office-muted); font-variant-numeric: tabular-nums; }
+.o-bd-steps-h { margin: 0 0 var(--space-1); font-size: var(--text-sm); font-weight: 600; color: var(--office-muted); }
+.o-bd-lines li > span:first-child, .o-bd-plan-name { overflow-wrap: anywhere; }
+.o-bd-lines .num, .o-bd-plans .num { white-space: nowrap; }
+.o-bd-lines .o-bd-last { font-weight: 600; }
+.o-bd-lines { margin: 0; }
+.o-bd-table { display: none; }
+.o-bd-stack { display: grid; gap: var(--space-3); }
+.o-bd-deal { display: grid; gap: var(--space-2); align-content: start; padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-row-alt); min-width: 0; }
+.o-bd-deal > * { margin: 0; max-width: none; }
+.o-bd-deal .o-rev-head { margin-bottom: 0; }
+.o-bd-title { margin: 0; font-size: var(--text-base); font-weight: 600; overflow-wrap: anywhere; }
+.o-bd-deal .o-rev-waiting { margin: 0; }
+.o-bd-plans { display: grid; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+.o-bd-plans li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-3); align-items: baseline; }
+.o-bd-plans .num { font-variant-numeric: tabular-nums; font-weight: 600; }
+.o-bd-plan-sub { grid-column: 1 / -1; color: var(--office-muted); }
+.o-bd-quiet { color: var(--office-muted); }
+.o-bd-sum { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-caramel-tint); }   /* warm here, grey for the waiting: on purpose. 10.25 espresso, 5.44 muted */
+.o-bd-sum > * { margin: 0; }
+.o-bd-sumrow { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); font-size: var(--text-sm); }
+.o-bd-sumrow .num { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.o-bd-rule { width: 100%; height: 1px; margin: var(--space-1) 0; border: 0; background: var(--color-hairline); }
+.o-bd-total { display: grid; gap: var(--space-1); }
+.o-bd-total > * { margin: 0; }
+.o-bd-total-lab { font-size: var(--text-sm); font-weight: 600; }
+.o-bd-total-num { font-family: var(--font-display); font-weight: 500; font-size: var(--office-stat); line-height: var(--leading-display); letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; color: var(--office-text); }
+.o-bd-total-sub { font-size: var(--text-sm); color: var(--office-muted); }
+.o-bd-waiting { padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-sunken); }   /* the same material as Possible: no shadow, no big number, no total */
+.o-bd-waiting .o-quiet { gap: var(--space-1); justify-self: start; }
+.o-bd-waiting .o-icon { width: 1rem; height: 1rem; }
+.o-bd-close { display: none; justify-self: start; font-weight: 600; text-decoration: underline; text-underline-offset: 0.25em; cursor: pointer; }
+.js .o-bd-close { display: inline-flex; }
+@media (min-width: 64em) {
+  .o-bd-run { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gutter); align-items: start; }
+  .o-bd-bars { grid-column: 1 / span 7; }
+  .o-bd-steps { grid-column: 8 / span 5; }
+  .o-bd-stack { display: none; }
+  .o-bd-table { display: table; }
+  .o-bd-table tbody::before { height: var(--space-3); }
+  .o-bd-table .o-bd-dealrow th, .o-bd-table .o-bd-dealrow td { background: var(--office-row-alt); font-weight: 600; }
+  .o-bd-table .o-bd-dealrow th { border-radius: var(--office-radius) 0 0 var(--office-radius); }
+  .o-bd-table .o-bd-dealrow td:last-child { border-radius: 0 var(--office-radius) var(--office-radius) 0; }
+  .o-bd-table .o-bd-planrow th, .o-bd-table .o-bd-planrow td { font-weight: 400; }
+  .o-bd-table .o-bd-dealrow .o-cell-sub, .o-bd-table .o-bd-planrow .o-cell-sub { font-weight: 400; }
+  .o-bd-table th, .o-bd-table td { height: auto; min-height: 3.25rem; padding-block: var(--space-2); }
+  .o-bd-table .o-bd-year { font-weight: 600; }
+  .o-bd-sum { padding: var(--space-4); }
+  .o-bd-total { justify-items: end; text-align: right; }
+  .o-bd-waiting { padding: var(--space-4); }
+}
+@media (min-width: 64em) and (max-width: 79.99em) { .o-bd-table th, .o-bd-table td { padding-inline: var(--space-2); } }
+@media (prefers-reduced-motion: reduce) { .o-bd-details[open] .o-bd-body { animation: none; } }
+
+/* ---------- Revenue: dates and "With your assumptions" (docs/features/office-2-design.md section 3) ---------- */
+/* The assumption is a different kind of number from the real one: a caramel tint, no shadow, a smaller figure, and always under the real one. */
+.o-rev-total > .o-rev-assumed { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-caramel-tint); color: var(--office-text); display: grid; gap: var(--space-1); }   /* espresso 10.25, muted 5.44 */
+.o-rev-assumed > * { margin: 0; max-width: none; }
+.o-rev-assumed-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-3); }
+.o-rev-assumed-label { margin: 0; font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; letter-spacing: 0; color: var(--office-text); }
+.o-rev-assumed-num { font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); line-height: var(--leading-display); letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--office-text); }
+.o-rev-assumed .o-sub { font-size: var(--text-sm); color: var(--office-text); }
+.o-rev-assumed .o-rev-assumed-why { color: var(--office-muted); }
+.o-rev-assumed-line { margin: var(--space-2) 0 0; padding: var(--space-1) var(--space-2); border-radius: var(--office-radius); background: var(--office-caramel-tint); }
+.o-list--revenue thead th.o-assumed, .o-list--revenue tbody tr td.o-assumed { background: var(--office-caramel-tint); }   /* in either table, the All row too: it must never read as part of a sum */
+.o-list--assumed th, .o-list--assumed td { padding-inline: var(--space-2); }

@@ -1,0 +1,43 @@
+{% extends "office/base.html" %}
+{% load office_tags %}
+{% block title %}Approvals | Spa 99 Office{% endblock %}
+{% block header_left %}<a class="o-back o-back--icon" href="{% url 'office_dashboard' %}" data-back-home>{% include "office/_icon.html" with name="chevron-left" %}<span class="sr-only">Home</span></a><span class="o-title">Approvals</span>{% endblock %}
+{% block main %}
+{% comment %}Barry's membership approval lists (docs/features/office-2-design.md section 4). Context: see office.views_approvals.approvals_page. A decision is a form POST (works without script); with script it is sent in the background, the row is replaced in place by an Undo strip of the same height (office-approvals.js).{% endcomment %}
+<h1 class="sr-only">Approvals</h1>
+<p class="o-sub o-approvals-note" data-approvals-note>{{ note }}</p>
+<nav class="o-seg o-seg--counts" style="--n: 3" aria-label="Approval lists" data-approval-tabs>{% for t in tabs %}<a class="o-seg-item{% if t.active %} is-active{% endif %}" href="{{ t.url }}"{% if t.active %} aria-current="page"{% endif %} data-tab="{{ t.status }}"><span>{{ t.label }}</span> <span class="o-count" data-tab-count>{{ t.count|num }}</span></a>{% endfor %}</nav>
+<form class="o-filters" method="get" action="{% url 'office_approvals' %}" role="search" aria-label="Find people" data-filter-form data-list="approvals">
+  <input type="hidden" name="status" value="{{ status }}">
+  <div class="o-filters-bar">
+    <div class="o-search"><label for="f-q" class="sr-only">Search name or email</label>{% include "office/_icon.html" with name="search" %}<input id="f-q" type="search" name="q" value="{{ q }}" placeholder="Search name or email" autocomplete="off" enterkeyhint="search" data-search></div>
+    <button type="button" class="btn btn-secondary btn-sm o-filters-open" data-filters-open hidden>{% include "office/_icon.html" with name="sliders" %}Filters</button>
+    <div class="o-filters-slot" data-filters-slot>
+      <div class="o-filters-body" data-filter-body>
+        <div class="o-filter-group"><label class="o-filter-label" for="f-plan">Plan</label>
+          <select id="f-plan" name="plan" class="o-select"><option value="">All plans</option>{% for p in plans %}<option value="{{ p.slug }}"{% if plan == p.slug %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></div>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button>
+  </div>
+  <dialog class="o-sheet" data-filter-sheet aria-labelledby="sheet-h">
+    <div class="o-sheet-head"><h2 id="sheet-h">Filters</h2></div>
+    <div data-sheet-slot></div>
+    <button type="button" class="btn btn-primary btn-block" data-sheet-close>Show results</button>
+  </dialog>
+</form>
+{% if gold_waiting %}<p class="o-approvals-gold"><a class="o-quiet" href="{{ gold_url }}" data-gold-link>Gold applications: {{ gold_waiting|num }} waiting{% include "office/_icon.html" with name="chevron-right" %}</a></p>{% endif %}
+<div class="o-card o-tablecard" data-list-card data-approvals>
+  <table class="o-list o-list--approvals">
+    <caption class="sr-only">{% for t in tabs %}{% if t.active %}{{ t.label }}{% endif %}{% endfor %} memberships</caption>
+    <thead><tr><th scope="col" class="c-name">Name</th><th scope="col" class="c-plan">Plan and price</th><th scope="col" class="c-date">Registered</th>{% if status != "waiting" %}<th scope="col" class="c-decided">{% if status == "approved" %}Approved{% else %}Declined{% endif %}</th>{% endif %}<th scope="col" class="c-action"><span class="sr-only">Decision</span></th></tr></thead>
+    <tbody data-region="list" data-office-list="approvals">{% include "office/_approvals_rows.html" %}</tbody>
+  </table>
+</div>
+<p class="sr-only" role="status" aria-live="polite" data-approvals-live></p>
+{# The Undo strip: the same height as the row it replaces. The script fills the name and the words with textContent; nothing is built from typed text. #}
+<template data-approval-strip>
+  <td class="o-strip-cell" colspan="5"><div class="o-strip"><p class="o-strip-text"><span data-strip-name></span> <span data-strip-verb></span></p>
+    <form method="post" class="o-strip-undo" data-decision="restore">{% csrf_token %}<button type="submit" class="o-quiet o-strip-btn">Undo</button></form></div></td>
+</template>
+{% endblock %}

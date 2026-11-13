@@ -304,6 +304,9 @@ def office_levels(w):
 
     # --- Office level: sees everything, can do nothing ---
     page = w.page()
+    with w.step("Set up: Barry approves the two members (Registered lists approved people only; waiting ones are in Approvals)", page):
+        for member in members:
+            assert dbtool("approve-member", member[0])["result"] == "done"
     with w.step("Office level signs in and sees the dashboard", page):
         sign_in(page, OFFICE, office_user["email"], PASSWORD)
         page.wait_for_selector("[data-office-dashboard]")

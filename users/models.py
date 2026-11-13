@@ -1,6 +1,6 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
-from django.db.models.functions import Lower
+from django.db.models.functions import Lower, Upper
 from simple_history.models import HistoricalRecords
 
 from common.ids import format_public_code, generate_public_code
@@ -45,6 +45,7 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     class Meta:
         ordering = ["email"]
         constraints = [models.UniqueConstraint(Lower("email"), name="users_user_email_ci_unique")]
+        indexes = [models.Index(Upper("email"), name="users_user_email_upper")]  # email__iexact on Postgres is UPPER(col) = UPPER(%s); Lower is covered by the constraint
 
     def __str__(self):
         return self.email

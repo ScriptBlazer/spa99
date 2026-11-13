@@ -146,7 +146,7 @@ def _entry(at, kind, label, detail="", href=""):
     return {"_at": at, "at": _iso(at), "kind": kind, "label": label, "detail": detail, "href": href}
 
 
-def timeline(sessions, user=None, interest=None, applications=(), email="", addresses=(), contacts=()):
+def timeline(sessions, user=None, interest=None, applications=(), email="", addresses=()):
     """Everything that happened to this person, newest first: journey started, email given, journey finished, registered,
     verified, membership choice changed, news opt in or out, Gold steps and emails sent (when recorded)."""
     out, given = [], set()
@@ -204,11 +204,6 @@ def timeline(sessions, user=None, interest=None, applications=(), email="", addr
 
         for at, kind, label, detail, note in outreach_services.timeline_entries(addresses):  # deleted and restored notes, messages, archive
             out.append({**_entry(at, kind, label, detail), "note": note})
-    if contacts:
-        from whatsapp import services as whatsapp
-
-        for at, kind, label, detail, href in whatsapp.timeline_entries(contacts):  # not one line per message: the first, one a day, STOP, failures
-            out.append(_entry(at, kind, label, detail, href))
     out.sort(key=lambda e: e["_at"], reverse=True)
     for e in out:
         del e["_at"]
@@ -232,19 +227,12 @@ def account_profile(user, interest=None):
         "gold": gold_block(sessions, applications),
         "source": {**(source_of(first) if first else {}), "registered_via": interest.source if interest is not None else ""},
         "consent": consent_block([user.email], [*sessions, *pending], user, applications),
-        "timeline": timeline(sessions, user, interest, applications, user.email, addresses=_addresses(user), contacts=_contacts(user=user)),
+        "timeline": timeline(sessions, user, interest, applications, user.email, addresses=_addresses(user)),
     }
 
 
 def _addresses(user):
     return people.resolve(user=user)[1]
-
-
-def _contacts(user=None, email=""):
-    """The WhatsApp chats of this person, for the timeline lines: the rule in common.ownership (an unverified account's address is never used)."""
-    from whatsapp import services as whatsapp
-
-    return list(whatsapp.contacts_for_person(user, people.resolve(user=user, email=email)[1]))
 
 
 def lead_sessions_for(email):
@@ -268,7 +256,7 @@ def lead_profile(email, session_id):
         "gold": gold_block(sessions, applications),
         "source": source_of(first) if first else {},
         "consent": consent_block([email], sessions, None, applications),
-        "timeline": timeline(sessions, applications=applications, email=email, addresses=people.resolve(email=email)[1], contacts=_contacts(email=email)),
+        "timeline": timeline(sessions, applications=applications, email=email, addresses=people.resolve(email=email)[1]),
     }
 
 

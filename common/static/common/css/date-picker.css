@@ -1,0 +1,163 @@
+/* Spa 99 shared calendar (docs/features/calendar.md). Loaded AFTER flatpickr's own stylesheet (common/_date_picker_assets.html) and overrides it; only pages that use the calendar load it.
+   Everything in the calendar reads only --cal-* tokens, which are ALIASES of the tone it sits in (no new colour): the Office (`.office`) or System (`body.system`).
+   Layout numbers that flatpickr fixes (39px days, 307.875px months, a ring on the range) are replaced here: each day is exactly 1/7 of its month with no gap, so a range reads as one unbroken band. */
+
+/* ---------- tone: the tokens ---------- */
+.office {
+  --cal-surface: var(--office-surface);
+  --cal-text: var(--office-text);
+  --cal-muted: var(--office-muted);
+  --cal-hover: var(--office-sunken);
+  --cal-range: var(--office-caramel-tint);       /* espresso 10.25 */
+  --cal-edge: var(--color-espresso);             /* cream 10.95 */
+  --cal-on-edge: var(--color-cream);
+  --cal-line: var(--color-control-line);
+  --cal-hairline: var(--color-hairline);
+  --cal-focus: var(--office-text);
+  --cal-radius: var(--office-radius);
+  --cal-day-radius: var(--radius-sm);
+  --cal-shadow: var(--office-shadow-2);
+  --cal-title: 500 var(--text-base) var(--font-display);
+  --cal-day-size: var(--text-sm);
+  --cal-wd-size: var(--office-text-xs);
+  --cal-day-h: 2.5rem;
+  --cal-arrow: 2rem;
+  --cal-space-1: var(--space-1);
+  --cal-space-2: var(--space-2);
+  --cal-space-3: var(--space-3);
+  --cal-field-h: var(--control-h-compact);
+  --cal-field-size: max(1rem, var(--text-base));
+}
+body.system {
+  --cal-surface: var(--sys-surface);
+  --cal-text: var(--sys-text);
+  --cal-muted: var(--sys-text-2);
+  --cal-hover: var(--sys-subtle);
+  --cal-range: var(--sys-selected);              /* text 13.81 */
+  --cal-edge: var(--sys-accent);                 /* surface 12.38 */
+  --cal-on-edge: var(--sys-surface);
+  --cal-line: var(--sys-control);
+  --cal-hairline: var(--sys-line);
+  --cal-focus: var(--sys-accent);
+  --cal-radius: var(--sys-radius-lg);
+  --cal-day-radius: var(--sys-radius);
+  --cal-shadow: var(--sys-shadow-pop);
+  --cal-title: 600 var(--sys-fs-md) var(--sys-font);
+  --cal-day-size: var(--sys-fs);
+  --cal-wd-size: var(--sys-fs-sm);
+  --cal-day-h: var(--sys-row);
+  --cal-arrow: 1.75rem;
+  --cal-space-1: var(--sys-1);
+  --cal-space-2: var(--sys-2);
+  --cal-space-3: var(--sys-3);
+  --cal-field-h: var(--sys-ctl);
+  --cal-field-size: var(--sys-fs);
+}
+@media (max-width: 63.99em) { .office { --cal-day-h: 2.75rem; --cal-arrow: 2.75rem; } }
+@media (max-width: 47.99em) { body.system { --cal-day-h: 2.75rem; --cal-arrow: 2.75rem; --cal-field-size: 1rem; } }
+
+/* ---------- the field and the no-JavaScript inputs ---------- */
+.dp { display: block; min-width: 0; }
+.dp-native { display: flex; flex-wrap: wrap; align-items: center; gap: var(--cal-space-2); }
+.dp-native[hidden] { display: none; }
+.dp-native-to { color: var(--cal-muted); font-size: var(--cal-day-size); }
+.dp-native input[type="date"], .dp-field {
+  height: var(--cal-field-h); padding: 0 var(--cal-space-3); background: var(--cal-surface); color: var(--cal-text);
+  border: 1px solid var(--cal-line); border-radius: var(--cal-day-radius); font: inherit; font-size: var(--cal-field-size);
+  letter-spacing: inherit; appearance: none; -webkit-appearance: none; max-width: 100%; box-sizing: border-box;
+}
+.dp-field { display: block; width: 16rem; text-overflow: ellipsis; }
+.dp-field::placeholder { color: var(--cal-muted); opacity: 1; }
+.dp-field:focus-visible, .dp-native input[type="date"]:focus-visible { outline: 2px solid var(--cal-focus); outline-offset: 2px; }
+.o-sheet .dp-field { width: 100%; height: 2.75rem; }   /* a finger, not a pointer */
+/* System: as its other inputs (global input rule); one date is 148px, and the field fills a phone row */
+body.system .dp-field { width: 148px; padding: 0 var(--sys-2); border-color: var(--sys-control); }
+@media (max-width: 47.99em) { body.system .dp-field { width: 100%; } }
+
+/* ---------- the panel ---------- */
+.dp-cal.flatpickr-calendar {
+  --cal-gap: calc(var(--cal-space-3) * 2);
+  --cal-month-w: min(calc(7 * var(--cal-day-h)), calc(100vw - 4 * var(--cal-space-3)));
+  --cal-months: 1;
+  --cal-nav-h: calc(var(--cal-arrow) + var(--cal-space-1));
+  box-sizing: border-box; padding: var(--cal-space-3); border: 0; border-radius: var(--cal-radius); background: var(--cal-surface); color: var(--cal-text);
+  box-shadow: var(--cal-shadow); font-family: var(--font-body); font-size: var(--cal-day-size); line-height: 1.2; letter-spacing: normal; text-align: left;
+  width: calc(var(--cal-months) * var(--cal-month-w) + (var(--cal-months) - 1) * var(--cal-gap) + 2 * var(--cal-space-3)) !important;
+}
+.dp-cal.flatpickr-calendar.multiMonth { --cal-months: 2; }
+.dp-cal.flatpickr-calendar::before, .dp-cal.flatpickr-calendar::after { display: none; }   /* no pointer triangle */
+.dp-cal.flatpickr-calendar.open { z-index: 60; }   /* above the sticky headers; below toasts */
+/* the sheet: lies open in place, as wide as the sheet, flat */
+.dp-cal.flatpickr-calendar.inline { position: relative; top: 0; margin-top: var(--cal-space-2); width: 100% !important; padding: 0; box-shadow: none; background: transparent; --cal-months: 1; }
+
+/* The popover fades in and rises 4px (transform and opacity only, no exit). The sheet's calendar is not a popover and does not move. */
+@keyframes dp-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.dp-cal.flatpickr-calendar.open:not(.inline) { animation: dp-in 240ms var(--ease-soft); }
+@media (prefers-reduced-motion: reduce) { .dp-cal.flatpickr-calendar.open { animation: none; } }
+
+/* ---------- month title and arrows ---------- */
+.dp-cal .flatpickr-months { position: relative; align-items: center; gap: var(--cal-gap); min-height: var(--cal-nav-h); }
+.dp-cal .flatpickr-months .flatpickr-month { flex: 1 1 0; min-width: 0; height: var(--cal-nav-h); display: flex; align-items: center; justify-content: center; overflow: visible; color: var(--cal-text); fill: var(--cal-text); }
+.dp-cal .flatpickr-current-month { position: static; display: flex; align-items: center; justify-content: center; gap: 0.5ch; width: 100%; height: auto; left: auto; padding: 0; font: var(--cal-title); color: var(--cal-text); transform: none; }
+.dp-cal .flatpickr-current-month span.cur-month { margin: 0; padding: 0; font: inherit; color: inherit; }
+.dp-cal .flatpickr-current-month span.cur-month:hover, .dp-cal .numInputWrapper:hover { background: none; }
+.dp-cal .flatpickr-current-month .numInputWrapper { width: 4.5ch; }
+.dp-cal .flatpickr-current-month input.cur-year { width: 100%; padding: 0; font: inherit; color: inherit; background: none; pointer-events: none; cursor: default; }   /* the year is plain text */
+.dp-cal .numInputWrapper span { display: none; }
+.dp-cal .flatpickr-months .flatpickr-prev-month, .dp-cal .flatpickr-months .flatpickr-next-month {
+  display: flex; align-items: center; justify-content: center; top: calc((var(--cal-nav-h) - var(--cal-arrow)) / 2); width: var(--cal-arrow); height: var(--cal-arrow); padding: 0;
+  border-radius: var(--cal-day-radius); color: var(--cal-text); fill: none;
+}
+.dp-cal .flatpickr-months .flatpickr-prev-month.flatpickr-disabled, .dp-cal .flatpickr-months .flatpickr-next-month.flatpickr-disabled { display: none; }   /* at a bound: gone, no empty box */
+.dp-cal .flatpickr-months .flatpickr-prev-month svg, .dp-cal .flatpickr-months .flatpickr-next-month svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.dp-cal .flatpickr-months .flatpickr-prev-month svg path, .dp-cal .flatpickr-months .flatpickr-next-month svg path { fill: none; stroke: currentColor; transition: none; }
+.dp-cal .flatpickr-months .flatpickr-prev-month:hover svg, .dp-cal .flatpickr-months .flatpickr-next-month:hover svg { fill: none; }
+.dp-cal .flatpickr-months .flatpickr-prev-month:hover, .dp-cal .flatpickr-months .flatpickr-next-month:hover { color: var(--cal-text); background: none; }
+@media (hover: hover) and (pointer: fine) {
+  .dp-cal .flatpickr-months .flatpickr-prev-month:hover, .dp-cal .flatpickr-months .flatpickr-next-month:hover { background: var(--cal-hover); }
+}
+.dp-cal .flatpickr-months .flatpickr-prev-month:focus-visible, .dp-cal .flatpickr-months .flatpickr-next-month:focus-visible { outline: 2px solid var(--cal-focus); outline-offset: -2px; }
+
+/* ---------- weekdays and days ---------- */
+.dp-cal .flatpickr-innerContainer, .dp-cal .flatpickr-rContainer { display: block; width: 100%; overflow: visible; }
+.dp-cal .flatpickr-weekdays { height: auto; gap: var(--cal-gap); margin: 0 0 var(--cal-space-1); overflow: visible; }
+.dp-cal .flatpickr-weekdays .flatpickr-weekdaycontainer { flex: 1 1 0; min-width: 0; }
+.dp-cal span.flatpickr-weekday { font: 500 var(--cal-wd-size)/2rem var(--font-body); text-transform: none; color: var(--cal-muted); background: none; }
+.dp-cal .flatpickr-days { display: flex; gap: var(--cal-gap); width: 100% !important; overflow: visible; }
+.dp-cal .dayContainer { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); flex: 1 1 0; width: auto; min-width: 0; max-width: none; padding: 0; box-shadow: none; }
+.dp-cal .dayContainer + .dayContainer { box-shadow: none; }
+
+.dp-cal .flatpickr-day {
+  --d-bg: transparent; --d-fg: var(--cal-text);
+  box-sizing: border-box; width: auto; max-width: none; height: var(--cal-day-h); margin: 0; padding: 0; border: 0 !important; border-radius: 0;
+  background: var(--d-bg) !important; color: var(--d-fg) !important; box-shadow: none !important;
+  font: 400 var(--cal-day-size)/var(--cal-day-h) var(--font-body); font-variant-numeric: tabular-nums; text-align: center; cursor: pointer; flex-basis: auto;
+}
+.dp-cal .rangeMode .flatpickr-day { margin: 0; }
+.dp-cal .flatpickr-day.prevMonthDay, .dp-cal .flatpickr-day.nextMonthDay { visibility: hidden; }   /* other months' days */
+.dp-cal .flatpickr-day.inRange { --d-bg: var(--cal-range); border-radius: 0; }
+.dp-cal .flatpickr-day.selected, .dp-cal .flatpickr-day.startRange, .dp-cal .flatpickr-day.endRange { --d-bg: var(--cal-edge); --d-fg: var(--cal-on-edge); font-weight: 600; border-radius: var(--cal-day-radius); }
+.dp-cal .flatpickr-day.selected.startRange, .dp-cal .flatpickr-day.startRange { border-radius: var(--cal-day-radius) 0 0 var(--cal-day-radius); }
+.dp-cal .flatpickr-day.selected.endRange, .dp-cal .flatpickr-day.endRange { border-radius: 0 var(--cal-day-radius) var(--cal-day-radius) 0; }
+.dp-cal .flatpickr-day.startRange.endRange { border-radius: var(--cal-day-radius); }
+.dp-cal .flatpickr-day.today:not(.selected):not(.startRange):not(.endRange) { box-shadow: inset 0 0 0 1px var(--cal-line) !important; border-radius: var(--cal-day-radius); font-weight: 600; }
+.dp-cal .flatpickr-day.today.inRange { border-radius: 0; }
+.dp-cal .flatpickr-day.flatpickr-disabled, .dp-cal .flatpickr-day.notAllowed { color: var(--cal-muted) !important; opacity: 0.4; cursor: default; background: transparent !important; }
+/* hover: a pointer only, instant, never on the chosen days or the days that cannot be chosen */
+@media (hover: hover) and (pointer: fine) {
+  .dp-cal .flatpickr-day:not(.selected):not(.startRange):not(.endRange):not(.inRange):not(.flatpickr-disabled):not(.notAllowed):not(.prevMonthDay):not(.nextMonthDay):hover { --d-bg: var(--cal-hover); }
+}
+.dp-cal .flatpickr-day.selected:focus-visible, .dp-cal .flatpickr-day.startRange:focus-visible, .dp-cal .flatpickr-day.endRange:focus-visible { outline-color: var(--cal-on-edge); outline-offset: -3px; }
+.dp-cal .flatpickr-day:focus { outline: none; }
+.dp-cal .flatpickr-day:focus-visible { outline: 2px solid var(--cal-focus); outline-offset: -2px; }
+
+/* ---------- the footer: hint, Clear, note ---------- */
+.dp-foot { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 var(--cal-space-3); margin-top: var(--cal-space-2); padding-top: var(--cal-space-2); border-top: 1px solid var(--cal-hairline); color: var(--cal-muted); font-size: var(--cal-day-size); }
+.dp-hint, .dp-note { margin: 0; color: var(--cal-muted); }
+.dp-hint { grid-column: 1; min-height: 1.2em; }
+.dp-note { grid-column: 1 / -1; margin-top: var(--cal-space-1); }
+.dp-clear { grid-column: 2; grid-row: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 2rem; padding: 0 var(--cal-space-2); border: 0; border-radius: var(--cal-day-radius); background: none; color: var(--cal-text); font: 500 var(--cal-day-size)/1 var(--font-body); cursor: pointer; }
+.dp-clear[hidden] { display: none; }
+@media (max-width: 63.99em) { .dp-clear { min-height: 2.75rem; } }
+@media (hover: hover) and (pointer: fine) { .dp-clear:hover { text-decoration: underline; text-underline-offset: 0.25em; } }
+.dp-clear:focus-visible { outline: 2px solid var(--cal-focus); outline-offset: 0; text-decoration: underline; text-underline-offset: 0.25em; }

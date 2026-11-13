@@ -23,6 +23,8 @@ from users.models import InterestRegistration
 from plans.models import Plan
 
 User = get_user_model()
+from common.models import RateHit  # noqa: E402
+
 LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "emails-tests"}}
 UUID = "00000000-0000-0000-0000-000000000000"
 PATHS = ["/emails/", "/emails/suppressions/", "/emails/bounces/", "/emails/automatic/", "/emails/automatic/verify/", "/emails/mailings/", "/emails/mailings/new/",
@@ -110,6 +112,15 @@ class AutomaticEmailTests(TestCase):
         bad = self.client.post("/emails/automatic/verify/preview/", {"subject": "Hi", "body": "{nope}"}).json()
         self.assertEqual((bad["ok"], bad["html"]), (False, ""))
         self.assertIn("body", bad["errors"])
+
+    @override_settings(SITE_URL="https://spa99.example")
+    def test_preview_reads_the_fonts_from_the_system_host_so_the_frame_needs_no_cors_but_a_sent_email_keeps_the_site_address(self):
+        html = self.client.post("/emails/automatic/verify/preview/", {"subject": "Hi", "body": "Hello {first_name}\n\n{button}"}).json()["html"]
+        self.assertNotIn("https://spa99.example/static/common/fonts/", html)
+        self.assertRegex(html, r"url\('/static/common/fonts/signika-latin[^']*\.woff2'\)")
+        from notifications.services import preview_email
+
+        self.assertIn("https://spa99.example/static/common/fonts/signika-latin.woff2", preview_email("verify", "Hi", "Hello {first_name}\n\n{button}")["html"])  # the email itself is untouched
 
     @override_settings(CACHES=LOCMEM)
     def test_test_send_goes_only_to_the_developer_is_logged_and_rate_limited(self):
@@ -209,6 +220,7 @@ class MailingViewTests(TestCase):
         self.assertEqual((len(mail.outbox), Mailing.objects.get().status, MailingRecipient.objects.count()), (0, "draft", 0))
         self.assertEqual(self.client.post(url, {"confirm": "yes", "expected_count": "3"}, HTTP_ACCEPT="application/json").status_code, 200)
         self.assertEqual(len(mail.outbox), 3)
+        RateHit.objects.all().delete()  # this test makes 7 posts; the 6-per-10-minutes limit (now really enforced in tests) is not what it checks
         again = self.client.post(url, {"confirm": "yes", "expected_count": "3"}, HTTP_ACCEPT="application/json")  # a double click
         self.assertEqual(again.status_code, 400)
         self.assertEqual(len(mail.outbox), 3)
@@ -261,7 +273,7 @@ class GroupsAndListsViewTests(TestCase):
     def test_the_groups_tab_shows_automatic_groups_with_counts_and_the_tabs_are_in_order(self):
         page = self.client.get("/emails/groups/")
         self.assertEqual([g["key"] for g in page.context["automatic_groups"]],
-                         ["everyone", "tier", "gold", "opted_in", "unconfirmed", "between", "applicants", "leads"])
+                         ["everyone", "tier", "gold", "opted_in", "unconfirmed", "between", "applicants", "leads_no_number", "leads"])
         self.assertEqual(next(g for g in page.context["automatic_groups"] if g["key"] == "everyone")["count"], 1)
         html = page.content.decode()
         order = [html.index(f'data-tab="{t}"') for t in ("automatic", "mailings", "groups", "templates", "suppressions")]

@@ -287,9 +287,9 @@ class EmailButtonTests(Base):
         events = application.events.filter(action=ApplicationEvent.RESPONDED)
         self.assertEqual((events.count(), events.first().meta), (1, {"email": True}))
 
-    def test_respond_opens_whatsapp_with_a_mobile_else_the_gold_page_with_the_email_pop_up(self):
+    def test_respond_opens_wa_me_with_a_mobile_else_the_gold_page_with_the_email_pop_up(self):
         with_mobile = self.application(email="mob@example.com", mobile="+447400123456")
-        self.assertEqual(call(self.approver, "get", f"/gold/{with_mobile.pk}/respond/")["Location"], f"/gold/{with_mobile.pk}/whatsapp/")
+        self.assertEqual(call(self.approver, "get", f"/gold/{with_mobile.pk}/respond/")["Location"], "https://wa.me/447400123456")
         none = self.application(email="nomob@example.com", mobile="")
         self.assertEqual(call(self.approver, "get", f"/gold/{none.pk}/?do=respond")["Location"], f"/gold/{none.pk}/?do=email")
         self.assertContains(call(self.approver, "get", f"/gold/{none.pk}/?do=email"), 'data-dialog="email" data-open')

@@ -3,7 +3,7 @@ import csv
 from django.contrib import admin
 from django.http import HttpResponse
 
-from .models import LoginEvent
+from .models import LoginEvent, RateHit
 
 _FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
@@ -53,4 +53,18 @@ class LoginEventAdmin(ExportCsvMixin, admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(RateHit)
+class RateHitAdmin(admin.ModelAdmin):
+    """Read-only view of the rate-limit counters (short-lived; housekeeping deletes expired rows)."""
+
+    list_display = ("key", "count", "expires_at")
+    search_fields = ("key",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False

@@ -7,13 +7,13 @@
 {# Open and Done: two options do not need a filter sheet, so the same control sits in the bar on phone and desktop. #}
 <form class="o-filters o-filters--outreach" method="get" action="{% url 'office_outreach' %}" data-filter-form data-full data-list="outreach" aria-label="Show open or done">
   <div class="o-filters-bar">
-    <fieldset class="o-seg" style="--n: 3; --i: {% if state == 'registered' %}1{% elif state == 'done' %}2{% else %}0{% endif %}" data-default="open">
+    <fieldset class="o-seg" style="--n: 2; --i: {% if state == 'done' %}1{% else %}0{% endif %}" data-default="open">
       <legend class="sr-only">Show</legend>
       <span class="o-seg-thumb" aria-hidden="true"></span>
       <label class="o-seg-item"><input type="radio" name="state" value="open"{% if state == "open" %} checked{% endif %}><span>Open <span class="o-seg-count" data-region="outreach-open">{{ open_count|num }}</span></span></label>
-      <label class="o-seg-item"><input type="radio" name="state" value="registered"{% if state == "registered" %} checked{% endif %}><span>Registered <span class="o-seg-count" data-region="outreach-registered">{{ registered_count|num }}</span></span></label>
       <label class="o-seg-item"><input type="radio" name="state" value="done"{% if state == "done" %} checked{% endif %}><span>Done <span class="o-seg-count" data-region="outreach-done">{{ done_count|num }}</span></span></label>
     </fieldset>
+    <label class="o-chip{% if emailed %} is-on{% endif %}" data-emailed-filter><input type="checkbox" name="emailed" value="1"{% if emailed %} checked{% endif %}><span>Emailed</span></label>
     <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button>
   </div>
   {# One line under the tabs: how many on this tab, and (phone only: the heads sort from 64em) the quiet Sort button with its small sheet. #}
@@ -28,4 +28,24 @@
     <tbody data-region="list" data-office-list="outreach">{% include "office/_outreach_rows.html" %}</tbody>
   </table>
 </div>
+{% if can_edit %}
+{# Archive from the list: the shared archive dialog, kept for its optional reason (quick chips as on the lead page). The script points the form at the row's own address (office-tools.js). #}
+<dialog class="fb-modal o-dialog" data-dialog="archive" aria-labelledby="od-archive-h">
+  <form method="post" action="" class="fb-modal-wrap" data-problems data-outreach-archive>{% csrf_token %}
+    <h2 class="fb-modal-title" id="od-archive-h">Archive <span data-archive-who>him</span>?</h2>
+    <p class="fb-modal-body">He leaves the list and Leads, and nothing is sent to him. You can undo it straight after.</p>
+    <div class="o-chips" role="group" aria-label="Quick reasons">
+      <button type="button" class="o-chip" data-reason-chip aria-pressed="false">Test</button>
+      <button type="button" class="o-chip" data-reason-chip aria-pressed="false">Duplicate</button>
+      <button type="button" class="o-chip" data-reason-chip aria-pressed="false">Not a fit</button>
+    </div>
+    <label class="fb-modal-field"><span>Reason (optional)</span>
+      <input class="fb-modal-input" type="text" name="reason" maxlength="300" autocomplete="off" data-label="Reason" data-reason-input></label>
+    <div class="fb-modal-actions">
+      <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
+      <button type="submit" class="fb-btn fb-btn--primary" data-working-text="Archiving">Archive</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
 {% endblock %}

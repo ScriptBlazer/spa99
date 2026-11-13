@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Upper
 from django.utils import timezone
 from django.db.models import Q
 from simple_history.models import HistoricalRecords
@@ -33,6 +34,8 @@ class NotificationTemplate(BaseModel):
     sender = models.CharField(
         max_length=10, blank=True, default="", db_default="", choices=emaildefaults.SENDERS,
         help_text="Site sender (hello@) or the person sender set in System > Emails. Blank = this email's default.")
+    sender_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                    help_text="The staff member this email goes out as (a @spa99.uk address). Empty = hello@ (or the old person sender, until the script has moved it). If he has no such address when it sends, hello@ is used.")
     heading = models.CharField(max_length=emaildefaults.HEADING_MAX, blank=True, default="", db_default="",
                                help_text="The big line at the top. Blank = the subject.")
     button_text = models.CharField(max_length=emaildefaults.BUTTON_TEXT_MAX, blank=True, default="", db_default="",
@@ -71,7 +74,7 @@ class EmailLog(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
-        indexes = [models.Index(fields=["-created_at"])]
+        indexes = [models.Index(fields=["-created_at"]), models.Index(Upper("subject_email"), name="emaillog_subj_email_upper")]
 
     def __str__(self):
         return f"{self.template} to {self.to} ({self.status})"

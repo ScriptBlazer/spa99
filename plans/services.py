@@ -121,6 +121,14 @@ def annual_fee_text(plan, vat_rate=None, inc=False):
     return f"£{trim_price(amount)} a year"
 
 
+def annual_fee_vat_text(plan):
+    """The Gold Card price as it reads everywhere (2026-11-05): '£199 + VAT a year' (the fee is ex VAT, so VAT is said, not added), or 'By application' while no fee is set. From the plan's own
+    annual fee, never typed: changing the fee in System > Plans changes this."""
+    if plan.annual_fee is None:
+        return "By application"
+    return f"£{trim_price(plan.annual_fee)} + VAT a year"
+
+
 GOLD_STAR = "{gold_star}"
 
 
@@ -191,6 +199,7 @@ def plan_display(plan, vat_rate=None, ranges=None):
         "annual_fee": plan.annual_fee,
         "annual_fee_text": annual_fee_text(plan, vat_rate),
         "annual_fee_inc_text": annual_fee_text(plan, vat_rate, inc=True),
+        "annual_fee_vat_text": annual_fee_vat_text(plan),
         "short_description": plan.short_description.replace(GOLD_STAR, gold_star(plan.annual_fee) if plan.slug == "gold" else ""),
         "highlight": plan.highlight,
         "interest_allowed": plan.interest_allowed,

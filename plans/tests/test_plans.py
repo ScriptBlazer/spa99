@@ -117,11 +117,11 @@ class MembershipsPageDataTests(TestCase):
             table = pages.compare_table(pages.purchasable_plans())
             return [next(c for c in next(r for r in table if r["label"] == label)["cells"] if c["slug"] == "gold")["text"] for label in ("Price, ex VAT", "Price, inc VAT")]
 
-        self.assertEqual(gold_cells(), ["£199 a year", "£238.80 a year"])  # default £199 ex VAT (2026-10-26)
+        self.assertEqual(gold_cells(), ["£199 + VAT a year", "£238.80 a year"])  # default £199 ex VAT (2026-10-26); the ex VAT cell says + VAT (2026-11-05)
         Plan.objects.filter(slug="gold").update(annual_fee=None)
         self.assertEqual(gold_cells(), ["By application", "By application"])  # no "TBC" text
         Plan.objects.filter(slug="gold").update(annual_fee=Decimal("150.00"))
-        self.assertEqual(gold_cells(), ["£150 a year", "£180 a year"])
+        self.assertEqual(gold_cells(), ["£150 + VAT a year", "£180 a year"])
         Plan.objects.filter(slug="gold").update(visible=False)  # a hidden Gold Card leaves the table
         self.assertEqual(len(pages.compare_table(pages.purchasable_plans())[0]["cells"]), 4)
 

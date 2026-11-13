@@ -10,6 +10,7 @@ an event loop, where Django refuses database calls, so the run calls this in a c
   gold EMAIL                {"status" (newest), "statuses", "waiting", "has_user", "count", "invites", "invites_used"}
   gold-total                number of Gold applications of any email
   age-gold EMAIL            make this email's applications a day old (so a re-apply is not inside the two-minute double-click window)
+  approve-member EMAIL      Barry's membership approval: moves this person from Waiting to Approved (so Registered lists him)
   events KIND               System audit events of one kind (for example unlock_failed)
   waiting                   Gold applications waiting for a decision
   price SLUG                plan price ex VAT
@@ -87,6 +88,12 @@ def main(argv):
 
         n = GoldApplication.objects.filter(email__iexact=args[0]).update(created_at=timezone.now() - timedelta(days=1))
         return {"aged": n}
+    if cmd == "approve-member":
+        from office import approvals
+
+        user = User.objects.get(email__iexact=args[0])
+        result, _row = approvals.decide(user.pk, approvals.APPROVED, None)
+        return {"result": result}
     if cmd == "events":
         return {"count": SystemEvent.objects.filter(kind=args[0]).count()}
     if cmd == "waiting":

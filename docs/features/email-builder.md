@@ -19,7 +19,7 @@ Parts can be added, removed and moved up or down:
 
 - **Limits:** at most 30 parts per email, and at least one part that isn't a divider.
 - **Headings:** the email's top heading is the subject without "[Test]", as now. Heading parts are section headings inside the email.
-- **Footer:** the existing footer stays. News emails get the notice and unsubscribe link; Service emails get the "why you get this" line.
+- **Footer:** the existing footer stays. News emails get the notice and unsubscribe link; Service emails get the "why you get this" line. Each group send chooses the shared footer with or without its contact line (`Mailing.footer_mode`, Moishe 2026-11-05); a starter can set the default (Barry's invitation: without).
 - **Preview:** the live preview, Desktop/Phone switch and "Send me a test" keep working.
 - **Plain-text version:** built from the same parts.
 

@@ -1,0 +1,133 @@
+{% extends "office/base.html" %}
+{% load i18n office_tags %}
+{% block title %}Revenue | Spa 99 Office{% endblock %}
+{% block head_extra %}{% if calendar.first or range_error %}{% include "common/_date_picker_assets.html" %}{% endif %}{% endblock %}
+{% block header_left %}<a class="o-back o-back--icon" href="{% url 'office_dashboard' %}" data-back-home>{% include "office/_icon.html" with name="chevron-left" %}<span class="sr-only">Home</span></a><span class="o-title">Revenue</span>{% endblock %}
+{% block main %}
+{% comment %}Revenue (Barry's view). An estimate, never money received (docs/features/office-2-design.md section 3). Context: see office.views_approvals.revenue_page. Whole pounds are for display only (`pounds`): the figures are exact pence, and no rounded figure is ever added up.
+Two states. With no dates the page is the full estimate and never mentions a date (the assumed start date appears only in the calendar's note). With dates every figure answers one question, what is due in those dates: the year and month columns are replaced by one "In these dates" figure, never averaged.
+"With your assumptions" (`assumed_shown`) is a second figure in a different material, shown only when an assumption is set and the calendar is stored. It never changes the real figure.
+The Possible panel (people still waiting) is never added to the approved figures and is a different material (sunken, no shadow, no big number) so it cannot be read as part of the money.
+The four-figure grid (_revenue_grid.html) and the range grid (_revenue_range_grid.html) are the page's two grids. The by-plan cards are the phone's; the one table below replaces them on a computer.
+The full breakdown (_revenue_breakdown.html) is the last card, closed until opened: the sum read top to bottom, ending on the full 12-month figure, with the waiting people after it. Its figures never change with dates or assumptions.{% endcomment %}
+<h1 class="sr-only">Revenue</h1>
+{% if calendar.first or range_error %}
+{% with from_day=calendar.first|site_date to_day=calendar.last|site_date %}
+{% if calendar.first %}{% if calendar.assumed %}{% blocktranslate asvar cal_note %}Money is due from {{ from_day }} to {{ to_day }}. Based on an assumed start date.{% endblocktranslate %}{% else %}{% blocktranslate asvar cal_note %}Money is due from {{ from_day }} to {{ to_day }}.{% endblocktranslate %}{% endif %}{% endif %}
+<form class="o-filters" method="get" action="{% url 'office_revenue' %}" data-filter-form aria-label="Choose dates">
+  <div class="o-filters-bar">
+    <button type="button" class="btn btn-secondary btn-sm o-filters-open" data-filters-open hidden>{% include "office/_icon.html" with name="sliders" %}Filters</button>
+    <div class="o-filters-slot" data-filters-slot>
+      <div class="o-filters-body" data-filter-body>
+        <div class="o-filter-group">{% include "common/_date_picker.html" with mode="range" id="rev-dates" label="Money due between" label_class="o-filter-label" empty="Choose dates" from=date_range.shown_from to=date_range.shown_to min=calendar.first max=calendar.last format=date_format note=cal_note sheet=True %}</div>
+      </div>
+    </div>
+  </div>
+  {% if date_range.active %}<p class="o-totalline" data-revenue-dates><span data-revenue-range-line>Money due {{ date_range.shown_from|site_date }} to {{ date_range.shown_to|site_date }}</span><a class="o-quiet" href="{% url 'office_revenue' %}" data-clear>Clear dates</a></p>
+  {% elif range_error %}<p class="o-field-error" role="alert" data-revenue-range-error>{{ range_error }} Showing the full estimate instead.</p>{% endif %}
+  <dialog class="o-sheet" data-filter-sheet aria-labelledby="sheet-h">
+    <div class="o-sheet-head"><h2 id="sheet-h">Filters</h2></div>
+    <div data-sheet-slot></div>
+    <button type="submit" class="btn btn-primary btn-block" data-sheet-close>Show results</button>
+  </dialog>
+</form>
+{% endwith %}
+{% endif %}
+{% with a=revenue.approved w=revenue.waiting active=date_range.active %}
+{% with due=range_figures.approved due_w=range_figures.waiting %}
+<div class="o-revenue" data-revenue>
+  <section class="o-card o-rev-total" data-revenue-total aria-labelledby="rev-total-h">
+    <h2 id="rev-total-h" class="o-rev-label">{% if active %}{% if assumed_shown %}Real figure, due from approved people{% else %}Due from approved people{% endif %}{% elif assumed_shown %}Real figure, from approved people{% else %}Estimate from approved people{% endif %}</h2>
+    {% if active %}<p class="o-stat-lg" data-revenue-year data-revenue-range>{{ due.total_ex|pounds }}</p>
+    <p class="o-sub">{{ date_range.shown_from|site_date }} to {{ date_range.shown_to|site_date }}, excluding VAT. {% if assumed_shown %}Every approved person paying. {% endif %}Not money received.</p>
+    {% else %}<p class="o-stat-lg" data-revenue-year>{{ a.year_ex|pounds }}</p>
+    <p class="o-sub">A year, excluding VAT. {% if assumed_shown %}Every approved person paying. {% endif %}Not money received.</p>{% endif %}
+    {% if empty %}<p class="o-sub" data-revenue-empty>Nothing approved yet, so there is nothing to estimate.</p>
+    {% elif active and not due.payments %}<p class="o-sub" data-revenue-nothing-due>Nothing falls due from approved people in these dates.</p>{% endif %}
+    {% if not active %}{% include "office/_revenue_grid.html" with b=a %}{% elif due.payments %}{% include "office/_revenue_range_grid.html" with b=due %}
+    <p class="o-sub" data-revenue-payments>{{ due.payments|num }} payment{{ due.payments|pluralize }} due.</p>{% endif %}
+    {% if assumed_shown and not active or assumed_shown and due.payments %}
+    <div class="o-rev-assumed" data-revenue-assumed>
+      <div class="o-rev-assumed-row"><h3 class="o-rev-assumed-label">With your assumptions</h3><p class="o-rev-assumed-num">{% if active %}{{ due.assumed_total_ex|pounds }}{% else %}{{ assumptions.figures.approved.assumed_total_ex|pounds }}{% endif %}</p></div>
+      <p class="o-sub">Excluding VAT. Including VAT: {% if active %}{{ due.assumed_total_inc|pounds }}{% else %}{{ assumptions.figures.approved.assumed_total_inc|pounds }}{% endif %}.{% if active %} Due {{ date_range.shown_from|site_date }} to {{ date_range.shown_to|site_date }}.{% endif %}</p>
+      <p class="o-sub o-rev-assumed-why">{% if assumptions.paying_percent != 100 and assumptions.dropoff_percent != 0 %}If {{ assumptions.paying_percent|floatformat:"-2" }}% of them pay and {{ assumptions.dropoff_percent|floatformat:"-2" }}% leave each month.{% elif assumptions.paying_percent != 100 %}If {{ assumptions.paying_percent|floatformat:"-2" }}% of them pay.{% else %}If {{ assumptions.dropoff_percent|floatformat:"-2" }}% leave each month.{% endif %} Your own guess. The real figure does not change.</p>
+    </div>
+    {% endif %}
+    {% if active and due.payments %}{% include "office/_revenue_basis.html" %}{% endif %}
+  </section>
+
+  {% if not active or due.payments %}
+  <div class="o-rev-plans" data-revenue-plans>
+    {% if active %}
+    {% for r in due.by_plan %}{% if r.payments %}
+    <section class="o-card" data-revenue-plan="{{ r.slug }}" aria-labelledby="rev-plan-{{ r.slug }}">
+      <header class="o-rev-head"><h2 id="rev-plan-{{ r.slug }}" class="o-h3">{{ r.name }}</h2><span class="o-rev-count">{{ r.payments|num }} payment{{ r.payments|pluralize }} due</span></header>
+      {% include "office/_revenue_range_grid.html" with b=r %}
+      {% if r.kind == "gold" %}<p class="o-sub o-rev-foot">{{ revenue.gold_fee_pence|pounds }} + VAT, one payment on the start date</p>{% endif %}
+      {% if assumed_shown %}<ul class="o-rev-waiting o-rev-assumed-line"><li data-revenue-assumed-row><span>With your assumptions, excl. VAT</span><span class="num">{{ r.assumed_total_ex|pounds }}</span></li></ul>{% endif %}
+    </section>
+    {% endif %}{% endfor %}
+    {% else %}
+    {% for r in a.by_plan %}{% if r.count %}
+    <section class="o-card" data-revenue-plan="{{ r.slug }}" aria-labelledby="rev-plan-{{ r.slug }}">
+      <header class="o-rev-head"><h2 id="rev-plan-{{ r.slug }}" class="o-h3">{{ r.name }}</h2><span class="o-rev-count">{{ r.count|num }} member{{ r.count|pluralize }}</span></header>
+      {% include "office/_revenue_grid.html" with b=r %}
+      <p class="o-sub o-rev-foot">{% if r.kind == "gold" %}{{ revenue.gold_fee_pence|pounds }} + VAT a year for each member{% else %}Average {{ r.avg_year_ex|pounds }} a year for each member{% endif %}</p>
+      {% if assumed_shown %}<ul class="o-rev-waiting o-rev-assumed-line"><li data-revenue-assumed-row><span>With your assumptions, a year, excl. VAT</span><span class="num">{{ r.assumed_year_ex|pounds }}</span></li></ul>{% endif %}
+    </section>
+    {% endif %}{% endfor %}
+    {% endif %}
+  </div>
+
+  {# The computer's table: one row a plan, then the whole. It replaces the plan cards above 64em and is never shown on a phone. #}
+  <section class="o-card o-rev-table" data-revenue-table aria-labelledby="rev-table-h">
+    {% if active %}
+    <h2 id="rev-table-h" class="o-h3">By plan and tier, in these dates</h2>
+    <table class="o-list o-list--revenue">
+      <thead><tr><th scope="col">Plan</th><th scope="col" class="num">Payments due</th><th scope="col" class="num">Due, excl. VAT</th><th scope="col" class="num">Due, incl. VAT</th>{% if assumed_shown %}<th scope="col" class="num o-assumed">With your assumptions, excl. VAT</th><th scope="col" class="num o-assumed">With your assumptions, incl. VAT</th>{% endif %}</tr></thead>
+      <tbody>
+        {% for r in due.by_plan %}{% if r.payments %}<tr data-revenue-row="{{ r.slug }}"><th scope="row">{{ r.name }}{% if r.kind == "gold" %}<span class="o-cell-sub">{{ revenue.gold_fee_pence|pounds }} + VAT, one payment on the start date</span>{% endif %}</th><td class="num">{{ r.payments|num }}</td><td class="num o-ex">{{ r.total_ex|pounds }}</td><td class="num">{{ r.total_inc|pounds }}</td>{% if assumed_shown %}<td class="num o-assumed">{{ r.assumed_total_ex|pounds }}</td><td class="num o-assumed">{{ r.assumed_total_inc|pounds }}</td>{% endif %}</tr>{% endif %}{% endfor %}
+        <tr class="o-rev-all" data-revenue-row="all"><th scope="row">All</th><td class="num">{{ due.payments|num }}</td><td class="num o-ex">{{ due.total_ex|pounds }}</td><td class="num">{{ due.total_inc|pounds }}</td>{% if assumed_shown %}<td class="num o-assumed">{{ due.assumed_total_ex|pounds }}</td><td class="num o-assumed">{{ due.assumed_total_inc|pounds }}</td>{% endif %}</tr>
+      </tbody>
+    </table>
+    {% else %}
+    <h2 id="rev-table-h" class="o-h3">By plan and tier</h2>
+    <table class="o-list o-list--revenue{% if assumed_shown %} o-list--assumed{% endif %}">
+      <thead><tr><th scope="col">Plan</th><th scope="col" class="num">Members</th><th scope="col" class="num">Year, excl. VAT</th>{% if assumed_shown %}<th scope="col" class="num o-assumed">With your assumptions, year, excl. VAT</th>{% endif %}<th scope="col" class="num">Month, excl. VAT</th><th scope="col" class="num">Year, incl. VAT</th><th scope="col" class="num">Month, incl. VAT</th><th scope="col" class="num">Average a member a year</th></tr></thead>
+      <tbody>
+        {% for r in a.by_plan %}{% if r.count %}<tr data-revenue-row="{{ r.slug }}"><th scope="row">{{ r.name }}{% if r.kind == "gold" %}<span class="o-cell-sub">{{ revenue.gold_fee_pence|pounds }} + VAT</span>{% endif %}</th><td class="num">{{ r.count|num }}</td><td class="num o-ex">{{ r.year_ex|pounds }}</td>{% if assumed_shown %}<td class="num o-assumed">{{ r.assumed_year_ex|pounds }}</td>{% endif %}<td class="num o-ex">{{ r.month_ex|pounds }}</td><td class="num">{{ r.year_inc|pounds }}</td><td class="num">{{ r.month_inc|pounds }}</td><td class="num">{{ r.avg_year_ex|pounds }}</td></tr>{% endif %}{% endfor %}
+        <tr class="o-rev-all" data-revenue-row="all"><th scope="row">All</th><td class="num">{{ a.count|num }}</td><td class="num o-ex">{{ a.year_ex|pounds }}</td>{% if assumed_shown %}<td class="num o-assumed">{{ assumptions.figures.approved.assumed_total_ex|pounds }}</td>{% endif %}<td class="num o-ex">{{ a.month_ex|pounds }}</td><td class="num">{{ a.year_inc|pounds }}</td><td class="num">{{ a.month_inc|pounds }}</td><td class="num">{{ a.avg_year_ex|pounds }}</td></tr>
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="o-rev-possible" data-revenue-possible aria-labelledby="rev-possible-h">
+    <h2 id="rev-possible-h" class="o-h3">Possible, from those waiting</h2>
+    {% if active %}
+    {% if due_w.payments %}
+    <p class="o-sub">Due in these dates. Not counted above. Only if they are approved.</p>
+    {% include "office/_revenue_range_grid.html" with b=due_w %}
+    <ul class="o-rev-waiting">{% for r in due_w.by_plan %}{% if r.payments %}<li data-revenue-waiting="{{ r.slug }}"><span>{{ r.name }}, {{ r.payments|num }} payment{{ r.payments|pluralize }}</span><span class="num">{{ r.total_ex|pounds }}</span></li>{% endif %}{% endfor %}</ul>
+    {% if assumed_shown %}<ul class="o-rev-waiting o-rev-assumed-line"><li data-revenue-assumed-row><span>With your assumptions, excl. VAT</span><span class="num">{{ due_w.assumed_total_ex|pounds }}</span></li></ul>{% endif %}
+    {% else %}
+    <p class="o-sub" data-revenue-nothing-waiting>Nobody waiting has a payment due in these dates.</p>
+    {% endif %}
+    {% else %}
+    <p class="o-sub">Not counted above. Only if they are approved.</p>
+    {% include "office/_revenue_grid.html" with b=w %}
+    <ul class="o-rev-waiting">{% for r in w.by_plan %}{% if r.count %}<li data-revenue-waiting="{{ r.slug }}"><span>{{ r.name }}, {{ r.count|num }} waiting</span><span class="num">{{ r.year_ex|pounds }}</span></li>{% endif %}{% endfor %}</ul>
+    {% if assumed_shown %}<ul class="o-rev-waiting o-rev-assumed-line"><li data-revenue-assumed-row><span>With your assumptions, a year, excl. VAT</span><span class="num">{{ assumptions.figures.waiting.assumed_total_ex|pounds }}</span></li></ul>{% endif %}
+    {% endif %}
+    <a class="o-quiet" href="{{ approvals_url }}" data-press>See who is waiting{% include "office/_icon.html" with name="chevron-right" %}</a>
+  </section>
+
+  {# The full breakdown: the last card, one closed card until the plus opens it (office/_revenue_breakdown.html). Computer: full width on row 3. #}
+  {% include "office/_revenue_breakdown.html" %}
+
+  <p class="o-sub o-rev-note" data-revenue-note>{% if active %}An estimate of payments due at today's prices. VAT at {{ revenue.vat_rate|floatformat:"-2" }}%.{% else %}An estimate for each member's first 12 months at today's prices. VAT at {{ revenue.vat_rate|floatformat:"-2" }}%.{% endif %}</p>
+</div>
+{% endwith %}
+{% endwith %}
+{% endblock %}

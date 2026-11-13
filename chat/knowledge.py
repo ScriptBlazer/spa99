@@ -63,7 +63,7 @@ def _plan(plan, site, ranges, prices):
         lines.append("  Also: " + "; ".join(p for p in perks if p) + ".")
     if prices:
         if plan.kind == Plan.FREE_BY_APPLICATION:
-            lines.append(f"  Price: free to hold, with an annual admin fee: {card['annual_fee_text']} ex VAT ({card['annual_fee_inc_text']} inc VAT).")
+            lines.append(f"  Price: free to hold, with an annual admin fee: {card['annual_fee_vat_text']} ({card['annual_fee_inc_text']} inc VAT).")
         else:
             lines.append(f"  Price: {card['price_line']}.")
     elif plan.kind == Plan.FREE_BY_APPLICATION:

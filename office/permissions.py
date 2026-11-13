@@ -4,6 +4,7 @@
   final     confirm or send back a Low potential Gold approval: the Final approver permission on top of Admin level or higher
   editor    approver or Admin and up: sticky notes, the approach list, Message
   admin     Admin and up: export members, delete a member
+  developer Developer and up: the Activity page
 Login is enforced first by LoginRequiredMiddleware. Someone with no team level at all gets a plain 404 (U5: the staff
 address never admits what is there). A team member who lacks the permission for an action gets a 403, and the
 templates do not render the buttons."""
@@ -34,6 +35,7 @@ reader = _guard(lambda user: True)
 admin = _guard(lambda user: levels.at_least(user, levels.ADMIN))
 approver = _guard(levels.is_approver)
 final_approver = _guard(levels.is_final_approver)
+developer = _guard(lambda user: levels.at_least(user, levels.DEVELOPER))  # Developer and Superuser only (Activity)
 
 
 def can_edit(user):
@@ -50,4 +52,6 @@ def abilities(user):
     level = levels.level_of(user)
     admin_up = levels.rank(level) >= levels.rank(levels.ADMIN)
     approves = levels.is_approver(user)
-    return {"can_act": approves, "can_final": levels.is_final_approver(user), "can_see_all": level != levels.NONE, "can_export": admin_up, "can_delete": admin_up, "can_delete_gold": admin_up, "can_setup": admin_up, "can_edit": approves or admin_up, "can_outreach": level != levels.NONE}
+    return {"can_act": approves, "can_final": levels.is_final_approver(user), "can_see_all": level != levels.NONE, "can_export": admin_up, "can_delete": admin_up, "can_delete_gold": admin_up, "can_setup": admin_up, "can_edit": approves or admin_up, "can_outreach": level != levels.NONE,
+            "can_approvals": approves or admin_up, "can_revenue": approves or admin_up,  # Barry's view: Approvals and Revenue, their tabs and the Home cards
+            "can_activity": levels.at_least(user, levels.DEVELOPER)}

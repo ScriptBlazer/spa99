@@ -72,10 +72,6 @@ class Figures:
     def new_lead_count(self, start, end):
         return len(self.new_leads(start, end))
 
-    def converted_leads(self, start, end):
-        """New leads in the range whose address has an account now (when they registered does not matter)."""
-        return len(self.new_leads(start, end) & self.registered_emails)
-
     def new_leads_series(self, buckets):
         return [self.new_lead_count(a, b) for a, b in buckets]
 

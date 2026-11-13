@@ -243,6 +243,39 @@ class FeedTests(TestCase):
             return len(queries)
         self.assertEqual(count(5), count(50))
 
+    def test_the_pages_are_the_shared_pagination_with_the_filters_kept_and_no_load_button(self):
+        from system.models import SiteDefaults
+        SiteDefaults.objects.update_or_create(singleton_key="site", defaults={"audit_page_size": 5})
+        self.make(10)   # 20 groups plus the test's own sign-in and unlock: five pages of 5
+        first = self.client.get("/changes/")
+        pages = first.context["pager"]["num_pages"]
+        self.assertGreaterEqual(pages, 4)
+        for gone in ("Load ", "data-system-more>", "Newer entries", "au-more-btn"):
+            self.assertNotContains(first, gone)
+        self.assertContains(first, 'class="pager"')
+        self.assertContains(first, 'aria-label="Audit log pages"')
+        self.assertContains(first, 'aria-disabled="true">Previous</span>')
+        self.assertContains(first, 'href="?page=2#au-count" rel="next">Next</a>')
+        self.assertContains(first, 'data-page-target="[data-system-results]"')   # the shared pager script swaps the list in place
+        self.assertNotContains(first, "Start of the log")   # not the last page
+        middle = self.client.get("/changes/", {"page": 2, "category": "change", "range": "30"})
+        self.assertEqual(middle.context["pager"]["number"], 2)
+        self.assertContains(middle, 'href="?category=change&amp;range=30&amp;page=1#au-count" rel="prev">Previous</a>')
+        self.assertNotContains(middle, "page=2&amp;page=")
+        last = self.client.get("/changes/", {"page": 999})   # past the end is the last page
+        self.assertEqual(last.context["pager"]["number"], pages)
+        self.assertContains(last, 'aria-disabled="true">Next</span>')
+        self.assertContains(last, "Start of the log")
+        filtered_last = self.client.get("/changes/", {"category": "change", "page": 999})
+        self.assertContains(filtered_last, "End of the results")
+        self.assertEqual(self.client.get("/changes/", {"page": "abc"}).context["pager"]["number"], 1)
+
+    def test_a_single_page_draws_no_pagination(self):
+        self.make(1)
+        page = self.client.get("/changes/")
+        self.assertNotContains(page, 'class="pager"')
+        self.assertContains(page, "Start of the log")
+
     def test_csv_export_streams_the_filtered_feed_and_is_logged(self):
         self.make(2)
         response = self.client.get("/changes/export.csv", {"category": "change"})

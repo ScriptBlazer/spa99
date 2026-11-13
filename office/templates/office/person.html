@@ -14,7 +14,7 @@
     {% if person.is_staff or person_status != "gold" %}<span class="o-badge o-badge--type">{% if person.is_staff %}Team{% elif person.kind == "lead" %}No account{% elif person.interest.plan %}Member, {{ person.interest.plan }}{% else %}Member{% endif %}</span>{% endif %}{# the status pill already says Gold member (Moishe, 2026-10-27) #}
     {% if person.kind == "account" %}{% if person.verified_at %}<span class="o-badge o-badge--s-approved">Verified</span>{% else %}<span class="o-badge o-badge--s-waiting">Not verified</span>{% endif %}{% endif %}
     {% if person.gold.potential %}{% include "office/_badge.html" with potential=person.gold.potential %}{% endif %}
-    {% if bounce.bounced %}<span class="o-badge o-badge--type" data-possible-fake>Possible fake</span>{% endif %}
+    {% if bounce.fake %}<span class="o-badge o-badge--type" data-possible-fake>Possible fake</span>{% endif %}
     {% if archive.archived %}<span class="o-badge o-badge--archived" data-archived-badge>{% include "office/_icon.html" with name="archive" %}Archived {{ archive.at|dm }}</span>{% endif %}
   </p>
   {% include "office/_bounce.html" %}
@@ -41,9 +41,8 @@
       {% if office_can.can_delete and not person.is_staff %}
       <form method="post" action="{% url 'office_person_delete' person.id %}" data-delete-person>{% csrf_token %}
         <button type="submit" class="o-danger-link" data-working-text="Deleting" data-confirm data-confirm-danger data-confirm-title="Delete {{ person.name }}?"
-                data-confirm-body="This removes his registration, journey answers and Gold application. It cannot be undone.{% if unclaimed_chats %} The WhatsApp chat with {% for c in unclaimed_chats %}{{ c.name }} ({{ c.phone }}){% if not forloop.last %}, {% endif %}{% endfor %} is not linked to him, so it stays: delete it from the chat if it is his.{% endif %}" data-confirm-label="Delete for good" data-confirm-cancel="Keep">Delete this person</button>
+                data-confirm-body="This removes his registration, journey answers and Gold application. It cannot be undone." data-confirm-label="Delete for good" data-confirm-cancel="Keep">Delete this person</button>
       </form>{% endif %}
-      {% if unclaimed_chats %}<p class="o-hint-line" data-unclaimed-chats>Not included in the export or the delete: the WhatsApp chat with {% for c in unclaimed_chats %}<a href="{{ c.url }}">{{ c.name }} ({{ c.phone }})</a>{% if not forloop.last %}, {% endif %}{% endfor %}. Nothing links {% if unclaimed_chats|length == 1 %}it{% else %}them{% endif %} to him.</p>{% endif %}
       {% endif %}
     </section>{% endif %}
   </aside>

@@ -212,3 +212,10 @@ def validate_sender_domain(value):
     domain, wanted = value.rsplit("@", 1)[-1].lower(), sending_domain()
     if wanted and domain != wanted:
         raise ValidationError(f"Use an address on {wanted}, the site's sending domain.", code="wrong_domain")
+
+
+def validate_sensible_year(value):
+    """A date typed for planning: a mistyped year is refused, so nothing downstream counts 12 months from year 9999."""
+    if value and not 2000 <= value.year <= 2100:
+        raise ValidationError("Enter a date between the years 2000 and 2100.")
+    return value

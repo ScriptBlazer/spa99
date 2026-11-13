@@ -375,3 +375,14 @@ html:has(.register) { scroll-padding-top: calc(var(--header-h) + var(--space-4))
 .no-payment { margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--s-muted); text-align: center; }
 .discount-line { margin-top: var(--space-3); text-align: center; max-width: none; }
 .m-title .discount-line { text-align: left; }
+
+/* The add-your-number page (docs/features/office-2-design.md section 9): the same entrance as sign-in, made short so the form and its button fit a 375 by 667 phone with no scroll.
+   On a phone the picture steps aside; from 64em it sits beside the form as everywhere else. */
+@media (max-width: 63.99em) {
+  .signin:has([data-add-number]) .signin-pic { display: none; }
+  .signin:has([data-add-number]) { padding-block: var(--space-2) var(--space-3); }
+  .signin:has([data-add-number]) .signin-form h1 { margin-top: var(--space-2); font-size: var(--text-xl); }
+  .signin:has([data-add-number]) .signin-fields { gap: var(--space-2); margin-top: var(--space-3); }
+  .signin:has([data-add-number]) .signin-fields .btn { margin-top: var(--space-1); }
+  .signin:has([data-add-number]) .signin-privacy { margin: 0; text-align: center; }
+}

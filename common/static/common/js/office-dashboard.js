@@ -28,7 +28,16 @@ function count(el, ms) {
   requestAnimationFrame(frame);
 }
 
+/** The two-ring cards (Waiting, Approved, Revenue) draw their arcs once a session: Home is opened many times a day, so later visits show the final state. Numbers never count, because money never animates. */
+function pairs() {
+  const cards = [...document.querySelectorAll('[data-office-dashboard] .o-pair')];
+  if (!cards.length || reduced()) return;
+  try { if (sessionStorage.getItem('office-pairs') === '1') return; sessionStorage.setItem('office-pairs', '1'); } catch { /* private mode: draw again */ }
+  cards.forEach((card) => card.setAttribute('data-draw', ''));
+}
+
 export function initCounts() {
+  pairs();
   const items = [...document.querySelectorAll('[data-office-dashboard] [data-count]')];
   if (!items.length) return;
   let seen = false;

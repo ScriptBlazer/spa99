@@ -13,10 +13,13 @@
 .o-badge--st-applied { background: var(--office-text); color: var(--color-gold); }                                                        /* 6.17 */
 .o-badge--st-gold { background: var(--color-gold); color: var(--office-text); }                                                           /* 6.17 */
 .o-badge--type { padding-inline: var(--space-1); color: var(--office-muted); }
+.o-badge--emailed { background: var(--office-sunken); color: var(--office-text); }                                                         /* 10.13: "Emailed 5 Nov" on a lead the group email reached */
+.o-badge--fake { background: var(--office-surface); color: var(--office-text); box-shadow: inset 0 0 0 1px var(--color-control-line); }   /* "Possible fake": shown instead of Emailed, because the email did not reach him */
+.o-list .c-name .o-badge { margin-left: var(--space-1); vertical-align: middle; }
 @media (forced-colors: active) { .o-badge--st-lead, .o-badge--st-registered { border: 1px solid CanvasText; } }
 
-/* ---------- the summary strip: three tonal tiles, no shadow ---------- */
-.o-leadsum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin-bottom: var(--space-3); }
+/* ---------- the summary strip: two tonal tiles (Leads, Registered), no shadow; each is a link with the press ---------- */
+.o-leadsum { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-bottom: var(--space-3); }
 .o-leadsum-tile { display: grid; align-content: start; gap: 2px; min-width: 0; padding: var(--space-3); border-radius: var(--office-radius); background: var(--office-sunken); color: var(--office-text); text-decoration: none; transition: background-color var(--office-dur-lift) var(--ease-soft); }
 .o-leadsum-tile > * { margin: 0; max-width: none; }
 .o-leadsum-label { font-size: var(--text-sm); font-weight: 500; color: var(--office-muted); }
@@ -33,10 +36,10 @@
 /* ---------- filters on Leads: more controls, same bar ---------- */
 .o-filters-body .o-select { min-width: 9rem; }
 .o-filters .o-seg-item { padding: 0 var(--space-2); }
-.o-totalline .o-export { margin-left: var(--space-3); }   /* beside the count, not pinned to the far right: the table card is only as wide as its content (Moishe 2026-10-30) */
+.o-totalline .o-export { margin-left: auto; }   /* on the right, over the table's right edge: the table card now spans the page (Moishe 2026-11-10, replacing 2026-10-30) */
 .o-export--sheet { display: none; }
 @media (max-width: 63.99em) { .o-export--bar { display: none; } .o-export--sheet { display: inline-flex; } }
-.o-filter-group--chip { align-self: flex-end; }
+.o-filter-group--chip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); align-self: flex-end; }
 .o-filter-group--chip .o-chip { min-height: var(--control-h-compact); }
 @media (min-width: 64em) { .o-filters-slot > .o-filters-body { display: contents; } }   /* the controls wrap in one bar with the search */
 .o-filters-bar .o-search { flex: 1 1 14rem; max-width: 20rem; }
@@ -203,6 +206,14 @@
   .o-list--archived .o-row td.c-action { display: block; order: 8; flex: 0 0 100%; width: auto; margin-top: var(--space-2); text-align: left; }
   .o-list--archived .o-row-move { width: 100%; min-height: 2.75rem; }
   .o-list--archived thead th { display: none; }
+  /* Possible fakes: the same phone cards as Archived (Lead, Best fit, Potential, Last seen, then Mark as genuine full width) */
+  .o-list--fakes .o-row td.c-name { order: 1; flex: 0 0 100%; }
+  .o-list--fakes .o-row td.c-potential { order: 3; flex: none; }
+  .o-list--fakes .o-row td.c-tier { order: 4; flex: none; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-list--fakes .o-row td.c-date { order: 6; flex: 0 0 100%; margin-left: 0; font-size: var(--text-sm); color: var(--office-muted); }
+  .o-list--fakes .o-row td.c-action { display: block; order: 8; flex: 0 0 100%; width: auto; margin-top: var(--space-2); text-align: left; }
+  .o-list--fakes .o-row-move, .o-list--fakes .c-action .btn { width: 100%; min-height: 2.75rem; }
+  .o-list--fakes thead th { display: none; }
 }
 /* the archived state of a lead, in the Reach out card */
 .o-archived-state { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
