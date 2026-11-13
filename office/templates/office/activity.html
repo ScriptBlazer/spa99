@@ -5,7 +5,7 @@
 {% block scripts %}<script type="module" src="{% static 'common/js/office-charts.js' %}"></script><script type="module" src="{% static 'common/js/office-activity.js' %}"></script><script type="module" src="{% static 'common/js/pager.js' %}"></script>{% endblock %}
 {% block main %}
 {% comment %}Activity (Developer and up): what the team did in a period and who did it. A mini dashboard over the list of every staff action. Context: see office.views.activity_page. Never shows note text or message bodies.
-The range bar (When, Dates, Staff member, Type) applies to the tiles, the charts and the list. Each type has one colour everywhere: Approvals clay, Leads and people teal, Notes sage, Emails slate, Gold ochre, Memberships plum.{% endcomment %}
+The range bar (When, Dates, Staff member, Type) applies to the tiles, the charts and the list. Each type has one colour everywhere: Approvals clay, Leads and people teal, Notes sage, Emails slate, Gold ochre, Memberships plum. By time (the parts of the London day) uses ochre, teal, plum and slate.{% endcomment %}
 <h1 class="sr-only">Activity</h1>
 <form class="o-filters o-filters--activity" method="get" action="{% url 'office_activity' %}" data-filter-form data-full data-list="activity" aria-label="Filter activity" data-activity-form>
   {% if show_all %}<input type="hidden" name="all" value="1">{% endif %}
@@ -68,16 +68,19 @@ The range bar (When, Dates, Staff member, Type) applies to the tiles, the charts
     </details>
   </section>
 
-  {# 3 Who did what: one bar for each person, split by type #}
-  <section class="o-card o-span-6" id="staff" data-reveal aria-labelledby="h-staff">
-    <header class="o-card-head"><h2 id="h-staff">Who did what</h2></header>
-    <p class="o-summary" data-region="summary-staff" data-fade>{{ data.summaries.staff }}</p>
-    <div data-region="bars-staff" data-fade>
-      <ul class="o-bars o-bars--stack">
-        {% for s in data.staff %}<li style="--share: {{ s.share }}; --stack: {{ s.stack }}"><span class="o-bar-name">{{ s.name }}</span><span class="o-bar-num">{{ s.total|num }}</span><span class="sr-only">{{ s.says }}</span></li>
-        {% empty %}<li class="o-empty-line">No staff actions in this range.</li>{% endfor %}
+  {# 3 By time: how many actions in each part of the London day (stored totals, the same filters) #}
+  <section class="o-card o-chartcard o-span-6" id="times" data-reveal data-chart-card="times" aria-labelledby="h-times">
+    <header class="o-card-head"><h2 id="h-times">By time</h2></header>
+    <p class="o-summary" data-region="summary-times" data-fade>{{ data.summaries.times }}</p>
+    <div class="o-donut">
+      <div class="o-chartbox o-chartbox--donut" data-chart="times" data-empty-text="No staff actions in this range."{% if data.times_empty %} data-empty{% endif %}>
+        <canvas id="chart-times" role="img" aria-label="{{ data.summaries.times }}" tabindex="-1"></canvas>
+        <p class="o-donut-centre" data-region="centre-times" data-fade>{% if data.busiest_part %}<span class="o-donut-word">Busiest</span><span class="o-donut-total o-donut-total--word">{{ data.busiest_part }}</span>{% else %}<span class="o-donut-total">0</span><span class="o-donut-word">actions</span>{% endif %}</p>
+        <p class="o-empty-chart">No staff actions in this range.</p>
+      </div>
+      <ul class="o-keylist" data-region="keylist-times" data-fade>
+        {% for t in data.times %}<li><span class="o-swatch" style="--sw: var(--office-{{ t.hue }})" aria-hidden="true"></span><span class="o-key-name">{{ t.label }}<span class="o-muted o-key-hours">{{ t.hours }}</span></span><span class="o-key-num">{{ t.value|num }}</span><span class="o-key-share">{{ t.share_bp|bp_rate }}</span></li>{% endfor %}
       </ul>
-      {% if data.more_staff %}<p class="o-footnote">and {{ data.more_staff }} more</p>{% endif %}
     </div>
   </section>
 

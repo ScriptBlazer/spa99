@@ -330,6 +330,7 @@ function start() {
         };
       },
     },
+    times: donut('times', (d) => d.times || [], 'value', 'clay', 'Actions'),   // Activity: the four parts of the London day, each with its own colour (hue)
     types: donut('types', (d) => d.types, 'value', 'clay', 'Actions'),   // each type brings its own colour (hue), the same on the bars and the list
     dropoff: {
       empty: (d) => !d.drop_off.some((s) => s.reached > 0),
@@ -398,7 +399,7 @@ function start() {
   }
 
   function summaryFor(card, d) {
-    const map = { visitors: 'visitors', funnel: 'funnel', tiers: '', days: 'days', types: 'types', plan: 'registrations_by_plan', suggested: 'suggested_plan', answers: 'journey_answers', dropoff: 'drop_off', gold: 'gold' };
+    const map = { visitors: 'visitors', funnel: 'funnel', tiers: '', days: 'days', types: 'types', times: 'times', plan: 'registrations_by_plan', suggested: 'suggested_plan', answers: 'journey_answers', dropoff: 'drop_off', gold: 'gold' };
     return d.summaries?.[map[card]] || '';
   }
 

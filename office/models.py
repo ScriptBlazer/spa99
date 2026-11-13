@@ -64,6 +64,28 @@ class ActivityDay(models.Model):
         return f"{self.day} {self.group} {self.staff_key}: {self.count}"
 
 
+class ActivityTimeOfDay(models.Model):
+    """Stored totals behind the "By time" card of Office > Activity (docs/features/office-activity.md): how many staff actions of one type one person did in one part of one London day
+    (morning 06:00-11:59, afternoon 12:00-16:59, evening 17:00-21:59, night 22:00-05:59, by the London clock). Written by the same paths as ActivityDay (office.activity_store), rebuilt in
+    full by `rebuild_activity`; the page only reads it. Counts only: no names of people, no text. Derived data, so it is not part of a person's export and nothing here needs erasing."""
+
+    MORNING, AFTERNOON, EVENING, NIGHT = "morning", "afternoon", "evening", "night"
+    PARTS = [(MORNING, "Morning"), (AFTERNOON, "Afternoon"), (EVENING, "Evening"), (NIGHT, "Night")]
+
+    day = models.DateField(help_text="The London calendar day the action happened on.")
+    part = models.CharField(max_length=9, choices=PARTS, help_text="Morning, afternoon, evening or night, by the London clock.")
+    group = models.CharField(max_length=12, help_text="The type: approvals, leads, notes, emails, gold or memberships.")
+    staff_key = models.CharField(max_length=254, help_text="One person, however his label was stored: the email inside the label (lower case), else the label.")
+    count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["day", "part", "group", "staff_key"], name="office_activitytimeofday_unique")]
+        indexes = [models.Index(fields=["day"], name="office_activitytod_day")]
+
+    def __str__(self):
+        return f"{self.day} {self.part} {self.group} {self.staff_key}: {self.count}"
+
+
 class ActivityDirtyDay(models.Model):
     """A London day whose Activity totals must be recounted, because a row of that day was deleted or saved after the fact (a person removed from the approach list or erased, a Gold
     application deleted, a backdated row). Written when the change commits (office.signals), read and cleared by the Office refresh (office.activity_store). One row per day however many

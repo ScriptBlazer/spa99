@@ -336,7 +336,7 @@ def leads(request):
 @require_GET
 @never_cache
 def activity_page(request):
-    """Activity (Developer and up): a mini dashboard (range, tiles, day by day, who did what, by type) over a list of every staff action, newest first. Read only; never note text or
+    """Activity (Developer and up): a mini dashboard (range, tiles, day by day, by type, by time) over a list of every staff action, newest first. Read only; never note text or
     message bodies. Closed, the list is the 8 newest (a preview). "See all" (?all=1) shows the whole list, 10 rows a page (activity.OPEN_PAGE_SIZE, ?page=N, the count of pages from the stored total):
     page 1 is rows 1 to 10 and every page stands on its own, with the shared pagination. `?fragment=1` (what the pager script asks for) answers with just the list and the pager.
     Context: data (activity.dashboard), data_json, top, rest, has_rest, show_all, toggle_query, pager, filters, filtered, staff [(key, label)], groups, ranges,

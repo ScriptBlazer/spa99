@@ -1,5 +1,5 @@
 /* Office > Activity: a mini dashboard over a list. It is built from parts that already exist (the range bar, KPI tiles, donut, bars, columns and the Dashboard feed rows).
-   This file holds only the additions approved in docs/design/OFFICE.md (Activity): .o-bars--stack, .o-day, .o-feed-person, and the page's own layout. Tokens only.
+   This file holds only the additions approved in docs/design/OFFICE.md (Activity): .o-day, .o-feed-person, and the page's own layout. Tokens only.
    (.o-kpi--teal and .o-kpi--plum are in office-analytics.css, next to the other tiles; the donut's own swatches are in office-charts.js.) */
 
 /* The range bar: When is a full-width seg on a phone, one row with Dates, Staff member and Type (the last two to the right) from 64em. */
@@ -18,10 +18,6 @@
   .o-filters--activity .o-filter-group--right { margin-left: auto; }
   .o-datechip { display: none; }
 }
-
-/* Who did what: each bar is split into the type colours (hard stops from the server, scaled to the bar's length), on the same pill and track. */
-.o-bars--stack li::after { background: var(--stack, var(--c)); }
-.o-bars--stack { --c: var(--office-slate); --t: var(--office-slate-track); }
 
 /* The list */
 .o-list-activity { position: relative; }   /* the round plus (.o-plus) sits at the card's top right, like What people want */
@@ -52,3 +48,8 @@
 .o-act-rest { scroll-margin-top: var(--space-5); }
 #list { scroll-margin-top: calc(var(--office-header-h) + var(--space-3)); }   /* the page links and "See all" land on the card, just below the sticky header */
 .o-list-activity .pager { --pager-color: var(--office-text); }   /* the shared pagination (pagination.css), in the Office text colour */
+
+/* By time: the hours sit on their own small line under the part name */
+.o-key-hours { display: block; font-size: var(--text-sm); line-height: var(--leading-snug); }
+/* By time: the busiest part, a word, sits in the centre; smaller than a count so it stays clear of the ring */
+.o-donut-total--word { font-size: var(--text-lg); }

@@ -414,7 +414,8 @@ Type colours, the same everywhere on the page (decoration; the words always carr
 
 **Additions approved on 2026-11-11** (no new tokens):
 - `.o-kpi--teal` and `.o-kpi--plum` (office-analytics.css): built like `.o-kpi--sage` from the `-tint` tokens.
-- `.o-bars--stack` (office-activity.css): the bar is split into type segments, a CSS `linear-gradient` of hard stops from server shares, on the same 0.625rem pill and track. An `sr-only` line says the split.
+- `.o-bars--stack` was removed on 2026-11-13 with the Who did what card; By time (a donut like By type, parts of the London day in ochre, teal, plum and slate) took its place.
+- 2026-11-13 By time additions: `.o-key-hours` (the hours on their own small muted line under the part name, `--text-sm`) and `.o-donut-total--word` (the ring centre shows the busiest part, "Busiest" over "Morning", at `--text-lg`).
 - `.o-day` (office-activity.css): the day heading in the list, `--text-sm` 600, the true count of that day on the right in muted text.
 - `.o-feed-person` (office-activity.css): the person in a feed sentence, weight 500, underlined on row hover (fine pointer only).
 - Per-row donut swatches: a keylist row carries its own `swatch` (the type hue) instead of `ramp_rows`, and the `donut()` spec in `office-charts.js` takes the colours from the rows when they give a `hue`.

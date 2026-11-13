@@ -1,6 +1,6 @@
 """Office > Activity: a mini dashboard and one list of every staff action (docs/features/office-activity.md). Read only.
 
-The figures (tiles, change lines, columns, who did what, by type, the staff list, the day counts) are read from the stored daily totals (`office.ActivityDay`, written by
+The figures (tiles, change lines, columns, by type, by time, the staff list, the day counts) are read from the stored daily totals (`office.ActivityDay`, written by
 office.activity_store), never counted from the sources while a page loads. The list is live: one source is one table, the newest rows of a page are limited in the database
 (`-when, -pk`) with the same filter (`_scope`) that fills the stored totals (`_by_day`), so the list and the figures agree. The rows of a page are merged from the sources and sorted by
 (at, source, pk), which is the order each source has in the database, so pages join up even when times are equal. A row is a plain dict. Text of notes and of
@@ -13,7 +13,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Callable
 
 from django.db.models import Count, Q, Sum
-from django.db.models.functions import Lower, TruncDate
+from django.db.models.functions import ExtractHour, Lower, TruncDate
 from django.utils import dateformat, timezone
 
 from gold.audit import label_for
@@ -27,18 +27,26 @@ from system.models import SystemEvent
 from users.models import User
 
 from . import profile
-from .models import ActivityDay
+from .models import ActivityDay, ActivityTimeOfDay
 from .selectors import ACTIVITY_RANGES
 
 NO_FILTER = {"staff": "", "group": ""}
 PAGE_SIZE = 50
-MAX_STAFF_BARS = 8
 TOP = 8  # the list shows this many while closed (a preview); "See all" opens the whole list, a page at a time
 OPEN_PAGE_SIZE = 10  # rows on each page once opened: page 1 is rows 1 to 10 (a fixed number, not a setting)
 AUTOMATIC = (outreach_services.GROUP_EMAIL_LABEL, "Bounce", outreach_services.SELF_LABEL)  # labels the system writes when no staff member acted
 GROUPS = [("approvals", "Approvals"), ("leads", "Leads and people"), ("notes", "Notes"), ("emails", "Emails"), ("gold", "Gold"), ("memberships", "Memberships")]
 GROUP_LABELS = dict(GROUPS)
 HUES = {"approvals": "clay", "leads": "teal", "notes": "sage", "emails": "slate", "gold": "ochre", "memberships": "plum"}  # one colour per type, everywhere on the page
+# "By time": the parts of the London day (by the clock on the wall, so summer time is followed): key, label, hours, colour token. Four distinct hues; every office hue is a type colour already, so these four are reused on a separate card.
+PARTS = [("morning", "Morning", "06:00 to 11:59", "ochre"), ("afternoon", "Afternoon", "12:00 to 16:59", "teal"), ("evening", "Evening", "17:00 to 21:59", "plum"), ("night", "Night", "22:00 to 05:59", "slate")]
+
+
+def part_of_hour(hour):
+    """The part of the day for a London clock hour 0-23: morning 6-11, afternoon 12-16, evening 17-21, night 22-5."""
+    return "morning" if 6 <= hour < 12 else "afternoon" if 12 <= hour < 17 else "evening" if 17 <= hour < 22 else "night"
+
+
 ICONS = {"approvals": "check", "leads": "address-book", "notes": "note", "emails": "envelope", "gold": "gold", "memberships": "coin"}
 SYSTEM_KINDS = (SystemEvent.SETUP_MANUAL, SystemEvent.SETUP_EDITED, SystemEvent.SETUP_CANCELLED, SystemEvent.SALE_RESTORED)
 GOLD_WORDS = {
@@ -369,9 +377,21 @@ def _by_day(f, start, end):
     return out
 
 
-def _stored(f, first, last):
+def _by_day_hour(f, start, end):
+    """[(group, label, day, hour, n)] for the window: counts by staff label, London day and London clock hour, one grouped query per source. The hour is taken in the London zone
+    in the database (`ExtractHour(tzinfo=...)`: the same on SQLite and Postgres), so a summer-time action at 23:30 is hour 23, not 22."""
+    zone = timezone.get_current_timezone()
+    out = []
+    for source in _sources(f):
+        grouped = (_scope(source, f, start, end).order_by().annotate(day=TruncDate(source.when, tzinfo=zone), hour=ExtractHour(source.when, tzinfo=zone))
+                   .values(source.label, "day", "hour").annotate(n=Count("pk")))
+        out.extend((source.group, row[source.label], row["day"], row["hour"], row["n"]) for row in grouped)
+    return out
+
+
+def _stored(f, first, last, model=ActivityDay):
     """The stored daily rows for the whole days first..last (None = open), with the staff and type filter: one query."""
-    rows = ActivityDay.objects.all()
+    rows = model.objects.all()
     if first:
         rows = rows.filter(day__gte=first)
     if last:
@@ -393,6 +413,12 @@ def _stored_totals(f, first, last):
     return Counter({row["group"]: row["n"] for row in _stored(f, first, last).order_by().values("group").annotate(n=Sum("count"))})
 
 
+def _stored_by_part(f, first, last):
+    """{part: n} for a window, from the stored time-of-day rows with the same staff and type filter: one small grouped query (at most four parts)."""
+    rows = _stored(f, first, last, ActivityTimeOfDay).order_by().values("part").annotate(n=Sum("count"))
+    return {row["part"]: row["n"] for row in rows}
+
+
 def _bucket(day, granularity):
     return day if granularity == "day" else day - timedelta(days=day.weekday())
 
@@ -406,20 +432,17 @@ def _plural(n, word):
 
 
 def dashboard(filters, now=None):
-    """Everything above the list, from the stored daily totals with the same filter as the list: totals and the change on the period before, the columns, who did what and by type.
+    """Everything above the list, from the stored daily totals with the same filter as the list: totals and the change on the period before, the columns, by type and by time.
     Keys: range (the window's name: week, month, 30d, all or custom), granularity, labels (ISO dates of the columns), series {all and each type: total, previous_total, values},
-    types, summaries, plus (for the template, not the chart script) kpis, staff, more_staff, day_counts, total, empty."""
+    types, times (the four parts of the day), summaries, plus (for the template, not the chart script) kpis, day_counts, total, times_total, empty, times_empty."""
     p = period(filters, now)
     rows = _stored_by_day(filters, p.day_from, p.day_to)
     previous = _stored_totals(filters, p.prev_from, p.prev_to) if p.has_previous else None
-    by_type, by_staff_type, by_day, by_bucket, stored = Counter(), defaultdict(Counter), Counter(), defaultdict(Counter), defaultdict(set)
+    by_type, by_day, by_bucket = Counter(), Counter(), defaultdict(Counter)
     for group, label, day, n in rows:
-        key = staff_key(label)
         by_type[group] += n
-        by_staff_type[key][group] += n
         by_day[day] += n
         by_bucket[_bucket(day, p.granularity)][group] += n
-        stored[key].add(label)
     total = sum(by_type.values())
     first = p.first_day or min(by_day, default=timezone.localdate())
     last = max(p.last_day or timezone.localdate(), first)
@@ -433,39 +456,33 @@ def dashboard(filters, now=None):
     order = sorted(GROUPS, key=lambda g: (-by_type[g[0]], [x[0] for x in GROUPS].index(g[0])))  # busiest first, the rest in table order
     kpis = [{"key": "all", "label": "Actions", "hue": "slate", "anchor": "days"}] + [{"key": g, "label": label, "hue": HUES[g], "anchor": "list"} for g, label in order[:3]]
     types = [{"key": g, "label": label, "value": by_type[g], "share_bp": round(by_type[g] * 10000 / total) if total else 0, "hue": HUES[g], "icon": ICONS[g]} for g, label in GROUPS]
-    people = _identities([label for labels in stored.values() for label in labels])
-    ranked = sorted(by_staff_type.items(), key=lambda item: (-sum(item[1].values()), people[item[0]][1].lower()))
-    top = sum(ranked[0][1].values()) if ranked else 0
-    staff = []
-    for key, counts in ranked:
-        n = sum(counts.values())
-        share, run, stops = n / top, 0, []
-        for g, label in GROUPS:
-            if counts[g]:
-                a, b = run / n * share * 100, (run + counts[g]) / n * share * 100
-                stops.append(f"var(--office-{HUES[g]}) {a:.2f}% {b:.2f}%")
-                run += counts[g]
-        staff.append({"key": key, "name": people[key][0], "full": people[key][1], "total": n, "share": f"{share:.4f}", "stack": f"linear-gradient(to right, {', '.join(stops)})",
-                      "says": ", ".join(f"{counts[g]} {label.lower()}" for g, label in GROUPS if counts[g])})
+    by_part = _stored_by_part(filters, p.day_from, p.day_to)
+    times_total = sum(by_part.values())
+    times = [{"key": k, "label": label, "hours": hours, "value": by_part.get(k, 0), "share_bp": round(by_part.get(k, 0) * 10000 / times_total) if times_total else 0, "hue": hue}
+             for k, label, hours, hue in PARTS]
     weekly = p.granularity == "week"
     busiest = max(range(len(buckets)), key=lambda i: series["all"]["values"][i], default=-1)
     if not total:
-        summaries = {"days": "No staff actions in this range.", "staff": "No staff actions in this range.", "types": "No staff actions in this range."}
+        summaries = {"days": "No staff actions in this range.", "types": "No staff actions in this range.", "times": "No staff actions in this range."}
     else:
         peak = buckets[busiest]
         days_line = f"{_plural(total, 'action')} {_phrase(p.name)}. " + (f"Busiest week: w/c {dateformat.format(peak, 'j M')}, with {series['all']['values'][busiest]:,}." if weekly
                                                                          else f"Busiest day: {dateformat.format(peak, 'l')}, with {series['all']['values'][busiest]:,}.")
         lead = max(types, key=lambda t: t["value"])
-        summaries = {"days": days_line, "staff": f"{staff[0]['name']} did the most: {staff[0]['total']:,} of {total:,}.",
-                     "types": f"Most were {lead['label'].lower()}: {lead['value']:,} of {total:,}."}
-    return {"range": p.name, "granularity": p.granularity, "labels": [b.isoformat() for b in buckets], "series": series, "types": types, "summaries": summaries,
-            "kpis": kpis, "staff": staff[:MAX_STAFF_BARS], "more_staff": max(len(staff) - MAX_STAFF_BARS, 0), "day_counts": {d.isoformat(): n for d, n in by_day.items()},
-            "total": total, "empty": not total, "peak": busiest, "days": [{"iso": b.isoformat(), "count": series["all"]["values"][i]} for i, b in enumerate(buckets)]}
+        summaries = {"days": days_line, "types": f"Most were {lead['label'].lower()}: {lead['value']:,} of {total:,}.", "times": "No staff actions in this range."}
+    busiest_part = ""
+    if times_total:
+        busy = max(times, key=lambda t: t["value"])
+        busiest_part = busy["label"]  # the centre of the By time ring (Moishe 2026-11-13: not the same total as By type)   # a tie keeps the earlier part of the day
+        summaries["times"] = f"Most of it happens in the {busy['label'].lower()}: {busy['value']:,} of {times_total:,}." if busy["key"] != "night" else f"Most of it happens at night: {busy['value']:,} of {times_total:,}."
+    return {"range": p.name, "granularity": p.granularity, "labels": [b.isoformat() for b in buckets], "series": series, "types": types, "times": times, "summaries": summaries,
+            "kpis": kpis, "day_counts": {d.isoformat(): n for d, n in by_day.items()}, "total": total, "times_total": times_total, "busiest_part": busiest_part, "empty": not total, "times_empty": not times_total, "peak": busiest,
+            "days": [{"iso": b.isoformat(), "count": series["all"]["values"][i]} for i, b in enumerate(buckets)]}
 
 
 def chart_data(data):
     """The part of `dashboard()` the chart script reads (no staff names, no per-day map)."""
-    return {key: data[key] for key in ("range", "granularity", "labels", "series", "types", "summaries")}
+    return {key: data[key] for key in ("range", "granularity", "labels", "series", "types", "times", "summaries")}
 
 
 # ---------- the list ----------

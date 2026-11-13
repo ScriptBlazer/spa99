@@ -23,7 +23,7 @@ from gold.tests.test_gold import application_data
 from office import activity, activity_store, approvals
 from office.templatetags import office_tags
 from office import signals, snapshots
-from office.models import ActivityDay, ActivityDirtyDay, MembershipReviewEvent
+from office.models import ActivityDay, ActivityDirtyDay, ActivityTimeOfDay, MembershipReviewEvent
 from office.tests.test_office import OFFICE, OfficeTestCase
 from outreach import services as outreach
 from outreach.models import LeadArchiveEvent, OutreachEntry, PersonEdit, PersonMessage, StickyNote
@@ -272,7 +272,7 @@ class ReviewFindingTests(Base):
         self.assertEqual(choices, [("sam@example.test", "Sam Hill (sam@example.test)")])
         self.assertEqual(len(self.rows(staff="sam@example.test")), 3)  # the filter matches both forms
         self.assertEqual({r["who"] for r in self.rows()}, {"Sam"})
-        self.assertEqual({s["name"] for s in dashboard(filters())["staff"]}, {"Sam"})
+        self.assertNotIn("staff", dashboard(filters()))  # the Who did what card is gone; the dropdown above reads the stored labels
 
     def test_an_action_with_no_staff_label_is_left_out_not_shown_as_unknown(self):
         PersonEdit.objects.create(email="a@example.com", what=PersonEdit.MOBILE, after="07911", by_label="")
@@ -361,12 +361,9 @@ class RangeTests(Base):
         self.assertEqual(by_type, {"approvals": 0, "leads": 2, "notes": 3, "emails": 2, "gold": 0, "memberships": 0})
         for key, n in by_type.items():
             self.assertEqual(len([r for r in rows if r["group"] == key]), n)
-        self.assertEqual([(s["name"], s["total"]) for s in data["staff"]], [("Ana", 5), ("ben@example.test", 2)])
-        for s in data["staff"]:
-            self.assertEqual(len([r for r in rows if r["who"] == s["name"]]), s["total"])
-        self.assertIn("var(--office-sage)", data["staff"][0]["stack"])
-        self.assertEqual(data["staff"][0]["says"], "2 leads and people, 3 notes")
-        self.assertEqual(data["summaries"]["staff"], "Ana did the most: 5 of 7.")
+        for gone in ("staff", "more_staff"):
+            self.assertNotIn(gone, data)  # Who did what was replaced by By time
+        self.assertNotIn("staff", data["summaries"])
         self.assertEqual([k["key"] for k in data["kpis"]], ["all", "notes", "leads", "emails"])  # the three busiest, ties in table order
         self.assertEqual(dashboard(filters(staff="ben@example.test"))["total"], 2)
         self.assertEqual(dashboard(filters(group="notes"))["total"], 3)
@@ -504,7 +501,7 @@ class ClosedListTests(Base):
 
     def test_the_list_card_sits_straight_under_the_tiles_above_the_charts(self):
         body = page(self.dev).content.decode()
-        order = [body.index(marker) for marker in ('data-office-kpis', 'id="list"', 'id="days"', 'id="staff"', 'id="types"')]
+        order = [body.index(marker) for marker in ('data-office-kpis', 'id="list"', 'id="days"', 'id="times"', 'id="types"')]
         self.assertEqual(order, sorted(order))
 
     def test_eight_rows_while_closed_and_see_all_opens_the_rest(self):
@@ -694,7 +691,7 @@ class StoredTotalsTests(Base):
             if p.has_previous:
                 before = activity._by_day(f, activity._local(p.prev_from), activity._local(p.prev_to, 1))
                 self.assertEqual(data["series"]["all"]["previous_total"], sum(n for *_, n in before), extra)
-        self.assertEqual(sorted(s["name"] for s in dashboard(filters(), self.now)["staff"]), ["Barry", "Dana", "Eli"])  # a bare email and "Name (email)" are one person
+        self.assertEqual(sorted(k for k, _ in activity.staff_choices()), ["barry@example.test", "dana", "eli@example.test"])  # a bare email and "Name (email)" are one person
         self.assertEqual(ActivityDay.objects.filter(staff_key="barry@example.test", group="leads").count(), 3)  # 8, 9 and 11 Nov: the bare email and "Name (email)" are one person
 
     def test_london_day_edges(self):
@@ -774,7 +771,8 @@ class StoredTotalsTests(Base):
             self.assertFalse([q for q in sql if "COUNT(" in q.upper() and "activitydays" not in q.lower() and "office_activityday" not in q.lower()], query)
             self.assertFalse([q for q in sql if " UNION " in q.upper()], query)  # the old staff list
             grouped = [q for q in sql if "GROUP BY" in q.upper()]
-            self.assertTrue(all("office_activityday" in q for q in grouped), grouped)  # the only grouped sums are over the stored totals
+            self.assertTrue(all("office_activityday" in q or "office_activitytimeofday" in q for q in grouped), grouped)  # the only grouped sums are over the stored totals
+            self.assertEqual(len([q for q in sql if "office_activitytimeofday" in q]), 1)  # By time adds one small read
             self.assertTrue(any("office_activityday" in q for q in sql))
 
 
@@ -938,3 +936,153 @@ class SignalSafetyTests(TestCase):
             note = StickyNote.objects.create(email="safe@example.com", text="x", author_label="Barry", created_at=timezone.now() - timedelta(days=10))
         self.assertTrue(StickyNote.objects.filter(pk=note.pk).exists())
 
+
+
+class ByTimeTests(Base):
+    """The By time ring: the four parts of the London day, from the stored ActivityTimeOfDay rows."""
+
+    def edit(self, at, who="Dana"):
+        PersonEdit.objects.create(email="a@example.com", what=PersonEdit.MOBILE, after="07911", by_label=who, at=at)
+
+    def parts(self):
+        out = {}
+        for d, p, n in ActivityTimeOfDay.objects.values_list("day", "part", "count"):
+            out[(d, p)] = out.get((d, p), 0) + n
+        return out
+
+    def test_the_part_edges_in_london_time_on_a_summer_and_a_winter_date(self):
+        for day in (date(2026, 7, 14), date(2026, 1, 14)):  # BST and GMT: the wall clock decides, not UTC
+            for hour, minute in ((5, 59), (6, 0), (11, 59), (12, 0), (16, 59), (17, 0), (21, 59), (22, 0)):
+                self.edit(london(day.year, day.month, day.day, hour, minute))
+        activity_store.apply()
+        for day in (date(2026, 7, 14), date(2026, 1, 14)):
+            self.assertEqual({p: self.parts()[(day, p)] for p in ("morning", "afternoon", "evening", "night")}, {"night": 2, "morning": 2, "afternoon": 2, "evening": 2}, day)
+        self.assertEqual({activity.part_of_hour(h) for h in (0, 5, 22, 23)}, {"night"})
+        self.assertEqual([activity.part_of_hour(h) for h in (6, 11, 12, 16, 17, 21)], ["morning", "morning", "afternoon", "afternoon", "evening", "evening"])
+
+    def test_a_late_summer_action_is_the_london_hour_not_the_utc_hour(self):
+        self.edit(london(2026, 7, 14, 22, 30))  # 21:30 UTC, but 22:30 in London: night, on the 14th
+        self.edit(london(2026, 7, 14, 0, 30))   # 23:30 UTC on the 13th, but London's 14th: night of the 14th
+        activity_store.apply()
+        self.assertEqual(self.parts(), {(date(2026, 7, 14), "night"): 2})
+
+    def test_clock_change_days_keep_the_london_day_and_hour(self):
+        self.edit(datetime(2026, 3, 29, 1, 30, tzinfo=dt_timezone.utc))   # spring forward: 02:30 BST on the 29th, night
+        self.edit(datetime(2026, 10, 25, 0, 30, tzinfo=dt_timezone.utc))  # fall back: 01:30 BST on the 25th, night
+        self.edit(datetime(2026, 10, 25, 1, 30, tzinfo=dt_timezone.utc))  # 01:30 GMT on the 25th, night again
+        self.edit(datetime(2026, 10, 25, 6, 0, tzinfo=dt_timezone.utc))   # 06:00 GMT: morning
+        activity_store.apply()
+        self.assertEqual(self.parts(), {(date(2026, 3, 29), "night"): 1, (date(2026, 10, 25), "night"): 2, (date(2026, 10, 25), "morning"): 1})
+
+    def test_the_ring_centre_is_the_busiest_part_a_tie_goes_earlier_and_empty_has_none(self):
+        self.assertEqual(dashboard(filters())["busiest_part"], "")  # empty: the centre says 0 actions
+        self.edit(london(2026, 11, 5, 9))
+        self.edit(london(2026, 11, 5, 19))
+        activity_store.apply()
+        self.assertEqual(dashboard(filters())["busiest_part"], "Morning")  # one each: the earlier part wins
+        self.edit(london(2026, 11, 5, 20))
+        activity_store.apply()
+        self.assertEqual(dashboard(filters())["busiest_part"], "Evening")
+
+    def test_the_store_writes_and_recounts_the_time_table_and_leaves_matching_rows_alone(self):
+        self.edit(london(2026, 11, 5, 13), "Barry (barry@example.test)")
+        StickyNote.objects.create(email="a@example.com", text="x", author_label="barry@example.test", created_at=london(2026, 11, 5, 14))
+        self.assertEqual(activity_store.apply_both(), ((2, 0, 0), (2, 0, 0)))  # by type: leads and notes; by time: the same two rows
+        self.assertEqual(self.parts(), {(date(2026, 11, 5), "afternoon"): 2})
+        self.assertEqual(ActivityTimeOfDay.objects.count(), 2)
+        pk = ActivityTimeOfDay.objects.first().pk
+        self.assertEqual(activity_store.apply_both(), ((0, 0, 0), (0, 0, 0)))
+        self.assertEqual(ActivityTimeOfDay.objects.first().pk, pk)  # untouched
+        self.edit(london(2026, 11, 5, 23), "Barry (barry@example.test)")
+        activity_store.apply_both()
+        self.assertEqual(self.parts(), {(date(2026, 11, 5), "afternoon"): 2, (date(2026, 11, 5), "night"): 1})
+        PersonEdit.objects.filter(at=london(2026, 11, 5, 23)).delete()
+        activity_store.refresh_recent(date(2026, 11, 6))  # a recount of today and yesterday takes the stale night row away
+        self.assertEqual(self.parts(), {(date(2026, 11, 5), "afternoon"): 2})
+
+    def test_the_ring_obeys_the_staff_type_and_date_filters_and_says_where_most_happens(self):
+        for hour in (13, 14, 15):
+            self.edit(london(2026, 11, 5, hour), "Barry (barry@example.test)")
+        self.edit(london(2026, 11, 5, 8), "Barry (barry@example.test)")
+        StickyNote.objects.create(email="a@example.com", text="x", author_label="Dana", created_at=london(2026, 11, 5, 9))
+        StickyNote.objects.create(email="a@example.com", text="x", author_label="Dana", created_at=london(2026, 10, 1, 23))
+        data = dashboard(filters())
+        self.assertEqual([(t["key"], t["value"]) for t in data["times"]], [("morning", 2), ("afternoon", 3), ("evening", 0), ("night", 1)])
+        self.assertEqual((data["times_total"], data["total"]), (6, 6))
+        self.assertEqual(data["summaries"]["times"], "Most of it happens in the afternoon: 3 of 6.")
+        self.assertEqual(data["busiest_part"], "Afternoon")  # the ring centre (Moishe 2026-11-13: not the By type total)
+        self.assertEqual([t["value"] for t in dashboard(filters(staff="barry@example.test"))["times"]], [1, 3, 0, 0])
+        self.assertEqual([t["value"] for t in dashboard(filters(group="notes"))["times"]], [1, 0, 0, 1])
+        self.assertEqual([t["value"] for t in dashboard(filters(**{"from": date(2026, 11, 1), "to": date(2026, 11, 30)}))["times"]], [2, 3, 0, 0])
+        self.assertEqual(sum(t["share_bp"] for t in data["times"]), 10000)
+        empty = dashboard(filters(staff="nobody"))
+        self.assertEqual((empty["times_total"], empty["times_empty"], empty["summaries"]["times"]), (0, True, "No staff actions in this range."))
+
+    def test_the_page_has_by_time_and_no_who_did_what(self):
+        self.edit(london(2026, 11, 5, 13))
+        body = page(self.dev).content.decode()
+        self.assertIn('id="times"', body)
+        self.assertIn("By time", body)
+        self.assertNotIn("Who did what", body)
+        self.assertNotIn('id="staff"', body)
+        self.assertIn('"times"', body)  # in the chart data
+
+    def test_dry_run_writes_nothing_shows_each_time_row_then_the_real_run_and_a_second_one_say_so(self):
+        self.edit(london(2026, 11, 5, 13), "Barry Lobenstein (barry@example.test)")
+        activity_store.apply()
+        ActivityTimeOfDay.objects.filter(part="afternoon").update(count=20)  # wrong: to change
+        ActivityTimeOfDay.objects.create(day=date(2020, 1, 1), part="night", group="notes", staff_key="barry@example.test", count=4)  # stale: to remove
+        ActivityDay.objects.create(day=date(2020, 1, 1), group="notes", staff_key="barry@example.test", staff_label="Barry Lobenstein (barry@example.test)", count=4)  # so the days have a change too
+        before = list(ActivityTimeOfDay.objects.order_by("pk").values_list("pk", "day", "part", "count"))
+        out = StringIO()
+        call_command("rebuild_activity", "--dry-run", stdout=out)
+        text = out.getvalue()
+        self.assertEqual(list(ActivityTimeOfDay.objects.order_by("pk").values_list("pk", "day", "part", "count")), before)  # nothing written
+        self.assertIn("5 Nov 2026 · Afternoon · Leads · Barry Lobenstein: 20 → 1", text)
+        self.assertIn("1 Jan 2020 · Night · Notes · Barry Lobenstein: 4 → removed", text)  # the name of a removed row comes from the stored day labels
+        self.assertIn("BY TIME (actions stored, old total → new total)", text)
+        self.assertIn("Afternoon: 20 → 1", text)
+        self.assertIn("Night: 4 → 0", text)
+        self.assertLess(text.index("BY STAFF"), text.index("EVERY ROW BY TIME"))  # its own section, after the existing ones
+        self.assertNotIn("@", text)
+        short = StringIO()
+        call_command("rebuild_activity", "--dry-run", "--summary", stdout=short)
+        self.assertIn("TOTALS BY TIME", short.getvalue())
+        self.assertNotIn("EVERY ROW BY TIME", short.getvalue())
+        done = StringIO()
+        call_command("rebuild_activity", stdout=done)
+        self.assertIn("1 Jan 2020 · Night · Notes · Barry Lobenstein: 4 → removed", done.getvalue())
+        self.assertEqual(self.parts(), {(date(2026, 11, 5), "afternoon"): 1})
+        again = StringIO()
+        call_command("rebuild_activity", stdout=again)
+        self.assertIn("Nothing changed", again.getvalue())
+
+    def test_a_first_run_that_only_has_time_rows_to_add_is_not_called_nothing_changed(self):
+        self.edit(london(2026, 11, 5, 13))
+        activity_store.apply()
+        ActivityTimeOfDay.objects.all().delete()  # the state just after deploying the new table
+        out = StringIO()
+        call_command("rebuild_activity", "--dry-run", stdout=out)
+        self.assertNotIn("Nothing would change", out.getvalue())
+        self.assertIn("5 Nov 2026 · Afternoon · Leads · Dana: none → 1", out.getvalue())
+
+    def test_the_no_wipe_guard_covers_the_time_table_and_allow_empty_clears_it(self):
+        self.edit(london(2026, 11, 5, 13))
+        activity_store.apply()
+        PersonEdit.objects.all().delete()
+        with self.assertLogs("spa99.activity", "WARNING") as logs:
+            self.assertEqual(activity_store.apply_both(), ((0, 0, 0), (0, 0, 0)))
+        self.assertTrue(any("office_activitytimeofday" in line for line in logs.output))
+        self.assertEqual(ActivityTimeOfDay.objects.count(), 1)
+        text = StringIO()
+        call_command("rebuild_activity", "--dry-run", stdout=text)
+        self.assertIn("SAFEGUARD (by time)", text.getvalue())
+        call_command("rebuild_activity", "--allow-empty", stdout=StringIO())
+        self.assertEqual(ActivityTimeOfDay.objects.count(), 0)
+        self.assertEqual(ActivityDay.objects.count(), 0)
+
+    def test_an_error_while_counting_the_time_table_writes_nothing_in_either_table(self):
+        self.edit(london(2026, 11, 5, 13))
+        with mock.patch.object(activity_store, "wanted_time", side_effect=RuntimeError("boom")), self.assertRaises(RuntimeError):
+            activity_store.apply_both()
+        self.assertEqual((ActivityDay.objects.count(), ActivityTimeOfDay.objects.count()), (0, 0))
