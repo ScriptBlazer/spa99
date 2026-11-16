@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils import timezone
 
+from common.emails import clean_email
 from common.tasks import enqueue
 from gold import audit
 from gold.models import ApplicationEvent, GoldApplication
@@ -216,7 +217,7 @@ def email_block(address):
 
     from notifications.models import EmailSuppression
 
-    address = (address or "").strip().lower()
+    address = clean_email(address)
     try:
         validate_email(address)
     except ValidationError:
@@ -490,7 +491,7 @@ def export_messages(addresses):
 
 def erase_email(email):
     """UK GDPR: notes, messages and approach-list entries held for this address go with the person."""
-    email = (email or "").strip().lower()
+    email = clean_email(email)
     if not email:
         return 0
     return (StickyNote.objects.filter(email=email).delete()[0] + PersonMessage.objects.filter(email=email).delete()[0]

@@ -14,6 +14,7 @@ from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from common import emaildefaults
+from common.emails import clean_email
 from common.models import BaseModel
 
 
@@ -204,7 +205,7 @@ class Invite(BaseModel):
         return f"{self.email} ({self.status})"
 
     def save(self, *args, **kwargs):
-        self.email = (self.email or "").strip().lower()
+        self.email = clean_email(self.email)
         if not self.expires_at:
             self.expires_at = timezone.now() + timedelta(days=_register_invite_days())
         super().save(*args, **kwargs)
@@ -270,7 +271,7 @@ class ContactListMember(BaseModel):
         return self.email
 
     def save(self, *args, **kwargs):
-        self.email = (self.email or "").strip().lower()
+        self.email = clean_email(self.email)
         super().save(*args, **kwargs)
 
 

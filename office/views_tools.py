@@ -1,8 +1,8 @@
 """Views for the person tools: sticky notes, the approach list, Send guide and the Email button. Short: validate, call the service in
 outreach.services (or gold.actions), answer. Notes answer an HTMX request with the notes partial."""
-from django.contrib import messages
 from urllib.parse import urlencode
 
+from django.contrib import messages
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -14,6 +14,7 @@ from gold import actions as gold_actions
 from gold import audit
 from gold.models import GoldApplication
 from common import sorting
+from common.emails import clean_email
 from outreach import listing, services
 from outreach.models import OutreachEntry, StickyNote
 from plans.models import SiteSettings
@@ -367,7 +368,7 @@ def outreach_archive(request, pk):
 @require_POST
 def outreach_undo_move(request):
     """Undo Back to Leads or Archive: POST email, reason, archived ("1" when he was archived): he comes back from Archived if needed and goes back on the list with the same reason."""
-    email = (request.POST.get("email") or "").strip().lower()
+    email = clean_email(request.POST.get("email"))
     if request.POST.get("archived") in ("1", "true", "yes"):
         services.unarchive_lead(email, request.user)
     result, _ = services.add_to_list(request.user, lead_email=email, reason=request.POST.get("reason", ""))

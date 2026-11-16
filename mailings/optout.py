@@ -1,6 +1,7 @@
 """Turning marketing off for an address (the public Unsubscribe page and one-click header)."""
 from django.db import IntegrityError, transaction
 
+from common.emails import clean_email
 from gold.models import GoldApplication
 from users import member
 from users.models import User
@@ -14,7 +15,7 @@ def unsubscribe(email):
     their news tick. An address with no account goes on `EmailOptOut` (a separate list: it is not a bounce or a complaint, so
     it does not belong in EmailSuppression, and it must not stop service messages).
     Returns {"account": bool, "changed": bool}."""
-    email = (email or "").strip().lower()
+    email = clean_email(email)
     changed = False
     user = User.objects.filter(email__iexact=email).first()
     if user is not None:
@@ -35,4 +36,4 @@ def unsubscribe(email):
 
 def clear(email):
     """The person chose news again (account switch or ticked the box when registering): forget the no-account opt-out."""
-    EmailOptOut.objects.filter(email=(email or "").strip().lower()).delete()
+    EmailOptOut.objects.filter(email=clean_email(email)).delete()

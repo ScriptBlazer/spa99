@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models.functions import Lower, Upper
 from simple_history.models import HistoricalRecords
 
+from common.emails import clean_email
 from common.ids import format_public_code, generate_public_code
 from common.models import BaseModel
 from common.validators import normalise_email, normalise_mobile
@@ -57,7 +58,7 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
             self.mobile = normalise_mobile(self.mobile)
 
     def save(self, *args, **kwargs):
-        self.email = (self.email or "").strip().lower()
+        self.email = clean_email(self.email)
         # Always stored as E.164 so uniqueness holds across formats; blank must be NULL (unique), not "".
         self.mobile = normalise_mobile(self.mobile) if self.mobile else None
         if not self.public_id:

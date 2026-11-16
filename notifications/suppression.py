@@ -6,13 +6,15 @@ from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from common.emails import clean_email
+
 from .models import EmailSuppression
 
 logger = logging.getLogger("spa99.email")
 
 
 def clean(email):
-    return (email or "").strip().lower()
+    return clean_email(email)
 
 
 def suppressed_set(addresses):

@@ -10,6 +10,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from chat import services as chat_services
+from common.emails import clean_email
 from common.models import LoginEvent
 from common.tasks import enqueue, erase_task_records
 from gold import services as gold_services
@@ -224,7 +225,7 @@ def verify_email(token):
 
 def request_password_reset(email):
     """Queue a reset email if the address belongs to an active account. Always looks the same to the caller."""
-    user = User.objects.filter(email__iexact=(email or "").strip(), is_active=True).first()
+    user = User.objects.filter(email__iexact=clean_email(email), is_active=True).first()
     if user is not None:
         try:
             enqueue("users.tasks.send_password_reset_email", str(user.pk))

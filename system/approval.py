@@ -14,6 +14,7 @@ from django.core.validators import validate_email
 from django.db import transaction
 
 from common import levels
+from common.emails import strip_hidden
 from common.validators import normalise_email
 from gold import approval
 from gold.models import ApproverDelivery
@@ -172,7 +173,7 @@ def set_delivery(actor, user_id, use_account_email, other_email=""):
         raise ChangeRefused("Only approvers and final approvers have an email setting.")
     if not _may_change(actor, target):
         raise ChangeRefused("You cannot change your own approval roles." if actor.pk == target.pk else "You can only change people below your own level.")
-    other = (other_email or "").strip()
+    other = strip_hidden(other_email)
     if other:
         try:
             validate_email(other)

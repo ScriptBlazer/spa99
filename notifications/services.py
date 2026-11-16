@@ -9,6 +9,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 
+from common.emails import clean_email, strip_hidden
 from plans.models import SiteSettings
 
 from . import emailbody, emailsettings, suppression
@@ -160,13 +161,15 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
     text a person typed, sent as typed in the shared layout; `blocks` are a group mailing's parts (used instead of `body`);
     `attachments` is a list of (filename, bytes, mimetype); `from_email` and `reply_to` (a list) replace the sender the email's
     settings choose; `options` (emailsettings.Options) replace its saved footer, sender, heading and button settings (a test send from the edit screen). `signature_html` and `signature_text` go under the text of an Office email: the signature is cleaned by `common.richtext.clean_signature` before it is marked safe, and a key of that name in `context` is ignored. An email with a signature has no heading."""
-    to, cc = list(to or []), list(cc or [])
+    to, cc = [a for a in (strip_hidden(a) for a in (to or [])) if a], [a for a in (strip_hidden(a) for a in (cc or [])) if a]  # safety net: a stored address with hidden characters (U+200F, U+202C) must never fail a send
+    from_email = strip_hidden(from_email) or None if from_email else from_email
+    reply_to = [a for a in (strip_hidden(a) for a in reply_to) if a] if reply_to else reply_to
     try:
         blocked = suppression.suppressed_set(to + cc)  # THE guard: every email goes through here
     except Exception as error:  # noqa: BLE001 - cannot tell who is suppressed: fail closed (send nothing), never raise
         logger.error("Email %s not sent: suppression list unavailable (%s)", template, type(error).__name__)
         log = EmailLog(to=", ".join(to), subject=subject[:300], template=template, status=EmailLog.FAILED,
-                       subject_email=(subject_email or "").strip().lower(), error="Suppression list unavailable; not sent.")
+                       subject_email=clean_email(subject_email), error="Suppression list unavailable; not sent.")
         try:
             log.save()
         except Exception:  # noqa: BLE001
@@ -179,7 +182,7 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
         if not to:  # nobody left to email (a CC alone is not a reason to send)
             log = EmailLog.objects.create(
                 to=", ".join(sorted(blocked)), subject=subject[:300], template=template, status=EmailLog.SUPPRESSED,
-                subject_email=(subject_email or "").strip().lower(), error="Address is on the suppression list (bounce or complaint).")
+                subject_email=clean_email(subject_email), error="Address is on the suppression list (bounce or complaint).")
             return log
     ctx = {**base_context(), "subject": subject, **(context or {})}
     for key in ("signature_html", "signature_text"):
@@ -192,12 +195,14 @@ def send_templated(template, to, subject, context=None, cc=None, subject_email="
         ctx["plain_body"] = plain_body
     log = EmailLog(
         to=", ".join(to), cc=", ".join(cc), subject=subject[:300], template=template,
-        subject_email=(subject_email or "").strip().lower(),
+        subject_email=clean_email(subject_email),
     )
     try:
         options = options or emailsettings.options_for(template)
         if from_email is None:  # the email's own sender setting (site by default; the person sender needs its address set in System)
             from_email, reply_to = emailsettings.sender_for(options, SiteSettings.load())
+        from_email = strip_hidden(from_email) or None
+        reply_to = [a for a in (strip_hidden(a) for a in reply_to) if a] if reply_to else reply_to
         html, text = render_email(template, ctx, body=body, blocks=blocks, options=options)
         message = EmailMultiAlternatives(
             subject=subject,

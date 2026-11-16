@@ -1,5 +1,6 @@
 from django.contrib.auth.base_user import BaseUserManager
 
+from common.emails import clean_email
 from common.validators import normalise_email
 
 
@@ -26,4 +27,4 @@ class UserManager(BaseUserManager):
 
     def get_by_natural_key(self, email):
         """Login lookup is case-insensitive."""
-        return self.get(email__iexact=(email or "").strip())
+        return self.get(email__iexact=clean_email(email))

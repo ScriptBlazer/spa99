@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from common.emails import clean_email
 from common.tasks import enqueue, erase_task_records
 from journey import engine as journey_engine
 from journey import services as journey_services
@@ -162,7 +163,7 @@ def submit_application(data, session=None):
     site = SiteSettings.load()
     if not site.register_interest_open:
         raise ApplicationsClosed
-    email = data["email"].strip().lower()
+    email = clean_email(data["email"])
     with transaction.atomic():
         _serialise_submissions(site)  # two clicks at the same instant are handled one after the other
         duplicate = _recent_duplicate(email)

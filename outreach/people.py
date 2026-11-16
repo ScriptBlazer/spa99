@@ -1,11 +1,12 @@
 """Who is "the same person": the addresses a person goes by. The account email, the emails of his Gold applications and the
 addresses he left at the journey gate while signed in, or - for a lead - his one address. Notes, the approach list and messages
 are found through this set, so they follow him from lead to account (docs/features/office-outreach.md section 2)."""
+from common.emails import clean_email
 from users.models import User
 
 
 def _clean(email):
-    return (email or "").strip().lower()
+    return clean_email(email)
 
 
 def resolve(user=None, email="", application=None):

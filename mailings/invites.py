@@ -14,6 +14,7 @@ from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from common.emails import clean_email
 from common.validators import normalise_email
 from notifications.models import EmailSuppression
 from users.models import User
@@ -389,7 +390,7 @@ def mark_bounced(email):
     """SES reported a permanent bounce or a complaint for this address: invites and mailing rows sent to it show it."""
     from .models import MailingRecipient
 
-    email = (email or "").strip().lower()
+    email = clean_email(email)
     now = timezone.now()
     Invite.objects.filter(email=email, status__in=(Invite.SENT, Invite.OPENED)).update(status=Invite.BOUNCED, updated_at=now)
     MailingRecipient.objects.filter(email=email, status=MailingRecipient.SENT, sent_at__gte=now - timedelta(days=7)).update(

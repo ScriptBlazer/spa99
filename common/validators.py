@@ -10,6 +10,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 
+from .emails import clean_email, strip_hidden
+
 MESSAGES = {
     "email_required": "Enter your email address.",
     "email_invalid": "Enter a valid email address.",
@@ -56,7 +58,7 @@ def validate_adult(dob, today=None):
 
 def split_emails(value):
     """'a@x.com, b@y.com' -> ['a@x.com', 'b@y.com'] (commas or semicolons or new lines; blanks dropped)."""
-    return [part.strip() for part in (value or "").replace(";", ",").replace("\n", ",").split(",") if part.strip()]
+    return [strip_hidden(part) for part in (value or "").replace(";", ",").replace("\n", ",").split(",") if strip_hidden(part)]
 
 
 def validate_email_list(value):
@@ -70,7 +72,7 @@ def validate_email_list(value):
 
 def normalise_email(value):
     """Trim and lowercase, then check the format. Returns the clean address or raises ValidationError."""
-    cleaned = (value or "").strip().lower()
+    cleaned = clean_email(value)
     if not cleaned:
         raise ValidationError(MESSAGES["email_required"], code="required")
     if len(cleaned) > 254:
