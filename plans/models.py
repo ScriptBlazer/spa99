@@ -259,7 +259,7 @@ class SiteSettings(BaseModel):
         help_text="The name on automatic emails that come from a person, e.g. Barry Lobenstein. Empty = Spa 99.")
     auto_email_from_address = models.EmailField(
         "Automatic emails sender address", max_length=254, blank=True, default="", db_default="", validators=[validate_sender_domain],
-        help_text="e.g. barry@spa99.uk. Must be on the same domain as the site's sending address. Replies go to this address.")
+        help_text="e.g. name@ followed by the sending domain. Must be on the same domain as the site's sending address. Replies go to this address.")
     lead_next_morning_on = models.BooleanField(
         "Send the next-morning email to new leads", default=False, db_default=False,
         help_text="Off by default. On: each new lead gets one email at 10:00 the next morning (London time), from the sender above. Only leads who give their email after this is turned on are emailed.")
@@ -324,7 +324,7 @@ class SiteSettings(BaseModel):
 
     @property
     def auto_sender(self):
-        """'Barry Lobenstein <barry@spa99.uk>' for automatic emails from a person, or '' while no address is set."""
+        """'Jane Smith <jane@example.com>' for automatic emails from a person, or '' while no address is set."""
         from email.utils import formataddr
 
         address = (self.auto_email_from_address or "").strip()

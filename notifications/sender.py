@@ -88,7 +88,7 @@ def sender_for(user):
 
 
 def format_address(address, name):
-    """`"Barry, Spa 99" <barry@spa99.uk>`: the display name quoted when it needs it and encoded when it is not ASCII, so a stray comma or an accent cannot break the header."""
+    """`"Barry, Spa 99" <name@example.com>`: the display name quoted when it needs it and encoded when it is not ASCII, so a stray comma or an accent cannot break the header."""
     return formataddr((name, address)) if name else address
 
 
@@ -149,13 +149,13 @@ def candidate_by_local_part(local_part):
 
 
 def choice_label(user, sender):
-    """`Barry Lobenstein <barry@spa99.uk>`: name first, then the address (two people can share a first name)."""
+    """`Barry Lobenstein <name@example.com>`: name first, then the address (two people can share a first name)."""
     name = full_name(user) or first_name(user) or sender.address
     return f"{name} <{sender.address}>"
 
 
 def site_choice():
-    """The default option: `Spa 99 <hello@spa99.uk>`."""
+    """The default option: `Spa 99 <hello@example.com>`."""
     return formataddr((BRAND, site_address())) if site_address() else BRAND
 
 

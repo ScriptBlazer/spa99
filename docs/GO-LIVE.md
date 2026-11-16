@@ -71,7 +71,7 @@ None of these block the launch. Each has a safe default already in place.
 
 7. **First data** (once; Postmark domain must be green first, or the invites never arrive)
    - Preview: `docker compose run --rm web python manage.py setup_live --dry-run`. It lists everything and sends nothing.
-   - Run: `docker compose run --rm web python manage.py setup_live`. It loads the seed, the team levels, System values (contact email, Gold CC, WhatsApp, staff alerts), and creates moishe@spa99.uk (Developer + Final approver) and barry@spa99.uk (Admin + Approver), each invited by email. It refuses to run if email doesn't work.
+   - Run: `docker compose run --rm web python manage.py setup_live`. It loads the seed, the team levels, System values (contact email, Gold CC, WhatsApp, staff alerts), and creates moishe@ (Developer + Final approver) and barry@ (Admin + Approver) on the sending domain from .env (EMAIL_SENDING_DOMAIN, else the domain of DEFAULT_FROM_EMAIL), each invited by email. A person who already has an account (same name, or same name before the @ at any domain) is skipped and reported as already present. It refuses to run if email doesn't work.
    - The output must end with "invite sent" for both, then a "Launch state" and "Next steps" block. Open the invite and choose your password within 1 hour (expired: System > Team, resend, or Forgot password on spa99.uk).
 
 8. **Checks**

@@ -381,7 +381,7 @@ class StaffWarningTests(PaymentCase):
     def test_seed_fills_the_alert_address_only_when_empty(self):
         SiteDefaults.objects.update(staff_alert_seeded=False)
         call_command("seed_phase1", stdout=open("/dev/null", "w"))
-        self.assertEqual(SiteDefaults.load().staff_alert_emails, "moishe@spa99.uk")
+        self.assertEqual(SiteDefaults.load().staff_alert_emails, "moishe@example.test")  # example.test: the sending domain of the test settings
         SiteDefaults.objects.update(staff_alert_emails="someone@else.example")
         call_command("seed_phase1", stdout=open("/dev/null", "w"))
         self.assertEqual(SiteDefaults.load().staff_alert_emails, "someone@else.example")

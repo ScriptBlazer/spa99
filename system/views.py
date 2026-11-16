@@ -2,6 +2,7 @@
 brief is docs/design/SYSTEM.md). Every page except sign-in goes through `signed_in` or `unlocked` (404 for strangers)."""
 import time
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_not_required
@@ -187,7 +188,7 @@ def dashboard(request):
     context = {"health": services.health_report(), "recent": services.recent_changes(defaults.get(request).dashboard_recent_changes), "site": site,
                "stages": [("Registration", site.register_interest_open), ("Book", site.booking_open)],
                "launched_text": launch.short_when(site.launched_at) if site.launched_at else "",
-               "whatsapp": clicks.summary(), "bounces_week": emails_logic.bounces_week()}
+               "whatsapp": clicks.summary(), "bounces_week": emails_logic.bounces_week(), "whatsapp_host": settings.DOMAIN}
     return page(request, "system/dashboard.html", "dashboard", context)
 
 

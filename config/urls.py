@@ -1,4 +1,4 @@
-"""Public site (spa99.uk): the website pages, the data endpoints (journey, Gold) and the account routes."""
+"""Public site (DOMAIN): the website pages, the data endpoints (journey, Gold) and the account routes."""
 from django.urls import include, path
 
 from common.views import check_mobile, health

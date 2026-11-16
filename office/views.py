@@ -566,7 +566,7 @@ def _gold_page(request, application, status=200, open_form="", form=None):
                # the approver email's signed token rides along so the audit says the approval came from the email link
                "approve_token": _email_token(request, application) if acts else "",
                "can_delete_gold": levels.at_least(request.user, levels.ADMIN), "delete_url": reverse("office_gold_delete", args=[application.pk]),
-               "guide_available": bool(guide), "guide_to": application.email, "guide_name": (guide.name or "").rsplit("/", 1)[-1],
+               "guide_available": bool(guide), "guide_to": application.email, "guide_from": _guide_from(), "guide_name": (guide.name or "").rsplit("/", 1)[-1],
                "system_guide_url": settings.SYSTEM_URL + reverse("system_gold", urlconf="config.urls_system") if levels.at_least(request.user, levels.DEVELOPER) else "", **tools.tools_context(tools.Target("gold", application.pk, application=application), request.user)}
     return render(request, "office/gold_detail.html", context, status=status)
 
@@ -574,6 +574,16 @@ def _gold_page(request, application, status=200, open_form="", form=None):
 def _email_token(request, application):
     token = request.GET.get("t", "")
     return token if token and approval.approve_token_is_valid(token, application) else ""
+
+
+def _guide_from():
+    """The address the Gold guide email really goes From: the sender chosen for the gold_guide email, else the site address."""
+    from email.utils import parseaddr
+
+    from notifications import emailsettings
+
+    from_email, _ = emailsettings.sender_for(emailsettings.options_for("gold_guide"), SiteSettings.load())
+    return parseaddr(from_email or settings.DEFAULT_FROM_EMAIL)[1]
 
 
 @reader

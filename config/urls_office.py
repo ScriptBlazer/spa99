@@ -1,4 +1,4 @@
-"""Spa 99 Office (office.spa99.uk): the business back office for staff (team levels Office, Admin, Developer and superuser).
+"""Spa 99 Office (the office host, OFFICE_DOMAIN): the business back office for staff (team levels Office, Admin, Developer and superuser).
 Chosen by common.middleware.HostRoutingMiddleware. Locked by default (LoginRequiredMiddleware); each office view
 then checks the team level."""
 from django.contrib import admin

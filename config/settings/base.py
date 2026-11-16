@@ -26,9 +26,9 @@ SECRET_KEY = ENV.get("SECRET_KEY", DEV_SECRET_KEY)
 DEBUG = False  # dev.py switches it on
 
 DOMAIN = ENV.get("DOMAIN", "spa99.uk")
-CONTROL_HOST = ENV.get("CONTROL_DOMAIN", "control.localhost")  # prod: control.spa99.uk (the building control room, parked)
-OFFICE_HOST = ENV.get("OFFICE_DOMAIN", "office.localhost")  # prod: office.spa99.uk (the business back office)
-SYSTEM_HOST = ENV.get("SYSTEM_DOMAIN", "system.localhost")  # prod: system.spa99.uk (developers only: the business rules)
+CONTROL_HOST = ENV.get("CONTROL_DOMAIN", "control.localhost")  # prod: the control host (CONTROL_DOMAIN) (the building control room, parked)
+OFFICE_HOST = ENV.get("OFFICE_DOMAIN", "office.localhost")  # prod: the office host (OFFICE_DOMAIN) (the business back office)
+SYSTEM_HOST = ENV.get("SYSTEM_DOMAIN", "system.localhost")  # prod: the system host (SYSTEM_DOMAIN) (developers only: the business rules)
 DEFAULT_ADMIN_PATH = "backstage-7d3f9a/"  # committed, so public: dev only. prod.py refuses it.
 ADMIN_PATH = ENV.get("ADMIN_PATH", DEFAULT_ADMIN_PATH).strip("/") + "/"  # hidden Django admin
 # ALLOWED_HOSTS in the environment ADDS to these defaults (prod.py adds DOMAIN, CONTROL_DOMAIN, OFFICE_DOMAIN and SYSTEM_DOMAIN too).

@@ -163,6 +163,30 @@ class RoutingAndRoleTests(OfficeTestCase):
         self.assertEqual(get(root, path).status_code, 200)
 
 
+class GoldGuideDialogTests(OfficeTestCase):
+    def test_the_dialog_names_the_real_sending_address_from_settings(self):
+        from django.test import override_settings
+        from plans.models import SiteSettings
+
+        SiteSettings.load()
+        SiteSettings.objects.update(gold_guide="gold/guide.pdf")
+        application = gold_services.submit_application(application_data())[0]
+        with override_settings(DEFAULT_FROM_EMAIL="Spa 99 <hello@mail.example.org>"):
+            page = get(staff("Owner"), f"/gold/{application.pk}/").content.decode()
+        self.assertIn("from hello@mail.example.org.", page)
+
+    def test_the_dialog_names_the_person_when_the_guide_email_goes_out_as_one(self):
+        from notifications.models import NotificationTemplate
+        from plans.models import SiteSettings
+
+        SiteSettings.objects.update(gold_guide="gold/guide.pdf")
+        person = staff("Owner", "jane@example.test")
+        NotificationTemplate.objects.update_or_create(key="gold_guide", defaults={"sender_user": person})
+        application = gold_services.submit_application(application_data())[0]
+        page = get(person, f"/gold/{application.pk}/").content.decode()
+        self.assertIn("from jane@example.test.", page)
+
+
 class StoredFigureTests(OfficeTestCase):
     def setUp(self):
         self.owner = staff("Owner", "q@example.com")

@@ -118,7 +118,7 @@ def _payment_open_values(ctx):
 
 VALID_FOR = {"valid_for": "How long the link works, in words (e.g. '24 hours', '14 days'). Set in System > Defaults"}
 _FIRST = {"first_name": "The person's first name"}
-_SAMPLE_URL = "https://spa99.uk/example-link/"
+_SAMPLE_URL = "https://example.com/example-link/"
 
 SPECS = {spec.key: spec for spec in [
     EmailSpec(
@@ -155,7 +155,7 @@ SPECS = {spec.key: spec for spec in [
     EmailSpec(
         "team_invite", "Added to the team",
         {**_FIRST, "level": "Their level: Office, Admin, Developer or Superuser", "office_url": "The address of the Office"},
-        {"first_name": "James", "level": "Office", "office_url": "https://office.spa99.uk"},
+        {"first_name": "James", "level": "Office", "office_url": "https://office.example.com"},
         "Hello {first_name},\n\nYou've been added to the Spa 99 team ({level}). Use the link below to choose your own password. "
         "It works for one hour and only once.\n\n{button}\n\nThen sign in at {office_url}. If the link has run out, ask the person who "
         "added you to send a new one.",

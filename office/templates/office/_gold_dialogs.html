@@ -25,7 +25,7 @@
 <dialog class="fb-modal o-dialog" data-gold-dialog="guide" aria-labelledby="gd-guide-h">
   <form method="post" action="{% url 'office_gold_send_guide' a.id %}" class="fb-modal-wrap" data-problems data-gold-form="guide">{% csrf_token %}
     <h2 class="fb-modal-title" id="gd-guide-h">Send the guide to {{ a.name|first_word }}?</h2>
-    <p class="fb-modal-body">To {{ guide_to }}, from hello@spa99.uk. His reply comes to the team. It is kept in the history.</p>
+    <p class="fb-modal-body">To {{ guide_to }}, from {{ guide_from }}. His reply comes to the team. It is kept in the history.</p>
     {% if guide_name %}<p class="o-attach" data-guide-file>{% include "office/_icon.html" with name="paperclip" %}<span class="o-attach-name">{{ guide_name }}</span></p>{% endif %}
     <div class="fb-modal-actions">
       <button type="button" class="fb-btn fb-btn--secondary" data-gold-close>Cancel</button>
