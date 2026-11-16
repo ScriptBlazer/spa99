@@ -6,6 +6,7 @@ class SystemConfig(AppConfig):
     name = "system"
 
     def ready(self):
-        from . import changes
+        from . import changes, office_signins
 
         changes.connect()
+        office_signins.connect()
