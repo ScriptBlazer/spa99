@@ -425,6 +425,9 @@ def _team_action(request, action, text="Saved."):
         saved(request, text)
     except services.ChangeRefused as error:
         messages.error(request, str(error))
+    pk = request.resolver_match.kwargs.get("pk")
+    if pk and request.POST.get("back") == "person" and team_service.team_queryset().filter(pk=pk).exists():  # a button on the person's page returns there
+        return redirect("system_team_person", pk=pk)
     return redirect("system_team")
 
 

@@ -42,7 +42,7 @@ def _staff_who_cannot_send():
     """([items], {user ids}): active staff with no address to send from."""
     users = get_user_model().objects.filter(is_active=True).filter(Q(is_staff=True) | Q(is_superuser=True)).order_by("first_name", "email")
     stuck = [u for u in users if sender_mod.sender_for(u).source == "site"]
-    return [_item(f"{_name(u)} has no address they can send from.", "system_team_email", u.pk) for u in stuck], {u.pk for u in stuck}
+    return [_item(f"{_name(u)} has no address they can send from.", "system_team_person", u.pk) for u in stuck], {u.pk for u in stuck}
 
 
 def _gone_senders():
@@ -62,7 +62,7 @@ def _off_domain_addresses(skip=()):
     rows = StaffSender.objects.exclude(sending_address="").filter(user__is_active=True).filter(Q(user__is_staff=True) | Q(user__is_superuser=True)).select_related("user")
     for row in rows:
         if row.user_id not in skip and not sender_mod.on_sending_domain(row.sending_address):
-            items.append(_item(f"{_name(row.user)}'s sending address {row.sending_address} is not on @{sender_mod.sending_domain()}.", "system_team_email", row.user_id))
+            items.append(_item(f"{_name(row.user)}'s sending address {row.sending_address} is not on @{sender_mod.sending_domain()}.", "system_team_person", row.user_id))
     legacy = (SiteSettings.load().auto_email_from_address or "").strip()
     if legacy and not sender_mod.on_sending_domain(legacy):
         # Old field, no System page edits it: no Fix link, the developer changes it.

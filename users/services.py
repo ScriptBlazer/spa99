@@ -249,6 +249,19 @@ def reset_password(uidb64, token, new_password):
     return user
 
 
+def sign_out_everywhere(user):
+    """End every signed-in session of this person (Office, Control, System, the member area). Sessions are stored in the database, so each one is
+    read and the ones that belong to this person are deleted. Returns how many. Works the same on SQLite and Postgres."""
+    from django.contrib.auth import SESSION_KEY
+    from django.contrib.sessions.models import Session
+
+    wanted, gone = str(user.pk), []
+    for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator():
+        if session.get_decoded().get(SESSION_KEY) == wanted:
+            gone.append(session.pk)
+    return Session.objects.filter(pk__in=gone).delete()[0] if gone else 0
+
+
 def password_changed(user):
     """Queue the "your password was changed" email. Called after a signed-in change and a completed reset (never after a
     first password from an invite, never for an admin or command setting one). Never raises."""

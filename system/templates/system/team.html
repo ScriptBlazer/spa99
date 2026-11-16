@@ -1,6 +1,6 @@
 {% extends "system/base.html" %}
 {% block main %}
-<div class="sys-head"><div><h1>Team</h1><p>Who works on Spa 99, at what level. Being on the team never makes someone a member. Gold approver, Membership approver and Final approver are set in Approval.</p></div>
+<div class="sys-head"><div><h1>Team</h1><p>Who works on Spa 99, at what level. Being on the team never makes someone a member. Click a person to open their page: level, approval ticks, Office email, login email and password. The approval ticks can also be set in Approval.</p></div>
   <div class="sys-actions"><a class="sys-btn" href="{% url 'system_team_merge' %}" data-system-team-merge>Merge two accounts</a></div></div>
 <section class="sys-panel" aria-label="Add a team member">
   <form method="post" action="{% url 'system_team_add' %}" class="sys-team-add" data-problems data-system-add-form>{% csrf_token %}
@@ -16,7 +16,7 @@
     <tbody>
     {% for row in staff %}
       <tr data-system-person="{{ row.user.pk }}"{% if not row.user.is_active %} data-hidden{% endif %}>
-        <td><span class="mono">{{ row.user.email }}</span>{% if row.invite_pending %} <span class="sys-badge">Invite sent</span>{% endif %}</td>
+        <td><a class="mono" href="{% url 'system_team_person' row.user.pk %}" data-system-team-person-link>{{ row.user.email }}</a>{% if row.invite_pending %} <span class="sys-badge">Invite sent</span>{% endif %}</td>
         <td>{% if row.user.is_active %}<span class="sys-badge ok">Active</span>{% else %}<span class="sys-badge">Inactive</span>{% endif %}</td>
         <td class="sys-rolesCell">
           {% if row.can_manage %}
@@ -32,7 +32,7 @@
           {% endif %}
         </td>
         <td>
-          {% if row.can_edit_email %}<a class="sys-btn sm" href="{% url 'system_team_email' row.user.pk %}" data-system-team-email-link>Email</a>{% endif %}
+          <a class="sys-btn sm" href="{% url 'system_team_person' row.user.pk %}">Open</a>
           {% if row.can_manage %}
           <form method="post" action="{% url 'system_team_active' row.user.pk %}" data-system-active-form data-noun="account" data-plural="accounts" data-line="Access changes at once." data-system-person-label="{{ row.user.email }}" data-active="{{ row.user.is_active|yesno:'1,0' }}" style="display:inline">{% csrf_token %}
             <input type="hidden" name="active" value="{% if row.user.is_active %}0{% else %}1{% endif %}">

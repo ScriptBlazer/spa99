@@ -205,6 +205,33 @@ def set_delivery(actor, user_id, use_account_email, other_email=""):
     return True
 
 
+def person(actor, target):
+    """What a team member's page shows for the approval roles: [{role, label, held, can_hold, why}] in page order, plus the delivery row when they hold a Gold or Final role.
+    `editable` is the same `_may_change` as System > Approval (so a superuser may set their own)."""
+    user = User.objects.select_related("approver_delivery").prefetch_related("groups").get(pk=target.pk)
+    roles = [{"role": role, "label": ROLES[role]["noun_plain"].capitalize(), "held": _holds(user, role) and ROLES[role]["can_hold"](user),
+              "can_hold": ROLES[role]["can_hold"](user), "why": ROLES[role]["eligible"]} for role in (APPROVER, MEMBERSHIP, FINAL)]
+    emails = any(r["held"] for r in roles if r["role"] in (APPROVER, FINAL))
+    return {"roles": roles, "editable": _may_change(actor, user) and user.is_active, "delivery": row(actor, user) if emails else None}
+
+
+@transaction.atomic
+def set_for_person(actor, target, wanted, delivery=None):
+    """Set a person's approval ticks from their page, with exactly the rules of System > Approval (each add and remove goes through `add`, `remove` and `set_delivery`).
+    `wanted`: {role: True or False} for the roles on the form; `delivery`: (use_account_email, other_email) when the form had the delivery box, else None.
+    All or nothing: one refusal undoes the lot. Returns True when something changed."""
+    current = {r["role"]: r["held"] for r in person(actor, target)["roles"]}
+    changed = False
+    for role, want in wanted.items():
+        if want and not current[role]:
+            changed = bool(add(actor, role, [str(target.pk)])) or changed
+        elif not want and current[role]:
+            changed = bool(remove(actor, role, str(target.pk))) or changed
+    if delivery is not None and any(r["held"] for r in person(actor, target)["roles"] if r["role"] in (APPROVER, FINAL)):
+        changed = bool(set_delivery(actor, str(target.pk), *delivery)) or changed
+    return changed
+
+
 def _clean_ids(values):
     """Only well-formed ids reach the query (a bad id would be a 500 on a UUID column)."""
     import uuid

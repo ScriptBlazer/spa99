@@ -360,12 +360,12 @@ def office_levels(w):
         assert toast_text(admin, "were deleted"), "No confirmation message after deleting"
         assert dbtool("user", members[0][0])["exists"] is False, "The member is still in the database"
 
-    # --- Approver: can approve (the same direct request that was refused above now works) ---
+    # --- Admin + Gold approver (Barry): can approve (the same direct request that was refused above now works) ---
     approver = w.page()
-    with w.step("Approver cannot export, but can approve (direct request accepted)", approver):
+    with w.step("Admin + Gold approver can export and can approve (direct request accepted)", approver):
         sign_in(approver, OFFICE, barry["email"], PASSWORD)
         approver.goto(f"{OFFICE}/people/")
-        assert approver.locator("[data-export-csv]").count() == 0, "Office + Approver sees Export CSV"
+        assert approver.locator("[data-export-csv]").count() > 0, "Admin + Gold approver does not see Export CSV (Barry is Admin: export is Admin and up)"
         approver.goto(f"{OFFICE}/gold/{application_id}/")
         assert approver.locator("[data-approve]").count() > 0, "The Approver sees no Approve button"
         response = direct_post(approver, OFFICE, f"/gold/{application_id}/approve/")

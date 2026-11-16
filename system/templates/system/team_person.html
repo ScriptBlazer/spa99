@@ -1,0 +1,122 @@
+{% extends "system/base.html" %}
+{% comment %}One team member's page (system/views_team_person.py). Every form posts to its own address and comes back here; no script is needed. The Office email form keeps the old data hooks and the sandboxed preview frame.{% endcomment %}
+{% block main %}
+{% include "system/_page_header.html" with title=person.email description="Level, approval ticks, Office email, login email and password for this team member." %}
+<p><a class="sys-btn sm" href="{% url 'system_team' %}">Back to Team</a></p>
+
+<section class="sys-panel" aria-label="Level and account" data-system-person-section="level">
+  <div class="sys-group">
+    <h3>Level and account</h3>
+    <p>{% if person.is_active %}<span class="sys-badge ok">Active</span>{% else %}<span class="sys-badge">Inactive</span>{% endif %}{% if invite_pending %} <span class="sys-badge">Invite sent</span>{% endif %}
+      <span data-system-level="{{ level }}">{{ level_label }}</span></p>
+    {% if can_manage %}
+    <form method="post" action="{% url 'system_team_access' person.pk %}" class="sys-team-roles" data-problems data-system-access-form data-level="{{ level }}" data-line="Access changes at once." data-system-person-label="{{ person.email }}">{% csrf_token %}
+      <input type="hidden" name="back" value="person">
+      <select name="level" aria-label="Level for {{ person.email }}">{% for value, label in level_choices %}<option value="{{ value }}"{% if value == level %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      <button type="submit" class="sys-btn sm">Save level</button>
+    </form>
+    <div class="sys-actions-row">
+      <form method="post" action="{% url 'system_team_active' person.pk %}" data-system-active-form data-noun="account" data-plural="accounts" data-line="Access changes at once." data-system-person-label="{{ person.email }}" data-active="{{ person.is_active|yesno:'1,0' }}" style="display:inline">{% csrf_token %}
+        <input type="hidden" name="back" value="person">
+        <input type="hidden" name="active" value="{% if person.is_active %}0{% else %}1{% endif %}">
+        <button type="submit" class="sys-btn sm">{% if person.is_active %}Deactivate{% else %}Reactivate{% endif %}</button>
+      </form>
+      {% if invite_pending and person.is_active %}
+      <form method="post" action="{% url 'system_team_invite' person.pk %}" style="display:inline">{% csrf_token %}<input type="hidden" name="back" value="person"><button type="submit" class="sys-btn sm">Send a new invite</button></form>
+      {% endif %}
+      <form method="post" action="{% url 'system_team_remove' person.pk %}" data-system-form="team-remove" data-system-confirm="team member" data-system-confirm-label="Remove from team" data-system-confirm-what="{{ person.email }}" data-noun="team member" data-plural="team members" data-line="Their level goes. Their account and any membership stay." style="display:inline">{% csrf_token %}
+        <button type="submit" class="sys-btn sm">Remove from team</button>
+      </form>
+    </div>
+    {% elif is_self %}<p class="sys-muted">This is you. Nobody can change their own level or deactivate themselves.</p>
+    {% else %}<p class="sys-muted">You can only change people below your own level.</p>{% endif %}
+  </div>
+</section>
+
+<section class="sys-panel" aria-label="Approval" data-system-person-section="approval">
+  <form method="post" action="{% url 'system_team_person_roles' person.pk %}" class="sys-group" data-problems>{% csrf_token %}
+    <h3>Approval</h3>
+    <p class="sys-muted">The same ticks as System &gt; Approval. Gold approver and Final approver get the emails for Gold applications. Membership approver is for Office level only: Admin and above can always approve memberships.</p>
+    {% for r in approval.roles %}
+    <div class="sys-row" data-system-role-row="{{ r.role }}">
+      <span class="sys-label">{{ r.label }}{% if not r.can_hold %}<small>{{ r.why }}</small>{% endif %}</span>
+      <div><label class="sys-toggle"><input type="checkbox" name="{{ r.role }}" value="1"{% if r.held %} checked{% endif %}{% if not approval.editable or not r.can_hold %} disabled{% endif %}> <span>{% if r.held %}Yes{% else %}No{% endif %}</span></label></div>
+    </div>
+    {% endfor %}
+    {% if approval.delivery %}
+    <input type="hidden" name="delivery" value="1">
+    <div class="sys-row" data-system-delivery>
+      <span class="sys-label">Where approval emails go<small>Now: <span class="mono">{{ approval.delivery.address }}</span></small></span>
+      <div class="sys-ctl">
+        <label class="sys-toggle"><input type="checkbox" name="use_account_email" value="1"{% if approval.delivery.use_account_email %} checked{% endif %}{% if not approval.editable %} disabled{% endif %}> <span>Send to their login email</span></label>
+        <input type="email" name="other_email" value="{{ approval.delivery.other_email }}" placeholder="name@example.com" autocomplete="off" aria-label="Other email address for approval emails"{% if not approval.editable %} disabled{% endif %}>
+      </div>
+    </div>
+    {% endif %}
+    {% if approval.editable %}<div class="sys-actions-row"><button type="submit" class="sys-btn primary">Save approval</button></div>
+    {% else %}<p class="sys-muted">{% if is_self %}You cannot change your own approval ticks.{% else %}You can only change people below your own level.{% endif %}</p>{% endif %}
+  </form>
+</section>
+
+<form method="post" action="{% url 'system_team_email' person.pk %}" class="sys-panel" data-system-team-email data-problems aria-label="Office email settings" id="email">{% csrf_token %}
+  <div class="sys-group">
+    <h3>Office email</h3>
+    <p class="sys-muted">Who his Office emails come from, and the signature under them. Automatic and system emails are not affected.</p>
+    <p class="sys-note" role="status" data-system-from-now>Right now an email he writes goes <strong>From <span class="mono">{{ sender.from_now }}</span></strong>{% if sender.from_source == "own" %} (his own address){% elif sender.from_source == "set" %} (the sending address below){% else %} (the site address: neither his own address nor a sending address is on @{{ sender.domain }}){% endif %}. Replies go to that address.</p>
+    <div class="sys-row{% if sender.errors.sending_address %} invalid{% endif %}" data-system-field="sending_address">
+      <label for="sending_address">Sending address<small>Only needed when his login address does not end in @{{ sender.domain }}{% if sender.own_ok %}: his own does, so this is not used{% endif %}. Must end in @{{ sender.domain }}. Empty: the site address.</small></label>
+      <div><div class="sys-ctl"><input type="email" id="sending_address" name="sending_address" value="{{ sender.sending_address }}" maxlength="254" autocomplete="off" placeholder="name@{{ sender.domain }}"></div>
+        {% if sender.errors.sending_address %}<p class="sys-error" role="alert" data-problem data-problem-field="sending_address" data-problem-label="Sending address">{{ sender.errors.sending_address }}</p>{% endif %}</div>
+    </div>
+    <div class="sys-row{% if sender.errors.signature %} invalid{% endif %}" data-system-field="signature" data-wide>
+      <label for="signature">Signature<small>HTML (tables, text, links, pictures). Cleaned when saved: scripts, forms and unsafe styles are removed. Empty: a plain "Kind regards" with his name. Pictures: <span class="mono">/static/common/img/email/signature-logo.png</span> and <span class="mono">signature-banner.jpg</span>. To fill it from the design files, run <span class="mono">manage.py fill_signatures</span>.</small></label>
+      <div><div class="sys-ctl"><textarea id="signature" name="signature" rows="14" spellcheck="false" autocomplete="off" class="mono">{{ sender.signature }}</textarea></div>
+        {% if sender.errors.signature %}<p class="sys-error" role="alert" data-problem data-problem-field="signature" data-problem-label="Signature">{{ sender.errors.signature }}</p>{% endif %}</div>
+    </div>
+  </div>
+  <div class="sys-actions-row">
+    {% if can_edit_email %}<button type="submit" class="sys-btn primary">Save</button>{% endif %}
+    <button type="submit" class="sys-btn" name="preview" value="1" data-system-signature-preview>Preview</button>
+  </div>
+  <div class="sys-group">
+    <h4>Preview</h4>
+    <p class="sys-muted">As it sits in an email. Press Preview to see what is typed above (nothing is saved).{% if not sender.preview_doc %} Nothing to show yet.{% endif %}</p>
+    <iframe title="Signature preview" sandbox srcdoc="{{ sender.preview_doc }}" style="width:100%;height:22rem;border:1px solid #e2ddd0;border-radius:6px;background:#fbf9ec" data-system-signature-frame></iframe>
+  </div>
+</form>
+
+<section class="sys-panel" aria-label="Login email" data-system-person-section="login-email">
+  <div class="sys-group">
+    <h3>Login email</h3>
+    <p>Now: <span class="mono">{{ person.email }}</span></p>
+    {% if can_manage %}
+    <p class="sys-muted">Changes the login on this same account, so everything stays. They are signed out everywhere, and both the old and the new address get a short notice. If another account already has the address, use Merge two accounts on the Team page instead.</p>
+    <form method="post" action="{% url 'system_team_person_email' person.pk %}" data-problems data-system-confirm data-confirm-title="Change the login email?" data-confirm-body="{{ person.email }} is signed out everywhere and both addresses are told." data-confirm-action="Change email">{% csrf_token %}
+      <label>New email <input type="email" name="new_email" required autocomplete="off" placeholder="name@example.com"></label>
+      <button type="submit" class="sys-btn sm">Change email</button>
+    </form>
+    {% elif is_self %}<p class="sys-muted">You cannot change your own email here. Ask another Developer or a superuser.</p>
+    {% else %}<p class="sys-muted">You can only change people below your own level.</p>{% endif %}
+  </div>
+</section>
+
+<section class="sys-panel" aria-label="Password" data-system-person-section="password">
+  <div class="sys-group">
+    <h3>Password</h3>
+    {% if can_manage %}
+    <p class="sys-muted">Best: send them a link, so they choose their own password. The link works for one hour.</p>
+    <form method="post" action="{% url 'system_team_person_reset' person.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="sys-btn sm" data-system-reset-link>Send password reset link</button></form>
+    {% if person.is_active %}
+    <h4>Set a password</h4>
+    <p class="sys-muted">Type a new password twice. It is checked against the password rules, kept only as a hash, never shown again and never written to the log (the log says who set it). They are signed out everywhere and emailed that you changed it. Tell them the password yourself, not by email.</p>
+    <form method="post" action="{% url 'system_team_person_password' person.pk %}" data-problems data-system-confirm data-confirm-title="Set a new password?" data-confirm-body="{{ person.email }} is signed out everywhere and emailed." data-confirm-action="Set password">{% csrf_token %}
+      <p><label>New password <input type="password" name="new_password" required autocomplete="new-password"></label></p>
+      <p><label>New password again <input type="password" name="new_password_again" required autocomplete="new-password"></label></p>
+      <button type="submit" class="sys-btn sm">Set password</button>
+    </form>
+    {% endif %}
+    {% elif is_self %}<p class="sys-muted">This is you: use Change password in the menu.</p>
+    {% else %}<p class="sys-muted">You can only change people below your own level.</p>{% endif %}
+  </div>
+</section>
+{% endblock %}

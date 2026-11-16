@@ -57,10 +57,10 @@ class AttentionTests(TestCase):
         barry = staff("barry@elsewhere.com", first_name="Barry")
         item = attention.attention_items()[0]
         self.assertIn("Barry has no address they can send from", item["text"])
-        self.assertEqual(item["fix_url"], reverse("system_team_email", args=[barry.pk], urlconf=URLCONF))
+        self.assertEqual(item["fix_url"], reverse("system_team_person", args=[barry.pk], urlconf=URLCONF))
         StaffSender.objects.create(user=barry, sending_address="barry@example.com")
         self.assertEqual(attention.attention_items(), [])
-        self.assertEqual(unlocked_client(self.admin).get(reverse("system_team_email", args=[barry.pk], urlconf=URLCONF)).status_code, 200)
+        self.assertEqual(unlocked_client(self.admin).get(reverse("system_team_person", args=[barry.pk], urlconf=URLCONF)).status_code, 200)
 
     def test_chosen_sender_who_can_no_longer_send(self):
         gone = staff("gone@elsewhere.com", first_name="Gone")

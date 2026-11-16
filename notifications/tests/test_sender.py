@@ -114,8 +114,10 @@ class SignatureTests(TestCase):
         dev, admin = at("developer", "dev@example.com"), at("admin", "admin@example.com")
         client = unlocked_client(dev)
         url = f"/team/{admin.pk}/email/"
-        page = client.get(url)
+        self.assertRedirects(client.get(url), f"/team/{admin.pk}/", fetch_redirect_response=False)  # the old Team > Email address goes to the person's page
+        page = client.get(f"/team/{admin.pk}/")
         self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Office email")
         self.assertNotContains(page, "Inbox address")
         bad = client.post(url, {"sending_address": "x@gmail.example", "signature": "<p>ok</p>"})
         self.assertContains(bad, "must end in @staff.example.test", status_code=400)

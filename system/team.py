@@ -76,11 +76,11 @@ def _keep_a_superuser(active_superusers, leaving):
         raise ChangeRefused(LAST_SUPERUSER)
 
 
-def _guard(actor, target, team_only=False):
+def _guard(actor, target, team_only=False, own="You cannot change your own access."):
     if team_only and not team_queryset().filter(pk=target.pk).exists():
         raise ChangeRefused("That person is not on the team. Members are managed in the Office.")
     if actor.pk == target.pk:
-        raise ChangeRefused("You cannot change your own access.")
+        raise ChangeRefused(own)
     if not levels.can_manage(actor, target):
         raise ChangeRefused("Only a superuser can change another superuser." if target.is_superuser
                             else "You can only change people below your own level.")

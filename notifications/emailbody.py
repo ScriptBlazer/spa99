@@ -153,6 +153,19 @@ SPECS = {spec.key: spec for spec in [
         "{reset_url}\n\nQuestions? Reply to this email and it will reach the team.",
         subject_placeholders=_FIRST),
     EmailSpec(
+        "password_set", "Password set by an administrator", {**_FIRST, "changed_by": "Who set the new password"},
+        {"first_name": "James", "changed_by": "Dana Developer"},
+        "Hello {first_name},\n\nYour Spa 99 password was changed by {changed_by}. You have been signed out everywhere, so sign in again with the new password.\n\n"
+        "If this wasn't expected, reply to this email and it will reach the team.",
+        subject_placeholders=_FIRST),
+    EmailSpec(
+        "email_changed", "Login email changed (to the old and the new address)",
+        {**_FIRST, "old_email": "The old login email", "new_email": "The new login email", "changed_by": "Who changed it"},
+        {"first_name": "James", "old_email": "james@old.example.com", "new_email": "james@new.example.com", "changed_by": "Dana Developer"},
+        "Hello {first_name},\n\nThe login email for your Spa 99 account was changed from {old_email} to {new_email} by {changed_by}. You have been signed out everywhere, "
+        "so sign in again with {new_email}.\n\nIf this wasn't expected, reply to this email and it will reach the team.",
+        subject_placeholders=_FIRST),
+    EmailSpec(
         "team_invite", "Added to the team",
         {**_FIRST, "level": "Their level: Office, Admin, Developer or Superuser", "office_url": "The address of the Office"},
         {"first_name": "James", "level": "Office", "office_url": "https://office.example.com"},
