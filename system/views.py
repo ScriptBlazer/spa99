@@ -183,9 +183,10 @@ def sign_out(request):
 @require_GET
 def dashboard(request):
     from . import emails as emails_logic
+    from .attention import attention_items
 
     site = SiteSettings.load()
-    context = {"health": services.health_report(), "recent": services.recent_changes(defaults.get(request).dashboard_recent_changes), "site": site,
+    context = {"attention": attention_items(), "health": services.health_report(), "recent": services.recent_changes(defaults.get(request).dashboard_recent_changes), "site": site,
                "stages": [("Registration", site.register_interest_open), ("Book", site.booking_open)],
                "launched_text": launch.short_when(site.launched_at) if site.launched_at else "",
                "whatsapp": clicks.summary(), "bounces_week": emails_logic.bounces_week(), "whatsapp_host": settings.DOMAIN}
@@ -221,7 +222,9 @@ def bounces(request):
     from . import emails as emails_logic
 
     kind = request.GET.get("kind", "")
-    context = {"rows": emails_logic.bounce_rows(kind), "kind": kind, "kinds": EmailBounce.KIND_CHOICES}
+    if kind not in dict(EmailBounce.KIND_CHOICES) and kind != emails_logic.ALL_KINDS:
+        kind = ""  # anything else is the default view
+    context = {"rows": emails_logic.bounce_rows(kind), "kind": kind, "kinds": EmailBounce.KIND_CHOICES, "all_kinds": emails_logic.ALL_KINDS}
     return page(request, "system/emails_bounces.html", "emails", context)
 
 
@@ -375,7 +378,13 @@ def emails(request):
 @unlocked
 @require_GET
 def suppressions(request):
-    return page(request, "system/emails_suppressions.html", "emails", {"rows": EmailSuppression.objects.all()[:500]})
+    from . import emails as emails_logic
+
+    rows = list(EmailSuppression.objects.all()[:500])
+    links = emails_logic.office_links([r.email for r in rows])
+    for row in rows:
+        row.office_url = links.get((row.email or "").strip().lower(), "")
+    return page(request, "system/emails_suppressions.html", "emails", {"rows": rows})
 
 
 @unlocked

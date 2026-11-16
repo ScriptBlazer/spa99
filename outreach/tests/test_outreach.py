@@ -184,7 +184,7 @@ class ApproachListTests(Base):
         self.assertEqual(len(call(self.reader, "get", "/outreach/?state=done").context["rows"]), 1)
         self.assertEqual(services.add_to_list(self.approver, lead_email="hugo@example.com")[0], services.DONE)  # a done entry no longer blocks
         call(self.approver, "post", f"/outreach/{OutreachEntry.objects.get(done_at__isnull=True).pk}/remove/")
-        self.assertEqual(OutreachEntry.objects.filter(done_at__isnull=True).count(), 0)
+        self.assertEqual(OutreachEntry.objects.filter(done_at__isnull=True, removed_at__isnull=True).count(), 0)
 
     def test_the_database_allows_one_open_entry_and_exactly_one_target(self):
         OutreachEntry.objects.create(lead_email="a@example.com")

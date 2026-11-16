@@ -9,7 +9,7 @@
     <tbody>
     {% for row in rows %}
       <tr data-system-suppression="{{ row.pk }}">
-        <td><span class="mono">{{ row.email }}</span></td>
+        <td>{% if row.office_url %}<a class="mono" href="{{ row.office_url }}" data-system-office-link>{{ row.email }}</a>{% else %}<span class="mono">{{ row.email }}</span>{% endif %}</td>
         <td>{{ row.get_reason_display }}</td>
         <td>{{ row.last_seen|date:"j M Y H:i" }}</td>
         <td>{{ row.count }}</td>

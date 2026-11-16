@@ -316,7 +316,7 @@ def outreach_page(request):
 @editor
 @require_POST
 def outreach_done(request, pk):
-    entry = get_object_or_404(OutreachEntry, pk=pk)
+    entry = get_object_or_404(OutreachEntry, pk=pk, removed_at__isnull=True)
     services.mark_done(entry, request.user)
     messages.success(request, "Marked done.")
     return redirect("office_outreach")
@@ -325,7 +325,7 @@ def outreach_done(request, pk):
 @editor
 @require_POST
 def outreach_remove(request, pk):
-    services.remove_entry(get_object_or_404(OutreachEntry, pk=pk))
+    services.remove_entry(get_object_or_404(OutreachEntry, pk=pk, removed_at__isnull=True), request.user)
     messages.success(request, "Removed.")
     return redirect("office_outreach")
 
@@ -342,8 +342,8 @@ def _list_reply(request, ok, message, **extra):
 @require_POST
 def outreach_to_leads(request, pk):
     """Back to Leads: a lead entry comes off the list and he shows in Leads again. No confirm: the answer carries `undo` = {url, reason} (POST url with reason puts him back on the list)."""
-    entry = get_object_or_404(OutreachEntry, pk=pk)
-    result, email, reason = services.entry_to_leads(entry)
+    entry = get_object_or_404(OutreachEntry, pk=pk, removed_at__isnull=True)
+    result, email, reason = services.entry_to_leads(entry, request.user)
     if result != services.DONE:
         return _list_reply(request, False, "Only a lead can go back to Leads.")
     return _list_reply(request, True, "Moved back to Leads.", undo={"url": reverse("office_outreach_undo_move"), "email": email, "reason": reason, "archived": False})
@@ -353,7 +353,7 @@ def outreach_to_leads(request, pk):
 @require_POST
 def outreach_archive(request, pk):
     """Archive from the list: the lead is archived (POST reason, optional, 300) and leaves the list. The answer carries `undo` (see outreach_to_leads)."""
-    entry = get_object_or_404(OutreachEntry, pk=pk)
+    entry = get_object_or_404(OutreachEntry, pk=pk, removed_at__isnull=True)
     form = ArchiveForm(request.POST)
     if not form.is_valid():
         return _list_reply(request, False, " ".join(_errors(form)))

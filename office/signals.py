@@ -19,7 +19,7 @@ from .models import MembershipReviewEvent
 
 # model -> [(time field, staff label field)]: what each source counts (office.activity.SOURCES)
 FIELDS = {StickyNote: [("created_at", "author_label")], NoteEvent: [("at", "by_label")], PersonEdit: [("at", "by_label")], LeadArchiveEvent: [("at", "by_label")],
-          OutreachEntry: [("added_at", "added_by_label"), ("done_at", "done_by_label")], PersonMessage: [("sent_at", "author_label")], MembershipReviewEvent: [("at", "by_label")],
+          OutreachEntry: [("added_at", "added_by_label"), ("done_at", "done_by_label"), ("removed_at", "removed_by_label")], PersonMessage: [("sent_at", "author_label")], MembershipReviewEvent: [("at", "by_label")],
           ApplicationEvent: [("at", "actor_label")], SystemEvent: [("created_at", "user_label")]}
 _local = threading.local()
 

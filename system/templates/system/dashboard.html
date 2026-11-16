@@ -1,6 +1,14 @@
 {% extends "system/base.html" %}
 {% block main %}
-{% include "system/_page_header.html" with title="Dashboard" description="Stored figures only. Nothing here is counted when the page loads (the WhatsApp clicks are a stored daily count)." %}
+{% include "system/_page_header.html" with title="Dashboard" description="Mostly stored figures. The Needs attention box and the bounce count are a few small reads when the page loads; nothing else is counted then." %}
+{% if attention %}
+<section class="sys-panel" data-system-attention aria-labelledby="dash-attention">
+  <header><h2 id="dash-attention">Needs attention</h2></header>
+  <div class="sys-pad">
+    {% for item in attention %}<div class="sys-state" data-system-attention-item><span>{{ item.text }}</span>{% if item.fix_url %}<a href="{{ item.fix_url }}">Fix</a>{% endif %}</div>{% endfor %}
+  </div>
+</section>
+{% endif %}
 <section class="sys-tiles" data-system-health aria-label="Health">
   <div class="sys-tile" data-system-tile="health"><div class="l">Health {% if health.database_ok %}<span class="sys-badge ok">OK</span>{% else %}<span class="sys-badge danger">Failing</span>{% endif %}</div>
     <div class="v" data-system-health-db="{{ health.database_ok|yesno:'ok,error' }}">{{ health.database_ok|yesno:"OK,Failing" }}</div><div class="m">Checked {% now "H:i" %}</div></div>

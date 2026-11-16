@@ -73,7 +73,7 @@ def queryset(state, sort=None, direction=None, emailed=False):
 
     from .services import emailed_q
 
-    found = with_state(OutreachEntry.objects.select_related("user", "gold_application"))
+    found = with_state(OutreachEntry.objects.filter(removed_at__isnull=True).select_related("user", "gold_application"))
     if state == DONE:
         found = found.filter(done_at__isnull=False)
     else:
@@ -86,4 +86,4 @@ def queryset(state, sort=None, direction=None, emailed=False):
 
 def counts():
     """{open, done}: one query. Someone who registered since he was added is not counted as open (he has left the list); a done entry stays in Done."""
-    return with_state(OutreachEntry.objects.all()).aggregate(open=Count("pk", filter=Q(done_at__isnull=True) & NOT_AFTER_ADDED), done=Count("pk", filter=Q(done_at__isnull=False)))
+    return with_state(OutreachEntry.objects.filter(removed_at__isnull=True)).aggregate(open=Count("pk", filter=Q(done_at__isnull=True) & NOT_AFTER_ADDED), done=Count("pk", filter=Q(done_at__isnull=False)))

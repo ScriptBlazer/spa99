@@ -69,7 +69,7 @@ class NoteEvent(UUIDModel):
 
 class OutreachEntry(UUIDModel):
     """One person on the approach list: by account, by lead address or by Gold application (exactly one). One OPEN entry per
-    target (partial unique constraints, fine on SQLite and Postgres); a done entry stays until removed (removing deletes the row)."""
+    target (partial unique constraints, fine on SQLite and Postgres); a done entry stays until removed. Removing sets removed_at (the row stays as history; only erasing a person deletes it)."""
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE, related_name="outreach_entries")
     lead_email = models.CharField(max_length=254, blank=True, db_index=True, help_text="Lower case.")
@@ -81,6 +81,9 @@ class OutreachEntry(UUIDModel):
     done_at = models.DateTimeField(null=True, blank=True, db_index=True)
     done_by = _person()
     done_by_label = models.CharField(max_length=254, blank=True)
+    removed_at = models.DateTimeField(null=True, blank=True, db_index=True, help_text="Taken off the list (removed, back to Leads or archived). The row stays as history; every list and rule ignores it.")
+    removed_by = _person()
+    removed_by_label = models.CharField(max_length=254, blank=True)
 
     class Meta:
         ordering = ["-added_at", "-id"]
@@ -89,9 +92,9 @@ class OutreachEntry(UUIDModel):
                 (Q(user__isnull=False) & Q(lead_email="") & Q(gold_application__isnull=True))
                 | (Q(user__isnull=True) & ~Q(lead_email="") & Q(gold_application__isnull=True))
                 | (Q(user__isnull=True) & Q(lead_email="") & Q(gold_application__isnull=False)))),
-            models.UniqueConstraint(fields=["user"], condition=Q(done_at__isnull=True, user__isnull=False), name="outreach_one_open_per_user"),
-            models.UniqueConstraint(fields=["lead_email"], condition=Q(done_at__isnull=True) & ~Q(lead_email=""), name="outreach_one_open_per_lead"),
-            models.UniqueConstraint(fields=["gold_application"], condition=Q(done_at__isnull=True, gold_application__isnull=False), name="outreach_one_open_per_gold"),
+            models.UniqueConstraint(fields=["user"], condition=Q(done_at__isnull=True, removed_at__isnull=True, user__isnull=False), name="outreach_one_open_per_user"),
+            models.UniqueConstraint(fields=["lead_email"], condition=Q(done_at__isnull=True, removed_at__isnull=True) & ~Q(lead_email=""), name="outreach_one_open_per_lead"),
+            models.UniqueConstraint(fields=["gold_application"], condition=Q(done_at__isnull=True, removed_at__isnull=True, gold_application__isnull=False), name="outreach_one_open_per_gold"),
         ]
 
     def __str__(self):

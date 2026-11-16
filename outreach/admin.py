@@ -13,7 +13,8 @@ class StickyNoteAdmin(admin.ModelAdmin):
 
 @admin.register(OutreachEntry)
 class OutreachEntryAdmin(admin.ModelAdmin):
-    list_display = ("pk", "user", "lead_email", "gold_application", "reason", "added_by_label", "added_at", "done_at")
+    list_display = ("pk", "user", "lead_email", "gold_application", "reason", "added_by_label", "added_at", "done_at", "removed_at")
+    list_filter = ("removed_at",)
     search_fields = ("lead_email", "reason")
 
 

@@ -185,3 +185,17 @@ Each value prints one line: set, already set (left alone), or would set. A missi
 
     docker compose exec web python manage.py setup_live --dry-run   # changes nothing, sends nothing
     docker compose exec web python manage.py setup_live
+
+## Needs attention and bounces you can act on (2026-11-16)
+
+**Needs attention box** (System dashboard, above the tiles; shown only when there is something to fix). `system/attention.py` `attention_items()` returns `[{text, fix_url}]`; each line has a Fix link. A few queries, plus two or three for each staff member who is not on the sending domain (the team is short). One sending domain throughout: `notifications.sender.sending_domain()`.
+
+1. Payment alert emails switched off, or no address set (same two cases as the Payments page). Fix: Defaults.
+2. An active staff member with no address to send from (`sender_for(user).source == "site"`). Fix: his Team > Email page.
+3. An automatic email or an unsent mailing (draft, scheduled, sending, paused) whose chosen sender can no longer send (`sender.chosen(...)` says "gone"). Fix: that email's or mailing's edit page.
+4. A stored address off the sending domain: a staff sending address (Team > Email) or the older automatic-emails sender address. Fix: his Team > Email page. The older address has no Fix link and says to tell the developer (no System page edits it now; it is changed in Django admin). Only active staff are checked, and someone already listed under check 2 is not listed again. Contact, Gold approver cc and alert addresses are never checked against the domain: they are inbound or internal.
+5. Gold has no final approver while final approval is on and potentials are ticked. Fix: Approval.
+
+**Bounces page** (`system/emails.py` `bounce_rows`): one row per address (latest date, times, latest Postmark type and detail, suppressed or not). Default: permanent bounces and spam complaints. Soft and Other stay under their filters; All shows every kind. The latest 500 addresses. Each address links (full Office URL, since this page is on the System host) to its Office person (an account with that address, any case) or else its latest real lead; no match is plain text. The latest row per address is one subquery, and the links are found in bulk (two queries for the whole page), so the query count does not grow with rows. The Suppressions page has the same links.
+
+**One weekly count**: `emails.bounces_week()` is the number of different addresses with a hard bounce in the last 7 days (from the bounce log; complaints have their own tile). The dashboard tile, the Emails overview and its bounce rate all use it. An unknown `?kind=` shows the default view.

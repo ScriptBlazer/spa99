@@ -65,7 +65,7 @@ WORDING = {
     "Note added": ("added a note on ", ""), "Note edited": ("edited a note on ", ""), "Note deleted": ("deleted a note on ", ""), "Note restored": ("restored a note on ", ""),
     "Archived": ("archived ", ""), "Moved back to Leads": ("moved ", " back to Leads"), "Marked as genuine": ("marked ", " as genuine"),
     "Genuine mark undone": ("undid the genuine mark on ", ""),
-    "Added to the approach list": ("added ", " to the {title}"), "Marked done on the approach list": ("marked ", " done on the {title}"),
+    "Added to the approach list": ("added ", " to the {title}"), "Marked done on the approach list": ("marked ", " done on the {title}"), "Removed from the approach list": ("removed ", " from the {title}"),
     "Email sent": ("emailed ", ""), "Email failed": ("tried to email ", ""),
     "Approved": ("approved ", ""), "Declined": ("declined ", ""), "Undid a decision": ("undid the decision on ", ""),
     GOLD_WORDS[ApplicationEvent.APPROVED]: ("approved ", " for Gold"), GOLD_WORDS[ApplicationEvent.SENT_FOR_FINAL]: ("sent ", " for final Gold approval"),
@@ -331,6 +331,7 @@ SOURCES = [
     Source(7, "approvals", "at", "by_label", lambda: MembershipReviewEvent.objects.all(), _row_membership, related=("registration__user",)),
     Source(8, "gold", "at", "actor_label", lambda: ApplicationEvent.objects.exclude(action__in=GOLD_NOT_STAFF), _row_gold, related=("application",)),
     Source(9, "memberships", "created_at", "user_label", lambda: SystemEvent.objects.filter(kind__in=SYSTEM_KINDS), _row_system),
+    Source(10, "leads", "removed_at", "removed_by_label", lambda: OutreachEntry.objects.all(), _approach_row("Removed from the approach list", "removed_by_label"), related=("user", "gold_application")),
 ]
 
 

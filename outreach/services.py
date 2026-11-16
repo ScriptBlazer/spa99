@@ -129,7 +129,7 @@ def open_entries(addresses, user, application):
         query |= Q(user=user) | Q(gold_application__user=user)
     if application is not None:
         query |= Q(gold_application=application)
-    return listing.with_state(OutreachEntry.objects.filter(query, done_at__isnull=True)).filter(listing.NOT_AFTER_ADDED)
+    return listing.with_state(OutreachEntry.objects.filter(query, done_at__isnull=True, removed_at__isnull=True)).filter(listing.NOT_AFTER_ADDED)
 
 
 def add_to_list(actor, user=None, lead_email="", application=None, reason=""):
@@ -161,7 +161,7 @@ def _revive_or_already(target, actor, reason):
     so staff adding him again really gets him on the list. Returns (DONE | ALREADY, entry)."""
     from . import listing
 
-    entry = OutreachEntry.objects.filter(**target, done_at__isnull=True).first()
+    entry = OutreachEntry.objects.filter(**target, done_at__isnull=True, removed_at__isnull=True).first()
     if entry is None:
         return ALREADY, None
     if listing.with_state(OutreachEntry.objects.filter(pk=entry.pk)).filter(listing.NOT_AFTER_ADDED).exists():
@@ -180,8 +180,26 @@ def mark_done(entry, actor):
     return DONE
 
 
-def remove_entry(entry):
-    entry.delete()
+def _take_off(queryset, actor, clicked=None):
+    """Mark rows removed: they stay as history and every list ignores them. One Activity line per click: only the `clicked` row gets who removed it; the others get removed_at alone (a blank
+    label is not counted). Rows are locked and saved one by one (not .update(), which skips the signals Activity needs), and only rows not yet removed are touched, so a second
+    simultaneous remove cannot overwrite who removed it. Returns how many."""
+    now = timezone.now()
+    with transaction.atomic():
+        rows = list(queryset.filter(removed_at__isnull=True).select_for_update())
+        for row in rows:
+            row.removed_at = now
+            fields = ["removed_at"]
+            if clicked is not None and row.pk == clicked.pk:
+                row.removed_by, row.removed_by_label = _actor(actor), label(actor)
+                fields += ["removed_by", "removed_by_label"]
+            row.save(update_fields=fields)
+    return len(rows)
+
+
+def remove_entry(entry, actor=None):
+    """Remove from the list. The row stays, marked removed (Activity keeps Added and Marked done, and shows who removed him)."""
+    _take_off(OutreachEntry.objects.filter(pk=entry.pk), actor, clicked=entry)
     _figures_changed()
     return DONE
 
@@ -286,7 +304,7 @@ def unarchive_lead(email, actor):
 def approach_entries(email_expr):
     """OutreachEntry rows (open or done) that put this lead address on the approach list: a lead entry, or a Gold application of the same address. Used inside Exists(): `email_expr` is the
     outer row's lower-cased address (OuterRef). A lead on the list is not in Leads; taking the entry away (Back to Leads) puts him back."""
-    return OutreachEntry.objects.annotate(application_key=Lower("gold_application__email")).filter(Q(lead_email=email_expr) | Q(application_key=email_expr))
+    return OutreachEntry.objects.filter(removed_at__isnull=True).annotate(application_key=Lower("gold_application__email")).filter(Q(lead_email=email_expr) | Q(application_key=email_expr))
 
 
 def has_mobile_q(email_expr):
@@ -310,12 +328,13 @@ def has_mobile(email):
             or GoldApplication.objects.filter(email__iexact=email).exclude(mobile="").exists())
 
 
-def entry_to_leads(entry):
+def entry_to_leads(entry, actor=None):
     """Back to Leads: a LEAD entry (an address, no account, no Gold application) is taken off the list, so he shows in Leads again. Returns (DONE | MISSING, lead_email, reason)."""
     if not entry.lead_email:
         return MISSING, "", ""
     email, reason = entry.lead_email, entry.reason
-    OutreachEntry.objects.filter(lead_email=email).delete()  # his older Done entries too: any row (open or done) keeps a lead out of Leads (see approach_entries)
+    with transaction.atomic():
+        _take_off(OutreachEntry.objects.filter(lead_email=email), actor, clicked=entry)  # the clicked row gets the Removed line; his older Done entries go quietly too: any row (open or done) keeps a lead out of Leads (see approach_entries)
     _figures_changed()
     return DONE, email, reason
 
@@ -328,7 +347,7 @@ def entry_archive(entry, actor, reason=""):
     with transaction.atomic():
         result, _ = archive_lead(email, actor, reason)
         if result in (DONE, ALREADY):
-            OutreachEntry.objects.filter(lead_email=email).delete()  # his older Done entries too, or they would keep him out of Leads after Unarchive
+            _take_off(OutreachEntry.objects.filter(lead_email=email), actor)  # every row goes quietly (the Archived line is the one Activity line); his older Done entries too, or they would keep him out of Leads after Unarchive
     return result, email
 
 

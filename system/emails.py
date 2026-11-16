@@ -44,7 +44,7 @@ def overview(request=None):
             "sent_today": sent.filter(created_at__gte=today).count(),
             "sent_week": sent.filter(created_at__gte=week).count(),
             "failed_week": EmailLog.objects.filter(status=EmailLog.FAILED, created_at__gte=week).count(),
-            "bounces_week": EmailSuppression.objects.filter(reason=EmailSuppression.HARD_BOUNCE, last_seen__gte=week).count(),
+            "bounces_week": bounces_week(),
             "complaints_week": EmailSuppression.objects.filter(reason=EmailSuppression.COMPLAINT, last_seen__gte=week).count(),
             "suppressed_total": EmailSuppression.objects.count(),
             "unsubscribed_no_account": EmailOptOut.objects.count(),
@@ -56,21 +56,55 @@ def overview(request=None):
 
 # ---------- bounces ----------
 
+BAD_KINDS = (EmailBounce.HARD, EmailBounce.COMPLAINT)  # the ones that stop us emailing an address
+ALL_KINDS = "all"
+
+
 def bounces_week():
-    """Bounces and complaints logged in the last 7 days (indexed on received_at)."""
-    return EmailBounce.objects.filter(received_at__gte=timezone.now() - datetime.timedelta(days=7)).count()
+    """Different addresses with a permanent (hard) bounce in the last 7 days. The one count the dashboard tile and the Emails page both show, and the bounce rate follows it. Complaints have their own tile (indexed on received_at)."""
+    since = timezone.now() - datetime.timedelta(days=7)
+    return EmailBounce.objects.filter(kind=EmailBounce.HARD, received_at__gte=since).values("email").distinct().count()
+
+
+def office_links(emails):
+    """{address: full Office URL (OFFICE_URL first: this page is on the System host)} for a page of lower-case addresses: the person when an account has the address, else the latest real lead session. Two queries, however many addresses."""
+    from django.contrib.auth import get_user_model
+    from django.db.models.functions import Lower
+    from django.urls import reverse
+
+    from journey.models import JourneySession
+
+    wanted = {e.strip().lower() for e in emails if e}
+    if not wanted:
+        return {}
+    links = {}
+    for pk, key in get_user_model().objects.annotate(k=Lower("email")).filter(k__in=wanted).order_by("-created_at").values_list("pk", "k"):
+        links.setdefault(key, f"{settings.OFFICE_URL}{reverse('office_person', args=[pk], urlconf='config.urls_office')}")
+    leads = JourneySession.objects.filter(is_bot=False).annotate(k=Lower("lead_email")).filter(k__in=wanted - set(links)).order_by("-created_at").values_list("pk", "k")
+    for pk, key in leads:
+        links.setdefault(key, f"{settings.OFFICE_URL}{reverse('office_lead', args=[pk], urlconf='config.urls_office')}")
+    return links
 
 
 def bounce_rows(kind=""):
-    """The latest 500 bounce records (optionally one kind), each with `suppressed` (the address is on the suppression list; one query)."""
+    """One row per address (the latest 500 addresses): latest date, count, the latest Postmark type and detail, whether the address is suppressed, and its Office link.
+    Default: permanent bounces and spam complaints. `kind` = one kind (e.g. soft), or "all" for every kind. A fixed number of queries, whatever the number of rows."""
+    from django.db.models import Count, Max, OuterRef, Subquery
+
     found = EmailBounce.objects.all()
     if kind in dict(EmailBounce.KIND_CHOICES):
         found = found.filter(kind=kind)
-    rows = list(found[:500])
-    suppressed = set(EmailSuppression.objects.filter(email__in={r.email for r in rows}).values_list("email", flat=True))
-    for row in rows:
-        row.suppressed = row.email in suppressed
-    return rows
+    elif kind != ALL_KINDS:
+        found = found.filter(kind__in=BAD_KINDS)
+    grouped = list(found.values("email").annotate(last=Max("received_at"), n=Count("pk")).order_by("-last", "email")[:500])
+    emails = [g["email"] for g in grouped]
+    newest = found.filter(email=OuterRef("email")).order_by("-received_at", "-pk").values("pk")[:1]  # each address's latest row (portable: no DISTINCT ON)
+    latest = {row.email: row for row in found.filter(email__in=emails, pk=Subquery(newest))}
+    suppressed = set(EmailSuppression.objects.filter(email__in=emails).values_list("email", flat=True))
+    links = office_links(emails)
+    return [{"email": g["email"], "last": g["last"], "count": g["n"], "kind": latest[g["email"]].kind, "kind_label": latest[g["email"]].get_kind_display(),
+             "postmark_type": latest[g["email"]].postmark_type, "detail": latest[g["email"]].detail, "suppressed": g["email"] in suppressed,
+             "office_url": links.get(g["email"], "")} for g in grouped]
 
 
 # ---------- automatic emails ----------

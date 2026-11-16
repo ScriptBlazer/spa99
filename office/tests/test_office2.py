@@ -486,9 +486,9 @@ class RegisteredAndLeadsTests(Base):
         done = call(self.approver, "post", f"/outreach/{entry.pk}/to-leads/", HTTP_X_REQUESTED_WITH="fetch").json()
         self.assertEqual((done["ok"], done["undo"]["email"], listed()), (True, "a@example.com", ["a@example.com"]))
         call(self.approver, "post", done["undo"]["url"], {k: v for k, v in done["undo"].items() if k != "url"})  # Undo: back on the list
-        self.assertEqual((listed(), OutreachEntry.objects.count()), ([], 1))
-        archived = call(self.approver, "post", f"/outreach/{OutreachEntry.objects.get().pk}/archive/", {"reason": "not a fit"}, HTTP_X_REQUESTED_WITH="fetch").json()
-        self.assertEqual((archived["ok"], archived["undo"]["archived"], ArchivedLead.objects.get().reason, OutreachEntry.objects.count()), (True, True, "not a fit", 0))
+        self.assertEqual((listed(), OutreachEntry.objects.filter(removed_at__isnull=True).count()), ([], 1))
+        archived = call(self.approver, "post", f"/outreach/{OutreachEntry.objects.filter(removed_at__isnull=True).get().pk}/archive/", {"reason": "not a fit"}, HTTP_X_REQUESTED_WITH="fetch").json()
+        self.assertEqual((archived["ok"], archived["undo"]["archived"], ArchivedLead.objects.get().reason, OutreachEntry.objects.filter(removed_at__isnull=True).count()), (True, True, "not a fit", 0))
         del session
 
     def test_registering_takes_him_off_the_list_by_lookup_only_and_the_tiles_are_true_totals(self):
@@ -497,7 +497,7 @@ class RegisteredAndLeadsTests(Base):
         user = user_services.register_interest(cleaned(email="a@example.com")).user
         verify(user)
         self.assertEqual(call(self.admin, "get", "/outreach/").context["counts"], {"open": 0, "done": 0})
-        self.assertEqual(OutreachEntry.objects.count(), 1)  # no row was rewritten or deleted
+        self.assertEqual(OutreachEntry.objects.filter(removed_at__isnull=True).count(), 1)  # no row was rewritten or deleted
         counts.refresh_approvals()
         tiles = call(self.admin, "get", "/leads/").context["tiles"]
         self.assertEqual(tiles, {"leads_total": 1, "registered_total": 1})  # one lead left (b), one registered (a); "went on to register" is gone
@@ -505,23 +505,23 @@ class RegisteredAndLeadsTests(Base):
     def test_back_to_leads_removes_older_done_entries_and_adding_again_revives_an_entry_hidden_by_registering(self):
         lead("a@example.com")
         outreach.add_to_list(self.admin, lead_email="a@example.com")
-        outreach.mark_done(OutreachEntry.objects.get(), self.admin)
+        outreach.mark_done(OutreachEntry.objects.filter(removed_at__isnull=True).get(), self.admin)
         outreach.add_to_list(self.admin, lead_email="a@example.com")  # a second, open entry beside the done one
-        result = outreach.entry_to_leads(OutreachEntry.objects.get(done_at__isnull=True))
-        self.assertEqual((result[0], OutreachEntry.objects.count()), (outreach.DONE, 0))
+        result = outreach.entry_to_leads(OutreachEntry.objects.filter(removed_at__isnull=True).get(done_at__isnull=True))
+        self.assertEqual((result[0], OutreachEntry.objects.filter(removed_at__isnull=True).count()), (outreach.DONE, 0))
         self.assertEqual([r["email"] for r in call(self.reader, "get", "/leads/").context["rows"]], ["a@example.com"])  # really back in Leads
         outreach.add_to_list(self.admin, lead_email="a@example.com")  # Archive from the list does the same: an older Done entry must not keep him out of Leads
-        outreach.mark_done(OutreachEntry.objects.get(), self.admin)
+        outreach.mark_done(OutreachEntry.objects.filter(removed_at__isnull=True).get(), self.admin)
         outreach.add_to_list(self.admin, lead_email="a@example.com")
-        outreach.entry_archive(OutreachEntry.objects.get(done_at__isnull=True), self.admin)
+        outreach.entry_archive(OutreachEntry.objects.filter(removed_at__isnull=True).get(done_at__isnull=True), self.admin)
         outreach.unarchive_lead("a@example.com", self.admin)
-        self.assertEqual(([r["email"] for r in call(self.reader, "get", "/leads/").context["rows"]], OutreachEntry.objects.count()), (["a@example.com"], 0))
+        self.assertEqual(([r["email"] for r in call(self.reader, "get", "/leads/").context["rows"]], OutreachEntry.objects.filter(removed_at__isnull=True).count()), (["a@example.com"], 0))
         user = user_services.register_interest(cleaned(email="b@example.com")).user
         outreach.add_to_list(self.admin, user=user, reason="first")
         verify(user)  # registering takes him off the list (the row stays, hidden)
         self.assertEqual(call(self.admin, "get", "/outreach/").context["counts"]["open"], 0)
         result, entry = outreach.add_to_list(self.admin, user=user, reason="again")
-        self.assertEqual((result, OutreachEntry.objects.count(), entry.reason), (outreach.DONE, 1, "again"))
+        self.assertEqual((result, OutreachEntry.objects.filter(removed_at__isnull=True).count(), entry.reason), (outreach.DONE, 1, "again"))
         self.assertEqual(call(self.admin, "get", "/outreach/").context["counts"]["open"], 1)  # visible again
         self.assertEqual(outreach.add_to_list(self.admin, user=user)[0], outreach.ALREADY)
 
