@@ -1,7 +1,9 @@
-"""System > Approval: who approves Gold applications (Approver, Office level or higher) and who gives the final approval to
-Low potential ones (Final approver, Admin level or higher), and where each person's approval emails go.
+"""System > Approval: who approves Gold applications (Gold approver, Office level or higher; the group is still named "Approver"), who approves
+regular memberships on the Approvals page (Membership approver, Office level only: Admin and up always can, so the role is refused for them and
+dropped when someone is promoted) and who gives the final approval to Low potential Gold ones (Final approver, Admin level or higher),
+and where each person's Gold approval emails go.
 
-The roles are the Approver and Final approver groups (common.levels); Team only shows them. Every change is guarded here,
+The roles are the Approver, Membership approver and Final approver groups (common.levels); Team only shows them. Every change is guarded here,
 recorded in the change list (record_direct, section "approval") and in the audit log (role_changed) with a plain sentence.
 
 Who may change whom (user rule book U4, same `can_manage` as Team): nobody changes themselves, nobody changes someone at their
@@ -27,10 +29,12 @@ from .services import ChangeRefused, record_direct
 
 User = get_user_model()
 SECTION = "approval"
-APPROVER, FINAL = "approver", "final"
+APPROVER, FINAL, MEMBERSHIP = "approver", "final", "membership"
 ROLES = {
-    APPROVER: {"group": levels.APPROVER_GROUP, "noun": "an approver", "noun_plain": "approver", "can_hold": levels.can_hold_approver,
-               "eligible": "Only people at Office level or higher can be approvers."},
+    APPROVER: {"group": levels.APPROVER_GROUP, "noun": "a Gold approver", "noun_plain": "Gold approver", "can_hold": levels.can_hold_approver,
+               "eligible": "Only people at Office level or higher can be Gold approvers."},
+    MEMBERSHIP: {"group": levels.MEMBERSHIP_APPROVER_GROUP, "noun": "a membership approver", "noun_plain": "membership approver", "can_hold": levels.can_hold_membership_approver,
+                 "eligible": "Only people at Office level can be membership approvers. Admin level and above can always approve memberships."},
     FINAL: {"group": levels.FINAL_APPROVER_GROUP, "noun": "a final approver", "noun_plain": "final approver", "can_hold": levels.can_hold_final_approver,
             "eligible": "Only people at Admin level or higher can be final approvers."},
 }
@@ -41,7 +45,8 @@ def _name(user):
 
 
 def _holds(user, role):
-    return levels.held_roles(user)[0 if role == APPROVER else 1]
+    group = ROLES[role]["group"]
+    return any(g.name == group for g in user.groups.all())
 
 
 def _may_change(actor, target):
@@ -86,6 +91,7 @@ def context(actor):
     final_rows = [row(actor, u) for u in _holders(FINAL)]
     return {
         "approvers": [row(actor, u) for u in _holders(APPROVER)], "final_approvers": final_rows,
+        "membership_approvers": [row(actor, u) for u in _holders(MEMBERSHIP)], "membership_candidates": candidates(actor, MEMBERSHIP),
         "approver_candidates": candidates(actor, APPROVER), "final_candidates": candidates(actor, FINAL),
         "cc": site.approver_cc_list, "cc_text": site.gold_approver_cc,
         "final_approver_missing": approval.final_approver_missing(),

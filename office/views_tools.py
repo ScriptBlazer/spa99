@@ -288,7 +288,7 @@ def lead_resend(request, pk):
 STATES = listing.STATES
 
 
-@reader
+@editor
 @require_GET
 @never_cache
 def outreach_page(request):

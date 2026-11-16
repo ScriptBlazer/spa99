@@ -39,6 +39,14 @@ class LevelTests(TestCase):
         self.assertFalse(levels.is_approver(stray))  # Approver without a level counts for nothing
         self.assertTrue(levels.is_approver(person("root@example.com", is_superuser=True)))
 
+    def test_viewer_is_the_lowest_level_and_holds_no_approver_permission(self):
+        viewer = person("viewer@example.com", "viewer", approver=True)
+        viewer.groups.add(Group.objects.get_or_create(name=levels.MEMBERSHIP_APPROVER_GROUP)[0])
+        self.assertEqual((levels.level_of(viewer), levels.rank("viewer") < levels.rank("office")), ("viewer", True))
+        self.assertFalse(levels.is_approver(viewer) or levels.can_approve_memberships(viewer))  # stale ticks count for nothing
+        self.assertFalse(levels.can_hold_approver(viewer) or levels.can_hold_membership_approver(viewer) or levels.can_hold_final_approver(viewer))
+        self.assertTrue(levels.can_manage(person("dev@example.com", "developer"), viewer))
+
     def test_can_manage_matrix(self):
         users = {name: person(f"{name}@example.com", name) for name in ("office", "admin", "developer")}
         users["superuser"] = person("root@example.com", is_superuser=True)

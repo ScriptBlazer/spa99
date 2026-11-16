@@ -9,7 +9,7 @@ Decided by Moishe 2026-10-23 (PROJECT.md). This replaces the old Owner / Manager
 | **Visitor** | Not signed in. The public website, the journey, registering, the Gold application, the tour |
 | **Member** | A person with a membership (registered for a tier, later a paid plan). The website plus the member area (`/account/`) |
 | **Gold member** | A member whose membership is Gold (approved application). Same member area; Gold cannot be changed there |
-| **Team** | People who work on Spa 99, at one of four levels (U2). Being on the team never makes you a member |
+| **Team** | People who work on Spa 99, at one of five levels (U2). Being on the team never makes you a member |
 
 One login per person (the email address). The same login can be a team member and a member at once: member access comes only from holding a membership. If someone already has two accounts, a Developer merges them in System (logged).
 
@@ -17,33 +17,42 @@ One login per person (the email address). The same login can be a team member an
 
 | Level | Office | Control (building) | System | Hidden Django admin | Member area |
 |---|---|---|---|---|---|
-| **Office** | View only | ✗ | ✗ | ✗ | only with a membership |
-| **Admin** | View and act | ✓ | ✗ | ✗ | only with a membership |
-| **Developer** | View and act | ✓ | ✓ (password + code) | ✗ | only with a membership |
+| **Viewer** (new, 2026-11-16) | Sees leads, people and Gold only. No action works | ✗ | ✗ | ✗ | only with a membership |
+| **Office** | Viewer plus the everyday actions (U3) | ✗ | ✗ | ✗ | only with a membership |
+| **Admin** | Office plus Revenue, Assistant chats, export, delete, payment setup | ✓ | ✗ | ✗ | only with a membership |
+| **Developer** | Admin plus Activity | ✓ | ✓ (password + code) | ✗ | only with a membership |
 | **Superuser** | Everything | ✓ | ✓ (password + code) | ✓ | ✓ always (an empty membership if none) |
 
-Two extra permissions sit on top of a level (set in **System > Approval**, shown read only on Team; 2026-10-25):
+Three extra permissions sit on top of a level (set in **System > Approval**, shown read only on Team; 2026-10-25, reshaped 2026-11-16). A **Viewer cannot hold any of them**:
 
-- **Approver**: may approve, decline and resend Gold applications, and gets the email for each one. Office level or higher (e.g. Barry = Office + Approver).
+- **Gold approver**: may approve, decline and resend Gold applications, and gets the email for each one. Office level or higher (e.g. Barry = Admin + Gold approver). This is the old "Approver"; the group is still named `Approver` in the database so live data is untouched, only the label people see changed.
+- **Membership approver**: may use the Approvals page and approve or decline regular memberships. **Office level only**: Admin and up always can, so the permission is refused for them (and dropped when someone is promoted to Admin) rather than shown as implied. Guard: `common.levels.can_hold_membership_approver`. No email goes with this role.
 - **Final approver**: may confirm or send back a Gold application that an approver approved with Low potential (it cannot decline). **Admin level or higher only** (Admin, Developer, Superuser), never Office. Guard: `common.levels.can_hold_final_approver`.
 
-Each person's approval emails go to their account email, or to another address chosen in System > Approval.
+Each person's Gold approval emails go to their account email, or to another address chosen in System > Approval.
 
 ## U3. What "act" means in the Office
 
-| Action | Office | Admin | Developer | Superuser |
-|---|---|---|---|---|
-| See dashboard, analytics, people, Gold | ✓ | ✓ | ✓ | ✓ |
-| Approve / decline / resend Gold | only with Approver | only with Approver | only with Approver | ✓ |
-| Confirm / send back a Low potential approval (final approval; cannot decline) | ✗ (never) | only with Final approver | only with Final approver | ✓ (emailed only if they hold the role) |
-| Export members (CSV, a person's data) | ✗ | ✓ | ✓ | ✓ |
-| Delete a member | ✗ | ✓ | ✓ | ✓ |
+| Action | Viewer | Office | Admin | Developer | Superuser |
+|---|---|---|---|---|---|
+| See dashboard, analytics, people, leads, Gold | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Email (Message), WhatsApp button, sticky notes, the Approach list (add, done, remove, back to Leads, archive from the list), fix a lead's email, resend the follow-up, mark a lead genuine, archive / unarchive leads | ✗ | ✓ | ✓ | ✓ | ✓ |
+| Approve / decline / resend Gold | ✗ | only with Gold approver | only with Gold approver | only with Gold approver | ✓ |
+| Approvals page: approve / decline memberships | ✗ | only with Membership approver | ✓ (always) | ✓ (always) | ✓ |
+| Confirm / send back a Low potential approval (final approval; cannot decline) | ✗ | ✗ (never) | only with Final approver | only with Final approver | ✓ (emailed only if they hold the role) |
+| Revenue (page, tab, Home cards, Analytics cards) | ✗ | ✗ | ✓ | ✓ | ✓ |
+| Assistant chats (list, a chat, the card on a person's page) | ✗ | ✗ | ✓ | ✓ | ✓ |
+| Export members (CSV, a person's data) | ✗ | ✗ | ✓ | ✓ | ✓ |
+| Delete a member, set up payments, restore a sale | ✗ | ✗ | ✓ | ✓ | ✓ |
+| Activity | ✗ | ✗ | ✗ | ✓ | ✓ |
+
+A Viewer's page has no action buttons (no WhatsApp or Email buttons, no notes, no Approach list tab); every action URL answers 403 on the server. Revenue was open to approvers below Admin before 2026-11-16; it is now Admin and up only.
 
 ## U4. Managing the team
 
 - Only **Developers and the superuser** add team members and set levels, in **System > Team** (behind the System unlock, every change in the audit log).
-- Adding someone: email and level (Approver and Final approver are not asked here; they are set in **System > Approval**, and Team shows them as read-only labels). They get an email to set their own password; nobody types a password for someone else.
-- **System > Approval** (Developer level, behind the unlock) adds and removes Approvers and Final approvers and sets where their emails go. It follows the same `can_manage` guard as Team (never yourself, strictly below you, a superuser may change another superuser), with one addition: a superuser may set their own approval roles (it adds no power; it only decides who is emailed). Changing a level in Team keeps these roles, except that a level below Admin drops Final approver and removing someone from the team drops both. Every change is in the audit log (`role_changed`).
+- Adding someone: email and level (Gold approver, Membership approver and Final approver are not asked here; they are set in **System > Approval**, and Team shows them as read-only labels). They get an email to set their own password; nobody types a password for someone else.
+- **System > Approval** (Developer level, behind the unlock) adds and removes Gold approvers, Membership approvers and Final approvers and sets where the Gold emails go. It follows the same `can_manage` guard as Team (never yourself, strictly below you, a superuser may change another superuser), with one addition: a superuser may set their own approval roles (it adds no power; it only decides who is emailed). Changing a level in Team keeps these roles, except that a level below Admin drops Final approver, any level other than Office drops Membership approver, Viewer drops Gold approver too, and removing someone from the team drops all three. Every change is in the audit log (`role_changed`).
 - **Nobody can delete or edit someone higher than them**, and below superuser nobody can delete or edit someone at their own level either. A Developer can change Office and Admin people; only a superuser can change a Developer. **Superusers are the exception: a superuser can delete or edit another superuser** (so a lost or departed superuser can always be removed).
 - Nobody can remove their own access or deactivate themselves.
 
@@ -54,4 +63,4 @@ Each person's approval emails go to their account email, or to another address c
 - No access = a plain "not found" (staff addresses never admit what is there).
 
 ## Payment window actions (2026-10-29)
-Admin and above (Office person page, audited): set up a membership manually (edit, cancel), restore a lapsed sale price (reason required). Developer (System, unlocked): open, schedule, cancel the schedule and close payments; Defaults. Office level can see the sale and payment state, not change it.
+Admin and above (Office person page, audited): set up a membership manually (edit, cancel), restore a lapsed sale price (reason required). Developer (System, unlocked): open, schedule, cancel the schedule and close payments; Defaults. Office level and below can see the sale and payment state (Viewer and Office), not change it.

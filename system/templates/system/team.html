@@ -1,6 +1,6 @@
 {% extends "system/base.html" %}
 {% block main %}
-<div class="sys-head"><div><h1>Team</h1><p>Who works on Spa 99, at what level. Being on the team never makes someone a member. Approver and Final approver are set in Approval.</p></div>
+<div class="sys-head"><div><h1>Team</h1><p>Who works on Spa 99, at what level. Being on the team never makes someone a member. Gold approver, Membership approver and Final approver are set in Approval.</p></div>
   <div class="sys-actions"><a class="sys-btn" href="{% url 'system_team_merge' %}" data-system-team-merge>Merge two accounts</a></div></div>
 <section class="sys-panel" aria-label="Add a team member">
   <form method="post" action="{% url 'system_team_add' %}" class="sys-team-add" data-problems data-system-add-form>{% csrf_token %}

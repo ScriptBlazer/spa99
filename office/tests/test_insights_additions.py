@@ -76,7 +76,7 @@ class HeardViaTests(OfficeTestCase):
 
 class ChatsCardTests(OfficeTestCase):
     def setUp(self):
-        self.office = staff("Office", "o@example.com")
+        self.office = staff("Admin", "o@example.com")  # Assistant chats are Admin and up
 
     def test_lead_page_lists_only_his_chats_newest_five_and_filters_chats(self):
         session = lead("hugo@example.com")
@@ -117,12 +117,12 @@ class ChatsCardMoreTests(OfficeTestCase):
         Conversation.objects.create(session=session, message_count=1)
         other = lead("zed@example.com")
         Conversation.objects.create(session=other, message_count=1)
-        page = get(staff("Office", "o@example.com"), f"/leads/{session.pk}/")
+        page = get(staff("Admin", "o@example.com"), f"/leads/{session.pk}/")
         self.assertContains(page, "1 message")
         self.assertNotContains(page, "2 messages")
 
     def test_pages_do_not_query_more_with_more_chats(self):
-        office = staff("Office", "o@example.com")
+        office = staff("Admin", "o@example.com")
         session = lead("hugo@example.com")
         user = services.register_interest(cleaned(email="sam@example.com")).user
         client = Client(HTTP_HOST=OFFICE)

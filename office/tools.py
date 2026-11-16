@@ -118,9 +118,9 @@ def whatsapp_context(target, user):
 
     mobile, first = mobile_and_name(target)
     edit = target.url("contact") if target.kind == "lead" else target.url("mobile")
-    link = wa_link(mobile)
     editor = can_edit(user)
-    return {"whatsapp": {"state": "mobile" if link else "none", "wa_link": link, "has_mobile": bool(link), "mobile": mobile or "", "first_name": first, "edit_url": edit, "can_edit": bool(editor),
+    link = wa_link(mobile) if editor else ""  # a Viewer never gets the wa.me link, only the number in Details
+    return {"whatsapp": {"state": "mobile" if link else "none", "wa_link": link, "has_mobile": bool(wa_link(mobile)), "mobile": mobile or "", "first_name": first, "edit_url": edit, "can_edit": bool(editor),
                          "can_add_number": bool(editor and not link), "reason": "" if link else ("Add a number to WhatsApp him." if editor else "No mobile on file.")},
             "mobile_countries": phone.countries()}
 

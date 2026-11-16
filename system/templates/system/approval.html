@@ -1,6 +1,6 @@
 {% extends "system/base.html" %}
 {% block main %}
-{% include "system/_page_header.html" with title="Approval" description="Who approves Gold applications, and who gives the final approval to the ones that need it. Team only shows these roles; they are set here." %}
+{% include "system/_page_header.html" with title="Approval" description="Who approves Gold applications (Gold approvers), who approves regular memberships (Membership approvers), and who gives the final approval to the Gold ones that need it. Team only shows these; they are set here." %}
 <form method="post" data-problems data-system-form="approval">{% csrf_token %}
   <section class="sys-panel" data-system-final-switch>
   <div class="sys-group">
@@ -21,8 +21,9 @@
 </form>
 {% if final_approver_missing %}<p class="sys-note warn sys-approval-note" role="status" data-final-approver-missing><strong>No final approver:</strong> final approval is on, so set one below. Until then approvals go straight through.</p>{% endif %}
 
-{% url 'system_approval_approvers_add' as approvers_add %}{% url 'system_approval_final_add' as final_add %}
-{% include "system/_approval_panel.html" with role="approver" title="Approvers" intro="Office level and above. They approve, decline and resend Gold applications, and get an email for each one." people=approvers candidates=approver_candidates add_url=approvers_add add_label="Add approvers" field_label="Team members to add as approvers" %}
+{% url 'system_approval_approvers_add' as approvers_add %}{% url 'system_approval_membership_add' as membership_add %}{% url 'system_approval_final_add' as final_add %}
+{% include "system/_approval_panel.html" with role="approver" title="Gold approvers" intro="Office level and above. They approve, decline and resend Gold applications, and get an email for each one." people=approvers candidates=approver_candidates add_url=approvers_add add_label="Add Gold approvers" field_label="Team members to add as Gold approvers" %}
+{% include "system/_approval_panel.html" with role="membership" title="Membership approvers" intro="Office level only. They approve and decline regular memberships on the Approvals page. Admin level and above always can, so they are not listed here." people=membership_approvers candidates=membership_candidates add_url=membership_add add_label="Add membership approvers" field_label="Team members to add as membership approvers" %}
 {% include "system/_approval_panel.html" with role="final" title="Final approvers" intro="Admin level and above. While final approval is on, approvals for the ticked potentials wait for a final approver before the applicant hears anything." people=final_approvers candidates=final_candidates add_url=final_add add_label="Add final approvers" field_label="Team members to add as final approvers" %}
 
 <p class="sys-muted sys-approval-cc" data-system-approval-cc>Copied on each Gold application email: {% if cc %}<span class="mono">{{ cc|join:", " }}</span>{% else %}nobody{% endif %}. Change it in <a href="{% url 'system_emails' %}">Emails</a>.</p>

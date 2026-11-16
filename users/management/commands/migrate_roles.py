@@ -14,7 +14,7 @@ from django.db import transaction
 
 from common import levels
 
-OLD_TO_LEVEL = {"Owner": levels.ADMIN, "Manager": levels.ADMIN, "Viewer": levels.OFFICE, "System": levels.DEVELOPER}
+OLD_TO_LEVEL = {"Owner": levels.ADMIN, "Manager": levels.ADMIN, "Viewer": levels.VIEWER, "System": levels.DEVELOPER}
 
 
 class Command(BaseCommand):

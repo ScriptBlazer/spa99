@@ -42,8 +42,8 @@ def call(user, method, path, data=None, **extra):
 
 class Base(OfficeTestCase):
     def setUp(self):
-        self.approver = make_team_member("approver@example.test", levels.OFFICE, approver=True)
-        self.reader = make_team_member("reader@example.test", levels.OFFICE)
+        self.approver = make_team_member("approver@example.test", levels.ADMIN, approver=True)  # like Barry on live: Admin and a Gold approver (Revenue and Approvals are Admin and up)
+        self.reader = make_team_member("reader@example.test", levels.VIEWER)
         self.admin = make_team_member("admin@example.test", levels.ADMIN)
 
     mobiles = 0
@@ -480,7 +480,8 @@ class RegisteredAndLeadsTests(Base):
         outreach.add_to_list(self.admin, lead_email="a@example.com", reason="rang him")
         self.assertEqual(listed(), [])  # on the list = gone from Leads
         entry = OutreachEntry.objects.get()
-        rows = call(self.reader, "get", "/outreach/").context["rows"]
+        rows = call(self.admin, "get", "/outreach/").context["rows"]
+        self.assertEqual(call(self.reader, "get", "/outreach/").status_code, 403)  # a Viewer has no approach list
         self.assertEqual((rows[0]["is_lead"], bool(rows[0]["to_leads_url"])), (True, True))
         self.assertEqual(call(self.reader, "post", rows[0]["to_leads_url"]).status_code, 403)
         done = call(self.approver, "post", f"/outreach/{entry.pk}/to-leads/", HTTP_X_REQUESTED_WITH="fetch").json()
@@ -543,7 +544,7 @@ class RegisteredAndLeadsTests(Base):
         rows = {r["email"]: r for r in call(self.reader, "get", "/leads/?view=fakes").context["rows"]}  # a bounced lead is in Possible fakes, not the main list
         self.assertEqual((rows["a@example.com"]["bounced"], rows["a@example.com"]["emailed_at"]), (True, ""))
         outreach.add_to_list(self.admin, lead_email="b@example.com")
-        self.assertEqual([r["email"] for r in call(self.reader, "get", "/outreach/?emailed=1").context["rows"]], ["b@example.com"])
+        self.assertEqual([r["email"] for r in call(self.admin, "get", "/outreach/?emailed=1").context["rows"]], ["b@example.com"])
 
 
 class WhatsAppButtonTests(Base):

@@ -34,7 +34,7 @@
     <div class="sys-group">
       {% if form.non_field_errors %}<p class="sys-note error" role="alert" data-system-error data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
       {% for field in form.visible_fields %}{% if field.name == "gold_approver_cc" or field.name == "contact_email" %}{% include "system/_field_row.html" %}{% endif %}{% endfor %}{{ form.row_token }}
-      <p class="sys-muted" data-system-emails-pointer>Approvers are set in <a href="{% url 'system_approval' %}">Approval</a>.</p>
+      <p class="sys-muted" data-system-emails-pointer>Gold approvers are set in <a href="{% url 'system_approval' %}">Approval</a>.</p>
     </div>
     <div class="sys-group" data-system-next-morning>
       <h3>Next-morning email to new leads</h3>

@@ -43,7 +43,7 @@ class ActionsTestCase(TestCase):
         SiteSettings.objects.filter(singleton_key="site").update(final_approval_on=True)  # final approval is off by default
         set_recipients()
         cls.approver = make_team_member("approver@example.test", levels.OFFICE, approver=True)
-        cls.reader = make_team_member("reader@example.test", levels.OFFICE)
+        cls.reader = make_team_member("reader@example.test", levels.VIEWER)
         cls.final = make_team_member("final@example.test", levels.ADMIN, final=True)
 
     def application(self, **over):

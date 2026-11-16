@@ -1,10 +1,11 @@
 """Office access by team level (common.levels, docs/features/user-rules.md U2/U3). Superusers pass everything.
-  reader    any team level (Office and up): sees everything, view only
-  approver  approve, decline, resend Gold: the Approver permission on top of a level (superusers always)
-  final     confirm or send back a Low potential Gold approval: the Final approver permission on top of Admin level or higher
-  editor    approver or Admin and up: sticky notes, the approach list, Message
-  admin     Admin and up: export members, delete a member
-  developer Developer and up: the Activity page
+  reader     any team level (Viewer and up): sees leads, people and Gold; no action works
+  editor     Office and up: Message, WhatsApp, sticky notes, the approach list, fix a lead's email, mark genuine, archive
+  approver   Gold approver permission on top of Office or higher (superusers always): approve, decline, resend Gold
+  final      Final approver permission on top of Admin or higher: confirm or send back a Low potential Gold approval
+  approvals  Admin and up always; Office with the Membership approver permission: the Approvals page and its decisions
+  admin      Admin and up: Revenue, Assistant chats, export, delete, payment setup
+  developer  Developer and up: the Activity page
 Login is enforced first by LoginRequiredMiddleware. Someone with no team level at all gets a plain 404 (U5: the staff
 address never admits what is there). A team member who lacks the permission for an action gets a 403, and the
 templates do not render the buttons."""
@@ -12,6 +13,7 @@ from functools import wraps
 
 from django.contrib.auth.decorators import login_not_required  # noqa: F401 - re-exported for office views that are public
 from django.core.exceptions import PermissionDenied
+from django.db.models import prefetch_related_objects
 from django.http import Http404
 
 from common import levels
@@ -31,27 +33,27 @@ def _guard(allowed):
     return decorator
 
 
+def can_edit(user):
+    """Message, WhatsApp, sticky notes, the approach list and lead fixes: Office level and up (superusers always). A Viewer gets a 403."""
+    return levels.at_least(user, levels.OFFICE)
+
+
 reader = _guard(lambda user: True)
-admin = _guard(lambda user: levels.at_least(user, levels.ADMIN))
+editor = _guard(can_edit)
+admin = _guard(lambda user: levels.at_least(user, levels.ADMIN))  # Revenue, Assistant chats, export, delete, payment setup
 approver = _guard(levels.is_approver)
+approvals = _guard(levels.can_approve_memberships)
 final_approver = _guard(levels.is_final_approver)
 developer = _guard(lambda user: levels.at_least(user, levels.DEVELOPER))  # Developer and Superuser only (Activity)
 
 
-def can_edit(user):
-    """Sticky notes, the approach list and Message: the Approver permission (the same people who could add Gold notes) or Admin
-    level and up. Superusers always. View-only team members get a 403."""
-    return levels.is_approver(user) or levels.at_least(user, levels.ADMIN)
-
-
-editor = _guard(can_edit)
-
-
 def abilities(user):
     """What the signed-in person may do, for the templates (buttons they cannot use are not rendered)."""
+    if getattr(user, "pk", None) and "groups" not in getattr(user, "_prefetched_objects_cache", {}):
+        prefetch_related_objects([user], "groups")  # one read of the groups for the many checks below (and the rest of the request)
     level = levels.level_of(user)
     admin_up = levels.rank(level) >= levels.rank(levels.ADMIN)
-    approves = levels.is_approver(user)
-    return {"can_act": approves, "can_final": levels.is_final_approver(user), "can_see_all": level != levels.NONE, "can_export": admin_up, "can_delete": admin_up, "can_delete_gold": admin_up, "can_setup": admin_up, "can_edit": approves or admin_up, "can_outreach": level != levels.NONE,
-            "can_approvals": approves or admin_up, "can_revenue": approves or admin_up,  # Barry's view: Approvals and Revenue, their tabs and the Home cards
+    office_up = levels.rank(level) >= levels.rank(levels.OFFICE)
+    return {"can_act": levels.is_approver(user), "can_final": levels.is_final_approver(user), "can_see_all": level != levels.NONE, "can_export": admin_up, "can_delete": admin_up, "can_delete_gold": admin_up, "can_setup": admin_up,
+            "can_edit": office_up, "can_outreach": office_up, "can_approvals": levels.can_approve_memberships(user), "can_revenue": admin_up, "can_chats": admin_up,
             "can_activity": levels.at_least(user, levels.DEVELOPER)}

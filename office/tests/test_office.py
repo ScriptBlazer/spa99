@@ -28,7 +28,7 @@ User = get_user_model()
 OFFICE = "office.localhost"
 
 
-LEVELS = {"Owner": ("Admin", True), "Manager": ("Admin", False), "Viewer": ("Office", False), "Approver": ("Office", True)}  # older test names -> (level group, Approver)
+LEVELS = {"Owner": ("Admin", True), "Manager": ("Admin", False), "Viewer": ("Viewer", False), "Approver": ("Office", True)}  # older test names -> (level group, Gold approver)
 
 
 def staff(role=None, email=None, approver=False, **extra):

@@ -1,19 +1,26 @@
 """Team levels (docs/features/user-rules.md, U2-U4). The one place that answers "what level is this person?".
 
-Levels are Django Groups `Office`, `Admin`, `Developer` plus the superuser flag; the highest one wins. `Approver` is an
-extra permission group, valid only on top of a level. Views call these helpers; they never test group names themselves.
+Levels, lowest first: Viewer, Office, Admin, Developer, Superuser. They are Django Groups `Viewer`, `Office`, `Admin`, `Developer` plus the
+superuser flag; the highest one wins. Three extra permission groups sit on top of a level: `Approver` (shown to people as "Gold approver";
+the group name is kept so live data is untouched), `Membership approver` and `Final approver`. Views call these helpers; they never test
+group names themselves.
 Team levels need is_staff and is_active; a superuser is is_superuser and is_active.
 """
-NONE, OFFICE, ADMIN, DEVELOPER, SUPERUSER = "none", "office", "admin", "developer", "superuser"
-RANK = {NONE: 0, OFFICE: 1, ADMIN: 2, DEVELOPER: 3, SUPERUSER: 4}
-LABELS = {NONE: "No team access", OFFICE: "Office", ADMIN: "Admin", DEVELOPER: "Developer", SUPERUSER: "Superuser"}
-GROUP_FOR = {OFFICE: "Office", ADMIN: "Admin", DEVELOPER: "Developer"}
+NONE, VIEWER, OFFICE, ADMIN, DEVELOPER, SUPERUSER = "none", "viewer", "office", "admin", "developer", "superuser"
+RANK = {NONE: 0, VIEWER: 1, OFFICE: 2, ADMIN: 3, DEVELOPER: 4, SUPERUSER: 5}
+LABELS = {NONE: "No team access", VIEWER: "Viewer", OFFICE: "Office", ADMIN: "Admin", DEVELOPER: "Developer", SUPERUSER: "Superuser"}
+GROUP_FOR = {VIEWER: "Viewer", OFFICE: "Office", ADMIN: "Admin", DEVELOPER: "Developer"}
 LEVEL_FOR_GROUP = {name: level for level, name in GROUP_FOR.items()}
-APPROVER_GROUP = "Approver"
+APPROVER_GROUP = "Approver"  # the Gold approver (the label people see is GOLD_APPROVER_LABEL)
+MEMBERSHIP_APPROVER_GROUP = "Membership approver"
 FINAL_APPROVER_GROUP = "Final approver"
+GOLD_APPROVER_LABEL = "Gold approver"
+ROLE_LABELS = {APPROVER_GROUP: GOLD_APPROVER_LABEL, MEMBERSHIP_APPROVER_GROUP: "Membership approver", FINAL_APPROVER_GROUP: "Final approver"}
 LEVEL_GROUPS = tuple(GROUP_FOR.values())
-TEAM_GROUPS = LEVEL_GROUPS + (APPROVER_GROUP, FINAL_APPROVER_GROUP)
-APPROVER_MIN_LEVEL, FINAL_APPROVER_MIN_LEVEL = OFFICE, ADMIN  # who may hold each role (docs/features/user-rules.md U2)
+ROLE_GROUPS = (APPROVER_GROUP, MEMBERSHIP_APPROVER_GROUP, FINAL_APPROVER_GROUP)
+TEAM_GROUPS = LEVEL_GROUPS + ROLE_GROUPS
+# Who may hold each role (docs/features/user-rules.md U2). Membership approver is Office only: Admin and up always approve memberships, so it is refused there, not stored.
+APPROVER_MIN_LEVEL, FINAL_APPROVER_MIN_LEVEL, MEMBERSHIP_APPROVER_MIN_LEVEL = OFFICE, ADMIN, OFFICE
 
 
 def rank(level):
@@ -35,8 +42,14 @@ def held(user):
     return level, APPROVER_GROUP in names
 
 
+def holds_membership_group(user):
+    """The Membership approver group as stored (ignoring level)."""
+    return user is not None and bool(getattr(user, "pk", None)) and MEMBERSHIP_APPROVER_GROUP in _group_names(user)
+
+
 def held_roles(user):
-    """(approver_group, final_approver_group) as stored: the extra permissions on the Team and Approval screens."""
+    """(approver_group, final_approver_group) as stored: the extra permissions on the Team and Approval screens.
+    The Membership approver group is read with holds_membership_group."""
     if user is None or not getattr(user, "pk", None):
         return False, False
     names = _group_names(user)
@@ -63,16 +76,29 @@ def at_least(user, level):
 
 
 def is_approver(user):
-    """May approve, decline and resend Gold: the Approver group on top of a level, or a superuser."""
+    """May approve, decline and resend Gold: the Gold approver group (Approver) on top of Office level or higher, or a superuser."""
     level = level_of(user)
     if level == SUPERUSER:
         return True
-    return level != NONE and held(user)[1]
+    return rank(level) >= rank(APPROVER_MIN_LEVEL) and held(user)[1]
+
+
+def can_approve_memberships(user):
+    """May use the Approvals page and approve regular memberships: Admin and up always, Office with the Membership approver group. Never Viewer."""
+    level = level_of(user)
+    if rank(level) >= rank(ADMIN):
+        return True
+    return level == OFFICE and holds_membership_group(user)
 
 
 def can_hold_approver(user):
-    """The one guard for the Approver role: Office level or higher (a superuser counts). Not signed-in state: what is stored."""
+    """The one guard for the Gold approver role: Office level or higher (a superuser counts). Not signed-in state: what is stored."""
     return rank(held_level(user)) >= rank(APPROVER_MIN_LEVEL)
+
+
+def can_hold_membership_approver(user):
+    """The one guard for the Membership approver role: Office level exactly. Viewer cannot; Admin and up already approve memberships."""
+    return rank(held_level(user)) == rank(MEMBERSHIP_APPROVER_MIN_LEVEL)
 
 
 def can_hold_final_approver(user):

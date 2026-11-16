@@ -21,11 +21,11 @@ from .services import ChangeRefused, record_direct
 
 logger = logging.getLogger("spa99.system")
 User = get_user_model()
-ASSIGNABLE = (levels.OFFICE, levels.ADMIN, levels.DEVELOPER, levels.SUPERUSER)
+ASSIGNABLE = (levels.VIEWER, levels.OFFICE, levels.ADMIN, levels.DEVELOPER, levels.SUPERUSER)
 
 
-def describe(level, approver, final=False):
-    roles = [name for name, held in ((levels.APPROVER_GROUP, approver), (levels.FINAL_APPROVER_GROUP, final)) if held and level != levels.NONE]
+def describe(level, approver, final=False, membership=False):
+    roles = [levels.ROLE_LABELS[group] for group, held in ((levels.APPROVER_GROUP, approver), (levels.MEMBERSHIP_APPROVER_GROUP, membership), (levels.FINAL_APPROVER_GROUP, final)) if held and level != levels.NONE]
     return levels.LABELS[level] + (" and " + " and ".join(roles) if roles else "")
 
 
@@ -46,8 +46,9 @@ def rows(actor):
         level, approver = levels.held(user)
         final = levels.held_roles(user)[1] and levels.can_hold_final_approver(user)
         approver = approver and levels.can_hold_approver(user)
-        result.append({"user": user, "level": level, "level_label": levels.LABELS[level], "approver": approver, "final_approver": final, "can_edit_email": user.pk == actor.pk or levels.can_manage(actor, user),
-                       "role_labels": [name for name, held in ((levels.APPROVER_GROUP, approver), (levels.FINAL_APPROVER_GROUP, final)) if held],
+        membership = levels.holds_membership_group(user) and levels.can_hold_membership_approver(user)
+        result.append({"user": user, "level": level, "level_label": levels.LABELS[level], "approver": approver, "membership_approver": membership, "final_approver": final, "can_edit_email": user.pk == actor.pk or levels.can_manage(actor, user),
+                       "role_labels": [levels.ROLE_LABELS[group] for group, held in ((levels.APPROVER_GROUP, approver), (levels.MEMBERSHIP_APPROVER_GROUP, membership), (levels.FINAL_APPROVER_GROUP, final)) if held],
                        "can_manage": levels.can_manage(actor, user), "invite_pending": not user.has_usable_password()})
     return result
 
@@ -90,12 +91,19 @@ def _log(actor, target, field, old, new, sentence, kind=SystemEvent.ROLE_CHANGED
     audit.log_event(kind, user=actor, detail={"person": target.email, "old": old, "new": new, **(detail or {})}, sentence=sentence)
 
 
-def apply_level(target, level, approver, actor=None, final=False):
-    """Make the groups and flags say `level` (+ Approver on any level, Final approver on Admin and above; both are
-    dropped when the level does not allow them). Never touches membership or password."""
-    approver = bool(approver) and level != levels.NONE
-    final = bool(final) and levels.rank(level) >= levels.rank(levels.FINAL_APPROVER_MIN_LEVEL)
-    names = ([levels.GROUP_FOR[level]] if level in levels.GROUP_FOR else []) + ([levels.APPROVER_GROUP] if approver else []) + ([levels.FINAL_APPROVER_GROUP] if final else [])
+def _roles_allowed(level, approver, final, membership):
+    """The roles a level can hold: Gold approver from Office up, Membership approver at Office only, Final approver from Admin up. Others are dropped."""
+    return (bool(approver) and levels.rank(level) >= levels.rank(levels.APPROVER_MIN_LEVEL),
+            bool(final) and levels.rank(level) >= levels.rank(levels.FINAL_APPROVER_MIN_LEVEL),
+            bool(membership) and level == levels.OFFICE)
+
+
+def apply_level(target, level, approver, actor=None, final=False, membership=False):
+    """Make the groups and flags say `level` (+ Gold approver from Office up, Membership approver at Office only, Final approver on Admin and above;
+    each is dropped when the level does not allow it). Never touches membership or password."""
+    approver, final, membership = _roles_allowed(level, approver, final, membership)
+    names = (([levels.GROUP_FOR[level]] if level in levels.GROUP_FOR else []) + ([levels.APPROVER_GROUP] if approver else [])
+             + ([levels.MEMBERSHIP_APPROVER_GROUP] if membership else []) + ([levels.FINAL_APPROVER_GROUP] if final else []))
     groups = {g.name: g for g in Group.objects.filter(name__in=levels.TEAM_GROUPS)}
     if any(name not in groups for name in names):
         raise ChangeRefused("The levels do not exist yet. Run: manage.py setup_roles")
@@ -121,15 +129,15 @@ def set_access(actor, target, level, added=False):
         raise ChangeRefused("You can only give a level below your own.")
     old_level, old_approver = levels.held(target)
     old_final = levels.held_roles(target)[1]
-    approver = old_approver and level != levels.NONE
-    final = old_final and levels.rank(level) >= levels.rank(levels.FINAL_APPROVER_MIN_LEVEL)
-    if (old_level, old_approver, old_final) == (level, approver, final):
+    old_membership = levels.holds_membership_group(target)
+    approver, final, membership = _roles_allowed(level, old_approver, old_final, old_membership)
+    if (old_level, old_approver, old_final, old_membership) == (level, approver, final, membership):
         return False
     if target.is_superuser and level != levels.SUPERUSER:
         _keep_a_superuser(superusers, target)
-    apply_level(target, level, approver, actor, final=final)
+    apply_level(target, level, approver, actor, final=final, membership=membership)
     _drop_delivery_if_unused(target)
-    old, new = describe(old_level, old_approver, old_final), describe(level, approver, final)
+    old, new = describe(old_level, old_approver, old_final, old_membership), describe(level, approver, final, membership)
     _log(actor, target, "level", old, new, f"Added {target.email} to the team as {new}" if added else f"Changed access for {target.email} from {old} to {new}")
     return True
 
@@ -141,13 +149,14 @@ def remove_from_team(actor, target):
     _guard(actor, target, team_only=True)
     old_level, old_approver = levels.held(target)
     old_final = levels.held_roles(target)[1]
-    if old_level == levels.NONE and not old_approver and not old_final and not target.is_staff:
+    old_membership = levels.holds_membership_group(target)
+    if old_level == levels.NONE and not old_approver and not old_final and not old_membership and not target.is_staff:
         return False
     if target.is_superuser:
         _keep_a_superuser(superusers, target)
     apply_level(target, levels.NONE, False, actor)
     ApproverDelivery.objects.filter(user=target).delete()  # nothing to deliver any more
-    old = describe(old_level, old_approver, old_final)
+    old = describe(old_level, old_approver, old_final, old_membership)
     _log(actor, target, "level", old, "No team access", f"Removed {target.email} from the team (was {old})")
     return True
 

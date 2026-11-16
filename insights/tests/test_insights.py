@@ -155,9 +155,9 @@ class PermissionTests(TestCase):
         self.assertEqual(self.get(viewer, host="localhost").status_code, 404)
 
     def test_setup_roles_makes_the_team_groups_and_is_safe_to_run_again(self):
-        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {"Office", "Admin", "Developer", "Approver", "Final approver"})
+        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {"Viewer", "Office", "Admin", "Developer", "Approver", "Membership approver", "Final approver"})
         call_command("setup_roles", stdout=StringIO())
-        self.assertEqual(Group.objects.count(), 5)
+        self.assertEqual(Group.objects.count(), 7)
 
 
 class BarrysStatusTests(TestCase):

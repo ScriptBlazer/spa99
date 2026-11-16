@@ -42,7 +42,7 @@ from . import activity, analytics_revenue, approvals, counts, lists, profile, se
 from .forms import ManualSetupForm
 from . import invited as invited_lists
 from . import leads as lead_lists
-from .permissions import abilities, admin, approver, developer, final_approver, reader
+from .permissions import abilities, admin, approver, developer, editor, final_approver, reader
 
 
 def _greeting(user):
@@ -80,7 +80,7 @@ def _remembered_range(request, key, allowed, default):  # `default` comes from S
 def dashboard(request):
     data = selectors.dashboard(_remembered_range(request, "office_range_dashboard", selectors.DASHBOARD_RANGES, defaults.get(request).dashboard_range), request)
     warning = payments.staff_warning() if levels.at_least(request.user, levels.ADMIN) else None
-    cards = counts.cards() if tools.can_edit(request.user) else None  # Waiting, Approved and Revenue: Barry's view only (Approver or Admin and up)
+    cards = counts.cards() if abilities(request.user)["can_revenue"] else None  # Waiting, Approved and Revenue: Admin and up only
     return render(request, "office/dashboard.html", {"data": data, "greeting": _greeting(request.user), "section": "dashboard", "payment_warning": warning, "cards": cards})
 
 
@@ -151,7 +151,7 @@ def people(request):
     tables = [_people_table(request, filters, key, page, size) for key in shown]
     first = tables[0]
     stored = counts.read()
-    approvals_line = approvals.line(stored["memberships"]) if tools.can_edit(request.user) else None
+    approvals_line = approvals.line(stored["memberships"]) if abilities(request.user)["can_approvals"] else None
     context = {"tables": tables, "table": filters["table"], "rows": first["rows"], "has_next": first["has_next"], "page": page, "more_url": first["more_url"], "columns": first["columns"],
                "filters": filters, "total_registered": stored["registered_total"], "counts": {**stored["memberships"], "gold_members": stored["gold_members"], "registered_total": stored["registered_total"]},
                "approvals_line": approvals_line, "plans": list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order").values("slug", "name")), "section": "people",
@@ -203,9 +203,9 @@ def _is_fragment(request):
     return bool(request.headers.get("HX-Request") and "tl" in request.GET)
 
 
-def _chats_context(person, user=None, email="", filter_key="", filter_id=""):
-    """The "Assistant chats" card and what the page shows near the top (how he heard about us)."""
-    return {"heard_via": profile.heard_via(person["journeys"]), "chats": profile.chats_card(user, email),
+def _chats_context(person, user=None, email="", filter_key="", filter_id="", allowed=False):
+    """The "Assistant chats" card and what the page shows near the top (how he heard about us). The chats themselves are loaded only when `allowed` (Admin and up)."""
+    return {"heard_via": profile.heard_via(person["journeys"]), "chats": profile.chats_card(user, email) if allowed else None,
             "chats_all_url": f"{reverse('office_chats')}?{urlencode({filter_key: filter_id})}"}
 
 
@@ -217,7 +217,7 @@ def person(request, pk):
     context = {"person": person, "section": "people", "setup_plans": ManualSetupForm().fields["plan"].queryset,
                **_timeline_context(request, person, lambda n: reverse("office_person_note_restore", args=[user.pk, n])), **_person_extras(request, person)}
     if not _is_fragment(request):
-        context.update(_chats_context(person, user=user, email=user.email, filter_key="user", filter_id=user.pk))
+        context.update(_chats_context(person, user=user, email=user.email, filter_key="user", filter_id=user.pk, allowed=abilities(request.user)["can_chats"]))
         context.update(tools.tools_context(tools.Target("person", user.pk, user=user), request.user))
     return render(request, "office/_timeline.html" if _is_fragment(request) else "office/person.html", context)
 
@@ -399,7 +399,7 @@ def lead(request, pk):
         return redirect("office_person", pk=data.pk)
     context = {"person": data, "section": "leads", **_timeline_context(request, data, lambda n: reverse("office_lead_note_restore", args=[pk, n])), **_person_extras(request, data)}
     if not _is_fragment(request):
-        context.update(_chats_context(data, email=data["email"], filter_key="lead", filter_id=pk))
+        context.update(_chats_context(data, email=data["email"], filter_key="lead", filter_id=pk, allowed=abilities(request.user)["can_chats"]))
         context.update(tools.tools_context(tools.Target("lead", pk, email=data["email"]), request.user))
     return render(request, "office/_timeline.html" if _is_fragment(request) else "office/lead.html", context)
 
@@ -457,7 +457,7 @@ def invited_csv(request):
 
 # ---------- chats (Ask us) ----------
 
-@reader
+@admin
 @require_GET
 @never_cache
 def chats(request):
@@ -509,7 +509,7 @@ def _chats_person(request):
     return None
 
 
-@reader
+@admin
 @require_GET
 @never_cache
 def chat_detail(request, pk):
@@ -748,7 +748,7 @@ def _respond(application):
     return redirect(f"{reverse('office_gold_application', args=[application.pk])}?do=email")
 
 
-@reader
+@editor
 def gold_respond(request, pk):
     """The old Respond URL (any method): see `_respond`."""
     return _respond(get_object_or_404(GoldApplication, pk=pk))

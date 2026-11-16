@@ -48,7 +48,8 @@ class SortingTests(Base):
 
     def test_chat_cost_is_not_sortable_below_developer_level(self):
         keys = lambda user: [c["key"] for c in call(user, "get", "/chats/").context["columns"]]
-        self.assertNotIn("cost", keys(self.reader))
+        self.assertNotIn("cost", keys(self.admin))
+        self.assertEqual(call(self.reader, "get", "/chats/").status_code, 403)  # Assistant chats are Admin and up
 
     def test_csv_follows_the_same_order(self):
         for email in ("c@example.com", "a@example.com"):

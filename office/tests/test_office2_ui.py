@@ -53,7 +53,7 @@ class ListsTests(Base):
     def test_a_short_list_says_nothing_at_its_end_and_assistant_answers_rows_to_the_auto_load(self):
         self.member("one@example.com")
         self.assertNotContains(call(self.approver, "get", "/approvals/"), "That is everyone.")
-        rows = call(self.reader, "get", "/chats/", HTTP_HX_REQUEST="true")
+        rows = call(self.admin, "get", "/chats/", HTTP_HX_REQUEST="true")
         self.assertNotContains(rows, "<html")
 
     def test_the_add_your_number_page_is_the_compact_entrance(self):

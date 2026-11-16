@@ -1,4 +1,4 @@
-"""Approvals and Revenue (Barry's view). Level: the Approver permission, or Admin and up (`editor`): a View-only team member sees neither page, their tabs nor their Home cards.
+"""Approvals and Revenue. Approvals: Admin and up, or Office with the Membership approver permission. Revenue: Admin and up only. Anyone else gets a 403 and no tab or Home card.
 Short views: they read office.approvals and office.counts and answer. The three decisions are POSTs and are audited (office.approvals.decide)."""
 from datetime import date
 from decimal import Decimal
@@ -15,7 +15,7 @@ from plans.models import Plan, SiteSettings
 from system import defaults
 
 from . import approvals, counts, lists
-from .permissions import editor
+from .permissions import admin, approvals as approvals_guard
 
 ACTIONS = {"approve": approvals.APPROVED, "decline": approvals.DECLINED, "undo": approvals.WAITING}
 SAID = {"approve": "approved", "decline": "declined", "undo": "back to waiting"}
@@ -30,7 +30,7 @@ def _tabs(status, stored, request):
     return [{"status": s, "label": approvals.LABELS[s], "count": members[s], "active": s == status, "url": f"{reverse('office_approvals')}?status={s}"} for s in approvals.STATUSES]
 
 
-@editor
+@approvals_guard
 @require_GET
 @never_cache
 def approvals_page(request):
@@ -53,7 +53,7 @@ def approvals_page(request):
     return response
 
 
-@editor
+@approvals_guard
 @require_POST
 def approval_decide(request, pk, action):
     """Approve, Decline or Undo (back to waiting) one person. Nothing is asked and nothing is sent: the member never sees it. A fetch (X-Requested-With: fetch, or Accept: application/json) gets
@@ -96,7 +96,7 @@ def _stored_calendar(revenue):
     return {"start": approved.get("start"), "assumed": approved.get("assumed"), "first": min(days["first"], default=None), "last": max(days["last"], default=None)}
 
 
-@editor
+@admin
 @require_GET
 @never_cache
 def revenue_page(request):

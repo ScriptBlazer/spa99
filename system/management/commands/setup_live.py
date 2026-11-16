@@ -236,7 +236,7 @@ class Command(BaseCommand):
             from system.team import apply_level
 
             try:
-                apply_level(user, level, new_approver, actor=None, final=new_final)
+                apply_level(user, level, new_approver, actor=None, final=new_final, membership=levels.holds_membership_group(user))
             except ChangeRefused as error:
                 return self.problem(label, str(error))
         text = self.describe(level, new_approver, new_final)
@@ -247,7 +247,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def describe(level, approver, final):
-        return levels.LABELS[level] + (" + Approver" if approver else "") + (" + Final approver" if final else "")
+        return levels.LABELS[level] + (" + Gold approver" if approver else "") + (" + Final approver" if final else "")
 
     def invite(self, user):
         """Sent only after the commit, never on a dry run (so a rollback can never email)."""
