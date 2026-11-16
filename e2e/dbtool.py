@@ -3,8 +3,8 @@
 Run as `python -m e2e.dbtool <command> ...` with the e2e environment (scripts/e2e.sh sets it). Playwright's sync API runs
 an event loop, where Django refuses database calls, so the run calls this in a child process instead.
 
-  create-staff EMAIL PASSWORD LEVEL [--approver] [--first NAME] [--last NAME]   Office, Admin or Developer team account
-  set-approver EMAIL        gives the account the Approver role (who receives Gold applications; System > Approval)
+  create-staff EMAIL PASSWORD LEVEL [--approver] [--first NAME] [--last NAME]   Viewer, Office, Admin or Developer team account
+  set-approver EMAIL        gives the account the Gold approver role (group "Approver") (who receives Gold applications; System > Approval)
   registrations             number of registration rows
   user EMAIL                {"exists", "count", "plan", "verified", "active"}
   gold EMAIL                {"status" (newest), "statuses", "waiting", "has_user", "count", "invites", "invites_used"}

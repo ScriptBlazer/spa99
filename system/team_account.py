@@ -12,6 +12,7 @@ from django.db import IntegrityError, transaction
 from common.tasks import enqueue
 from common.validators import normalise_email
 from notifications import sender as sender_mod
+from outreach import services as outreach
 from users import services as user_services
 
 from . import audit, team
@@ -29,19 +30,21 @@ def _name(user):
     return user.get_full_name() or user.email
 
 
-def _follow_email(target, old, new):
-    """The stored copies of the old address that belong to this person move with it, so export and erasure (which look people up by address) still find them,
-    exactly as a merge does: their journey sessions and Gold applications (and the history rows), and the email log rows about them (`subject_email`).
-    Left on purpose: where an old email was actually sent (`to`), sign-in attempts, lists, invites and Approach notes (they record that address, not the account)."""
+def _follow_email(target, old, new, actor):
+    """Everything stored under the old address follows it. The Office data (notes, messages, Approach entries, timeline edits, archive rows, follow-up, chat, email log) moves through
+    outreach.services.move_address_data, the same helper a lead's email correction uses. On top, the rows linked to this account move with their history rows (journey sessions
+    `lead_email`, Gold applications `email`), as a merge does, so export and erasure (which find people by address) still find them. Left on purpose: sign-in attempts, uploaded
+    lists and invites (they record that address, not the account)."""
     from gold.models import GoldApplication
     from journey.models import JourneySession
-    from notifications.models import EmailLog
+    from outreach import services as outreach
 
     for model, field in ((JourneySession, "lead_email"), (GoldApplication, "email")):
         ids = list(model.objects.filter(user=target, **{f"{field}__iexact": old}).values_list("pk", flat=True))
         model.objects.filter(pk__in=ids).update(**{field: new})
         model.history.model.objects.filter(id__in=ids).update(**{field: new})
-    EmailLog.objects.filter(subject_email__iexact=old).update(subject_email=new)
+    outreach.move_address_data(old, new, actor)
+    outreach._figures_changed()
 
 
 def _send_notices(user_id, old, actor_id):
@@ -62,11 +65,14 @@ def change_email(actor, target, new_email):
         new = normalise_email(new_email)
     except ValidationError as error:
         raise ChangeRefused(" ".join(error.messages)) from error
-    old = target.email
+    old = target.email  # email_verified_at is kept on purpose: an address a Developer types counts as verified (decision 2026-11-16)
     if new == old:
         return False
     if User.objects.filter(email__iexact=new).exclude(pk=target.pk).exists():
         raise ChangeRefused(MERGE_HINT)
+    owner = outreach.owner_of_email(new, exclude=old)  # a lead, a Gold applicant or an archived lead who is not this person (their own rows carry the old address)
+    if owner:
+        raise ChangeRefused(f"That address belongs to {owner['kind'] if owner['kind'] != 'gold' else 'a Gold applicant'} ({owner['name']}). Choose a different one.")
     if sender_mod.belongs_to_someone_else(new, target):
         raise ChangeRefused("That address is another team member's sending address. Choose a different one.")
     target.email = new
@@ -76,7 +82,7 @@ def change_email(actor, target, new_email):
             target.save(update_fields=["email", "updated_at"])
     except IntegrityError as error:  # two people saved the same address at once
         raise ChangeRefused(MERGE_HINT) from error
-    _follow_email(target, old, new)
+    _follow_email(target, old, new, actor)
     team._log(actor, target, "email", old, new, f"Changed the login email for {old} to {new}", detail={"signed_out": True})
     user_services.sign_out_everywhere(target)
     transaction.on_commit(lambda: _send_notices(target.pk, old, actor.pk))
@@ -120,7 +126,7 @@ def send_reset_link(actor, target):
     except Exception as error:  # noqa: BLE001
         logger.exception("Could not queue %s", task)
         raise ChangeRefused("The email could not be queued. Try again in a moment.") from error
-    audit.log_event(SystemEvent.ROLE_CHANGED, user=actor, detail={"person": target.email}, sentence=f"Sent a password reset link to {target.email}")
+    audit.log_event(SystemEvent.PASSWORD_CHANGED, user=actor, detail={"person": target.email, "kind": "reset_link"}, sentence=f"Sent a password reset link to {target.email}")
     return True
 
 

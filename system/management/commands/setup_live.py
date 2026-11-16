@@ -225,10 +225,11 @@ class Command(BaseCommand):
         """Only ever adds: a higher level is kept, roles already held are kept."""
         held_level = levels.held_level(user)
         approver, final = levels.held_roles(user)
+        membership = levels.holds_membership_group(user) and levels.can_hold_membership_approver(user)  # kept as it is; shown so the line is the whole truth
         level = want_level if levels.rank(want_level) > levels.rank(held_level) else held_level
         new_approver, new_final = approver or want_approver, final or want_final
         if (level, new_approver, new_final) == (held_level, approver, final) and user.is_staff:
-            return self.kept(label, f"exists as {self.describe(held_level, approver, final)} (left alone)")
+            return self.kept(label, f"exists as {self.describe(held_level, approver, final, membership)} (left alone)")
         if user.is_superuser:  # apply_level would clear the superuser flag: add the role groups only
             groups = ([levels.APPROVER_GROUP] if new_approver and not approver else []) + ([levels.FINAL_APPROVER_GROUP] if new_final and not final else [])
             user.groups.add(*[Group.objects.get_or_create(name=name)[0] for name in groups])
@@ -239,15 +240,15 @@ class Command(BaseCommand):
                 apply_level(user, level, new_approver, actor=None, final=new_final, membership=levels.holds_membership_group(user))
             except ChangeRefused as error:
                 return self.problem(label, str(error))
-        text = self.describe(level, new_approver, new_final)
+        text = self.describe(level, new_approver, new_final, membership and level == levels.OFFICE)
         sentence = f"Set {user.email} to {text} (setup_live)"
-        record_direct(None, "team", "users.user", user, "level", self.describe(held_level, approver, final), text, sentence=sentence)
+        record_direct(None, "team", "users.user", user, "level", self.describe(held_level, approver, final, membership), text, sentence=sentence)
         audit.log_event(SystemEvent.ROLE_CHANGED, detail={"person": user.email, "new": text, "via": "setup_live"}, email="command line", sentence=sentence)
         self.done(label, f"existing account now {text} (nothing removed, password and name untouched)")
 
     @staticmethod
-    def describe(level, approver, final):
-        return levels.LABELS[level] + (" + Gold approver" if approver else "") + (" + Final approver" if final else "")
+    def describe(level, approver, final, membership=False):
+        return levels.LABELS[level] + (" + Gold approver" if approver else "") + (" + Membership approver" if membership else "") + (" + Final approver" if final else "")
 
     def invite(self, user):
         """Sent only after the commit, never on a dry run (so a rollback can never email)."""

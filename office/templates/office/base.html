@@ -67,6 +67,7 @@ Stable hooks: data-office-*. Pages fill: title, header_left, header_range, main,
           {% if office_can.can_see_all %}<div class="o-menu-group o-menu-phone" data-menu-phone>
             <a class="o-menu-item" href="{% url 'office_people' %}" data-menu-registered>Registered</a>
             <a class="o-menu-item" href="{% url 'office_gold' %}" data-menu-gold><span>Gold</span><span data-region="menu-badge">{% if office_waiting %}<span class="o-count">{{ office_waiting }}<span class="sr-only"> waiting</span></span>{% endif %}</span></a>
+            {% if office_can.can_approvals %}<a class="o-menu-item" href="{% url 'office_approvals' %}" data-menu-approvals>Approvals</a>{% endif %}
             {% if office_can.can_export %}<a class="o-menu-item" href="{% url 'office_invited' %}" data-menu-invited>Invited</a>{% endif %}
             {% if office_can.can_activity %}<a class="o-menu-item" href="{% url 'office_activity' %}" data-menu-activity>Activity</a>{% endif %}
           </div>{% endif %}

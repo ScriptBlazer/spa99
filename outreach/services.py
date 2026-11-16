@@ -809,6 +809,35 @@ def _move_follow_up(old, new, bounced):
     row.save(update_fields=["email"])
 
 
+def move_address_data(old, new, actor):
+    """Everything stored under a person's old email moves to the new one: journeys, notes, messages, Approach entries, edits, archive rows and events, the follow-up row, the stop-emails request,
+    an Ask us chat, and the emails sent (the timeline reads them by address). The ONE place that knows the set: a lead's correction and a team member's login change both call it, so Approach
+    list, timeline, export and erasure (which all find a person by address) keep finding everything. Call inside a transaction, after the caller has checked the new address is free; the caller
+    calls `_figures_changed()` afterwards. A bounced old address: what went to it is dropped, not moved (it is not his on the new one)."""
+    from chat import services as chat_services
+    from journey.models import JourneySession
+    from mailings.models import EmailOptOut
+    from notifications.models import EmailLog
+
+    bounced = is_bounced(old)
+    for session in JourneySession.objects.filter(lead_email__iexact=old, is_bot=False):
+        session.lead_email = new
+        session.save(update_fields=["lead_email", "updated_at"])
+    for model, field in ((StickyNote, "email"), (PersonMessage, "email"), (OutreachEntry, "lead_email"), (PersonEdit, "email"), (ArchivedLead, "email"), (LeadArchiveEvent, "email")):
+        model.objects.filter(**{field: old}).update(**{field: new})
+    _move_follow_up(old, new, bounced)
+    GenuineLead.objects.filter(email=old).delete()  # the mark was about the bouncing address: the new one has not bounced, and erasing him must leave nothing behind
+    if EmailOptOut.objects.filter(email=old).exists():  # he asked us to stop: that follows him (the old one stays, as the record of the request)
+        EmailOptOut.objects.get_or_create(email=new, defaults={"source": "moved"})
+    chat_services.move_lead_email(old, new)  # an Ask us chat where he gave the old address
+    if bounced:
+        EmailLog.objects.filter(Q(to__iexact=old) | Q(subject_email__iexact=old)).delete()
+    else:
+        EmailLog.objects.filter(to__iexact=old).update(to=new)
+        EmailLog.objects.filter(subject_email__iexact=old).update(subject_email=new)
+    _edit(new, PersonEdit.EMAIL, old, new, actor)
+
+
 def correct_lead_email(old, new, actor):
     """Change a lead's address (a typo or a new one he gave; after a bounce or not): written on every journey that left the old one, and his notes, messages, list entries and history follow it.
     Refused when the new address already belongs to another lead, an account, a Gold application, or an archived lead (the answer says whose), or when the old one is on a Gold application. The old address stays on the suppression
@@ -816,12 +845,9 @@ def correct_lead_email(old, new, actor):
     the owner {kind, name, url} for TAKEN."""
     from django.core.exceptions import ValidationError
 
-    from chat import services as chat_services
     from common.validators import normalise_email
     from gold.models import GoldApplication
     from journey.models import JourneySession
-    from mailings.models import EmailOptOut
-    from notifications.models import EmailLog
 
     old = (old or "").strip().lower()
     try:
@@ -838,24 +864,8 @@ def correct_lead_email(old, new, actor):
     owner = owner_of_email(new, exclude=old)
     if owner:
         return TAKEN, owner
-    bounced = is_bounced(old)
     with transaction.atomic():
-        for session in sessions:
-            session.lead_email = new
-            session.save(update_fields=["lead_email", "updated_at"])
-        for model, field in ((StickyNote, "email"), (PersonMessage, "email"), (OutreachEntry, "lead_email"), (PersonEdit, "email"), (ArchivedLead, "email"), (LeadArchiveEvent, "email")):
-            model.objects.filter(**{field: old}).update(**{field: new})
-        _move_follow_up(old, new, bounced)
-        GenuineLead.objects.filter(email=old).delete()  # the mark was about the bouncing address: the new one has not bounced, and erasing him must leave nothing behind
-        if EmailOptOut.objects.filter(email=old).exists():  # he asked us to stop: that follows him (the old one stays, as the record of the request)
-            EmailOptOut.objects.get_or_create(email=new, defaults={"source": "moved"})
-        chat_services.move_lead_email(old, new)  # an Ask us chat where he gave the old address
-        if bounced:  # what went to a bouncing address is not his on the new one; otherwise the sent emails are his and follow the address (the timeline reads them by address)
-            EmailLog.objects.filter(Q(to__iexact=old) | Q(subject_email__iexact=old)).delete()
-        else:
-            EmailLog.objects.filter(to__iexact=old).update(to=new)
-            EmailLog.objects.filter(subject_email__iexact=old).update(subject_email=new)
-        _edit(new, PersonEdit.EMAIL, old, new, actor)
+        move_address_data(old, new, actor)
     _figures_changed()
     return DONE, ""
 

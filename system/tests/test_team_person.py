@@ -99,11 +99,13 @@ class ChangeEmailTests(PersonBase):
         journey.refresh_from_db(), application.refresh_from_db()
         self.assertEqual((journey.lead_email, application.email, application.user_id), ("olive.new@example.com", "olive.new@example.com", target.pk))
         self.assertEqual(EmailLog.objects.get(template="welcome").subject_email, "olive.new@example.com")
-        self.assertEqual(EmailLog.objects.get(template="welcome").to, "olive@example.com")  # where it was sent is history: left as it was
+        self.assertEqual(EmailLog.objects.get(template="welcome").to, "olive.new@example.com")  # the sent emails follow the address (the timeline reads them by address)
         # both addresses are told, the sessions are gone
         notices = [m for m in mail.outbox if "login email was changed" in m.subject]
         self.assertEqual(sorted(m.to[0] for m in notices), ["olive.new@example.com", "olive@example.com"])
-        self.assertIn("olive@example.com to olive.new@example.com", notices[0].body)
+        by_address = {m.to[0]: m for m in notices}
+        self.assertNotIn("olive.new@example.com", by_address["olive@example.com"].body)  # the old address is told, but never where to
+        self.assertIn("olive@example.com to olive.new@example.com", by_address["olive.new@example.com"].body)
         self.assertEqual(sessions_of(target), 0)
         self.assertNotIn("_auth_user_id", stay.session)
         # change list and audit: old to new
@@ -122,6 +124,39 @@ class ChangeEmailTests(PersonBase):
         self.assertFalse(team_account.change_email(self.dev, self.office, "OLIVE@example.com"))  # the same address: nothing to do
         self.assertFalse(SystemChange.objects.filter(field="email").exists())
         self.assertEqual(len(mail.outbox), 0)
+
+
+class OfficeDataTests(PersonBase):
+    def test_notes_messages_and_timeline_follow_the_change_and_erasure_finds_them(self):
+        from outreach import people
+        from outreach.models import PersonEdit, PersonMessage, StickyNote
+        from users import services as user_services
+
+        target = User.objects.get(pk=self.office.pk)
+        target.email_verified_at = timezone.now()
+        target.save()
+        StickyNote.objects.create(email="olive@example.com", text="Likes the sauna", author=self.dev)
+        PersonMessage.objects.create(email="olive@example.com", text="Hello", subject="Hi", author=self.dev)
+        self.assertTrue(team_account.change_email(self.dev, target, "olive.new@example.com"))
+        target.refresh_from_db()
+        main, addresses, _ = people.resolve(user=target)
+        self.assertEqual(main, "olive.new@example.com")
+        self.assertEqual(StickyNote.objects.get().email, "olive.new@example.com")
+        self.assertEqual(PersonMessage.objects.get().email, "olive.new@example.com")
+        self.assertTrue(PersonEdit.objects.filter(email="olive.new@example.com", what=PersonEdit.EMAIL, before="olive@example.com").exists())  # the timeline line
+        user_services.delete_user_data(target)
+        self.assertFalse(StickyNote.objects.exists() or PersonMessage.objects.exists() or PersonEdit.objects.exists())
+
+    def test_an_address_a_lead_or_gold_applicant_or_archived_lead_holds_is_refused(self):
+        from outreach.models import ArchivedLead
+
+        JourneySession.objects.create(lead_email="lead@example.com")
+        gold_services.submit_application(application_data(email="gold@example.com"))
+        ArchivedLead.objects.create(email="gone@example.com")
+        for address in ("lead@example.com", "gold@example.com", "gone@example.com"):
+            with self.subTest(address=address), self.assertRaises(ChangeRefused):
+                team_account.change_email(self.dev, self.office, address)
+        self.assertEqual(User.objects.get(pk=self.office.pk).email, "olive@example.com")
 
 
 class PasswordTests(PersonBase):
@@ -176,7 +211,7 @@ class PasswordTests(PersonBase):
         pending.groups.add(*self.office.groups.all())
         team_account.send_reset_link(self.dev, pending)
         self.assertIn("added to the Spa 99 team", mail.outbox[-1].subject)
-        self.assertEqual(SystemEvent.objects.filter(sentence__startswith="Sent a password reset link").count(), 2)
+        self.assertEqual(SystemEvent.objects.filter(kind="password_changed", detail__kind="reset_link").count(), 2)
         with self.assertRaises(ChangeRefused):
             team_account.send_reset_link(self.dev, self.dev)
 

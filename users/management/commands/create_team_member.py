@@ -37,7 +37,7 @@ def make_member(email, level, approver=False, final=False, first_name="", last_n
             user = User.objects.create_user(email, password, first_name=first_name, last_name=last_name)
         final = final or levels.held_roles(user)[1]  # an existing Final approver keeps it
         apply_level(user, level, approver, actor=None, final=final, membership=levels.holds_membership_group(user))  # an existing Membership approver keeps it
-        label = levels.LABELS[level] + (" and Gold approver" if approver else "") + (" and Final approver" if final and levels.can_hold_final_approver(user) else "")
+        label = levels.LABELS[level] + (" and Gold approver" if approver and levels.can_hold_approver(user) else "") + (" and Final approver" if final and levels.can_hold_final_approver(user) else "")
         audit.log_event(SystemEvent.ROLE_CHANGED, detail={"person": user.email, "new": label, "via": via}, email="command line",
                         sentence=f"{'Added' if created else 'Set'} {user.email} {'to the team as' if created else 'to'} {label} (command line)")
     return user, created
@@ -76,7 +76,7 @@ class Command(BaseCommand):
             send_team_invite_email(str(user.pk))
         made = "Created" if created else "Updated (password unchanged)"
         extra = " An email to choose a password has been sent." if created and options["invite"] else ""
-        self.stdout.write(f"{made}: {user.email} is now {levels.LABELS[options['level']]}{' and Gold approver' if options['approver'] else ''}.{extra}")
+        self.stdout.write(f"{made}: {user.email} is now {levels.LABELS[options['level']]}{' and Gold approver' if options['approver'] and levels.can_hold_approver(user) else ''}.{extra}")
 
     def _ask_password(self, email):
         first, second = getpass("Password: "), getpass("Password (again): ")

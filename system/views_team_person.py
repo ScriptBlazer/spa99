@@ -3,6 +3,7 @@ team.py, team_account.py and approval.py (the ticks use the same code as System 
 are saved by views_team_email (their old address now redirects here)."""
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
+from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_GET, require_POST
 
 from common import levels
@@ -69,6 +70,7 @@ def team_person_email(request, pk):
 
 @unlocked
 @require_POST
+@sensitive_post_parameters("new_password", "new_password_again")
 def team_person_password(request, pk):
     target = _target(pk)
     return _back(request, pk, lambda: team_account.set_password(request.user, target, request.POST.get("new_password", ""), request.POST.get("new_password_again", "")),

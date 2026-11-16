@@ -14,7 +14,7 @@
     <p class="o-lead" data-office-what-changed data-region="what-changed" data-fade>{{ data.what_changed|default:"A quiet day so far." }}</p>
   </header>
 
-  {% comment %}Waiting for approval, Approved, Revenue (Barry's view: the Approver permission or Admin and up). True totals: they ignore the range. Context `cards` (office.counts.cards): each ring {value, of}; Revenue rings are pence excluding VAT.
+  {% comment %}Waiting for approval, Approved, Revenue (Admin and up only; Revenue is Admin and up, 2026-11-16). True totals: they ignore the range. Context `cards` (office.counts.cards): each ring {value, of}; Revenue rings are pence excluding VAT.
      Design: docs/features/office-2-design.md section 1. DOM order is the phone order, and the cards sit before the journey.{% endcomment %}
   {% if cards %}
   <section class="o-cards-approval" data-approval-cards aria-label="Approval and revenue">
@@ -88,8 +88,9 @@
     <p class="o-gold-label"><span class="o-gold-dot" aria-hidden="true"></span><span id="gold-tile-h">Gold applications</span></p>
     <p class="o-gold-num" data-gold-waiting>{{ data.gold_waiting|num }}</p>
     {% if data.gold_waiting %}
-    <p class="o-gold-line">waiting for you</p>
+    {% if office_can.can_act %}<p class="o-gold-line">waiting for you</p>
     <a class="btn btn-primary btn-sm o-gold-go" href="{% url 'office_gold' %}?status=waiting">Review</a>
+    {% else %}<p class="o-gold-line">waiting</p>{% endif %}
     {% else %}
     <p class="o-gold-line">Nothing waiting.</p>
     {% endif %}
@@ -97,7 +98,7 @@
 
   <section class="o-card o-waiting" data-reveal data-office-waiting aria-labelledby="waiting-h">
     <header class="o-card-head">
-      <h2 id="waiting-h">Waiting for you</h2>
+      <h2 id="waiting-h">{% if office_can.can_act %}Waiting for you{% else %}Waiting{% endif %}</h2>
       <span class="o-count" data-region="waiting-count" data-waiting-count>{{ data.waiting.count|num }}</span>
     </header>
     <div class="o-rowlist" data-region="waiting-list">
@@ -110,7 +111,7 @@
           <span class="o-wait-go"><span class="o-wait-cta">View application</span>{% include "office/_icon.html" with name="chevron-right" %}</span>
         </a>
       </div>
-      {% empty %}<p class="o-empty-line">Nothing waiting for you.</p>{% endfor %}
+      {% empty %}<p class="o-empty-line">{% if office_can.can_act %}Nothing waiting for you.{% else %}Nothing waiting.{% endif %}</p>{% endfor %}
       {% if data.waiting.count > 5 %}<a class="o-quiet o-more" href="{% url 'office_gold' %}">See all {{ data.waiting.count|num }}</a>{% endif %}
     </div>
   </section>

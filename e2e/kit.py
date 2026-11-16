@@ -31,6 +31,7 @@ TIMEOUT = 20000
 
 # The staff accounts (made by the run itself: team people are never self-service). Barry matches live: Admin + Gold approver (since 2026-11-16 Revenue and Approvals need Admin; an Office approver sees neither).
 STAFF = {
+    "viewer": {"email": "viewer@example.com", "level": "viewer", "approver": False, "first": "Vera", "last": "Viewer"},
     "office": {"email": "office@example.com", "level": "office", "approver": False, "first": "Olive", "last": "Office"},
     "admin": {"email": "admin@example.com", "level": "admin", "approver": False, "first": "Adam", "last": "Admin"},
     "barry": {"email": "barry@example.com", "level": "admin", "approver": True, "first": "Barry", "last": "Approver"},

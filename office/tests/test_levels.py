@@ -1,11 +1,15 @@
 """Team levels against every guarded action (docs/features/user-rules.md U2/U3): Viewer, Office, Admin, Developer, Superuser, plus the
 Gold approver and Membership approver permissions. One table, one loop: a denied action is a 403, an allowed one is anything but 403/404."""
+import uuid
+
 from django.test import Client
 
+from chat.models import Conversation
 from common import levels
 from gold import services as gold_services
 from gold.tests.test_gold import application_data
 from office.tests.test_leads import lead
+from outreach.models import OutreachEntry
 from office.tests.test_office import OFFICE, OfficeTestCase
 from plans.tests.helpers import make_team_member
 from users import services as user_services
@@ -38,8 +42,17 @@ ACTIONS = [
     ("approve membership", "post", "/approvals/{person}/approve/", APPROVALS),
     ("approve Gold", "post", "/gold/{gold}/approve/", GOLD),
     ("activity", "get", "/activity/", DEVELOPER),
+    ("assistant chat", "get", "/chats/{chat}/", ADMIN),
+    ("Gold decline", "post", "/gold/{gold}/decline/", GOLD),
+    ("Gold resend", "post", "/gold/{gold}/resend/", GOLD),
+    ("person export", "get", "/people/{person}/export/", ADMIN),
+    ("lead export", "get", "/leads/{lead}/export/", ADMIN),
+    ("approach row: done", "post", "/outreach/{entry}/done/", EDIT),  # each call gets a fresh entry
+    ("approach row: remove", "post", "/outreach/{entry}/remove/", EDIT),
+    ("approach row: back to leads", "post", "/outreach/{entry}/to-leads/", EDIT),
+    ("approach row: archive", "post", "/outreach/{entry}/archive/", EDIT),
 ]
-READS = ["/", "/leads/", "/people/", "/gold/", "/analytics/"]  # every level, Viewer included
+READS = ["/", "/leads/", "/people/", "/gold/", "/analytics/", "/insights/summary/"]  # every level, Viewer included
 
 # who -> (level, Gold approver, Membership approver)
 WHO = {"viewer": (levels.VIEWER, False, False), "office": (levels.OFFICE, False, False), "office+membership": (levels.OFFICE, False, True),
@@ -67,13 +80,14 @@ class LevelMatrixTests(OfficeTestCase):
         super().setUpTestData()
         cls.people = {name: make_team_member(f"{name.replace('+', '-')}@example.test", level, approver=gold, membership=membership) for name, (level, gold, membership) in WHO.items()}
         cls.ids = {"lead": lead("hugo@example.com").pk, "person": user_services.register_interest(cleaned(email="reg@example.com")).user.pk,
-                   "gold": gold_services.submit_application(application_data())[0].pk}
+                   "gold": gold_services.submit_application(application_data())[0].pk, "chat": Conversation.objects.create().pk}
         cls.victims = {name: user_services.register_interest(cleaned(email=f"victim{i}@example.com", mobile=f"0791112{i:04d}")).user.pk for i, name in enumerate(WHO)}
 
     def call(self, who, method, path):
         client = Client(HTTP_HOST=OFFICE)
         client.force_login(self.people[who])
-        return getattr(client, method)(path.format(victim=self.victims[who], **self.ids))
+        entry = OutreachEntry.objects.create(lead_email=f"row{uuid.uuid4().hex[:8]}@example.com").pk if "{entry}" in path else ""
+        return getattr(client, method)(path.format(victim=self.victims[who], entry=entry, **self.ids))
 
     def test_every_level_against_every_guarded_action(self):
         for who in WHO:

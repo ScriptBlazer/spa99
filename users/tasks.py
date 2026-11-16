@@ -70,16 +70,19 @@ def send_password_set_email(user_id, actor_id):
 
 
 def send_email_changed_notices(user_id, old_email, actor_id):
-    """After a team member's login email was changed: the same short notice to the old and to the new address. Called straight after the change
+    """After a team member's login email was changed: a short notice to the old address (without the new one) and one to the new address. Called straight after the change
     (not queued: the task queue would keep the old address). Returns the two statuses."""
     user = User.objects.filter(pk=user_id).first()
     actor = User.objects.filter(pk=actor_id).first()
     if user is None:
         return None
-    context = {"first_name": user.first_name, "old_email": old_email, "new_email": user.email,
-               "changed_by": (actor.get_full_name() or actor.email) if actor else "a Spa 99 administrator"}
-    return [send_templated("email_changed", [address], subject_for("email_changed", first_name=user.first_name), context, subject_email=user.email).status
-            for address in (old_email, user.email)]
+    who = (actor.get_full_name() or actor.email) if actor else "a Spa 99 administrator"
+    # The old address is told the login changed but never where to: it may no longer be the person's, and must not learn the new one.
+    old = send_templated("email_changed_old", [old_email], subject_for("email_changed_old", first_name=user.first_name),
+                         {"first_name": user.first_name, "changed_by": who}, subject_email=user.email)
+    new = send_templated("email_changed", [user.email], subject_for("email_changed", first_name=user.first_name),
+                         {"first_name": user.first_name, "old_email": old_email, "new_email": user.email, "changed_by": who}, subject_email=user.email)
+    return [old.status, new.status]
 
 
 def send_team_invite_email(user_id):

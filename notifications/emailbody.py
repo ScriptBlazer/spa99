@@ -159,7 +159,13 @@ SPECS = {spec.key: spec for spec in [
         "If this wasn't expected, reply to this email and it will reach the team.",
         subject_placeholders=_FIRST),
     EmailSpec(
-        "email_changed", "Login email changed (to the old and the new address)",
+        "email_changed_old", "Login email changed (to the old address)", {**_FIRST, "changed_by": "Who changed it"},
+        {"first_name": "James", "changed_by": "Dana Developer"},
+        "Hello {first_name},\n\nThe login email for your Spa 99 account was changed by {changed_by}, so this address no longer signs in. You have been signed out everywhere.\n\n"
+        "If this wasn't expected, reply to this email and it will reach the team.",
+        subject_placeholders=_FIRST),
+    EmailSpec(
+        "email_changed", "Login email changed (to the new address)",
         {**_FIRST, "old_email": "The old login email", "new_email": "The new login email", "changed_by": "Who changed it"},
         {"first_name": "James", "old_email": "james@old.example.com", "new_email": "james@new.example.com", "changed_by": "Dana Developer"},
         "Hello {first_name},\n\nThe login email for your Spa 99 account was changed from {old_email} to {new_email} by {changed_by}. You have been signed out everywhere, "

@@ -149,6 +149,12 @@ class PermissionTests(TestCase):
         superuser = User.objects.create_superuser("root@example.com", "x")
         self.assertEqual(self.get(superuser).status_code, 200)
 
+    def test_projected_revenue_is_only_for_admin_and_up(self):
+        for role, sees in (("Viewer", False), ("Office", False), ("Admin", True), ("Developer", True)):
+            tier_mix = self.get(self.staff(f"{role.lower()}-money@example.com", role)).json()["tier_mix"]
+            self.assertEqual(any("revenue" in key for key in tier_mix), sees, role)
+            self.assertIn("plans", tier_mix)  # the counts stay
+
     def test_bad_dates_and_the_public_host_has_no_such_page(self):
         viewer = self.staff("viewer2@example.com", "Office")
         self.assertEqual(self.get(viewer, "/insights/summary/?from=yesterday").status_code, 400)

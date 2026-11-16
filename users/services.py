@@ -251,7 +251,8 @@ def reset_password(uidb64, token, new_password):
 
 def sign_out_everywhere(user):
     """End every signed-in session of this person (Office, Control, System, the member area). Sessions are stored in the database, so each one is
-    read and the ones that belong to this person are deleted. Returns how many. Works the same on SQLite and Postgres."""
+    read and the ones that belong to this person are deleted. Returns how many. Works the same on SQLite and Postgres.
+    Cost: it decodes every unexpired session (one pass, no index on the user), so it is for rare admin actions on a small team site, not for anything per request."""
     from django.contrib.auth import SESSION_KEY
     from django.contrib.sessions.models import Session
 
