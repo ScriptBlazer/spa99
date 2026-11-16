@@ -43,7 +43,7 @@ def _follow_email(target, old, new, actor):
         ids = list(model.objects.filter(user=target, **{f"{field}__iexact": old}).values_list("pk", flat=True))
         model.objects.filter(pk__in=ids).update(**{field: new})
         model.history.model.objects.filter(id__in=ids).update(**{field: new})
-    outreach.move_address_data(old, new, actor)
+    outreach.move_address_data(old, new, actor, keep_history=True)
     outreach._figures_changed()
 
 
@@ -70,9 +70,10 @@ def change_email(actor, target, new_email):
         return False
     if User.objects.filter(email__iexact=new).exclude(pk=target.pk).exists():
         raise ChangeRefused(MERGE_HINT)
-    owner = outreach.owner_of_email(new, exclude=old)  # a lead, a Gold applicant or an archived lead who is not this person (their own rows carry the old address)
+    owner = outreach.owner_of_email(new, exclude=old, exclude_user=target)  # a lead, a Gold applicant or an archived lead who is not this person (their own rows carry the old address)
     if owner:
-        raise ChangeRefused(f"That address belongs to {owner['kind'] if owner['kind'] != 'gold' else 'a Gold applicant'} ({owner['name']}). Choose a different one.")
+        kind = {"lead": "a lead", "gold": "a Gold applicant", "archived": "an archived lead"}.get(owner["kind"], "someone else")
+        raise ChangeRefused(f"That address belongs to {kind} ({owner['name']}). Choose a different one.")
     if sender_mod.belongs_to_someone_else(new, target):
         raise ChangeRefused("That address is another team member's sending address. Choose a different one.")
     target.email = new

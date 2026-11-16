@@ -153,10 +153,22 @@ class OfficeDataTests(PersonBase):
         JourneySession.objects.create(lead_email="lead@example.com")
         gold_services.submit_application(application_data(email="gold@example.com"))
         ArchivedLead.objects.create(email="gone@example.com")
-        for address in ("lead@example.com", "gold@example.com", "gone@example.com"):
-            with self.subTest(address=address), self.assertRaises(ChangeRefused):
+        for address, words in (("lead@example.com", "a lead"), ("gold@example.com", "a Gold applicant"), ("gone@example.com", "an archived lead")):
+            with self.subTest(address=address), self.assertRaises(ChangeRefused) as caught:
                 team_account.change_email(self.dev, self.office, address)
+            self.assertIn(f"belongs to {words} (", str(caught.exception))
         self.assertEqual(User.objects.get(pk=self.office.pk).email, "olive@example.com")
+        # his own journey already on the new address is not someone else's
+        JourneySession.objects.create(user=self.office, lead_email="olive.mine@example.com")
+        self.assertTrue(team_account.change_email(self.dev, self.office, "olive.mine@example.com"))
+
+    def test_a_bounced_old_address_keeps_his_email_history(self):
+        from notifications.models import EmailSuppression
+
+        EmailSuppression.objects.create(email="olive@example.com", reason=EmailSuppression.HARD_BOUNCE, first_seen=timezone.now(), last_seen=timezone.now())
+        EmailLog.objects.create(to="olive@example.com", subject="Invite", template="team_invite", subject_email="olive@example.com")
+        self.assertTrue(team_account.change_email(self.dev, self.office, "olive.new@example.com"))
+        self.assertEqual(EmailLog.objects.get(template="team_invite").to, "olive.new@example.com")
 
 
 class PasswordTests(PersonBase):

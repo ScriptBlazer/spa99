@@ -769,7 +769,7 @@ def unmark_genuine(email, actor):
     return DONE
 
 
-def owner_of_email(new, exclude=""):
+def owner_of_email(new, exclude="", exclude_user=None):
     """Who already holds this address: {"kind": "account"|"lead"|"gold"|"archived", "name", "url"} or None. An account (any, verified or not), another lead's journeys,
     a Gold application or an archived lead."""
     from django.urls import reverse
@@ -782,10 +782,14 @@ def owner_of_email(new, exclude=""):
     if user is not None:
         name = user.get_full_name() or user.email
         return {"kind": "account", "name": name, "url": reverse("office_person", args=[user.pk], urlconf="config.urls_office") if hasattr(user, "interest") else ""}
-    session = JourneySession.objects.filter(lead_email__iexact=new, is_bot=False).exclude(lead_email__iexact=exclude).order_by("-created_at").first()
+    sessions = JourneySession.objects.filter(lead_email__iexact=new, is_bot=False).exclude(lead_email__iexact=exclude)
+    applications = GoldApplication.objects.filter(email__iexact=new)
+    if exclude_user is not None:  # a team member's own rows (linked to his account) are not someone else's
+        sessions, applications = sessions.exclude(user=exclude_user), applications.exclude(user=exclude_user)
+    session = sessions.order_by("-created_at").first()
     if session is not None:
         return {"kind": "lead", "name": session.lead_first_name or new, "url": reverse("office_lead", args=[session.pk], urlconf="config.urls_office")}
-    application = GoldApplication.objects.filter(email__iexact=new).order_by("-created_at").first()
+    application = applications.order_by("-created_at").first()
     if application is not None:
         return {"kind": "gold", "name": application.full_name or new, "url": reverse("office_gold_application", args=[application.pk], urlconf="config.urls_office")}
     if ArchivedLead.objects.filter(email=new).exists():
@@ -809,7 +813,7 @@ def _move_follow_up(old, new, bounced):
     row.save(update_fields=["email"])
 
 
-def move_address_data(old, new, actor):
+def move_address_data(old, new, actor, keep_history=False):
     """Everything stored under a person's old email moves to the new one: journeys, notes, messages, Approach entries, edits, archive rows and events, the follow-up row, the stop-emails request,
     an Ask us chat, and the emails sent (the timeline reads them by address). The ONE place that knows the set: a lead's correction and a team member's login change both call it, so Approach
     list, timeline, export and erasure (which all find a person by address) keep finding everything. Call inside a transaction, after the caller has checked the new address is free; the caller
@@ -819,7 +823,7 @@ def move_address_data(old, new, actor):
     from mailings.models import EmailOptOut
     from notifications.models import EmailLog
 
-    bounced = is_bounced(old)
+    bounced = is_bounced(old) and not keep_history  # keep_history: a team member's login change keeps his own email history even if the old address bounced
     for session in JourneySession.objects.filter(lead_email__iexact=old, is_bot=False):
         session.lead_email = new
         session.save(update_fields=["lead_email", "updated_at"])
