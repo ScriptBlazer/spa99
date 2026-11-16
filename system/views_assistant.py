@@ -16,6 +16,7 @@ from chat.models import AssistantSettings, Conversation, KnowledgeNote, Message
 from chat.prompt import personality, system_rules
 
 from . import defaults, services
+from .forms import add_model_error
 from .forms_faq import CapForm, LimitsForm, NoteForm, PersonalityForm
 from .models import SiteDefaults
 from .permissions import unlocked
@@ -113,7 +114,7 @@ def note_save(request, pk=None):
                 messages.info(request, "Nothing changed.")
             return redirect("system_notes")
         except ValidationError as error:
-            form.add_error(None, error)
+            add_model_error(form, error)
     return _notes_page(request, {key: form}, form_status(form))
 
 
@@ -131,7 +132,7 @@ def _singleton_save(request, form, url_name):
                 messages.info(request, "Nothing changed.")
             return True
         except ValidationError as error:
-            form.add_error(None, error)
+            add_model_error(form, error)
     return False
 
 

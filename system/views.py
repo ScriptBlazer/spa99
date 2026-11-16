@@ -24,7 +24,7 @@ from users.views import LoginView, TeamPasswordView
 from . import approval as approval_service
 from . import audit, changes, codeview, defaults, feed, launch, services, throttle
 from . import team as team_service
-from .forms import ApprovalForm, EmailsForm, RevenueForm, SettingsForm
+from .forms import ApprovalForm, EmailsForm, RevenueForm, SettingsForm, add_model_error
 from .forms_rules import RISKY
 from .models import SystemChange, SystemEvent
 from .permissions import signed_in, unlocked
@@ -359,7 +359,7 @@ def _edit_site(request, form_class, template, section, extra=None):
                 messages.info(request, "Nothing changed.")
             return redirect(request.path)
         except ValidationError as error:  # a model rule, or the row changed since the page was made
-            form.add_error(None, error)
+            add_model_error(form, error)
     context = {"form": form, "risky_fields": RISKY.get(section, []), **(extra() if extra else {})}
     return page(request, template, section, context, status=form_status(form) if request.method == "POST" else 200)
 

@@ -29,7 +29,7 @@ from notifications.services import fill_subject, preview_email as _preview_email
 from . import audit, emails as logic, services
 from .models import SystemEvent
 from .permissions import unlocked
-from .forms import FooterForm
+from .forms import FooterForm, add_model_error
 from .views import _edit_site, form_status, page, saved
 
 
@@ -105,7 +105,7 @@ def automatic_save(request, key):
                 messages.info(request, "Nothing changed.")
             return redirect("system_email_edit", key=key)
         except ValidationError as error:  # the row changed since the page was made
-            form.add_error(None, error)
+            add_model_error(form, error)
     return _edit(request, key, form, status=form_status(form))
 
 

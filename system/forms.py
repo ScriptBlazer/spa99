@@ -1,5 +1,5 @@
 from django import forms
-from django.core.exceptions import ValidationError
+from django.core.exceptions import FieldDoesNotExist, ValidationError
 from django.utils import timezone
 
 from common.jsonshape import has_non_ascii_digit
@@ -11,6 +11,26 @@ from . import services
 
 TOKEN = "row_token"  # the hidden field every System form for an existing row carries (the row's version when the page was made)
 DIGITS_MESSAGE = "Use the digits 0-9."
+
+
+def add_model_error(form, error):
+    """Show a model ValidationError on a form without ever crashing. A message for a field the form has goes on that field;
+    anything else (a rule for the whole row, or a field that is not on this form) becomes a form-level error that names the field."""
+    if not hasattr(error, "error_dict"):
+        form.add_error(None, error)
+        return
+    for name, errors in error.error_dict.items():
+        for item in errors:
+            if name in form.fields:
+                form.add_error(name, item)
+                continue
+            try:
+                label = str(form._meta.model._meta.get_field(name).verbose_name)
+                label = label[:1].upper() + label[1:]
+            except FieldDoesNotExist:  # NON_FIELD_ERRORS or an unknown name
+                label = ""
+            for message in item.messages:
+                form.add_error(None, f"{label}: {message}" if label else message)
 
 
 class TokenField(forms.CharField):

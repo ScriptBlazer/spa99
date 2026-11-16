@@ -10,6 +10,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from plans import sales
 from plans.models import Sale
 
+from .forms import add_model_error
 from .forms_sales import SaleForm
 from .views import form_status, page, saved
 from .views_emails import _respond
@@ -70,7 +71,7 @@ def sale_edit(request, pk=None):
                     messages.info(request, "Nothing changed.")
                 return redirect("system_sale_edit", pk=form.instance.pk)
             except ValidationError as error:  # overlap or live lock caught under the lock, or the row changed since the page was made
-                form.add_error(None, error)
+                add_model_error(form, error)
         return _form_page(request, form, sale, status=form_status(form))
     return _form_page(request, form, sale)
 

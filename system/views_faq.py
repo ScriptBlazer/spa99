@@ -8,6 +8,7 @@ from django.views.decorators.http import require_GET, require_POST
 from chat.models import FaqItem
 
 from . import services
+from .forms import add_model_error
 from .forms_faq import FaqForm
 from .permissions import unlocked
 from .views import form_status, page, saved
@@ -39,5 +40,5 @@ def faq_save(request, pk=None):
                 messages.info(request, "Nothing changed.")
             return redirect("system_faq")
         except ValidationError as error:
-            form.add_error(None, error)
+            add_model_error(form, error)
     return _page(request, {key: form}, form_status(form))

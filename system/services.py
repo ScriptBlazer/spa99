@@ -142,9 +142,14 @@ def current_row(obj, lock=False):
 
 @transaction.atomic
 def save_logged(obj, user, fields=None):
-    """Save a row with the person recorded in its history (the log entries are written from that history row)."""
+    """Save a row with the person recorded in its history (the log entries are written from that history row).
+    fields=None checks the whole row; a list of fields checks only those (plus the model's clean())."""
     obj._history_user = user
-    obj.full_clean()
+    if fields is None:
+        obj.full_clean()
+    else:  # only the fields being saved are checked (a stored value on another field must not block this save); clean() and unique checks for them still run
+        wanted = {obj._meta.get_field(name).name for name in fields}  # a caller may pass an FK's attname (plan_id): still checks that FK
+        obj.full_clean(exclude=[f.name for f in obj._meta.concrete_fields if f.name not in wanted])
     obj.save(update_fields=None if fields is None else list(fields) + (["updated_at"] if hasattr(obj, "updated_at") else []))
     return obj
 

@@ -12,6 +12,7 @@ from plans.models import Closure, OpeningRule, Plan, SiteSettings
 
 from . import forms_rules as f
 from . import services
+from .forms import add_model_error
 from .permissions import unlocked
 from .views import form_status, page, saved
 from django.views.decorators.http import require_GET, require_POST
@@ -37,7 +38,7 @@ def _save(request, model, form_class, pk, key, url_name, build, **kwargs):
                 messages.info(request, "Nothing changed.")
             return redirect(url_name)
         except ValidationError as error:  # a rule only the whole row can check, or the row changed since the page was made
-            form.add_error(None, error)
+            add_model_error(form, error)
     return build(request, {key: form}, form_status(form))
 
 
@@ -144,7 +145,7 @@ def gold_guide_save(request):
                 messages.info(request, "Nothing changed.")
             return redirect("system_gold")
         except ValidationError as error:
-            form.add_error(None, error)
+            add_model_error(form, error)
     return _gold(request, {"guide": form}, form_status(form))
 
 
@@ -193,7 +194,7 @@ def option_add(request, question_pk):
             saved(request)
             return redirect("system_journey")
         except ValidationError as error:
-            form.add_error(None, error)
+            add_model_error(form, error)
     return _journey(request, {f"new-{question.pk}": form}, 400)
 
 
