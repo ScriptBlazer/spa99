@@ -134,13 +134,12 @@ class WebhookTests(TestCase):
             signed_post("/phone/recording/", {"CallSid": CALL_SID, "RecordingSid": REC_SID, "RecordingStatus": "completed", "RecordingDuration": "10"})
         self.assertEqual(Call.objects.get().kind, Call.VOICEMAIL)
 
-    def test_absent_is_a_voicemail_with_no_audio_and_is_still_emailed(self):
+    def test_absent_is_a_voicemail_with_no_audio_and_no_email(self):
         signed_post("/phone/voice/", {"CallSid": CALL_SID, "From": "+447368912320", "To": "+442045384999"})
         signed_post("/phone/recording/", {"CallSid": CALL_SID, "RecordingSid": REC_SID, "RecordingStatus": "absent", "RecordingDuration": "0"})  # sync queue in tests: it ran
         call = Call.objects.get()
         self.assertEqual((call.kind, call.recording_status, bool(call.audio), call.has_sound), (Call.VOICEMAIL, Call.ABSENT, False, False))
-        self.assertIsNotNone(call.emailed_at)
-        self.assertIn("No sound was recorded", mail.outbox[0].body)
+        self.assertEqual((call.emailed_at, call.email_skipped, len(mail.outbox)), (None, True, 0))  # 0 seconds: under 3, so hidden and not emailed
 
     def test_other_statuses_do_nothing(self):
         make_call(kind=Call.MISSED, recording_sid=None, recording_status="")
@@ -191,6 +190,16 @@ class ProcessingTests(TestCase):
         self.assertTrue(call.email_skipped)
         self.assertIn("No one is on the", call.last_error)
         self.assertTrue(call.audio)
+
+    def test_a_voicemail_under_3_seconds_is_saved_but_not_emailed(self):
+        call = make_call(duration_seconds=2)
+        self.process(call)
+        call.refresh_from_db()
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertTrue(call.email_skipped)
+        self.assertIn("Shorter than 3 seconds", call.last_error)
+        self.assertTrue(call.audio)
+        call.audio.delete(save=False)  # InMemoryStorage outlives the test: free the name for the others
 
     def test_failure_is_recorded_backs_off_and_stops_at_the_cap(self):
         call = make_call()
@@ -411,6 +420,18 @@ class OfficeTests(TestCase):
         self.assertEqual(len(every.context["rows"]), 2)
         self.assertEqual(every.context["rows"][0].pk, self.call.pk)  # newest first
         self.assertContains(every, "No message")
+
+    def test_short_voicemails_are_hidden_until_shown_and_never_counted(self):
+        short = make_call(call_sid="CA" + "e" * 32, recording_sid="RE" + "e" * 32, duration_seconds=2)
+        client = self.login(levels.OFFICE)
+        hidden = client.get("/calls/")
+        self.assertEqual([c.pk for c in hidden.context["rows"]], [self.call.pk])
+        self.assertEqual((hidden.context["short"], hidden.context["counts"]["voicemails"], hidden.context["unheard"]), (1, 1, 1))
+        self.assertContains(hidden, "1 short voicemail (under 3 seconds) hidden")
+        shown = client.get("/calls/?short=1")
+        self.assertEqual({c.pk for c in shown.context["rows"]}, {self.call.pk, short.pk})
+        self.assertContains(shown, "Hide")
+        self.assertEqual(len(client.get("/calls/?view=all").context["rows"]), 3)  # All calls lists everything
 
     def test_no_sound_voicemails_never_count_as_unheard_and_opening_one_marks_it_heard(self):
         silent = make_call(call_sid="CA" + "d" * 32, recording_sid="RE" + "d" * 32, recording_status=Call.ABSENT)

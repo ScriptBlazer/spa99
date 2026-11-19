@@ -100,7 +100,7 @@ def email_context(call):
     caller = naming.friendly_number(call.from_number)
     when = f"{timezone.localtime(call.received_at):%d %B %Y, %H:%M}"
     lines = [f"From: {caller}", f"Received: {when}", f"Length: {_length(call.duration_seconds)}"]
-    if not call.has_sound:
+    if not call.has_sound:  # unreachable while short ones (0 s included) are not emailed; kept so that rule can be undone
         lines.append("No sound was recorded.")
     return caller, {"details": Rich("<br>".join(escape(line) for line in lines), "\n".join(lines)), "url": f"{settings.OFFICE_URL}/calls/{call.pk}/"}
 
@@ -111,6 +111,9 @@ def _send_email(call):
     from notifications.services import send_templated, subject_for
     from plans.models import SiteSettings
 
+    if call.duration_seconds < SHORT_SECONDS:
+        Call.objects.filter(pk=call.pk, emailed_at__isnull=True).update(email_skipped=True)
+        return "", f"Shorter than {SHORT_SECONDS} seconds: no email sent."
     recipients = SiteSettings.load().voicemail_to_list
     if not recipients:
         Call.objects.filter(pk=call.pk, emailed_at__isnull=True).update(email_skipped=True)
@@ -187,11 +190,17 @@ def sweep(clock=time.monotonic):
 # ---------- the Office ----------
 
 UNHEARD_CAP = 100
+SHORT_SECONDS = 3  # Moishe 2026-11-19: voicemails under 3 seconds (pocket calls, a breath) are hidden in the list, left out of the badge and not emailed
+
+
+def short_q():
+    """Voicemails under SHORT_SECONDS long (a no-sound one is 0 seconds, so it is short too)."""
+    return Q(kind=Call.VOICEMAIL, duration_seconds__lt=SHORT_SECONDS)
 
 
 def unheard_count():
     """Unheard voicemails for the badge, counted up to UNHEARD_CAP (100 means "100 or more"). A short indexed read of ids, not COUNT(*), because Office pages must not count source tables."""
-    return len(Call.objects.filter(kind=Call.VOICEMAIL, heard_at__isnull=True).exclude(recording_status=Call.ABSENT).values_list("pk", flat=True)[:UNHEARD_CAP])  # no-sound ones have nothing to play, so they never count
+    return len(Call.objects.filter(kind=Call.VOICEMAIL, heard_at__isnull=True).exclude(recording_status=Call.ABSENT).exclude(short_q()).values_list("pk", flat=True)[:UNHEARD_CAP])  # no-sound and short ones are hidden, so they never count
 
 
 LIST_CAP = 5000
