@@ -92,6 +92,11 @@ def can_approve_memberships(user):
     return rank(MEMBERSHIP_APPROVER_MIN_LEVEL) <= rank(level) <= rank(MEMBERSHIP_APPROVER_MAX_LEVEL) and holds_membership_group(user)
 
 
+def can_hear_calls(user):
+    """The Calls tab (voicemails and the call log) and the recordings: any team level above Viewer (Office, Admin, Developer, Superuser)."""
+    return at_least(user, OFFICE)
+
+
 def can_hold_approver(user):
     """The one guard for the Gold approver role: Office level or higher (a superuser counts). Not signed-in state: what is stored."""
     return rank(held_level(user)) >= rank(APPROVER_MIN_LEVEL)

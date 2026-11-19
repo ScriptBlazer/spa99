@@ -26,6 +26,7 @@ RISKY = {
     "capacity": ("capacity", "capacities", "Booking availability changes at once."),
     "gold_approver_emails": ("recipient list", "recipient lists", "Gold applications go to the new list at once."),
     "gold_approver_cc": ("recipient list", "recipient lists", "Copies go to the new list at once."),
+    "voicemail_email_to": ("recipient list", "recipient lists", "New voicemails are emailed to the new list at once."),
     "lead_next_morning_on": ("switch", "switches", "New leads are emailed from the next morning on. Real people get this email."),
     "contact_email": ("contact address", "contact addresses", "The site shows and replies from the new address at once."),
     "lock_idle_minutes": ("lock setting", "lock settings", "System locks after the new idle time at once."),

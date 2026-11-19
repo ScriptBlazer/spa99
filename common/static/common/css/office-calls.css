@@ -1,0 +1,40 @@
+/* Office Calls (Voicemails and All calls, one call). Reuses the Office list, badge and card styles; only what is new is here. Tokens only. */
+.o-seg--calls { --n: 2; margin-bottom: var(--space-3); }
+@media (min-width: 48em) { .o-seg--calls { max-width: 22rem; } }
+
+.o-badge--call-new { background: var(--color-gold); color: var(--office-text); }                 /* 6.17 */
+.o-badge--call-none { background: var(--office-sunken); color: var(--office-muted); }            /* 5.38 */
+.o-calls-states { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+@media (min-width: 64em) { .o-list--calls .c-caller { white-space: nowrap; } }   /* one line on a computer; on a phone the number and the person wrap, never a sideways scroll */
+.o-list--calls .c-when { white-space: nowrap; color: var(--office-muted); }
+.o-calls-person { overflow-wrap: anywhere; position: relative; z-index: 1; width: fit-content; text-decoration: none; }
+@media (hover: hover) and (pointer: fine) { .o-calls-person:hover { text-decoration: underline; text-underline-offset: 0.25em; } }
+.o-calls-audio { position: relative; z-index: 1; display: block; width: 100%; max-width: 18rem; height: 2.5rem; color-scheme: light; }
+.o-list--calls .c-play { width: 19rem; }
+.o-list--calls th:last-child { padding-inline: var(--space-3); }
+.o-list--calls td.c-len { width: 1px; }
+
+@media (max-width: 63.99em) {
+  .o-list--calls .o-row { align-items: center; }
+  .o-list--calls .o-row td.c-caller { order: 1; flex: 1 1 auto; min-width: 0; font-size: var(--text-base); }
+  .o-list--calls .o-row td.c-state { order: 2; flex: none; }
+  .o-list--calls .o-row td.c-when { order: 3; flex: 1 1 auto; font-size: var(--text-sm); }
+  .o-list--calls .o-row td.c-len { order: 4; flex: none; width: auto; font-size: var(--text-sm); color: var(--office-muted); text-align: right; }
+  .o-list--calls .o-row td.c-play { order: 5; flex: 0 0 100%; width: auto; }
+  .o-list--calls .o-row td.c-play:empty { display: none; }
+  .o-list--calls .o-row td.c-len:empty { display: none; }
+  .o-calls-audio { max-width: none; }
+}
+
+/* one call */
+.o-call { display: grid; gap: var(--space-4); max-width: 40rem; margin-bottom: var(--space-3); }
+.o-call-facts { display: grid; gap: var(--space-3); margin: 0; }
+.o-call-facts > div { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: var(--space-3); align-items: start; }
+.o-call-facts dt { font-size: var(--office-text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--office-muted); padding-top: 0.2rem; }
+.o-call-facts dd { margin: 0; font-size: var(--text-base); min-width: 0; overflow-wrap: anywhere; }
+.o-call-tel { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 2.75rem; color: var(--office-text); font-weight: 600; text-decoration: none; }
+.o-call-tel .o-icon { width: 1.125rem; height: 1.125rem; }
+.o-call-person { text-decoration: none; }
+@media (hover: hover) and (pointer: fine) { .o-call-tel:hover span, .o-call-person:hover { text-decoration: underline; text-underline-offset: 0.25em; } }
+.o-calls-audio--detail { max-width: none; height: 3rem; }
+.o-call-player .o-empty-line { padding-block: 0; }

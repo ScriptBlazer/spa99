@@ -227,6 +227,12 @@ SPECS = {spec.key: spec for spec in [
          "people": Rich(f'<a href="{_SAMPLE_URL}" style="{LINK_STYLE}">James Smith</a>', f"James Smith: {_SAMPLE_URL}")},
         "Hello,\n\n{count_line}\n\nThey registered during a sale and have not set up their membership yet:\n\n{people}\n\n{button}",
         button_label="Open the list in the Office", button_required=False, button_fallback=False, subject_placeholders={"count": "How many members"}),
+    EmailSpec(
+        "voicemail_new", "New voicemail (to staff)",
+        {"caller": "The caller's number, e.g. 07368 912320", "details": "Who called, when and for how long"},
+        {"caller": "07368 912320", "details": Rich("From: 07368 912320<br>Received: 19 November 2026, 14:30<br>Length: 42 seconds", "From: 07368 912320\nReceived: 19 November 2026, 14:30\nLength: 42 seconds")},
+        "Hello,\n\nThere is a new voicemail on the Spa 99 number.\n\n{details}\n\n{button}",
+        button_label="Listen in the Office", button_required=True, button_fallback=False, subject_placeholders={"caller": "The caller's number"}),
     # Sent by an approver from the Office (docs/features/gold-actions.md). Respond: the typed {message} sits in this wording.
     # Declined: this wording only PREFILLS the decline form; the approver can edit it, and what is sent is exactly that text.
     EmailSpec(

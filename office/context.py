@@ -30,5 +30,9 @@ def office(request):
     from plans.models import SiteSettings
 
     name = (SiteSettings.objects.values_list("outreach_list_name", flat=True).first() or "").strip()  # one light read; no row = the default
-    return {"office_outreach_title": name or "Approach list", "office_waiting": selectors.waiting_count(selectors.counters(K.GOLD_BY_STATUS)), "office_can": abilities(request.user),
+    from phone import services as phone_services
+
+    can = abilities(request.user)
+    unheard = phone_services.unheard_count() if can["can_calls"] else 0  # one cheap count, only for people who can see Calls
+    return {"office_voicemails_unheard": unheard, "office_outreach_title": name or "Approach list", "office_waiting": selectors.waiting_count(selectors.counters(K.GOLD_BY_STATUS)), "office_can": can,
             "office_person": _person(request.user), "app_version": settings.APP_VERSION}

@@ -98,12 +98,17 @@ class VersionedForm(forms.ModelForm):
 class EmailsForm(VersionedForm):
     class Meta:
         model = SiteSettings
-        fields = ["gold_approver_cc", "contact_email", "lead_next_morning_on", "lead_next_morning_at", "lead_next_morning_min_hours"]
+        fields = ["gold_approver_cc", "voicemail_email_to", "contact_email", "lead_next_morning_on", "lead_next_morning_at", "lead_next_morning_min_hours"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name in ("lead_next_morning_at", "lead_next_morning_min_hours"):
             self.fields[name].required = False  # a post without them (older forms, scripts) keeps the saved value
+
+    def clean_voicemail_email_to(self):
+        if "voicemail_email_to" not in self.data:  # a post without it (older forms, scripts) keeps the saved list; an empty box clears it on purpose
+            return self.instance.voicemail_email_to
+        return self.cleaned_data.get("voicemail_email_to", "")
 
     def clean_lead_next_morning_at(self):
         return self.cleaned_data.get("lead_next_morning_at") or self.instance.lead_next_morning_at

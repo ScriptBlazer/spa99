@@ -37,6 +37,7 @@ FIELD_SECTIONS = {
     ("plans.sitesettings", "final_approval_potentials"): "approval",
     ("plans.sitesettings", "gold_approver_emails"): "emails",
     ("plans.sitesettings", "gold_approver_cc"): "emails",
+    ("plans.sitesettings", "voicemail_email_to"): "emails",
     ("plans.sitesettings", "contact_email"): "emails",
     ("plans.sitesettings", "auto_email_from_name"): "emails",
     ("plans.sitesettings", "auto_email_from_address"): "emails",
