@@ -1,4 +1,6 @@
-# Tests on every push and pull request. A version tag (1.2.3, no "v") also builds the live image, only if the tests pass:
+# Tests on every push (any branch, PR or not) and every pull request into main. A version tag (1.2.3, no "v") also
+# builds the live image straight away, in parallel with the tests (Moishe, 2026-11-19: quick deploys; the tests still
+# run on the tag and show red if anything fails, but they no longer hold the build back):
 #   git tag 1.2.3 && git push origin 1.2.3   ->   <DOCKERHUB_USERNAME>/spa99:1.2.3 and :latest on Docker Hub.
 # Repo secrets: DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker Hub Read & Write access token).
 name: CI
@@ -67,9 +69,9 @@ jobs:
         run: python manage.py test
 
   build:
-    # Version tags only (1.2.3), after the tests pass. Pushes to Docker Hub as <DOCKERHUB_USERNAME>/spa99:<tag>
-    # (Moishe, 2026-10-26). Repo secrets: DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker Hub access token).
-    needs: test
+    # Version tags only (1.2.3). Runs at the same time as the tests, not after them (Moishe, 2026-11-19). Pushes to
+    # Docker Hub as <DOCKERHUB_USERNAME>/spa99:<tag> (Moishe, 2026-10-26). Repo secrets: DOCKERHUB_USERNAME and
+    # DOCKERHUB_TOKEN (a Docker Hub access token).
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:

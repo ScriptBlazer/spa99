@@ -117,7 +117,7 @@ Live uses managed PostgreSQL: take an RDS snapshot before every deploy and backf
 
 ## Live (Docker)
 
-Images are built by GitHub Actions on a version tag (`1.2.3`, no `v`) after the tests pass. The server holds
+Images are built by GitHub Actions on a version tag (`1.2.3`, no `v`), at the same time as the tests (it does not wait for them: check CI is green before deploying). The server holds
 `docker-compose.yml`, `Caddyfile` and `.env` only. Services: `caddy` (HTTPS), `web` (runs migrations, then gunicorn),
 `worker` (background jobs). Deploy by changing `APP_TAG` in the server `.env`, then `docker compose pull && docker compose up -d` (full steps: `docs/GO-LIVE.md`).
 Check `https://<domain>/health/` afterwards.
