@@ -7,7 +7,7 @@
 {% comment %}Calls (any level above Viewer): voicemails (default) and the whole call log. Context: see phone.views_office.call_list. A voicemail with sound has a small player in its row; the first play marks it heard (office-calls.js).{% endcomment %}
 <h1 class="sr-only">Calls</h1>
 <nav class="o-seg o-seg--counts o-seg--calls" aria-label="Calls view" data-calls-views>
-  <a class="o-seg-item{% if view == "voicemails" %} is-active{% endif %}" href="{% url 'office_calls' %}"{% if view == "voicemails" %} aria-current="page"{% endif %}><span>Voicemails</span> <span class="o-count">{{ counts.voicemails|num }}</span></a>
+  <a class="o-seg-item{% if view != "all" %} is-active{% endif %}" href="{% url 'office_calls' %}"{% if view == "voicemails" %} aria-current="page"{% endif %}><span>Voicemails</span> <span class="o-count">{{ counts.voicemails|num }}</span></a>
   <a class="o-seg-item{% if view == "all" %} is-active{% endif %}" href="{% url 'office_calls' %}?view=all"{% if view == "all" %} aria-current="page"{% endif %}><span>All calls</span> <span class="o-count">{{ counts.all|num }}</span></a>
 </nav>
 {% if view == "short" %}<p class="o-calls-short"><a href="{% url 'office_calls' %}">&larr; Back to voicemails</a> &middot; {{ short|num }} short voicemail{{ short|pluralize }} (under {{ short_seconds }} seconds)</p>{% elif view == "voicemails" and short %}<p class="o-calls-short"><a href="{% url 'office_calls' %}?view=short">{{ short|num }} short voicemail{{ short|pluralize }} (under {{ short_seconds }} seconds) &rarr;</a></p>{% endif %}

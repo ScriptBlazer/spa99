@@ -430,6 +430,7 @@ class OfficeTests(TestCase):
         self.assertContains(main, "?view=short")
         page = client.get("/calls/?view=short")
         self.assertEqual([c.pk for c in page.context["rows"]], [short.pk])
+        self.assertEqual(page.context["counts"]["voicemails"], 1)  # the tab shows the short count on this page
         self.assertContains(page, "Back to voicemails")
         self.assertEqual(len(client.get("/calls/?view=all").context["rows"]), 3)  # All calls lists everything
 

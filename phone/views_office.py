@@ -47,7 +47,8 @@ def call_list(request):
     pages = num_pages(total, PAGE_SIZE)
     page = clamp(request.GET.get("page"), pages)
     rows = _decorate(queryset[(page - 1) * PAGE_SIZE:page * PAGE_SIZE])
-    counts = {"voicemails": services.capped_count(voicemails.exclude(services.short_q())), "all": total if view == "all" else services.capped_count(Call.objects.all())}
+    counts = {"voicemails": short if view == "short" else services.capped_count(voicemails.exclude(services.short_q())),  # on the short page the tab shows the short count
+               "all": total if view == "all" else services.capped_count(Call.objects.all())}
     return render(request, "phone/call_list.html", {"section": "calls", "view": view, "rows": rows, "counts": counts, "pager": pager(page, pages, request.GET), "page": page,
                                                     "unheard": services.unheard_count(), "short": short, "short_seconds": services.SHORT_SECONDS})
 
