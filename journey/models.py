@@ -5,6 +5,7 @@ import secrets
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models.functions import Lower, Upper
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
@@ -63,7 +64,8 @@ class JourneySession(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
-        indexes = [models.Index(fields=["-created_at"]), models.Index(fields=["is_bot", "created_at"])]
+        indexes = [models.Index(fields=["-created_at"]), models.Index(fields=["is_bot", "created_at"]),
+                   models.Index(Upper("lead_email"), name="journey_lead_email_upper"), models.Index(Lower("lead_email"), name="journey_lead_email_lower")]
 
     def __str__(self):
         return f"Journey {str(self.id)[:8]} step {self.current_step}"

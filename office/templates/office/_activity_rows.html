@@ -1,0 +1,9 @@
+{% load office_tags text_tags %}{% comment %}Activity rows, newest first, with a heading for each day (Today, Yesterday, Mon 9 Nov and the true count of that day). A row is the Dashboard feed row: a link when the person still has a page, else a plain block.
+One sentence ("Moishe added a note on Hugo"), the detail under it. Note text and message bodies are never in `rows`. `part` is "top" (the 8 newest, always shown: carries the empty message) or "rest" (the page under "See all": no empty message). Keys: rows, part, filtered, filters.range.{% endcomment %}{% for r in rows %}{% if r.heading %}
+<h3 class="o-day" data-day="{{ r.heading.iso }}"><span>{{ r.heading.label }}</span><span class="o-day-count">{{ r.heading.count|num }}</span></h3>{% endif %}
+{% if r.href %}<a class="o-feed-row" href="{{ r.href }}" data-press data-activity-row data-group="{{ r.group }}">{% else %}<div class="o-feed-row" data-activity-row data-group="{{ r.group }}">{% endif %}
+  <span class="o-feed-dot" aria-hidden="true">{% include "office/_icon.html" with name=r.icon %}</span><span class="sr-only">{{ r.group_label }}: </span>
+  <span class="o-feed-text"><span class="o-feed-who">{{ r.who }}</span> {{ r.before }}{% if r.name %}<span class="o-feed-person">{{ r.name }}</span>{% else %}<span class="o-unrated">a removed person</span>{% endif %}{{ r.after }}{% if r.detail %}<span class="o-feed-detail">{% truncated r.detail %}</span>{% endif %}</span>
+  <span class="o-latest-when">{{ r.time }}</span>
+{% if r.href %}</a>{% else %}</div>{% endif %}
+{% empty %}{% if part != "rest" %}<p class="o-empty-line" data-empty>{% if filtered %}Nothing matches that. Try fewer filters. <a class="o-quiet" href="{% url 'office_activity' %}" data-clear>Clear</a>{% elif filters.range != "all" %}Nothing happened in this range. <a class="o-quiet" href="{% url 'office_activity' %}?range=all">See all time</a>{% else %}No staff activity yet.{% endif %}</p>{% endif %}{% endfor %}

@@ -13,7 +13,8 @@ pip install -r requirements-dev.txt
 python manage.py migrate
 python manage.py createcachetable       # the rate-limit cache table (safe to repeat)
 python manage.py seed_phase1            # plans, prices, hours, facilities, site copy, journey questions, Gold rules (safe to repeat; --dry-run to preview)
-python manage.py setup_roles            # Office / Admin / Developer / Approver groups (on an old database run migrate_roles first)
+python manage.py setup_roles            # Viewer / Office / Admin / Developer / Approver (Gold approver) / Membership approver / Final approver groups (Viewer and Membership approver are also made by migration users.0009; on an old database run migrate_roles first)
+python manage.py tick_admin_membership_approvers --dry-run  # one-off (2026-11-19): Admin now needs the Membership approver tick; run without --dry-run on deploy
 python manage.py createsuperuser        # email + password; use it for Control and the hidden admin
 ```
 
@@ -116,7 +117,7 @@ Live uses managed PostgreSQL: take an RDS snapshot before every deploy and backf
 
 ## Live (Docker)
 
-Images are built by GitHub Actions on a version tag (`1.2.3`, no `v`) after the tests pass. The server holds
+Images are built by GitHub Actions on a version tag (`1.2.3`, no `v`), at the same time as the tests (it does not wait for them: check CI is green before deploying). The server holds
 `docker-compose.yml`, `Caddyfile` and `.env` only. Services: `caddy` (HTTPS), `web` (runs migrations, then gunicorn),
 `worker` (background jobs). Deploy by changing `APP_TAG` in the server `.env`, then `docker compose pull && docker compose up -d` (full steps: `docs/GO-LIVE.md`).
 Check `https://<domain>/health/` afterwards.

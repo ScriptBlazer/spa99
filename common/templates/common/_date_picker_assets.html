@@ -1,0 +1,6 @@
+{% load static %}{% comment %}The shared calendar's files (docs/features/calendar.md). Put this in `head_extra` on a page that uses `_date_picker.html` or a `data-date-picker` field. Not loaded anywhere else.
+Order matters: flatpickr's own CSS first, ours after it (it overrides), then the library, then our script (both deferred, so they run in this order).{% endcomment %}
+<link rel="stylesheet" href="{% static 'common/vendor/flatpickr/4.6.13/flatpickr.min.css' %}">
+<link rel="stylesheet" href="{% static 'common/css/date-picker.css' %}">
+<script defer src="{% static 'common/vendor/flatpickr/4.6.13/flatpickr.min.js' %}"></script>
+<script defer src="{% static 'common/js/date-picker.js' %}"></script>

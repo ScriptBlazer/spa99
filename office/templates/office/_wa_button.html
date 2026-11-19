@@ -1,23 +1,7 @@
-{% comment %}The WhatsApp button (lead, person and Gold pages). Keyed on `wa.state`, never on `configured`: with Twilio not set up the button stays and says so.
-`wa` is the page's `whatsapp` context, `em` its `email_msg`, `primary` which channel is the one primary (see reach_primary). No mobile: nothing here, _channels.html draws the grey line under Email.{% endcomment %}
-{% if wa.state != "no_mobile" %}
-<div class="o-channel" data-wa-button data-state="{{ wa.state }}">
-  {% if wa.state == "chat" or wa.state == "unconfigured" and wa.has_chat %}
-  <a class="btn {% if primary == 'wa' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{{ wa.open_url }}" data-whatsapp-open{% if wa.opted_out or wa.state == 'unconfigured' %} aria-describedby="wa-hint"{% endif %}>{% include "office/_icon.html" with name="whatsapp" %}<span>Open WhatsApp chat</span>{% if wa.unread %}<span class="o-badge-count">{{ wa.unread }}<span class="sr-only"> unread</span></span>{% endif %}</a>
-  {% if wa.state == "unconfigured" %}<p class="o-hint-line" id="wa-hint">{{ wa.reason }}</p>{% elif wa.opted_out %}<p class="o-hint-line" id="wa-hint">He replied STOP.</p>{% endif %}
-  {% elif wa.state == "ready" %}
-  {% if wa.opted_out %}
-  <a class="btn {% if primary == 'wa' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{{ wa.open_url }}" data-whatsapp-open aria-describedby="wa-hint">{% include "office/_icon.html" with name="whatsapp" %}<span>Open WhatsApp chat</span></a>
-  <p class="o-hint-line" id="wa-hint">He replied STOP.</p>
-  {% else %}{# Start writes (it can make the chat), so it is a POST with CSRF: a link never writes #}
-  <form method="post" action="{{ wa.start_url }}" data-whatsapp-start>{% csrf_token %}<button type="submit" class="btn {% if primary == 'wa' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" data-whatsapp-open>{% include "office/_icon.html" with name="whatsapp" %}<span>Start WhatsApp chat</span></button></form>
-  {% endif %}
-  {% elif wa.state == "view_only" %}
-  <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="wa-hint" data-wa-off>{% include "office/_icon.html" with name="whatsapp" %}<span>No WhatsApp chat yet</span></button>
-  <p class="o-hint-line" id="wa-hint">View only.</p>
-  {% else %}{# unconfigured, no chat #}
-  <button type="button" class="btn btn-secondary btn-block o-wa-btn o-btn-off" aria-disabled="true" aria-describedby="wa-hint" data-wa-off>{% include "office/_icon.html" with name="whatsapp" %}<span>Start WhatsApp chat</span></button>
-  <p class="o-hint-line" id="wa-hint">{{ wa.reason }}</p>
-  {% endif %}
+{% comment %}The WhatsApp button (lead, person and Gold pages): a plain link to wa.me, nothing else. `wa` is the page's `whatsapp` context (state "mobile" or "none", wa_link), `primary` which
+channel is the one primary (see reach_primary). With no mobile nothing is drawn here: _channels.html draws the one muted line under Email. Opening wa.me proves nothing was sent, so it marks nothing.{% endcomment %}
+{% if wa.state == "mobile" %}
+<div class="o-channel" data-wa-button data-state="mobile">
+  <a class="btn {% if primary == 'wa' %}btn-primary{% else %}btn-secondary{% endif %} btn-block o-wa-btn" href="{{ wa.wa_link }}" target="_blank" rel="noopener noreferrer" data-whatsapp-open aria-label="WhatsApp {{ wa.first_name|default:'him' }} on {{ wa.mobile }}">{% include "office/_icon.html" with name="whatsapp" %}<span>WhatsApp</span></a>
 </div>
 {% endif %}

@@ -35,6 +35,7 @@ html:not(.js) .au-dates { display: flex; } html:not(.js) .au-custom-btn { displa
 
 /* count and tools */
 .au-count { display: flex; align-items: center; justify-content: space-between; gap: var(--sys-3); min-height: 32px; padding: 0 var(--sys-3); background: var(--sys-surface); border: solid var(--sys-line); border-width: 0 1px; color: var(--sys-text-2); font-size: var(--sys-fs-sm); }
+.au-count { scroll-margin-top: calc(var(--au-top) + var(--au-bar-h, 0px) + var(--sys-2)); }   /* paging brings the count line (the top of the list) in view, below the sticky bar */
 .au-count-tools { display: inline-flex; align-items: center; gap: var(--sys-3); }
 .au-error { display: flex; align-items: center; gap: var(--sys-3); padding: var(--sys-2) var(--sys-3); background: var(--sys-danger-bg); color: var(--sys-danger); border: solid var(--sys-line); border-width: 0 1px; }
 .au-list { background: var(--sys-surface); border: 1px solid var(--sys-line); border-bottom-width: 0; transition: opacity .1s ease-out; min-height: 80px; }
@@ -42,7 +43,7 @@ html:not(.js) .au-dates { display: flex; } html:not(.js) .au-custom-btn { displa
 .au-empty { display: grid; justify-items: center; gap: var(--sys-2); padding: var(--sys-6) var(--sys-4); color: var(--sys-text-2); }
 
 /* day header: sticky under the filter bar */
-.au-dayhead { position: sticky; top: calc(var(--au-top) + var(--au-bar-h)); z-index: 10; display: flex; align-items: center; gap: var(--sys-2); height: 28px; padding: 0 var(--sys-3); background: var(--sys-bg); border-bottom: 1px solid var(--sys-line); font-size: var(--sys-fs-sm); font-weight: 600; color: var(--sys-text-2); }
+.au-day .au-dayhead { position: sticky; top: calc(var(--au-top) + var(--au-bar-h)); z-index: 10; display: flex; align-items: center; gap: var(--sys-2); height: 28px; padding: 0 var(--sys-3); background: var(--sys-bg); border-bottom: 1px solid var(--sys-line); font-size: var(--sys-fs-sm); font-weight: 600; color: var(--sys-text-2); }
 .au-date { font-weight: 400; color: var(--sys-text-3); }
 .au-daycount { margin-left: auto; font-weight: 400; color: var(--sys-text-3); }
 .au-groups > li { border-bottom: 1px solid var(--sys-line); }
@@ -91,9 +92,8 @@ html:not(.js) .au-dates { display: flex; } html:not(.js) .au-custom-btn { displa
 .au-meta { margin-top: 2px; color: var(--sys-text-3); overflow-wrap: anywhere; }
 
 /* pages */
-.au-pages { display: flex; flex-direction: column; align-items: stretch; gap: var(--sys-2); padding: var(--sys-3); background: var(--sys-surface); border: 1px solid var(--sys-line); border-radius: 0 0 var(--sys-radius-lg) var(--sys-radius-lg); text-align: center; }
-.au-pages .sys-btn { height: 32px; } .au-end, .au-pageno { color: var(--sys-text-3); font-size: var(--sys-fs-sm); }
-.au-more-btn[aria-disabled=true] { opacity: .5; pointer-events: none; }
+.au-pages { display: flex; flex-direction: column; align-items: stretch; gap: var(--sys-2); padding: var(--sys-3); --pager-color: var(--sys-text-2); --pager-size: var(--sys-fs-sm); background: var(--sys-surface); border: 1px solid var(--sys-line); border-radius: 0 0 var(--sys-radius-lg) var(--sys-radius-lg); text-align: center; }
+.au-pages .pager { margin: 0; } .au-end { margin: 0; color: var(--sys-text-3); font-size: var(--sys-fs-sm); }
 
 /* drawer */
 .au-drawer { position: fixed; z-index: 50; top: var(--au-top); right: 0; bottom: 0; width: 480px; max-width: 100vw; display: flex; flex-direction: column; background: var(--sys-surface); box-shadow: var(--sys-shadow-pop); animation: au-slide .15s ease-out; }
@@ -131,7 +131,7 @@ html:not(.js) .au-dates { display: flex; } html:not(.js) .au-custom-btn { displa
   .au-chip-btn, .au-seg { height: 36px; } .au-chips, .au-range { gap: var(--sys-1); }
   .au-dates { flex-wrap: wrap; } .au-dates input { width: 100%; } .au-dates label { flex: 1 1 140px; }
   .js .au-export { display: none; } .sys-head .au-chain { font-size: var(--sys-fs-sm); }
-  .au-dayhead { height: 32px; }
+  .au-day .au-dayhead { height: 32px; }
   .au-row { grid-template-columns: 24px minmax(0, 1fr); padding: var(--sys-2); }
   .au-side { grid-column: 2; justify-content: flex-start; flex-wrap: wrap; margin-top: 2px; }
   .au-side > * { order: 3; } .au-side .au-where { display: inline; order: 0; font-size: var(--sys-fs-sm); color: var(--sys-text-2); } .au-side .au-time { order: 1; margin-right: auto; }

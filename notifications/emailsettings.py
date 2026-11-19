@@ -32,6 +32,7 @@ class Options:
     sender: str
     heading: str = ""
     button_text: str = ""
+    sender_user: object = None  # the staff member picked in System (a user id as text, or None = hello@); notifications.sender.chosen() decides whether he can still send
 
 
 # ---------- checking what is typed ----------
@@ -129,10 +130,11 @@ def options_for(key, posted=None, shared=None):
         lines = tuple(shared) if shared is not None else shared_lines()
         if mode == d.FOOTER_NO_CONTACT:
             lines = (lines[0], lines[1], "")
+    chosen_user = pick("sender_user", row.sender_user_id if row else None)
     editable = spec is not None and spec.editable
     heading = (pick("heading", row.heading if row else "") or "").strip() if editable else ""
     button = (pick("button_text", row.button_text if row else "") or "").strip() if editable and spec.button_label else ""
-    return Options(mode, lines, sender, heading, button)
+    return Options(mode, lines, sender, heading, button, str(chosen_user) if chosen_user else None)
 
 
 # ---------- using them ----------
@@ -168,7 +170,12 @@ def footer_context(options, ctx):
 
 def sender_for(options, site):
     """(from_email or None, reply_to list or None) for the chosen sender. None = the site sender (DEFAULT_FROM_EMAIL, Reply-To the contact
-    address). The person sender needs the address set in System > Emails; without it the site sender is used and a warning is logged."""
+    address). Order: the staff member picked in the Sender select (Reply-To follows him; hello@ if he can no longer send); else, until `migrate_person_sender` has moved it, the old person sender
+    (the address set in System > Emails), which needs that address; without it the site sender is used and a warning is logged."""
+    from . import sender as sender_mod
+
+    if options.sender_user:
+        return sender_mod.from_and_reply(options.sender_user)
     if options.sender == d.SENDER_PERSON:
         sender = site.auto_sender
         if sender:

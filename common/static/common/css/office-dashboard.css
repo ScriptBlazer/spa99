@@ -1,22 +1,25 @@
 /* Office Dashboard (docs/design/OFFICE.md section 4). DOM order is the phone order; the desktop grid places the cards.
    Plain counts. Rings and sparklines are server-rendered SVG; a metric keeps its colour everywhere. */
-.o-dash { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.o-dash { --shift: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.o-dash:has(.o-cards-approval) { --shift: 1; }   /* the three cards take row 2 when there are any; everything else moves down one row */
 .o-greeting h1 { font-size: var(--text-xl); }
 .o-greeting .o-lead { margin-top: var(--space-2); }
+/* Phone (office-2-design.md section 1): no greeting, no Gold applications, no Waiting for you, no Hot leads. The range stays on All (office-swap.js asks for it). */
+@media (max-width: 63.99em) { .o-dash > .o-greeting, .o-dash > .o-gold-tile, .o-dash > .o-waiting, .o-dash > .o-hot, .o-dash > .o-rings { display: none; } }
 @media (min-width: 64em) {
   .o-dash { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gutter); }
   .o-greeting { grid-column: 1 / -1; grid-row: 1; }
-  .o-greeting h1 { font-size: var(--text-2xl); }
-  .o-rings { grid-column: 1 / span 8; grid-row: 2; }
-  .o-gold-tile { grid-column: 9 / span 4; grid-row: 2; }
-  .o-leads { grid-column: 1 / span 4; grid-row: 3; }
-  .o-hot { grid-column: 5 / span 8; grid-row: 3; }
-  .o-wants { grid-column: 1 / -1; grid-row: 4; }
-  .o-waiting { grid-column: 1 / span 7; grid-row: 5; }
-  .o-latest { grid-column: 8 / span 5; grid-row: 5; }
-  .o-activity { grid-column: 1 / span 7; grid-row: 6 / span 2; }
-  .o-stat[data-stat="visitors"] { grid-column: 8 / span 5; grid-row: 6; }
-  .o-stat[data-stat="page_views"] { grid-column: 8 / span 5; grid-row: 7; }
+  .o-cards-approval { grid-column: 1 / -1; grid-row: 2; }
+  .o-rings { grid-column: 1 / span 8; grid-row: calc(2 + var(--shift)); }
+  .o-gold-tile { grid-column: 9 / span 4; grid-row: calc(2 + var(--shift)); }
+  .o-leads { grid-column: 1 / span 4; grid-row: calc(3 + var(--shift)); }
+  .o-hot { grid-column: 5 / span 8; grid-row: calc(3 + var(--shift)); }
+  .o-wants { grid-column: 1 / -1; grid-row: calc(4 + var(--shift)); }
+  .o-waiting { grid-column: 1 / span 7; grid-row: calc(5 + var(--shift)); }
+  .o-latest { grid-column: 8 / span 5; grid-row: calc(5 + var(--shift)); }
+  .o-activity { grid-column: 1 / span 7; grid-row: calc(6 + var(--shift)) / span 2; }
+  .o-stat[data-stat="visitors"] { grid-column: 8 / span 5; grid-row: calc(6 + var(--shift)); }
+  .o-stat[data-stat="page_views"] { grid-column: 8 / span 5; grid-row: calc(7 + var(--shift)); }
 }
 
 /* ---------- the journey: three single rings, the count in the middle ---------- */
@@ -88,7 +91,7 @@
 @media (min-width: 64em) { .o-plus { top: var(--space-4); right: var(--space-4); } }
 .o-plus::-webkit-details-marker { display: none; }
 .o-plus-icon { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; transition: transform var(--office-dur-thumb) var(--ease-soft); }
-.o-wants-details[open] .o-plus-icon { transform: rotate(45deg); }
+.o-wants-details[open] .o-plus-icon, .o-bd-details[open] .o-plus-icon { transform: rotate(45deg); }
 @media (hover: hover) and (pointer: fine) { .o-plus:hover { background: var(--office-taupe-track); } }
 /* open: the six tiles give way to every option (no JS needed) */
 .o-wants:has(.o-wants-details[open]) [data-tiles] { display: none; }
@@ -171,7 +174,9 @@
 }
 
 /* ---------- Leads, Hot leads, Recent activity (OFFICE-LEADS 2): stored figures and two short lists ---------- */
-.o-leads-body { display: grid; gap: var(--space-4); }
+.o-leads-body { display: flex; justify-content: space-between; align-items: flex-end; align-items: last baseline; gap: var(--space-3); }   /* See all leads: bottom right, on the line of "gave their email" (Moishe, 2026-11-05) */
+.o-leads-new { min-width: 0; }
+.o-leads-body .o-more { flex: none; margin-block: -0.75rem; }   /* keeps the 2.75rem tap target without making the card taller */
 .o-leads .o-h3 { display: flex; align-items: center; gap: var(--space-2); }
 .o-lead-dot { width: 0.625rem; height: 0.625rem; flex: none; border-radius: 50%; background: var(--office-teal); }
 .o-leads-new, .o-leads-reg { display: grid; gap: var(--space-1); }
@@ -182,7 +187,7 @@
 .o-leads-label--muted { font-weight: 400; color: var(--office-muted); }
 .o-lbar { display: block; height: 0.625rem; margin-top: var(--space-2); border-radius: var(--office-pill); background: var(--office-clay-track); overflow: hidden; }
 .o-lbar-fill { display: block; height: 100%; width: max(calc(var(--share, 0) * 100%), 0.375rem); border-radius: var(--office-pill); background: var(--office-clay); transition: width var(--office-dur-morph) var(--ease-soft); }
-.o-leads-body .o-more { margin-top: 0; padding-inline: 0; }
+.o-leads-body .o-more { padding-inline: 0; }
 .js .o-leads.is-visible:not(.is-settled) .o-lbar-fill { animation: o-lbar-grow var(--office-dur-spark) var(--ease-soft) backwards; }
 @keyframes o-lbar-grow { from { width: 0.375rem; } }
 
@@ -207,7 +212,7 @@
 @media (hover: hover) and (pointer: fine) { .o-feed-row[href]:hover { background: var(--office-sunken); } }
 /* phone: the time goes under the text, so an email is never squeezed into a sliver */
 @media (max-width: 47.99em) {
-  .o-feed-row { display: grid; grid-template-columns: var(--office-feed-dot) minmax(0, 1fr); grid-template-areas: "dot text" ". when"; column-gap: var(--space-3); align-items: start; }
+  .o-feed-row { display: grid; grid-template-columns: var(--office-feed-dot) minmax(0, 1fr); grid-template-areas: "dot text" ". when"; column-gap: var(--space-2); padding-inline: 0; align-items: start; }   /* the icon lines up with the card title (Moishe, 2026-11-05) */
   .o-feed-dot { grid-area: dot; }
   .o-feed-text { grid-area: text; overflow-wrap: break-word; }
   .o-feed-row .o-latest-when { grid-area: when; text-align: left; }

@@ -1,6 +1,6 @@
 {% extends "system/base.html" %}
 {% load static system_ui %}
-{% block head_extra %}<link rel="stylesheet" href="{% static 'common/css/system-audit.css' %}">{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="{% static 'common/css/system-audit.css' %}"><link rel="stylesheet" href="{% static 'common/css/pagination.css' %}"><script type="module" src="{% static 'common/js/pager.js' %}"></script>{% endblock %}
 {% block main %}
 {% comment %}
 The audit log (docs/design/SYSTEM.md 7). Context: feed (days > groups > items, page; see system/feed.py), params, people, section_choices,
@@ -17,7 +17,7 @@ Hooks: data-system-audit, data-system-day, data-system-group (data-type, data-ca
 </div>
 {% if chain and not chain.ok %}<div class="au-banner" role="alert"><b>The audit chain is broken at entry {{ chain.broken_seq }}.</b> Entries from there on may have been altered outside System.</div>{% endif %}
 
-<div class="au" data-system-audit>
+<div class="au" data-system-audit data-page-host>
   <form method="get" action="{% url 'system_changes' %}" class="au-bar" data-system-filters role="search" aria-label="Filter the audit log">
     <button type="submit" class="sys-btn au-apply">Filter</button>
     {% if params.kind %}<input type="hidden" name="kind" value="{{ params.kind }}">{% endif %}
@@ -37,7 +37,7 @@ Hooks: data-system-audit, data-system-day, data-system-group (data-type, data-ca
   </form>
   <div class="au-sheet-scrim" data-system-sheet-scrim hidden></div>
 
-  <div class="au-count" data-system-summary>
+  <div class="au-count" id="au-count" data-system-summary>
     <p data-system-count-text aria-live="polite"><span class="mono">{{ entry_count }}</span> entr{{ entry_count|pluralize:"y,ies" }} in <span class="mono">{{ feed.page.total }}</span> group{{ feed.page.total|pluralize }}</p>
     <span class="au-count-tools">{% if filters_set %}<a href="{% url 'system_changes' %}" data-system-clear>Clear filters</a>{% endif %}<button type="button" class="sys-btn link sm" data-system-expand-all hidden>Expand all</button></span>
   </div>
@@ -53,12 +53,10 @@ Hooks: data-system-audit, data-system-day, data-system-group (data-type, data-ca
     <div class="au-empty" data-system-empty>{% if filters_set %}<p>No entries match these filters.</p><a href="{% url 'system_changes' %}" data-system-clear>Clear filters</a>{% else %}<p>Nothing logged yet.</p>{% endif %}</div>
   {% endfor %}
   </div>
-  <nav class="au-pages" data-system-pages aria-label="Pages">
-    {% if feed.page.has_previous %}<a class="sys-btn" href="?{{ export_query }}{% if export_query %}&amp;{% endif %}page={{ feed.page.previous_number }}">Newer entries</a>{% endif %}
-    {% if feed.page.has_next %}<a class="sys-btn au-more-btn" href="?{{ export_query }}{% if export_query %}&amp;{% endif %}page={{ feed.page.next_number }}" data-system-more>Load {% if feed.page.remaining < feed.page.size %}{{ feed.page.remaining }}{% else %}{{ feed.page.size }}{% endif %} more</a>
-    {% elif feed.days %}<p class="au-end">{% if filters_set %}End of the results{% else %}Start of the log{% endif %} · {% with last=feed.days|last %}{{ last.date|date:"j M Y" }}{% endwith %}</p>{% endif %}
-    {% if feed.page.num_pages > 1 %}<span class="au-pageno mono">Page {{ feed.page.number }} of {{ feed.page.num_pages }}</span>{% endif %}
-  </nav>
+  <div class="au-pages" data-system-pages data-page-part>
+    {% include "common/_pagination.html" with pager=pager label="Audit log pages" target="[data-system-results]" scroll="#au-count" %}
+    {% if not feed.page.has_next and feed.days %}<p class="au-end">{% if filters_set %}End of the results{% else %}Start of the log{% endif %} · {% with last=feed.days|last %}{{ last.date|date:"j M Y" }}{% endwith %}</p>{% endif %}
+  </div>
 </div>
 {% include "system/_audit_drawer.html" %}
 {% endblock %}

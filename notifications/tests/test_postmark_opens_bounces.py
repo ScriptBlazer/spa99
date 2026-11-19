@@ -91,14 +91,17 @@ class BouncesPageTests(TestCase):
     def test_developer_sees_the_log_filter_suppressed_badge_and_dashboard_count(self):
         client = unlocked_client(make_user())
         page = client.get("/emails/bounces/").content.decode()
-        self.assertIn("soft@x.com", page)
+        self.assertNotIn("soft@x.com", page)  # soft bounces are hidden by default
         self.assertIn("hard@x.com", page)
         self.assertEqual(page.count(">Suppressed</span>"), 1)
+        everything = client.get("/emails/bounces/?kind=all").content.decode()
+        self.assertIn("soft@x.com", everything)
+        self.assertIn("soft@x.com", client.get("/emails/bounces/?kind=soft").content.decode())
         only = client.get("/emails/bounces/?kind=hard").content.decode()
         self.assertIn("hard@x.com", only)
         self.assertNotIn("soft@x.com", only)
         dashboard = client.get("/").content.decode()
-        self.assertRegex(dashboard, r'data-system-bounces><a href="/emails/bounces/">1</a>')  # the 10 day old one is outside 7 days
+        self.assertRegex(dashboard, r'data-system-bounces><a href="/emails/bounces/">0</a>')  # soft ones do not count; the hard one is 10 days old
 
     def test_lower_levels_get_404(self):
         client, _ = sign_in(make_user("office@example.com", system=False))

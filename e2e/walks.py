@@ -302,8 +302,11 @@ def office_levels(w):
         apply_gold(site, applicant[1], applicant[2], applicant[0], applicant[3])
         assert dbtool("gold", applicant[0])["status"] == "new"
 
-    # --- Office level: sees everything, can do nothing ---
+    # --- Office level (no Gold approver): works the Office, but makes no Gold decision and cannot export or delete ---
     page = w.page()
+    with w.step("Set up: Barry approves the two members (Registered lists approved people only; waiting ones are in Approvals)", page):
+        for member in members:
+            assert dbtool("approve-member", member[0])["result"] == "done"
     with w.step("Office level signs in and sees the dashboard", page):
         sign_in(page, OFFICE, office_user["email"], PASSWORD)
         page.wait_for_selector("[data-office-dashboard]")
@@ -321,7 +324,7 @@ def office_levels(w):
             page.locator("[data-person-row]", has_text=members[0][0]).locator("a.o-rowlink").click()
         person_id = re.search(r"/people/([0-9a-f-]{36})/", page.url).group(1)
         assert page.locator("[data-delete-person], [data-export-person]").count() == 0, "Office level sees Delete/Export on a person"
-    with w.step("Office level: direct requests are refused (403) and nothing changes", page):
+    with w.step("Office level: direct Gold decisions, export and delete are refused (403) and nothing changes", page):
         refused = {
             "approve": direct_post(page, OFFICE, f"/gold/{application_id}/approve/"),
             "decline": direct_post(page, OFFICE, f"/gold/{application_id}/decline/"),
@@ -333,6 +336,16 @@ def office_levels(w):
         assert not wrong, f"Expected 403 for every one; got {wrong}"
         assert dbtool("gold", applicant[0])["status"] == "new", "The application changed"
         assert dbtool("user", members[0][0])["exists"], "The member was deleted"
+
+    # --- Viewer (new 2026-11-16): sees leads, people and Gold, and nothing works ---
+    viewer = w.page()
+    with w.step("Viewer: reads the Gold application but has no buttons, and Revenue, chats and every action are refused (403)", viewer):
+        sign_in(viewer, OFFICE, STAFF["viewer"]["email"], PASSWORD)
+        viewer.goto(f"{OFFICE}/gold/{application_id}/")
+        assert viewer.locator("[data-channels], [data-approve], [data-decline], [data-note-form]").count() == 0, "A Viewer sees action buttons"
+        assert viewer.goto(f"{OFFICE}/revenue/").status == 403, "A Viewer can open Revenue"
+        assert viewer.goto(f"{OFFICE}/chats/").status == 403, "A Viewer can open Assistant chats"
+        assert direct_post(viewer, OFFICE, f"/gold/{application_id}/respond/").status == 403, "A Viewer could use the WhatsApp redirect"
 
     # --- Admin: export and delete, but not Gold decisions (no Approver) ---
     admin = w.page()
@@ -357,12 +370,12 @@ def office_levels(w):
         assert toast_text(admin, "were deleted"), "No confirmation message after deleting"
         assert dbtool("user", members[0][0])["exists"] is False, "The member is still in the database"
 
-    # --- Approver: can approve (the same direct request that was refused above now works) ---
+    # --- Admin + Gold approver (Barry): can approve (the same direct request that was refused above now works) ---
     approver = w.page()
-    with w.step("Approver cannot export, but can approve (direct request accepted)", approver):
+    with w.step("Admin + Gold approver can export and can approve (direct request accepted)", approver):
         sign_in(approver, OFFICE, barry["email"], PASSWORD)
         approver.goto(f"{OFFICE}/people/")
-        assert approver.locator("[data-export-csv]").count() == 0, "Office + Approver sees Export CSV"
+        assert approver.locator("[data-export-csv]").count() > 0, "Admin + Gold approver does not see Export CSV (Barry is Admin: export is Admin and up)"
         approver.goto(f"{OFFICE}/gold/{application_id}/")
         assert approver.locator("[data-approve]").count() > 0, "The Approver sees no Approve button"
         response = direct_post(approver, OFFICE, f"/gold/{application_id}/approve/")

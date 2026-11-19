@@ -19,7 +19,11 @@ from plans import seed as plans_seed
 SEEDS = [("plans", plans_seed), ("content", content_seed), ("journey", journey_seed), ("gold", gold_seed), ("notifications", notifications_seed), ("mailings", mailings_seed), ("chat", chat_seed)]
 
 
-INITIAL_STAFF_ALERT_EMAIL = "moishe@spa99.uk"  # the ONE place this address lives: first value of System > Defaults > Payment alert emails
+def initial_staff_alert_email():
+    """First value of System > Defaults > Payment alert emails: moishe@ on the sending domain (from .env), '' when none is configured."""
+    from notifications.sender import sending_domain
+
+    return f"moishe@{sending_domain()}" if sending_domain() else ""
 
 
 def _seed_staff_alert_email():
@@ -30,7 +34,7 @@ def _seed_staff_alert_email():
     if row.staff_alert_seeded:  # only ever the first time: clearing the field later is respected (use the on/off switch to stop the emails)
         return
     if not row.staff_alert_emails:
-        SiteDefaults.objects.filter(pk=row.pk).update(staff_alert_emails=INITIAL_STAFF_ALERT_EMAIL)
+        SiteDefaults.objects.filter(pk=row.pk).update(staff_alert_emails=initial_staff_alert_email())
     SiteDefaults.objects.filter(pk=row.pk).update(staff_alert_seeded=True)
 
 

@@ -1,23 +1,14 @@
 from datetime import date
 
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.http import HttpResponse
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase
 
 from common.ratelimit import hit, rate_limited_json
 from common.useragent import device_type
 from common.validators import validate_adult
 
-LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "ratelimit-tests"}}
-
-
-@override_settings(CACHES=LOCMEM)
-class RateLimitTests(SimpleTestCase):
-    def setUp(self):
-        cache.clear()
-        self.addCleanup(cache.clear)
-
+class RateLimitTests(TestCase):
     def test_hit_allows_the_limit_then_refuses(self):
         self.assertEqual([hit("t", "ip", 3, 60) for _ in range(5)], [True, True, True, False, False])
         self.assertTrue(hit("t", "other-ip", 3, 60))  # separate per identifier

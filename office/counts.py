@@ -1,0 +1,464 @@
+"""The one service for every approval and revenue figure the Office shows (docs/features/office-counting-rules.md, "Office 2"). Home's three cards, the Approvals tabs, the Leads and
+Registered tiles and the Revenue page all read this, so they always agree.
+
+WHAT THE WORDS MEAN
+  Membership people   every registration that is not on the Gold plan (a person on a Tier). Gold-plan members are the Gold table of Registered; they are never in the approval lists.
+  waiting / approved / declined (membership)   Barry's review of the registration (office.MembershipReview). No row = waiting.
+  waiting / approved / declined (Gold)         the Gold application's own status. Waiting = new, contacted or awaiting final approval (the same rows as the Gold Waiting list).
+  Registered total    every registration, Gold-plan members included: the true total.
+  Leads total         the Leads list: no account, not archived, not on the approach list, not a Possible fake.
+A Tier member who also applied for Gold counts in both Waiting figures (two different decisions), but Revenue counts him once, at the plan he is on.
+
+REVENUE ("approved" and "waiting" are the same two words as above; declined counts in neither)
+  Gold         the number of Gold applications x Plan.annual_fee of the Gold plan (never a typed 199), excluding VAT. An applicant who holds a non-declined Tier registration is not counted
+               here: he is counted at his Tier.
+  Memberships  each member's own first 12 months, excluding VAT: an active subscription's agreed price, for its stored months and then the plan's price (no months stored: x 12); else, while a kept sale price is held, the sale's months at the
+               sale price and the rest of the 12 at the plan's price (a sale of 12 months or more is 12 at the sale price); else the plan's price x 12.
+  Left out      declined people, a staff member's own registration or Gold application (a test), and a registration whose subscription is cancelled (and not active again).
+  Possible     the same sums for the people still waiting. Never added to the approved figures.
+Everything is kept in whole pence (integers), excluding VAT, in the stored snapshot; VAT is added when it is shown, from the VAT setting, and nothing is rounded until display.
+
+WHERE THE NUMBERS LIVE
+  One stored snapshot (OfficeSnapshot page "counts"), written by the hourly roll-up and the debounced refresh like every other Office figure, and by `refresh_approvals()` right after Barry
+  approves, declines or undoes, so the tabs and cards are right when the page loads. Nothing is summed while a page loads: a missing row is an empty state (`updating`) and asks for a
+  refresh (`read()`). Plain ORM, the same on SQLite and Postgres."""
+import calendar
+from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
+
+from django.db import transaction
+from django.db.models import Count, Exists, OuterRef, Subquery, Value
+from django.db.models.functions import Coalesce
+from django.utils import timezone
+
+from gold.models import GoldApplication
+from insights.models import OfficeSnapshot
+from plans.models import Plan, SiteSettings, Subscription
+from plans.sales import sale_price
+from users.models import InterestRegistration, User
+
+from .models import MembershipReview
+
+WAITING, APPROVED, DECLINED = MembershipReview.WAITING, MembershipReview.APPROVED, MembershipReview.DECLINED
+SALE, AGREED, FULL = "sale", "agreed", "full"
+GOLD_SLUG = "gold"
+GOLD_WAITING = (GoldApplication.NEW, GoldApplication.CONTACTED, GoldApplication.AWAITING_FINAL)
+PAGE, RANGE = OfficeSnapshot.COUNTS, "all"
+PENCE = Decimal(100)
+
+
+def to_pence(amount):
+    """A price in pounds (Decimal or text) as whole pence."""
+    return int((Decimal(amount) * PENCE).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
+# ---------- who is in which list ----------
+
+def membership_people():
+    """Registrations on a Tier (not Gold-plan members, not people with no plan left)."""
+    return InterestRegistration.objects.exclude(plan__slug=GOLD_SLUG)
+
+
+def with_review(queryset):
+    """Annotate `review_status`: the review's status, or waiting when there is no row."""
+    return queryset.annotate(review_status=Coalesce("review__status", Value(WAITING)))
+
+
+def _by_status(queryset):
+    counts = dict(with_review(queryset).order_by().values_list("review_status").annotate(n=Count("pk")).values_list("review_status", "n"))
+    approved, declined = counts.get(APPROVED, 0), counts.get(DECLINED, 0)
+    total = sum(counts.values())
+    return {"total": total, "waiting": total - approved - declined, "approved": approved, "declined": declined}
+
+
+def gold_counts():
+    counts = dict(GoldApplication.objects.order_by().values_list("status").annotate(n=Count("pk")).values_list("status", "n"))
+    approved, declined = counts.get(GoldApplication.APPROVED, 0), counts.get(GoldApplication.DECLINED, 0)
+    waiting = sum(counts.get(status, 0) for status in GOLD_WAITING)
+    return {"total": sum(counts.values()), "waiting": waiting, "approved": approved, "declined": declined}
+
+
+# ---------- revenue (whole pence, excluding VAT) ----------
+
+def agreed_subquery():
+    """Annotation for a registration queryset: the agreed price of his active subscription (None when he has none). Used as `.annotate(agreed=agreed_subquery())`."""
+    return Subquery(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.ACTIVE).order_by("-created_at").values("agreed_price_ex_vat")[:1])
+
+
+def agreed_months_subquery():
+    """Annotation next to `agreed_subquery`: how many months that agreed price lasts (None: no end)."""
+    return Subquery(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.ACTIVE).order_by("-created_at").values("agreed_months")[:1])
+
+
+def agreed_plan_price_subquery():
+    """Annotation next to `agreed_subquery`: the list price of the plan on that subscription, which may not be the plan he registered for."""
+    return Subquery(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.ACTIVE).order_by("-created_at").values("plan__price_ex_vat")[:1])
+
+
+def agreed_price(reg):
+    """The same figure for one registration: the annotation when the queryset carried it, else one query."""
+    if hasattr(reg, "agreed"):
+        return reg.agreed
+    return Subscription.objects.filter(registration=reg, status=Subscription.ACTIVE).order_by("-created_at").values_list("agreed_price_ex_vat", flat=True).first()
+
+
+def month_pence(reg):
+    """THE price rule, used by Revenue and by the Approvals rows: one member's monthly price in pence, excluding VAT, and whether it is a kept sale price.
+    His active subscription's agreed price, else the kept sale price (while held), else the plan's price. (None, False) when he has no plan."""
+    if reg.plan is None:
+        return None, False
+    agreed = agreed_price(reg)
+    if agreed is not None:
+        return to_pence(agreed), False
+    if reg.sale_percent_off and not reg.sale_expired_at:
+        return to_pence(sale_price(reg.plan, reg.sale_percent_off)), True
+    return to_pence(reg.plan.price_ex_vat), False
+
+
+def _agreed_terms(reg):
+    """(months the agreed price lasts, the price per month in pounds after that) from his active subscription."""
+    if hasattr(reg, "agreed_for"):
+        return reg.agreed_for, reg.agreed_plan_price
+    return Subscription.objects.filter(registration=reg, status=Subscription.ACTIVE).order_by("-created_at").values_list("agreed_months", "plan__price_ex_vat").first() or (None, None)
+
+
+def terms(reg):
+    """How one member's first 12 months run, from what is stored on his rows. The one source for his year and for the Revenue breakdown, so they can never disagree.
+    {"kind": sale | agreed | full, "month": pence a month now, "months": months at that price inside the 12, "after": pence a month for the rest, ...}. None when he has no plan."""
+    month, on_sale = month_pence(reg)
+    if month is None:
+        return None
+    if on_sale:
+        months = reg.sale_months or 1  # no months on the snapshot: 1, as the rest of the site reads it
+        return {"kind": SALE, "name": reg.sale_name, "percent": reg.sale_percent_off, "lasts": months, "month": month, "months": min(months, 12), "after": to_pence(reg.plan.price_ex_vat)}
+    if agreed_price(reg) is not None:
+        lasts, after = _agreed_terms(reg)
+        months = min(lasts or 12, 12)  # no months stored: the agreed price has no end
+        return {"kind": AGREED, "lasts": lasts, "month": month, "months": months, "after": to_pence(after) if after is not None else month}
+    return {"kind": FULL, "lost": bool(reg.sale_percent_off), "month": month, "months": 12, "after": month}
+
+
+def year_pence(reg):
+    """One member's first 12 months in pence, excluding VAT (the module text). A reduced price only lasts its own months: John on 20% off for 6 months is 6 at that price and 6 at the plan's,
+    whether the price is his kept sale or an agreed price on his subscription. Everything here is stored on his rows, so nothing looks back through time."""
+    deal = terms(reg)
+    if deal is None:
+        return 0
+    return deal["month"] * deal["months"] + deal["after"] * (12 - deal["months"])
+
+
+def add_months(start, number):
+    """`start` plus whole months, on the same day of the month or the month's last day when it has no such day (31 Jan -> 28 Feb -> 31 Mar)."""
+    index = start.year * 12 + start.month - 1 + number
+    year, month = divmod(index, 12)
+    month += 1
+    if year > date.max.year:  # a mistyped far-off year must never stop the figures: the forms refuse it, this is the floor under them
+        return date.max
+    return date(year, month, min(start.day, calendar.monthrange(year, month)[1]))
+
+
+def agreed_start_subquery():
+    """Annotation next to `agreed_subquery`: the start date of his active subscription (None when he has none)."""
+    return Subquery(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.ACTIVE).order_by("-created_at").values("start_date")[:1])
+
+
+def _add_due(due, slug, day, pence, month):
+    """One payment into the stored calendar: {plan slug: {ISO date: {"<month number 1-12>": [pence, payments]}}}. The month number is which of his 12 payments it is (Gold's one is month 1)."""
+    cell = due.setdefault(slug, {}).setdefault(day.isoformat(), {}).setdefault(str(month), [0, 0])
+    cell[0] += pence
+    cell[1] += 1
+
+
+def _new_detail():
+    return {"groups": {}, "months": [0] * 12, "due": {}}
+
+
+def _add_to_detail(detail, deal, plan, start):
+    """One member into his deal's group and plan row, and into the 12 months (his own first month is month 1)."""
+    key = "|".join(str(deal.get(name, "")) for name in ("kind", "name", "percent", "lasts")) + (f"|{deal['month']}" if deal["kind"] == AGREED else "")
+    group = detail["groups"].setdefault(key, {"kind": deal["kind"], "name": deal.get("name", ""), "percent": deal.get("percent"), "lasts": deal.get("lasts"), "months": deal["months"], "rows": {}})
+    row = group["rows"].setdefault(f"{plan.slug}|{deal['after']}", {"slug": plan.slug, "name": plan.name, "order": plan.order, "count": 0, "lost": 0, "month_pence": deal["month"], "after_pence": deal["after"], "during_pence": 0, "after_total_pence": 0})
+    row["count"] += 1
+    row["lost"] += 1 if deal.get("lost") else 0
+    row["during_pence"] += deal["month"] * deal["months"]
+    row["after_total_pence"] += deal["after"] * (12 - deal["months"])
+    for index in range(12):
+        detail["months"][index] += deal["month"] if index < deal["months"] else deal["after"]
+    for index in range(12):  # the 12 monthly payments, on his start date and the same day of each following month
+        _add_due(detail["due"], plan.slug, add_months(start, index), deal["month"] if index < deal["months"] else deal["after"], index + 1)
+
+
+def _finish_detail(detail):
+    """Plain lists for the stored JSON: sales first (largest first), then agreed prices, then full price; plans in their order."""
+    rank = {SALE: 0, AGREED: 1, FULL: 2}
+    groups = []
+    for group in detail["groups"].values():
+        rows = sorted(group["rows"].values(), key=lambda r: r["order"])
+        for row in rows:
+            del row["order"]
+            row["year_pence"] = row["during_pence"] + row["after_total_pence"]
+        groups.append({**group, "rows": rows, "count": sum(r["count"] for r in rows), "lost": sum(r["lost"] for r in rows), "during_pence": sum(r["during_pence"] for r in rows),
+                       "after_total_pence": sum(r["after_total_pence"] for r in rows), "year_pence": sum(r["year_pence"] for r in rows)})
+    groups.sort(key=lambda g: (rank[g["kind"]], -g["count"], g["name"], g["percent"] or 0, g["lasts"] or 0))
+    return {"groups": groups, "months": detail["months"], "due": detail["due"]}
+
+
+def _calendar(due, start, assumed):
+    """The stored `calendar` of one bucket: the assumed start, and every payment due by plan and date (one entry per date per plan, no people)."""
+    days = sorted(day for by_day in due.values() for day in by_day)
+    return {"start": start.isoformat(), "assumed": assumed, "first": days[0] if days else None, "last": days[-1] if days else None, "due": due}
+
+
+def _blank(bucket_plans):
+    return {"count": 0, "year_pence": 0, "by_plan": [{"slug": p["slug"], "name": p["name"], "kind": p["kind"], "count": 0, "year_pence": 0} for p in bucket_plans]}
+
+
+def revenue():
+    """{"gold_fee_pence", "approved": {...}, "waiting": {...}} in whole pence a year, excluding VAT. Each bucket: count, year_pence and `by_plan` (the Tiers in plan order, Gold last):
+    [{slug, name, kind, count, year_pence}], and `detail` (the breakdown: _finish_detail). See the module text for what counts."""
+    gold_plan = Plan.objects.filter(slug=GOLD_SLUG).first()
+    fee = to_pence(gold_plan.annual_fee) if gold_plan is not None and gold_plan.annual_fee is not None else 0
+    tiers = list(Plan.objects.filter(kind=Plan.MONTHLY).order_by("order", "price_ex_vat"))
+    layout = [{"slug": p.slug, "name": p.name, "kind": "tier"} for p in tiers] + [{"slug": GOLD_SLUG, "name": gold_plan.name if gold_plan else "Gold Card", "kind": "gold"}]
+    buckets = {APPROVED: _blank(layout), WAITING: _blank(layout)}
+    details = {APPROVED: _new_detail(), WAITING: _new_detail()}
+    rows_by_slug = {bucket: {row["slug"]: row for row in data["by_plan"]} for bucket, data in buckets.items()}
+    cancelled = Exists(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.CANCELLED))
+    active = Exists(Subscription.objects.filter(registration=OuterRef("pk"), status=Subscription.ACTIVE))
+    site = SiteSettings.load()
+    assumed = site.opening_date is None
+    launch = site.opening_date or site.revenue_start_date  # a person with no subscription of his own starts here
+    held = []  # (user id, lower email) of everyone holding a non-declined Tier registration: his Gold application is not added on top
+    for reg in with_review(InterestRegistration.objects.filter(plan__kind=Plan.MONTHLY).select_related("plan", "user")).annotate(agreed=agreed_subquery(), agreed_for=agreed_months_subquery(), agreed_plan_price=agreed_plan_price_subquery(), sub_start=agreed_start_subquery(), has_cancelled=cancelled, has_active=active).iterator():
+        if reg.review_status == DECLINED or reg.user.is_staff or (reg.has_cancelled and not reg.has_active):
+            continue  # not revenue: declined, a staff member's own (test) registration, or a membership whose subscription was cancelled
+        held.append((reg.user_id, (reg.user.email or "").strip().lower()))
+        row = rows_by_slug[reg.review_status].get(reg.plan.slug)
+        if row is None:
+            continue
+        deal = terms(reg)
+        row["count"] += 1
+        row["year_pence"] += deal["month"] * deal["months"] + deal["after"] * (12 - deal["months"])
+        _add_to_detail(details[reg.review_status], deal, reg.plan, reg.sub_start or launch)
+    users, emails = {u for u, _ in held}, {e for _, e in held if e}
+    staff_emails = {e.strip().lower() for e in User.objects.filter(is_staff=True).values_list("email", flat=True) if e}  # one query, not one per application
+    for application in GoldApplication.objects.filter(status__in=(GoldApplication.APPROVED, *GOLD_WAITING)).select_related("user").only("status", "user_id", "email", "user__is_staff"):
+        if (application.user is not None and application.user.is_staff) or (application.email or "").strip().lower() in staff_emails:
+            continue  # a staff member's own application (by his account or by his address)
+        if application.user_id in users or (application.email or "").strip().lower() in emails:
+            continue  # he is on a Tier: counted once, there
+        bucket = APPROVED if application.status == GoldApplication.APPROVED else WAITING
+        row = rows_by_slug[bucket][GOLD_SLUG]
+        row["count"] += 1
+        row["year_pence"] += fee
+        if fee:
+            _add_due(details[bucket]["due"], GOLD_SLUG, launch, fee, 1)  # the whole annual fee, one payment (a Gold application has no subscription)
+    for bucket, data in buckets.items():
+        data["count"] = sum(row["count"] for row in data["by_plan"])
+        data["year_pence"] = sum(row["year_pence"] for row in data["by_plan"])
+        data["detail"] = _finish_detail(details[bucket])
+        data["detail"]["calendar"] = _calendar(data["detail"].pop("due"), launch, assumed)
+    return {"gold_fee_pence": fee, "approved": buckets[APPROVED], "waiting": buckets[WAITING]}
+
+
+def with_vat(pence, vat_rate):
+    """Pence including VAT, exact (a Decimal: not rounded here)."""
+    return Decimal(pence) * (Decimal(100) + Decimal(vat_rate)) / Decimal(100)
+
+
+def _detail_view(source):
+    """The breakdown for the page, from the stored figures: None until the next roll-up has stored it. `steps` joins months with the same figure, so 12 months read as a few lines."""
+    detail = source.get("detail")
+    if not detail:
+        return None
+    groups, steps = [{**g, "after_months": 12 - g["months"]} for g in detail["groups"]], []  # `after_months`: the months of the 12 left at the price after this one
+    for number, pence in enumerate(detail["months"], start=1):
+        if steps and steps[-1]["pence"] == pence:
+            steps[-1]["to"] = number
+        else:
+            steps.append({"from": number, "to": number, "pence": pence})
+    gold = next((r for r in source["by_plan"] if r["kind"] == "gold"), {"count": 0, "year_pence": 0})
+    highest = max(detail["months"]) or 1
+    return {"groups": groups, "months": [{"number": n, "pence": p, "percent": p * 100 / highest} for n, p in enumerate(detail["months"], start=1)], "steps": steps,
+            "reduced_count": sum(g["count"] for g in groups if g["kind"] != FULL), "full_count": sum(g["count"] for g in groups if g["kind"] == FULL), "lost_count": sum(g["lost"] for g in groups),
+            "memberships_year_pence": sum(detail["months"]), "gold_count": gold["count"], "gold_year_pence": gold["year_pence"]}
+
+
+def revenue_view(data=None, vat_rate=None):
+    """The Revenue page's figures from the stored ones: every bucket and plan row gets month and year, excluding and including VAT (Decimal pence, exact), and the average for a member.
+    Rounding is for display only (the `pounds` filter): totals are never added up from rounded figures."""
+    data = data if data is not None else read()["revenue"]
+    vat = Decimal(SiteSettings.load().vat_rate if vat_rate is None else vat_rate)
+
+    def figures(count, year):
+        return {"count": count, "year_ex": Decimal(year), "month_ex": Decimal(year) / 12, "year_inc": with_vat(year, vat), "month_inc": with_vat(year, vat) / 12,
+                "avg_year_ex": Decimal(year) / count if count else None, "avg_year_inc": with_vat(year, vat) / count if count else None}
+
+    out = {"vat_rate": vat, "gold_fee_pence": data["gold_fee_pence"], "gold_fee_inc_pence": with_vat(data["gold_fee_pence"], vat)}
+    for bucket in (APPROVED, WAITING):
+        source = data[bucket]
+        out[bucket] = {**figures(source["count"], source["year_pence"]), "by_plan": [{**row, **figures(row["count"], row["year_pence"])} for row in source["by_plan"]], "detail": _detail_view(source)}
+    return out
+
+
+def _due_figures(data, vat, paying, dropoff, low=None, high=None):
+    """The shared sum behind the two functions below. Real: every payment in the dates as stored. Assumed: a payment in month n counts pence x paying% x (1 - dropoff%)^(n-1); Gold's fee
+    counts pence x paying% with no drop-off. Decimals, never rounded. `low` and `high` are ISO dates (None: all stored due)."""
+    share, stay = Decimal(paying) / 100, 1 - Decimal(dropoff) / 100
+    out = {}
+    for bucket in (APPROVED, WAITING):
+        source = data.get(bucket) or {}
+        due = ((source.get("detail") or {}).get("calendar") or {}).get("due") or {}
+        rows = []
+        for plan in source.get("by_plan", []):
+            pence = payments = 0
+            assumed = Decimal(0)
+            for day, months in (due.get(plan["slug"]) or {}).items():
+                if (low is None or low <= day) and (high is None or day <= high):
+                    for month, (amount, number) in months.items():
+                        pence, payments = pence + amount, payments + number
+                        assumed += Decimal(amount) * share * (1 if plan["kind"] == "gold" or int(month) == 1 else stay ** (int(month) - 1))
+            rows.append({"slug": plan["slug"], "name": plan["name"], "kind": plan["kind"], "payments": payments, "total_ex": Decimal(pence), "total_inc": with_vat(pence, vat),
+                         "assumed_total_ex": assumed, "assumed_total_inc": with_vat(assumed, vat)})
+        total, assumed = sum(row["total_ex"] for row in rows), sum((row["assumed_total_ex"] for row in rows), Decimal(0))
+        out[bucket] = {"payments": sum(row["payments"] for row in rows), "total_ex": Decimal(total), "total_inc": with_vat(total, vat), "assumed_total_ex": assumed,
+                       "assumed_total_inc": with_vat(assumed, vat), "by_plan": rows}
+    return out
+
+
+def _settings_figures(data, vat_rate, low=None, high=None):
+    site = SiteSettings.load()
+    return _due_figures(data, Decimal(site.vat_rate if vat_rate is None else vat_rate), site.revenue_paying_percent, site.revenue_dropoff_percent, low, high)
+
+
+def revenue_between(data, start, end, vat_rate=None):
+    """Money due from `start` to `end`, both days included, from the stored figures only (no queries but the settings): {approved|waiting: {payments, total_ex, total_inc,
+    assumed_total_ex, assumed_total_inc, by_plan: [{slug, name, kind, payments, total_ex, total_inc, assumed_total_ex, assumed_total_inc}]}}, Decimal pence, exact. `by_plan` follows
+    the stored plan order. An old payload with no calendar finds nothing."""
+    return _settings_figures(data, vat_rate, start.isoformat(), end.isoformat())  # ISO dates sort as dates
+
+
+def revenue_assumptions(data, vat_rate=None):
+    """The same figures over all stored due (the page with no dates). With 100% paying and 0% leaving the assumed totals equal the real ones."""
+    return _settings_figures(data, vat_rate)
+
+
+# ---------- the snapshot ----------
+
+def compute_approvals():
+    """Everything cheap: memberships, Gold, the registered total and Revenue."""
+    return {"memberships": _by_status(membership_people()), "gold": gold_counts(), "registered_total": InterestRegistration.objects.count(),
+            "gold_members": InterestRegistration.objects.filter(plan__slug=GOLD_SLUG).count(), "revenue": revenue()}
+
+
+def compute_leads():
+    """The Leads total (the list's own query, so the two always agree). The heavy part: only the job and the first read build it."""
+    from . import leads
+
+    return {"leads_total": leads.lead_queryset("all", fakes="out").count(), "fakes_total": leads.lead_queryset("all", fakes="only").count()}
+
+
+def compute_assistant_cost(now=None):
+    """Assistant spend for the Developer-only card on the Assistant page: all time, this calendar month and today (London), each as {"pence": "<decimal string>", "chats": n}, plus the
+    staff-test share of all time ("test_pence", "test_chats"). Every conversation counts, staff tests included: it is real money. Two aggregate queries, run only by the background job."""
+    from django.db.models import Count, Q, Sum
+
+    from chat.models import Conversation
+
+    now = timezone.localtime(now) if now is not None else timezone.localtime()
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)  # London midnight (an aware datetime in the current zone)
+    month_start = day_start.replace(day=1)
+    month, today = Q(created_at__gte=month_start), Q(created_at__gte=day_start)
+
+    row = Conversation.objects.aggregate(
+        all_pence=Sum("total_cost_pence"), all_chats=Count("pk"),
+        month_pence=Sum("total_cost_pence", filter=month), month_chats=Count("pk", filter=month),
+        today_pence=Sum("total_cost_pence", filter=today), today_chats=Count("pk", filter=today),
+    )
+    tests = Conversation.objects.filter(staff_test=True).aggregate(pence=Sum("total_cost_pence"), chats=Count("pk"))
+
+    def part(name):
+        return {"pence": str(row[f"{name}_pence"] or Decimal(0)), "chats": row[f"{name}_chats"]}
+
+    return {"all": part("all"), "month": part("month"), "today": part("today"), "test_pence": str(tests["pence"] or Decimal(0)), "test_chats": tests["chats"]}
+
+
+def compute_all():
+    return {**compute_approvals(), **compute_leads(), "assistant_cost": compute_assistant_cost()}
+
+
+def _write(payload):
+    now = timezone.now()
+    row, created = OfficeSnapshot.objects.get_or_create(page=PAGE, range=RANGE, defaults={"payload": payload, "built_at": now})
+    if not created:
+        OfficeSnapshot.objects.filter(pk=row.pk).update(payload=payload, built_at=now, updated_at=now)
+    return payload
+
+
+def refresh_approvals():
+    """Barry decided something (or a registration was removed): recompute the cheap figures now and keep the stored Leads total. Never raises past the decision: a failure is logged and the
+    hourly roll-up catches up."""
+    import logging
+
+    try:
+        with transaction.atomic():
+            stored = OfficeSnapshot.objects.filter(page=PAGE, range=RANGE).values_list("payload", flat=True).first() or {}
+            kept = {k: stored[k] for k in ("leads_total", "fakes_total") if k in stored}
+            payload = {**compute_approvals(), **(kept if len(kept) == 2 else compute_leads())}
+            if "assistant_cost" in stored:
+                payload["assistant_cost"] = stored["assistant_cost"]  # the hourly job owns this one
+            _write(payload)
+    except Exception:  # noqa: BLE001
+        logging.getLogger("spa99.office").exception("Could not refresh the approval counts")
+
+
+def refresh_memberships():
+    """An approval click: update only the membership counts in the stored row (one grouped count over registrations, the same numbers as `_by_status`), in the caller's transaction. Revenue,
+    Gold and the rest stay as stored until the queued snapshot refresh. No stored row yet: the whole row is built once, as before. Never raises past the decision."""
+    import logging
+
+    try:
+        with transaction.atomic():
+            row = OfficeSnapshot.objects.select_for_update().filter(page=PAGE, range=RANGE).first()  # a job writing the row at the same moment waits, so nothing is overwritten
+            if row is None or not row.payload:
+                return refresh_approvals()  # nothing stored yet (a brand-new database): build the whole row once, as before
+            payload = {**row.payload, "memberships": _by_status(membership_people())}
+            OfficeSnapshot.objects.filter(pk=row.pk).update(payload=payload, updated_at=timezone.now())
+    except Exception:  # noqa: BLE001
+        logging.getLogger("spa99.office").exception("Could not refresh the membership counts")
+
+
+def empty():
+    """What a page shows before the first snapshot exists (a fresh database): zeros and `updating`, never worked out while the page loads."""
+    zero = {"total": 0, "waiting": 0, "approved": 0, "declined": 0}
+    bucket = {"count": 0, "year_pence": 0, "by_plan": []}
+    return {"memberships": dict(zero), "gold": dict(zero), "registered_total": 0, "gold_members": 0, "leads_total": 0, "fakes_total": 0, "updating": True,
+            "revenue": {"gold_fee_pence": 0, "approved": dict(bucket), "waiting": dict(bucket)}}
+
+
+def read():
+    """The stored figures, one row. A missing row is an empty state and a refresh is asked for in the background (the same rule as every other Office figure: nothing is worked out while a
+    page loads)."""
+    payload = OfficeSnapshot.objects.filter(page=PAGE, range=RANGE).values_list("payload", flat=True).first()
+    if payload:
+        return payload
+    from . import snapshots
+
+    snapshots.request_refresh()
+    return empty()
+
+
+def cards(vat_rate=None):
+    """For Home's three cards: {"waiting": {gold, memberships}, "approved": {...}, "revenue": {...}} from one stored row. Each ring has `value` and `of` (its total):
+    people rings are x of y applied / registered; the Revenue rings are pence, with `of` = the estimate plus what those waiting would add."""
+    data = read()
+    gold, members = data["gold"], data["memberships"]
+    rev = data["revenue"]
+
+    def money(gold):
+        have, wait = (sum(r["year_pence"] for r in rev[bucket]["by_plan"] if (r["slug"] == GOLD_SLUG) == gold) for bucket in ("approved", "waiting"))
+        return {"value": have, "possible": wait, "of": have + wait}
+
+    return {"waiting": {"gold": {"value": gold["waiting"], "of": gold["total"]}, "memberships": {"value": members["waiting"], "of": members["total"]}},
+            "approved": {"gold": {"value": gold["approved"], "of": gold["total"]}, "memberships": {"value": members["approved"], "of": members["total"]}},
+            "revenue": {"gold": money(True), "memberships": money(False)}, "registered_total": data["registered_total"], "leads_total": data.get("leads_total", 0)}

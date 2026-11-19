@@ -1,4 +1,4 @@
-"""Spa 99 Office (office.spa99.uk): the business back office for staff (team levels Office, Admin, Developer and superuser).
+"""Spa 99 Office (the office host, OFFICE_DOMAIN): the business back office for staff (team levels Office, Admin, Developer and superuser).
 Chosen by common.middleware.HostRoutingMiddleware. Locked by default (LoginRequiredMiddleware); each office view
 then checks the team level."""
 from django.contrib import admin
@@ -14,7 +14,6 @@ urlpatterns = [
     path("robots.txt", login_not_required(lambda request: HttpResponse("User-agent: *\nDisallow: /\n", content_type="text/plain"))),
     path("", include("users.urls")),  # staff sign-in and sign-out
     path("insights/", include("insights.urls")),  # the older statistics JSON, staff roles only
-    path("", include("whatsapp.urls_office")),  # chats, push, manifest and service worker: the Office host only
     path("", include("office.urls")),
     # Hidden Django admin on this host too (content, plans, hours, notifications stay there for now).
     path(settings.ADMIN_PATH, admin.site.urls),

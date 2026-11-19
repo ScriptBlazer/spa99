@@ -25,7 +25,6 @@ from django.db.models import Min
 from django.db.models.functions import Lower
 from django.utils import timezone
 
-from common.emaildefaults import SENDER_PERSON
 from common.jobs import tracked
 from journey.models import JourneySession
 from plans.models import SiteSettings
@@ -155,8 +154,6 @@ def send_one(row, site, now, force=False):
 
     if not site.lead_next_morning_on and not force:
         return _skip(row, SKIP_OFF, now)
-    if emailsettings.options_for(TEMPLATE).sender == SENDER_PERSON and not site.auto_sender:  # the email's own sender setting (Person by default)
-        return _skip(row, SKIP_NO_SENDER, now)
     if row.due_at < now - TOO_LATE and not force:
         return _skip(row, SKIP_LATE, now)
     reason = skip_reason(row.email, site, now)
@@ -166,8 +163,12 @@ def send_one(row, site, now, force=False):
         first_name = _first_name(row.email)
         url = tokens.unsubscribe_url(row.email)
         headers = {**tokens.list_unsubscribe_headers(url), "X-PM-Tag": TAG}
+        from notifications import sender as sender_mod
+
+        chosen = emailsettings.options_for(TEMPLATE).sender_user  # the staff member picked on the email's page signs it; otherwise the old sender name, else Spa 99
+        sender_name = sender_mod.sign_name(chosen, fallback=(site.auto_email_from_name or "").strip() or "Spa 99")
         log = send_templated(TEMPLATE, [row.email], subject_for(TEMPLATE, first_name=first_name),
-                             {"first_name": first_name, "sender_name": (site.auto_email_from_name or "").strip() or "Spa 99", "unsubscribe_url": url, "notice": NOTICE},
+                             {"first_name": first_name, "sender_name": sender_name, "unsubscribe_url": url, "notice": NOTICE},
                              subject_email=row.email, headers=headers)  # From, Reply-To and the footer come from the email's own settings (System > Emails)
     except Exception as error:  # noqa: BLE001 - one bad row must not stop the others; the row is not retried (it may have gone out)
         logger.error("Next-morning email failed (%s)", type(error).__name__)

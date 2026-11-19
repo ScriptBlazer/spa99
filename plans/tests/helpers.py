@@ -5,12 +5,12 @@ from common import levels
 from plans.models import SiteSettings
 
 
-def make_team_member(email, level=levels.OFFICE, approver=False, final=False, is_active=True):
-    """A team account at `level`, optionally holding the Approver and Final approver groups (the groups are made if missing)."""
+def make_team_member(email, level=levels.OFFICE, approver=False, final=False, is_active=True, membership=False):
+    """A team account at `level`, optionally holding the Approver (Gold approver), Membership approver and Final approver groups (the groups are made if missing)."""
     user = get_user_model().objects.filter(email__iexact=email).first() or get_user_model().objects.create_user(email, "x-Pass-123456")
     user.is_staff, user.is_active, user.is_superuser = True, is_active, level == levels.SUPERUSER
     user.save()
-    names = ([levels.GROUP_FOR[level]] if level in levels.GROUP_FOR else []) + ([levels.APPROVER_GROUP] if approver else []) + ([levels.FINAL_APPROVER_GROUP] if final else [])
+    names = ([levels.GROUP_FOR[level]] if level in levels.GROUP_FOR else []) + ([levels.APPROVER_GROUP] if approver else []) + ([levels.MEMBERSHIP_APPROVER_GROUP] if membership else []) + ([levels.FINAL_APPROVER_GROUP] if final else [])
     user.groups.set([Group.objects.get_or_create(name=name)[0] for name in names])
     return user
 

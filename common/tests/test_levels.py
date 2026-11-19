@@ -39,6 +39,14 @@ class LevelTests(TestCase):
         self.assertFalse(levels.is_approver(stray))  # Approver without a level counts for nothing
         self.assertTrue(levels.is_approver(person("root@example.com", is_superuser=True)))
 
+    def test_viewer_is_the_lowest_level_and_holds_no_approver_permission(self):
+        viewer = person("viewer@example.com", "viewer", approver=True)
+        viewer.groups.add(Group.objects.get_or_create(name=levels.MEMBERSHIP_APPROVER_GROUP)[0])
+        self.assertEqual((levels.level_of(viewer), levels.rank("viewer") < levels.rank("office")), ("viewer", True))
+        self.assertFalse(levels.is_approver(viewer) or levels.can_approve_memberships(viewer))  # stale ticks count for nothing
+        self.assertFalse(levels.can_hold_approver(viewer) or levels.can_hold_membership_approver(viewer) or levels.can_hold_final_approver(viewer))
+        self.assertTrue(levels.can_manage(person("dev@example.com", "developer"), viewer))
+
     def test_can_manage_matrix(self):
         users = {name: person(f"{name}@example.com", name) for name in ("office", "admin", "developer")}
         users["superuser"] = person("root@example.com", is_superuser=True)
@@ -58,3 +66,18 @@ class LevelTests(TestCase):
         developer, root = person("d@example.com", "developer"), person("root@example.com", is_superuser=True)
         self.assertTrue(levels.can_assign(developer, "admin") and not levels.can_assign(developer, "developer"))
         self.assertTrue(levels.can_assign(root, "superuser"))
+
+
+class MembershipApproverTests(TestCase):
+    def test_office_and_admin_need_the_tick_developer_and_up_always_approve_viewer_never(self):
+        for level, ticked, expected in (("office", False, False), ("office", True, True), ("admin", False, False), ("admin", True, True),
+                                        ("developer", False, True), ("developer", True, True), ("viewer", True, False)):
+            user = person(f"{level}{ticked}@example.com", level)
+            if ticked:
+                user.groups.add(Group.objects.get_or_create(name=levels.MEMBERSHIP_APPROVER_GROUP)[0])
+            self.assertEqual(levels.can_approve_memberships(user), expected, (level, ticked))
+        self.assertTrue(levels.can_approve_memberships(person("root@example.com", is_superuser=True)))
+        self.assertFalse(levels.can_approve_memberships(None))
+        who = {level: person(f"hold-{level}@example.com", level) for level in ("viewer", "office", "admin", "developer")}
+        self.assertEqual({level: levels.can_hold_membership_approver(user) for level, user in who.items()},
+                         {"viewer": False, "office": True, "admin": True, "developer": False})

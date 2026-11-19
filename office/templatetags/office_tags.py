@@ -1,9 +1,11 @@
 """Office template helpers. Formatting only (British numbers, London dates) and drawing geometry (ring arcs,
 sparkline paths, bar lengths): every figure shown is a stored figure from the selectors, never calculated here."""
 import re
+import threading
 from datetime import date, datetime
 
 from django import template
+from django.core.signals import request_finished, request_started
 from django.utils import timezone
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
@@ -28,6 +30,89 @@ def num(value):
     return f"{_int(value):,}"
 
 
+def _pounds_exact(pence):
+    """Whole pounds from pence, rounded half up: the ONLY place a money figure is rounded (the stored and summed figures are exact pence)."""
+    from decimal import ROUND_HALF_UP, Decimal
+
+    try:
+        return int((Decimal(pence or 0) / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    except (TypeError, ValueError, ArithmeticError):
+        return 0
+
+
+@register.filter
+def pounds(pence):
+    """Pence as whole pounds with a comma: 59700 -> £597, 995000 -> £9,950, 15021300 -> £150,213. Rounded for display only."""
+    return f"£{_pounds_exact(pence):,}"
+
+
+_request = threading.local()
+
+
+def _reset_site_format(**kwargs):
+    _request.active, _request.format = True, None
+
+
+def _end_site_format(**kwargs):
+    _request.active, _request.format = False, None
+
+
+request_started.connect(_reset_site_format, dispatch_uid="office_site_date_start")
+request_finished.connect(_end_site_format, dispatch_uid="office_site_date_end")
+
+
+def _site_format():
+    """The `date_format` setting as a strftime string. Read once for a request (a page shows many dates); outside a request, read each time so a changed setting is never stale."""
+    if getattr(_request, "active", False) and getattr(_request, "format", None):
+        return _request.format
+    from plans.models import SiteSettings
+
+    found = SiteSettings.load().strftime_date_format
+    if getattr(_request, "active", False):
+        _request.format = found
+    return found
+
+
+@register.filter
+def site_date(value):
+    """A date (or an ISO 'YYYY-MM-DD' string) in the System's date format setting: 01/03/2027, 03/01/2027 or 2027-03-01. Anything else (None, garbage) is empty."""
+    if isinstance(value, datetime):
+        value = value.date()
+    if isinstance(value, str):
+        try:
+            value = date.fromisoformat(value.strip())
+        except ValueError:
+            return ""
+    if not isinstance(value, date):
+        return ""
+    return value.strftime(_site_format())
+
+
+@register.filter
+def price_month(pence):
+    """A price a month, exact: whole pounds when the pence are 00 (35000 -> £350), otherwise two places (27930 -> £279.30). Never rounded, so a price reads as it was set."""
+    from decimal import Decimal
+
+    try:
+        exact = Decimal(pence or 0) / 100
+    except (TypeError, ValueError, ArithmeticError):
+        return "£0"
+    return f"£{exact:,.0f}" if exact == exact.to_integral_value() else f"£{exact:,.2f}"
+
+
+@register.filter
+def pounds_compact(pence):
+    """For a ring: whole pounds up to £9,999 (£9,950), then £57.5k, £150k, and from £1m £1.25m."""
+    whole = _pounds_exact(pence)
+    if whole < 10_000:
+        return f"£{whole:,}"
+    for size, suffix in ((1_000_000, "m"), (1_000, "k")):
+        if whole >= size:
+            text = f"{whole / size:.2f}" if size == 1_000_000 else f"{whole / size:.1f}"
+            return f"£{text.rstrip('0').rstrip('.')}{suffix}"
+    return f"£{whole:,}"
+
+
 @register.filter
 def compact(value):
     """Counts: 1,204 · 12.4k · 1.2m (compact from 10,000, one decimal)."""
@@ -47,7 +132,7 @@ def bp_rate(value):
     if value in (None, ""):
         return ""
     pct = _int(value) / 100
-    return f"{pct:.1f}%" if pct < 10 else f"{round(pct)}%"
+    return f"{pct:.1f}%" if pct < 10 else f"{int(pct + 0.5)}%"  # half up, as the chart's tooltip rounds
 
 
 @register.filter
@@ -213,10 +298,37 @@ def ring_arcs(percent):
     return {"goal": 1, "first": f"{100 - first:g}", "second": f"{100 - second:g}", "on": 1 if first else 0, "on2": 1 if second else 0}
 
 
+@register.filter
+def ring_of(total, word):
+    """Line 3 under a ring: 'of 12 applied', or 'none yet' with nothing to be a share of."""
+    return f"of {_int(total):,} {word}" if _int(total) else "none yet"
+
+
+@register.filter
+def ring_of_pounds(pence):
+    """Line 3 under a money ring: 'of £224k possible', or 'none yet'."""
+    return f"of {pounds_compact(pence)} possible" if _pounds_exact(pence) else "none yet"
+
+
+@register.simple_tag
+def share_arcs(value, of):
+    """Offset for a two-ring card ("x of y"), in pathLength units (0 = full lap). Drawing only: the figures shown are the stored ones. A share above zero never draws
+    thinner than 2% (it would not show); nothing to draw (no total, or none yet) is a closed track with no arc, so no round cap leaves a dot. `none` is True with no total (line 3 says so)."""
+    try:
+        total, part = float(of or 0), float(value or 0)
+    except (TypeError, ValueError):
+        total, part = 0.0, 0.0
+    if total <= 0 or part <= 0:
+        return {"first": "100", "on": 0, "none": total <= 0}
+    share = min(max(part / total * 100, 2.0), 100.0)
+    return {"first": f"{100 - share:.2f}".rstrip("0").rstrip("."), "on": 1, "none": False}
+
+
 PERIODS = {   # how a change line names the period before: (reference, the word for "new")
     "today": ("yesterday", "today"), "7d": ("last week", "this week"), "30d": ("the 30 days before", "this month"),
 }
-ANALYTICS_PERIODS = {"7d": "the previous 7 days", "30d": "the previous 30 days", "90d": "the previous 90 days"}
+ANALYTICS_PERIODS = {"7d": "the previous 7 days", "30d": "the previous 30 days", "90d": "the previous 90 days",
+                     "week": "last week", "month": "last month", "custom": "the days before"}  # the last three are Activity's
 
 
 @register.simple_tag
@@ -250,7 +362,7 @@ def change_ana(value, previous_values, range_name):
     if diff == 0:
         return f"Same as {ref}"
     if diff > 0:
-        return f"New in the last {ref.split()[-2]} days" if previous == 0 else f"+{diff:,} on {ref}"
+        return f"New in the last {ref.split()[-2]} days" if previous == 0 and range_name in ("7d", "30d", "90d") else f"+{diff:,} on {ref}"
     return f"{-diff:,} fewer than {ref}"
 
 
@@ -355,7 +467,7 @@ def index_of(items, value):
 
 @register.filter
 def range_label(value):
-    return {"today": "Today", "7d": "7 days", "30d": "30 days", "90d": "90 days", "all": "All time"}.get(value, value)
+    return {"today": "Today", "7d": "7 days", "30d": "30 days", "90d": "90 days", "all": "All time", "week": "This week", "month": "This month"}.get(value, value)
 
 
 @register.simple_tag
@@ -494,12 +606,26 @@ def pick_columns(columns, spec=""):
 
 @register.simple_tag
 def reach_primary(wa, em, secondary=False):
-    """Which channel button is the one primary: "wa", "email" or "". WhatsApp when he can be sent to on it (a chat or ready, staff may send, he has not
-    said STOP), else Email when it can send. Gold (`secondary`) has none, so Approve stays the one primary."""
+    """Which channel button is the one primary: "wa", "email" or "". WhatsApp when he has a mobile and the viewer can act, else Email when it can send. Gold (`secondary`) has none,
+    so Approve stays the one primary."""
     if secondary:
         return ""
-    if wa.get("state") in ("chat", "ready") and wa.get("can_edit") and not wa.get("opted_out"):
+    if wa.get("state") == "mobile" and wa.get("can_edit"):
         return "wa"
     if em.get("can_send") and not em.get("blocked"):
         return "email"
     return ""
+
+
+@register.filter
+def cost_pence(value):
+    """An assistant cost stored in pence, shown in pounds to three places so it reads as a fraction of a pound: 2.10p is "£0.021",
+    0.35p "£0.004", 123.4p "£1.234" (Moishe 2026-11-11). Half rounds up."""
+    from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+
+    try:
+        pence = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return ""
+    return f"£{(pence / 100).quantize(Decimal('0.001'), rounding=ROUND_HALF_UP):,}"
+

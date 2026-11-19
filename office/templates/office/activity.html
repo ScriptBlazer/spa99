@@ -1,0 +1,105 @@
+{% extends "office/base.html" %}
+{% load static office_tags %}
+{% block title %}Activity | Spa 99 Office{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="{% static 'common/css/pagination.css' %}">{% include "common/_date_picker_assets.html" %}<script defer src="{% static 'common/vendor/chartjs/4.6.1/chart.umd.min.js' %}"></script>{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/office-charts.js' %}"></script><script type="module" src="{% static 'common/js/office-activity.js' %}"></script><script type="module" src="{% static 'common/js/pager.js' %}"></script>{% endblock %}
+{% block main %}
+{% comment %}Activity (Developer and up): what the team did in a period and who did it. A mini dashboard over the list of every staff action. Context: see office.views.activity_page. Never shows note text or message bodies.
+The range bar (When, Dates, Staff member, Type) applies to the tiles, the charts and the list. Each type has one colour everywhere: Approvals clay, Leads and people teal, Notes sage, Emails slate, Gold ochre, Memberships plum. By time (the parts of the London day) uses ochre, teal, plum and slate.{% endcomment %}
+<h1 class="sr-only">Activity</h1>
+<form class="o-filters o-filters--activity" method="get" action="{% url 'office_activity' %}" data-filter-form data-full data-list="activity" aria-label="Filter activity" data-activity-form>
+  {% if show_all %}<input type="hidden" name="all" value="1">{% endif %}
+  <div class="o-filters-bar">
+    <div class="o-filter-group o-filter-group--when"><span class="o-filter-label o-when-label" id="l-when">When</span>
+      <fieldset class="o-seg" aria-labelledby="l-when" style="--n: {{ ranges|length }}; --i: {% if filters.from or filters.to %}0{% else %}{% index_of ranges filters.range %}{% endif %}" data-default="{{ filters.range }}" data-activity-seg>
+        <span class="o-seg-thumb" aria-hidden="true"></span>
+        {% for r in ranges %}<label class="o-seg-item"><input type="radio" name="range" value="{{ r }}"{% if r == filters.range and not filters.from and not filters.to %} checked{% endif %}><span>{{ r|range_label }}</span></label>{% endfor %}
+      </fieldset></div>
+    <button type="button" class="btn btn-secondary btn-sm o-filters-open" data-filters-open hidden>{% include "office/_icon.html" with name="sliders" %}Filters</button>
+    <span class="o-muted o-datechip" data-region="act-datechip">{{ dates_text }}</span>
+    <div class="o-filters-slot" data-filters-slot>
+      <div class="o-filters-body" data-filter-body>
+        <div class="o-filter-group">{% include "common/_date_picker.html" with id="act-dates" label="Dates" label_class="o-filter-label" empty="Choose dates" from=filters.from to=filters.to format=date_format sheet=True %}</div>
+        <div class="o-filter-group o-filter-group--right"><label class="o-filter-label" for="f-staff">Staff member</label>
+          <select id="f-staff" name="staff" class="o-select" data-default=""><option value="">Everyone</option>{% for key, name in staff %}<option value="{{ key }}"{% if filters.staff == key %} selected{% endif %}>{{ name }}</option>{% endfor %}</select></div>
+        <div class="o-filter-group"><label class="o-filter-label" for="f-group">Type</label>
+          <select id="f-group" name="group" class="o-select" data-default=""><option value="">All types</option>{% for value, label in groups %}<option value="{{ value }}"{% if filters.group == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      </div>
+    </div>
+  </div>
+  <p class="o-totalline" data-region="activity-total">{% if filtered %}<span data-filtered>Filtered</span> <a class="o-quiet" href="{% url 'office_activity' %}" data-clear>Clear</a>{% endif %}
+    <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button></p>
+  {% if filters.error %}<p class="o-field-error" role="alert">{{ filters.error }}</p>{% endif %}
+  <dialog class="o-sheet" data-filter-sheet aria-labelledby="sheet-h">
+    <div class="o-sheet-head"><h2 id="sheet-h">Filters</h2></div>
+    <div data-sheet-slot></div>
+    <button type="submit" class="btn btn-primary btn-block" data-sheet-close>Show results</button>
+  </dialog>
+</form>
+
+<div class="o-charts" data-office-charts>
+  {# 1 Tiles: all actions, then the three busiest types. The whole row is one region, because the busiest types change with the range. #}
+  <div class="o-kpis o-span-12" data-office-kpis data-region="act-kpis" data-fade>
+    {% for k in data.kpis %}{% include "office/_kpi.html" with key=k.key label=k.label hue=k.hue anchor=k.anchor %}{% endfor %}
+  </div>
+  <p class="o-footnote o-span-12">Figures update every hour, the list is live.</p>
+
+  {% comment %}1b The list, straight under the tiles: the 8 newest, then "See all" at the bottom opens the whole list, 10 rows a page (activity.OPEN_PAGE_SIZE) with the shared pagination under it (?all=1&page=N).
+     "See all" and "Show less" are plain links, so it works without script. The foot (the pagination and the link) is a region, so a filter change swaps it with the rows. With 8 or fewer there is no See all.{% endcomment %}
+  <section class="o-card o-span-12 o-list-activity" id="list" data-reveal data-list-card aria-labelledby="h-list">
+    <header class="o-card-head"><h2 id="h-list">Everything that happened</h2><span class="o-muted o-list-count" data-region="count-list" data-fade>{{ data.total|num }}</span></header>
+    {% include "office/_activity_list.html" %}
+  </section>
+
+  {# 2 Day by day (Week by week for All time or a long range) #}
+  <section class="o-card o-chartcard o-span-12" id="days" data-reveal data-chart-card="days" aria-labelledby="h-days">
+    <header class="o-card-head"><h2 id="h-days" data-region="head-days">{% if data.granularity == "week" %}Week by week{% else %}Day by day{% endif %}</h2></header>
+    <p class="o-summary" data-region="summary-days" data-fade>{{ data.summaries.days }}</p>
+    <div class="o-chartbox" data-chart="days" data-empty-text="No staff actions in this range."{% if data.empty %} data-empty{% endif %}>
+      <canvas id="chart-days" role="img" aria-label="{{ data.summaries.days }}" tabindex="-1"></canvas>
+      <p class="o-empty-chart">No staff actions in this range.</p>
+    </div>
+    <details class="o-table" data-table="days"{% if data.empty %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="table-days" data-fade>
+        <table><caption class="sr-only">Staff actions, {% if data.granularity == "week" %}week by week{% else %}day by day{% endif %}</caption>
+          <thead><tr><th scope="col">{% if data.granularity == "week" %}Week{% else %}Day{% endif %}</th><th scope="col">Actions</th></tr></thead>
+          <tbody>{% for d in data.days %}<tr><th scope="row">{% if data.granularity == "week" %}{{ d.iso|week_label }}{% else %}{{ d.iso|day_label }}{% endif %}</th><td>{{ d.count|num }}</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </details>
+  </section>
+
+  {# 3 By time: how many actions in each part of the London day (stored totals, the same filters) #}
+  <section class="o-card o-chartcard o-span-6" id="times" data-reveal data-chart-card="times" aria-labelledby="h-times">
+    <header class="o-card-head"><h2 id="h-times">By time</h2></header>
+    <p class="o-summary" data-region="summary-times" data-fade>{{ data.summaries.times }}</p>
+    <div class="o-donut">
+      <div class="o-chartbox o-chartbox--donut" data-chart="times" data-empty-text="No staff actions in this range."{% if data.times_empty %} data-empty{% endif %}>
+        <canvas id="chart-times" role="img" aria-label="{{ data.summaries.times }}" tabindex="-1"></canvas>
+        <p class="o-donut-centre" data-region="centre-times" data-fade>{% if data.busiest_part %}<span class="o-donut-word">Busiest</span><span class="o-donut-total o-donut-total--word">{{ data.busiest_part }}</span>{% else %}<span class="o-donut-total">0</span><span class="o-donut-word">actions</span>{% endif %}</p>
+        <p class="o-empty-chart">No staff actions in this range.</p>
+      </div>
+      <ul class="o-keylist" data-region="keylist-times" data-fade>
+        {% for t in data.times %}<li><span class="o-swatch" style="--sw: var(--office-{{ t.hue }})" aria-hidden="true"></span><span class="o-key-name">{{ t.label }}<span class="o-muted o-key-hours">{{ t.hours }}</span></span><span class="o-key-num">{{ t.value|num }}</span><span class="o-key-share">{{ t.share_bp|bp_rate }}</span></li>{% endfor %}
+      </ul>
+    </div>
+  </section>
+
+  {# 4 By type: also the colour key for the bars and the list #}
+  <section class="o-card o-chartcard o-span-6" id="types" data-reveal data-chart-card="types" aria-labelledby="h-types">
+    <header class="o-card-head"><h2 id="h-types">By type</h2></header>
+    <p class="o-summary" data-region="summary-types" data-fade>{{ data.summaries.types }}</p>
+    <div class="o-donut">
+      <div class="o-chartbox o-chartbox--donut" data-chart="types" data-empty-text="No staff actions in this range."{% if data.empty %} data-empty{% endif %}>
+        <canvas id="chart-types" role="img" aria-label="{{ data.summaries.types }}" tabindex="-1"></canvas>
+        <p class="o-donut-centre" data-region="centre-types" data-fade><span class="o-donut-total">{{ data.total|num }}</span><span class="o-donut-word">actions</span></p>
+        <p class="o-empty-chart">No staff actions in this range.</p>
+      </div>
+      <ul class="o-keylist" data-region="keylist-types" data-fade>
+        {% for t in data.types %}<li><span class="o-swatch" style="--sw: var(--office-{{ t.hue }})" aria-hidden="true"></span><span class="o-key-name">{{ t.label }}</span><span class="o-key-num">{{ t.value|num }}</span><span class="o-key-share">{{ t.share_bp|bp_rate }}</span></li>{% endfor %}
+      </ul>
+    </div>
+  </section>
+
+</div>
+{{ data_json|json_script:"office-series" }}
+{% endblock %}

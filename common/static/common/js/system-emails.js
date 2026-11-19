@@ -92,10 +92,26 @@ async function confirmSend({ url, opener, when = '' }) {
     const td = tr.insertCell(); td.textContent = value;
     tr.prepend(th);
   }
+  // A send that moves people (leads with no mobile go to Archived) says who moves, in plain counts, before anything else.
+  let details = table;
+  if (d.moves) {
+    const lines = [
+      `${fmt(d.moves.stay)} ${plural(d.moves.stay, 'has a mobile and stays', 'have a mobile and stay')} in Leads, tagged Emailed.`,
+      `${fmt(d.moves.archive)} ${plural(d.moves.archive, 'has no mobile and moves', 'have no mobile and move')} to Archived, reason "${d.moves.reason}".`,
+      d.moves.bounced,
+    ].filter(Boolean);
+    const list = document.createElement('ul');
+    list.className = 'se-moves';
+    list.dataset.seMoves = '';
+    for (const line of lines) { const item = document.createElement('li'); item.textContent = line; list.append(item); }
+    details = document.createElement('div');
+    details.append(list, table);
+  }
+  const who = d.moves ? `${fmt(n)} ${plural(n, 'lead', 'leads')}` : `${fmt(n)} ${plural(n, 'person', 'people')}`;
   const ok = await confirmModal({
-    title: when ? `Schedule '${d.title}' to ${fmt(n)} ${plural(n, 'person', 'people')}?` : `Send '${d.title}' to ${fmt(n)} ${plural(n, 'person', 'people')}?`,
+    title: when ? `Schedule '${d.title}' to ${who}?` : (d.moves ? `Send to ${who}?` : `Send '${d.title}' to ${who}?`),
     body: when ? 'You can cancel until then.' : 'This cannot be unsent.',
-    details: table, confirmLabel: when ? 'Schedule' : `Send to ${fmt(n)}`, tone: IS_LIVE ? 'danger' : 'neutral', opener,
+    details, confirmLabel: when ? 'Schedule' : `Send to ${fmt(n)}`, tone: IS_LIVE ? 'danger' : 'neutral', opener,
   });
   return ok ? { count: n } : null;
 }
@@ -461,12 +477,14 @@ function initComposer(form) {
     known: known.body, drawTokens, insertAt, csrf,
     onChange: () => {
       dirty = true; typed = true; refreshBar(); preview.soon();
-      const personal = /personal_/.test($('[data-se-blocks]', form)?.value || '');
+      const personal = /personal_(journey|register)/.test($('[data-se-blocks]', form)?.value || '');
       if (personal !== hadPersonal) { hadPersonal = personal; countAll(); } // a personal link changes who can get it (account groups are refused)
     },
     locked: () => showLocked('System locked. Unlock it in another tab, then upload the image again.'),
   });
-  const params = () => new URLSearchParams({ subject: fields.subject.value, blocks: builder.json(), kind: kind(), group: group() });
+  const senderSelect = form.elements.sender_user;
+  const footerSelect = form.elements.footer_mode;
+  const params = () => new URLSearchParams({ subject: fields.subject.value, blocks: builder.json(), kind: kind(), group: group(), sender_user: senderSelect?.value || '', footer_mode: footerSelect?.value || '' });
   const preview = previewPane(form, {
     url: form.dataset.previewUrl, params,
     nothing: () => (builder.count ? '' : 'Add a part to see the preview.'),
@@ -486,7 +504,7 @@ function initComposer(form) {
     const mine = (cardSeq[key] = (cardSeq[key] || 0) + 1);
     if (asChosen) { counting = true; countError = ''; paintCount(); }
     const query = new URLSearchParams({ group: key, kind: kind(), ...optionsOf(key) });
-    if (/personal_/.test($('[data-se-blocks]', form)?.value || '')) query.set('personal', '1'); // a personal-link button follows the invitation rules
+    if (/personal_(journey|register)/.test($('[data-se-blocks]', form)?.value || '')) query.set('personal', '1'); // a personal-link button follows the invitation rules
     const result = await call(`${form.dataset.countUrl}?${query}`, { method: 'GET' });
     if (mine !== cardSeq[key] || result.aborted) return;
     if (result.locked) showLocked('System locked. Unlock it in another tab to see how many people get this.');
@@ -561,6 +579,7 @@ function initComposer(form) {
 
   $$('input[name="group"]', form).forEach((r) => r.addEventListener('change', () => { syncOptions(); dirty = true; count = null; countError = ''; countChosen(); paintCount(); refreshBar(); preview.soon(); }));
   $$('.se-group-opts select, .se-group-opts input', form).forEach((el) => el.addEventListener('change', () => { dirty = true; const key = el.closest('.se-group[data-group]').dataset.group; if (key === group()) countChosen(); else countCard(key, false); }));
+  [senderSelect, footerSelect].forEach((el) => el?.addEventListener('change', () => { dirty = true; preview.soon(); }));
   $$('input[name="kind"]', form).forEach((r) => r.addEventListener('change', () => { dirty = true; help(); countAll(); refreshBar(); preview.soon(); }));
   $$('input[name="when"]', form).forEach((r) => r.addEventListener('change', () => {
     if (later() && !date.value) { const d = new Date(); d.setDate(d.getDate() + 1); date.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -665,7 +684,7 @@ function initComposer(form) {
       result = await call(`${base}${id}/test/`);
     } else {
       testButton.setAttribute('aria-disabled', 'true');
-      result = await call(form.dataset.testUrl, { body: { subject: fields.subject.value, blocks: builder.json(), kind: kind(), name: nameField?.value || '' } });
+      result = await call(form.dataset.testUrl, { body: { subject: fields.subject.value, blocks: builder.json(), kind: kind(), name: nameField?.value || '', sender_user: senderSelect?.value || '', footer_mode: footerSelect?.value || '' } });
     }
     refreshBar();
     if (result.locked) return showLocked('System locked. Unlock it in another tab, then send the test again.');

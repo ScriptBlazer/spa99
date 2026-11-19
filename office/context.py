@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from insights.metrics import K
 
 from . import selectors
@@ -10,8 +12,11 @@ def _person(user):
     name = user.get_full_name() or user.email
     letters = [part[0] for part in (user.first_name, user.last_name) if part] or [user.email[:1]]
     role = levels.LABELS[levels.level_of(user)]
-    if levels.is_approver(user) and not user.is_superuser:
-        role += " and Approver"
+    if not user.is_superuser:
+        if levels.is_approver(user):
+            role += " and " + levels.GOLD_APPROVER_LABEL
+        if levels.can_hold_membership_approver_level(levels.level_of(user)) and levels.can_approve_memberships(user):
+            role += " and Membership approver"
     return {"name": name, "first_name": user.first_name or name, "initials": "".join(letters[:2]).upper(), "role": role}
 
 
@@ -26,4 +31,4 @@ def office(request):
 
     name = (SiteSettings.objects.values_list("outreach_list_name", flat=True).first() or "").strip()  # one light read; no row = the default
     return {"office_outreach_title": name or "Approach list", "office_waiting": selectors.waiting_count(selectors.counters(K.GOLD_BY_STATUS)), "office_can": abilities(request.user),
-            "office_person": _person(request.user)}
+            "office_person": _person(request.user), "app_version": settings.APP_VERSION}

@@ -35,3 +35,6 @@ tmp*/
 # End-to-end run (scripts/e2e.sh): throwaway workspace and the kept report
 .private/e2e/
 .private/e2e-report/
+
+# Local-only sample people for the dev database (never commit)
+scripts/seed_local.py

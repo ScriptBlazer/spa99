@@ -69,6 +69,59 @@
     {% include "office/_kpi.html" with key="gold_applications" label="Gold applications" hue="ochre" anchor="gold" %}
   </div>
 
+  {# 3a Revenue, short: only for people who may see Revenue (the figures are not sent to anyone else). Stored figures, the range above does not change them. #}
+  {% if office_can.can_revenue and data.revenue_card %}
+  {% with rc=data.revenue_card %}
+  <section class="o-card o-chartcard o-span-6" id="revenue" data-reveal data-chart-card="revenue-plan" aria-labelledby="h-revenue-plan">
+    <header class="o-card-head"><h2 id="h-revenue-plan">Revenue by plan</h2></header>
+    <p class="o-summary" data-region="summary-revenue-plan" data-fade>{{ rc.plan.summary }}</p>
+    <div class="o-donut">
+      <div class="o-chartbox o-chartbox--donut" data-chart="revenue-plan" data-empty-text="Nothing approved yet."{% if not rc.plan.rows %} data-empty{% endif %}>
+        <canvas id="chart-revenue-plan" role="img" aria-label="{{ rc.plan.summary|default:'Revenue by plan' }}" tabindex="-1"></canvas>
+        <p class="o-donut-centre" data-region="centre-revenue-plan" data-fade><span class="o-donut-total o-donut-total--money">{{ rc.plan.total_pence|pounds_compact }}</span><span class="o-donut-word">a year</span></p>
+        <p class="o-empty-chart">Nothing approved yet.</p>
+      </div>
+      <ul class="o-keylist" data-region="keylist-revenue-plan" data-fade>
+        {% if rc.plan.rows %}{% ramp_rows rc.plan.rows "clay" "value" as rev_plan_rows %}{% for r in rev_plan_rows %}<li><span class="o-swatch" style="--sw: {{ r.swatch }}" aria-hidden="true"></span><span class="o-key-name">{{ r.label }}</span><span class="o-key-num">{{ r.value|pounds }}</span><span class="o-key-share">{{ r.share_bp|bp_rate }}</span></li>{% endfor %}{% endif %}
+      </ul>
+    </div>
+    <p class="o-footnote">Approved people, excluding VAT, each member's first 12 months. The dates above don't change this.</p>
+    <details class="o-table" data-table="revenue-plan"{% if not rc.plan.rows %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="table-revenue-plan" data-fade>
+        <table><caption class="sr-only">Revenue by plan, a year, excluding VAT</caption>
+          <thead><tr><th scope="col">Plan</th><th scope="col">A year</th><th scope="col">Share</th></tr></thead>
+          <tbody>{% for r in rc.plan.rows %}<tr><th scope="row">{{ r.label }}</th><td>{{ r.value|pounds }}</td><td>{{ r.share_bp|bp_rate }}</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </details>
+    <a class="o-quiet o-seelink" href="{% url 'office_revenue' %}">See Revenue {% include "office/_icon.html" with name="chevron-right" %}</a>
+  </section>
+
+  <section class="o-card o-chartcard o-span-6" id="revenue-price" data-reveal data-chart-card="revenue-price" aria-labelledby="h-revenue-price">
+    <header class="o-card-head"><h2 id="h-revenue-price">Who is on what price</h2></header>
+    <p class="o-summary" data-region="summary-revenue-price" data-fade>{{ rc.price.summary }}</p>
+    <div class="o-donut">
+      <div class="o-chartbox o-chartbox--donut" data-chart="revenue-price" data-empty-text="No Tier members approved yet."{% if not rc.price.rows %} data-empty{% endif %}>
+        <canvas id="chart-revenue-price" role="img" aria-label="{{ rc.price.summary|default:'Who is on what price' }}" tabindex="-1"></canvas>
+        <p class="o-donut-centre" data-region="centre-revenue-price" data-fade><span class="o-donut-total">{{ rc.price.members|num }}</span><span class="o-donut-word">member{{ rc.price.members|pluralize }}</span></p>
+        <p class="o-empty-chart">No Tier members approved yet.</p>
+      </div>
+      <ul class="o-keylist" data-region="keylist-revenue-price" data-fade>
+        {% if rc.price.rows %}{% ramp_rows rc.price.rows "clay" "value" as rev_price_rows %}{% for r in rev_price_rows %}<li><span class="o-swatch" style="--sw: {{ r.swatch }}" aria-hidden="true"></span><span class="o-key-name">{{ r.label }}</span><span class="o-key-num">{{ r.value|num }}</span><span class="o-key-share">{{ r.share_bp|bp_rate }}</span></li>{% endfor %}{% endif %}
+      </ul>
+    </div>
+    <p class="o-footnote">Approved people, excluding VAT, each member's first 12 months. The dates above don't change this.</p>
+    <details class="o-table" data-table="revenue-price"{% if not rc.price.rows %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="table-revenue-price" data-fade>
+        <table><caption class="sr-only">Who is on what price, Tier members</caption>
+          <thead><tr><th scope="col">Price</th><th scope="col">Members</th><th scope="col">Share</th></tr></thead>
+          <tbody>{% for r in rc.price.rows %}<tr><th scope="row">{{ r.label }}</th><td>{{ r.value|num }}</td><td>{{ r.share_bp|bp_rate }}</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </details>
+    <a class="o-quiet o-seelink" href="{% url 'office_revenue' %}">See Revenue {% include "office/_icon.html" with name="chevron-right" %}</a>
+  </section>
+  {% endwith %}
+  {% endif %}
+
   {# 3 Funnel #}
   <section class="o-card o-chartcard o-span-12" id="journeys" data-reveal data-chart-card="funnel" aria-labelledby="h-funnel">
     <header class="o-card-head"><h2 id="h-funnel">From visit to registration</h2></header>

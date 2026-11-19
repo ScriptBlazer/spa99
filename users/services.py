@@ -10,6 +10,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from chat import services as chat_services
+from common.emails import clean_email
 from common.models import LoginEvent
 from common.tasks import enqueue, erase_task_records
 from gold import services as gold_services
@@ -215,9 +216,6 @@ def verify_email(token):
         metrics.email_verified(user.email_verified_at)
         link_earlier_data(user)  # the address is proven: earlier leads and applications with it become his
     _after_registration(user, user.marketing_consent, proven=True)  # the address is proven: its invites become registered, and ticking the news box lifts an earlier unsubscribe
-    from whatsapp import services as whatsapp
-
-    whatsapp.relink_address(user.email)  # rule 1c: a chat staff gave this lead address now joins the verified account
     try:
         enqueue("users.tasks.send_welcome_email", str(user.pk))
     except Exception:  # noqa: BLE001
@@ -227,7 +225,7 @@ def verify_email(token):
 
 def request_password_reset(email):
     """Queue a reset email if the address belongs to an active account. Always looks the same to the caller."""
-    user = User.objects.filter(email__iexact=(email or "").strip(), is_active=True).first()
+    user = User.objects.filter(email__iexact=clean_email(email), is_active=True).first()
     if user is not None:
         try:
             enqueue("users.tasks.send_password_reset_email", str(user.pk))
@@ -251,6 +249,20 @@ def reset_password(uidb64, token, new_password):
     return user
 
 
+def sign_out_everywhere(user):
+    """End every signed-in session of this person (Office, Control, System, the member area). Sessions are stored in the database, so each one is
+    read and the ones that belong to this person are deleted. Returns how many. Works the same on SQLite and Postgres.
+    Cost: it decodes every unexpired session (one pass, no index on the user), so it is for rare admin actions on a small team site, not for anything per request."""
+    from django.contrib.auth import SESSION_KEY
+    from django.contrib.sessions.models import Session
+
+    wanted, gone = str(user.pk), []
+    for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator():
+        if session.get_decoded().get(SESSION_KEY) == wanted:
+            gone.append(session.pk)
+    return Session.objects.filter(pk__in=gone).delete()[0] if gone else 0
+
+
 def password_changed(user):
     """Queue the "your password was changed" email. Called after a signed-in change and a completed reset (never after a
     first password from an invite, never for an admin or command setting one). Never raises."""
@@ -262,9 +274,8 @@ def password_changed(user):
 
 # ---------- GDPR ----------
 
-def export_user_data(user, include_chats=False):
-    """Everything we hold about a person, as plain JSON-friendly data. `include_chats` (WhatsApp chats) is for staff-run exports only: a mobile
-    number is not proven (anyone can register with a lead's number), so a member's own download never includes a WhatsApp chat."""
+def export_user_data(user):
+    """Everything we hold about a person, as plain JSON-friendly data."""
     profile = {name: getattr(user, name) for name in PERSON_FIELDS}
     profile = {key: (value.isoformat() if hasattr(value, "isoformat") else value) for key, value in profile.items()}
     logins = [
@@ -289,7 +300,6 @@ def export_user_data(user, include_chats=False):
         "interest": _export_interest(user),
         "journey_sessions": _export_sessions(user),
         "chats": chat_services.export_conversations(user=user, email=user.email if user.email_verified_at else None),
-        **({"whatsapp": _export_whatsapp(user), "whatsapp_chats_not_included": _unlinked_chats(user)} if include_chats else {}),  # names only: nothing links them to him, so staff decide
         "staff_emails": _export_staff_emails(user) if user.email_verified_at else [],  # found by address: only once the address is proven his
         "gold_applications": gold_services.export_applications(user.email) if user.email_verified_at else [],  # by email only once the address is proven his
         "emails": [
@@ -323,20 +333,6 @@ def _export_staff_emails(user):
     from outreach.services import export_messages
 
     return export_messages(_chat_addresses(user))
-
-
-def _unlinked_chats(user):
-    """Chats on his mobile that nobody holds: not part of his export or erasure (common.ownership), so the export names them (number and name, never the messages)."""
-    from whatsapp import services as whatsapp
-
-    return [{"phone": c["phone"], "name": c["name"]} for c in whatsapp.unclaimed_for_user(user)]
-
-
-def _export_whatsapp(user):
-    from whatsapp import services as whatsapp
-
-    addresses = _chat_addresses(user)  # common.ownership uses them only when the account is verified
-    return whatsapp.export_for(whatsapp.contacts_for_person(user, addresses))
 
 
 def _email_logs(email):
@@ -390,7 +386,7 @@ def _export_interest(user):
             "notices": [{"kind": n.kind, "status": n.status, "sent_at": _plain(n.sent_at)} for n in interest.payment_notices.order_by("created_at")],
             "subscriptions": [
                 {"plan": s.plan.name, "source": s.source, "status": s.status, "start_date": _plain(s.start_date),
-                 "agreed_price_ex_vat": str(s.agreed_price_ex_vat) if s.agreed_price_ex_vat is not None else None, "billing_note": s.billing_note,
+                 "agreed_price_ex_vat": str(s.agreed_price_ex_vat) if s.agreed_price_ex_vat is not None else None, "agreed_months": s.agreed_months, "billing_note": s.billing_note,
                  "created_at": s.created_at.isoformat(), "cancelled_at": _plain(s.cancelled_at)}
                 for s in interest.subscriptions.select_related("plan").order_by("created_at")],
         },
@@ -448,7 +444,7 @@ def _anonymise_sessions(user):
 
 
 @transaction.atomic
-def delete_user_data(user, include_chats=False):
+def delete_user_data(user):
     """Erase a person: account, interest, Gold applications by their email, email log (including emails about them sent to staff), django-q task records, login events and the history
     rows that copy their details. Journey sessions are anonymised (kept for statistics, no longer linked).
     Erasure overrides the "history is never deleted" rule because history holds personal data."""
@@ -461,10 +457,6 @@ def delete_user_data(user, include_chats=False):
     if proven:  # notes, messages, approach list and archive rows on all his addresses: an unverified account never erases another person's
         for address in outreach_people.resolve(user=user)[1] | {email.lower()}:
             erase_email(address)
-    from whatsapp import services as whatsapp
-
-    if include_chats:  # staff-run erasure only: a member deleting his own account never reaches a WhatsApp chat
-        whatsapp.erase_person(user, _chat_addresses(user))  # chats, messages and files, by the rule in common.ownership (before the sessions are cleared)
     anonymised = _anonymise_sessions(user)
     if proven:
         journey_services.erase_lead(email)  # an address given at the journey gate before he had an account

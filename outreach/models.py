@@ -69,7 +69,7 @@ class NoteEvent(UUIDModel):
 
 class OutreachEntry(UUIDModel):
     """One person on the approach list: by account, by lead address or by Gold application (exactly one). One OPEN entry per
-    target (partial unique constraints, fine on SQLite and Postgres); a done entry stays until removed (removing deletes the row)."""
+    target (partial unique constraints, fine on SQLite and Postgres); a done entry stays until removed. Removing sets removed_at (the row stays as history; only erasing a person deletes it)."""
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE, related_name="outreach_entries")
     lead_email = models.CharField(max_length=254, blank=True, db_index=True, help_text="Lower case.")
@@ -78,9 +78,12 @@ class OutreachEntry(UUIDModel):
     added_by = _person()
     added_by_label = models.CharField(max_length=254, blank=True)
     added_at = models.DateTimeField(default=timezone.now, db_index=True)
-    done_at = models.DateTimeField(null=True, blank=True)
+    done_at = models.DateTimeField(null=True, blank=True, db_index=True)
     done_by = _person()
     done_by_label = models.CharField(max_length=254, blank=True)
+    removed_at = models.DateTimeField(null=True, blank=True, db_index=True, help_text="Taken off the list (removed, back to Leads or archived). The row stays as history; every list and rule ignores it.")
+    removed_by = _person()
+    removed_by_label = models.CharField(max_length=254, blank=True)
 
     class Meta:
         ordering = ["-added_at", "-id"]
@@ -89,9 +92,9 @@ class OutreachEntry(UUIDModel):
                 (Q(user__isnull=False) & Q(lead_email="") & Q(gold_application__isnull=True))
                 | (Q(user__isnull=True) & ~Q(lead_email="") & Q(gold_application__isnull=True))
                 | (Q(user__isnull=True) & Q(lead_email="") & Q(gold_application__isnull=False)))),
-            models.UniqueConstraint(fields=["user"], condition=Q(done_at__isnull=True, user__isnull=False), name="outreach_one_open_per_user"),
-            models.UniqueConstraint(fields=["lead_email"], condition=Q(done_at__isnull=True) & ~Q(lead_email=""), name="outreach_one_open_per_lead"),
-            models.UniqueConstraint(fields=["gold_application"], condition=Q(done_at__isnull=True, gold_application__isnull=False), name="outreach_one_open_per_gold"),
+            models.UniqueConstraint(fields=["user"], condition=Q(done_at__isnull=True, removed_at__isnull=True, user__isnull=False), name="outreach_one_open_per_user"),
+            models.UniqueConstraint(fields=["lead_email"], condition=Q(done_at__isnull=True, removed_at__isnull=True) & ~Q(lead_email=""), name="outreach_one_open_per_lead"),
+            models.UniqueConstraint(fields=["gold_application"], condition=Q(done_at__isnull=True, removed_at__isnull=True, gold_application__isnull=False), name="outreach_one_open_per_gold"),
         ]
 
     def __str__(self):
@@ -165,11 +168,27 @@ class ArchivedLead(UUIDModel):
         return f"archived {self.email}"
 
 
-class LeadArchiveEvent(UUIDModel):
-    """One line of a lead's timeline: "Archived by X" or "Moved back by X". Append-only in practice; erased with the address."""
+class GenuineLead(UUIDModel):
+    """Staff checked a lead whose email bounced and decided he is real ("Mark as genuine"): he stays in Leads, never in Possible fakes, even if the
+    same address bounces again. One row per lower-cased address; Undo deletes the row. The address stays on the suppression list (no email goes to it)."""
 
-    ARCHIVED, RESTORED = "archived", "restored"
-    KIND_CHOICES = [(ARCHIVED, "Archived"), (RESTORED, "Moved back")]
+    email = models.CharField(max_length=254, unique=True, help_text="Lower case.")
+    marked_by = _person()
+    marked_by_label = models.CharField(max_length=254, blank=True)
+    marked_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-marked_at", "-id"]
+
+    def __str__(self):
+        return f"genuine {self.email}"
+
+
+class LeadArchiveEvent(UUIDModel):
+    """One line of a lead's timeline: "Archived by X", "Moved back by X", "Marked as genuine by X" or its undo. Append-only in practice; erased with the address."""
+
+    ARCHIVED, RESTORED, GENUINE, UNGENUINE = "archived", "restored", "genuine", "ungenuine"
+    KIND_CHOICES = [(ARCHIVED, "Archived"), (RESTORED, "Moved back"), (GENUINE, "Marked as genuine"), (UNGENUINE, "Genuine mark undone")]
 
     email = models.CharField(max_length=254, db_index=True, help_text="Lower case.")
     kind = models.CharField(max_length=10, choices=KIND_CHOICES)

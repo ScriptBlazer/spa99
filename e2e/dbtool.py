@@ -3,13 +3,15 @@
 Run as `python -m e2e.dbtool <command> ...` with the e2e environment (scripts/e2e.sh sets it). Playwright's sync API runs
 an event loop, where Django refuses database calls, so the run calls this in a child process instead.
 
-  create-staff EMAIL PASSWORD LEVEL [--approver] [--first NAME] [--last NAME]   Office, Admin or Developer team account
-  set-approver EMAIL        gives the account the Approver role (who receives Gold applications; System > Approval)
+  create-staff EMAIL PASSWORD LEVEL [--approver] [--first NAME] [--last NAME]   Viewer, Office, Admin or Developer team account
+  set-approver EMAIL        gives the account the Gold approver role (group "Approver") (who receives Gold applications; System > Approval)
+  set-membership-approver EMAIL   gives the account the Membership approver group (Office and Admin need it to use Approvals)
   registrations             number of registration rows
   user EMAIL                {"exists", "count", "plan", "verified", "active"}
   gold EMAIL                {"status" (newest), "statuses", "waiting", "has_user", "count", "invites", "invites_used"}
   gold-total                number of Gold applications of any email
   age-gold EMAIL            make this email's applications a day old (so a re-apply is not inside the two-minute double-click window)
+  approve-member EMAIL      Barry's membership approval: moves this person from Waiting to Approved (so Registered lists him)
   events KIND               System audit events of one kind (for example unlock_failed)
   waiting                   Gold applications waiting for a decision
   price SLUG                plan price ex VAT
@@ -62,6 +64,12 @@ def main(argv):
         user = User.objects.get(email__iexact=args[0])
         user.groups.add(Group.objects.get_or_create(name="Approver")[0])
         return {"approver": args[0]}
+    if cmd == "set-membership-approver":
+        from django.contrib.auth.models import Group
+
+        user = User.objects.get(email__iexact=args[0])
+        user.groups.add(Group.objects.get_or_create(name="Membership approver")[0])
+        return {"membership_approver": args[0]}
     if cmd == "registrations":
         return {"count": InterestRegistration.objects.count()}
     if cmd == "user":
@@ -87,6 +95,12 @@ def main(argv):
 
         n = GoldApplication.objects.filter(email__iexact=args[0]).update(created_at=timezone.now() - timedelta(days=1))
         return {"aged": n}
+    if cmd == "approve-member":
+        from office import approvals
+
+        user = User.objects.get(email__iexact=args[0])
+        result, _row = approvals.decide(user.pk, approvals.APPROVED, None)
+        return {"result": result}
     if cmd == "events":
         return {"count": SystemEvent.objects.filter(kind=args[0]).count()}
     if cmd == "waiting":

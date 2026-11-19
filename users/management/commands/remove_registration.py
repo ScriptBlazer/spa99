@@ -1,5 +1,5 @@
 """Remove one person's registration (a test or a mistake). The account stays. Dry run first:
-    manage.py remove_registration --email barry@spa99.uk --plan tier-2 --dry-run
+    manage.py remove_registration --email name@example.com --plan tier-2 --dry-run
 Refuses anything with a payment or a kept sale price on it, and the stored figures move with it."""
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction

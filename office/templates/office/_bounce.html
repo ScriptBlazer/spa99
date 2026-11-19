@@ -1,10 +1,14 @@
-{% comment %}Lead page: a bounced address (docs/features/office-outreach.md "Bounced lead emails"). The one Correct / Change the email dialog lives here (once per page); Details (_details.html) opens it too, bounced or not. Keys: bounce{bounced, email, notice, can_edit, correct_url, resend_url, can_resend, sent}.
+{% load office_tags %}{% comment %}Lead page: a bounced address (docs/features/office-outreach.md "Bounced lead emails"). The one Correct / Change the email dialog lives here (once per page); Details (_details.html) opens it too, bounced or not. Keys: bounce{bounced, email, notice, can_edit, correct_url, resend_url, can_resend, sent}.
 The notice and Correct the email show while the address bounces; Resend follow-up shows once staff corrected it (the follow-up never reached the new address).{% endcomment %}
 {% if bounce.bounced %}
 <div class="o-callout o-callout--calm o-bounce" data-bounce-notice role="note">
-  <p><strong>Possible fake</strong></p>
-  <p>{{ bounce.notice }}</p>
-  {% if bounce.can_edit %}<p><button type="button" class="btn btn-secondary btn-sm" data-dialog-open="correct-email" aria-haspopup="dialog" data-correct-email>Correct the email</button></p>{% endif %}
+  {% if bounce.genuine %}<p><strong>Marked as genuine{% if bounce.genuine_by %} by {{ bounce.genuine_by|first_word }}{% endif %}</strong></p>
+  <p>This address still bounces, so he cannot be emailed. Correct it if you can.</p>
+  {% else %}<p><strong>Possible fake</strong></p>
+  <p>{{ bounce.notice }}</p>{% endif %}
+  {% if bounce.can_edit %}<p class="o-bounce-actions"><button type="button" class="btn btn-secondary btn-sm" data-dialog-open="correct-email" aria-haspopup="dialog" data-correct-email>Correct the email</button>
+    {% if bounce.can_mark %}<form method="post" action="{{ bounce.genuine_url }}" data-mark-genuine style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="btn btn-secondary btn-sm" data-working-text="Moving">Mark as genuine</button></form>{% endif %}
+    {% if bounce.genuine %}<form method="post" action="{{ bounce.ungenuine_url }}" data-undo-genuine style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="btn btn-secondary btn-sm" data-working-text="Undoing">Undo</button></form>{% endif %}</p>{% endif %}
 </div>
 {% elif bounce.can_resend %}
 <div class="o-callout o-callout--calm o-bounce" data-bounce-resend>

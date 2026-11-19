@@ -60,6 +60,23 @@
           <p class="sys-muted se-help" data-se-kind-help aria-live="polite"></p>
         </fieldset>
 
+        <fieldset class="se-block se-sender" data-system-field="sender_user">
+          <legend>Sender</legend>
+          <select name="sender_user" id="{{ form.sender_user.id_for_label }}" aria-label="Sender">{% for value, label in form.sender_user.field.choices %}<option value="{{ value }}"{% if value|stringformat:"s" == form.sender_user.value|stringformat:"s" or not value and not form.sender_user.value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+          <p class="sys-muted se-help" data-se-reply-to>Replies go to the sender's own address; hello@ replies go to the contact address.</p>
+          {% if sender_note %}<p class="sys-note warn" data-se-sender-gone>{{ sender_note }}</p>{% endif %}
+          {% if form.sender_user.errors %}<p class="sys-error" role="alert">{{ form.sender_user.errors|join:" " }}</p>{% endif %}
+          <label class="se-choice"><input type="checkbox" name="archive_no_number" value="on"{% if form.archive_no_number.value %} checked{% endif %}> Move leads with no mobile to Archived (reason "Emailed, no number") once the email has gone. Journey leads only.</label>
+          {% if form.archive_no_number.errors %}<p class="sys-error" role="alert">{{ form.archive_no_number.errors|join:" " }}</p>{% endif %}
+        </fieldset>
+
+        <fieldset class="se-block se-sender" data-system-field="footer_mode">
+          <legend>Footer</legend>
+          <select name="footer_mode" id="{{ form.footer_mode.id_for_label }}" aria-label="Footer">{% for value, label in form.footer_mode.field.choices %}{% if value %}<option value="{{ value }}"{% if value == form.footer_mode.value %} selected{% endif %}>{{ label }}</option>{% endif %}{% endfor %}</select>
+          <p class="sys-muted se-help">The contact line is "Questions? Reply to this email or write to hello@". The unsubscribe link always stays.</p>
+          {% if form.footer_mode.errors %}<p class="sys-error" role="alert">{{ form.footer_mode.errors|join:" " }}</p>{% endif %}
+        </fieldset>
+
         <div class="se-count" data-se-count role="status" aria-live="polite"></div>
 
         <div class="se-block se-message">

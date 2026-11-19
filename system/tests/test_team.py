@@ -103,7 +103,7 @@ class TeamManagementTests(TestCase):
         self.assertEqual(levels.held(other), ("office", True))  # level changed, the Approver role is untouched
         page = client.get("/team/")
         self.assertNotContains(page, 'name="approver"')
-        self.assertContains(page, 'data-system-role="Approver"')
+        self.assertContains(page, 'data-system-role="Gold approver"')
         client.post("/team/add/", {"email": "fresh@example.com", "level": "admin"})
         self.assertTrue(User.objects.filter(email="fresh@example.com", is_staff=True).exists())
         client.post("/team/add/", {"email": "bad@example.com", "level": "developer"})  # not above your own level
@@ -157,7 +157,7 @@ class MergeTests(TestCase):
 
 class MigrateRolesTests(TestCase):
     def test_dry_run_changes_nothing_then_the_real_run_maps_the_old_groups(self):
-        old = {name: Group.objects.create(name=name) for name in ("Owner", "Manager", "Viewer", "Approver", "System")}
+        old = {name: Group.objects.get_or_create(name=name)[0] for name in ("Owner", "Manager", "Viewer", "Approver", "System")}  # Viewer and the roles already exist (a data migration makes them)
         owner, viewer, approver, dev = (User.objects.create_user(f"{n}@example.com", "x", is_staff=True) for n in ("owner", "viewer", "approver", "dev"))
         owner.groups.add(old["Owner"], old["Viewer"])
         viewer.groups.add(old["Viewer"])
@@ -166,13 +166,18 @@ class MigrateRolesTests(TestCase):
         out = StringIO()
         call_command("migrate_roles", "--dry-run", stdout=out)
         self.assertIn("Dry run", out.getvalue())
-        self.assertEqual(levels.held_level(owner), "none")
+        self.assertEqual(levels.held_level(owner), "viewer")  # the old Viewer group is the new Viewer level: nothing is mapped yet beyond that
         self.assertFalse(Group.objects.filter(name="Office").exists())
         call_command("migrate_roles", stdout=StringIO())
-        self.assertEqual([levels.held(u) for u in (owner, viewer, approver, dev)], [("admin", False), ("office", False), ("office", True), ("developer", False)])
+        self.assertEqual([levels.held(u) for u in (owner, viewer, approver, dev)], [("admin", False), ("viewer", False), ("office", True), ("developer", False)])  # the old Viewer is the new Viewer level
         call_command("setup_roles", stdout=StringIO())
-        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {"Office", "Admin", "Developer", "Approver", "Final approver"})
+        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {"Viewer", "Office", "Admin", "Developer", "Approver", "Membership approver", "Final approver"})
         self.assertEqual(levels.held(dev), ("developer", False))
+
+
+class NewGroupsTests(TestCase):
+    def test_the_migration_made_the_viewer_and_membership_approver_groups_with_no_setup_command(self):
+        self.assertEqual(set(Group.objects.filter(name__in=("Viewer", "Membership approver")).values_list("name", flat=True)), {"Viewer", "Membership approver"})
 
 
 class SystemPasswordTests(TestCase):

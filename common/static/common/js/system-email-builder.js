@@ -42,7 +42,7 @@ const LIST_WORDS = { 'Add at least one part that is not a divider.': 'Add someth
 
 /* ---------- field specs: what each part shows (the limits come from the server, as block_types) ---------- */
 
-const LINK_CHOICES = [['url', 'Web address'], ['personal_journey', 'Personal link: questionnaire'], ['personal_register', 'Personal link: Register']];
+const LINK_CHOICES = [['url', 'Web address'], ['personal_journey', 'Personal link: questionnaire'], ['personal_register', 'Personal link: Register'], ['personal_add_number', 'Personal link: Add your number']];
 
 const SPECS = {
   heading: { label: 'Heading', fields: [{ name: 'text', label: 'Text', control: 'line', place: true, hint: 'You can use {first_name}.' }] },
@@ -52,7 +52,7 @@ const SPECS = {
     fields: [
       { name: 'label', label: 'Label', control: 'line', place: true, hint: 'Short, like Book your visit. You can use {first_name}.' },
       { name: 'link', label: 'Link to', control: 'select', options: LINK_CHOICES, fallback: 'url',
-        hint: 'A personal link is made for each person, so you can see who opened it and who registered. Only for uploaded lists and journey leads.' },
+        hint: 'A personal link is made for each person, so you can see who opened it and who registered. Only for uploaded lists and leads. Add your number is for leads only: it opens a small page where he gives the mobile he uses on WhatsApp.' },
       { name: 'url', label: 'Web address', showWhen: 'url', control: 'url', hint: 'A full address (https://...) or a page on the site, like /memberships/.' },
     ],
   },

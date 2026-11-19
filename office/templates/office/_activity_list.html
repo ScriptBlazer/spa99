@@ -1,0 +1,9 @@
+{% comment %}The Activity list and its foot: the part the pager script swaps (`#act-list`, and the pager inside the foot). Closed: the 8 newest. Opened (?all=1): one page of 10 rows, with its own day heading first.
+Also the whole answer to `?fragment=1`. Keys: top, rest, top_part, pager, has_rest, show_all, toggle_query, filtered, filters.{% endcomment %}<div id="act-list" data-page-list>
+  <div data-region="list-top">{% include "office/_activity_rows.html" with rows=top part=top_part %}</div>
+  <div class="o-act-rest" id="act-rest"><div data-region="list" data-office-list="activity">{% include "office/_activity_rows.html" with rows=rest part="rest" %}</div></div>
+</div>
+<div data-region="act-foot" data-page-part>
+  {% include "common/_pagination.html" with pager=pager label="Activity pages" target="#act-list" scroll="#list" %}
+  {% if has_rest or show_all %}<p class="o-act-more"><a class="o-act-toggle" href="?{{ toggle_query }}#list" data-act-toggle data-page-target="#act-list" data-page-scroll="#list"{% if show_all %} data-page-open{% endif %}>{% if show_all %}Show less{% else %}See all{% endif %}</a></p>{% endif %}
+</div>

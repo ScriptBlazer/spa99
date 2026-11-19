@@ -8,4 +8,5 @@ urlpatterns = [
     path("email-image/<uuid:image_id>.<str:ext>", views.email_image, name="email_image_file"),
     path("email-image/<uuid:image_id>/", views.email_image, name="email_image"),
     path("invite/<str:token>/", views.invite_link, name="invite_link"),
+    path("add-number/<str:token>/", views.add_number, name="add_number"),  # the personal link in the group email to leads
 ]

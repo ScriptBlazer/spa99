@@ -3,17 +3,25 @@
 {% block title %}Registered | Spa 99 Office{% endblock %}
 {% block main %}
 <h1 class="sr-only">Registered</h1>
+{% if approvals_line %}<a class="o-approvals-line" href="{{ approvals_line.url }}" data-approvals-line data-press><span>{{ approvals_line.text }}</span>{% include "office/_icon.html" with name="chevron-right" %}</a>{% endif %}
+{# Computer: All, Membership, Gold. Phone: one table at a time, so All steps aside and Membership is the default (stacked tables cannot work with a list that loads itself). #}
+<nav class="o-seg o-seg--counts o-seg--tables" aria-label="Table" data-table-switch>
+  <a class="o-seg-item o-seg-all{% if not table %} is-active{% endif %}" href="{% url 'office_people' %}" data-table-all><span>All</span></a>
+  <a class="o-seg-item{% if table == 'membership' %} is-active{% endif %}" href="{% url 'office_people' %}?table=membership" data-table="membership"{% if table == 'membership' %} aria-current="page"{% endif %}><span>Membership</span> <span class="o-count">{{ counts.approved|num }}</span></a>
+  <a class="o-seg-item{% if table == 'gold' %} is-active{% endif %}" href="{% url 'office_people' %}?table=gold" data-table="gold"{% if table == 'gold' %} aria-current="page"{% endif %}><span>Gold</span> <span class="o-count">{{ counts.gold_members|num }}</span></a>
+</nav>
 <form class="o-filters" method="get" action="{% url 'office_people' %}" data-filter-form data-list="people" role="search" aria-label="Find registered people">
   <div class="o-filters-bar">
     <div class="o-search">
       <label for="f-q" class="sr-only">Search registered people</label>
       {% include "office/_icon.html" with name="search" %}
+      {% if table %}<input type="hidden" name="table" value="{{ table }}">{% endif %}
       <input id="f-q" type="search" name="q" value="{{ filters.q }}" placeholder="Search name, email or mobile" autocomplete="off" enterkeyhint="search" data-search>
     </div>
     <button type="button" class="btn btn-secondary btn-sm o-filters-open" data-filters-open hidden>{% include "office/_icon.html" with name="sliders" %}Filters</button>
     <div class="o-filters-slot" data-filters-slot>
       <div class="o-filters-body" data-filter-body>
-        <div class="o-filter-group"><label class="o-filter-label" for="f-plan">Plan</label>
+        <div class="o-filter-group"{% if table == "gold" %} hidden{% endif %}><label class="o-filter-label" for="f-plan">Plan</label>
           <select id="f-plan" name="plan" class="o-select"><option value="">All plans</option>{% for p in plans %}<option value="{{ p.slug }}"{% if filters.plan == p.slug %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></div>
         <div class="o-filter-group"><span class="o-filter-label" id="l-verified">Verified</span>
           <fieldset class="o-seg" aria-labelledby="l-verified" style="--n: 3; --i: {% if filters.verified == 'yes' %}1{% elif filters.verified == 'no' %}2{% else %}0{% endif %}" data-default="">
@@ -48,11 +56,14 @@
     <button type="button" class="btn btn-primary btn-block" data-sheet-close>Show results</button>
   </dialog>
 </form>
-<div class="o-card o-tablecard" data-list-card>
+{% for t in tables %}
+<div class="o-card o-tablecard" data-list-card data-table-card="{{ t.key }}">
+  <h2 class="o-h3 o-table-title">{{ t.title }} <span class="o-count-muted">{% if t.key == "gold" %}{{ counts.gold_members|num }}{% else %}{{ counts.approved|num }}{% endif %}</span></h2>
   <table class="o-list o-list--people">
-    <caption class="sr-only">Registered people</caption>
-    <thead><tr>{% include "office/_sort_head.html" %}</tr></thead>
-    <tbody data-region="list" data-office-list="people">{% include "office/_people_rows.html" %}</tbody>
+    <caption class="sr-only">{{ t.title }}: registered people</caption>
+    <thead><tr>{% include "office/_sort_head.html" with columns=t.columns %}</tr></thead>
+    <tbody data-region="list" data-office-list="people{% if t.key == 'gold' %}-gold{% endif %}">{% if t.key == "gold" %}{% include "office/_people_gold_rows.html" with rows=t.rows has_next=t.has_next page=t.page more_url=t.more_url %}{% else %}{% include "office/_people_rows.html" with rows=t.rows has_next=t.has_next page=t.page more_url=t.more_url %}{% endif %}</tbody>
   </table>
 </div>
+{% endfor %}
 {% endblock %}

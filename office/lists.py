@@ -25,11 +25,18 @@ def page_number(request):
         return 1
 
 
-def cut(queryset, page, size=None):
+def shift_from(request):
+    """?shift=N: how many rows of the earlier pages have left this list since they were shown (done, archived, decided). The page's script sends it when it loads more, so the next
+    page carries on from the right place instead of skipping the rows that moved up. 0 when absent or not a number."""
+    value = request.GET.get("shift", "")
+    return min(int(value), 100_000) if value.isdigit() else 0
+
+
+def cut(queryset, page, size=None, shift=0):
     """(rows of this page, has_next): fetches one extra row instead of counting. `size` defaults to System > Defaults > People
-    and Gold lists rows per page (views pass it from their per-request copy)."""
+    and Gold lists rows per page (views pass it from their per-request copy). `shift`: see shift_from."""
     size = size or defaults.get().list_page_size
-    start = (page - 1) * size
+    start = max((page - 1) * size - shift, 0)
     rows = list(queryset[start:start + size + 1])
     return rows[:size], len(rows) > size
 
@@ -54,28 +61,50 @@ PEOPLE_COLUMNS = [
     Column("gold", "Gold"),
 ]
 PEOPLE_TIEBREAK = ("email", "pk")
+# The Gold table of Registered (Gold-plan members): no Plan, Journey or Gold column. Approved = when his Gold application was approved.
+GOLD_PEOPLE_COLUMNS = [
+    Column("name", "Name", (Lower("first_name"), Lower("last_name"), Lower("email"))),
+    Column("approved", "Approved", "gold_approved_at", first=sorting.DESC, css="num"),
+    Column("verified", "Verified", "email_verified_at", first=sorting.DESC),
+    Column("marketing", "Marketing", "marketing_consent", first=sorting.DESC),
+    Column("registered", "Registered", "interest__created_at", first=sorting.DESC, css="num"),
+]
+TABLES = ("membership", "gold")  # Registered shows a Membership table (approved people on a Tier) and a Gold table (Gold-plan members); ?table= picks one, empty = both
 
 
 def people_filters(request):
-    key, direction, _ = sorting.resolve(PEOPLE_COLUMNS, request.GET, "registered", sorting.DESC)
-    return {"q": request.GET.get("q", "").strip(), "plan": request.GET.get("plan", ""),
+    key, direction, _ = sorting.resolve([*PEOPLE_COLUMNS, GOLD_PEOPLE_COLUMNS[1]], request.GET, "registered", sorting.DESC)
+    table = request.GET.get("table", "")
+    return {"q": request.GET.get("q", "").strip(), "plan": request.GET.get("plan", ""), "table": table if table in TABLES else "",
             "verified": request.GET.get("verified", ""), "marketing": request.GET.get("marketing", ""),
             "sale": request.GET.get("sale", ""), "payment": request.GET.get("payment", ""), "sort": key, "dir": direction}
 
 
-def people_columns(filters, request):
-    """The `columns` context for the Registered table header (see common.sorting)."""
-    return sorting.header_columns(PEOPLE_COLUMNS, filters["sort"], filters["dir"], request.path, request.GET)
+def people_columns(filters, request, table="membership"):
+    """The `columns` context for a Registered table header (see common.sorting). `table` is "membership" or "gold"."""
+    columns = GOLD_PEOPLE_COLUMNS if table == "gold" else PEOPLE_COLUMNS
+    return sorting.header_columns(columns, filters["sort"] if any(c.key == filters["sort"] for c in columns) else "registered", filters["dir"], request.path, request.GET)
 
 
-def people_queryset(filters):
-    people = User.objects.filter(interest__isnull=False).select_related("interest__plan").order_by(
-        *sorting.ordering_from(PEOPLE_COLUMNS, filters, "registered", PEOPLE_TIEBREAK))
+def people_queryset(filters, table="membership"):
+    """Registered people. "membership": approved people on a Tier (Barry's review says approved; everyone else waits in Approvals). "gold": members on the Gold plan. "all": every registered person
+    (the CSV export, which is not Barry's view)."""
+    from django.db.models import Max
+
+    from .counts import GOLD_SLUG
+
+    columns = GOLD_PEOPLE_COLUMNS if table == "gold" else PEOPLE_COLUMNS
+    people = User.objects.filter(interest__isnull=False).select_related("interest__plan", "interest__review")
+    if table == "gold":
+        people = people.filter(interest__plan__slug=GOLD_SLUG).annotate(gold_approved_at=Max("gold_applications__approved_at", filter=Q(gold_applications__status=GoldApplication.APPROVED)))
+    elif table == "membership":
+        people = people.exclude(interest__plan__slug=GOLD_SLUG).filter(interest__review__status="approved")
+    people = people.order_by(*sorting.ordering_from(columns, filters, "registered", PEOPLE_TIEBREAK))
     if filters["q"]:
         for word in filters["q"].split():
             people = people.filter(Q(email__icontains=word) | Q(first_name__icontains=word) | Q(last_name__icontains=word)
                                    | Q(mobile__icontains=word) | Q(public_id__icontains=word.replace(" ", "").upper()))
-    if filters["plan"]:
+    if filters["plan"] and table != "gold":  # Plan filters the Membership table only
         people = people.filter(interest__plan__slug=filters["plan"])
     if filters["verified"] in ("yes", "no"):
         people = people.filter(email_verified_at__isnull=filters["verified"] == "no")
@@ -119,20 +148,23 @@ def journey_state(sessions):
 def person_row(user):
     interest = user.interest
     sessions = list(user.journey_sessions.all())
-    live_gold = [a for a in user.gold_applications.all() if a.status != GoldApplication.DECLINED]
+    # the Gold column: only an application still in play (waiting, sent back, awaiting final approval). An approved Gold member and a declined applicant show none.
+    live_gold = [a for a in user.gold_applications.all() if a.status in (GoldApplication.NEW, GoldApplication.CONTACTED, GoldApplication.AWAITING_FINAL)]
+    approved = [a.approved_at for a in user.gold_applications.all() if a.status == GoldApplication.APPROVED and a.approved_at]
     return {
         "id": str(user.pk), "name": user.get_full_name() or user.email, "email": user.email, "public_id": user.public_id_display,
         "plan": interest.plan.name if interest.plan_id else "", "plan_slug": interest.plan.slug if interest.plan_id else "",
         "verified": bool(user.email_verified_at), "marketing": user.marketing_consent,
         "journey": journey_state(sessions), "registered": interest.created_at.isoformat(),
-        "gold_application_id": str(live_gold[0].pk) if live_gold else "",  # a declined application drops off the list (Moishe, 2026-11-03)
+        "gold_application_id": str(live_gold[0].pk) if live_gold else "",  # only for an application that is not approved or declined
+        "gold_approved_at": max(approved).isoformat() if approved else "",
         "sale": sale_label(interest), "sale_ended": bool(interest.sale_expired_at), "payment": payment_label(interest),
         "payment_status": interest.payment_status,
     }
 
 
-def people_page(filters, page, size=None):
-    queryset = people_queryset(filters).prefetch_related("journey_sessions", "gold_applications")
+def people_page(filters, page, size=None, table="membership"):
+    queryset = people_queryset(filters, table).prefetch_related("journey_sessions", "gold_applications")
     users, has_next = cut(queryset, page, size)
     return [person_row(u) for u in users], has_next
 
@@ -148,7 +180,7 @@ def people_csv(filters):
     writer = csv.writer(response)
     writer.writerow(["account_id", "first_name", "last_name", "email", "mobile", "membership", "source", "email_verified",
                      "marketing_consent", "registered_at", "sale_name", "sale_percent_off", "sale_months", "sale_status", "payment_status", "payment_source"])
-    for user in people_queryset(filters).iterator():
+    for user in people_queryset(filters, "all").iterator():  # everyone registered: the export is for admins, not Barry's approved-only view
         interest = user.interest
         writer.writerow([safe_cell(x) for x in (
             user.public_id, user.first_name, user.last_name, user.email, user.mobile or "",

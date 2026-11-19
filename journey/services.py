@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from django.core.exceptions import ValidationError
 
+from common.emails import clean_email
 from common.useragent import device_type
 from common.validators import normalise_email, normalise_mobile
 from insights import metrics
@@ -203,7 +204,7 @@ def save_lead(session, email, consent, first_name=None, mobile=None, mobile_coun
 def erase_lead(email):
     """Remove an address given at the gate (sessions and their history rows). Used when a person's data is erased.
     The answers stay (anonymous statistics). Returns the number of sessions cleared."""
-    email = (email or "").strip()
+    email = clean_email(email)
     if not email:
         return 0
     from chat import services as chat_services  # local: chat reads the journey session
@@ -220,7 +221,7 @@ def erase_lead_data(email):
     Sessions lose the address, consent, cookie value, person key and referrer, typed answer text goes (also in history),
     emails sent to the address and group-send rows, invites and the unsubscribe key go. The choices stay as anonymous
     statistics. Returns the number of sessions cleared."""
-    email = (email or "").strip()
+    email = clean_email(email)
     if not email:
         return 0
     from chat import services as chat_services
@@ -540,4 +541,4 @@ def export_lead_emails(email):
     from notifications.models import EmailLog
 
     return [{"template": e.template, "subject": e.subject, "status": e.status, "sent_at": e.sent_at.isoformat() if e.sent_at else None}
-            for e in EmailLog.objects.filter(to__iexact=(email or "").strip()).order_by("created_at")]
+            for e in EmailLog.objects.filter(to__iexact=clean_email(email)).order_by("created_at")]

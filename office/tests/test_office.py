@@ -19,6 +19,7 @@ from insights import metrics, rollup
 from insights.metrics import K
 from insights.models import OfficeGoal
 from insights.tests.test_metrics import finished_journey
+from office.models import MembershipReview
 from plans.management.commands.seed_phase1 import seed_all
 from users import services
 from users.tests.test_register import cleaned
@@ -27,7 +28,7 @@ User = get_user_model()
 OFFICE = "office.localhost"
 
 
-LEVELS = {"Owner": ("Admin", True), "Manager": ("Admin", False), "Viewer": ("Office", False), "Approver": ("Office", True)}  # older test names -> (level group, Approver)
+LEVELS = {"Owner": ("Admin", True), "Manager": ("Admin", False), "Viewer": ("Viewer", False), "Approver": ("Office", True)}  # older test names -> (level group, Gold approver)
 
 
 def staff(role=None, email=None, approver=False, **extra):
@@ -162,6 +163,30 @@ class RoutingAndRoleTests(OfficeTestCase):
         self.assertEqual(get(root, path).status_code, 200)
 
 
+class GoldGuideDialogTests(OfficeTestCase):
+    def test_the_dialog_names_the_real_sending_address_from_settings(self):
+        from django.test import override_settings
+        from plans.models import SiteSettings
+
+        SiteSettings.load()
+        SiteSettings.objects.update(gold_guide="gold/guide.pdf")
+        application = gold_services.submit_application(application_data())[0]
+        with override_settings(DEFAULT_FROM_EMAIL="Spa 99 <hello@mail.example.org>"):
+            page = get(staff("Owner"), f"/gold/{application.pk}/").content.decode()
+        self.assertIn("from hello@mail.example.org.", page)
+
+    def test_the_dialog_names_the_person_when_the_guide_email_goes_out_as_one(self):
+        from notifications.models import NotificationTemplate
+        from plans.models import SiteSettings
+
+        SiteSettings.objects.update(gold_guide="gold/guide.pdf")
+        person = staff("Owner", "jane@example.test")
+        NotificationTemplate.objects.update_or_create(key="gold_guide", defaults={"sender_user": person})
+        application = gold_services.submit_application(application_data())[0]
+        page = get(person, f"/gold/{application.pk}/").content.decode()
+        self.assertIn("from jane@example.test.", page)
+
+
 class StoredFigureTests(OfficeTestCase):
     def setUp(self):
         self.owner = staff("Owner", "q@example.com")
@@ -184,7 +209,7 @@ class StoredFigureTests(OfficeTestCase):
         rollup.run()
         for path in paths:
             self.assertEqual(self.queries(path), empty[path], path)
-            self.assertLessEqual(empty[path], 32, path)  # 30 plus the WhatsApp unread count and the Email unread count on the navigation badges
+            self.assertLessEqual(empty[path], 34, path)  # a fixed number; the stored figures (snapshots and the approval counts) are one stored row each
 
     def test_dashboard_and_analytics_json_shapes(self):
         finished_journey()
@@ -221,10 +246,13 @@ class PeopleAndGoldTests(OfficeTestCase):
     def test_people_search_filter_csv_detail_and_gdpr_export(self):
         owner = staff("Owner")
         hugo = services.register_interest(cleaned(plan="tier-2")).user
-        services.register_interest(cleaned(email="=evil@example.com", first_name="=SUM(A1)", mobile="07911111111", plan="tier-1"))
+        evil = services.register_interest(cleaned(email="=evil@example.com", first_name="=SUM(A1)", mobile="07911111111", plan="tier-1")).user
+        for person in (hugo, evil):  # Registered lists approved people: Barry's review says so
+            MembershipReview.objects.create(registration=person.interest, status="approved")
+        rollup.run()
         page = get(owner, "/people/?q=hugo&plan=tier-2").context
         self.assertEqual([r["email"] for r in page["rows"]], ["hugo@example.com"])
-        self.assertEqual(page["total_registered"], 2)  # the stored counter, not a count of the filtered list
+        self.assertEqual(page["total_registered"], 2)  # the stored figure (office.counts), not a count of the filtered list
         self.assertEqual(len(get(owner, "/people/?verified=yes").context["rows"]), 0)
         csv_text = get(owner, "/people/export.csv?plan=tier-1").content.decode()
         self.assertIn("'=SUM(A1)", csv_text)

@@ -4,7 +4,7 @@ from datetime import date
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
-from office.permissions import reader
+from office.permissions import abilities, reader
 
 from . import services
 
@@ -25,4 +25,6 @@ def summary(request):
         return JsonResponse({"error": "Dates must look like 2026-10-22."}, status=400)
     completed = {"yes": True, "no": False}.get(request.GET.get("completed", ""))
     data = services.summary(date_from, date_to, source=request.GET.get("source") or None, completed=completed)
+    if not abilities(request.user)["can_revenue"]:  # money is Admin and up only (rule book U3): a Viewer or Office person gets the counts, never the projected revenue
+        data["tier_mix"] = {key: value for key, value in data["tier_mix"].items() if "revenue" not in key}  # the projected_monthly_revenue_* keys
     return JsonResponse(data)

@@ -1,5 +1,5 @@
 {% load office_tags text_tags %}{% for r in rows %}
-<tr class="o-row" data-invited-row>
+<tr class="o-row"{% if r.href %} data-press{% endif %} data-invited-row>
   <td class="c-name" data-col="name">{% if r.href %}<a class="o-rowlink" href="{{ r.href }}">{% truncated r.name|default:r.email %}</a>{% else %}{% truncated r.name|default:"No name" %}{% endif %}<span class="o-cell-sub o-email-sub">{% truncated r.email %}</span></td>
   <td class="c-email o-email-col" data-col="email">{% truncated r.email %}</td>
   <td class="c-lists" data-col="lists">{% truncated r.lists|join:", "|default:"None" lines=2 %}</td>
@@ -9,4 +9,4 @@
   <td class="c-expired" data-col="expired"><span class="o-only-narrow">Expired: </span>{% if r.expired %}Yes{% else %}No{% endif %}</td>
 </tr>
 {% empty %}<tr class="o-empty-row" data-empty><td colspan="7"><p>{% if filtered %}No one matches that. Try another view.{% else %}No one is waiting: every invited person has registered or clicked the link.{% endif %}</p></td></tr>{% endfor %}
-{% if has_next %}<tr class="o-more-row" data-more-row><td colspan="7"><a class="btn btn-secondary btn-sm" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}page={{ page|add:1 }}" data-show-more data-working-text="Loading">Show more</a></td></tr>{% endif %}
+{% include "office/_list_foot.html" with cols="7" %}

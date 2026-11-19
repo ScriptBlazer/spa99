@@ -47,7 +47,7 @@ function start() {
   const tokens = () => {
     const t = {
       slate: norm(cssVar('--office-slate')), plum: norm(cssVar('--office-plum')), sage: norm(cssVar('--office-sage')), teal: norm(cssVar('--office-teal')),
-      clay: norm(cssVar('--office-clay')), taupe: norm(cssVar('--office-taupe')),
+      clay: norm(cssVar('--office-clay')), ochre: norm(cssVar('--office-ochre')), taupe: norm(cssVar('--office-taupe')),
       clayRamp: ['--office-clay', '--office-clay-2', '--office-clay-3', '--office-clay-4'].map((n) => norm(cssVar(n))),
       tealRamp: ['--office-teal', '--office-teal-2', '--office-teal-3', '--office-teal-4'].map((n) => norm(cssVar(n))),
       surface: norm(cssVar('--office-surface')), iron: norm(cssVar('--color-iron')), muted: norm(cssVar('--office-muted')), text: norm(cssVar('--office-text')),
@@ -299,9 +299,39 @@ function start() {
     },
     plan: donut('plan', (d) => d.registrations_by_plan, 'value', 'clay', 'Registrations'),
     suggested: donut('suggested', (d) => d.suggested_plan, 'value', 'clay', 'Suggested'),
+    'revenue-plan': donut('revenue-plan', (d) => d.revenue_card.plan.rows, 'value', 'clay', 'A year', (v) => `£${nf.format(Math.round(v / 100))}`, (d) => !!d.revenue_card),   // Approvers only: the figures are in the page's data only for them. Pence, shown as whole pounds.
+    'revenue-price': donut('revenue-price', (d) => d.revenue_card.price.rows, 'value', 'clay', 'Members', undefined, (d) => !!d.revenue_card),
     'answers-time': donut('answers-time', (d) => d.journey_answers.time, 'count', 'teal', 'Answers'),
     'answers-frequency': donut('answers-frequency', (d) => d.journey_answers.frequency, 'count', 'teal', 'Answers'),
     'answers-company': donut('answers-company', (d) => d.journey_answers.company, 'count', 'teal', 'Answers'),
+    days: {   // Activity: staff actions by day (by week for All time or a long range); the busiest column in full slate, the others softened
+      empty: (d) => !d.series.all.total,
+      make(d) {
+        const weekly = d.granularity === 'week'; const values = d.series.all.values; const labels = d.labels; const n = Math.max(values.length, 1);
+        let top = -1; let max = 0;
+        values.forEach((v, i) => { if (v > max) { max = v; top = i; } });
+        const soft = mixOver(T.slate, T.surface, 0.48);
+        const weekday = new Intl.DateTimeFormat('en-GB', { ...zone, weekday: 'short' });
+        const short = (i) => weekday.format(isoDate(labels[i]));
+        const seven = !weekly && labels.length <= 7;   // one week: Mon to Sun (a single letter when the columns are narrow)
+        return {
+          type: 'bar',
+          data: { labels: labels.map((l) => label(l, weekly)), datasets: [{ data: values, backgroundColor: values.map((_v, i) => (i === top ? T.slate : soft)), borderRadius: 8, borderSkipped: 'start', maxBarThickness: 32, categoryPercentage: 0.8, barPercentage: 0.9 }] },
+          options: base('days', {
+            layout: { padding: { top: 30 } }, interaction: { mode: 'nearest', axis: 'x', intersect: true },
+            scales: {
+              x: xScale({ ticks: { color: T.muted, maxRotation: 0, autoSkip: !seven, maxTicksLimit: coarse.matches ? 5 : 10, padding: 10, callback(_v, i) { return seven ? (this.chart.width / n < 56 ? short(i).charAt(0) : short(i)) : label(labels[i], weekly); } } }),
+              y: yScale({ ticks: { color: T.muted, padding: 10, maxTicksLimit: 4, precision: 0, callback: (v) => compact(v) } }),
+            },
+            plugins: { legend: { display: false }, tooltip: { enabled: false, external: externalTip('days') }, topLabel: { index: top, text: top >= 0 ? (weekly ? `${nf.format(max)} in ${label(labels[top], true)}` : `${nf.format(max)} on ${short(top)}`) : '' } },
+          }),
+          plugins: [topLabel],
+          tip: (pts) => { const i = pts[0].dataIndex; return { title: weekly ? `w/c ${tipDay(labels[i])}` : tipDay(labels[i]), rows: [{ label: 'Actions', value: nf.format(values[i]), color: i === top ? T.slate : soft }] }; },
+        };
+      },
+    },
+    times: donut('times', (d) => d.times || [], 'value', 'clay', 'Actions'),   // Activity: the four parts of the London day, each with its own colour (hue)
+    types: donut('types', (d) => d.types, 'value', 'clay', 'Actions'),   // each type brings its own colour (hue), the same on the bars and the list
     dropoff: {
       empty: (d) => !d.drop_off.some((s) => s.reached > 0),
       make(d) {
@@ -328,11 +358,14 @@ function start() {
   };
   const i0 = (pts) => pts[0].dataIndex;
 
-  function donut(key, pick, field, hue, rowLabel) {
+  function donut(key, pick, field, hue, rowLabel, fmt = (v) => nf.format(v), has = () => true) {
     return {
+      has,
       empty: (d) => !pick(d).some((i) => i[field] > 0),
       make(d) {
-        const rows = rampRows(pick(d), hue, field).filter((r) => r.value > 0);
+        const items = pick(d);
+        const own = items.some((i) => i.hue);   // rows that carry their own colour (Activity's types) are drawn in it; ordered categories take a ramp
+        const rows = (own ? items.map((i) => ({ label: i.label, value: i[field], share_bp: i.share_bp, color: T[i.hue] })) : rampRows(items, hue, field)).filter((r) => r.value > 0);
         return {
           type: 'doughnut',
           data: { labels: rows.map((r) => r.label), datasets: [{ data: rows.map((r) => r.value), backgroundColor: rows.map((r) => r.color), borderWidth: 0, borderRadius: 8, spacing: 3, hoverOffset: 6 }] },
@@ -341,7 +374,7 @@ function start() {
             animation: reducedQuery.matches ? false : { duration: T.ms, easing: 'easeOutQuint', animateRotate: true, animateScale: false },
           }),
           plugins: [],
-          tip: (pts) => { const r = rows[pts[0].dataIndex]; return { title: r.label, rows: [{ label: rowLabel, value: `${nf.format(r.value)} · ${rate(r.share_bp)}`, color: r.color }] }; },
+          tip: (pts) => { const r = rows[pts[0].dataIndex]; return { title: r.label, rows: [{ label: rowLabel, value: `${fmt(r.value)} · ${rate(r.share_bp)}`, color: r.color }] }; },
         };
       },
     };
@@ -366,7 +399,7 @@ function start() {
   }
 
   function summaryFor(card, d) {
-    const map = { visitors: 'visitors', funnel: 'funnel', tiers: '', plan: 'registrations_by_plan', suggested: 'suggested_plan', answers: 'journey_answers', dropoff: 'drop_off', gold: 'gold' };
+    const map = { visitors: 'visitors', funnel: 'funnel', tiers: '', days: 'days', types: 'types', times: 'times', plan: 'registrations_by_plan', suggested: 'suggested_plan', answers: 'journey_answers', dropoff: 'drop_off', gold: 'gold' };
     return d.summaries?.[map[card]] || '';
   }
 
@@ -383,12 +416,14 @@ function start() {
   function tables(d) {
     const set = (card, empty) => { const t = root.querySelector(`[data-chart-card="${card}"] .o-table`); if (t) t.hidden = empty; };
     const a = d.journey_answers;
+    if (!a || !d.gold) return;   // another page's data (Activity has no answers or Gold card)
     set('answers', !['time', 'frequency', 'facilities', 'company'].some((q) => a[q].some((i) => i.count > 0)));
     set('gold', !d.gold.by_potential.some((i) => i.value > 0) && !d.gold.by_status_now.some((i) => i.value > 0));
   }
 
   function sync(key, d) {
     const entry = charts.get(key); const spec = specs[key]; if (!entry && !spec) return;
+    if (spec.has && !spec.has(d)) return;   // the data has no figures for this card (a reader's, or an old payload): leave the card as it is
     const box = entry?.box || root.querySelector(`[data-chart="${key}"]`);
     const empty = spec.empty(d);
     box.toggleAttribute('data-empty', empty);
@@ -413,6 +448,7 @@ function start() {
     if (charts.has(key)) return;
     const box = root.querySelector(`[data-chart="${key}"]`); if (!box) return;
     const d = readData(); const spec = specs[key]; if (!spec) return;
+    if (spec.has && !spec.has(d)) return;
     box.toggleAttribute('data-empty', spec.empty(d));
     if (spec.empty(d)) return; // an empty range keeps its one-line state; a later range creates the chart
     const cfg = spec.make(d);

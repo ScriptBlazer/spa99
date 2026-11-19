@@ -118,7 +118,7 @@ def _payment_open_values(ctx):
 
 VALID_FOR = {"valid_for": "How long the link works, in words (e.g. '24 hours', '14 days'). Set in System > Defaults"}
 _FIRST = {"first_name": "The person's first name"}
-_SAMPLE_URL = "https://spa99.uk/example-link/"
+_SAMPLE_URL = "https://example.com/example-link/"
 
 SPECS = {spec.key: spec for spec in [
     EmailSpec(
@@ -153,9 +153,28 @@ SPECS = {spec.key: spec for spec in [
         "{reset_url}\n\nQuestions? Reply to this email and it will reach the team.",
         subject_placeholders=_FIRST),
     EmailSpec(
+        "password_set", "Password set by an administrator", {**_FIRST, "changed_by": "Who set the new password"},
+        {"first_name": "James", "changed_by": "Dana Developer"},
+        "Hello {first_name},\n\nYour Spa 99 password was changed by {changed_by}. You have been signed out everywhere, so sign in again with the new password.\n\n"
+        "If this wasn't expected, reply to this email and it will reach the team.",
+        subject_placeholders=_FIRST),
+    EmailSpec(
+        "email_changed_old", "Login email changed (to the old address)", {**_FIRST, "changed_by": "Who changed it"},
+        {"first_name": "James", "changed_by": "Dana Developer"},
+        "Hello {first_name},\n\nThe login email for your Spa 99 account was changed by {changed_by}, so this address no longer signs in. You have been signed out everywhere.\n\n"
+        "If this wasn't expected, reply to this email and it will reach the team.",
+        subject_placeholders=_FIRST),
+    EmailSpec(
+        "email_changed", "Login email changed (to the new address)",
+        {**_FIRST, "old_email": "The old login email", "new_email": "The new login email", "changed_by": "Who changed it"},
+        {"first_name": "James", "old_email": "james@old.example.com", "new_email": "james@new.example.com", "changed_by": "Dana Developer"},
+        "Hello {first_name},\n\nThe login email for your Spa 99 account was changed from {old_email} to {new_email} by {changed_by}. You have been signed out everywhere, "
+        "so sign in again with {new_email}.\n\nIf this wasn't expected, reply to this email and it will reach the team.",
+        subject_placeholders=_FIRST),
+    EmailSpec(
         "team_invite", "Added to the team",
         {**_FIRST, "level": "Their level: Office, Admin, Developer or Superuser", "office_url": "The address of the Office"},
-        {"first_name": "James", "level": "Office", "office_url": "https://office.spa99.uk"},
+        {"first_name": "James", "level": "Office", "office_url": "https://office.example.com"},
         "Hello {first_name},\n\nYou've been added to the Spa 99 team ({level}). Use the link below to choose your own password. "
         "It works for one hour and only once.\n\n{button}\n\nThen sign in at {office_url}. If the link has run out, ask the person who "
         "added you to send a new one.",
@@ -251,7 +270,10 @@ SPECS = {spec.key: spec for spec in [
     EmailSpec("gold_sent_back", "Sent back (to approvers)", {}, {}, editable=False,
               subject_placeholders={"name": "The applicant's name"}),
     # A group mailing's body is typed per mailing; this only supplies the placeholders, the layout and the preview samples.
-    EmailSpec("mailing", "Group mailing", {**_FIRST}, {"first_name": "James"}, listed=False, subject_placeholders=_FIRST),
+    EmailSpec("mailing", "Group mailing",
+              {**_FIRST, "whatsapp_number": "The site's WhatsApp number (System > Settings). Journey leads only",
+               "add_number_link": "Each lead's own add-your-number link. Journey leads only"},
+              {"first_name": "James", "whatsapp_number": "+44 7441 919990", "add_number_link": _SAMPLE_URL}, listed=False, subject_placeholders=_FIRST),
 ]}
 
 
@@ -357,7 +379,7 @@ def _html_value(name, value):
     if isinstance(value, Rich):
         return value.html
     value = "" if value is None else str(value)
-    if name.endswith("_url") and value.startswith(("http://", "https://")):
+    if name.endswith(("_url", "_link")) and value.startswith(("http://", "https://")):
         return mark_safe(f'<a href="{escape(value)}" style="{LINK_STYLE}">{escape(value)}</a>')
     return conditional_escape(value)
 

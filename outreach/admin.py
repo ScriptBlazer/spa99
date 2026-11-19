@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import OutreachEntry, PersonMessage, StickyNote
+from .models import GenuineLead, OutreachEntry, PersonMessage, StickyNote
 
 
 @admin.register(StickyNote)
@@ -13,7 +13,8 @@ class StickyNoteAdmin(admin.ModelAdmin):
 
 @admin.register(OutreachEntry)
 class OutreachEntryAdmin(admin.ModelAdmin):
-    list_display = ("pk", "user", "lead_email", "gold_application", "reason", "added_by_label", "added_at", "done_at")
+    list_display = ("pk", "user", "lead_email", "gold_application", "reason", "added_by_label", "added_at", "done_at", "removed_at")
+    list_filter = ("removed_at",)
     search_fields = ("lead_email", "reason")
 
 
@@ -21,3 +22,9 @@ class OutreachEntryAdmin(admin.ModelAdmin):
 class PersonMessageAdmin(admin.ModelAdmin):
     list_display = ("email", "author_label", "sent_at")
     search_fields = ("email", "text")
+
+
+@admin.register(GenuineLead)
+class GenuineLeadAdmin(admin.ModelAdmin):
+    list_display = ("email", "marked_by_label", "marked_at")
+    search_fields = ("email",)

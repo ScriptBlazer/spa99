@@ -22,7 +22,8 @@ from django.core.validators import validate_email
 from django.db import transaction
 
 from common import levels
-from plans.management.commands.seed_phase1 import INITIAL_STAFF_ALERT_EMAIL, seed_all
+from notifications.sender import sending_domain, site_address
+from plans.management.commands.seed_phase1 import seed_all
 from plans.models import SiteSettings
 from system import audit
 from system.models import SiteDefaults, SystemEvent
@@ -35,19 +36,32 @@ NO_EMAIL_BACKENDS = {"django.core.mail.backends.console.EmailBackend", "django.c
 # ======================================================================================================================
 # THE LIVE VALUES. Edit them here and nowhere else (never in app code). Everything below this block is logic only.
 # ======================================================================================================================
-TEAM = [
-    {"email": "moishe@spa99.uk", "first_name": "Moishe", "last_name": "Berkowitz", "level": levels.DEVELOPER, "approver": False, "final_approver": True},
-    {"email": "barry@spa99.uk", "first_name": "Barry", "last_name": "Lobenstein", "level": levels.ADMIN, "approver": True, "final_approver": False},
+# Staff addresses and the contact address are not typed here: they come from the sending domain (.env: EMAIL_SENDING_DOMAIN, else the domain of
+# DEFAULT_FROM_EMAIL) and DEFAULT_FROM_EMAIL itself, so moving domain needs only .env. They only fill empty first-time values.
+TEAM = [  # (local part, first name, last name, level, approver, final approver, membership approver: Office and Admin only, Developer always can)
+    ("moishe", "Moishe", "Berkowitz", levels.DEVELOPER, False, True, False),
+    ("barry", "Barry", "Lobenstein", levels.ADMIN, True, False, True),
 ]
 SITE_SETTINGS = {  # SiteSettings field -> value. Filled only while the field is empty.
-    "contact_email": "hello@spa99.uk",
-    "gold_approver_cc": "moishe@spa99.uk",
     "whatsapp_number": "447441919990",  # the spa WhatsApp (07441 919990)
     "whatsapp_message": "Hi, I'd love to find out more about Spa 99.",
     "whatsapp_rate_message": "Hi, I'd like to discuss better prices for Spa 99.",
 }
-STAFF_ALERT_EMAILS = INITIAL_STAFF_ALERT_EMAIL  # System > Defaults > Payment alert emails. Filled by seed_phase1, once only (kept there:
-#   the seed imports nothing from this command, so moving it here would be a circular import).
+
+
+def team():
+    """The team to create, each with an email on the sending domain."""
+    return [{"email": f"{local}@{sending_domain()}", "first_name": first, "last_name": last, "level": level, "approver": approver, "final_approver": final,
+             "membership_approver": membership and levels.can_hold_membership_approver_level(level)}
+            for local, first, last, level, approver, final, membership in TEAM]
+
+
+def site_values():
+    """SITE_SETTINGS plus the two address fields, derived from the sending domain (left out when no domain is configured)."""
+    values = {"contact_email": site_address(), "gold_approver_cc": f"moishe@{sending_domain()}" if sending_domain() else "", **SITE_SETTINGS}
+    return {name: value for name, value in values.items() if value}
+
+
 OLD_SUBJECTS = {"gold_final": "Final approval: {name} (Low potential)",
                 "gold_sent_back": "{name} was approved, but the potential is Low. Are you sure?"}  # the old defaults, replaced only on an exact match
 FINAL_APPROVAL_ON = False  # left at its default (off); System > Approval turns it on.
@@ -91,7 +105,7 @@ class Command(BaseCommand):
                  else "seed_phase1: everything is already there")
         call_command("setup_roles", stdout=StringIO())  # the level and role groups (safe to repeat); quiet, it prints its own lines
         self.alert_email(alert_before)
-        for person in TEAM:
+        for person in team():
             self.team_member(person)
         self.site_settings()
         self.email_subjects()
@@ -167,7 +181,7 @@ class Command(BaseCommand):
     def site_settings(self):
         site = SiteSettings.load()
         fields = []
-        for name, value in SITE_SETTINGS.items():
+        for name, value in site_values().items():
             try:
                 SiteSettings._meta.get_field(name).run_validators(value)  # the same rules the System forms use
             except ValidationError as error:  # a bad value is reported, the rest carry on
@@ -190,27 +204,34 @@ class Command(BaseCommand):
             return self.problem(label, "not a valid email address")
         User = get_user_model()
         user = User.objects.filter(email__iexact=email).first()
-        want_level, want_approver, want_final = person["level"], person["approver"], person["final_approver"]
+        if user is None:  # after a domain move the same person is still there under the old address: never create a second account
+            twin = User.objects.filter(email__istartswith=email.partition("@")[0] + "@").first() or User.objects.filter(
+                first_name__iexact=person["first_name"], last_name__iexact=person["last_name"]).first()
+            if twin is not None:
+                return self.kept(label, f"already present as {twin.email} (no new account)")
+        want_level, want_approver, want_final, want_membership = person["level"], person["approver"], person["final_approver"], person["membership_approver"]
         if user is not None and not user.is_active:
             return self.problem(label, "the account is deactivated (reactivate it in System > Team)")
         if user is not None:
-            return self.existing(user, label, want_level, want_approver, want_final)
+            return self.existing(user, label, want_level, want_approver, want_final, want_membership)
         try:
-            user, _ = make_member(email, want_level, want_approver, want_final, person["first_name"], person["last_name"], password=None, via="setup_live")
+            user, _ = make_member(email, want_level, want_approver, want_final, person["first_name"], person["last_name"], password=None, via="setup_live", membership=want_membership)
         except ChangeRefused as error:
             return self.problem(label, str(error))
-        self.done(label, f"{self.describe(want_level, want_approver, want_final)}, invite to choose a password "
+        self.done(label, f"{self.describe(want_level, want_approver, want_final, want_membership)}, invite to choose a password "
                          f"{'would be sent' if self.dry else 'will be sent after saving'}", verbs=("created as", "would create as"))
         self.invite(user)
 
-    def existing(self, user, label, want_level, want_approver, want_final):
+    def existing(self, user, label, want_level, want_approver, want_final, want_membership=False):
         """Only ever adds: a higher level is kept, roles already held are kept."""
         held_level = levels.held_level(user)
         approver, final = levels.held_roles(user)
+        membership = levels.holds_membership_group(user) and levels.can_hold_membership_approver(user)  # as held now
         level = want_level if levels.rank(want_level) > levels.rank(held_level) else held_level
         new_approver, new_final = approver or want_approver, final or want_final
-        if (level, new_approver, new_final) == (held_level, approver, final) and user.is_staff:
-            return self.kept(label, f"exists as {self.describe(held_level, approver, final)} (left alone)")
+        new_membership = (membership or want_membership) and levels.can_hold_membership_approver_level(level)
+        if (level, new_approver, new_final, new_membership) == (held_level, approver, final, membership) and user.is_staff:
+            return self.kept(label, f"exists as {self.describe(held_level, approver, final, membership)} (left alone)")
         if user.is_superuser:  # apply_level would clear the superuser flag: add the role groups only
             groups = ([levels.APPROVER_GROUP] if new_approver and not approver else []) + ([levels.FINAL_APPROVER_GROUP] if new_final and not final else [])
             user.groups.add(*[Group.objects.get_or_create(name=name)[0] for name in groups])
@@ -218,18 +239,18 @@ class Command(BaseCommand):
             from system.team import apply_level
 
             try:
-                apply_level(user, level, new_approver, actor=None, final=new_final)
+                apply_level(user, level, new_approver, actor=None, final=new_final, membership=new_membership)
             except ChangeRefused as error:
                 return self.problem(label, str(error))
-        text = self.describe(level, new_approver, new_final)
+        text = self.describe(level, new_approver, new_final, new_membership)
         sentence = f"Set {user.email} to {text} (setup_live)"
-        record_direct(None, "team", "users.user", user, "level", self.describe(held_level, approver, final), text, sentence=sentence)
+        record_direct(None, "team", "users.user", user, "level", self.describe(held_level, approver, final, membership), text, sentence=sentence)
         audit.log_event(SystemEvent.ROLE_CHANGED, detail={"person": user.email, "new": text, "via": "setup_live"}, email="command line", sentence=sentence)
         self.done(label, f"existing account now {text} (nothing removed, password and name untouched)")
 
     @staticmethod
-    def describe(level, approver, final):
-        return levels.LABELS[level] + (" + Approver" if approver else "") + (" + Final approver" if final else "")
+    def describe(level, approver, final, membership=False):
+        return levels.LABELS[level] + (" + Gold approver" if approver else "") + (" + Membership approver" if membership else "") + (" + Final approver" if final else "")
 
     def invite(self, user):
         """Sent only after the commit, never on a dry run (so a rollback can never email)."""

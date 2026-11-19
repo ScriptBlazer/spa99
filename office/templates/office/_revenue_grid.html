@@ -1,0 +1,9 @@
+{% load office_tags %}{% comment %}The four-figure grid, one component used everywhere on the Revenue page: a year and a month, excluding and including VAT. Excluding VAT is the bold row, because every price is stated in it. `b` is a bucket (count, year_ex, month_ex, year_inc, month_inc).
+No year/month or VAT switch, so he never wonders which state it is in.{% endcomment %}
+<table class="o-grid" data-revenue-grid>
+  <thead><tr><td></td><th scope="col">A year</th><th scope="col">A month</th></tr></thead>
+  <tbody>
+    <tr class="o-grid-ex"><th scope="row">Excluding VAT</th><td>{{ b.year_ex|pounds }}</td><td>{{ b.month_ex|pounds }}</td></tr>
+    <tr><th scope="row">Including VAT</th><td>{{ b.year_inc|pounds }}</td><td>{{ b.month_inc|pounds }}</td></tr>
+  </tbody>
+</table>

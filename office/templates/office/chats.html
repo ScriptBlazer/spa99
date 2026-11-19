@@ -1,9 +1,27 @@
 {% extends "office/base.html" %}
-{% load office_tags text_tags %}
+{% load static office_tags text_tags %}
 {% block title %}Assistant | Spa 99 Office{% endblock %}
+{% block head_extra %}{% if cost_card %}<link rel="stylesheet" href="{% static 'common/css/office-analytics.css' %}">{% endif %}{% endblock %}
 {% block main %}
 <h1 class="sr-only">Assistant</h1>
 <p class="o-sub">{% if person %}What {{ person.label }} asked the assistant{% else %}What people asked the assistant{% endif %}. Kept for 90 days.</p>
+{% if cost_card %}{# Developer level and up only: stored figures (the hourly job), never added up here. Non-developers get none of this markup. #}
+<section class="o-costcard" aria-label="Assistant cost">
+  <div class="o-kpis o-kpis--three">
+    {% for tile in cost_card.tiles %}
+    <div class="o-kpi o-kpi--{{ tile.hue }}" data-cost="{{ tile.key }}">
+      <span class="o-kpi-label">{{ tile.label }}</span>
+      <span class="o-kpi-body">
+        {% if cost_card.missing %}<span class="o-kpi-value">Updating</span><span class="o-delta">&nbsp;</span>
+        {% else %}<span class="o-kpi-value">{{ tile.pence|cost_pence }}</span>
+        <span class="o-delta">{{ tile.chats|num }} chat{{ tile.chats|pluralize }}{% if tile.key == "all" and cost_card.test_chats %}, including {{ cost_card.test_pence|cost_pence }} of team tests{% endif %}</span>{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="o-footnote">Figures update every hour. Costs are converted from US dollars at the fixed rate in settings, £{{ cost_card.rate }} to the dollar.</p>
+</section>
+{% endif %}
 {# No filters here: the form only carries the order (the phone's small Sort sheet) and whose chats these are, so the same swap serves the table heads. #}
 <form class="o-filters" method="get" action="{% url 'office_chats' %}" data-filter-form data-full data-list="chats" aria-label="Order the chats">
   {% if request.GET.user %}<input type="hidden" name="user" value="{{ request.GET.user }}">{% endif %}{% if request.GET.lead %}<input type="hidden" name="lead" value="{{ request.GET.lead }}">{% endif %}
@@ -17,17 +35,7 @@
     <caption class="sr-only">Ask us chats</caption>
     <thead><tr>{% include "office/_sort_head.html" %}</tr></thead>
     <tbody data-region="list" data-office-list="chats">
-    {% for c in rows %}
-      <tr class="o-row">
-        <td class="c-date"><span class="o-only-wide">{{ c.created_at|dt }}</span><span class="o-only-narrow">{{ c.created_at|dm }}, {{ c.created_at|date:"H:i" }}</span></td>
-        <td class="c-question"><a class="o-rowlink" href="{% url 'office_chat' c.pk %}">{% truncated c.preview lines=2 %}</a></td>
-        <td class="c-who">{% if c.user %}{% truncated c.user.email %}{% elif c.lead_email %}{% truncated c.lead_email %}{% else %}Anonymous{% endif %}</td>
-        <td class="c-count num">{{ c.message_count }}<span class="o-only-narrow"> message{{ c.message_count|pluralize }}</span></td>
-        {% if show_cost %}<td class="c-cost num">{{ c.total_cost_pence|floatformat:2 }}p</td>{% endif %}
-        <td class="c-note">{% if c.ended_off_topic %}Closed: off-topic{% endif %}{% if c.ended_by_cap %} Stopped by the spending cap{% endif %}</td>
-      </tr>
-    {% empty %}<tr class="o-empty-row"><td colspan="{% if show_cost %}6{% else %}5{% endif %}"><p>No chats yet.</p></td></tr>{% endfor %}
-    {% if has_next %}<tr class="o-more-row"><td colspan="{% if show_cost %}6{% else %}5{% endif %}"><a class="btn btn-secondary btn-sm" href="{{ more_url }}">Older chats</a></td></tr>{% endif %}
+    {% include "office/_chats_rows.html" %}
     </tbody>
   </table>
 </div>

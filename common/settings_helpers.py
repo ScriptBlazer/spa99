@@ -127,7 +127,7 @@ def prod_config_errors(env, dev_secret_key, default_admin_path, email_backend):
     for key in ("DOMAIN", "OFFICE_DOMAIN", "SYSTEM_DOMAIN", "CONTROL_DOMAIN"):
         host = (env.get(key) or "").strip().lower()
         if host and (host.endswith("localhost") or "://" in host or "/" in host):
-            errors.append(f"{key} must be a bare public host name (e.g. spa99.uk), not a URL or localhost.")
+            errors.append(f"{key} must be a bare public host name (e.g. example.com), not a URL or localhost.")
     if any(name in email_backend.lower() for name in _NON_SENDING_BACKENDS):
         errors.append("EMAIL_BACKEND prints or drops mail; live must really send (leave it blank for SMTP/Postmark).")
     if email_backend == SMTP_BACKEND:

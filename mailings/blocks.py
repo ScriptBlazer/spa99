@@ -39,7 +39,8 @@ TYPES = {
 TEXT_PARTS = (HEADING, PARAGRAPH, SMALL_PRINT)  # {first_name} works here, and in a button's label
 # What a Button links to: the typed web address (same for everyone), or a personal tracked link (each person's own Invite).
 LINK_URL, LINK_JOURNEY, LINK_REGISTER = "url", "personal_journey", "personal_register"
-LINKS = (LINK_URL, LINK_JOURNEY, LINK_REGISTER)
+LINK_ADD_NUMBER = "personal_add_number"  # each lead's own signed add-your-number link (mailings.addnumber). Not an Invite: no tracking row, so it is not "personal" for has_personal().
+LINKS = (LINK_URL, LINK_JOURNEY, LINK_REGISTER, LINK_ADD_NUMBER)
 PERSONAL_DEST = {LINK_JOURNEY: "journey", LINK_REGISTER: "register"}  # the `to=` of /invite/<token>/?to=
 
 
@@ -76,6 +77,24 @@ STARTERS = {
                                         "from your account, whenever you are ready."},
             {"type": BUTTON, "label": "Book your first visit", "url": "/account/book/"},
             {"type": SMALL_PRINT, "text": "Spa 99, __ADDRESS__. If you have any questions, reply to this email and it will reach the team."},
+        ],
+    },
+    # Barry's invitation to leads (Office 2, docs/features/office-2-design.md section 10). Fully editable. {whatsapp_number} is the System > Settings number; the button is each lead's own
+    # signed add-your-number link. News, so the unsubscribe link stays. Moves leads with no mobile to Archived when sent (the confirm says so).
+    "barry_invitation": {
+        "label": "Barry's invitation",
+        "name": "Barry's invitation",
+        "subject": "A word from Barry at Spa 99",
+        "kind": "news",
+        "group": "leads_no_number",
+        "archive_no_number": True,
+        "footer_mode": "no_contact",  # replies reach Barry, so no "write to hello@" line
+        "sender_local_part": "barry",  # the Sender select starts on the team member whose address is barry@ (nothing is picked when nobody matches: hello@)
+        "blocks": [
+            {"type": PARAGRAPH, "text": "Hi,\n\nI would very much like you to join Spa 99. I approve each member personally, and those I approve receive special discounts and prices."},
+            {"type": PARAGRAPH, "text": "Please add your number and name, and a member of our staff will be in touch with you about custom prices and deals."},
+            {"type": BUTTON, "label": "Add your number and name", "url": "", "link": LINK_ADD_NUMBER},
+            {"type": PARAGRAPH, "text": "Barry\nSpa 99"},
         ],
     },
 }
@@ -154,6 +173,18 @@ def _text_errors(kind, name, text):
 def link_of(part):
     """A button's link kind; a part saved before the choice existed is a web address."""
     return part.get("link") if isinstance(part, dict) and part.get("link") in LINKS else LINK_URL
+
+
+def uses_add_number(blocks):
+    """Does the email use the add-your-number link (a button of that kind, or the {add_number_link} placeholder)? It only works for the Journey leads group."""
+    for part in blocks or []:
+        if not isinstance(part, dict):
+            continue
+        if part.get("type") == BUTTON and link_of(part) == LINK_ADD_NUMBER:
+            return True
+        if "{add_number_link}" in str(part.get("text", "")) or "{add_number_link}" in str(part.get("label", "")):
+            return True
+    return False
 
 
 def has_personal(blocks):
@@ -302,8 +333,10 @@ def render(blocks, values):
             html.append(str(part_html))
             text.append(part_text)
             (paragraphs if kind == PARAGRAPH else others).append(part_text)
-        elif kind == BUTTON and part.get("label") and (part.get("url") or link_of(part) in PERSONAL_DEST):
-            if link_of(part) in PERSONAL_DEST:
+        elif kind == BUTTON and part.get("label") and (part.get("url") or link_of(part) in PERSONAL_DEST or link_of(part) == LINK_ADD_NUMBER):
+            if link_of(part) == LINK_ADD_NUMBER:
+                url = values.get("add_number_link", "")
+            elif link_of(part) in PERSONAL_DEST:
                 url = (values.get("personal_links") or {}).get(PERSONAL_DEST[link_of(part)], "")
             else:
                 url = absolute_url(part["url"])

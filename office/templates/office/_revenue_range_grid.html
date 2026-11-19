@@ -1,0 +1,8 @@
+{% load office_tags %}{% comment %}The grid when dates are chosen: one figure, the money due in those dates, excluding and including VAT. There is no year or month here: a monthly average of a chosen range means nothing, and a member can have 0, 1 or 2 payments in it. `b` is a due bucket or plan row (total_ex, total_inc).{% endcomment %}
+<table class="o-grid o-grid--range" data-revenue-grid data-revenue-range-grid>
+  <thead><tr><td></td><th scope="col">In these dates</th></tr></thead>
+  <tbody>
+    <tr class="o-grid-ex"><th scope="row">Excluding VAT</th><td>{{ b.total_ex|pounds }}</td></tr>
+    <tr><th scope="row">Including VAT</th><td>{{ b.total_inc|pounds }}</td></tr>
+  </tbody>
+</table>

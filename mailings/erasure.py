@@ -1,13 +1,15 @@
 """Erasing an address from group sends, uploaded lists and invites (called when a person's data, or a Gold applicant's, is erased)."""
 from django.db.models import Q
 
+from common.emails import clean_email
+
 from .models import ContactListMember, Invite, MailingRecipient, UnsubscribeKey
 
 
 def erase_address(email, user=None):
     """Remove group-send rows, uploaded-list memberships, invites and the unsubscribe key for this address (and rows linked to `user`). Returns the number removed.
     EmailOptOut stays: it holds only the address and honours a request to stop."""
-    email = (email or "").strip().lower()
+    email = clean_email(email)
     from outreach.services import erase_email
 
     erase_email(email)  # sticky notes, one-to-one messages and approach-list entries for the address

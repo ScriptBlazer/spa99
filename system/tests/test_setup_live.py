@@ -9,11 +9,13 @@ from django.test import TestCase
 from unittest import mock
 
 from common import levels
+from notifications.sender import sending_domain, site_address
 from plans.models import SiteSettings
 from system.management.commands import setup_live
 from system.models import SiteDefaults
 
 User = get_user_model()
+MOISHE, BARRY, HELLO = f"moishe@{sending_domain()}", f"barry@{sending_domain()}", site_address()  # derived from settings, never typed
 
 
 OUT = StringIO()
@@ -35,18 +37,18 @@ class SetupLiveTests(TestCase):
         with self.settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend"):
             with self.assertRaisesMessage(CommandError, "Email is not set up"):
                 run()
-            self.assertFalse(User.objects.filter(email="moishe@spa99.uk").exists())
+            self.assertFalse(User.objects.filter(email=MOISHE).exists())
             self.assertIn("Dry run", run("--dry-run"))  # the preview still works
             with self.captureOnCommitCallbacks(execute=True):
                 run("--no-email-check")
-        self.assertTrue(User.objects.filter(email="moishe@spa99.uk").exists())
+        self.assertTrue(User.objects.filter(email=MOISHE).exists())
 
     def test_a_dry_run_writes_nothing_and_sends_nothing(self):
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             text = run("--dry-run")
         self.assertEqual(callbacks, [])
         self.assertEqual(mail.outbox, [])
-        self.assertFalse(User.objects.filter(email__endswith="@spa99.uk").exists())
+        self.assertFalse(User.objects.filter(email__endswith="@" + sending_domain()).exists())
         self.assertEqual(SiteSettings.load().contact_email, "")
         self.assertEqual(SiteSettings.load().whatsapp_number, "")
         self.assertFalse(SiteDefaults.load().staff_alert_seeded)
@@ -56,20 +58,20 @@ class SetupLiveTests(TestCase):
 
     def test_a_real_run_creates_both_accounts_with_the_right_groups_and_invites_them(self):
         text = self.real_run()
-        moishe, barry = User.objects.get(email="moishe@spa99.uk"), User.objects.get(email="barry@spa99.uk")
+        moishe, barry = User.objects.get(email=MOISHE), User.objects.get(email=BARRY)
         self.assertEqual((levels.held_level(moishe), levels.held_roles(moishe)), (levels.DEVELOPER, (False, True)))
         self.assertEqual((levels.held_level(barry), levels.held_roles(barry)), (levels.ADMIN, (True, False)))
         self.assertEqual((moishe.first_name, moishe.last_name, barry.last_name), ("Moishe", "Berkowitz", "Lobenstein"))
         self.assertFalse(moishe.has_usable_password() or barry.has_usable_password())
-        self.assertEqual(sorted(m.to[0] for m in mail.outbox), ["barry@spa99.uk", "moishe@spa99.uk"])
+        self.assertEqual(sorted(m.to[0] for m in mail.outbox), [BARRY, MOISHE])
         site = SiteSettings.load()
         self.assertEqual((site.contact_email, site.gold_approver_cc, site.whatsapp_number, site.whatsapp_message),
-                         ("hello@spa99.uk", "moishe@spa99.uk", "447441919990", "Hi, I'd love to find out more about Spa 99."))
+                         (HELLO, MOISHE, "447441919990", "Hi, I'd love to find out more about Spa 99."))
         self.assertFalse(site.final_approval_on)
-        self.assertEqual(SiteDefaults.load().staff_alert_emails, "moishe@spa99.uk")
+        self.assertEqual(SiteDefaults.load().staff_alert_emails, MOISHE)
         self.assertNotIn("/reset/", text)  # no link is ever printed
         self.assertIn("created as Developer + Final approver", text)
-        self.assertIn("invite moishe@spa99.uk: invite sent", OUT.getvalue())
+        self.assertIn(f"invite {MOISHE}: invite sent", OUT.getvalue())
 
     def test_a_second_run_changes_nothing(self):
         self.real_run()
@@ -101,23 +103,36 @@ class SetupLiveTests(TestCase):
     def test_an_existing_account_only_gains_and_never_loses(self):
         from plans.tests.helpers import make_team_member
 
-        make_team_member("barry@spa99.uk", levels.DEVELOPER, approver=False, final=True)  # higher level and another role
-        User.objects.filter(email="barry@spa99.uk").update(first_name="Keep")
+        make_team_member(BARRY, levels.DEVELOPER, approver=False, final=True)  # higher level and another role
+        User.objects.filter(email=BARRY).update(first_name="Keep")
         self.real_run()
-        barry = User.objects.get(email="barry@spa99.uk")
+        barry = User.objects.get(email=BARRY)
         self.assertEqual((levels.held_level(barry), levels.held_roles(barry), barry.first_name), (levels.DEVELOPER, (True, True), "Keep"))
-        self.assertEqual([m.to[0] for m in mail.outbox], ["moishe@spa99.uk"])  # only the new account is invited
+        self.assertEqual([m.to[0] for m in mail.outbox], [MOISHE])  # only the new account is invited
+
+    def test_after_a_domain_move_existing_staff_are_not_created_again(self):
+        from django.test import override_settings
+        from plans.tests.helpers import make_team_member
+
+        make_team_member("barry@spa99.uk", levels.ADMIN, approver=True, final=False)
+        make_team_member("moishe@spa99.uk", levels.DEVELOPER, approver=False, final=True)
+        before = User.objects.count()
+        with override_settings(DEFAULT_FROM_EMAIL="Spa 99 <hello@spa99.co.uk>", EMAIL_SENDING_DOMAIN=""):
+            text = self.real_run()
+        self.assertEqual(User.objects.count(), before)
+        self.assertEqual(mail.outbox, [])
+        self.assertIn("already present", text)
 
     def test_a_bad_value_is_reported_and_the_rest_carry_on(self):
         with mock.patch.dict(setup_live.SITE_SETTINGS, {"whatsapp_number": "12"}):
             text = self.real_run()
         self.assertIn("whatsapp_number: PROBLEM", text)
-        self.assertEqual(SiteSettings.load().contact_email, "hello@spa99.uk")
+        self.assertEqual(SiteSettings.load().contact_email, HELLO)
         self.assertEqual(SiteSettings.load().whatsapp_number, "")
 
 
 def moishe_groups():
-    return list(User.objects.get(email="moishe@spa99.uk").groups.values_list("name", flat=True))
+    return list(User.objects.get(email=MOISHE).groups.values_list("name", flat=True))
 
 
 class SetupLiveExtrasTests(TestCase):

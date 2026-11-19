@@ -65,3 +65,10 @@ class PageStructureTests(TestCase):
         self.assertIn('<div class="sys-group">', client.get("/approval/").content.decode())
         for path in ("/assistant/personality/", "/assistant/limits/"):
             self.assertIn('class="sys-group"', client.get(path).content.decode(), path)
+
+    def test_label_uses_the_public_site_host_from_settings(self):
+        from django.test import override_settings
+
+        with override_settings(DOMAIN="www.example.org"):
+            html = unlocked_client(make_user()).get("/").content.decode()
+        self.assertIn("www.example.org/whatsapp", html)

@@ -20,13 +20,15 @@ from . import selectors
 
 logger = logging.getLogger("spa99.snapshots")
 
-STALE_AFTER = timedelta(minutes=2)  # a queued refresh that never ran (queue off) stops blocking new ones after this
+STALE_AFTER = timedelta(minutes=2)  # a queued flag older than this is a lost job, not a waiting one
 TASK = "office.snapshots.refresh"
 
 
 def payloads(today, figures):
     """{(page, range): payload} for every page and range."""
-    out = {}
+    from . import counts
+
+    out = {(OfficeSnapshot.COUNTS, counts.RANGE): counts.compute_all()}  # approvals, Revenue, registered and Leads totals (office.counts)
     for name in selectors.DASHBOARD_RANGES:
         out[(OfficeSnapshot.DASHBOARD, name)] = selectors.build_dashboard(name, today, figures)
     for name in selectors.ANALYTICS_RANGES:
@@ -57,6 +59,16 @@ def write_snapshots(today, figures, built_at):
     return len(wanted)
 
 
+def _activity_days(today):
+    """The Activity page's stored daily totals: only today and yesterday are recounted here (`rebuild_activity` does the whole history). A failure must not stop the other figures."""
+    from . import activity_store
+
+    try:
+        activity_store.refresh_recent(today)
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not refresh the Activity daily totals")
+
+
 @tracked("snapshot")
 def build_everything(today=None):
     """Sentences, insights, then snapshots (which read both), all from one load of the source tables, so every figure
@@ -67,6 +79,7 @@ def build_everything(today=None):
     sentences = summaries.write_all(today, figures)
     facts.write_all(today, figures)
     write_snapshots(today, figures, built_at)
+    _activity_days(today)
     return sentences
 
 
@@ -78,10 +91,10 @@ def refresh():
 
 
 def _already_waiting():
-    """True when a refresh job is already sitting in the queue (django-q's OrmQ table)."""
-    from django_q.models import OrmQ
-
-    return any(row.task.get("func") == TASK for row in OrmQ.objects.all().iterator())
+    """True when a refresh is already queued: the `SnapshotRefresh.queued_at` flag (set when queued, cleared when the job starts) is set and younger than STALE_AFTER.
+    An older flag is a lost job and counts as not waiting, so it can never stop refreshes for good."""
+    queued_at = SnapshotRefresh.objects.filter(key="snapshots").values_list("queued_at", flat=True).first()
+    return queued_at is not None and queued_at > timezone.now() - STALE_AFTER
 
 
 def _queue():
@@ -90,7 +103,7 @@ def _queue():
 
     try:
         if _already_waiting():
-            return  # a down worker must not pile up jobs
+            return  # one queued job per burst; a down worker must not pile up jobs
         row, _ = SnapshotRefresh.objects.get_or_create(key="snapshots")
         cutoff = timezone.now() - STALE_AFTER
         won = SnapshotRefresh.objects.filter(pk=row.pk).filter(Q(queued_at__isnull=True) | Q(queued_at__lt=cutoff)).update(queued_at=timezone.now())

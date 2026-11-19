@@ -185,7 +185,7 @@ class BuilderTests(TestCase):
         self.assertEqual(blocks.clean(blocks.STARTERS["booking_open"]["blocks"])[1], {})
         row = MailingTemplate.objects.get(key="booking_open")
         self.assertEqual(context["start"], str(row.pk))
-        self.assertIn("Service message to Everyone registered: a heading", [d["description"] for d in context["starter_details"]][0])
+        self.assertIn("Service message to Everyone registered: a heading", next(d["description"] for d in context["starter_details"] if d["name"] == "Booking is open"))
         self.assertNotIn("!", json.dumps(blocks.STARTERS["booking_open"]))
 
     def test_a_send_with_parts_carries_the_unsubscribe_link_or_the_notice(self):

@@ -488,26 +488,8 @@ function initAudit() {
     if (open) form.elements.date_from.focus();
   });
 
-  /* load more: append groups, merging a day that continues */
-  document.addEventListener('click', async (event) => {
-    const more = event.target.closest('[data-system-more]');
-    if (!more || more.getAttribute('aria-disabled') === 'true') return;
-    event.preventDefault();
-    const label = more.textContent; more.textContent = 'Loading'; more.setAttribute('aria-disabled', 'true');
-    try {
-      const doc = await fetchDoc(more.href);
-      const list = results();
-      for (const day of $$('[data-system-day]', doc)) {
-        const same = $(`[data-system-day="${day.dataset.systemDay}"]`, list);
-        if (same) { $('.au-groups', same).append(...$$('.au-groups > li', day)); $('.au-daycount', same).replaceWith($('.au-daycount', day)); }
-        else list.append(day);
-      }
-      $('[data-system-pages]').replaceWith($('[data-system-pages]', doc));
-      showError(false); syncExpand();
-    } catch { more.textContent = label; more.removeAttribute('aria-disabled'); showError(true); lastUrl = more.href; }
-  });
-
   /* back and forward: the URL is the state */
+  document.addEventListener('pager:swapped', () => { lastUrl = location.href; syncExpand(); fit(); });   // the shared pager (pager.js) swapped the list and the pager
   window.addEventListener('popstate', () => {
     const query = new URLSearchParams(location.search);
     for (const el of form.elements) { if (['q', 'user', 'section', 'date_from', 'date_to'].includes(el.name)) el.value = query.get(el.name) || ''; }

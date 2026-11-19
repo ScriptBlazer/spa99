@@ -269,7 +269,7 @@ Freed places come only from cancellations before the deadline, expired invites, 
 | LC-26 | Gold needs Barry's approval. Applicants must already have an account. **Overridden for Phase 1: no account needed.** | CONFIRMED | 1 |
 | LC-27 | Gold's month starts on the approval date. Guest visits and penalties reset on that anniversary. | CONFIRMED | 2 |
 | LC-28 | Barry (and one named deputy) approve or decline in admin. Applicant emailed either way. | PROPOSED | 2 |
-| LC-28a | Gold approvers are team members with the Approver permission (Office level or higher), set in System > Approval, each emailed at their account email or another address. An approval of a Low potential application waits for a final approver (Admin level or higher), who confirms or sends it back; after a send-back the next approval goes through at once. Without a final approver, Low is approved as normal. Added 2026-10-25 (docs/features/gold-final-approval.md). | CONFIRMED | 1 |
+| LC-28a | Gold approvers are team members with the Gold approver permission (Office level or higher, never Viewer; the group is still named Approver), set in System > Approval, each emailed at their account email or another address. An approval of a Low potential application waits for a final approver (Admin level or higher), who confirms or sends it back; after a send-back the next approval goes through at once. Without a final approver, Low is approved as normal. Added 2026-10-25 (docs/features/gold-final-approval.md). | CONFIRMED | 1 |
 | LC-29 | Gold can be revoked any time. Future bookings and guests cancelled; a visit in progress is not interrupted. | PROPOSED | 3 |
 
 ## 09 Single visits and credits

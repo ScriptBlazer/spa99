@@ -1,4 +1,4 @@
-"""Spa 99 System (system.spa99.uk): developers only. Chosen by common.middleware.HostRoutingMiddleware. Everyone who may
+"""Spa 99 System (the system host, SYSTEM_DOMAIN): developers only. Chosen by common.middleware.HostRoutingMiddleware. Everyone who may
 not be here gets a plain 404 (system.permissions); the only open pages are health, robots.txt and the sign-in."""
 from django.contrib.auth.decorators import login_not_required
 from django.http import HttpResponse

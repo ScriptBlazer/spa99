@@ -2,6 +2,7 @@
 brief is docs/design/SYSTEM.md). Every page except sign-in goes through `signed_in` or `unlocked` (404 for strangers)."""
 import time
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_not_required
@@ -12,6 +13,7 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from common import pagination
 from notifications.models import EmailBounce, EmailSuppression
 from pages import clicks
 from plans.models import SiteSettings
@@ -22,13 +24,13 @@ from users.views import LoginView, TeamPasswordView
 from . import approval as approval_service
 from . import audit, changes, codeview, defaults, feed, launch, services, throttle
 from . import team as team_service
-from .forms import ApprovalForm, EmailsForm, SettingsForm
+from .forms import ApprovalForm, EmailsForm, RevenueForm, SettingsForm, add_model_error
 from .forms_rules import RISKY
 from .models import SystemChange, SystemEvent
 from .permissions import signed_in, unlocked
 
 NAV = [("dashboard", "Dashboard", "system_dashboard"), ("plans", "Plans and pricing", "system_plans"), ("hours", "Hours and closures", "system_hours"),
-       ("gold", "Gold rules", "system_gold"), ("approval", "Approval", "system_approval"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("sales", "Sales", "system_sales"), ("payments", "Payments", "system_payments"), ("launch", "Launch", "system_launch"), ("whatsapp", "WhatsApp", "system_whatsapp"), ("assistant", "Assistant", "system_assistant"),
+       ("gold", "Gold rules", "system_gold"), ("approval", "Approval", "system_approval"), ("revenue", "Revenue", "system_revenue"), ("journey", "Journey", "system_journey"), ("emails", "Emails", "system_emails"), ("sales", "Sales", "system_sales"), ("payments", "Payments", "system_payments"), ("launch", "Launch", "system_launch"), ("assistant", "Assistant", "system_assistant"),
        ("settings", "Settings", "system_settings"), ("defaults", "Defaults", "system_defaults"), ("team", "Team", "system_team"), ("changes", "Audit log", "system_changes")]
 
 
@@ -181,12 +183,13 @@ def sign_out(request):
 @require_GET
 def dashboard(request):
     from . import emails as emails_logic
+    from .attention import attention_items
 
     site = SiteSettings.load()
-    context = {"health": services.health_report(), "recent": services.recent_changes(defaults.get(request).dashboard_recent_changes), "site": site,
+    context = {"attention": attention_items(), "health": services.health_report(), "recent": services.recent_changes(defaults.get(request).dashboard_recent_changes), "site": site,
                "stages": [("Registration", site.register_interest_open), ("Book", site.booking_open)],
                "launched_text": launch.short_when(site.launched_at) if site.launched_at else "",
-               "whatsapp": clicks.summary(), "bounces_week": emails_logic.bounces_week()}
+               "whatsapp": clicks.summary(), "bounces_week": emails_logic.bounces_week(), "whatsapp_host": settings.DOMAIN}
     return page(request, "system/dashboard.html", "dashboard", context)
 
 
@@ -208,6 +211,7 @@ def change_log(request):
                "link_query": "&".join(part for part in (filters, f"page={number}" if number > 1 else "") if part),
                "drawer": feed.entry_detail(entry) if entry else None, "filters_set": bool(filters),
                "active_filters": sum(bool(v) for v in (params["user"], params["section"], params["category"], params["range"] or params["date_from"] or params["date_to"])),
+               "pager": pagination.pager(number, result["page"]["num_pages"], filters, anchor="#au-count"),
                "chain": audit.stored_status()}  # the stored result only: a full verify per page load is too costly
     return page(request, "system/changes.html", "changes", context)
 
@@ -218,7 +222,9 @@ def bounces(request):
     from . import emails as emails_logic
 
     kind = request.GET.get("kind", "")
-    context = {"rows": emails_logic.bounce_rows(kind), "kind": kind, "kinds": EmailBounce.KIND_CHOICES}
+    if kind not in dict(EmailBounce.KIND_CHOICES) and kind != emails_logic.ALL_KINDS:
+        kind = ""  # anything else is the default view
+    context = {"rows": emails_logic.bounce_rows(kind), "kind": kind, "kinds": EmailBounce.KIND_CHOICES, "all_kinds": emails_logic.ALL_KINDS}
     return page(request, "system/emails_bounces.html", "emails", context)
 
 
@@ -324,18 +330,39 @@ def undo_all(request, batch):
     return redirect(safe_next(request, "system_changes"))
 
 
+
+
+def _revenue_context():
+    """What System > Revenue shows from the SAVED settings and the stored Office figures (nothing is worked out here but reading them): `preview` {real_pence: the approved year, excluding VAT;
+    months: the 12 month figures of the first 12 months, memberships only; gold_pence: the Gold Card fees; assumed_pence: the saved "With your assumptions" year; ready: the breakdown and its calendar
+    are stored yet; start: the opening date or else the assumed start date; assumed: no opening date is set, so `start` is the private assumed one; plain: the saved percentages are 100 and 0} and `date_format` for the calendar.
+    The live example is worked out in the browser from the same numbers (system-revenue.js)."""
+    from office import counts
+
+    site = SiteSettings.load()
+    stored = counts.read()["revenue"]
+    approved = counts.revenue_view(stored)["approved"]
+    detail = approved["detail"]
+    preview = {"real_pence": approved["year_ex"], "months": [month["pence"] for month in detail["months"]] if detail else [], "gold_pence": detail["gold_year_pence"] if detail else 0,
+               "assumed_pence": counts.revenue_assumptions(stored)["approved"]["assumed_total_ex"],
+               "ready": bool(detail and ((stored.get("approved") or {}).get("detail") or {}).get("calendar")),
+               "start": site.opening_date or site.revenue_start_date, "assumed": site.opening_date is None,
+               "plain": site.revenue_paying_percent == 100 and site.revenue_dropoff_percent == 0}
+    return {"preview": preview, "date_format": site.flatpickr_date_format}
+
+
 def _edit_site(request, form_class, template, section, extra=None):
     site = SiteSettings.load()
     form = form_class(request.POST or None, instance=site)
     if request.method == "POST" and form.is_valid():
         try:
-            if services.save_form(form, request.user):
+            if services.save_form(form, request.user):  # Revenue's stored dates follow by a signal (insights.signals), so undo and the code view move them too
                 saved(request)
             else:
                 messages.info(request, "Nothing changed.")
             return redirect(request.path)
         except ValidationError as error:  # a model rule, or the row changed since the page was made
-            form.add_error(None, error)
+            add_model_error(form, error)
     context = {"form": form, "risky_fields": RISKY.get(section, []), **(extra() if extra else {})}
     return page(request, template, section, context, status=form_status(form) if request.method == "POST" else 200)
 
@@ -351,7 +378,13 @@ def emails(request):
 @unlocked
 @require_GET
 def suppressions(request):
-    return page(request, "system/emails_suppressions.html", "emails", {"rows": EmailSuppression.objects.all()[:500]})
+    from . import emails as emails_logic
+
+    rows = list(EmailSuppression.objects.all()[:500])
+    links = emails_logic.office_links([r.email for r in rows])
+    for row in rows:
+        row.office_url = links.get((row.email or "").strip().lower(), "")
+    return page(request, "system/emails_suppressions.html", "emails", {"rows": rows})
 
 
 @unlocked
@@ -364,6 +397,12 @@ def suppression_remove(request, pk):
     except services.ChangeRefused as error:
         messages.error(request, str(error))
     return redirect("system_suppressions")
+
+
+@unlocked
+@require_http_methods(["GET", "POST"])
+def revenue(request):
+    return _edit_site(request, RevenueForm, "system/revenue.html", "revenue", extra=_revenue_context)
 
 
 @unlocked
@@ -386,6 +425,9 @@ def _team_action(request, action, text="Saved."):
         saved(request, text)
     except services.ChangeRefused as error:
         messages.error(request, str(error))
+    pk = request.resolver_match.kwargs.get("pk")
+    if pk and request.POST.get("back") == "person" and team_service.team_queryset().filter(pk=pk).exists():  # a button on the person's page returns there
+        return redirect("system_team_person", pk=pk)
     return redirect("system_team")
 
 

@@ -23,7 +23,7 @@ from .kit import approve_on_application_page
 from .walks import body_text, confirm_office_modal, wav_bytes
 
 BARRY = STAFF["barry"]["email"]
-OLIVE = STAFF["office"]  # Office level, no Approver
+OLIVE = STAFF["office"]  # Office level, no Gold approver (works the Office; makes no Gold decision)
 ADMIN = STAFF["admin"]
 DEV = STAFF["dev"]
 SCRIPT = "<script>alert(1)</script>"
@@ -210,11 +210,11 @@ def beta_gold_links(w):
         assert "/login/" in signed_out.url, f"Landed on {signed_out.url}"
         assert dbtool("gold", email)["status"] == "new"
     olive = w.page()
-    with w.step("Office level without Approver opens the link: view only, no Approve, nothing approved", olive):
+    with w.step("Office level without Gold approver opens the link: no Approve or Decline, nothing approved", olive):
         sign_in(olive, OFFICE, OLIVE["email"], PASSWORD)
         status = olive.goto(url).status  # the link opens the application page, which Office level may view (2026-10-26)
         assert status == 200, f"The link answered {status} to an Office-level person"
-        assert olive.locator("[data-approve], [data-decline]").count() == 0, "Office level without Approver sees decision buttons"
+        assert olive.locator("[data-approve], [data-decline]").count() == 0, "Office level without Gold approver sees decision buttons"
         assert post_direct(olive, OFFICE, f"/gold/{application_id(url)}/approve/").status == 403, "Office level could approve directly"
         assert dbtool("gold", email)["status"] == "new"
     barry = barry_page(w)
@@ -477,7 +477,7 @@ def beta_access(w):
         wrong = {path: system.goto(SYSTEM + path).status for path in ("/", "/plans/", "/team/")}
         assert all(code == 404 for code in wrong.values()), f"Expected 404 everywhere; got {wrong}"
     office_level = w.page()
-    with w.step("Office level (view only) opens Control: plain 404 (Control needs Admin)", office_level):
+    with w.step("Office level opens Control: plain 404 (Control needs Admin)", office_level):
         sign_in(office_level, CONTROL, OLIVE["email"], PASSWORD)
         wrong = {path: office_level.goto(CONTROL + path).status for path in ("/", "/rooms/", "/library/")}
         assert all(code == 404 for code in wrong.values()), f"Expected 404 everywhere; got {wrong}"
@@ -671,6 +671,7 @@ def beta_bad_input(w):
         page.wait_for_timeout(300)
     office = w.page()
     with w.step("Office: the person page shows the names as plain text and nothing runs", office):
+        assert dbtool("approve-member", "beta-script@example.com")["result"] == "done"  # Registered lists approved people only; a new member waits in Approvals
         sign_in(office, OFFICE, OLIVE["email"], PASSWORD)
         office.goto(f"{OFFICE}/people/")
         row = office.locator("[data-person-row]", has_text="beta-script@example.com").first

@@ -1,4 +1,4 @@
-"""Spa 99 Control (control.spa99.uk): the building control room. A DEMO for now (docs/features/control.md): pretend
+"""Spa 99 Control (the control host, CONTROL_DOMAIN): the building control room. A DEMO for now (docs/features/control.md): pretend
 values, nothing reaches hardware. The business back office is the Office (config.urls_office). Chosen by
 common.middleware.HostRoutingMiddleware. Admin level and up; everyone else gets a plain 404."""
 from django.contrib import admin

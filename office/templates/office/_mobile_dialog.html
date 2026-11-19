@@ -1,7 +1,7 @@
 {% comment %}The Add a mobile / Change the mobile dialog (lead, person and Gold pages), opened from the Details rows (_details.html); on a lead it is Change the details, with the first name. Keys: whatsapp (office.tools.whatsapp_context), mobile_countries, archive (lead page only: adds the first name field).{% endcomment %}
 {% if whatsapp.can_edit and whatsapp.edit_url %}
 <dialog class="fb-modal o-dialog" data-dialog="mobile" aria-labelledby="od-mobile-h">
-  <form method="post" action="{{ whatsapp.edit_url }}" class="fb-modal-wrap" data-mobile-form data-start-url="{{ whatsapp.start_url }}" novalidate>{% csrf_token %}
+  <form method="post" action="{{ whatsapp.edit_url }}" class="fb-modal-wrap" data-mobile-form novalidate>{% csrf_token %}
     <h2 class="fb-modal-title" id="od-mobile-h">{% if archive %}Change the details{% elif whatsapp.has_mobile %}Change the mobile{% else %}Add a mobile{% endif %}</h2>
     <p class="fb-modal-body">{% if archive %}His name and number, so the team can WhatsApp him. Leave the number empty to keep the one he has.{% else %}So the team can WhatsApp him.{% endif %}</p>
     {% if archive %}<label class="fb-modal-field"><span>First name</span><input class="fb-modal-input" type="text" name="first_name" value="{{ whatsapp.first_name }}" maxlength="100" autocomplete="off" autocapitalize="words" enterkeyhint="next"></label>{% endif %}

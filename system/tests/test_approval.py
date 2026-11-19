@@ -80,11 +80,11 @@ class ApprovalTests(TestCase):
         self.assertEqual(approval.address_for(User.objects.get(pk=self.office.pk)), "office@example.com")
         self.client.post(f"/approval/approvers/{self.admin.pk}/remove/")
         sentences = set(SystemChange.objects.filter(section="approval").values_list("sentence", flat=True))
-        self.assertIn("Made office@example.com an approver", sentences)
+        self.assertIn("Made office@example.com a Gold approver", sentences)
         self.assertIn("office@example.com's approval emails now go to barry@example.com", sentences)
         self.assertIn("office@example.com's approval emails now go to their account email", sentences)
-        self.assertIn("Removed admin@example.com as approver", sentences)
-        self.assertEqual(SystemEvent.objects.filter(kind="role_changed", sentence__contains="an approver").count(), 2)
+        self.assertIn("Removed admin@example.com as Gold approver", sentences)
+        self.assertEqual(SystemEvent.objects.filter(kind="role_changed", sentence__contains="a Gold approver").count(), 2)
         page = self.client.get("/approval/")  # the list rows render, with the delivery form and the remove button
         self.assertEqual([a["email"] for a in page.context["approvers"]], ["office@example.com"])
         self.assertContains(page, "Send to their account email")
@@ -114,6 +114,38 @@ class ApprovalTests(TestCase):
         self.assertEqual(approval.approver_addresses(), [])
         self.assertEqual(approval.final_approver_addresses(), [])
 
+    def test_membership_approver_is_for_office_and_admin_and_follows_level_changes(self):
+        from system import team
+
+        viewer = make_team_member("viewer@example.com", levels.VIEWER)
+        peer = make_team_member("peer@example.com", levels.DEVELOPER)
+        for who in (viewer, peer):  # a Viewer holds no tick; Developer and up approve memberships anyway, so the tick is refused, not stored
+            with self.assertRaises(ChangeRefused):
+                service.add(self.dev, service.MEMBERSHIP, [who.pk])
+        self.assertFalse(levels.can_approve_memberships(self.admin))  # Admin needs the tick too
+        self.assertEqual(service.add(self.dev, service.MEMBERSHIP, [self.admin.pk]), 1)
+        self.assertTrue(levels.can_approve_memberships(self.admin))
+        self.assertIn(self.admin.pk, [r["user"].pk for r in service.context(self.dev)["membership_approvers"]])
+        team.set_access(self.dev, self.admin, "office")  # Office and Admin keep the tick when moved between them
+        self.assertTrue(levels.holds_membership_group(self.admin))
+        team.set_access(self.dev, self.admin, "admin")
+        self.assertTrue(levels.can_approve_memberships(self.admin))
+        with self.assertRaises(ChangeRefused):
+            service.add(self.dev, service.APPROVER, [viewer.pk])
+        self.assertEqual(service.add(self.dev, service.MEMBERSHIP, [self.office.pk]), 1)
+        self.assertTrue(levels.can_approve_memberships(self.office))
+        self.assertFalse(levels.is_approver(self.office))  # a different permission from the Gold approver
+        self.assertEqual({r["user"].email: r["role_labels"] for r in team.rows(self.dev)}[self.office.email], ["Membership approver"])
+        team.set_access(self.dev, self.office, "admin")  # Office to Admin: the tick stays
+        self.assertTrue(levels.can_approve_memberships(self.office))
+        team.set_access(self.dev, self.office, "viewer")  # a Viewer cannot hold it: dropped, and it does not come back
+        self.assertFalse(levels.holds_membership_group(self.office))
+        team.set_access(self.dev, self.office, "office")
+        self.assertFalse(levels.can_approve_memberships(self.office))
+        gold = make_team_member("gold@example.com", levels.OFFICE, approver=True, membership=True)
+        team.set_access(self.dev, gold, "viewer")  # a Viewer cannot keep either tick
+        self.assertEqual((levels.held_level(gold), levels.held_roles(gold), levels.holds_membership_group(gold)), ("viewer", (False, False), False))
+
     def test_team_changes_keep_the_roles_and_drop_what_the_new_level_cannot_hold(self):
         from system import team
 
@@ -121,7 +153,7 @@ class ApprovalTests(TestCase):
         team.set_access(self.dev, user, "office")
         self.assertEqual((levels.held_level(user), levels.held_roles(user)), ("office", (True, False)))  # Approver stays, Final goes
         rows = {r["user"].email: r for r in team.rows(self.dev)}
-        self.assertEqual(rows["both@example.com"]["role_labels"], ["Approver"])
+        self.assertEqual(rows["both@example.com"]["role_labels"], ["Gold approver"])
 
 
 class ImportApproversTests(TestCase):

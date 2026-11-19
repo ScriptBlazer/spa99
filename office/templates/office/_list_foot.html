@@ -1,0 +1,4 @@
+{% comment %}The end of a page of rows, for every long list (also the fragment the auto-load fetches). More to come: the "Show more" row. The last page of a list that was loaded in more than one go: "That is everyone."
+A short list that fits one page says nothing (its total line has the count). `cols` makes table rows; without it, list items. Keys from the page: has_next, page, more_url; `href`, `label` optional.{% endcomment %}
+{% if has_next %}{% if cols %}<tr class="o-more-row" data-more-row><td colspan="{{ cols }}">{% include "office/_more_inner.html" %}</td></tr>{% else %}<li class="o-more-row" data-more-row>{% include "office/_more_inner.html" %}</li>{% endif %}
+{% elif page > 1 %}{% if cols %}<tr class="o-end-row" data-end-row><td colspan="{{ cols }}">That is everyone.</td></tr>{% else %}<li class="o-end-row" data-end-row>That is everyone.</li>{% endif %}{% endif %}

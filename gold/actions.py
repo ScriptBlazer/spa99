@@ -50,7 +50,7 @@ def send_guide(application, actor, channel=audit.OFFICE):
 
 @transaction.atomic
 def delete_application(application, actor, request=None):
-    """Delete a Gold application and everything of it: its events (the audit trail), invites, history rows, the WhatsApp chats linked to it (unless an account owns them), and the queue records of
+    """Delete a Gold application and everything of it: its events (the audit trail), invites, history rows, and the queue records of
     its email tasks. For tests and junk (Admin and up, the view guards it). Notes belong to the person's email and stay. The deletion
     is written to the System change log (who, when, reference, applicant email). Returns the reference."""
     from common.tasks import erase_task_records
@@ -60,9 +60,6 @@ def delete_application(application, actor, request=None):
 
     pk, reference, email = application.pk, application.reference, application.email
     invite_ids = list(GoldInvite.objects.filter(application_id=pk).values_list("pk", flat=True))
-    from whatsapp import services as whatsapp
-
-    whatsapp.erase_for_application(application)  # an applicant with no account has no person or lead page to erase this from: it goes with the application
     application.delete()  # events and invites go with it (Django's cascade; the trail refuses only a direct delete)
     GoldApplication.history.model.objects.filter(id=pk).delete()
     erase_task_records([pk, *invite_ids], ["gold.tasks."])

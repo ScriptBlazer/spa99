@@ -7,6 +7,7 @@ from django.shortcuts import redirect
 from django.views.decorators.http import require_http_methods, require_POST
 
 from . import defaults, forms_defaults as f, services
+from .forms import add_model_error
 from .models import SiteDefaults
 from .permissions import unlocked
 from .views import form_status, page, saved
@@ -43,7 +44,7 @@ def defaults_page(request):
                 messages.info(request, "Nothing changed.")
             return redirect("system_defaults")
         except ValidationError as error:  # a model rule, or the row changed since the page was made
-            form.add_error(None, error)
+            add_model_error(form, error)
     return page(request, "system/defaults.html", "defaults", _context(form), status=form_status(form) if request.method == "POST" else 200)
 
 

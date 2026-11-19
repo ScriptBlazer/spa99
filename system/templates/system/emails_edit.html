@@ -87,12 +87,13 @@
           </div>{% endfor %}
           <p class="sys-muted se-help">Empty line = left out. You can use {% for p in footer.placeholders %}<code>{{ "{" }}{{ p.name }}{{ "}" }}</code> {% endfor %}.</p>
         </div>
-        <fieldset class="se-field" data-system-field="sender">
-          <legend>Sender</legend>
-          {% for radio in form.sender %}<label class="se-choice"><input type="radio" name="sender" value="{{ radio.data.value }}"{% if radio.data.selected %} checked{% endif %} data-se-setting> {{ radio.choice_label }}{% if radio.data.value == "site" %}: {{ footer.site_sender }}, replies to {{ footer.contact_email }}{% elif footer.person_sender %}: {{ footer.person_sender }}, replies to the same address{% endif %}{% if radio.data.value == footer.default_sender %} <span class="sys-muted">(default for this email)</span>{% endif %}</label>{% endfor %}
-          {% if not footer.person_sender %}<p class="sys-note" data-se-person-missing>The person sender has no address yet. Set it in <a href="{% url 'system_emails' %}">Emails</a>. {% if spec.key == "lead_next_morning" %}Until then this email is not sent.{% else %}Until then an email set to the person sender goes from the site sender.{% endif %}</p>{% endif %}
-          {% if form.sender.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="sender" data-problem-label="Sender">{{ form.sender.errors|join:" " }}</p>{% endif %}
-        </fieldset>
+        <div class="se-field" data-system-field="sender_user">
+          <label for="{{ form.sender_user.id_for_label }}">Sender</label>
+          <div><select name="sender_user" id="{{ form.sender_user.id_for_label }}" data-se-setting>{% for value, label in form.sender_user.field.choices %}<option value="{{ value }}"{% if value|stringformat:"s" == form.sender_user.value|stringformat:"s" or not value and not form.sender_user.value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+          <p class="sys-muted se-help" data-se-reply-to>Replies go to {{ footer.reply_to }}.</p>
+          {% if footer.sender_note %}<p class="sys-note warn" data-se-sender-gone>{{ footer.sender_note }}</p>{% endif %}
+          {% if form.sender_user.errors %}<p class="sys-error" role="alert" data-problem data-problem-field="sender_user" data-problem-label="Sender">{{ form.sender_user.errors|join:" " }}</p>{% endif %}</div>
+        </div>
       </div>
     </section>{% endif %}
     <section class="sys-panel se-preview" aria-label="Preview" data-se-pane="preview">

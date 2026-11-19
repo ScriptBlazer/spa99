@@ -1,6 +1,6 @@
 """One-off data move from the old roles to the team levels (docs/features/user-rules.md). Never a migration.
 
-  Owner -> Admin     Manager -> Admin     Viewer -> Office     System -> Developer
+  Owner -> Admin     Manager -> Admin     Viewer -> Viewer     System -> Developer
   Approver stays Approver (and gets Office if they would have no level)
 
 Each person ends at the highest level they map to. Superusers are untouched. Old group memberships are left in place;
@@ -14,11 +14,11 @@ from django.db import transaction
 
 from common import levels
 
-OLD_TO_LEVEL = {"Owner": levels.ADMIN, "Manager": levels.ADMIN, "Viewer": levels.OFFICE, "System": levels.DEVELOPER}
+OLD_TO_LEVEL = {"Owner": levels.ADMIN, "Manager": levels.ADMIN, "Viewer": levels.VIEWER, "System": levels.DEVELOPER}
 
 
 class Command(BaseCommand):
-    help = "Map the old Owner/Manager/Viewer/Approver/System groups to Office/Admin/Developer + Approver."
+    help = "Map the old Owner/Manager/Viewer/Approver/System groups to Admin/Viewer/Developer + Gold approver."
 
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true", help="Show the mapping; change nothing.")

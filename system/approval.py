@@ -1,7 +1,9 @@
-"""System > Approval: who approves Gold applications (Approver, Office level or higher) and who gives the final approval to
-Low potential ones (Final approver, Admin level or higher), and where each person's approval emails go.
+"""System > Approval: who approves Gold applications (Gold approver, Office level or higher; the group is still named "Approver"), who approves
+regular memberships on the Approvals page (Membership approver, Office and Admin levels: both need the tick; Developer and up always can, so the role is refused for them and
+dropped when someone is promoted) and who gives the final approval to Low potential Gold ones (Final approver, Admin level or higher),
+and where each person's Gold approval emails go.
 
-The roles are the Approver and Final approver groups (common.levels); Team only shows them. Every change is guarded here,
+The roles are the Approver, Membership approver and Final approver groups (common.levels); Team only shows them. Every change is guarded here,
 recorded in the change list (record_direct, section "approval") and in the audit log (role_changed) with a plain sentence.
 
 Who may change whom (user rule book U4, same `can_manage` as Team): nobody changes themselves, nobody changes someone at their
@@ -14,6 +16,7 @@ from django.core.validators import validate_email
 from django.db import transaction
 
 from common import levels
+from common.emails import strip_hidden
 from common.validators import normalise_email
 from gold import approval
 from gold.models import ApproverDelivery
@@ -26,10 +29,12 @@ from .services import ChangeRefused, record_direct
 
 User = get_user_model()
 SECTION = "approval"
-APPROVER, FINAL = "approver", "final"
+APPROVER, FINAL, MEMBERSHIP = "approver", "final", "membership"
 ROLES = {
-    APPROVER: {"group": levels.APPROVER_GROUP, "noun": "an approver", "noun_plain": "approver", "can_hold": levels.can_hold_approver,
-               "eligible": "Only people at Office level or higher can be approvers."},
+    APPROVER: {"group": levels.APPROVER_GROUP, "noun": "a Gold approver", "noun_plain": "Gold approver", "can_hold": levels.can_hold_approver,
+               "eligible": "Only people at Office level or higher can be Gold approvers."},
+    MEMBERSHIP: {"group": levels.MEMBERSHIP_APPROVER_GROUP, "noun": "a membership approver", "noun_plain": "membership approver", "can_hold": levels.can_hold_membership_approver,
+                 "eligible": "Only Office and Admin can hold this tick. Developer and above always approve memberships."},
     FINAL: {"group": levels.FINAL_APPROVER_GROUP, "noun": "a final approver", "noun_plain": "final approver", "can_hold": levels.can_hold_final_approver,
             "eligible": "Only people at Admin level or higher can be final approvers."},
 }
@@ -40,7 +45,8 @@ def _name(user):
 
 
 def _holds(user, role):
-    return levels.held_roles(user)[0 if role == APPROVER else 1]
+    group = ROLES[role]["group"]
+    return any(g.name == group for g in user.groups.all())
 
 
 def _may_change(actor, target):
@@ -85,6 +91,7 @@ def context(actor):
     final_rows = [row(actor, u) for u in _holders(FINAL)]
     return {
         "approvers": [row(actor, u) for u in _holders(APPROVER)], "final_approvers": final_rows,
+        "membership_approvers": [row(actor, u) for u in _holders(MEMBERSHIP)], "membership_candidates": candidates(actor, MEMBERSHIP),
         "approver_candidates": candidates(actor, APPROVER), "final_candidates": candidates(actor, FINAL),
         "cc": site.approver_cc_list, "cc_text": site.gold_approver_cc,
         "final_approver_missing": approval.final_approver_missing(),
@@ -172,7 +179,7 @@ def set_delivery(actor, user_id, use_account_email, other_email=""):
         raise ChangeRefused("Only approvers and final approvers have an email setting.")
     if not _may_change(actor, target):
         raise ChangeRefused("You cannot change your own approval roles." if actor.pk == target.pk else "You can only change people below your own level.")
-    other = (other_email or "").strip()
+    other = strip_hidden(other_email)
     if other:
         try:
             validate_email(other)
@@ -196,6 +203,33 @@ def set_delivery(actor, user_id, use_account_email, other_email=""):
     where = "their account email" if use else keep
     _log(actor, target, "approval_email", old_address, delivery.address, f"{target.email}'s approval emails now go to {where}")
     return True
+
+
+def person(actor, target):
+    """What a team member's page shows for the approval roles: [{role, label, held, can_hold, why}] in page order, plus the delivery row when they hold a Gold or Final role.
+    `editable` is the same `_may_change` as System > Approval (so a superuser may set their own)."""
+    user = User.objects.select_related("approver_delivery").prefetch_related("groups").get(pk=target.pk)
+    roles = [{"role": role, "label": ROLES[role]["noun_plain"].capitalize(), "held": _holds(user, role) and ROLES[role]["can_hold"](user),
+              "can_hold": ROLES[role]["can_hold"](user), "why": ROLES[role]["eligible"]} for role in (APPROVER, MEMBERSHIP, FINAL)]
+    emails = any(r["held"] for r in roles if r["role"] in (APPROVER, FINAL))
+    return {"roles": roles, "editable": _may_change(actor, user) and user.is_active, "delivery": row(actor, user) if emails else None}
+
+
+@transaction.atomic
+def set_for_person(actor, target, wanted, delivery=None):
+    """Set a person's approval ticks from their page, with exactly the rules of System > Approval (each add and remove goes through `add`, `remove` and `set_delivery`).
+    `wanted`: {role: True or False} for the roles on the form; `delivery`: (use_account_email, other_email) when the form had the delivery box, else None.
+    All or nothing: one refusal undoes the lot. Returns True when something changed."""
+    current = {r["role"]: r["held"] for r in person(actor, target)["roles"]}
+    changed = False
+    for role, want in wanted.items():
+        if want and not current[role]:
+            changed = bool(add(actor, role, [str(target.pk)])) or changed
+        elif not want and current[role]:
+            changed = bool(remove(actor, role, str(target.pk))) or changed
+    if delivery is not None and any(r["held"] for r in person(actor, target)["roles"] if r["role"] in (APPROVER, FINAL)):
+        changed = bool(set_delivery(actor, str(target.pk), *delivery)) or changed
+    return changed
 
 
 def _clean_ids(values):

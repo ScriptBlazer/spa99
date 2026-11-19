@@ -598,10 +598,14 @@ class AssistantTests(ChatTestCase):
 
 
 class OfficeChatsTests(OfficeTestCase):
-    def test_office_level_and_up_can_read_chats_and_strangers_cannot(self):
+    def test_admin_and_up_can_read_chats_office_and_viewer_and_strangers_cannot(self):
         conversation = Conversation.objects.create(lead_email="l@example.com", message_count=1)
         Message.objects.create(conversation=conversation, role="user", text="Is there a gym?")
-        viewer = staff("Office", "chat-viewer@example.com")
+        viewer = staff("Admin", "chat-viewer@example.com")
+        for lower in ("Viewer", "Office"):
+            person = staff(lower, f"{lower}-chat@example.com")
+            for path in ("/chats/", f"/chats/{conversation.pk}/"):
+                self.assertEqual(get(person, path).status_code, 403, f"{lower} {path}")
         for path in ("/chats/", f"/chats/{conversation.pk}/"):
             self.assertEqual(get(viewer, path).status_code, 200)
         self.assertContains(get(viewer, "/chats/"), "Is there a gym?")

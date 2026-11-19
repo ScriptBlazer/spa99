@@ -381,7 +381,7 @@ class StaffWarningTests(PaymentCase):
     def test_seed_fills_the_alert_address_only_when_empty(self):
         SiteDefaults.objects.update(staff_alert_seeded=False)
         call_command("seed_phase1", stdout=open("/dev/null", "w"))
-        self.assertEqual(SiteDefaults.load().staff_alert_emails, "moishe@spa99.uk")
+        self.assertEqual(SiteDefaults.load().staff_alert_emails, "moishe@example.test")  # example.test: the sending domain of the test settings
         SiteDefaults.objects.update(staff_alert_emails="someone@else.example")
         call_command("seed_phase1", stdout=open("/dev/null", "w"))
         self.assertEqual(SiteDefaults.load().staff_alert_emails, "someone@else.example")
@@ -436,6 +436,9 @@ class ScreenTests(PaymentCase):
         admin, office = make_team_member("ad@example.com", levels.ADMIN), make_team_member("of@example.com", levels.OFFICE)
         c = Client(HTTP_HOST="office.localhost")
         c.force_login(office)
+        from office.models import MembershipReview
+
+        MembershipReview.objects.create(registration=holder, status="approved")  # Registered lists approved people only
         rows = c.get("/people/?sale=yes").context["rows"]
         self.assertEqual([r["email"] for r in rows], [holder.user.email])
         self.assertEqual(rows[0]["sale"], "20% for 3 months")

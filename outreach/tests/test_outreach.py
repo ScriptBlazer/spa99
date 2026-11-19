@@ -34,7 +34,7 @@ def call(user, method, path, data=None, **extra):
 class Base(OfficeTestCase):
     def setUp(self):
         self.approver = make_team_member("approver@example.test", levels.OFFICE, approver=True)
-        self.reader = make_team_member("reader@example.test", levels.OFFICE)
+        self.reader = make_team_member("reader@example.test", levels.VIEWER)
         self.admin = make_team_member("admin@example.test", levels.ADMIN)
 
     def application(self, **over):
@@ -172,19 +172,20 @@ class ApproachListTests(Base):
         self.assertEqual(call(self.approver, "post", f"/leads/{session.pk}/outreach/").status_code, 302)
         self.assertEqual(OutreachEntry.objects.count(), 1)
         entry = OutreachEntry.objects.get()
-        page = call(self.reader, "get", "/outreach/")
+        page = call(self.approver, "get", "/outreach/")
         self.assertContains(page, "Approach list")
         SiteSettings.objects.update(outreach_list_name="Barry's list")
-        self.assertContains(call(self.reader, "get", "/outreach/"), "Barry&#x27;s list")
+        self.assertContains(call(self.approver, "get", "/outreach/"), "Barry&#x27;s list")
+        self.assertEqual(call(self.reader, "get", "/outreach/").status_code, 403)  # a Viewer has no approach list
         self.assertEqual(call(self.reader, "post", f"/outreach/{entry.pk}/done/").status_code, 403)
         self.assertEqual(call(self.reader, "post", f"/outreach/{entry.pk}/remove/").status_code, 403)
         self.assertEqual(call(self.reader, "post", f"/leads/{session.pk}/outreach/").status_code, 403)
         call(self.approver, "post", f"/outreach/{entry.pk}/done/")
-        self.assertEqual(len(call(self.reader, "get", "/outreach/").context["rows"]), 0)
-        self.assertEqual(len(call(self.reader, "get", "/outreach/?state=done").context["rows"]), 1)
+        self.assertEqual(len(call(self.approver, "get", "/outreach/").context["rows"]), 0)
+        self.assertEqual(len(call(self.approver, "get", "/outreach/?state=done").context["rows"]), 1)
         self.assertEqual(services.add_to_list(self.approver, lead_email="hugo@example.com")[0], services.DONE)  # a done entry no longer blocks
         call(self.approver, "post", f"/outreach/{OutreachEntry.objects.get(done_at__isnull=True).pk}/remove/")
-        self.assertEqual(OutreachEntry.objects.filter(done_at__isnull=True).count(), 0)
+        self.assertEqual(OutreachEntry.objects.filter(done_at__isnull=True, removed_at__isnull=True).count(), 0)
 
     def test_the_database_allows_one_open_entry_and_exactly_one_target(self):
         OutreachEntry.objects.create(lead_email="a@example.com")
@@ -287,9 +288,9 @@ class EmailButtonTests(Base):
         events = application.events.filter(action=ApplicationEvent.RESPONDED)
         self.assertEqual((events.count(), events.first().meta), (1, {"email": True}))
 
-    def test_respond_opens_whatsapp_with_a_mobile_else_the_gold_page_with_the_email_pop_up(self):
+    def test_respond_opens_wa_me_with_a_mobile_else_the_gold_page_with_the_email_pop_up(self):
         with_mobile = self.application(email="mob@example.com", mobile="+447400123456")
-        self.assertEqual(call(self.approver, "get", f"/gold/{with_mobile.pk}/respond/")["Location"], f"/gold/{with_mobile.pk}/whatsapp/")
+        self.assertEqual(call(self.approver, "get", f"/gold/{with_mobile.pk}/respond/")["Location"], "https://wa.me/447400123456")
         none = self.application(email="nomob@example.com", mobile="")
         self.assertEqual(call(self.approver, "get", f"/gold/{none.pk}/?do=respond")["Location"], f"/gold/{none.pk}/?do=email")
         self.assertContains(call(self.approver, "get", f"/gold/{none.pk}/?do=email"), 'data-dialog="email" data-open')

@@ -29,11 +29,12 @@ NEW_PASSWORD = "Plunge-Pool-2027!"
 RESET_PASSWORD = "Eucalyptus-Mist-88"
 TIMEOUT = 20000
 
-# The staff accounts (made by the run itself: team people are never self-service).
+# The staff accounts (made by the run itself: team people are never self-service). Barry matches live: Admin + Gold approver + Membership approver (Revenue needs Admin; Approvals needs the Membership approver tick, 2026-11-19).
 STAFF = {
+    "viewer": {"email": "viewer@example.com", "level": "viewer", "approver": False, "first": "Vera", "last": "Viewer"},
     "office": {"email": "office@example.com", "level": "office", "approver": False, "first": "Olive", "last": "Office"},
     "admin": {"email": "admin@example.com", "level": "admin", "approver": False, "first": "Adam", "last": "Admin"},
-    "barry": {"email": "barry@example.com", "level": "office", "approver": True, "first": "Barry", "last": "Approver"},
+    "barry": {"email": "barry@example.com", "level": "admin", "approver": True, "first": "Barry", "last": "Approver"},
     "dev": {"email": "dev@example.com", "level": "developer", "approver": False, "first": "Dana", "last": "Developer"},
 }
 
@@ -83,6 +84,7 @@ def setup_staff():
         extra = ["--approver"] if person["approver"] else []
         dbtool("create-staff", person["email"], PASSWORD, person["level"], "--first", person["first"], "--last", person["last"], *extra)
     dbtool("set-approver", STAFF["barry"]["email"])
+    dbtool("set-membership-approver", STAFF["barry"]["email"])  # Admin needs the tick to use Approvals (2026-11-19)
 
 
 # ---------- a walk-through: steps, screenshots, errors ----------

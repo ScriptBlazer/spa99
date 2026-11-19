@@ -16,18 +16,26 @@ How a legal body is written (one line per block, rendered by `content.legal_rend
 Keys: `body` (title and intro), `updated` (the date shown), `part_N` (the numbered parts, in order), `contact`."""
 
 UPDATED = "26 October 2026"
-PRIVACY_UPDATED = "3 November 2026"  # WhatsApp added; earlier: invitation emails track opens, earlier: Ask us chat (Anthropic) added, Postmark added as the email sender
+PRIVACY_UPDATED = "5 November 2026"  # WhatsApp wording corrected (no Twilio, no chat kept on this site); earlier: WhatsApp added, invitation emails track opens, Ask us chat (Anthropic) added, Postmark added as the email sender
 INVITE_OPEN_LINE = ("- Invitation emails contain a tiny image (a tracking pixel), so we know whether the email was opened. "
                     "Other emails we send you do not.")
 WHATSAPP_BLOCK = "\n".join([
     "### WhatsApp",
     "- Your first name and mobile number, if you gave them before seeing your suggested membership, and that you agreed we may email and WhatsApp you about opening and offers. "
     "Registered people can also be WhatsApped on the mobile number on their account.",
+    "- Our WhatsApp messages with you. A member of our team writes to you from their own phone, in WhatsApp, so WhatsApp (Meta) handles those messages under its own privacy policy. "
+    "We do not keep a copy of them on this website.",
+    "- Tell us you do not want WhatsApp messages from us, by replying or by writing to {contact}, and we will stop.",
+])
+OLD_WHATSAPP_BLOCK = "\n".join([
+    "### WhatsApp",
+    "- Your first name and mobile number, if you gave them before seeing your suggested membership, and that you agreed we may email and WhatsApp you about opening and offers. "
+    "Registered people can also be WhatsApped on the mobile number on their account.",
     "- Our WhatsApp messages with you: the text, photos and files, with the times and whether they were delivered and read, and your WhatsApp profile name. "
     "They pass through Twilio, our messaging provider, and WhatsApp.",
     "- Reply STOP to a message and we stop writing to you on WhatsApp.",
-])
-PRIVACY_VERSION = "2026-11-03"  # SiteSettings.privacy_version (WhatsApp added); recorded on everyone who accepts this notice. Changing it forces nobody to accept again: only new sign-ups, leads and applications record the new one.
+])  # the wording saved on live until 2026-11-05 (the in-Office chat through Twilio, removed in Office 2); the backfill swaps it for WHATSAPP_BLOCK
+PRIVACY_VERSION = "2026-11-05"  # SiteSettings.privacy_version (WhatsApp wording corrected); recorded on everyone who accepts this notice. Changing it forces nobody to accept again: only new sign-ups, leads and applications record the new one.
 
 COMPANY_LINE = ("Spa 99 is run by BML SPA 99 LIMITED, a company registered in England (company number 16930909). "
                 "Our registered office is 40 Wellington Avenue, London N15 6AS.")
