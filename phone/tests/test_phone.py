@@ -431,7 +431,7 @@ class OfficeTests(TestCase):
         page = client.get("/calls/?view=short")
         self.assertEqual([c.pk for c in page.context["rows"]], [short.pk])
         self.assertEqual(page.context["counts"]["voicemails"], 1)  # the tab shows the short count on this page
-        self.assertContains(page, "Back to voicemails")
+        self.assertContains(page, "Back to real voicemails")
         self.assertEqual(len(client.get("/calls/?view=all").context["rows"]), 3)  # All calls lists everything
 
     def test_no_sound_voicemails_never_count_as_unheard_and_opening_one_marks_it_heard(self):
