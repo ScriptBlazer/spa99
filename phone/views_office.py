@@ -33,24 +33,23 @@ def _decorate(rows):
 @never_cache
 def call_list(request):
     """Context: section "calls", view ("voicemails" or "all"), rows (calls with display_number and person), counts {voicemails, all}, pager (common/_pagination.html),
-    page, unheard (unheard voicemails; the sidebar badge is office_voicemails_unheard), short (voicemails under 3 seconds; Voicemails view only), show_short.
-    Voicemails hides the short ones unless ?short=1; All calls always lists everything."""
-    view = "all" if request.GET.get("view") == "all" else "voicemails"
-    show_short = view == "voicemails" and request.GET.get("short") == "1"
+    page, unheard (unheard voicemails; the sidebar badge is office_voicemails_unheard), short (voicemails under 3 seconds), short_seconds.
+    Voicemails leaves the short ones out and links to them; ?view=short is a page of only those; All calls lists everything."""
+    view = request.GET.get("view") if request.GET.get("view") in ("all", "short") else "voicemails"
     voicemails = Call.objects.filter(kind=Call.VOICEMAIL)
-    short = services.capped_count(voicemails.filter(services.short_q())) if view == "voicemails" else 0
+    short = services.capped_count(voicemails.filter(services.short_q())) if view != "all" else 0
     queryset = Call.objects.select_related("heard_by")
     if view == "voicemails":
-        queryset = queryset.filter(kind=Call.VOICEMAIL)
-        if not show_short:
-            queryset = queryset.exclude(services.short_q())
+        queryset = queryset.filter(kind=Call.VOICEMAIL).exclude(services.short_q())
+    elif view == "short":
+        queryset = queryset.filter(services.short_q())
     total = services.capped_count(queryset)
     pages = num_pages(total, PAGE_SIZE)
     page = clamp(request.GET.get("page"), pages)
     rows = _decorate(queryset[(page - 1) * PAGE_SIZE:page * PAGE_SIZE])
     counts = {"voicemails": services.capped_count(voicemails.exclude(services.short_q())), "all": total if view == "all" else services.capped_count(Call.objects.all())}
     return render(request, "phone/call_list.html", {"section": "calls", "view": view, "rows": rows, "counts": counts, "pager": pager(page, pages, request.GET), "page": page,
-                                                    "unheard": services.unheard_count(), "short": short, "show_short": show_short, "short_seconds": services.SHORT_SECONDS})
+                                                    "unheard": services.unheard_count(), "short": short, "short_seconds": services.SHORT_SECONDS})
 
 
 @calls_only

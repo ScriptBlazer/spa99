@@ -421,16 +421,16 @@ class OfficeTests(TestCase):
         self.assertEqual(every.context["rows"][0].pk, self.call.pk)  # newest first
         self.assertContains(every, "No message")
 
-    def test_short_voicemails_are_hidden_until_shown_and_never_counted(self):
+    def test_short_voicemails_have_their_own_page_and_never_count(self):
         short = make_call(call_sid="CA" + "e" * 32, recording_sid="RE" + "e" * 32, duration_seconds=2)
         client = self.login(levels.OFFICE)
-        hidden = client.get("/calls/")
-        self.assertEqual([c.pk for c in hidden.context["rows"]], [self.call.pk])
-        self.assertEqual((hidden.context["short"], hidden.context["counts"]["voicemails"], hidden.context["unheard"]), (1, 1, 1))
-        self.assertContains(hidden, "1 short voicemail (under 3 seconds) hidden")
-        shown = client.get("/calls/?short=1")
-        self.assertEqual({c.pk for c in shown.context["rows"]}, {self.call.pk, short.pk})
-        self.assertContains(shown, "Hide")
+        main = client.get("/calls/")
+        self.assertEqual([c.pk for c in main.context["rows"]], [self.call.pk])
+        self.assertEqual((main.context["short"], main.context["counts"]["voicemails"], main.context["unheard"]), (1, 1, 1))
+        self.assertContains(main, "?view=short")
+        page = client.get("/calls/?view=short")
+        self.assertEqual([c.pk for c in page.context["rows"]], [short.pk])
+        self.assertContains(page, "Back to voicemails")
         self.assertEqual(len(client.get("/calls/?view=all").context["rows"]), 3)  # All calls lists everything
 
     def test_no_sound_voicemails_never_count_as_unheard_and_opening_one_marks_it_heard(self):

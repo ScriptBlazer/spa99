@@ -14,9 +14,9 @@
 .o-list--calls th:last-child { padding-inline: var(--space-3); }
 .o-list--calls td.c-len { width: 1px; }
 
-/* the "N short voicemails hidden · Show" line above the list */
-.o-calls-short { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--office-muted); }
-.o-calls-short a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--office-text); text-decoration: underline; text-underline-offset: 0.2em; }
+/* the "N short voicemails →" link above the list (and "Back to voicemails" on that page): one tight line */
+.o-calls-short { margin: calc(var(--space-2) * -1) 0 0; font-size: var(--text-sm); line-height: 1.5; color: var(--office-muted); }
+.o-calls-short a { display: inline-block; padding-block: var(--space-2); color: var(--office-text); text-decoration: underline; text-underline-offset: 0.2em; }
 
 /* phone card: always the same 2x2, whatever the content length. Number | New, then date | length, then the player */
 @media (max-width: 63.99em) {
