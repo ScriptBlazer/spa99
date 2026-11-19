@@ -3,7 +3,7 @@
   editor     Office and up: Message, WhatsApp, sticky notes, the approach list, fix a lead's email, mark genuine, archive
   approver   Gold approver permission on top of Office or higher (superusers always): approve, decline, resend Gold
   final      Final approver permission on top of Admin or higher: confirm or send back a Low potential Gold approval
-  approvals  Admin and up always; Office with the Membership approver permission: the Approvals page and its decisions
+  approvals  Developer and up always; Office or Admin with the Membership approver permission: the Approvals page and its decisions
   admin      Admin and up: Revenue, Assistant chats, export, delete, payment setup
   developer  Developer and up: the Activity page
 Login is enforced first by LoginRequiredMiddleware. Someone with no team level at all gets a plain 404 (U5: the staff

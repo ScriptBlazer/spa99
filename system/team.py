@@ -92,14 +92,14 @@ def _log(actor, target, field, old, new, sentence, kind=SystemEvent.ROLE_CHANGED
 
 
 def _roles_allowed(level, approver, final, membership):
-    """The roles a level can hold: Gold approver from Office up, Membership approver at Office only, Final approver from Admin up. Others are dropped."""
+    """The roles a level can hold: Gold approver from Office up, Membership approver at Office and Admin only, Final approver from Admin up. Others are dropped."""
     return (bool(approver) and levels.rank(level) >= levels.rank(levels.APPROVER_MIN_LEVEL),
             bool(final) and levels.rank(level) >= levels.rank(levels.FINAL_APPROVER_MIN_LEVEL),
-            bool(membership) and level == levels.OFFICE)
+            bool(membership) and levels.can_hold_membership_approver_level(level))
 
 
 def apply_level(target, level, approver, actor=None, final=False, membership=False):
-    """Make the groups and flags say `level` (+ Gold approver from Office up, Membership approver at Office only, Final approver on Admin and above;
+    """Make the groups and flags say `level` (+ Gold approver from Office up, Membership approver at Office and Admin only, Final approver on Admin and above;
     each is dropped when the level does not allow it). Never touches membership or password."""
     approver, final, membership = _roles_allowed(level, approver, final, membership)
     names = (([levels.GROUP_FOR[level]] if level in levels.GROUP_FOR else []) + ([levels.APPROVER_GROUP] if approver else [])

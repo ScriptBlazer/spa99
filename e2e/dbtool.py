@@ -5,6 +5,7 @@ an event loop, where Django refuses database calls, so the run calls this in a c
 
   create-staff EMAIL PASSWORD LEVEL [--approver] [--first NAME] [--last NAME]   Viewer, Office, Admin or Developer team account
   set-approver EMAIL        gives the account the Gold approver role (group "Approver") (who receives Gold applications; System > Approval)
+  set-membership-approver EMAIL   gives the account the Membership approver group (Office and Admin need it to use Approvals)
   registrations             number of registration rows
   user EMAIL                {"exists", "count", "plan", "verified", "active"}
   gold EMAIL                {"status" (newest), "statuses", "waiting", "has_user", "count", "invites", "invites_used"}
@@ -63,6 +64,12 @@ def main(argv):
         user = User.objects.get(email__iexact=args[0])
         user.groups.add(Group.objects.get_or_create(name="Approver")[0])
         return {"approver": args[0]}
+    if cmd == "set-membership-approver":
+        from django.contrib.auth.models import Group
+
+        user = User.objects.get(email__iexact=args[0])
+        user.groups.add(Group.objects.get_or_create(name="Membership approver")[0])
+        return {"membership_approver": args[0]}
     if cmd == "registrations":
         return {"count": InterestRegistration.objects.count()}
     if cmd == "user":

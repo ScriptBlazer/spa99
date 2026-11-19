@@ -241,9 +241,9 @@ class TickTests(PersonBase):
         # Final approver is refused for Office, and the whole save is undone (all or nothing)
         self.client.post(url, {"approver": "1", "membership": "1", "final": "1"})
         self.assertFalse(levels.held_roles(User.objects.get(pk=self.office.pk))[1])
-        # Admin: Membership approver refused, Final approver allowed; where the emails go is set with it
+        # Admin: Membership approver allowed (Admin needs the tick); Final approver allowed; where the emails go is set with it
         self.client.post(f"/team/{admin.pk}/roles/", {"membership": "1"})
-        self.assertFalse(levels.holds_membership_group(User.objects.get(pk=admin.pk)))
+        self.assertTrue(levels.holds_membership_group(User.objects.get(pk=admin.pk)))
         from gold import approval
         self.client.post(f"/team/{admin.pk}/roles/", {"final": "1", "delivery": "1", "other_email": "boss@example.org"})
         self.assertTrue(approval_service.person(self.dev, admin)["roles"][2]["held"])

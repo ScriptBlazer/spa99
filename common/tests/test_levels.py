@@ -66,3 +66,18 @@ class LevelTests(TestCase):
         developer, root = person("d@example.com", "developer"), person("root@example.com", is_superuser=True)
         self.assertTrue(levels.can_assign(developer, "admin") and not levels.can_assign(developer, "developer"))
         self.assertTrue(levels.can_assign(root, "superuser"))
+
+
+class MembershipApproverTests(TestCase):
+    def test_office_and_admin_need_the_tick_developer_and_up_always_approve_viewer_never(self):
+        for level, ticked, expected in (("office", False, False), ("office", True, True), ("admin", False, False), ("admin", True, True),
+                                        ("developer", False, True), ("developer", True, True), ("viewer", True, False)):
+            user = person(f"{level}{ticked}@example.com", level)
+            if ticked:
+                user.groups.add(Group.objects.get_or_create(name=levels.MEMBERSHIP_APPROVER_GROUP)[0])
+            self.assertEqual(levels.can_approve_memberships(user), expected, (level, ticked))
+        self.assertTrue(levels.can_approve_memberships(person("root@example.com", is_superuser=True)))
+        self.assertFalse(levels.can_approve_memberships(None))
+        who = {level: person(f"hold-{level}@example.com", level) for level in ("viewer", "office", "admin", "developer")}
+        self.assertEqual({level: levels.can_hold_membership_approver(user) for level, user in who.items()},
+                         {"viewer": False, "office": True, "admin": True, "developer": False})

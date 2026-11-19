@@ -38,9 +38,9 @@ NO_EMAIL_BACKENDS = {"django.core.mail.backends.console.EmailBackend", "django.c
 # ======================================================================================================================
 # Staff addresses and the contact address are not typed here: they come from the sending domain (.env: EMAIL_SENDING_DOMAIN, else the domain of
 # DEFAULT_FROM_EMAIL) and DEFAULT_FROM_EMAIL itself, so moving domain needs only .env. They only fill empty first-time values.
-TEAM = [  # (local part, first name, last name, level, approver, final approver)
-    ("moishe", "Moishe", "Berkowitz", levels.DEVELOPER, False, True),
-    ("barry", "Barry", "Lobenstein", levels.ADMIN, True, False),
+TEAM = [  # (local part, first name, last name, level, approver, final approver, membership approver: Office and Admin only, Developer always can)
+    ("moishe", "Moishe", "Berkowitz", levels.DEVELOPER, False, True, False),
+    ("barry", "Barry", "Lobenstein", levels.ADMIN, True, False, True),
 ]
 SITE_SETTINGS = {  # SiteSettings field -> value. Filled only while the field is empty.
     "whatsapp_number": "447441919990",  # the spa WhatsApp (07441 919990)
@@ -51,8 +51,9 @@ SITE_SETTINGS = {  # SiteSettings field -> value. Filled only while the field is
 
 def team():
     """The team to create, each with an email on the sending domain."""
-    return [{"email": f"{local}@{sending_domain()}", "first_name": first, "last_name": last, "level": level, "approver": approver, "final_approver": final}
-            for local, first, last, level, approver, final in TEAM]
+    return [{"email": f"{local}@{sending_domain()}", "first_name": first, "last_name": last, "level": level, "approver": approver, "final_approver": final,
+             "membership_approver": membership and levels.can_hold_membership_approver_level(level)}
+            for local, first, last, level, approver, final, membership in TEAM]
 
 
 def site_values():
@@ -208,27 +209,28 @@ class Command(BaseCommand):
                 first_name__iexact=person["first_name"], last_name__iexact=person["last_name"]).first()
             if twin is not None:
                 return self.kept(label, f"already present as {twin.email} (no new account)")
-        want_level, want_approver, want_final = person["level"], person["approver"], person["final_approver"]
+        want_level, want_approver, want_final, want_membership = person["level"], person["approver"], person["final_approver"], person["membership_approver"]
         if user is not None and not user.is_active:
             return self.problem(label, "the account is deactivated (reactivate it in System > Team)")
         if user is not None:
-            return self.existing(user, label, want_level, want_approver, want_final)
+            return self.existing(user, label, want_level, want_approver, want_final, want_membership)
         try:
-            user, _ = make_member(email, want_level, want_approver, want_final, person["first_name"], person["last_name"], password=None, via="setup_live")
+            user, _ = make_member(email, want_level, want_approver, want_final, person["first_name"], person["last_name"], password=None, via="setup_live", membership=want_membership)
         except ChangeRefused as error:
             return self.problem(label, str(error))
-        self.done(label, f"{self.describe(want_level, want_approver, want_final)}, invite to choose a password "
+        self.done(label, f"{self.describe(want_level, want_approver, want_final, want_membership)}, invite to choose a password "
                          f"{'would be sent' if self.dry else 'will be sent after saving'}", verbs=("created as", "would create as"))
         self.invite(user)
 
-    def existing(self, user, label, want_level, want_approver, want_final):
+    def existing(self, user, label, want_level, want_approver, want_final, want_membership=False):
         """Only ever adds: a higher level is kept, roles already held are kept."""
         held_level = levels.held_level(user)
         approver, final = levels.held_roles(user)
-        membership = levels.holds_membership_group(user) and levels.can_hold_membership_approver(user)  # kept as it is; shown so the line is the whole truth
+        membership = levels.holds_membership_group(user) and levels.can_hold_membership_approver(user)  # as held now
         level = want_level if levels.rank(want_level) > levels.rank(held_level) else held_level
         new_approver, new_final = approver or want_approver, final or want_final
-        if (level, new_approver, new_final) == (held_level, approver, final) and user.is_staff:
+        new_membership = (membership or want_membership) and levels.can_hold_membership_approver_level(level)
+        if (level, new_approver, new_final, new_membership) == (held_level, approver, final, membership) and user.is_staff:
             return self.kept(label, f"exists as {self.describe(held_level, approver, final, membership)} (left alone)")
         if user.is_superuser:  # apply_level would clear the superuser flag: add the role groups only
             groups = ([levels.APPROVER_GROUP] if new_approver and not approver else []) + ([levels.FINAL_APPROVER_GROUP] if new_final and not final else [])
@@ -237,10 +239,10 @@ class Command(BaseCommand):
             from system.team import apply_level
 
             try:
-                apply_level(user, level, new_approver, actor=None, final=new_final, membership=levels.holds_membership_group(user))
+                apply_level(user, level, new_approver, actor=None, final=new_final, membership=new_membership)
             except ChangeRefused as error:
                 return self.problem(label, str(error))
-        text = self.describe(level, new_approver, new_final, membership and level == levels.OFFICE)
+        text = self.describe(level, new_approver, new_final, new_membership)
         sentence = f"Set {user.email} to {text} (setup_live)"
         record_direct(None, "team", "users.user", user, "level", self.describe(held_level, approver, final, membership), text, sentence=sentence)
         audit.log_event(SystemEvent.ROLE_CHANGED, detail={"person": user.email, "new": text, "via": "setup_live"}, email="command line", sentence=sentence)

@@ -104,7 +104,7 @@
             {% for g in w.detail.groups %}<li><span>{% include "office/_revenue_deal.html" with g=g part="title" %}{% if g.kind == "sale" %}, {{ g.percent }}% off for {{ g.lasts }} month{{ g.lasts|pluralize }}{% endif %}, {{ g.count|num }} waiting</span><span class="num">{{ g.year_pence|pounds }}</span></li>{% endfor %}
             {% for r in w.by_plan %}{% if r.kind == "gold" and r.count %}<li><span>{{ r.name }}, {{ r.count|num }} waiting</span><span class="num">{{ r.year_ex|pounds }}</span></li>{% endif %}{% endfor %}
           </ul>
-          <a class="o-quiet" href="{{ approvals_url }}" data-press>See who is waiting{% include "office/_icon.html" with name="chevron-right" %}</a>
+          {% if approvals_url %}<a class="o-quiet" href="{{ approvals_url }}" data-press>See who is waiting{% include "office/_icon.html" with name="chevron-right" %}</a>{% endif %}
         </div>
         {% endif %}
 

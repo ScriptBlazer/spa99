@@ -42,7 +42,7 @@ def call(user, method, path, data=None, **extra):
 
 class Base(OfficeTestCase):
     def setUp(self):
-        self.approver = make_team_member("approver@example.test", levels.ADMIN, approver=True)  # like Barry on live: Admin and a Gold approver (Revenue and Approvals are Admin and up)
+        self.approver = make_team_member("approver@example.test", levels.ADMIN, approver=True, membership=True)  # like Barry on live: Admin, Gold approver and Membership approver (Revenue is Admin and up; Approvals needs the tick)
         self.reader = make_team_member("reader@example.test", levels.VIEWER)
         self.admin = make_team_member("admin@example.test", levels.ADMIN)
 
@@ -99,11 +99,25 @@ class ApprovalTests(Base):
         ask.assert_called()
         self.assertEqual(counts.read()["memberships"], counts._by_status(counts.membership_people()))
 
+    def test_an_admin_without_the_tick_is_not_linked_to_approvals_from_home_or_revenue(self):
+        self.member("a@example.com")
+        self.figures()
+        for who, linked in ((self.admin, False), (self.approver, True)):
+            for path in ("/", "/revenue/"):
+                page = call(who, "get", path)
+                self.assertEqual(page.status_code, 200)
+                self.assertEqual('href="/approvals/' in page.content.decode(), linked, (who.email, path))
+
     def test_only_an_approver_or_admin_sees_or_decides_and_gold_members_are_not_in_the_list(self):
         user, gold = self.member("a@example.com"), self.member("g@example.com", plan="gold")
-        for who, code in ((self.reader, 403), (self.approver, 200), (self.admin, 200)):
+        developer = make_team_member("dev@example.test", levels.DEVELOPER)
+        for who, code in ((self.reader, 403), (self.approver, 200), (self.admin, 403), (developer, 200)):  # Admin needs the Membership approver tick (2026-11-19)
             self.assertEqual(call(who, "get", "/approvals/").status_code, code)
+        for who, code in ((self.reader, 403), (self.approver, 200), (self.admin, 200)):
             self.assertEqual(call(who, "get", "/revenue/").status_code, code)
+        for decision in ("approve", "decline", "undo"):  # the decisions are refused too, and nothing is stored
+            self.assertEqual(call(self.admin, "post", f"/approvals/{user.pk}/{decision}/").status_code, 403)
+        self.assertFalse(MembershipReview.objects.exists())
         self.assertEqual(call(self.reader, "post", f"/approvals/{user.pk}/approve/").status_code, 403)
         self.assertEqual(call(self.approver, "get", f"/approvals/{user.pk}/approve/").status_code, 405)  # a decision is a POST
         self.assertEqual(call(self.approver, "post", f"/approvals/{gold.pk}/approve/").status_code, 404)  # a Gold-plan member is approved through Gold

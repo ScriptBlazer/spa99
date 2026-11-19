@@ -114,20 +114,31 @@ class ApprovalTests(TestCase):
         self.assertEqual(approval.approver_addresses(), [])
         self.assertEqual(approval.final_approver_addresses(), [])
 
-    def test_membership_approver_is_for_office_only_and_follows_level_changes(self):
+    def test_membership_approver_is_for_office_and_admin_and_follows_level_changes(self):
         from system import team
 
         viewer = make_team_member("viewer@example.com", levels.VIEWER)
-        for who in (viewer, self.admin):  # a Viewer holds no tick; Admin and up approve memberships anyway, so the tick is refused, not stored
+        peer = make_team_member("peer@example.com", levels.DEVELOPER)
+        for who in (viewer, peer):  # a Viewer holds no tick; Developer and up approve memberships anyway, so the tick is refused, not stored
             with self.assertRaises(ChangeRefused):
                 service.add(self.dev, service.MEMBERSHIP, [who.pk])
+        self.assertFalse(levels.can_approve_memberships(self.admin))  # Admin needs the tick too
+        self.assertEqual(service.add(self.dev, service.MEMBERSHIP, [self.admin.pk]), 1)
+        self.assertTrue(levels.can_approve_memberships(self.admin))
+        self.assertIn(self.admin.pk, [r["user"].pk for r in service.context(self.dev)["membership_approvers"]])
+        team.set_access(self.dev, self.admin, "office")  # Office and Admin keep the tick when moved between them
+        self.assertTrue(levels.holds_membership_group(self.admin))
+        team.set_access(self.dev, self.admin, "admin")
+        self.assertTrue(levels.can_approve_memberships(self.admin))
         with self.assertRaises(ChangeRefused):
             service.add(self.dev, service.APPROVER, [viewer.pk])
         self.assertEqual(service.add(self.dev, service.MEMBERSHIP, [self.office.pk]), 1)
         self.assertTrue(levels.can_approve_memberships(self.office))
         self.assertFalse(levels.is_approver(self.office))  # a different permission from the Gold approver
         self.assertEqual({r["user"].email: r["role_labels"] for r in team.rows(self.dev)}[self.office.email], ["Membership approver"])
-        team.set_access(self.dev, self.office, "admin")  # promoted: the tick is dropped (always approves now), it does not come back on a later demotion
+        team.set_access(self.dev, self.office, "admin")  # Office to Admin: the tick stays
+        self.assertTrue(levels.can_approve_memberships(self.office))
+        team.set_access(self.dev, self.office, "viewer")  # a Viewer cannot hold it: dropped, and it does not come back
         self.assertFalse(levels.holds_membership_group(self.office))
         team.set_access(self.dev, self.office, "office")
         self.assertFalse(levels.can_approve_memberships(self.office))

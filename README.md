@@ -14,6 +14,7 @@ python manage.py migrate
 python manage.py createcachetable       # the rate-limit cache table (safe to repeat)
 python manage.py seed_phase1            # plans, prices, hours, facilities, site copy, journey questions, Gold rules (safe to repeat; --dry-run to preview)
 python manage.py setup_roles            # Viewer / Office / Admin / Developer / Approver (Gold approver) / Membership approver / Final approver groups (Viewer and Membership approver are also made by migration users.0009; on an old database run migrate_roles first)
+python manage.py tick_admin_membership_approvers --dry-run  # one-off (2026-11-19): Admin now needs the Membership approver tick; run without --dry-run on deploy
 python manage.py createsuperuser        # email + password; use it for Control and the hidden admin
 ```
 

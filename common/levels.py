@@ -19,8 +19,9 @@ ROLE_LABELS = {APPROVER_GROUP: GOLD_APPROVER_LABEL, MEMBERSHIP_APPROVER_GROUP: "
 LEVEL_GROUPS = tuple(GROUP_FOR.values())
 ROLE_GROUPS = (APPROVER_GROUP, MEMBERSHIP_APPROVER_GROUP, FINAL_APPROVER_GROUP)
 TEAM_GROUPS = LEVEL_GROUPS + ROLE_GROUPS
-# Who may hold each role (docs/features/user-rules.md U2). Membership approver is Office only: Admin and up always approve memberships, so it is refused there, not stored.
-APPROVER_MIN_LEVEL, FINAL_APPROVER_MIN_LEVEL, MEMBERSHIP_APPROVER_MIN_LEVEL = OFFICE, ADMIN, OFFICE
+# Who may hold each role (docs/features/user-rules.md U2). Membership approver is for Office and Admin (2026-11-19): both need the tick to approve memberships;
+# Developer and Superuser always can, so the role is refused there, not stored.
+APPROVER_MIN_LEVEL, FINAL_APPROVER_MIN_LEVEL, MEMBERSHIP_APPROVER_MIN_LEVEL, MEMBERSHIP_APPROVER_MAX_LEVEL = OFFICE, ADMIN, OFFICE, ADMIN
 
 
 def rank(level):
@@ -84,11 +85,11 @@ def is_approver(user):
 
 
 def can_approve_memberships(user):
-    """May use the Approvals page and approve regular memberships: Admin and up always, Office with the Membership approver group. Never Viewer."""
+    """May use the Approvals page and approve regular memberships: Developer and up always; Office or Admin only with the Membership approver group. Never Viewer."""
     level = level_of(user)
-    if rank(level) >= rank(ADMIN):
+    if rank(level) >= rank(DEVELOPER):
         return True
-    return level == OFFICE and holds_membership_group(user)
+    return rank(MEMBERSHIP_APPROVER_MIN_LEVEL) <= rank(level) <= rank(MEMBERSHIP_APPROVER_MAX_LEVEL) and holds_membership_group(user)
 
 
 def can_hold_approver(user):
@@ -96,9 +97,14 @@ def can_hold_approver(user):
     return rank(held_level(user)) >= rank(APPROVER_MIN_LEVEL)
 
 
+def can_hold_membership_approver_level(level):
+    """The same rule for a level name (no user yet), e.g. when setting up a team before the accounts exist."""
+    return rank(MEMBERSHIP_APPROVER_MIN_LEVEL) <= rank(level) <= rank(MEMBERSHIP_APPROVER_MAX_LEVEL)
+
+
 def can_hold_membership_approver(user):
-    """The one guard for the Membership approver role: Office level exactly. Viewer cannot; Admin and up already approve memberships."""
-    return rank(held_level(user)) == rank(MEMBERSHIP_APPROVER_MIN_LEVEL)
+    """The one guard for the Membership approver role: Office or Admin level. Viewer cannot; Developer and up already approve memberships."""
+    return can_hold_membership_approver_level(held_level(user))
 
 
 def can_hold_final_approver(user):

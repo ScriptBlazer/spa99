@@ -36,7 +36,7 @@
 <section class="sys-panel" aria-label="Approval" data-system-person-section="approval">
   <form method="post" action="{% url 'system_team_person_roles' person.pk %}" class="sys-group" data-problems>{% csrf_token %}
     <h3>Approval</h3>
-    <p class="sys-muted">The same ticks as System &gt; Approval. Gold approver and Final approver get the emails for Gold applications. Membership approver is for Office level only: Admin and above can always approve memberships.</p>
+    <p class="sys-muted">The same ticks as System &gt; Approval. Gold approver and Final approver get the emails for Gold applications. Office and Admin need the Membership approver tick to approve memberships. Developer and above always can.</p>
     {% for r in approval.roles %}
     <div class="sys-row" data-system-role-row="{{ r.role }}">
       <span class="sys-label">{{ r.label }}{% if not r.can_hold %}<small>{{ r.why }}</small>{% endif %}</span>

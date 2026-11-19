@@ -17,7 +17,7 @@ from users.tests.test_register import cleaned
 
 EDIT = "edit"  # Office and up
 ADMIN = "admin"  # Admin and up
-APPROVALS = "approvals"  # Admin and up, or Office with Membership approver
+APPROVALS = "approvals"  # Developer and up, or Office or Admin with Membership approver
 GOLD = "gold"  # the Gold approver permission on Office or higher (superuser always)
 DEVELOPER = "developer"
 
@@ -56,7 +56,7 @@ READS = ["/", "/leads/", "/people/", "/gold/", "/analytics/", "/insights/summary
 
 # who -> (level, Gold approver, Membership approver)
 WHO = {"viewer": (levels.VIEWER, False, False), "office": (levels.OFFICE, False, False), "office+membership": (levels.OFFICE, False, True),
-       "office+gold": (levels.OFFICE, True, False), "admin": (levels.ADMIN, False, False), "admin+gold": (levels.ADMIN, True, False),
+       "office+gold": (levels.OFFICE, True, False), "admin": (levels.ADMIN, False, False), "admin+gold": (levels.ADMIN, True, False), "admin+membership": (levels.ADMIN, False, True),
        "developer": (levels.DEVELOPER, False, False), "superuser": (levels.SUPERUSER, False, False)}
 
 
@@ -68,7 +68,7 @@ def allowed(who, rule):
     if rule == ADMIN:
         return rank >= levels.rank(levels.ADMIN)
     if rule == APPROVALS:
-        return rank >= levels.rank(levels.ADMIN) or membership
+        return rank >= levels.rank(levels.DEVELOPER) or membership
     if rule == GOLD:
         return level == levels.SUPERUSER or gold
     return rank >= levels.rank(levels.DEVELOPER)
@@ -104,7 +104,7 @@ class LevelMatrixTests(OfficeTestCase):
                 self.assertEqual(self.call(who, "get", path).status_code, 200, f"{who} {path}")
 
     def test_the_navigation_and_buttons_follow_the_level(self):
-        for who, links in (("viewer", ()), ("office", ("/outreach/",)), ("office+membership", ("/outreach/", "/approvals/")), ("admin", ("/outreach/", "/approvals/", "/revenue/", "/chats/"))):
+        for who, links in (("viewer", ()), ("office", ("/outreach/",)), ("office+membership", ("/outreach/", "/approvals/")), ("admin", ("/outreach/", "/revenue/", "/chats/")), ("admin+membership", ("/outreach/", "/approvals/", "/revenue/", "/chats/")), ("developer", ("/outreach/", "/approvals/", "/revenue/", "/chats/"))):
             page = self.call(who, "get", "/").content.decode()
             for link in ("/outreach/", "/approvals/", "/revenue/", "/chats/"):
                 self.assertEqual(f'href="{link}"' in page, link in links, f"{who} {link}")

@@ -1,7 +1,7 @@
 """Office 2 walk-throughs (docs/features/office-2.md, "Built, UI"): the phone Home cards and tabs, approvals with undo, Registered, Leads and the Approach list, the wa.me button, the group send
 with its confirm, the add-your-number link, a bounced lead coming back, and a list that loads itself. Fake mail only (the throwaway workspace's mail folder).
 
-Accounts: Barry (Admin + Gold approver, as on live: Revenue and Approvals need Admin) does the work; the people are office2-*@example.test. Leads and members are made through the real journey and register forms; the few things no screen can do
+Accounts: Barry (Admin + Gold approver + Membership approver, as on live: Revenue needs Admin, Approvals needs the tick) does the work; the people are office2-*@example.test. Leads and members are made through the real journey and register forms; the few things no screen can do
 (a bounce arriving, a pile of leads for the long list) are done with manage.py shell against the throwaway database."""
 import json
 import re

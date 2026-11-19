@@ -1,4 +1,4 @@
-"""Approvals and Revenue. Approvals: Admin and up, or Office with the Membership approver permission. Revenue: Admin and up only. Anyone else gets a 403 and no tab or Home card.
+"""Approvals and Revenue. Approvals: Office or Admin with the Membership approver permission (Developer and up always). Revenue: Admin and up only. Anyone else gets a 403 and no tab or Home card.
 Short views: they read office.approvals and office.counts and answer. The three decisions are POSTs and are audited (office.approvals.decide)."""
 from datetime import date
 from decimal import Decimal
@@ -15,7 +15,7 @@ from plans.models import Plan, SiteSettings
 from system import defaults
 
 from . import approvals, counts, lists
-from .permissions import admin, approvals as approvals_guard
+from .permissions import abilities, admin, approvals as approvals_guard
 
 ACTIONS = {"approve": approvals.APPROVED, "decline": approvals.DECLINED, "undo": approvals.WAITING}
 SAID = {"approve": "approved", "decline": "declined", "undo": "back to waiting"}
@@ -133,5 +133,5 @@ def revenue_page(request):
     context = {"revenue": figures, "assumptions": assumptions, "assumed_shown": assumed_shown, "date_range": window, "range_error": window["error"], "range_figures": range_figures, "calendar": calendar,
                "date_format": site.flatpickr_date_format,
                "counts": {"memberships": stored["memberships"], "gold": stored["gold"]}, "empty": not figures["approved"]["count"],
-               "approvals_url": f"{reverse('office_approvals')}?status=waiting", "section": "revenue"}
+               "approvals_url": f"{reverse('office_approvals')}?status=waiting" if abilities(request.user)["can_approvals"] else None, "section": "revenue"}
     return render(request, "office/revenue.html", context)

@@ -15,7 +15,7 @@ def _person(user):
     if not user.is_superuser:
         if levels.is_approver(user):
             role += " and " + levels.GOLD_APPROVER_LABEL
-        if levels.rank(levels.level_of(user)) == levels.rank(levels.OFFICE) and levels.can_approve_memberships(user):
+        if levels.can_hold_membership_approver_level(levels.level_of(user)) and levels.can_approve_memberships(user):
             role += " and Membership approver"
     return {"name": name, "first_name": user.first_name or name, "initials": "".join(letters[:2]).upper(), "role": role}
 

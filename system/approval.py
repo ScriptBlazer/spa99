@@ -1,5 +1,5 @@
 """System > Approval: who approves Gold applications (Gold approver, Office level or higher; the group is still named "Approver"), who approves
-regular memberships on the Approvals page (Membership approver, Office level only: Admin and up always can, so the role is refused for them and
+regular memberships on the Approvals page (Membership approver, Office and Admin levels: both need the tick; Developer and up always can, so the role is refused for them and
 dropped when someone is promoted) and who gives the final approval to Low potential Gold ones (Final approver, Admin level or higher),
 and where each person's Gold approval emails go.
 
@@ -34,7 +34,7 @@ ROLES = {
     APPROVER: {"group": levels.APPROVER_GROUP, "noun": "a Gold approver", "noun_plain": "Gold approver", "can_hold": levels.can_hold_approver,
                "eligible": "Only people at Office level or higher can be Gold approvers."},
     MEMBERSHIP: {"group": levels.MEMBERSHIP_APPROVER_GROUP, "noun": "a membership approver", "noun_plain": "membership approver", "can_hold": levels.can_hold_membership_approver,
-                 "eligible": "Only people at Office level can be membership approvers. Admin level and above can always approve memberships."},
+                 "eligible": "Only Office and Admin can hold this tick. Developer and above always approve memberships."},
     FINAL: {"group": levels.FINAL_APPROVER_GROUP, "noun": "a final approver", "noun_plain": "final approver", "can_hold": levels.can_hold_final_approver,
             "eligible": "Only people at Admin level or higher can be final approvers."},
 }

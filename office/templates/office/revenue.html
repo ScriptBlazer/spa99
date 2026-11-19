@@ -120,7 +120,7 @@ The full breakdown (_revenue_breakdown.html) is the last card, closed until open
     <ul class="o-rev-waiting">{% for r in w.by_plan %}{% if r.count %}<li data-revenue-waiting="{{ r.slug }}"><span>{{ r.name }}, {{ r.count|num }} waiting</span><span class="num">{{ r.year_ex|pounds }}</span></li>{% endif %}{% endfor %}</ul>
     {% if assumed_shown %}<ul class="o-rev-waiting o-rev-assumed-line"><li data-revenue-assumed-row><span>With your assumptions, a year, excl. VAT</span><span class="num">{{ assumptions.figures.waiting.assumed_total_ex|pounds }}</span></li></ul>{% endif %}
     {% endif %}
-    <a class="o-quiet" href="{{ approvals_url }}" data-press>See who is waiting{% include "office/_icon.html" with name="chevron-right" %}</a>
+    {% if approvals_url %}<a class="o-quiet" href="{{ approvals_url }}" data-press>See who is waiting{% include "office/_icon.html" with name="chevron-right" %}</a>{% endif %}
   </section>
 
   {# The full breakdown: the last card, one closed card until the plus opens it (office/_revenue_breakdown.html). Computer: full width on row 3. #}
