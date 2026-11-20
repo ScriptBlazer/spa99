@@ -15,7 +15,7 @@
 .o-badge--type { padding-inline: var(--space-1); color: var(--office-muted); }
 .o-badge--emailed { background: var(--office-sunken); color: var(--office-text); }                                                         /* 10.13: "Emailed 5 Nov" on a lead the group email reached */
 .o-badge--fake { background: var(--office-surface); color: var(--office-text); box-shadow: inset 0 0 0 1px var(--color-control-line); }   /* "Possible fake": shown instead of Emailed, because the email did not reach him */
-.o-list .c-name .o-badge { margin-left: var(--space-1); vertical-align: middle; }
+.o-list .c-name .o-badge { vertical-align: middle; }   /* no left margin: the badge often starts its own line (under the name, email and mobile) and must line up with them; the space before it in the markup separates it from a tag on the same line */
 @media (forced-colors: active) { .o-badge--st-lead, .o-badge--st-registered { border: 1px solid CanvasText; } }
 
 /* ---------- the summary strip: two tonal tiles (Leads, Registered), no shadow; each is a link with the press ---------- */

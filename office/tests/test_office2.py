@@ -551,6 +551,7 @@ class RegisteredAndLeadsTests(Base):
         rows = {r["email"]: r for r in call(self.reader, "get", "/leads/").context["rows"]}
         self.assertEqual((bool(rows["a@example.com"]["emailed_at"]), bool(rows["b@example.com"]["emailed_at"]), bool(rows["c@example.com"]["emailed_at"])), (True, True, False))
         self.assertEqual(sorted(r["email"] for r in call(self.reader, "get", "/leads/?emailed=1").context["rows"]), ["a@example.com", "b@example.com"])
+        self.assertEqual([r["email"] for r in call(self.reader, "get", "/leads/?emailed=0").context["rows"]], ["c@example.com"])  # Not emailed
         from notifications import suppression
         from notifications.models import EmailSuppression
 
@@ -559,6 +560,8 @@ class RegisteredAndLeadsTests(Base):
         self.assertEqual((rows["a@example.com"]["bounced"], rows["a@example.com"]["emailed_at"]), (True, ""))
         outreach.add_to_list(self.admin, lead_email="b@example.com")
         self.assertEqual([r["email"] for r in call(self.admin, "get", "/outreach/?emailed=1").context["rows"]], ["b@example.com"])
+        outreach.add_to_list(self.admin, lead_email="c@example.com")
+        self.assertEqual([r["email"] for r in call(self.admin, "get", "/outreach/?emailed=0").context["rows"]], ["c@example.com"])
 
 
 class WhatsAppButtonTests(Base):

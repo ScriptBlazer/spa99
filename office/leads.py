@@ -147,7 +147,7 @@ def filters_from(request):
     default_key = "archived" if view == "archived" else "last_seen" if view else (d.leads_sort if d.leads_sort in SORTS else "last_seen")   # the archive reads newest put away first
     sort, direction, _ = sorting.resolve(_columns(view), get, default_key, sorting.DESC)
     return {"q": get.get("q", "").strip(), "range": range_name if range_name in RANGES else d.leads_range, "tier": get.get("tier", ""), "potential": get.get("potential", "") if get.get("potential") in POTENTIALS else "",
-            "industry": get.get("industry", ""), "heard": get.get("heard", ""), "chat": "1" if get.get("chat") == "1" else "", "gold": "yes" if get.get("gold") in ("yes", "1", "on") else "", "hot": "1" if get.get("hot") == "1" else "", "emailed": "1" if get.get("emailed") == "1" else "",
+            "industry": get.get("industry", ""), "heard": get.get("heard", ""), "chat": "1" if get.get("chat") == "1" else "", "gold": "yes" if get.get("gold") in ("yes", "1", "on") else "", "hot": "1" if get.get("hot") == "1" else "", "emailed": get.get("emailed") if get.get("emailed") in ("1", "0") else "",
             "view": view, "sort": sort, "dir": direction}
 
 
@@ -201,8 +201,8 @@ def filtered_queryset(filters):
         queryset = queryset.filter(Exists(_chats_with_email()))
     if filters["gold"]:
         queryset = queryset.filter(has_application=True)
-    if filters["emailed"]:  # a person or a group send emailed him (the Emailed tag)
-        queryset = queryset.filter(emailed_q(OuterRef("email_key")))
+    if filters["emailed"]:  # "1": a person or a group send emailed him (the Emailed tag); "0": none did
+        queryset = queryset.filter(emailed_q(OuterRef("email_key")) if filters["emailed"] == "1" else ~emailed_q(OuterRef("email_key")))
     if filters["hot"]:  # exactly the Hot leads count: High potential, no account, no Gold application
         queryset = queryset.filter(gold_potential="high", has_application=False)
     key = filters.get("sort") if filters.get("sort") in {c.key for c in columns if c.sortable} else "last_seen"

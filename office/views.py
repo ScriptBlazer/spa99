@@ -166,6 +166,19 @@ def people_csv(request):
     return lists.people_csv(lists.people_filters(request))
 
 
+def _timeline_group(kind):
+    """The marker group of a timeline line: email, note, journey (the site and the account), gold, or change (edits and archive)."""
+    if kind == "email" or kind == "message_sent" or kind.startswith("next_morning_"):
+        return "email"
+    if kind.startswith("note_"):
+        return "note"
+    if kind.startswith("journey_") or kind in ("lead_given", "registered", "verified", "plan_changed", "marketing_changed"):
+        return "journey"
+    if kind.startswith("gold_"):
+        return "gold"
+    return "change"
+
+
 def _timeline_context(request, person, restore=None):
     """The timeline for the page: the default number of events, grouped by day; ?tl=2 (HTMX 'Show earlier') asks for the next page."""
     try:
@@ -175,6 +188,7 @@ def _timeline_context(request, person, restore=None):
     days, more = lead_lists.timeline_page(person["timeline"], number, defaults.get(request).timeline_page_size)
     for day in days:
         for item in day["items"]:
+            item["group"] = _timeline_group(item["kind"])
             item["time"] = f"{timezone.localtime(datetime.fromisoformat(item['at'])):%H:%M}" if item["at"] else ""  # the day is the heading above
             # a "Note deleted by X" line carries `restore_url` (POST) while the note is still deleted and the person may edit; else ''
             item["restore_url"] = restore(item["note"]) if restore and item.get("note") and tools.can_edit(request.user) else ""
