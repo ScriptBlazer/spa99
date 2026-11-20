@@ -197,6 +197,8 @@ def timeline(sessions, user=None, interest=None, applications=(), email="", addr
         logs = EmailLog.objects.filter(to__iexact=email)
         if user is not None and not user.email_verified_at:
             logs = logs.exclude(template="office_message")  # what staff wrote to this address is the lead's, not an unverified account's (anyone can register any address)
+        if addresses:  # a sent Email-button message is already its own "Email sent by ..." line with the text; only a failed or suppressed one adds a warning line
+            logs = logs.exclude(template="office_message", status=EmailLog.SENT)
         for log in logs.order_by("-created_at")[:defaults.get().person_emails_shown]:
             out.append(_entry(log.sent_at or log.created_at, "email", f"Email: {log.subject}", log.get_status_display()))
     if addresses:

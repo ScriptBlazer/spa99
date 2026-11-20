@@ -253,6 +253,7 @@ class EmailButtonTests(Base):
         self.assertTrue(row.subject)
         timeline = call(self.reader, "get", f"/leads/{self.session.pk}/").context["person"]["timeline"]
         self.assertIn(("Email sent by Barry (barry@spa99.uk)", "Hello Hugo, thanks for your interest."), [(t["label"], t["detail"]) for t in timeline])
+        self.assertEqual([t["label"] for t in timeline if t["kind"] == "email"], [])  # the same email is not listed a second time
 
     def test_a_failed_send_shows_failed_in_the_timeline_and_the_toast_says_so(self):
         from django.contrib.messages import get_messages
