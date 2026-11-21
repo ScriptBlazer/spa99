@@ -6,7 +6,7 @@
 {% block scripts %}<script type="module" src="{% static 'common/js/office-charts.js' %}"></script>{% endblock %}
 {% block main %}
 <h1 class="sr-only">Analytics</h1>
-{% include "office/_analytics_nav.html" with active="journey" %}
+{% if office_can.can_visitors %}{% include "office/_analytics_nav.html" with active="journey" %}{% endif %}{# Visitors: Developer and up only for now (Moishe 2026-11-21) #}
 {% include "office/_range.html" with place="page" ranges=data.ranges current=data.range %}
 {% if data.updating %}<p class="o-sub" data-updating>Updating…</p>{% endif %}
 <div class="o-charts" data-office-charts>
@@ -60,7 +60,7 @@
           </tbody></table>
       </div>
     </details>
-    <a class="o-quiet o-seelink" href="{% url 'office_analytics_visitors' %}">See Visitors {% include "office/_icon.html" with name="chevron-right" %}</a>
+    {% if office_can.can_visitors %}<a class="o-quiet o-seelink" href="{% url 'office_analytics_visitors' %}">See Visitors {% include "office/_icon.html" with name="chevron-right" %}</a>{% endif %}
   </section>
 
   {# 2 Four tinted KPI tiles #}

@@ -235,7 +235,7 @@ class BarryChangesBackfillTests(TestCase):
         from journey.models import Option, Question
         Question.objects.filter(key="industry").update(text="What do you do?")
         Option.objects.filter(question__key="heard_via", value="bml").update(label="BML member")
-        Option.objects.filter(question__key="heard_via", value="barry_status").delete()
+        Option.objects.filter(question__key="heard_via", value__in=["barry_status", "news_update", "midweek"]).delete()
         Option.objects.filter(question__key="heard_via", value="other").update(order=4)
         GoldChoice.objects.filter(group="where", value="midlands").update(value="rest_of_london", label="Rest of London")
         GoldRule.objects.filter(group="bml", match_value="yes").update(label="BML staff")
@@ -265,7 +265,7 @@ class BarryChangesBackfillTests(TestCase):
         self.assertEqual(Question.objects.get(key="industry").text, "What industry are you in?")
         self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML staff member")
         options = list(Option.objects.filter(question__key="heard_via", active=True).order_by("order", "value").values_list("value", flat=True))
-        self.assertEqual(options[-2:], ["barry_status", "other"])
+        self.assertEqual(options[-4:], ["barry_status", "news_update", "midweek", "other"])  # the new ones sit just before Other
         self.assertEqual(GoldApplication.objects.get(pk=application.pk).location, "midlands")
         self.assertEqual(GoldChoice.objects.get(group="where", value="midlands").label, "Midlands")
         self.assertFalse(GoldChoice.objects.filter(value="rest_of_london").exists())
@@ -286,11 +286,22 @@ class BarryChangesBackfillTests(TestCase):
         self.run_command()
         self.assertEqual(Question.objects.get(key="industry").text, "Your line of work?")
         self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML team")
-        self.assertEqual(Option.objects.get(question__key="heard_via", value="other").order, 8)  # the new option takes its place, Other moves down one
+        self.assertEqual(Option.objects.get(question__key="heard_via", value="other").order, 10)  # each new option takes Other's place and Other moves down one
         self.assertEqual(Option.objects.get(question__key="heard_via", value="barry_status").order, 7)
         self.assertEqual(GoldChoice.objects.get(group="where", value="rest_of_london").label, "Greater London")
         self.assertEqual(GoldRule.objects.get(group="bml", match_value="yes").label, "BML colleague")
         self.assertFalse(GoldApplication.objects.filter(location="midlands").exists())
+
+    def test_news_update_and_midweek_are_added_before_other_once(self):
+        from journey.models import Option
+        Option.objects.filter(question__key="heard_via", value__in=["news_update", "midweek"]).delete()
+        self.assertIn("News Update", self.run_command("--dry-run"))
+        self.assertFalse(Option.objects.filter(value="midweek").exists())
+        self.run_command()
+        self.run_command()  # twice: no duplicates
+        options = list(Option.objects.filter(question__key="heard_via", active=True).order_by("order", "value").values_list("value", flat=True))
+        self.assertEqual(options[-3:], ["news_update", "midweek", "other"])
+        self.assertEqual(Option.objects.filter(value="midweek").count(), 1)
 
     def test_when_the_seed_already_made_midlands_the_old_row_is_retired_not_duplicated(self):
         from gold.models import GoldChoice, GoldApplication

@@ -44,7 +44,7 @@ PROPERTY_SIZE = [("1_9", "1 to 9"), ("10_49", "10 to 49"), ("50_199", "50 to 199
 YES_NO = [("yes", "Yes"), ("no", "No")]
 HEARD_VIA = [
     ("friend", "A friend"), ("bml", "BML staff member"), ("social_media", "Social media"),
-    ("barry_status", "Barry's status"), ("other", "Other"),
+    ("barry_status", "Barry's status"), ("news_update", "News Update"), ("midweek", "Midweek"), ("other", "Other"),
 ]
 
 GUEST_COMPANY = ["sometimes", "often"]  # "often" was retired (2026-10-23); old sessions keep their points

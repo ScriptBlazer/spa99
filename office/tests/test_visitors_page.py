@@ -20,10 +20,11 @@ def payload(**over):
 
 class VisitorsPageTests(OfficeTestCase):
     def setUp(self):
-        self.viewer, self.office = staff("Viewer", "v@example.com"), staff("Office", "o@example.com")
+        self.viewer, self.office, self.admin = staff("Viewer", "v@example.com"), staff("Office", "o@example.com"), staff("Admin", "a@example.com")
+        self.dev, self.root = staff("Developer", "d@example.com"), staff(None, "root@example.com", is_superuser=True)
 
-    def test_the_page_renders_for_viewer_and_office_with_the_sub_nav_and_every_card(self):
-        for user in (self.viewer, self.office):
+    def test_the_page_renders_for_developer_and_superuser_with_the_sub_nav_and_every_card(self):
+        for user in (self.dev, self.root):
             response = get(user, "/analytics/visitors/")
             self.assertEqual(response.status_code, 200)
             html = response.content.decode()
@@ -34,26 +35,35 @@ class VisitorsPageTests(OfficeTestCase):
             self.assertIn("Updating…", html)  # no snapshot yet: empty states, not a blank page
             self.assertIn("No visits in this range yet.", html)
 
-    def test_a_viewer_has_no_link_maker_and_office_does(self):
-        self.assertNotIn("Make a campaign link", get(self.viewer, "/analytics/visitors/").content.decode())
-        self.assertNotIn("data-linkmaker", get(self.viewer, "/analytics/visitors/").content.decode())
-        self.assertIn("Make a campaign link", get(self.office, "/analytics/visitors/").content.decode())
+    def test_the_developer_has_the_link_maker(self):
+        html = get(self.dev, "/analytics/visitors/").content.decode()
+        self.assertIn("Make a campaign link", html)
+        self.assertIn("data-linkmaker", html)
 
-    def test_the_journey_page_links_to_visitors_and_top_pages_moved(self):
-        html = get(self.viewer, "/analytics/").content.decode()
-        self.assertIn("See Visitors", html)
-        self.assertIn('href="/analytics/visitors/"', html)
-        self.assertNotIn("Top pages", html)
+    def test_the_journey_page_shows_visitors_to_developer_and_up_only(self):
+        for user in (self.dev, self.root):
+            html = get(user, "/analytics/").content.decode()
+            self.assertIn("See Visitors", html)
+            self.assertIn('href="/analytics/visitors/"', html)
+            self.assertIn('aria-label="Analytics"', html)
+            self.assertNotIn("Top pages", html)
+        for user in (self.viewer, self.office, self.admin):
+            response = get(user, "/analytics/")
+            self.assertEqual(response.status_code, 200)
+            html = response.content.decode()
+            self.assertNotIn("See Visitors", html)
+            self.assertNotIn('aria-label="Analytics"', html)
+            self.assertNotIn("/analytics/visitors/", html)
 
     def test_the_range_is_shared_between_the_two_sub_pages(self):
-        get(self.office, "/analytics/?range=7d")  # remembered in the session
-        client_get = get(self.office, "/analytics/visitors/?range=90d")
+        get(self.dev, "/analytics/?range=7d")  # remembered in the session
+        client_get = get(self.dev, "/analytics/visitors/?range=90d")
         self.assertIn('value="90d" checked', client_get.content.decode())
 
     def test_the_page_runs_a_fixed_number_of_queries(self):
         def count():
             with CaptureQueriesContext(connection) as queries:
-                self.assertEqual(get(self.office, "/analytics/visitors/").status_code, 200)
+                self.assertEqual(get(self.dev, "/analytics/visitors/").status_code, 200)
             return len(queries)
         empty = count()
         for day in range(1, 6):
@@ -66,20 +76,19 @@ class VisitorsPageTests(OfficeTestCase):
 
 class LinkEndpointTests(OfficeTestCase):
     def setUp(self):
-        self.viewer, self.office = staff("Viewer", "v@example.com"), staff("Office", "o@example.com")
+        self.dev = staff("Developer", "d@example.com")
 
-    def test_a_viewer_cannot_use_it_and_office_gets_the_address_from_build_link(self):
+    def test_a_developer_gets_the_address_from_build_link(self):
         query = "?placement=flyer-qr&name=Spring%20open%20day!&page=memberships"
-        self.assertEqual(get(self.viewer, LINK + query).status_code, 403)
-        data = get(self.office, LINK + query).json()
+        data = get(self.dev, LINK + query).json()
         self.assertEqual(data["name"], "spring-open-day")
         self.assertEqual(data["url"], campaigns.build_link("/memberships/", "flyer-qr", "Spring open day!", base=__import__("django.conf", fromlist=["settings"]).settings.SITE_URL))
         self.assertIn("utm_source=flyer&utm_medium=print&utm_campaign=spring-open-day&utm_content=qr", data["url"])
 
     def test_no_address_until_a_place_a_name_and_a_page_are_all_chosen(self):
         for query in ("?name=spring&page=home", "?placement=email&page=home", "?placement=email&name=spring", "?placement=nope&name=spring&page=home", "?placement=email&name=spring&page=elsewhere", "?placement=email&name=%21%21&page=home"):
-            self.assertEqual(get(self.office, LINK + query).json()["url"], "", query)
-        self.assertEqual(get(self.office, LINK + "?name=Spring%20Fair").json()["name"], "spring-fair")  # the cleaned name shows as you type
+            self.assertEqual(get(self.dev, LINK + query).json()["url"], "", query)
+        self.assertEqual(get(self.dev, LINK + "?name=Spring%20Fair").json()["name"], "spring-fair")  # the cleaned name shows as you type
 
     def test_only_our_own_pages_can_be_picked(self):
         self.assertEqual(visitors_page.link_page_path("home"), "/")

@@ -38,7 +38,8 @@ class VisitorsDataTests(OfficeTestCase):
         reader = mock.Mock()
         reader.get.return_value = {"country": {"iso_code": "GB"}}
         geoip._state.update(loaded=True, reader=reader)
-        self.viewer, self.office = staff("Viewer", "v@example.com"), staff("Office", "o@example.com")
+        self.viewer, self.office, self.admin = staff("Viewer", "v@example.com"), staff("Office", "o@example.com"), staff("Admin", "a@example.com")
+        self.dev = staff("Developer", "d@example.com")  # Analytics > Visitors is Developer and up only for now
 
     def make_traffic(self):
         first = visit("/memberships/", IPHONE, "203.0.113.1", "?utm_source=flyer&utm_medium=print&utm_campaign=spring&utm_content=qr")
@@ -49,7 +50,7 @@ class VisitorsDataTests(OfficeTestCase):
 
     def test_the_payload_has_the_figures_the_screens_need(self):
         self.make_traffic()
-        data = get(self.viewer, "/analytics/visitors/data/?range=7d").json()
+        data = get(self.dev, "/analytics/visitors/data/?range=7d").json()
         self.assertEqual((data["range"], data["granularity"], len(data["labels"]), len(data["previous_labels"])), ("7d", "day", 7, 7))
         self.assertEqual(data["visitors_since"], metrics.day().isoformat())
         overview = data["overview"]
@@ -73,7 +74,7 @@ class VisitorsDataTests(OfficeTestCase):
             self.assertIn(key, data)
 
     def test_all_ranges_are_stored_and_a_missing_snapshot_is_an_empty_state(self):
-        before = get(self.viewer, "/analytics/visitors/data/?range=30d").json()
+        before = get(self.dev, "/analytics/visitors/data/?range=30d").json()
         self.assertTrue(before["updating"])
         self.assertEqual(before["overview"]["visits"]["value"], 0)
         self.make_traffic()
@@ -87,7 +88,7 @@ class VisitorsDataTests(OfficeTestCase):
 
         def queries(path):
             client = Client(HTTP_HOST=OFFICE)
-            client.force_login(self.viewer)
+            client.force_login(self.dev)
             with CaptureQueriesContext(connection) as ctx:
                 self.assertEqual(client.get(path).status_code, 200)
             return len(ctx)
@@ -99,25 +100,34 @@ class VisitorsDataTests(OfficeTestCase):
             self.assertEqual(queries(path), empty[path], path)
         self.assertLessEqual(max(empty.values()), 12)
 
-    def test_live_json_shape_and_readers_only(self):
+    def test_live_json_shape_and_developers_only(self):
         visit("/memberships/", IPHONE, "203.0.113.1")
-        data = get(self.viewer, "/analytics/live.json").json()
+        data = get(self.dev, "/analytics/live.json").json()
         self.assertEqual(data["count"], 1)
         self.assertEqual(data["by_page"], [{"label": "memberships", "value": 1}])
-        self.assertEqual(get(self.viewer, "/analytics/live.json")["Cache-Control"].count("no-cache"), 1)
+        self.assertEqual(get(self.dev, "/analytics/live.json")["Cache-Control"].count("no-cache"), 1)
         self.assertEqual(get(None, "/analytics/live.json").status_code, 302)  # signed out: to the sign-in page
         nobody = staff(None, "nobody@example.com")
         self.assertEqual(get(nobody, "/analytics/live.json").status_code, 404)  # no team level: the address admits nothing
         self.assertEqual(get(nobody, "/analytics/visitors/data/").status_code, 404)
 
-    def test_the_qr_code_is_for_office_level_and_our_own_addresses_only(self):
+    def test_viewer_office_and_admin_are_refused_on_every_visitors_endpoint(self):
+        link = campaigns.build_link("/memberships/", "flyer-qr", "spring", base=settings.SITE_URL)
+        paths = ["/analytics/visitors/", "/analytics/visitors/data/", "/analytics/live.json", "/analytics/link.json?placement=email&name=x&page=home", "/analytics/qr.svg?url=" + quote(link, safe="")]
+        for user in (self.viewer, self.office, self.admin):
+            for path in paths:
+                self.assertEqual(get(user, path).status_code, 403, path)  # the guard says 403 to a team level that is too low
+        root = staff(None, "root@example.com", is_superuser=True)
+        for path in paths:
+            self.assertEqual(get(root, path).status_code, 200, path)
+
+    def test_the_qr_code_is_for_our_own_addresses_only(self):
         link = campaigns.build_link("/memberships/", "flyer-qr", "spring", base=settings.SITE_URL)
         url = "/analytics/qr.svg?url=" + quote(link, safe="")
-        ok = get(self.office, url)
+        ok = get(self.dev, url)
         self.assertEqual((ok.status_code, ok["Content-Type"]), (200, "image/svg+xml"))
         self.assertIn(b"<svg", ok.content)
         self.assertIn("no-cache", ok["Cache-Control"])
-        self.assertEqual(get(self.viewer, url).status_code, 403)  # a Viewer sees the figures, not the link maker
         for bad in ("http://[x", "https://evil.example/?x=1", "javascript:alert(1)", "", "/memberships/"):
-            response = get(self.office, "/analytics/qr.svg?url=" + quote(bad, safe=""))
+            response = get(self.dev, "/analytics/qr.svg?url=" + quote(bad, safe=""))
             self.assertEqual(response.status_code, 400, bad)

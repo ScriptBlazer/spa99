@@ -54,6 +54,7 @@ Branch `feature/analytics`. Decided 2026-11-21 (PROJECT.md). Builds on the cooki
 - `GET office /analytics/live.json`, polled every 15 seconds while the page is open and visible. Viewer level and up.
 
 ## A9. Office screens (designer brief first, then frontend)
+**Access (Moishe 2026-11-21): Developer and Superuser only for now**, while he tries it out. Everyone else sees only the Journey page, with no Journey/Visitors switch and no "See Visitors" link; the five Visitors endpoints refuse them. The Viewer/Office levels below describe the later plan.
 Analytics gets a **Visitors** area (exact layout from the designer): Live, Overview (visitors, visits, pages per visit, average visit, bounce rate, each with the previous period), Devices / browsers / systems, Countries (+ DB-IP credit), Pages (views, average time, scroll, entry, exit), Channels and sources, Campaigns (visits and steps per campaign, the link maker), Contact taps, When people visit (heat map). Same ranges (7d, 30d, 90d, all), same snapshot approach, phone friendly, brand tokens only.
 
 ## A10. Privacy notice

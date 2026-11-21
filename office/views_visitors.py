@@ -10,11 +10,11 @@ from insights import campaigns, live
 from system import defaults
 
 from . import selectors, visitors_page
-from .permissions import editor, reader
+from .permissions import developer
 from .views import _remembered_range
 
 
-@reader
+@developer
 @require_GET
 @never_cache
 def analytics_visitors(request):
@@ -23,7 +23,7 @@ def analytics_visitors(request):
     return render(request, "office/analytics_visitors.html", {**context, "section": "analytics"})
 
 
-@editor
+@developer
 @require_GET
 @never_cache
 def analytics_link(request):

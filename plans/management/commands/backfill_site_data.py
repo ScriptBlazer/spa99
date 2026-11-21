@@ -178,6 +178,7 @@ def backfill():
     changed.update(_whatsapp_and_gold_2026_10_29())
     changed.update(_privacy_notice_2026_11_04())
     changed.update(_privacy_notice_2026_11_21())
+    changed.update(_heard_via_papers_2026_11_21())
     changed.update(_not_you_start_again_2026_11_03())
     changed.update(_dashboard_all_time_2026_11_05())
     return changed
@@ -310,6 +311,25 @@ def _barry_changes_2026_10_29():
         rule.save()
         changed["gold.GoldRule (Working with BML)"] += 1
     _midlands(changed)
+    return changed
+
+
+def _heard_via_papers_2026_11_21():
+    """Moishe 2026-11-21: "News Update" and "Midweek" added to How did you hear about us?, before Other. Created only when missing."""
+    changed = Counter()
+    heard = Question.objects.filter(key="heard_via").first()
+    if heard is None:
+        return changed
+    for value, label in (("news_update", "News Update"), ("midweek", "Midweek")):
+        if Option.objects.filter(question=heard, value=value).exists():
+            continue
+        other = Option.objects.filter(question=heard, value="other").first()
+        order = other.order if other is not None else Option.objects.filter(question=heard).count() + 1
+        if other is not None:  # the new option takes Other's place and Other moves down one
+            other.order += 1
+            other.save()
+        Option.objects.create(question=heard, value=value, label=label, order=order)
+        changed[f"journey.Option ({label} added)"] += 1
     return changed
 
 

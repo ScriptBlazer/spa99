@@ -18,7 +18,7 @@ const progress = document.querySelector('[data-progress]');
 const fill = document.querySelector('[data-progress-fill]');
 
 // Layout choices per question (everything else follows its type).
-const PREFER_NOT_SAY = new Set(['property_link', 'property_size', 'heard_via']);
+const PREFER_NOT_SAY = new Set(['property_link', 'property_size']);  // heard_via has Other instead (Moishe 2026-11-21)
 const LAYOUT = {
   time: 'tiles-2', frequency: 'segmented', facilities: 'image', company: 'large', industry: 'tiles-4',
   property_link: 'tiles-stack', property_size: 'segmented', property_law: 'segmented', heard_via: 'small',

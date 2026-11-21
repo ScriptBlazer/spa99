@@ -65,7 +65,7 @@ class SuggestionTests(TestCase):
         state = services.build_state(make_session())
         options = {q["key"]: [o["value"] for o in q["options"]] for s in state["screens"] for q in s["questions"]}
         self.assertEqual(options["company"], ["alone", "sometimes"])
-        self.assertEqual(options["heard_via"], ["friend", "bml", "social_media", "barry_status", "other"])
+        self.assertEqual(options["heard_via"], ["friend", "bml", "social_media", "barry_status", "news_update", "midweek", "other"])
         self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML staff member")
         self.assertEqual(Option.objects.get(question__key="heard_via", value="barry_status").label, "Barry's status")
         self.assertEqual(Question.objects.get(key="industry").text, "What industry are you in?")

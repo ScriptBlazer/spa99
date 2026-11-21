@@ -122,7 +122,7 @@ def analytics_pages(request):
     return JsonResponse(selectors.pages(request.GET.get("range", defaults.get(request).analytics_range), request))
 
 
-@reader
+@developer
 @require_GET
 @never_cache
 def analytics_visitors_data(request):
@@ -130,7 +130,7 @@ def analytics_visitors_data(request):
     return JsonResponse(selectors.visitors(request.GET.get("range", defaults.get(request).analytics_range), request))
 
 
-@reader
+@developer
 @require_GET
 @never_cache
 def analytics_live(request):
@@ -141,7 +141,7 @@ def analytics_live(request):
 QR_MAX_URL = 500
 
 
-@editor
+@developer
 @require_GET
 @never_cache
 def analytics_qr(request):

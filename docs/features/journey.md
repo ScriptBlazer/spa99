@@ -140,3 +140,6 @@ Which answers count as property, and the thresholds, are editable in Control.
 - Changing a plan's points in Control changes the suggestion without a deploy.
 - Unfinished sessions appear in the funnel.
 - Works and looks right at 375px and 1440px; keyboard and screen reader usable; reduced motion respected.
+
+## How did you hear about us? (2026-11-21)
+Options: A friend, BML staff member, Social media, Barry's status, News Update, Midweek, Other (then "Where?"). Moishe: News Update and Midweek added (both papers that carry our ads); no "Prefer not to say" on this question, as Other covers it. Live gets the two options from `backfill_site_data`.
