@@ -74,7 +74,7 @@ Five `o-kpi` tiles, all `o-kpi--slate` (new modifier, built like `--sage` from `
 | Visits | 1,532 | "+140 on the previous 30 days" |
 | Pages per visit | 2.4 | "+0.3 on the previous 30 days" |
 | Average visit | 1m 20s | "12s longer than the previous 30 days" / "12s shorter than..." |
-| Left after one page | 42% | "4 points higher than the previous 30 days" / "lower" |
+| Bounce rate | 42% | "4 points higher than the previous 30 days" / "lower" |
 
 - Change lines stay muted text with no colour or arrow, so a rising bounce rate is not dressed as good or bad. "Same as the previous 30 days" when equal. All has no previous period: no change line (as now).
 - Sparkline per tile from daily points (backend: daily `visits`, `pages_per_visit`, `avg_visit_seconds`, `bounce_rate_bp` in the snapshot series; if a series is missing the tile simply has no line, as `_kpi.html` already allows).
