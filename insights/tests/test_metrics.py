@@ -39,7 +39,7 @@ def today_row(key, dimension=""):
 
 def finished_journey(time="evening", frequency="two_three"):
     session = journey.create_session(SAFARI)
-    for key, values in {"time": [time], "frequency": [frequency], "facilities": ["gym"], "company": ["alone"], "industry": ["finance"]}.items():
+    for key, values in {"time": [time], "frequency": [frequency], "facilities": ["gym"], "company": ["alone"], "industry": ["finance"], "heard_via": ["bml"]}.items():
         journey.save_answer(session, key, options=values)
     journey.set_step(session, step=2)
     engine.complete(session)
@@ -91,7 +91,7 @@ class EventTests(TestCase):
     def test_two_tabs_finishing_with_stale_copies_count_the_journey_once(self):
         from journey.models import JourneySession
         session = journey.create_session(SAFARI)
-        for key, values in {"time": ["evening"], "frequency": ["two_three"], "facilities": ["gym"], "company": ["alone"], "industry": ["finance"]}.items():
+        for key, values in {"time": ["evening"], "frequency": ["two_three"], "facilities": ["gym"], "company": ["alone"], "industry": ["finance"], "heard_via": ["bml"]}.items():
             journey.save_answer(session, key, options=values)
         other_tab = JourneySession.objects.get(pk=session.pk)  # loaded before either finished
         engine.complete(session)
