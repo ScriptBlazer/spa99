@@ -30,7 +30,7 @@ class LegalPageTests(TestCase):
                 self.assertContains(response, "16930909")
                 self.assertContains(response, "40 Wellington Avenue, London N15 6AS")
                 self.assertContains(response, 'href="mailto:desk@example.com"')
-                self.assertContains(response, "Last updated 5 November 2026" if path == "/privacy/" else "Last updated 26 October 2026")
+                self.assertContains(response, "Last updated 21 November 2026" if path == "/privacy/" else "Last updated 26 October 2026")
                 self.assertNotContains(response, "To be supplied")
                 self.assertNotContains(response, "{contact}")
 
@@ -164,7 +164,7 @@ class InviteOpenNoticeTests(TestCase):
         call_command("backfill_site_data", stdout=StringIO())
         self.assertIn("tracking pixel", rows.get(key="part_2").body)
         self.assertIn("### WhatsApp", rows.get(key="part_2").body)
-        self.assertEqual(rows.get(key="updated").body, "5 November 2026")
+        self.assertEqual(rows.get(key="updated").body, "21 November 2026")
         rows.filter(key="part_2").update(body="Edited by hand.")
         call_command("backfill_site_data", stdout=StringIO())
         self.assertEqual(rows.get(key="part_2").body, "Edited by hand.")

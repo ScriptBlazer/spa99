@@ -177,6 +177,7 @@ def backfill():
     changed.update(_barry_changes_2026_10_29())
     changed.update(_whatsapp_and_gold_2026_10_29())
     changed.update(_privacy_notice_2026_11_04())
+    changed.update(_privacy_notice_2026_11_21())
     changed.update(_not_you_start_again_2026_11_03())
     changed.update(_dashboard_all_time_2026_11_05())
     return changed
@@ -442,6 +443,26 @@ def _privacy_notice_2026_11_04():
         site.privacy_version = legal.PRIVACY_VERSION
         site.save()
         changed["plans.SiteSettings (privacy version)"] += 1
+    return changed
+
+
+def _privacy_notice_2026_11_21():
+    """2026-11-21 (Analytics plus): the visitor counter paragraph says what else is noted. Added after the "name of the website" line only
+    where that line is still there; "Last updated" moves only when the notice now says it. The privacy version is left as it is (nobody is asked to accept again)."""
+    from content import legal
+
+    changed = Counter()
+    page = Page.objects.filter(key="privacy").first()
+    if page is None:
+        return changed
+    anchor = "Only the name, never the full address."
+    _edit_privacy_section(page, "part_5", [("visitor counter: device, country, time on page, taps, campaign tags", anchor, anchor + "\n" + legal.VISITOR_COUNTER_MORE)],
+                          changed, "part_5")
+    if Section.objects.filter(page=page, key="part_5", body__contains=legal.VISITOR_COUNTER_MORE).exists():
+        for section in Section.objects.filter(page=page, key="updated", body="5 November 2026"):
+            section.body = legal.PRIVACY_UPDATED
+            section.save()
+            changed["content.Section (privacy notice: last updated)"] += 1
     return changed
 
 
