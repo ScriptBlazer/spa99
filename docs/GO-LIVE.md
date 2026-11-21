@@ -271,5 +271,5 @@ Nothing grows without limit on disk: every container's log is capped at 5 x 10 M
 - **Tell Barry:** where the Office is and how Gold approvals arrive.
 - **Before the first marketing email:** an unsubscribe link for journey leads (confirm and approval emails are transactional).
 - **Legal:** solicitor's sign-off on the men-only wording and the privacy notice.
-- **Moving to SES later:** in `.env` set `EMAIL_BACKEND=notifications.backends.SesBackend`, remove the `EMAIL_HOST*` lines, add the SES permissions to the role, `docker compose up -d`. Then subscribe `https://spa99.uk/ses/notifications/` to the SNS topic (set `SES_SNS_TOPIC_ARN`) and change the Postmark lines in the privacy notice back to Amazon SES.
+- **Moving to SES later:** in `.env` set `EMAIL_BACKEND=notifications.backends.SesBackend`, remove the `EMAIL_HOST*` lines, add the SES permissions to the role, `docker compose up -d`. Then subscribe `https://spa99.co.uk/ses/notifications/` to the SNS topic (set `SES_SNS_TOPIC_ARN`) and change the Postmark lines in the privacy notice back to Amazon SES.
 - **Control (parked):** Cloudflare caps uploads at 100 MB, so big Control videos need `control.spa99.uk` on grey cloud.
