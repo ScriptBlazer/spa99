@@ -147,6 +147,7 @@ def result(request):
         return _needs_email()
     try:
         data = engine.complete(session)
+        visitors.record_step(request, "finished")  # the visit's campaign gets a finished journey (never breaks the answer)
         return _with_cookie(JsonResponse(data), session)
     except services.AnswerError as error:
         return _bad(str(error), missing=error.missing)

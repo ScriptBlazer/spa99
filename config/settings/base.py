@@ -63,6 +63,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "common.probes.ProbeBlockMiddleware",  # first: junk probes (/wp-login.php, /.env ...) get a bare 404 and are never counted or reported
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "common.middleware.HostRoutingMiddleware",

@@ -18,11 +18,22 @@
 	}
 }
 
+# Junk probes: paths only bots try get a bare 404 before anything else (the same list is in common/probes.py, a test keeps them in step).
+# /.well-known/ is never listed, so certificate checks and security.txt still work.
+(probes) {
+	@probes path /.env* /.git* /.aws* /.ssh* /.DS_Store /wp-admin* /wp-login.php /wp-content* /wp-includes* /wp-json* /xmlrpc.php /phpmyadmin* /pma* /cgi-bin* /vendor/* /server-status* /actuator* /boaform* /HNAP1*
+	@php path_regexp (?i)\.php$
+	respond @probes 404
+	respond @php 404
+}
+
 {$DOMAIN} {
+	import probes
 	import app
 }
 
 {$CONTROL_DOMAIN} {
+	import probes
 	# Control Library uploads: video may be up to 500 MB (CONTROL_MAX_VIDEO_MB), so the body limit sits above that.
 	request_body {
 		max_size 600MB
@@ -31,6 +42,7 @@
 }
 
 {$OFFICE_DOMAIN} {
+	import probes
 	# The Office pages take only small forms (the WhatsApp chat's photos and PDFs are gone), but the Django admin on this host has file fields (Plan, Section and Facility images, the Gold
 	# guide: up to 5 MB). 6 MB leaves room for the form around a 5 MB file and keeps anything bigger away from the app.
 	request_body {
@@ -40,6 +52,7 @@
 }
 
 {$SYSTEM_DOMAIN} {
+	import probes
 	# Email picture uploads are at most 2 MB (mailings/images.py); this keeps anything bigger away from the app.
 	request_body {
 		max_size 5MB
@@ -49,5 +62,6 @@
 
 # www goes to the bare domain (needs a www DNS record pointing here too).
 www.{$DOMAIN} {
+	import probes
 	redir https://{$DOMAIN}{uri} permanent
 }

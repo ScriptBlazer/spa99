@@ -19,6 +19,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from common.audit import client_ip
 from common.ratelimit import hit, rate_limited_json
 from common.validators import normalise_email
+from insights import visitors
 from journey import services as journey_services
 from mailings import invites as invite_services
 from pages import services as pages_services
@@ -212,6 +213,7 @@ def register(request):
                     return _register_json_failure("Registration is not open yet.", 403)
                 return _message(request, "Not open yet", "Registration is not open yet.", status=403)
             else:
+                visitors.record_step(request, "registered")  # the visit's campaign gets a registration (never breaks the sign-up)
                 request.session[PENDING_EMAIL_KEY] = result.user.email
                 request.session.pop("invite_token", None)  # done: a shared device must not pre-fill the next person
                 if as_json:

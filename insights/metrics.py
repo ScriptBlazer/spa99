@@ -5,6 +5,7 @@ import it), and takes plain values (slugs, dates, strings), never models.
 Each event bumps the all-time MetricCounter and the DailyMetric row of the entity's own date (a session's start date, a
 registration's date, ...), so `rebuild_metrics` can recompute exactly the same rows from the source tables."""
 import logging
+import re
 
 from django.db import IntegrityError, transaction
 from django.db.models import F
@@ -40,6 +41,34 @@ class K:
     VISITORS = "visitors"                                    # daily unique visitors (one per anonymous hash per day)
     PAGE_VIEWS = "page_views"                                # dimension "" = all pages, else path group
     REFERRERS = "referrers"                                  # dimension: referring site host
+
+    # Analytics plus (docs/features/analytics.md). Daily rows only; counted live, no source table.
+    DEVICES = "devices"                                      # unique visitors by device: mobile | tablet | desktop
+    BROWSERS = "browsers"                                    # unique visitors by browser family
+    SYSTEMS = "systems"                                      # unique visitors by operating system
+    COUNTRIES = "countries"                                  # unique visitors by two-letter country (or unknown)
+    VIEWS_BY_DEVICE = "views_by_device"                      # the same three, per page view
+    VIEWS_BY_BROWSER = "views_by_browser"
+    VIEWS_BY_SYSTEM = "views_by_system"
+    VISITS = "visits"                                        # "" = all
+    BOUNCES = "bounces"                                      # visits with one page view
+    VISIT_PAGES = "visit_pages"                              # sum of page views of closed and open visits
+    ENTRY_PAGES = "entry_pages"                              # dimension: page group
+    EXIT_PAGES = "exit_pages"                                # dimension: page group (written when the visit closes)
+    VISIT_LENGTH = "visit_length"                            # dimension: bucket (written when the visit closes)
+    VISIT_SECONDS = "visit_seconds"                          # sum of closed visit lengths
+    ENGAGED_SECONDS = "engaged_seconds"                      # dimension: page group (visible seconds, from the beacon)
+    ENGAGED_VIEWS = "engaged_views"                          # dimension: page group (page views that sent a beacon)
+    SCROLL = "scroll"                                        # dimension: "group:bucket" (0 | 25 | 50 | 75 | 100)
+    VISITS_BY_CHANNEL = "visits_by_channel"                  # dimension: campaign | search | social | email | referral | direct
+    VISIT_SOURCES = "visit_sources"                          # dimension: utm source, else referring site, else direct
+    CAMPAIGN_VISITS = "campaign_visits"                      # dimension: "source|medium|campaign|content"
+    CAMPAIGN_STEPS = "campaign_steps"                        # dimension: "campaign key:step"
+    CHANNEL_STEPS = "channel_steps"                          # dimension: "channel:step"
+    CONTACT_TAPS = "contact_taps"                            # dimension: kind
+    CONTACT_TAPS_PAGE = "contact_taps_page"                  # dimension: "kind:group"
+    VISIT_HOUR = "visit_hour"                                # dimension: "mon:09" (London weekday and hour of a new visit)
+    PROBES_BLOCKED = "probes_blocked"                        # junk probe requests answered 404 by Django (System health only)
 
     RATE_JOURNEY_START = "rate_journey_start"                # journeys started / visitors, basis points
     RATE_JOURNEY_FINISH = "rate_journey_finish"              # journeys completed / started
@@ -79,6 +108,16 @@ def _refresh_after_commit():
     snapshots.request_refresh()
 
 
+MAX_DIMENSIONS = 100  # distinct dimensions one key keeps per day; later ones add to OTHER
+OTHER = "other"
+_DIMENSION_JUNK = re.compile(r"[^a-z0-9_:|.+\-]")
+
+
+def clean_dimension(value):
+    """Lower-cased, only letters, digits and _ : | . + -, cut to the column length."""
+    return _DIMENSION_JUNK.sub("", str(value or "").strip().lower())[:100]
+
+
 def count(key, dimension="", amount=1, on=None, counter=True, daily=True):
     """Add `amount` (negative to take back) to the all-time counter and to the day's row (`on` = the day, default today)."""
     if not amount:
@@ -89,6 +128,23 @@ def count(key, dimension="", amount=1, on=None, counter=True, daily=True):
         _refresh_after_commit()  # a counted event: the stored snapshots are refreshed in the background
     if daily and key not in NO_DAILY:
         _bump(DailyMetric, {"date": on or day(), "key": key, "dimension": dimension}, amount)
+
+
+def count_capped(key, dimension, amount=1, on=None):
+    """Daily-row count for a visitor dimension (not the all-time counter), cleaned, and capped: a key keeps at most
+    MAX_DIMENSIONS distinct dimensions a day, anything new after that adds to 'other'. The common case (the row exists)
+    is one UPDATE. A race at the cap can overshoot by a row or two, which does not matter."""
+    if not amount:
+        return
+    dimension = clean_dimension(dimension)
+    if not dimension:
+        return
+    on = on or day()
+    if DailyMetric.objects.filter(date=on, key=key, dimension=dimension).update(value=F("value") + amount):
+        return
+    if dimension != OTHER and DailyMetric.objects.filter(date=on, key=key).exclude(dimension__in=("", OTHER)).count() >= MAX_DIMENSIONS:
+        dimension = OTHER
+    _bump(DailyMetric, {"date": on, "key": key, "dimension": dimension}, amount)
 
 
 # ---------- registrations ----------

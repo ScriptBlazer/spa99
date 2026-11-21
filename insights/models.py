@@ -72,9 +72,23 @@ class VisitorHash(models.Model):
 
     date = models.DateField()
     hash = models.CharField(max_length=64)
+    # Today's visit (docs/features/analytics.md A3 to A8). Only ever today; wiped with the row. No IP, user agent or full URL.
+    last_seen = models.DateTimeField(null=True, blank=True)
+    visit_started = models.DateTimeField(null=True, blank=True, help_text="Empty = no visit open (it was closed).")
+    visit_pages = models.PositiveIntegerField(default=0)
+    visit_seconds = models.PositiveIntegerField(default=0, help_text="Visible seconds reported by the page beacon during this visit.")
+    entry_group = models.CharField(max_length=40, blank=True, default="")
+    current_group = models.CharField(max_length=40, blank=True, default="")
+    channel = models.CharField(max_length=12, blank=True, default="")
+    source = models.CharField(max_length=100, blank=True, default="")
+    campaign = models.CharField(max_length=100, blank=True, default="", help_text="source|medium|campaign|content, only when the link had utm tags.")
+    country = models.CharField(max_length=7, blank=True, default="")
+    device = models.CharField(max_length=10, blank=True, default="")
+    steps = models.CharField(max_length=80, blank=True, default="", help_text=",started,finished, ... : steps already credited to the visit's campaign today.")
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["date", "hash"], name="visitor_hash_unique")]
+        indexes = [models.Index(fields=["date", "last_seen"], name="visitor_hash_live")]
 
 
 class Insight(models.Model):
@@ -103,7 +117,7 @@ class OfficeSnapshot(models.Model):
     """The finished payload of one Office data view (page: dashboard, analytics or pages) for one range, written by the
     roll-up and by the debounced refresh after each event. Views read this one row; nothing is summed on page load."""
 
-    DASHBOARD, ANALYTICS, PAGES, LEADS, COUNTS = "dashboard", "analytics", "pages", "leads", "counts"
+    DASHBOARD, ANALYTICS, PAGES, LEADS, COUNTS, VISITORS = "dashboard", "analytics", "pages", "leads", "counts", "visitors"
 
     page = models.CharField(max_length=12)
     range = models.CharField(max_length=5)
