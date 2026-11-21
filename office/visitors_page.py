@@ -22,7 +22,7 @@ LENGTH_LABELS = {"0-10s": "Under 10s", "10-30s": "10 to 30s", "30s-1m": "30s to 
 LIVE_HEADINGS = (("by_page", "Pages"), ("by_country", "Countries"), ("by_device", "Devices"), ("by_channel", "How they came"))
 LINK_PAGES = (("home", "Home", "home"), ("spa", "The spa", "spa"), ("memberships", "Memberships", "memberships"), ("gold-card", "Gold Card", "gold_card"),
               ("visit", "Visit us", "visit"), ("book", "Book", "book"), ("journey", "Start the journey", "journey"))
-TAP_ICONS = {"whatsapp": "whatsapp", "phone": "phone", "email": "envelope"}   # the set has no Instagram or map icon, and none is drawn new
+TAP_ICONS = {"whatsapp": "whatsapp", "phone": "phone", "email": "envelope", "instagram": "instagram", "map": "map-pin"}
 
 
 def link_page_path(key):
@@ -226,12 +226,10 @@ def _heat(data):
 
 def _countries(data):
     rows = _rank(data["countries"], taupe=("other", "unknown"))
-    if not data["geoip_available"]:
+    if not data["countries"]:
         summary = "Countries are not available yet."
-    elif data["countries"]:
-        summary = f"Most visitors come from {data['countries'][0]['label']}." if data["countries"][0]["dimension"] not in ("unknown", "other") else ""
     else:
-        summary = EMPTY["visits"]
+        summary = f"Most visitors come from {data['countries'][0]['label']}." if data["countries"][0]["dimension"] not in ("unknown", "other") else ""
     return {"rows": rows, "summary": summary}
 
 

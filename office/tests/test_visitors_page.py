@@ -140,6 +140,14 @@ class VisitorsWordingTests(OfficeTestCase):
         self.assertFalse(visitors_page._heat(payload())["show"])
         self.assertEqual(len(heat["cells"]), 168)
 
+    def test_countries_show_when_there_is_data_even_if_geoip_is_unavailable(self):
+        rows = [{"dimension": "GB", "label": "United Kingdom", "value": 12, "share_bp": 10000}]
+        shown = visitors_page._countries(payload(countries=rows, geoip_available=False))
+        self.assertEqual(len(shown["rows"]), 1)
+        self.assertNotIn("not available", shown["summary"])
+        self.assertEqual(shown["summary"], "Most visitors come from United Kingdom.")
+        self.assertIn("not available", visitors_page._countries(payload(countries=[], geoip_available=True))["summary"])
+
     def test_early_pages_do_not_pretend_to_know_time_or_scroll(self):
         most = [{"page": "home", "label": "Home", "views": 40, "reported_views": 9, "avg_seconds": 80, "scroll": {}, "scrolled_half_bp": 6400},
                 {"page": "visit", "label": "Visit", "views": 30, "reported_views": 10, "avg_seconds": 80, "scroll": {}, "scrolled_half_bp": 6400}]

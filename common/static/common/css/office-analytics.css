@@ -337,3 +337,10 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { .o-lm-made:not([hidden]) .o-lm-link { animation: none; } }
 .o-lm-qr [hidden] { display: none; }
 .o-quiet[hidden] { display: none; }
+
+/* Visitors: the Campaigns and Pages cards span the page like the other full-width cards, and their tables fill them (the shared
+   table-card rule shrinks a card to its content; that suits short lists, not these). Phone layout is untouched. */
+@media (min-width: 64em) {
+  .o-charts .o-tablecard.o-span-12 { width: auto; max-width: none; }
+  .o-charts .o-tablecard .o-list.o-list--vis { width: 100%; }
+}
