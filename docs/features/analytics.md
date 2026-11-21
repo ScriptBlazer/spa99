@@ -70,7 +70,7 @@ Analytics gets a **Visitors** area (exact layout from the designer): Live, Overv
 - No backfill: the new figures start from deploy day; the old visitor and page-view rows stay as they are.
 
 ## Built (backend, 2026-11-21)
-A1 to A8, A10, A11 and the Checks are built; A9 (Office screens) is the frontend's. Code: `common/useragent.py`, `common/geoip.py` + `common/geoip_fetch.py`, `insights/visitors.py` (visits, steps, closing), `insights/campaigns.py` (utm, channels, link maker), `insights/beacon.py` + `common/static/common/js/beacon.js`, `insights/live.py`, `common/probes.py` + the `(probes)` snippet in the `Caddyfile`, `office/analytics_visitors.py` (the `visitors` snapshot), endpoints in the `office.md` API table. Migration `insights/0008`. Settings: `GEOIP_DB_PATH`. Pinned: `maxminddb`, `segno`.
+A1 to A8, A10, A11 and the Checks are built; A9 (Office screens) is built too (see "Built (frontend)" below). Code: `common/useragent.py`, `common/geoip.py` + `common/geoip_fetch.py`, `insights/visitors.py` (visits, steps, closing), `insights/campaigns.py` (utm, channels, link maker), `insights/beacon.py` + `common/static/common/js/beacon.js`, `insights/live.py`, `common/probes.py` + the `(probes)` snippet in the `Caddyfile`, `office/analytics_visitors.py` (the `visitors` snapshot), endpoints in the `office.md` API table. Migration `insights/0008`. Settings: `GEOIP_DB_PATH`. Pinned: `maxminddb`, `segno`.
 
 Deviations (one line each):
 - The campaign key keeps each utm part to source 20, medium 15, campaign 30, content 20 characters (not 60) so `key:step` fits the 100 character dimension column.
@@ -80,3 +80,13 @@ Deviations (one line each):
 - The beacon carries `n` (0 for the first beacon of a page view): only the first counts the page as reported and records the scroll step; later beacons add seconds.
 - `/.private/deploy/Caddyfile` is not tracked in git, so it was not edited.
 - The privacy notice date moved to 21 November 2026; the privacy version number was left at 2026-11-05 (a bump needs a model default migration and asks nobody to accept again). `backfill_site_data` gets the new paragraph (dry run supported).
+
+## Built (frontend, 2026-11-21)
+A9 is built from `analytics-design.md`: `/analytics/visitors/` (reader; Journey and Visitors share the range and the sub-nav `_analytics_nav.html`; Top pages moved there as the Pages card). Code: `office/views_visitors.py` (page and `GET /analytics/link.json`, Office level and up, which calls `campaigns.build_link` so the cleaning rules live in one place), `office/visitors_page.py` (the snapshot worded for the page: numbers, "Not enough yet" under 10, "Counting since", live first paint), `analytics_visitors.html` + `_vis_rank.html` + `_visitor_kpi.html`, `office-visitors.js` (live polling, Pages switch, heat map tip, link maker), a new `length` chart in `office-charts.js`, a `Visitors` block in `office-analytics.css`, slate ramp tokens `--office-slate-2/3/4` and `--office-heat-cell` in `office-tokens.css`. Tests: `office/tests/test_visitors_page.py`.
+
+Deviations (one line each):
+- The campaign name is cut at 30 characters (the backend limit), not 40 as the brief says.
+- Summary sentences other than busiest, channels and campaign are made in `visitors_page.py` from the stored figures (the snapshot stores only those three).
+- The overview tile is its own include (`_visitor_kpi.html`) rather than a variant of `_kpi.html`, because its figures are already worded; same classes and look.
+- The live card words countries with the browser's `Intl.DisplayNames`; its first paint uses the server's country list, so a rare name can differ by a letter.
+
