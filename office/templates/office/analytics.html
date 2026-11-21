@@ -6,6 +6,7 @@
 {% block scripts %}<script type="module" src="{% static 'common/js/office-charts.js' %}"></script>{% endblock %}
 {% block main %}
 <h1 class="sr-only">Analytics</h1>
+{% include "office/_analytics_nav.html" with active="journey" %}
 {% include "office/_range.html" with place="page" ranges=data.ranges current=data.range %}
 {% if data.updating %}<p class="o-sub" data-updating>Updating…</p>{% endif %}
 <div class="o-charts" data-office-charts>
@@ -59,6 +60,7 @@
           </tbody></table>
       </div>
     </details>
+    <a class="o-quiet o-seelink" href="{% url 'office_analytics_visitors' %}">See Visitors {% include "office/_icon.html" with name="chevron-right" %}</a>
   </section>
 
   {# 2 Four tinted KPI tiles #}
@@ -318,18 +320,8 @@
     </details>
   </section>
 
-  {# 8 Top pages: a ranked list, not a chart #}
-  <section class="o-card o-ranked o-span-12" id="pages" data-reveal aria-labelledby="h-pages">
-    <header class="o-card-head"><h2 id="h-pages">Top pages</h2></header>
-    <p class="o-summary" data-region="summary-pages" data-fade>{{ pages.summaries.top_pages }}</p>
-    <ol class="o-rank" data-region="rank-pages" data-fade data-top-pages>
-      {% for p in pages.top_pages %}
-      <li style="--share: {% ratio p.views pages.top_pages.0.views %}"><span class="o-rank-name">{{ p.page|capfirst }}</span><span class="o-rank-num">{{ p.views|num }}</span></li>
-      {% empty %}<li class="o-empty-line">No page views in this range yet.</li>{% endfor %}
-    </ol>
-  </section>
+  {# Top pages moved to Analytics > Visitors (the Pages card), 2026-11-21 #}
   {# Referring sites: hidden 2026-10-25 (Moishe: not useful for now). Still counted and in the snapshot; to bring it back, restore this section from git history. #}
 </div>
 {{ data|json_script:"office-series" }}
-{{ pages|json_script:"office-pages" }}
 {% endblock %}

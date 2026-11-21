@@ -355,6 +355,30 @@ function start() {
         };
       },
     },
+    length: {   // Analytics > Visitors, "How long visits last": the "where people stop" columns in slate (docs/features/analytics-design.md 3.8)
+      has: (d) => Array.isArray(d.visit_length),
+      empty: (d) => !d.visit_length.some((b) => b.visits > 0),
+      make(d) {
+        const rows = d.visit_length; let top = -1; let max = 0;
+        rows.forEach((r, i) => { if (r.visits > max) { max = r.visits; top = i; } });
+        const soft = mixOver(T.slate, T.surface, 0.48);
+        const n = Math.max(rows.length, 1);
+        return {
+          type: 'bar',
+          data: { labels: rows.map((r) => r.label), datasets: [{ data: rows.map((r) => r.visits), backgroundColor: rows.map((_r, i) => (i === top ? T.slate : soft)), borderRadius: 8, borderSkipped: 'start', maxBarThickness: 32, categoryPercentage: 0.8, barPercentage: 0.9 }] },
+          options: base('length', {
+            layout: { padding: { top: 30 } }, interaction: { mode: 'nearest', axis: 'x', intersect: true },
+            scales: {
+              x: xScale({ ticks: { color: T.muted, maxRotation: 0, autoSkip: false, padding: 10, callback(_v, i) { const text = rows[i]?.label || ''; return this.chart.width / n < 76 ? wrap(text, 7) : text; } } }),   // never rotated: two lines on a phone
+              y: yScale({ ticks: { color: T.muted, padding: 10, maxTicksLimit: 4, precision: 0, callback: (v) => compact(v) } }),
+            },
+            plugins: { legend: { display: false }, tooltip: { enabled: false, external: externalTip('length') }, topLabel: { index: top, text: top >= 0 ? `${nf.format(max)} ${max === 1 ? 'visit' : 'visits'}` : '' } },
+          }),
+          plugins: [topLabel],
+          tip: (pts) => { const r = rows[i0(pts)]; const color = i0(pts) === top ? T.slate : soft; return { title: r.label, rows: [{ label: 'Visits', value: nf.format(r.visits), color }, { label: 'Share', value: r.share, color }] }; },
+        };
+      },
+    },
   };
   const i0 = (pts) => pts[0].dataIndex;
 
@@ -399,7 +423,7 @@ function start() {
   }
 
   function summaryFor(card, d) {
-    const map = { visitors: 'visitors', funnel: 'funnel', tiers: '', days: 'days', types: 'types', times: 'times', plan: 'registrations_by_plan', suggested: 'suggested_plan', answers: 'journey_answers', dropoff: 'drop_off', gold: 'gold' };
+    const map = { visitors: 'visitors', funnel: 'funnel', tiers: '', days: 'days', types: 'types', times: 'times', plan: 'registrations_by_plan', suggested: 'suggested_plan', answers: 'journey_answers', dropoff: 'drop_off', gold: 'gold', length: 'length' };
     return d.summaries?.[map[card]] || '';
   }
 

@@ -1,0 +1,15 @@
+{% comment %}One slate overview tile on Analytics > Visitors (a div, not a link: no chart to scroll to). Param: t (key, label, value, small, change, spark). The body swaps with the range.{% endcomment %}
+<div class="o-kpi o-kpi--slate o-kpi--static" data-kpi="{{ t.key }}" data-reveal>
+  <span class="o-kpi-label">{{ t.label }}</span>
+  <span class="o-kpi-body" data-region="v-kpi-{{ t.key }}" data-fade>
+    <span class="o-kpi-value{% if t.small %} o-kpi-value--small{% endif %}">{{ t.value }}</span>
+    <span class="o-delta">{{ t.change|default:"&nbsp;" }}</span>
+    {% if t.spark %}<span class="o-spark o-spark--kpi" aria-hidden="true">
+      <svg viewBox="0 0 100 40" preserveAspectRatio="none" focusable="false">
+        <defs><linearGradient id="vkpi-{{ t.key }}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="o-spark-top"/><stop offset="1" class="o-spark-end"/></linearGradient></defs>
+        <path class="o-spark-area" d="{{ t.spark.area }}" fill="url(#vkpi-{{ t.key }})"/>
+        <path class="o-spark-line" d="{{ t.spark.line }}" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </span>{% endif %}
+  </span>
+</div>
