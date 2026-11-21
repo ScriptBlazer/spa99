@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import pwa, views, views_approvals as ap, views_tools as t
+from . import pwa, views, views_approvals as ap, views_tools as t, views_visitors as vv
 
 urlpatterns = [
     path("manifest.webmanifest", pwa.manifest, name="office_manifest"),  # the Office as an installable app (public file, no secrets)
@@ -9,6 +9,8 @@ urlpatterns = [
     path("dashboard.json", views.dashboard_json, name="office_dashboard_json"),
     path("analytics/", views.analytics, name="office_analytics"),
     path("analytics/data/", views.analytics_data, name="office_analytics_data"),
+    path("analytics/visitors/", vv.analytics_visitors, name="office_analytics_visitors"),
+    path("analytics/link.json", vv.analytics_link, name="office_analytics_link"),
     path("analytics/visitors/data/", views.analytics_visitors_data, name="office_analytics_visitors_data"),
     path("analytics/live.json", views.analytics_live, name="office_analytics_live"),
     path("analytics/qr.svg", views.analytics_qr, name="office_analytics_qr"),

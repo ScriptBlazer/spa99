@@ -105,7 +105,7 @@ def _with_revenue(request, data):
 @never_cache
 def analytics(request):
     name = _remembered_range(request, "office_range_analytics", selectors.ANALYTICS_RANGES, defaults.get(request).analytics_range)
-    context = {"data": _with_revenue(request, selectors.analytics(name)), "pages": selectors.pages(name), "section": "analytics"}
+    context = {"data": _with_revenue(request, selectors.analytics(name)), "section": "analytics"}
     return render(request, "office/analytics.html", context)
 
 
