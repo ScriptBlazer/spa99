@@ -123,13 +123,13 @@ function keepTablesOpen() {
 
 function initHeat() {
   let revealed = false;
-  function fade() {
+  function fade() {   // visible by default; waits (opacity 0) only once this script is running and can bring it back
     const grid = document.querySelector('.o-heat-grid');
-    if (!grid) return;
-    if (revealed || !('IntersectionObserver' in window)) { grid.classList.add('is-in'); return; }
+    if (!grid || revealed || !('IntersectionObserver' in window)) return;
+    grid.classList.add('is-wait');
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
-      revealed = true; grid.classList.add('is-in'); observer.disconnect();
+      revealed = true; grid.classList.remove('is-wait'); observer.disconnect();
     }, { threshold: 0.15 });
     observer.observe(grid);
   }

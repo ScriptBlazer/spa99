@@ -298,7 +298,7 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 .o-heat-key span:first-child { margin-right: var(--space-2); }
 .o-heat-key span:last-child { margin-left: var(--space-2); }
 .o-heat-key i { width: 1.25rem; height: 0.75rem; border-radius: 4px; background: var(--office-sunken); }
-.js:not(.no-reveal) .o-heat-grid:not(.is-in) { opacity: 0; }
+.o-heat-grid.is-wait { opacity: 0; }   /* set by office-visitors.js until 15% of it is on screen */
 .o-heat-grid { transition: opacity var(--office-dur-chart) var(--ease-soft); }
 .o-heat .o-table { margin-top: var(--space-3); }
 .o-heat .o-table table { min-width: 44rem; }
