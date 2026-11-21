@@ -58,7 +58,13 @@ GUEST_RULES = {  # 2026-10-23: "Sometimes with a friend" never yields Tier 1 and
         "conditions": [{"question": "company", "any_of": GUEST_COMPANY}],
     },
 }
-MIN_CHOICES = {"time": 1, "facilities": 1, "industry": 1}  # 2026-10-23: "Choose at least one." (industry too, 2026-10-26: it is multi-select)
+# Nothing is optional (Moishe 2026-11-21): every question needs an answer whenever it is shown, and the two typed follow-ups need
+# at least one letter (min_choices 1 on a TEXT question means "text required"). Hidden questions are never required.
+MIN_CHOICES = {key: 1 for key in (
+    "time", "frequency", "facilities", "company", "industry", "property_link", "property_size", "property_law",
+    "heard_via", "industry_other", "heard_via_other",
+)}
+REQUIRED_KEYS = tuple(MIN_CHOICES)
 
 # key, text, help, type, screen, order, condition, options
 QUESTIONS = [
@@ -74,7 +80,7 @@ QUESTIONS = [
     ("property_law", "Is it property law?", "", Question.SINGLE, 4, 4,
      {"question": "industry", "any_of": ["law"]}, YES_NO),
     ("heard_via", "How did you hear about us?", "", Question.SINGLE, 4, 5, {}, HEARD_VIA),
-    # Typed follow-ups (optional): shown under their parent when "Other" is chosen.
+    # Typed follow-ups (required when shown): shown under their parent when "Other" is chosen.
     ("industry_other", "In a few words", "", Question.TEXT, 4, 6, {"question": "industry", "any_of": ["other"]}, []),
     ("heard_via_other", "Where?", "", Question.TEXT, 4, 7, {"question": "heard_via", "any_of": ["other"]}, []),
 ]

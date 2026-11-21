@@ -124,7 +124,6 @@ html.has-sale .menu::backdrop { background: transparent; }
 .tile:has(input:focus-visible) { outline: 2px solid var(--s-focus); outline-offset: 3px; }
 .tile-small:has(input:checked) { background: var(--s-accent); color: var(--s-on-accent); }
 .tile-small:has(input:checked) .tile-label { color: inherit; }
-.tiles[data-skipped="true"] .tile { opacity: 0.6; }
 .tile-image { flex-direction: column; padding: 0; gap: 0; overflow: hidden; }
 .tile-image .tile-body { padding: var(--space-3); }
 .tile-image .tile-thumb { position: relative; aspect-ratio: 4 / 5; overflow: hidden; }

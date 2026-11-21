@@ -179,6 +179,7 @@ def backfill():
     changed.update(_privacy_notice_2026_11_04())
     changed.update(_privacy_notice_2026_11_21())
     changed.update(_heard_via_papers_2026_11_21())
+    changed.update(_journey_required_2026_11_21())
     changed.update(_not_you_start_again_2026_11_03())
     changed.update(_dashboard_all_time_2026_11_05())
     return changed
@@ -330,6 +331,32 @@ def _heard_via_papers_2026_11_21():
             other.save()
         Option.objects.create(question=heard, value=value, label=label, order=order)
         changed[f"journey.Option ({label} added)"] += 1
+    return changed
+
+
+def _journey_required_2026_11_21():
+    """Moishe 2026-11-21: nothing optional in the journey. The questions in journey_seed.REQUIRED_KEYS (the two typed follow-ups
+    included) move from min_choices 0 to 1; any other value is a choice made in Control and stays. The words "Please write a few
+    words." are added when missing, and the "About you." line stops saying Optional (only while it still has its exact old words)."""
+    changed = Counter()
+    for question in Question.objects.filter(key__in=journey_seed.REQUIRED_KEYS, min_choices=0):
+        question.min_choices = 1
+        question.save()  # one by one, so history records it
+        changed["journey.Question (answer required)"] += 1
+    page = Page.objects.filter(key="journey").first()
+    if page is not None:
+        sections = Section.objects.filter(page=page)
+        need = content_seed.PAGES["journey"][2]
+        text = next(row for row in need if row[0] == "need_text")
+        if not sections.filter(key="need_text").exists():
+            Section.objects.create(page=page, key="need_text", heading=text[1], body=text[2], cta_label=text[3], cta_url=text[4],
+                                   order=(sections.order_by("-order").values_list("order", flat=True).first() or 0) + 1)
+            changed["content.Section (journey: Please write a few words.)"] += 1
+        about = sections.filter(key="screen_4", body="Optional, and only to suggest the right fit.").first()
+        if about is not None:
+            about.body = "Only to suggest the right fit."
+            about.save()
+            changed["content.Section (journey: About you. no longer optional)"] += 1
     return changed
 
 

@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.template import Context, Template
 
 from journey import engine
+from journey.tests.helpers import MINIMAL
 from journey.tests.test_journey import make_session
 from plans import sales
 from plans.management.commands.seed_phase1 import seed_all
@@ -126,7 +127,7 @@ class JourneyResultLineTests(TestCase):
         open_memberships()
 
     def answers(self):
-        return dict(time=["evening"], frequency="two_three", facilities=["gym"], industry="tech")  # suggests Tier 2
+        return MINIMAL  # suggests Tier 2
 
     def test_line_only_when_the_suggested_plan_is_in_a_live_sale(self):
         self.assertIsNone(engine.complete(make_session(**self.answers()))["suggested"]["sale_line"])
