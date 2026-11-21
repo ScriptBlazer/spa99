@@ -382,7 +382,10 @@ def required_now(question, values):
     if not question.min_choices:
         return False
     if question.type == Question.TEXT:
-        return only_wanted_chosen(question.condition, values)
+        parents = [item.get("question") for item in (question.condition if isinstance(question.condition, list) else [question.condition]) if item]
+        active = {key: set(Option.objects.filter(question__key=key, active=True).values_list("value", flat=True)) for key in parents}
+        live = {key: [v for v in values.get(key, []) if v in active[key]] for key in parents}  # a retired choice is not "another industry"
+        return only_wanted_chosen(question.condition, live)
     return True
 
 

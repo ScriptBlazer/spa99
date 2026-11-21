@@ -184,7 +184,6 @@ def backfill():
     changed.update(_heard_via_papers_2026_11_21())
     changed.update(_journey_required_2026_11_21())
     changed.update(_industry_other_under_industry_2026_11_21())
-    changed.update(_other_box_context_2026_11_21())
     changed.update(_not_you_start_again_2026_11_03())
     changed.update(_dashboard_all_time_2026_11_05())
     return changed
@@ -1002,6 +1001,7 @@ def _industry_other_under_industry_2026_11_21():
             rows[key].order = order
             rows[key].save()  # one by one, so history records it
             changed["journey.Question (In a few words moved under Industry)"] += 1
+    changed.update(_other_box_context_2026_11_21())  # once, with the move: a line cleared later in Control stays cleared
     return changed
 
 

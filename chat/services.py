@@ -292,7 +292,7 @@ def reply_events(request, conversation):
 
 
 # A price, cost or sale question (Moishe 2026-11-21: while prices are closed the answer always carries the journey button).
-PRICE_QUESTION = re.compile(r"£|\b(price|prices|pricing|cost|costs|how much|fee|fees|sale|sales|discount|discounts|offer|offers|deal|deals|rate|rates|cheap|expensive|afford|pay|monthly|per month|a month)\b", re.I)
+PRICE_QUESTION = re.compile(r"£|\b(price|prices|priced|pricing|pricey|cost|costs|costing|fee|fees|charge|charges|charged|discount|discounts|promotion|promotions|promo|sale|special offer|special offers|cheap|cheaper|expensive|afford|per month|per visit|how much (is|are|does|do|for|would|will))\b", re.I)
 
 
 def _reply(request, conversation):

@@ -139,7 +139,7 @@ def _singleton_save(request, form, url_name):
 def _personality_context(request, form=None, status=200):
     form = form or PersonalityForm(instance=AssistantSettings.load())
     forms_ = [{"form": form, "action": "/assistant/personality/save/", "key": "personality",
-               "note": "These add to the built-in rules (Spa 99 topics only, no price before an email, no code, no promises). They can never replace them."}]
+               "note": "These add to the built-in rules (Spa 99 topics only, no price while memberships are closed, no code, no promises). They can never replace them."}]
     return page(request, "system/assistant_form.html", "assistant",
                 {"forms": forms_, "tab": "personality", "description": "How the assistant sounds. The hard rules stay in code."}, status)
 

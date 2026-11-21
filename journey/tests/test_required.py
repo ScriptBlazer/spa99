@@ -328,6 +328,21 @@ class OtherBoxTests(RequiredBase):
         self.assertEqual(by_key["industry_other"]["help"], "You picked Other under Industry.")
         self.assertEqual(by_key["heard_via_other"]["help"], "You picked Other under How did you hear about us.")
 
+    def test_a_retired_industry_next_to_other_does_not_make_the_words_optional(self):
+        services.save_answer(self.session, "industry", options=["other", "finance"])
+        self.assertEqual(services.missing_required(self.session), [])
+        Option.objects.filter(question__key="industry", value="finance").update(active=False)
+        self.assertEqual(services.missing_required(self.session), ["industry_other"])  # the page shows Other alone ticked
+        node = shutil.which("node")
+        if node is None:
+            return
+        state = services.build_state(self.session)
+        answers = {q["key"]: q["answer"] for sc in state["screens"] for q in sc["questions"] if q["answer"]}
+        run = subprocess.run([node, str(Path(__file__).with_name("required_check.js")), str(Path(settings.BASE_DIR) / "common/static/common/js/journey.js")],
+                             input=json.dumps([{"state": state, "answers": answers}]), capture_output=True, text=True, timeout=60)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(json.loads(run.stdout)[0]["unmet"]["4"], ["industry_other"])
+
     def test_where_is_still_needed_when_other_is_picked(self):
         services.save_answer(self.session, "industry", options=["finance"])
         services.save_answer(self.session, "heard_via", options=["other"])
@@ -362,6 +377,9 @@ class OtherBoxBackfillTests(RequiredBase):
         again = self.run_command()
         self.assertNotIn("moved under Industry", again)
         self.assertNotIn("line above", again)
+        Question.objects.filter(key="industry_other").update(help_text="")  # removed in Control later: stays removed
+        self.assertNotIn("line above", self.run_command())
+        self.assertEqual(Question.objects.get(key="industry_other").help_text, "")
 
     def test_an_order_or_line_changed_in_control_is_left_alone(self):
         self.make_old()

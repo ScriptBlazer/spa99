@@ -131,6 +131,13 @@ class KnowledgeAndPriceRuleTests(ChatTestCase):
         other = events(ask(self.client, "Where are you?"))
         self.assertNotIn("next_steps", [n for n, _ in other])  # not on every answer
 
+    def test_the_price_check_catches_price_questions_and_leaves_ordinary_ones(self):
+        from chat.services import PRICE_QUESTION
+        for text in ("How much is Tier 2?", "What does it cost?", "Any discounts?", "Is it pricey?", "Do you charge for guests?", "£?", "How much for a month?", "What is the running sale?", "Any special offers?"):
+            self.assertTrue(PRICE_QUESTION.search(text), text)
+        for text in ("What do you offer?", "I work in sales, can I apply for Gold?", "Can I come once a month?", "How much time can I stay?", "heart rate"):
+            self.assertFalse(PRICE_QUESTION.search(text), text)
+
     def test_an_email_given_in_the_chat_no_longer_unlocks_prices(self):
         fake = self.fake((["ok"], final()))
         conversation = Conversation.objects.create(lead_email="old@example.com")  # an old chat that gave an email
@@ -433,7 +440,7 @@ class ReviewFixTests(ChatTestCase):
         self.assertIn('<h3 id="chat">When you use the Ask us chat</h3>', render("### When you use the Ask us chat {#chat}"))
         self.assertContains(self.client.get("/privacy/"), 'id="chat"')
 
-    def test_prices_are_refused_in_faq_text_and_such_entries_wait_for_the_email(self):
+    def test_prices_are_refused_in_faq_text(self):
         from system.forms_faq import FaqForm
 
         self.assertFalse(FaqForm({"question": "Cost?", "answer": "From £299.", "order": 1, "visible": "on"}).is_valid())

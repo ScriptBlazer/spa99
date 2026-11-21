@@ -136,7 +136,6 @@
   .chat-actions { grid-auto-flow: column; grid-auto-columns: max-content; align-items: center; gap: var(--space-3); }
   .chat-actions .btn { width: auto; }
 }
-.chat-email .btn[aria-busy="true"] { opacity: 0.7; }
 
 @keyframes chat-rise { from { opacity: 0; transform: translateY(8px); } }
 @media (prefers-reduced-motion: no-preference) {

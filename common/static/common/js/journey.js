@@ -212,7 +212,8 @@ const NEED_TEXT = 'Please write a few words.';
  *  is the one that shows it (Other alone); Other plus another choice makes it optional. */
 const onlyWantedChosen = (condition) => conditionItems(condition).every((item) => {
   const wanted = item.any_of || [];
-  return !wanted.length || (chosenNow[item.question] || []).every((v) => wanted.includes(v));
+  const offered = new Set((questionByKey(item.question)?.options || []).map((o) => o.value));  // a retired choice does not count
+  return !wanted.length || (chosenNow[item.question] || []).filter((v) => offered.has(v)).every((v) => wanted.includes(v));
 });
 const isRequired = (q) => (q.min_choices || 0) > 0 && (q.type !== 'text' || onlyWantedChosen(q.condition));
 /** Same rule as the server (journey/services.py missing_required): choices for a choice question, one non-blank letter for a text one. */
