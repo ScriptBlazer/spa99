@@ -93,8 +93,8 @@ PRIVACY_PARTS = [
         "- Our decision and, if we approve, the date and the invitation we send you.",
         "- If our team writes to you about your application (for example to ask a question), a record of that email.",
         "### When you use the Ask us chat {#chat}",
-        "- What you type to the assistant and its replies, with the time. If you gave your email to see prices, or you are "
-        "signed in, the chat is linked to it. We do not store your IP address with a chat.",
+        "- What you type to the assistant and its replies, with the time. If you are signed in, the chat is linked to your account. "
+        "Chats from before 21 November 2026 may be linked to an email given in the chat. We do not store your IP address with a chat.",
         "### Change history",
         "- Earlier versions of your details (a change history): when your account, registration or Gold Card "
         "application changes, we keep the previous version, so we can see what changed and put mistakes right. "

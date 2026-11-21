@@ -15,7 +15,6 @@ from django.views.decorators.http import require_GET, require_POST
 
 from common.ratelimit import rate_limited_json
 from common.useragent import device_type
-from journey import services as journey_services
 from journey import views as journey_views
 from pages.access import memberships_visible
 
@@ -97,7 +96,7 @@ def state(request):
 @login_not_required  # PUBLIC: see state(). CSRF protected, rate limited per browser and per IP, bots refused, capped by length and count.
 @require_POST
 def message(request):
-    """{"conversation_id"?, "message"} or {"conversation_id", "retry": true} (answer the pending question again after the email)."""
+    """{"conversation_id"?, "message"}."""
     if not assistant_config.is_on(request):
         raise Http404
     refused = _gate(request)
@@ -113,68 +112,25 @@ def message(request):
         return _refuse("rate_limited", "Too many messages. Please wait a few minutes.", 429)
     token = _page_cookie(request)
     conversation = services.find_conversation(request, data.get("conversation_id"), token)
-    retry = data.get("retry") is True
-    if retry:
-        if conversation is None or not services.pending_question(conversation):
-            return JsonResponse({"error": "Nothing to answer again.", "code": "nothing_pending"}, status=400)
-        if not services.prices_allowed(request, conversation):  # no email yet: answering again would only loop on the model
-            services.abuse("retry_without_email", request)
-            return JsonResponse({"error": "Leave your email to see prices.", "code": "needs_email"}, status=403)
-        if conversation.message_count >= assistant_config.get(request).max_messages:  # a retry is a message too
-            return _refuse("conversation_full", "This conversation is full.", 409)
-        conversation.message_count += 1
-        conversation.save(update_fields=["message_count", "updated_at"])
-    else:
-        text = data.get("message")
-        text = text.strip() if isinstance(text, str) else ""
-        if not text:
-            return JsonResponse({"error": "Write a question first.", "code": "empty"}, status=400)
-        if len(text) > assistant_config.get(request).max_chars:
-            return JsonResponse({"error": "That is the limit for one message.", "code": "too_long", "max_length": assistant_config.get(request).max_chars}, status=400)
-        if conversation is not None and conversation.message_count >= assistant_config.get(request).max_messages:
-            return _refuse("conversation_full", "This conversation is full.", 409)
-        if conversation is None:
-            if services.too_busy():
-                services.abuse("busy", request)
-                return _refuse("busy", "Our assistant is busy just now.", 503)
-            conversation = Conversation.objects.create(browser_hash=services.browser_hash(token))
-        Message.objects.create(conversation=conversation, role=Message.USER, text=text)
-        conversation.message_count += 1
-        conversation.save(update_fields=["message_count", "updated_at"])
+    text = data.get("message")
+    text = text.strip() if isinstance(text, str) else ""
+    if not text:
+        return JsonResponse({"error": "Write a question first.", "code": "empty"}, status=400)
+    if len(text) > assistant_config.get(request).max_chars:
+        return JsonResponse({"error": "That is the limit for one message.", "code": "too_long", "max_length": assistant_config.get(request).max_chars}, status=400)
+    if conversation is not None and conversation.message_count >= assistant_config.get(request).max_messages:
+        return _refuse("conversation_full", "This conversation is full.", 409)
+    if conversation is None:
+        if services.too_busy():
+            services.abuse("busy", request)
+            return _refuse("busy", "Our assistant is busy just now.", 503)
+        conversation = Conversation.objects.create(browser_hash=services.browser_hash(token))
+    Message.objects.create(conversation=conversation, role=Message.USER, text=text)
+    conversation.message_count += 1
+    conversation.save(update_fields=["message_count", "updated_at"])
     services.attach(conversation, request)
     response = StreamingHttpResponse(services.reply_events(request, conversation), content_type="text/event-stream")
     response["Cache-Control"] = "no-cache, no-transform"
     response["X-Accel-Buffering"] = "no"  # a proxy must not hold the stream back
     response["X-Chat-Conversation"] = str(conversation.pk)
     return response
-
-
-@login_not_required  # PUBLIC: see state(). The email for prices: a lead exactly as at the journey gate.
-@require_POST
-@rate_limited_json("chat-email", 20, 60)
-def email(request):
-    """{"conversation_id"?, "email", "consent": true}. 200 {"saved", "conversation_id", "retry"}; 400 {"errors": {"email", "consent"}}.
-    `retry` true: send POST /chat/message/ {conversation_id, retry: true} and the pending price question is answered, with prices."""
-    if not assistant_config.is_on(request):
-        raise Http404
-    refused = _gate(request)
-    if refused:
-        return refused
-    data = _json(request)
-    if data is None:
-        return JsonResponse({"error": "Send JSON."}, status=400)
-    if data.get(HONEYPOT_FIELD):
-        services.abuse("honeypot", request)
-        return JsonResponse({"saved": True, "retry": False})  # a bot: pretend, store nothing
-    token = _page_cookie(request)
-    conversation = services.find_conversation(request, data.get("conversation_id"), token)
-    if request.user.is_authenticated:  # signed in: his account is his address and prices are already shown
-        return JsonResponse({"saved": True, "conversation_id": str(conversation.pk) if conversation else None,
-                             "retry": bool(conversation and services.pending_question(conversation))})
-    session, _ = journey_views._session_for(request)  # the journey session of this browser (made if there is none), as at the gate
-    try:  # a conversation is only made once the lead is saved: a failed attempt leaves nothing behind
-        conversation = services.lead_saved(conversation, session, data.get("email"), data.get("consent"), token)
-    except journey_services.LeadError as error:
-        return journey_views._with_cookie(JsonResponse({"errors": error.errors}, status=400), session)
-    body = {"saved": True, "conversation_id": str(conversation.pk), "retry": services.pending_question(conversation)}
-    return journey_views._with_cookie(JsonResponse(body), session)

@@ -17,6 +17,7 @@
 .question { margin-top: var(--space-6); }
 .question > legend, .question-title { font-size: var(--text-lg); line-height: var(--leading-snug); font-weight: 500; padding: 0; }
 .question-help { display: block; margin-top: var(--space-1); font-size: var(--text-sm); color: var(--s-muted); }
+.question-context { display: block; margin-bottom: var(--space-2); font-size: var(--text-sm); color: var(--s-muted); } /* which "Other" a typed box is for */
 .question-help[data-state="nudge"] { color: var(--s-text); font-weight: 500; }
 .question .tiles, .question .segmented, .question .field { margin-top: var(--space-3); }
 .question[hidden] { display: none; }

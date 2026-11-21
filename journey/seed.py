@@ -66,6 +66,10 @@ MIN_CHOICES = {key: 1 for key in (
 )}
 REQUIRED_KEYS = tuple(MIN_CHOICES)
 
+# The small line above each typed follow-up, so he knows which "Other" it is for (Moishe 2026-11-21). Editable in Control.
+INDUSTRY_OTHER_HELP = "You picked Other under Industry."
+HEARD_VIA_OTHER_HELP = "You picked Other under How did you hear about us."
+
 # key, text, help, type, screen, order, condition, options
 QUESTIONS = [
     ("time", "When would you come?", "Choose at least one.", Question.MULTI, 1, 1, {}, TIME),
@@ -73,16 +77,18 @@ QUESTIONS = [
     ("facilities", "What would you use?", "Choose at least one.", Question.MULTI, 2, 1, {}, FACILITIES),
     ("company", "Do you usually come alone?", "", Question.SINGLE, 3, 1, {}, COMPANY),
     ("industry", "What industry are you in?", "Choose at least one.", Question.MULTI, 4, 1, {}, INDUSTRY),
-    ("property_link", "Your link to property", "", Question.SINGLE, 4, 2,
+    # Typed follow-up to Industry: right under it, above the property questions (Moishe 2026-11-21). Needed only when Other
+    # is the only industry ticked; with another industry it shows and is optional.
+    ("industry_other", "In a few words", INDUSTRY_OTHER_HELP, Question.TEXT, 4, 2, {"question": "industry", "any_of": ["other"]}, []),
+    ("property_link", "Your link to property", "", Question.SINGLE, 4, 3,
      {"question": "industry", "any_of": ["property"]}, PROPERTY_LINK),
-    ("property_size", "How many properties or units?", "An approximate range is fine.", Question.SINGLE, 4, 3,
+    ("property_size", "How many properties or units?", "An approximate range is fine.", Question.SINGLE, 4, 4,
      {"question": "property_link", "any_of": PROPERTY_LINK_VALUES}, PROPERTY_SIZE),
-    ("property_law", "Is it property law?", "", Question.SINGLE, 4, 4,
+    ("property_law", "Is it property law?", "", Question.SINGLE, 4, 5,
      {"question": "industry", "any_of": ["law"]}, YES_NO),
-    ("heard_via", "How did you hear about us?", "", Question.SINGLE, 4, 5, {}, HEARD_VIA),
-    # Typed follow-ups (required when shown): shown under their parent when "Other" is chosen.
-    ("industry_other", "In a few words", "", Question.TEXT, 4, 6, {"question": "industry", "any_of": ["other"]}, []),
-    ("heard_via_other", "Where?", "", Question.TEXT, 4, 7, {"question": "heard_via", "any_of": ["other"]}, []),
+    ("heard_via", "How did you hear about us?", "", Question.SINGLE, 4, 6, {}, HEARD_VIA),
+    # Typed follow-up (required when shown, as Other is its only choice): shown under How did you hear when "Other" is chosen.
+    ("heard_via_other", "Where?", HEARD_VIA_OTHER_HELP, Question.TEXT, 4, 7, {"question": "heard_via", "any_of": ["other"]}, []),
 ]
 
 

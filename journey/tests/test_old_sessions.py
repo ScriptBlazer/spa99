@@ -130,7 +130,7 @@ class UnfinishedOldSessionTests(TestCase):
         result = self.post("/journey/result/", {})
         self.assertEqual(result.status_code, 400)
         missing = result.json()["missing"]
-        self.assertEqual(missing, ["frequency", "company", "heard_via", "industry_other"])  # in screen order: the page bounces to screen 1
+        self.assertEqual(missing, ["frequency", "company", "industry_other", "heard_via"])  # in screen order: the page bounces to screen 1
         step = self.post("/journey/step/", {"step": 5})
         self.assertEqual((step.status_code, step.json()["missing"][0]), (400, "frequency"))
 

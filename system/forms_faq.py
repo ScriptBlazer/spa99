@@ -15,7 +15,7 @@ class FaqForm(VersionedForm):
     def _no_price(self, name):
         value = self.cleaned_data[name]
         if "£" in value:
-            raise forms.ValidationError("Leave prices out. The chat shares prices only after an email, and takes them from the plans.")
+            raise forms.ValidationError("Leave prices out. The chat shares prices only with people who can see the Memberships page, and takes them from the plans.")
         return value
 
     def clean_question(self):
@@ -39,7 +39,7 @@ class NoteForm(VersionedForm):
     def _no_price(self, name):
         value = self.cleaned_data[name]
         if "£" in value:
-            raise forms.ValidationError("Leave prices out. Prices come only from the plans, and only after an email.")
+            raise forms.ValidationError("Leave prices out. Prices come only from the plans, and only for people who can see the Memberships page.")
         return value
 
     def clean_title(self):

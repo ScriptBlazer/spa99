@@ -16,6 +16,7 @@ from chat.models import AssistantSettings, Conversation, FaqItem, KnowledgeNote,
 from journey.models import JourneySession
 from office.tests.test_office import OFFICE, OfficeTestCase, get, staff
 from plans.management.commands.seed_phase1 import seed_all
+from plans.models import SiteSettings
 from system.models import SiteDefaults, SystemChange
 from system.tests.test_rules import form_data
 from system.tests.test_system import make_user, unlocked_client
@@ -104,7 +105,7 @@ class ChatTestCase(TestCase):
 
 
 class KnowledgeAndPriceRuleTests(ChatTestCase):
-    def test_no_prices_until_an_email_is_given_then_prices_follow(self):
+    def test_closed_memberships_get_no_price_and_the_journey_button_never_an_email(self):
         text, _ = knowledge.build(prices=False)
         self.assertNotIn("£", text)
         self.assertIn("PRICES ARE NOT AVAILABLE", text)
@@ -113,26 +114,42 @@ class KnowledgeAndPriceRuleTests(ChatTestCase):
         self.assertIn("£399", with_prices)
         self.assertEqual(digest, knowledge.build(prices=True)[1])  # byte-stable while the data is unchanged
 
-        fake = self.fake((["We share prices once we have your email."], final(tools=[("offer_email", {})])), (["Tier 2 is £399 a month."], final()))
-        first = events(ask(self.client, "How much is Tier 2?"))
+        fake = self.fake((["Prices are shared once you have tailored your membership."], final(tools=[("offer_journey", {})])))
+        got = events(ask(self.client, "How much is Tier 2?"))
         self.assertNotIn("£", fake.system_text(0))
-        self.assertIn("offer_email", [name for name, _ in first])
-        conversation_id = first[-1][1]["conversation_id"]
+        names = [name for name, _ in got]
+        self.assertNotIn("offer_email", names)
+        self.assertEqual([s["url"] for s in dict(got)["next_steps"]["steps"]], ["/journey/"])
+        self.assertEqual(dict(got)["next_steps"]["steps"][0]["label"], "Tailor your membership")
+        self.assertNotIn("offer_email", [t["name"] for t in fake.calls[0]["tools"]])
 
-        saved = self.client.post("/chat/email/", json.dumps({"conversation_id": conversation_id, "email": "a@example.com", "consent": True}),
-                                 content_type="application/json")
-        self.assertEqual((saved.status_code, saved.json()["retry"]), (200, True))
-        self.assertTrue(JourneySession.objects.filter(lead_email="a@example.com").exists())  # a lead, as at the journey gate
-        again = events(ask(self.client, conversation_id=conversation_id, retry=True, message=""))
-        self.assertIn("£399", fake.system_text(1))
-        self.assertEqual(Message.objects.filter(role="user").count(), 1)  # the question was not stored twice
-        self.assertEqual(again[-1][0], "done")
+    def test_a_price_question_gets_the_journey_button_even_when_the_model_forgets_the_tool(self):
+        self.fake((["We share those once you have tailored your membership."], final()),
+                  (["We are at 99 Vale Road."], final()))
+        got = events(ask(self.client, "Is there a sale running?"))
+        self.assertEqual([s["url"] for s in dict(got)["next_steps"]["steps"]], ["/journey/"])
+        other = events(ask(self.client, "Where are you?"))
+        self.assertNotIn("next_steps", [n for n, _ in other])  # not on every answer
 
-    def test_email_needs_the_consent_tick(self):
+    def test_an_email_given_in_the_chat_no_longer_unlocks_prices(self):
+        fake = self.fake((["ok"], final()))
+        conversation = Conversation.objects.create(lead_email="old@example.com")  # an old chat that gave an email
+        events(ask(self.client, "How much?", conversation_id=str(conversation.pk)))
+        self.assertNotIn("£", fake.system_text(0))
+        self.assertIn("PRICES ARE NOT AVAILABLE", fake.system_text(0))
+
+    def test_visitors_who_can_see_memberships_still_get_prices(self):
+        fake = self.fake((["Tier 2 is £399 a month."], final()))
+        SiteSettings.objects.update(memberships_public=True)
+        got = events(ask(self.client, "How much is Tier 2?"))
+        self.assertIn("£399", fake.system_text(0))
+        self.assertIn("£399", "".join(d["text"] for n, d in got if n == "delta"))
+        self.assertNotIn("next_steps", [n for n, _ in got])
+
+    def test_the_chat_email_endpoint_is_gone(self):
         self.fake()
-        response = self.client.post("/chat/email/", json.dumps({"email": "a@example.com", "consent": False}), content_type="application/json")
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("consent", response.json()["errors"])
+        response = self.client.post("/chat/email/", json.dumps({"email": "a@example.com", "consent": True}), content_type="application/json")
+        self.assertEqual(response.status_code, 404)
         self.assertFalse(JourneySession.objects.exclude(lead_email="").exists())
 
     def test_a_price_the_model_writes_anyway_is_cut_off_in_code(self):
@@ -141,7 +158,7 @@ class KnowledgeAndPriceRuleTests(ChatTestCase):
         text = "".join(d["text"] for n, d in got if n == "delta")
         self.assertNotIn("£", text)
         self.assertNotIn("399", text)
-        self.assertIn("offer_email", [n for n, _ in got])
+        self.assertEqual(dict(got)["next_steps"]["steps"][0]["key"], "journey")  # the journey button, not an email form
 
 
 class GuardTests(ChatTestCase):
@@ -212,8 +229,7 @@ class GuardTests(ChatTestCase):
         self.fake((["ok"], final()), (["ok"], final()))
         mine = events(ask(self.client))[-1][1]["conversation_id"]
         other = self.browser()
-        self.client.post("/chat/email/", json.dumps({"email": "m@example.com", "consent": True}), content_type="application/json")  # links a journey session to me
-        Conversation.objects.filter(pk=mine).update(session=JourneySession.objects.get())
+        Conversation.objects.filter(pk=mine).update(session=JourneySession.objects.create())  # a conversation tied to a journey session of mine
         new = events(ask(other, conversation_id=mine))[-1][1]["conversation_id"]
         self.assertNotEqual(new, mine)
 
@@ -243,7 +259,7 @@ class ReplyTests(ChatTestCase):
         self.assertEqual(call["system"][-2]["cache_control"], {"type": "ephemeral"})  # the knowledge block is cached
         self.assertTrue(call["system"][-1]["text"].startswith("NOW: it is "))  # the time comes after it, uncached
         self.assertNotIn("cache_control", call["system"][-1])
-        self.assertEqual([t["name"] for t in call["tools"]], ["show_handoff", "offer_email", "off_topic", "suggest_next_steps"])
+        self.assertEqual([t["name"] for t in call["tools"]], ["show_handoff", "offer_journey", "off_topic", "suggest_next_steps"])
 
     def test_handoff_tool_and_empty_text_fallback(self):
         self.fake(([], final(tools=[("show_handoff", {"reason": "asked_for_person"})])))
@@ -325,7 +341,6 @@ class SecurityTests(ChatTestCase):
         self.assertEqual(self.client.post("/chat/message/", body, content_type="application/json", HTTP_ORIGIN="https://evil.example").status_code, 403)
         self.assertEqual(self.client.post("/chat/message/", body, content_type="application/json", HTTP_SEC_FETCH_SITE="cross-site").status_code, 403)
         self.assertEqual(ask(self.client, "hi", website="http://spam.example").status_code, 403)
-        self.assertEqual(bare.post("/chat/email/", json.dumps({"email": "a@example.com", "consent": True}), content_type="application/json").status_code, 403)
         self.assertEqual(fake.calls, [])
         self.assertFalse(JourneySession.objects.exclude(lead_email="").exists())
 
@@ -391,27 +406,11 @@ class ReviewFixTests(ChatTestCase):
             events(ask(self.client, "three"))
         self.assertGreater(Message.objects.filter(role="assistant").order_by("created_at").last().cost_pence, 0)  # cut mid-stream: billed
 
-    def test_a_failed_email_leaves_no_conversation_and_busy_counts_real_chats_only(self):
-        self.fake()
-        bad = self.client.post("/chat/email/", json.dumps({"email": "nope", "consent": False}), content_type="application/json")
-        self.assertEqual(bad.status_code, 400)
-        self.assertFalse(Conversation.objects.exists())
+    def test_busy_limit_counts_real_chats_only(self):
         Conversation.objects.create()  # nothing said in it
         with override_settings(CHAT_MAX_CONVERSATIONS_PER_HOUR=1):
             self.fake((["ok"], final()))
             self.assertEqual(ask(self.client).status_code, 200)
-
-    def test_retry_needs_the_email_and_counts_as_a_message(self):
-        fake = self.fake((["Prices follow once we have your email."], final(tools=[("offer_email", {})])), (["Tier 2 is £399."], final()))
-        conversation_id = events(ask(self.client, "price?"))[-1][1]["conversation_id"]
-        refused = ask(self.client, conversation_id=conversation_id, retry=True)
-        self.assertEqual((refused.status_code, refused.json()["code"]), (403, "needs_email"))
-        self.assertEqual(len(fake.calls), 1)
-        self.client.post("/chat/email/", json.dumps({"conversation_id": conversation_id, "email": "r@example.com", "consent": True}), content_type="application/json")
-        before = Conversation.objects.get().message_count
-        events(ask(self.client, conversation_id=conversation_id, retry=True))
-        self.assertEqual(Conversation.objects.get().message_count, before + 1)
-        self.assertEqual(ask(self.client, conversation_id=conversation_id, retry=True).status_code, 400)  # nothing pending now
 
     def test_declined_turns_never_reach_the_model_again(self):
         fake = self.fake((["ok"], final()))
@@ -547,7 +546,6 @@ class AssistantTests(ChatTestCase):
         self.assertFalse(AssistantSettings.load().enabled)
         self.assertEqual(ask(self.client).status_code, 404)
         self.assertEqual(self.client.get("/chat/state/").status_code, 404)
-        self.assertEqual(self.client.post("/chat/email/", "{}", content_type="application/json").status_code, 404)
         response = self.client.get("/")
         self.assertFalse(response.context["chat_enabled"] or response.context["chat_button"])
         self.assertEqual(fake.calls, [])

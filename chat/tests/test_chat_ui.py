@@ -48,13 +48,14 @@ class ChatButtonTests(TestCase):
     @KEY
     def test_panel_markup(self):
         html = Client().get("/").content.decode()
-        for needle in ('data-state-url="/chat/state/"', 'data-message-url="/chat/message/"', 'data-email-url="/chat/email/"',
+        for needle in ('data-state-url="/chat/state/"', 'data-message-url="/chat/message/"',
                        'role="log"', 'aria-live="off"', 'aria-live="polite" data-chat-live', 'maxlength="500"', 'for="ask-us-input"',
                        "Your question", "Ask a question", "Ask us anything.", "Prefer a person?", "Message our team",
-                       "AI assistant. Chats are kept for 90 days.", 'data-chat-tpl="handoff"', 'data-chat-tpl="email"',
-                       "WhatsApp us", "Email us", "Show prices", "Not now", CHAT_CONSENT, "How we use your email", 'name="website"'):
+                       "AI assistant. Chats are kept for 90 days.", 'data-chat-tpl="handoff"',
+                       "WhatsApp us", "Email us"):
             self.assertIn(needle, html)
-        self.assertNotIn("value=\"on\"", html[html.index('data-chat-tpl="email"'):][:2500].split("consent")[1][:80])  # not pre-ticked
+        for gone in ('data-chat-tpl="email"', "Show prices", "chat/email", CHAT_CONSENT):  # the email-for-prices form is removed
+            self.assertNotIn(gone, html)
 
     @KEY
     def test_cream_card_with_assistant_name_and_fallbacks(self):

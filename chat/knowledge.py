@@ -141,7 +141,7 @@ def _gold():
 
 def _faq(prices):
     items = list(FaqItem.objects.filter(visible=True))
-    if not prices:  # an entry that mentions a price waits for the email like any other price
+    if not prices:  # an entry that mentions a price stays out like any other price
         items = [i for i in items if "£" not in i.question and "£" not in i.answer]
     if not items:
         return []

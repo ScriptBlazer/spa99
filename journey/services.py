@@ -13,7 +13,7 @@ from common.validators import normalise_email, normalise_mobile
 from insights import metrics
 from plans.models import SiteSettings
 
-from .conditions import matches
+from .conditions import matches, only_wanted_chosen
 from .copy import CONSENT_VERSION, GATE
 from .models import Answer, JourneySession, Option, Question, new_session_key
 
@@ -320,21 +320,22 @@ def _clean_values(question, options, active_values):
 def save_answer(session, question_key, options=None, text="", skipped=False):
     """Save (or change) the answer to one question. Safe to repeat: the same answer twice changes nothing.
     Returns (answer, changed). Raises AnswerError for anything invalid."""
-    visible, _ = visible_questions(session)
+    visible, values = visible_questions(session)
     question = next((q for q in visible if q.key == question_key), None)
     if question is None:
         raise AnswerError("That question is not part of this journey.")
     active = {o.value: o for o in question.active_options}
+    required = required_now(question, values)
 
     chosen, text = [], (text or "")
-    if skipped and question.min_choices:  # nothing visible is optional (2026-11-21); a TEXT question with min_choices 1 needs words
+    if skipped and required:  # nothing visible is optional (2026-11-21); a TEXT question with min_choices 1 needs words
         raise AnswerError("Please write a few words." if question.type == Question.TEXT else "Choose at least one option.")
     if skipped:
         text = ""
     elif question.type == Question.TEXT:
         text = " ".join(str(text).split())
         if not text:
-            raise AnswerError("Please write a few words." if question.min_choices else "Type an answer, or skip.")
+            raise AnswerError("Please write a few words." if required else "Type an answer, or skip.")
         if len(text) > MAX_TEXT_LENGTH:
             raise AnswerError("That answer is too long.")
         if options:
@@ -375,15 +376,25 @@ def _store(session, question, new_options, text, skipped):
 
 # ---------- required questions ----------
 
+def required_now(question, values):
+    """Does this visible question need an answer, given the answers so far (`values` from visible_questions)? Choice questions:
+    min_choices. A typed follow-up with min_choices: only while its parent's only choice is the one that shows it (Other alone)."""
+    if not question.min_choices:
+        return False
+    if question.type == Question.TEXT:
+        return only_wanted_chosen(question.condition, values)
+    return True
+
+
 def missing_required(session, before_step=None):
     """Keys of visible questions that need choices (min_choices; for a TEXT question, any non-blank text) and do not
     have enough yet, on screens before `before_step` (all screens when None). A skipped or unanswered question counts
     as missing. Hidden questions are never required (visible_questions applies the conditions)."""
     answers = answers_by_key(session)
-    visible, _ = visible_questions(session, answers)
+    visible, values = visible_questions(session, answers)
     missing = []
     for question in visible:
-        if not question.min_choices or (before_step is not None and question.screen >= before_step):
+        if not required_now(question, values) or (before_step is not None and question.screen >= before_step):
             continue
         answer = answers.get(question.key)
         if question.type == Question.TEXT:  # a required text question needs one non-blank character

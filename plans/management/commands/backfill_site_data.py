@@ -40,6 +40,8 @@ written by hand:
   (review round, same day) privacy parts still exactly as first written get the corrected text (Sentry wording, change
   history, Gold consents, optional details, tour storage, team sign-ins)
 
+- (2026-11-21) the privacy line about the Ask us chat no longer says an email unlocks prices (exact old line only)
+
 - (2026-10-26) "with someone" becomes "with a friend" (journey Company options and their reasons, the two guest suggestion
   rule names); the journey result label "Your membership" becomes "Based on your answers". Exact old wording only, so
   hand edits are kept; saved one by one so the change is in the history
@@ -178,8 +180,11 @@ def backfill():
     changed.update(_whatsapp_and_gold_2026_10_29())
     changed.update(_privacy_notice_2026_11_04())
     changed.update(_privacy_notice_2026_11_21())
+    changed.update(_privacy_chat_email_2026_11_21())
     changed.update(_heard_via_papers_2026_11_21())
     changed.update(_journey_required_2026_11_21())
+    changed.update(_industry_other_under_industry_2026_11_21())
+    changed.update(_other_box_context_2026_11_21())
     changed.update(_not_you_start_again_2026_11_03())
     changed.update(_dashboard_all_time_2026_11_05())
     return changed
@@ -513,6 +518,21 @@ def _privacy_notice_2026_11_21():
             section.body = legal.PRIVACY_UPDATED
             section.save()
             changed["content.Section (privacy notice: last updated)"] += 1
+    return changed
+
+
+def _privacy_chat_email_2026_11_21():
+    """2026-11-21: the Ask us chat no longer asks for an email, so the privacy line about it changes. Exact old line only (a part edited by hand
+    is reported as left alone); the privacy version and "Last updated" are left as they are."""
+    changed = Counter()
+    page = Page.objects.filter(key="privacy").first()
+    if page is None:
+        return changed
+    old = ("- What you type to the assistant and its replies, with the time. If you gave your email to see prices, or you are "
+           "signed in, the chat is linked to it. We do not store your IP address with a chat.")
+    new = ("- What you type to the assistant and its replies, with the time. If you are signed in, the chat is linked to your account. "
+           "Chats from before 21 November 2026 may be linked to an email given in the chat. We do not store your IP address with a chat.")
+    _edit_privacy_section(page, "part_2", [("Ask us chat no longer asks for an email", old, new)], changed, "part_2")
     return changed
 
 
@@ -962,3 +982,37 @@ class Command(BaseCommand):
                 self.stdout.write(f"{prefix} {count} x {name}")
         if dry_run:
             self.stdout.write("Dry run: nothing was saved.")
+
+
+# Screen 4 order before 2026-11-21 (the seed's numbers), and after: "In a few words" moves right under Industry.
+_SCREEN_4_OLD = {"industry": 1, "property_link": 2, "property_size": 3, "property_law": 4, "heard_via": 5, "industry_other": 6, "heard_via_other": 7}
+_SCREEN_4_NEW = {"industry": 1, "industry_other": 2, "property_link": 3, "property_size": 4, "property_law": 5, "heard_via": 6, "heard_via_other": 7}
+
+
+def _industry_other_under_industry_2026_11_21():
+    """Moishe 2026-11-21: "In a few words" shows right under Industry, above the property questions. Only when screen 4 still has
+    exactly the old order (an order changed in Control is left alone). Its new "needed only when Other is the only industry"
+    rule is in code (journey.services.required_now), so nothing else changes here."""
+    changed = Counter()
+    rows = {q.key: q for q in Question.objects.filter(key__in=_SCREEN_4_OLD, screen=4)}
+    if {key: q.order for key, q in rows.items()} != _SCREEN_4_OLD:
+        return changed
+    for key, order in _SCREEN_4_NEW.items():
+        if rows[key].order != order:
+            rows[key].order = order
+            rows[key].save()  # one by one, so history records it
+            changed["journey.Question (In a few words moved under Industry)"] += 1
+    return changed
+
+
+def _other_box_context_2026_11_21():
+    """Moishe 2026-11-21: a small line above "In a few words" and "Where?" says which Other it is for. Only fills a blank help text."""
+    changed = Counter()
+    for key, text in (("industry_other", journey_seed.INDUSTRY_OTHER_HELP), ("heard_via_other", journey_seed.HEARD_VIA_OTHER_HELP)):
+        question = Question.objects.filter(key=key, help_text="").first()
+        if question is not None:
+            question.help_text = text
+            question.save()
+            changed["journey.Question (line above the Other box)"] += 1
+    return changed
+

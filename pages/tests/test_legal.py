@@ -200,3 +200,17 @@ class InviteOpenNoticeTests(TestCase):
         self.assertNotIn("Reply STOP", body)
         self.assertEqual(body.count("### WhatsApp"), 1)
         self.assertEqual(SiteSettings.load().privacy_version, legal.PRIVACY_VERSION)
+
+    def test_backfill_rewords_the_chat_email_line_only_where_it_is_the_exact_old_line(self):
+        seed_all()
+        rows = Section.objects.filter(page__key="privacy", key="part_2")
+        new_line = "If you are signed in, the chat is linked to your account."
+        old_line = "If you gave your email to see prices, or you are signed in, the chat is linked to it."
+        old = rows.get().body.replace("If you are signed in, the chat is linked to your account. Chats from before 21 November 2026 may be linked to an email given in the chat.", old_line)
+        self.assertIn(old_line, old)
+        rows.update(body=old)
+        call_command("backfill_site_data", "--dry-run", stdout=StringIO())
+        self.assertEqual(rows.get().body, old)
+        call_command("backfill_site_data", stdout=StringIO())
+        self.assertIn(new_line, rows.get().body)
+        self.assertNotIn("to see prices", rows.get().body)

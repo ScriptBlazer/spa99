@@ -295,3 +295,78 @@ class BackfillRequiredTests(RequiredBase):
         Question.objects.filter(key="company").update(min_choices=0)
         self.assertNotIn("answer required", self.run_command())
         self.assertEqual(self.mins()["company"], 0)
+
+
+class OtherBoxTests(RequiredBase):
+    """Moishe 2026-11-21: "In a few words" sits right under Industry, says which Other it is for, and is needed only when Other
+    is the only industry ticked. "Where?" says the same for How did you hear about us."""
+
+    def setUp(self):
+        super().setUp()
+        self.session = services.create_session()
+        for key, value in (("time", "evening"), ("frequency", "weekly"), ("facilities", "gym"), ("company", "alone"), ("heard_via", "friend")):
+            services.save_answer(self.session, key, options=[value])
+
+    def test_other_alone_needs_words_other_with_another_industry_does_not(self):
+        services.save_answer(self.session, "industry", options=["other"])
+        self.assertEqual(services.missing_required(self.session), ["industry_other"])
+        with self.assertRaises(services.AnswerError):
+            services.save_answer(self.session, "industry_other", skipped=True)
+        services.save_answer(self.session, "industry", options=["other", "finance"])
+        self.assertEqual(services.missing_required(self.session), [])
+        services.save_answer(self.session, "industry_other", skipped=True)  # clearing it is fine now
+        self.assertEqual(engine.complete(self.session)["suggested"] is not None, True)
+        services.save_answer(self.session, "industry", options=["other"])  # back to Other alone: words needed again
+        self.assertEqual(services.missing_required(self.session), ["industry_other"])
+
+    def test_other_with_property_shows_the_box_first_then_the_property_questions(self):
+        services.save_answer(self.session, "industry", options=["property", "other"])
+        keys = [q.key for q in services.visible_questions(self.session)[0] if q.screen == 4]
+        self.assertEqual(keys, ["industry", "industry_other", "property_link", "heard_via"])
+        state = services.build_state(self.session)
+        by_key = {q["key"]: q for s in state["screens"] for q in s["questions"]}
+        self.assertEqual(by_key["industry_other"]["help"], "You picked Other under Industry.")
+        self.assertEqual(by_key["heard_via_other"]["help"], "You picked Other under How did you hear about us.")
+
+    def test_where_is_still_needed_when_other_is_picked(self):
+        services.save_answer(self.session, "industry", options=["finance"])
+        services.save_answer(self.session, "heard_via", options=["other"])
+        self.assertEqual(services.missing_required(self.session), ["heard_via_other"])
+        services.save_answer(self.session, "heard_via_other", text="a")
+        self.assertEqual(services.missing_required(self.session), [])
+
+
+class OtherBoxBackfillTests(RequiredBase):
+    OLD = {"industry": 1, "property_link": 2, "property_size": 3, "property_law": 4, "heard_via": 5, "industry_other": 6, "heard_via_other": 7}
+
+    def run_command(self, *args):
+        out = StringIO()
+        call_command("backfill_site_data", *args, stdout=out)
+        return out.getvalue()
+
+    def make_old(self):
+        for key, order in self.OLD.items():
+            Question.objects.filter(key=key).update(order=order)
+        Question.objects.filter(key__in=["industry_other", "heard_via_other"]).update(help_text="")
+
+    def test_moves_the_box_and_fills_the_lines_once_dry_run_saves_nothing(self):
+        self.make_old()
+        dry = self.run_command("--dry-run")
+        self.assertIn("Would change 5 x journey.Question (In a few words moved under Industry)", dry)
+        self.assertIn("Would change 2 x journey.Question (line above the Other box)", dry)
+        self.assertEqual(Question.objects.get(key="industry_other").order, 6)
+        self.run_command()
+        orders = dict(Question.objects.filter(screen=4).values_list("key", "order"))
+        self.assertEqual(orders, {"industry": 1, "industry_other": 2, "property_link": 3, "property_size": 4, "property_law": 5, "heard_via": 6, "heard_via_other": 7})
+        self.assertEqual(Question.objects.get(key="industry_other").help_text, "You picked Other under Industry.")
+        again = self.run_command()
+        self.assertNotIn("moved under Industry", again)
+        self.assertNotIn("line above", again)
+
+    def test_an_order_or_line_changed_in_control_is_left_alone(self):
+        self.make_old()
+        Question.objects.filter(key="heard_via").update(order=9)
+        Question.objects.filter(key="industry_other").update(help_text="Our own words.")
+        self.run_command()
+        self.assertEqual(Question.objects.get(key="industry_other").order, 6)
+        self.assertEqual(Question.objects.get(key="industry_other").help_text, "Our own words.")

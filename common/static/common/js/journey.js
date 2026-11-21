@@ -50,6 +50,7 @@ function matches(condition, values) {
 }
 const parentKey = (q) => (conditionItems(q.condition)[0] || {}).question || null;
 
+let chosenNow = {}; // question key -> option values, for the visible answered questions (set by computeVisible)
 function computeVisible() {
   const values = {};
   const visible = new Set();
@@ -60,6 +61,7 @@ function computeVisible() {
     if (a && !a.skipped) values[q.key] = a.options;
   });
   visibleKeys = visible;
+  chosenNow = values;
 }
 const screenNumbers = () => state.screens.filter((s) => s.questions.some((q) => visibleKeys.has(q.key))).map((s) => s.number);
 function computeResultStep() {
@@ -159,16 +161,20 @@ function questionBlock(q) {
     const id = `t-${q.key}`;
     const input = el('input', { type: 'text', id, class: 'input', maxlength: String(state.session.max_text_length), autocomplete: 'off', value: answers[q.key]?.text || '', 'data-q': q.key, 'data-text': '' });
     input.value = answers[q.key]?.text || '';
-    // Nothing is optional (2026-11-21): a shown text question needs at least one letter (min_choices > 0).
-    if (isRequired(q)) input.setAttribute('aria-describedby', `hint-${q.key}`);
+    // A shown typed follow-up needs one letter while Other is the only choice above it (2026-11-21); syncVisibility shows or hides the hint.
+    const needed = isRequired(q);
+    input.setAttribute('aria-describedby', `hint-${q.key}`);
+    // The small line above says which "Other" this box is for (its help text, editable in Control).
+    if (q.help) block.append(el('span', { class: 'question-context', id: `ctx-${q.key}`, text: q.help }));
+    if (q.help) input.setAttribute('aria-describedby', `ctx-${q.key} hint-${q.key}`);
     block.append(el('div', { class: 'field' }, el('label', { for: id }, q.text), input));
-    if (isRequired(q)) block.append(el('span', { class: 'question-help', id: `hint-${q.key}`, text: copyOf('need_text').body || NEED_TEXT }));
+    block.append(el('span', { class: 'question-help', id: `hint-${q.key}`, text: copyOf('need_text').body || NEED_TEXT, hidden: !needed }));
     return block;
   }
 
   const title = el('span', { id: `l-${q.key}`, text: q.text });
   const needs = (q.min_choices || 0) > 0;
-  const helpText = q.help || (needs ? 'Choose at least one.' : '');
+  const helpText = q.help || (needs ? (q.type === 'multi' ? 'Choose at least one.' : 'Choose one.') : '');
   const help = helpText ? el('span', { class: 'question-help', id: `hint-${q.key}`, text: helpText }) : null;
   const legend = el('legend', {}, title);
   block.append(legend);
@@ -194,13 +200,21 @@ function syncVisibility() {
   root.querySelectorAll('[data-question]').forEach((block) => {
     const show = visibleKeys.has(block.dataset.question);
     if (block.hidden === show) block.hidden = !show;
+    const hint = block.querySelector('input[data-text]') && block.querySelector('.question-help');
+    if (hint) hint.hidden = !isRequired(questionByKey(block.dataset.question));
   });
   updateAction();
   updateProgress();
 }
 
 const NEED_TEXT = 'Please write a few words.';
-const isRequired = (q) => (q.min_choices || 0) > 0;
+/** Same rule as the server (journey/services.py required_now): a typed follow-up is needed only while its parent's only choice
+ *  is the one that shows it (Other alone); Other plus another choice makes it optional. */
+const onlyWantedChosen = (condition) => conditionItems(condition).every((item) => {
+  const wanted = item.any_of || [];
+  return !wanted.length || (chosenNow[item.question] || []).every((v) => wanted.includes(v));
+});
+const isRequired = (q) => (q.min_choices || 0) > 0 && (q.type !== 'text' || onlyWantedChosen(q.condition));
 /** Same rule as the server (journey/services.py missing_required): choices for a choice question, one non-blank letter for a text one. */
 const isMet = (q) => {
   const a = answers[q.key];
