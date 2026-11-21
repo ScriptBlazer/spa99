@@ -205,7 +205,8 @@ const isRequired = (q) => (q.min_choices || 0) > 0;
 const isMet = (q) => {
   const a = answers[q.key];
   if (q.type === 'text') return Boolean(a && !a.skipped && (a.text || '').trim());
-  return (a?.options.length || 0) >= q.min_choices;
+  const offered = new Set(q.options.map((o) => o.value));  // a retired option no longer counts, as on the server
+  return (a?.options.filter((v) => offered.has(v)).length || 0) >= q.min_choices;
 };
 
 /** Visible required questions on a screen that are not answered yet (the "at least one" rule, and typed text). */
@@ -467,6 +468,7 @@ async function show(step) {
     updateProgress();
     try {
       // POST: arriving at the result is what stores the suggestion and marks the journey finished (a GET changes nothing).
+      await chain;  // the last answers (a letter typed just before the tap) are saved before the result is asked for
       const reply = await postWithRetry('/journey/result/', {});
       if (reply.status === 400 && reply.data?.missing?.length) { bounce(reply.data.missing); return; }
       if (reply.status === 403 && reply.data?.needs_email) { state.session.lead_required = true; show(step); return; }  // gate first

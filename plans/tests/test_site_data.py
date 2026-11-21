@@ -138,7 +138,7 @@ class JourneyAndGoldBackfillTests(TestCase):
         self.run_command()
         time, facilities = Question.objects.get(key="time"), Question.objects.get(key="facilities")
         self.assertEqual((time.help_text, time.min_choices), ("Choose at least one.", 1))
-        self.assertEqual((facilities.help_text, facilities.min_choices), ("Pick a few.", 1))  # help text stays; nothing is optional now (_journey_required_2026_11_21)
+        self.assertEqual((facilities.help_text, facilities.min_choices), ("Pick a few.", 0))  # edited by hand: stays. The 2026-11-21 required step has already run here (its need_text words exist), so it leaves a 0 alone
         self.assertEqual(Section.objects.get(page__key="journey", key="change_answers").cta_label, "Start again")
         screen = Section.objects.get(page__key="gold-apply", key="screen_1")
         self.assertEqual((screen.heading, screen.body), ("About you.", "Our own words."))

@@ -14,7 +14,7 @@ from django.test import Client, TestCase
 from common.models import RateHit
 from content.models import Section
 from journey import engine, services
-from journey.models import Answer, JourneySession, Question
+from journey.models import Answer, JourneySession, Option, Question
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import SiteSettings
 
@@ -234,6 +234,31 @@ class PageScriptAgreesWithServerTests(RequiredBase):
         self.assertEqual(json.loads(run.stdout), expected)
 
 
+    def test_an_answer_on_a_retired_option_counts_as_unanswered_on_the_page_as_on_the_server(self):
+        """Reviewer 2026-11-21: the page used to count a retired option as an answer while the server did not, so Continue
+        looked active and every tap bounced back with no message."""
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("node is not installed")
+        session = services.create_session()
+        for key, value in (("time", "evening"), ("frequency", "weekly"), ("facilities", "gym"), ("company", "alone"),
+                           ("industry", "finance"), ("heard_via", "friend")):
+            services.save_answer(session, key, options=[value])
+        Option.objects.filter(question__key="heard_via", value="friend").update(active=False)
+        Option.objects.filter(question__key="facilities", value="gym").update(active=False)
+        self.assertEqual(set(services.missing_required(session)), {"heard_via", "facilities"})
+        state = services.build_state(session)
+        answers = {q["key"]: q["answer"] for s in state["screens"] for q in s["questions"] if q["answer"]}
+        self.assertIn("friend", answers["heard_via"]["options"])  # the page does receive the retired value
+        script = Path(__file__).with_name("required_check.js")
+        journey_js = Path(settings.BASE_DIR) / "common/static/common/js/journey.js"
+        run = subprocess.run([node, str(script), str(journey_js)], input=json.dumps([{"state": state, "answers": answers}]),
+                             capture_output=True, text=True, timeout=60)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        unmet = sorted(k for keys in json.loads(run.stdout)[0]["unmet"].values() for k in keys)
+        self.assertEqual(unmet, ["facilities", "heard_via"])
+
+
 class BackfillRequiredTests(RequiredBase):
     def run_command(self, *args):
         out = StringIO()
@@ -266,3 +291,7 @@ class BackfillRequiredTests(RequiredBase):
         self.assertEqual(Section.objects.get(page__key="journey", key="screen_4").body, "Only to suggest the right fit.")
         self.assertNotIn("answer required", self.run_command())  # second run: nothing left
         self.assertEqual(self.mins(), got)
+        # Moishe later makes a question optional in Control: a later backfill run (GO-LIVE says to re-run it) leaves it alone
+        Question.objects.filter(key="company").update(min_choices=0)
+        self.assertNotIn("answer required", self.run_command())
+        self.assertEqual(self.mins()["company"], 0)

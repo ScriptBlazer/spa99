@@ -150,6 +150,8 @@ def result(request):
         visitors.record_step(request, "finished")  # the visit's campaign gets a finished journey (never breaks the answer)
         return _with_cookie(JsonResponse(data), session)
     except services.AnswerError as error:
+        if session.completed:  # finished before answers became required (2026-11-21): his result still shows, nothing is re-stored
+            return _with_cookie(JsonResponse(engine.preview(session)), session)
         return _bad(str(error), missing=error.missing)
 
 

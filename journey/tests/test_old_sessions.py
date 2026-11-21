@@ -70,6 +70,28 @@ class OldFinishedSessionTests(OfficeTestCase):
         self.assertEqual(get(admin, f"/leads/{session.pk}/").status_code, 200)
         self.assertEqual(list(Answer.objects.order_by("pk").values_list("pk", "skipped", "text_value")), before)  # nothing rewritten
 
+    def test_the_page_can_still_show_an_old_finished_result_and_nothing_is_re_stored(self):
+        """The result page always POSTs /journey/result/ (See my last suggestion, a reload, a bookmark). Reviewer 2026-11-21:
+        it used to answer 400 and send him back to screen 1."""
+        site = SiteSettings.load()
+        site.journey_email_gate = False
+        site.save()
+        client = Client()
+        client.get("/journey/state/")
+        session = services.session_from_cookies({"spa99_journey": client.cookies["spa99_journey"].value})
+        services.save_answer(session, "time", options=["evening"])
+        services.save_answer(session, "facilities", options=["gym"])
+        services.save_answer(session, "industry", options=["finance"])
+        for key in ("frequency", "company", "heard_via"):
+            skipped(session, key)
+        JourneySession.objects.filter(pk=session.pk).update(completed=True, completed_at=timezone.now(), current_step=5, furthest_step=5)
+        stored = JourneySession.objects.filter(pk=session.pk).values("completed_at", "suggested_plan_id", "gold_score").get()
+        RateHit.objects.all().delete()
+        reply = client.post("/journey/result/", "{}", content_type="application/json")
+        self.assertEqual(reply.status_code, 200, reply.content)
+        self.assertTrue(reply.json()["suggested"])
+        self.assertEqual(JourneySession.objects.filter(pk=session.pk).values("completed_at", "suggested_plan_id", "gold_score").get(), stored)
+
 
 class UnfinishedOldSessionTests(TestCase):
     """Someone halfway through at deploy, with a now-required answer skipped on an earlier screen."""

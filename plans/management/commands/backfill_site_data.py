@@ -339,11 +339,14 @@ def _journey_required_2026_11_21():
     included) move from min_choices 0 to 1; any other value is a choice made in Control and stays. The words "Please write a few
     words." are added when missing, and the "About you." line stops saying Optional (only while it still has its exact old words)."""
     changed = Counter()
-    for question in Question.objects.filter(key__in=journey_seed.REQUIRED_KEYS, min_choices=0):
+    page = Page.objects.filter(key="journey").first()
+    # Once only: this step also adds the need_text words, so their presence means it has run. A later run must not undo a
+    # question Moishe has since made optional in Control.
+    first_run = page is None or not Section.objects.filter(page=page, key="need_text").exists()
+    for question in Question.objects.filter(key__in=journey_seed.REQUIRED_KEYS, min_choices=0) if first_run else []:
         question.min_choices = 1
         question.save()  # one by one, so history records it
         changed["journey.Question (answer required)"] += 1
-    page = Page.objects.filter(key="journey").first()
     if page is not None:
         sections = Section.objects.filter(page=page)
         need = content_seed.PAGES["journey"][2]
