@@ -79,6 +79,8 @@ Deviations (one line each):
 - Visit length is the larger of (last page seen minus start) and the beacon's visible seconds; a visit with neither is under 10s. A step (started, finished, registered, gold) counts once per visit; every contact tap counts.
 - The beacon carries `n` (0 for the first beacon of a page view): only the first counts the page as reported and records the scroll step; later beacons add seconds.
 - `/.private/deploy/Caddyfile` is not tracked in git, so it was not edited.
+- Contact taps accept only whatsapp, phone, email, instagram and map (one list in `insights/metrics.py`); `data-track` names are not used, so junk kinds can't fill the daily cap. The beacon ignores webhook paths (`/ses/`, `/postmark/`, `/phone/`).
+- The `www` Caddy block doesn't import `(probes)`: it only redirects, and the bare domain blocks them.
 - The privacy notice date moved to 21 November 2026; the privacy version number was left at 2026-11-05 (a bump needs a model default migration and asks nobody to accept again). `backfill_site_data` gets the new paragraph (dry run supported).
 
 ## Built (frontend, 2026-11-21)
