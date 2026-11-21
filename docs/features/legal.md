@@ -18,7 +18,7 @@ Not legal advice: a solicitor must review both texts before launch (see Launch b
 | Statement | Source |
 |---|---|
 | Controller, company number, office, BML Group | PROJECT.md 2026-10-23 (legal owner); PROJECT.md section 1 |
-| Browsing collects nothing identifying; visitor counter (daily salt, one-way hash, no IP or UA stored, wiped next day, referrer host only) | `insights/visitors.py`, `insights/rollup.py` (deletes `VisitorHash`/`VisitorSalt` older than today), `office-counting-rules.md` C3 |
+| Browsing collects nothing identifying; visitor counter (since 2026-11-21 also device, browser, system, country, time on page, scroll, contact taps, campaign tags: see analytics.md) (daily salt, one-way hash, no IP or UA stored, wiped next day, referrer host only) | `insights/visitors.py`, `insights/rollup.py` (deletes `VisitorHash`/`VisitorSalt` older than today), `office-counting-rules.md` C3 |
 | Journey answers, saved from the first tap, typed text | `journey/seed.py` (questions incl. `industry_other`, `heard_via_other`), `journey.md` |
 | Journey context: referrer (up to 500 chars), UTM tags, device type, timings | `journey/models.py` `JourneySession`, `journey/services.py` `create_session` (user agent only turned into a device type, not stored) |
 | Account fields, hashed password, men-only, privacy version, marketing consent, account ID, verification | `users/models.py`, `users/forms.py` (mobile required), `register-interest.md` |

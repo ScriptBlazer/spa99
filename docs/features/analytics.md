@@ -68,3 +68,15 @@ Analytics gets a **Visitors** area (exact layout from the designer): Live, Overv
 - Works on SQLite and Postgres; no Postgres-only code.
 - Tests (mocked GeoIP reader, no network): UA parsing table; visit start, 30-minute gap, bounce take-back, close by roll-up and at midnight; beacon validation, caps, rate limit and 204; utm cleaning and channel rules; same-day campaign step attribution; caps to `other`; nothing personal stored (no IP, UA or full URL in any row); roll-up wipes visit rows; probes give 404 and are not counted; Office live and snapshot endpoints keep a fixed query count; permissions (Viewer sees, Office makes links).
 - No backfill: the new figures start from deploy day; the old visitor and page-view rows stay as they are.
+
+## Built (backend, 2026-11-21)
+A1 to A8, A10, A11 and the Checks are built; A9 (Office screens) is the frontend's. Code: `common/useragent.py`, `common/geoip.py` + `common/geoip_fetch.py`, `insights/visitors.py` (visits, steps, closing), `insights/campaigns.py` (utm, channels, link maker), `insights/beacon.py` + `common/static/common/js/beacon.js`, `insights/live.py`, `common/probes.py` + the `(probes)` snippet in the `Caddyfile`, `office/analytics_visitors.py` (the `visitors` snapshot), endpoints in the `office.md` API table. Migration `insights/0008`. Settings: `GEOIP_DB_PATH`. Pinned: `maxminddb`, `segno`.
+
+Deviations (one line each):
+- The campaign key keeps each utm part to source 20, medium 15, campaign 30, content 20 characters (not 60) so `key:step` fits the 100 character dimension column.
+- A visit tagged `utm_medium=email` has channel `email`; any other tagged visit is `campaign`. `campaign_visits` still counts every tagged visit.
+- An in-app Instagram or Facebook browser with no referrer counts as `social`, not `direct`.
+- Visit length is the larger of (last page seen minus start) and the beacon's visible seconds; a visit with neither is under 10s. A step (started, finished, registered, gold) counts once per visit; every contact tap counts.
+- The beacon carries `n` (0 for the first beacon of a page view): only the first counts the page as reported and records the scroll step; later beacons add seconds.
+- `/.private/deploy/Caddyfile` is not tracked in git, so it was not edited.
+- The privacy notice date moved to 21 November 2026; the privacy version number was left at 2026-11-05 (a bump needs a model default migration and asks nobody to accept again). `backfill_site_data` gets the new paragraph (dry run supported).
