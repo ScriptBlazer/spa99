@@ -74,6 +74,8 @@ def early_note(data):
     since = _since(data)
     if not since or (date.fromisoformat(data["today"]) - since).days >= 30:
         return ""
+    if data.get("who") == "real":
+        return f"Real visitor figures started on {since.day} {since:%B %Y} (older days are not counted this way), so the first weeks will look thin."
     return f"Visitor figures started on {since.day} {since:%B %Y}, so the first weeks will look thin."
 
 

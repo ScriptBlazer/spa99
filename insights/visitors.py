@@ -29,6 +29,7 @@ _GROUP = re.compile(r"[^a-z0-9_-]")
 VISIT_GAP = timedelta(minutes=30)  # a visit ends after this long without a page view (A3)
 LENGTH_BUCKETS = (("0-10s", 10), ("10-30s", 30), ("30s-1m", 60), ("1-3m", 180), ("3-10m", 600), ("10m+", None))
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+REAL = "real:"  # the real-visitors twin of a daily key: "real:visitors" (A12). Same dimensions, written only for human visitors.
 STEPS = ("started", "finished", "registered", "gold", "contact")  # what a visit's campaign and channel are credited with (A5)
 
 
@@ -98,6 +99,15 @@ def length_bucket(seconds):
             return name
 
 
+def _add(human, key, dimension, amount, day):
+    """One figure for the day: always under `key` (all visitors) and, for a human visitor, under REAL + key too (A12)."""
+    for name in ((key, REAL + key) if human else (key,)):
+        if dimension == "":
+            metrics.count(name, "", amount, day, counter=False)
+        else:
+            metrics.count_capped(name, dimension, amount, day)
+
+
 def _refresh_sentences(today):
     """Keep the stored snapshots close behind the figures: for each of the day's first visitors, then every 25th."""
     from office import snapshots
@@ -128,17 +138,17 @@ def _visit_fields(request, group, now):
             "channel": channel, "source": source[:100], "campaign": campaigns.campaign_key(utm), "steps": ""}
 
 
-def _count_new_visit(fields, now, today):
+def _count_new_visit(fields, now, today, human=False):
     local = timezone.localtime(now)
-    metrics.count(K.VISITS, "", 1, today, counter=False)
-    metrics.count(K.BOUNCES, "", 1, today, counter=False)  # taken back by the visit's second page view
-    metrics.count(K.VISIT_PAGES, "", 1, today, counter=False)
-    metrics.count_capped(K.ENTRY_PAGES, fields["entry_group"], 1, today)
-    metrics.count_capped(K.VISITS_BY_CHANNEL, fields["channel"], 1, today)
-    metrics.count_capped(K.VISIT_SOURCES, fields["source"], 1, today)
+    _add(human, K.VISITS, "", 1, today)
+    _add(human, K.BOUNCES, "", 1, today)  # taken back by the visit's second page view
+    _add(human, K.VISIT_PAGES, "", 1, today)
+    _add(human, K.ENTRY_PAGES, fields["entry_group"], 1, today)
+    _add(human, K.VISITS_BY_CHANNEL, fields["channel"], 1, today)
+    _add(human, K.VISIT_SOURCES, fields["source"], 1, today)
     if fields["campaign"]:
-        metrics.count_capped(K.CAMPAIGN_VISITS, fields["campaign"], 1, today)
-    metrics.count_capped(K.VISIT_HOUR, f"{WEEKDAYS[local.weekday()]}:{local.hour:02d}", 1, today)
+        _add(human, K.CAMPAIGN_VISITS, fields["campaign"], 1, today)
+    _add(human, K.VISIT_HOUR, f"{WEEKDAYS[local.weekday()]}:{local.hour:02d}", 1, today)
 
 
 def _create_row(request, today, digest, now, visit):
@@ -172,9 +182,9 @@ def close_visit(row):
         return False
     span = max(int((row.last_seen - row.visit_started).total_seconds()), 0) if row.last_seen else 0
     length = max(span, row.visit_seconds)  # the beacon's visible seconds can exceed the span of a one-page visit
-    metrics.count_capped(K.EXIT_PAGES, row.current_group, 1, row.date)
-    metrics.count_capped(K.VISIT_LENGTH, length_bucket(length), 1, row.date)
-    metrics.count(K.VISIT_SECONDS, "", length, row.date, counter=False)
+    _add(row.human, K.EXIT_PAGES, row.current_group, 1, row.date)
+    _add(row.human, K.VISIT_LENGTH, length_bucket(length), 1, row.date)
+    _add(row.human, K.VISIT_SECONDS, "", length, row.date)
     return True
 
 
@@ -197,16 +207,18 @@ def record_page_view(request):
     row = VisitorHash.objects.filter(date=today, hash=digest).first()
     if row is None and _create_row(request, today, digest, now, _visit_fields(request, group, now)) is None:
         row = VisitorHash.objects.filter(date=today, hash=digest).first()  # lost a race: he is already here
+    human = False
     if row is not None:
+        human = row.human
         _continue_visit(row, request, group, now, today)
-    metrics.count(K.PAGE_VIEWS, "", 1, today, counter=False)
-    metrics.count_capped(K.PAGE_VIEWS, group, 1, today)
-    metrics.count_capped(K.VIEWS_BY_DEVICE, device_type(agent), 1, today)
-    metrics.count_capped(K.VIEWS_BY_BROWSER, browser_family(agent), 1, today)
-    metrics.count_capped(K.VIEWS_BY_SYSTEM, os_family(agent), 1, today)
+    _add(human, K.PAGE_VIEWS, "", 1, today)
+    _add(human, K.PAGE_VIEWS, group, 1, today)
+    _add(human, K.VIEWS_BY_DEVICE, device_type(agent), 1, today)
+    _add(human, K.VIEWS_BY_BROWSER, browser_family(agent), 1, today)
+    _add(human, K.VIEWS_BY_SYSTEM, os_family(agent), 1, today)
     source = referrer_source(request)
     if source:
-        metrics.count_capped(K.REFERRERS, source, 1, today)
+        _add(human, K.REFERRERS, source, 1, today)
 
 
 def _continue_visit(row, request, group, now, today):
@@ -217,12 +229,12 @@ def _continue_visit(row, request, group, now, today):
         close_visit(row)
         fields = _visit_fields(request, group, now)
         if VisitorHash.objects.filter(pk=row.pk, visit_started__isnull=True).update(**fields):
-            _count_new_visit(fields, now, today)
+            _count_new_visit(fields, now, today, row.human)
             return
-    metrics.count(K.VISIT_PAGES, "", 1, today, counter=False)
+    _add(row.human, K.VISIT_PAGES, "", 1, today)
     rows = VisitorHash.objects.filter(pk=row.pk)
     if rows.filter(visit_pages=1, visit_started__isnull=False).update(visit_pages=2, last_seen=now, current_group=group):
-        metrics.count(K.BOUNCES, "", -1, today, counter=False)
+        _add(row.human, K.BOUNCES, "", -1, today)
     else:
         rows.update(visit_pages=F("visit_pages") + 1, last_seen=now, current_group=group)
 
@@ -236,9 +248,61 @@ def credit_step(row, step, once=True):
             return
         if not VisitorHash.objects.filter(pk=row.pk, steps=row.steps).update(steps=(row.steps or ",") + step + ","):
             return  # another request is crediting it right now
-    metrics.count_capped(K.CHANNEL_STEPS, f"{row.channel}:{step}", 1, row.date)
+    _add(row.human, K.CHANNEL_STEPS, f"{row.channel}:{step}", 1, row.date)
     if row.campaign:
-        metrics.count_capped(K.CAMPAIGN_STEPS, f"{row.campaign}:{step}", 1, row.date)
+        _add(row.human, K.CAMPAIGN_STEPS, f"{row.campaign}:{step}", 1, row.date)
+
+
+def make_human(request, row, group):
+    """The first accepted beacon of the day for this visitor (A12): our page script ran, so he is a real browser. One conditional
+    UPDATE claims it, so racing beacons count it once. What he already contributed today is added to the real figures once, from
+    what the row holds: the visitor and his device, browser, system and country; the visit now open (its entry page, channel,
+    source, campaign, hour, pages so far, and the steps already credited); and the page view of the beacon's page. Earlier closed
+    visits of the day and earlier page views are not added (an approximation). Returns True when this call made him human."""
+    if not VisitorHash.objects.filter(pk=row.pk, human=False).update(human=True):
+        row.human = True  # already human (or another beacon just made him): the caller's row object must say so
+        return False
+    row.refresh_from_db()  # what the visit holds right now
+    day = row.date
+    agent = request.META.get("HTTP_USER_AGENT", "")
+
+    def real(key, dimension, amount=1):
+        _add_real(key, dimension, amount, day)
+
+    real(K.VISITORS, "")
+    real(K.DEVICES, row.device)
+    real(K.BROWSERS, browser_family(agent))
+    real(K.SYSTEMS, os_family(agent))
+    real(K.COUNTRIES, row.country)
+    if row.visit_started is not None:
+        local = timezone.localtime(row.visit_started)
+        real(K.VISITS, "")
+        if row.visit_pages <= 1:
+            real(K.BOUNCES, "")
+        real(K.VISIT_PAGES, "", max(row.visit_pages, 1))
+        real(K.ENTRY_PAGES, row.entry_group)
+        real(K.VISITS_BY_CHANNEL, row.channel)
+        real(K.VISIT_SOURCES, row.source)
+        if row.campaign:
+            real(K.CAMPAIGN_VISITS, row.campaign)
+        real(K.VISIT_HOUR, f"{WEEKDAYS[local.weekday()]}:{local.hour:02d}")
+        for step in (part for part in row.steps.split(",") if part):
+            real(K.CHANNEL_STEPS, f"{row.channel}:{step}")
+            if row.campaign:
+                real(K.CAMPAIGN_STEPS, f"{row.campaign}:{step}")
+    real(K.PAGE_VIEWS, "")
+    real(K.PAGE_VIEWS, group)
+    real(K.VIEWS_BY_DEVICE, device_type(agent))
+    real(K.VIEWS_BY_BROWSER, browser_family(agent))
+    real(K.VIEWS_BY_SYSTEM, os_family(agent))
+    return True
+
+
+def _add_real(key, dimension, amount, day):
+    if dimension == "":
+        metrics.count(REAL + key, "", amount, day, counter=False)
+    else:
+        metrics.count_capped(REAL + key, dimension, amount, day)
 
 
 def record_step(request, step):

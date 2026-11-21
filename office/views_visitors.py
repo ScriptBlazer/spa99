@@ -9,9 +9,21 @@ from django.views.decorators.http import require_GET
 from insights import campaigns, live
 from system import defaults
 
-from . import selectors, visitors_page
+from . import analytics_visitors as av, selectors, visitors_page
 from .permissions import developer
 from .views import _remembered_range
+
+
+def _remembered_who(request):
+    """?who=real|all wins and is remembered in the session like the range; otherwise the remembered one; real by default (A12)."""
+    asked = request.GET.get("who")
+    if asked in av.WHO:
+        if request.session.get("office_who_visitors") != asked:
+            request.session["office_who_visitors"] = asked
+        return asked
+    if asked is not None:
+        return "real"  # a bad value is real (and is not remembered)
+    return av.clean_who(request.session.get("office_who_visitors"))
 
 
 @developer
@@ -19,7 +31,8 @@ from .views import _remembered_range
 @never_cache
 def analytics_visitors(request):
     name = _remembered_range(request, "office_range_analytics", selectors.ANALYTICS_RANGES, defaults.get(request).analytics_range)
-    context = visitors_page.build(selectors.visitors(name, request), live.live_now())
+    who = _remembered_who(request)
+    context = visitors_page.build(selectors.visitors(name, request, who), live.live_now(who=who))
     return render(request, "office/analytics_visitors.html", {**context, "section": "analytics"})
 
 

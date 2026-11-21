@@ -50,7 +50,7 @@ class VisitorsDataTests(OfficeTestCase):
 
     def test_the_payload_has_the_figures_the_screens_need(self):
         self.make_traffic()
-        data = get(self.dev, "/analytics/visitors/data/?range=7d").json()
+        data = get(self.dev, "/analytics/visitors/data/?range=7d&who=all").json()
         self.assertEqual((data["range"], data["granularity"], len(data["labels"]), len(data["previous_labels"])), ("7d", "day", 7, 7))
         self.assertEqual(data["visitors_since"], metrics.day().isoformat())
         overview = data["overview"]
@@ -102,7 +102,7 @@ class VisitorsDataTests(OfficeTestCase):
 
     def test_live_json_shape_and_developers_only(self):
         visit("/memberships/", IPHONE, "203.0.113.1")
-        data = get(self.dev, "/analytics/live.json").json()
+        data = get(self.dev, "/analytics/live.json?who=all").json()
         self.assertEqual(data["count"], 1)
         self.assertEqual(data["by_page"], [{"label": "memberships", "value": 1}])
         self.assertEqual(get(self.dev, "/analytics/live.json")["Cache-Control"].count("no-cache"), 1)
@@ -131,3 +131,47 @@ class VisitorsDataTests(OfficeTestCase):
         for bad in ("http://[x", "https://evil.example/?x=1", "javascript:alert(1)", "", "/memberships/"):
             response = get(self.dev, "/analytics/qr.svg?url=" + quote(bad, safe=""))
             self.assertEqual(response.status_code, 400, bad)
+
+
+class RealAllEndpointTests(OfficeTestCase):
+    """Analytics > Visitors takes ?who=real|all (A12): real by default, anything else is real, the choice is remembered, permissions as before."""
+
+    def setUp(self):
+        visitors.forget_salts()
+        self.dev = staff("Developer", "d@example.com")
+
+    def test_who_picks_the_figures_and_a_bad_value_is_real(self):
+        visit("/memberships/", IPHONE, "203.0.113.1")  # no beacon: all only
+        rollup.run()
+        for query, expected, who in (("&who=all", 1, "all"), ("&who=real", 0, "real"), ("", 0, "real"), ("&who=junk", 0, "real")):
+            data = get(self.dev, f"/analytics/visitors/data/?range=7d{query}").json()
+            self.assertEqual((data["who"], data["overview"]["visitors"]["value"]), (who, expected), query)
+        self.assertEqual(get(self.dev, "/analytics/live.json?who=all").json()["count"], 1)
+        self.assertEqual(get(self.dev, "/analytics/live.json").json()["count"], 0)
+        self.assertEqual(get(self.dev, "/analytics/live.json?who=junk").json()["count"], 0)
+
+    def test_the_page_remembers_the_choice_and_polls_live_with_it(self):
+        client = Client(HTTP_HOST=OFFICE)  # one client, so the session carries the choice
+        client.force_login(self.dev)
+        html = client.get("/analytics/visitors/").content.decode()
+        self.assertIn("Real visitors: browsers that ran our page script", html)
+        self.assertIn("/analytics/live.json?who=real", html)
+        html = client.get("/analytics/visitors/?who=all").content.decode()
+        self.assertIn("All visitors, bots included.", html)
+        self.assertIn("/analytics/live.json?who=all", html)
+        self.assertIn("All visitors, bots included.", client.get("/analytics/visitors/").content.decode())  # remembered
+        self.assertIn("Real visitors: browsers", client.get("/analytics/visitors/?who=junk").content.decode())
+
+    def test_snapshot_queries_stay_fixed_with_the_second_variant(self):
+        def queries():
+            client = Client(HTTP_HOST=OFFICE)
+            client.force_login(self.dev)
+            with CaptureQueriesContext(connection) as ctx:
+                client.get("/analytics/visitors/data/?range=7d&who=real")
+                client.get("/analytics/visitors/data/?range=7d&who=all")
+            return len(ctx)
+        empty = queries()
+        for i in range(5):
+            visit("/memberships/", IPHONE, f"203.0.113.{10 + i}")
+        rollup.run()
+        self.assertEqual(queries(), empty)

@@ -85,6 +85,7 @@ class VisitorHash(models.Model):
     country = models.CharField(max_length=7, blank=True, default="")
     device = models.CharField(max_length=10, blank=True, default="")
     steps = models.CharField(max_length=80, blank=True, default="", help_text=",started,finished, ... : steps already credited to the visit's campaign today.")
+    human = models.BooleanField(default=False, help_text="Our page script (beacon.js) has reported for this visitor today: a real browser, not a bot that only fetches pages (A12).")
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["date", "hash"], name="visitor_hash_unique")]
@@ -118,6 +119,7 @@ class OfficeSnapshot(models.Model):
     roll-up and by the debounced refresh after each event. Views read this one row; nothing is summed on page load."""
 
     DASHBOARD, ANALYTICS, PAGES, LEADS, COUNTS, VISITORS = "dashboard", "analytics", "pages", "leads", "counts", "visitors"
+    VISITORS_REAL = "vis_real"  # the Visitors payload counting real visitors only (page is 12 characters at most)
 
     page = models.CharField(max_length=12)
     range = models.CharField(max_length=5)

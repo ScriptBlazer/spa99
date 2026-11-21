@@ -10,12 +10,18 @@ A range change swaps the [data-region] parts (office-swap.js); the Pages switch,
 <h1 class="sr-only">Analytics</h1>
 {% include "office/_analytics_nav.html" with active="visitors" %}
 {% include "office/_range.html" with place="page" ranges=data.ranges current=data.range %}
+{# Real / All visitors (A12): two plain links, the choice is remembered in the session like the range #}
+<nav class="o-seg o-seg--sub o-who" style="--n: 2" aria-label="Which visitors">
+  <a class="o-seg-item{% if data.who == 'real' %} is-active{% endif %}" href="?who=real"{% if data.who == "real" %} aria-current="true"{% endif %}><span>Real visitors</span></a>
+  <a class="o-seg-item{% if data.who == 'all' %} is-active{% endif %}" href="?who=all"{% if data.who == "all" %} aria-current="true"{% endif %}><span>All visitors</span></a>
+</nav>
+<p class="o-sub o-who-note" data-who-note>{% if data.who == "all" %}All visitors, bots included.{% else %}Real visitors: browsers that ran our page script. Most bots don’t.{% endif %}</p>
 {% if data.updating %}<p class="o-sub" data-updating>Updating…</p>{% endif %}
 {% if early_note %}<p class="o-sub o-early">{{ early_note }}</p>{% endif %}
 <div class="o-charts" data-office-charts>
 
   {# A On the site now: the one live figure. Not in a region: the range does not change it. #}
-  <section class="o-card o-live o-span-12" id="live" data-reveal data-live data-live-url="{% url 'office_analytics_live' %}"{% if live.empty %} data-empty{% endif %} aria-labelledby="h-live">
+  <section class="o-card o-live o-span-12" id="live" data-reveal data-live data-live-url="{% url 'office_analytics_live' %}?who={{ data.who }}"{% if live.empty %} data-empty{% endif %} aria-labelledby="h-live">
     <div class="o-live-main">
       <h2 class="o-live-title" id="h-live"><span class="o-live-dot" aria-hidden="true"></span>On the site now</h2>
       <p class="o-live-count" data-live-count aria-describedby="live-line">{{ live.count }}</p>

@@ -182,6 +182,7 @@ html:has(.o-charts) { scroll-behavior: smooth; }
 @media (hover: hover) and (pointer: fine) { .o-seg--sub .o-seg-item:not(.is-active):hover { color: var(--office-text); } }
 @media (min-width: 64em) { .o-seg--sub { width: 18rem; margin-bottom: var(--space-4); } }
 .o-early { margin-bottom: var(--space-3); }
+.o-who-note { margin-top: calc(var(--space-2) * -1); margin-bottom: var(--space-3); }   /* the one line under the Real / All switch */
 
 /* ---------- A  On the site now ---------- */
 .o-live { display: grid; gap: var(--space-4); }

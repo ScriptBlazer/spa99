@@ -287,13 +287,13 @@ class VisitTests(TestCase):
         self.later(minutes=4)
         self.view("/gold/", addr="198.51.100.9", agent=CHROME_WIN)
         with self.assertNumQueries(1):
-            data = live.live_now()
+            data = live.live_now(who="all")
         self.assertEqual(data["count"], 2)
         self.assertEqual(data["by_page"], [{"label": "gold", "value": 1}, {"label": "plans", "value": 1}])
         self.assertEqual(data["by_country"], [{"label": "gb", "value": 1}, {"label": "us", "value": 1}])
         self.assertEqual(data["by_device"], [{"label": "desktop", "value": 1}, {"label": "mobile", "value": 1}])
         self.later(minutes=2)  # the first has now been quiet for 6 minutes
-        self.assertEqual(live.live_now()["count"], 1)
+        self.assertEqual(live.live_now(who="all")["count"], 1)
         self.assertEqual(set(data), {"count", "window_minutes", "as_of", "by_page", "by_country", "by_device", "by_channel"})
 
 

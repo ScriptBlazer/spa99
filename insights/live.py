@@ -18,10 +18,11 @@ def _ranked(values):
     return [{"label": label, "value": n} for label, n in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:TOP]]
 
 
-def live_now(now=None):
-    """{count, window_minutes, as_of, by_page, by_country, by_device, by_channel}; each list is [{label, value}], biggest first."""
+def live_now(now=None, who="real"):
+    """`who`: "real" (visitors whose page script has reported, A12) or "all" (bots included). {count, window_minutes, as_of, by_page, by_country, by_device, by_channel}; each list is [{label, value}], biggest first."""
     now = now or timezone.now()
-    rows = list(VisitorHash.objects.filter(date=metrics.day(now), last_seen__gte=now - WINDOW).values_list("current_group", "country", "device", "channel"))
+    seen = VisitorHash.objects.filter(date=metrics.day(now), last_seen__gte=now - WINDOW)
+    rows = list((seen.filter(human=True) if who == "real" else seen).values_list("current_group", "country", "device", "channel"))
     return {
         "count": len(rows), "window_minutes": int(WINDOW.total_seconds() // 60), "as_of": now.isoformat(),
         "by_page": _ranked(r[0] for r in rows), "by_country": _ranked(r[1] for r in rows),

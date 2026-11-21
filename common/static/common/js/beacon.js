@@ -1,6 +1,8 @@
 /* Page beacon (docs/features/analytics.md A4, A6). Tells our own server how long this page was on screen, how far it was
    scrolled, and when a contact link (WhatsApp, phone, email, Instagram, map) is tapped. No cookie, no storage, no third party,
-   nothing about the person: the path, a number of seconds, a scroll step, a kind of link. */
+   nothing about the person: the path, a number of seconds, a scroll step, a kind of link.
+   A12: about 1.5 seconds after the page is on screen it also sends a tiny "hello" ({p, h:1}), so a real browser is confirmed
+   while still on its first page (Live shows it) and not only when it leaves. Bots that do not run scripts never send it. */
 (function () {
   "use strict";
   var URL = "/a/e/";
@@ -40,9 +42,28 @@
     seconds = 0;
   }
 
+  var HELLO_MS = 1500;
+  var helloSent = false;
+  var helloTimer = 0;
+  function hello() {
+    helloTimer = 0;
+    if (helloSent || document.visibilityState === "hidden") return;
+    helloSent = true;
+    post({ p: location.pathname, h: 1 });
+  }
+  function helloSoon() {
+    if (!helloSent && !helloTimer) helloTimer = setTimeout(hello, HELLO_MS);
+  }
+  if (document.visibilityState !== "hidden") helloSoon();
+
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "hidden") flush();
-    else shown = Date.now();
+    if (document.visibilityState === "hidden") {
+      clearTimeout(helloTimer); helloTimer = 0; // not on screen: the wait starts again when it is
+      flush();
+    } else {
+      shown = Date.now();
+      helloSoon();
+    }
   });
   window.addEventListener("pagehide", flush);
   window.addEventListener("scroll", scrolled, { passive: true });

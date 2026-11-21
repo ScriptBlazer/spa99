@@ -6,6 +6,8 @@ Body: {"p": "/plans/", "t": 12, "s": 50, "n": 0}  or  {"p": "/", "c": "whatsapp"
   t  seconds the page was visible since the last beacon (0 to 1800)
   s  furthest scroll so far: 0, 25, 50, 75 or 100 (first beacon of a page view only)
   n  0 for the first beacon of this page view (counts the view and the scroll), 1 for any later one (adds seconds only)
+  h  1 for the "hello" beacon: sent once, about 1.5 seconds after the page is on screen. It carries no figures; it only tells us the
+     page script ran, so the visitor counts as a real browser at once (A12)
   c  a contact tap: one of metrics.CONTACT_KINDS (whatsapp, phone, email, instagram, map); anything else is ignored"""
 import json
 import logging
@@ -62,12 +64,14 @@ def parse(raw):
             return None
         out["scroll"] = int(scroll)
         out["first"] = data.get("n", 0) == 0
+    if data.get("h") == 1:
+        out["hello"] = True
     if "c" in data:
         kind = data["c"]
         if not isinstance(kind, str) or kind.lower() not in metrics.CONTACT_KINDS:
             return None
         out["contact"] = kind.lower()
-    return out if ("seconds" in out or "contact" in out) else None
+    return out if ("seconds" in out or "contact" in out or "hello" in out) else None
 
 
 def record(request, beacon):
@@ -78,17 +82,23 @@ def record(request, beacon):
     if row is None or not hit("beacon", row.hash, RATE_LIMIT, RATE_WINDOW):
         return
     group = beacon["group"]
+
+    def both(key, dimension, amount):  # a beacon only comes from a real browser, so it counts in both
+        metrics.count_capped(key, dimension, amount, today)
+        metrics.count_capped(visitors.REAL + key, dimension, amount, today)
+
+    visitors.make_human(request, row, group)  # any accepted beacon shows the page script ran (A12); only the first one acts
     if "seconds" in beacon:
-        metrics.count_capped(K.ENGAGED_SECONDS, group, beacon["seconds"], today)
+        both(K.ENGAGED_SECONDS, group, beacon["seconds"])
         if beacon["first"]:
-            metrics.count_capped(K.ENGAGED_VIEWS, group, 1, today)
-            metrics.count_capped(K.SCROLL, f"{group}:{beacon['scroll']}", 1, today)
+            both(K.ENGAGED_VIEWS, group, 1)
+            both(K.SCROLL, f"{group}:{beacon['scroll']}", 1)
         # the visit goes on while the page is read; a visit already closed stays closed
         VisitorHash.objects.filter(pk=row.pk, visit_started__isnull=False).update(
             last_seen=now, visit_seconds=F("visit_seconds") + beacon["seconds"])
     if "contact" in beacon:
-        metrics.count_capped(K.CONTACT_TAPS, beacon["contact"], 1, today)
-        metrics.count_capped(K.CONTACT_TAPS_PAGE, f"{beacon['contact']}:{group}", 1, today)
+        both(K.CONTACT_TAPS, beacon["contact"], 1)
+        both(K.CONTACT_TAPS_PAGE, f"{beacon['contact']}:{group}", 1)
         visitors.credit_step(row, "contact", once=False)
 
 

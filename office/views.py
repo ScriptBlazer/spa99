@@ -126,8 +126,8 @@ def analytics_pages(request):
 @require_GET
 @never_cache
 def analytics_visitors_data(request):
-    """Analytics > Visitors, one stored snapshot (docs/features/analytics.md A9). ?range=7d|30d|90d|all"""
-    return JsonResponse(selectors.visitors(request.GET.get("range", defaults.get(request).analytics_range), request))
+    """Analytics > Visitors, one stored snapshot (docs/features/analytics.md A9). ?range=7d|30d|90d|all &who=real|all (A12; anything else is real)"""
+    return JsonResponse(selectors.visitors(request.GET.get("range", defaults.get(request).analytics_range), request, request.GET.get("who")))
 
 
 @developer
@@ -135,7 +135,7 @@ def analytics_visitors_data(request):
 @never_cache
 def analytics_live(request):
     """Who is on the public site in the last 5 minutes (counts only; the one figure read from today's rows). Polled every 15 seconds."""
-    return JsonResponse(live.live_now())
+    return JsonResponse(live.live_now(who="all" if request.GET.get("who") == "all" else "real"))
 
 
 QR_MAX_URL = 500

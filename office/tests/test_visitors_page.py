@@ -13,7 +13,7 @@ LINK = "/analytics/link.json"
 
 def payload(**over):
     """An empty Visitors payload with some figures set (what the page shapes)."""
-    data = analytics_visitors.empty("30d")
+    data = analytics_visitors.empty("30d", "all")
     data.update(over)
     return data
 
@@ -127,6 +127,7 @@ class VisitorsWordingTests(OfficeTestCase):
         early = self.tiles(100, 80, "2026-11-03")  # the previous period starts before the first day of figures
         self.assertTrue(all(t["change"] == "Counting since 3 Nov" for t in early.values()))
         self.assertEqual(visitors_page.early_note(payload(visitors_since="2026-11-03", today="2026-11-21")), "Visitor figures started on 3 November 2026, so the first weeks will look thin.")
+        self.assertTrue(visitors_page.early_note(payload(who="real", visitors_since="2026-11-03", today="2026-11-21")).startswith("Real visitor figures started on 3 November 2026"))
         self.assertEqual(visitors_page.early_note(payload(visitors_since="2026-09-01", today="2026-11-21")), "")
 
     def test_live_says_one_person_not_one_people_and_zero_calmly(self):

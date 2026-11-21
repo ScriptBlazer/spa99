@@ -65,6 +65,26 @@ Analytics gets a **Visitors** area (exact layout from the designer): Live, Overv
 - In Caddy on every host (`(probes)` snippet imported by each site), plus the same list in a first Django middleware so local, CI and anything that reaches Django behave the same (404, no Sentry, not counted, not logged as an error). `/.well-known/` is never blocked.
 - A count of blocked hits per day (`probes_blocked`, Django side only) for the System health page. Not shown in Office.
 
+## A12. Real and all visitors (2026-11-21)
+Moishe's decision: Analytics > Visitors (still Developer and up only) shows **Real visitors** by default, with a switch to **All visitors** (bots included).
+
+**Why:** the Live card showed 5 "on the site now" (US computers, an unknown device, Kenya and Thailand phones), almost certainly bots that send a Chrome user agent and pass the user-agent filter. Most bots do not run JavaScript.
+
+**Definition:** a visitor (today's `VisitorHash` row) is **real** once our page script (`beacon.js`) has sent a valid beacon for them (`VisitorHash.human`, set by the first accepted beacon of the day). Cookieless, no storage, same endpoint `/a/e/`, same 2 KB and rate-limit rules, still 204.
+
+**The hello beacon:** `beacon.js` used to send only when the page was hidden or closed, so a visitor was not confirmed (and Live did not show him) until he left. It now also sends `{p, h:1}` once, about 1.5 s after the page is on screen (restarted if the tab was hidden), with no figures. A real visitor is confirmed on his first page. Cost: one small request per page view; a bot that does run scripts also counts as real (this separates scripts from no scripts, not people from machines).
+
+**Figures:** every existing figure stays as **all**. The real set is the same keys with a `real:` prefix (`real:visitors`, `real:devices`, ... dimensions unchanged), in the same `DailyMetric` and `PeriodMetric` rows. No new table, no schema change beyond `VisitorHash.human` (migration `insights` 0009, default False, no backfill), and caps (100 dimensions a key a day) apply per key, so they stay simple. The roll-up sums `real:` rows into weeks and months with everything else. `visitors._add` writes `key` always and `real:key` when the row is human.
+- A hit by an already-real visitor writes both. A visit close (exit page, length bucket, seconds) and campaign/channel steps write real too when the row is human. Beacon figures (engaged seconds and views, scroll, contact taps) come only from real browsers, so they count in both.
+- When a visitor **becomes** real (`visitors.make_human`, one conditional UPDATE so racing beacons act once), real gets what the row shows he already did today: the visitor, his device, browser, system and country; the visit now open (visit, bounce if one page, pages so far, entry page, channel, source, campaign, hour, steps already credited); and the page view of the beacon's page (total, page group, per device, browser and system).
+- **Approximation:** earlier closed visits of the same day, and earlier page views before the beacon's page, are not added to real; the referrer of that first page is not either (the beacon has no referrer). Real can therefore be slightly under all for the same people. Figures start on the deploy day; nothing is backfilled, and the page says "Real visitor figures started on ...".
+
+**Screens and endpoints:** `selectors.visitors(range, request, who="real"|"all")`; two stored snapshots per range (`visitors` = all, `vis_real` = real), both built by the same job, nothing computed on page load. `GET /analytics/visitors/data/?range=&who=` and `GET /analytics/live.json?who=` (default and any bad value: real); the page `/analytics/visitors/?who=` remembers the choice in the session (`office_who_visitors`) like the range. `insights.live.live_now(who=)` filters `human=True` for real. The switch is two plain links in the `o-seg o-seg--sub` markup under the range picker (works without JavaScript, one full page load), with one line under it: "Real visitors: browsers that ran our page script. Most bots don't." / "All visitors, bots included." Live polls with the current choice. The Journey page and every other Office figure stay on all.
+
+Deviations:
+- The switch is a page load, not an in-place swap, to keep it working without JavaScript and to keep Live and the tiles on the same choice.
+- A `who` the page does not know is real and is not remembered.
+
 ## Checks (acceptance)
 - Works on SQLite and Postgres; no Postgres-only code.
 - Tests (mocked GeoIP reader, no network): UA parsing table; visit start, 30-minute gap, bounce take-back, close by roll-up and at midnight; beacon validation, caps, rate limit and 204; utm cleaning and channel rules; same-day campaign step attribution; caps to `other`; nothing personal stored (no IP, UA or full URL in any row); roll-up wipes visit rows; probes give 404 and are not counted; Office live and snapshot endpoints keep a fixed query count; permissions (Viewer sees, Office makes links).

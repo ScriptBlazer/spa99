@@ -10,7 +10,7 @@ from insights import campaigns, metrics
 from insights.metrics import K
 from insights.models import DailyMetric
 from insights.rollup import basis_points
-from insights.visitors import LENGTH_BUCKETS, STEPS, WEEKDAYS
+from insights.visitors import LENGTH_BUCKETS, REAL, STEPS, WEEKDAYS
 
 KEYS = (
     K.VISITORS, K.PAGE_VIEWS, K.VISITS, K.BOUNCES, K.VISIT_PAGES, K.VISIT_SECONDS, K.VISIT_LENGTH, K.DEVICES, K.BROWSERS, K.SYSTEMS, K.COUNTRIES,
@@ -40,12 +40,20 @@ def country_name(code):
     return {"unknown": "Unknown", "other": "Other"}.get(code) or _country_names.get(code, code.upper())
 
 
-def _by_label(rows, labels):
-    """{label: {(key, dimension): value}} for the given labels."""
+WHO = ("real", "all")
+
+
+def clean_who(value):
+    """'real' or 'all'; anything else is 'real' (A12)."""
+    return value if value in WHO else "real"
+
+
+def _by_label(rows, labels, prefix=""):
+    """{label: {(key, dimension): value}} for the given labels; `prefix` ('real:') is taken off the keys so the figures read the same."""
     wanted, out = set(labels), defaultdict(lambda: defaultdict(int))
     for day, key, dimension, value in rows:
         if day in wanted:
-            out[day][(key, dimension)] += value
+            out[day][(key[len(prefix):] if prefix and key.startswith(prefix) else key, dimension)] += value
     return out
 
 
@@ -189,17 +197,19 @@ def _sentences(s, heat, channels, campaign_rows):
     return out
 
 
-def build(range_name="30d", today=None):
-    """The stored JSON of Analytics > Visitors for one range."""
+def build(range_name="30d", today=None, who="all"):
+    """The stored JSON of Analytics > Visitors for one range. who="real": only visitors whose page script reported (the `real:` rows, A12)."""
     from . import selectors
 
     range_name = range_name if range_name in selectors.ANALYTICS_RANGES else "30d"
     today = today or metrics.day()
     granularity, labels = selectors._points(range_name, today)
-    rows = selectors._fetch(range_name, granularity, labels, KEYS)
+    who = clean_who(who)
+    prefix = REAL if who == "real" else ""
+    rows = selectors._fetch(range_name, granularity, labels, [prefix + key for key in KEYS])
     size = len(labels)
     previous = [] if range_name == "all" else [day - timedelta(days=size) for day in labels]
-    per_label = _by_label(rows, labels + previous)
+    per_label = _by_label(rows, labels + previous, prefix)
     here = _sum(per_label, labels)
     before = _sum(per_label, previous) if previous else None
     now_f, before_f = figures(here), (figures(before) if before is not None else None)
@@ -215,9 +225,9 @@ def build(range_name="30d", today=None):
     length = _dims(here, K.VISIT_LENGTH)
     length_total = sum(length.values())
     channels, campaign_rows, heat = _channels(here), _campaigns(here), _heatmap(here)
-    since = DailyMetric.objects.filter(key=K.VISITS, dimension="").order_by("date").values_list("date", flat=True).first()
+    since = DailyMetric.objects.filter(key=prefix + K.VISITS, dimension="").order_by("date").values_list("date", flat=True).first()
     return {
-        "range": range_name, "ranges": list(selectors.ANALYTICS_RANGES), "granularity": granularity, "today": today.isoformat(),
+        "who": who, "range": range_name, "ranges": list(selectors.ANALYTICS_RANGES), "granularity": granularity, "today": today.isoformat(),
         "labels": [d.isoformat() for d in labels], "previous_labels": [d.isoformat() for d in previous],
         "visitors_since": since.isoformat() if since else None,
         "overview": overview, "series": series,
@@ -237,13 +247,13 @@ def build(range_name="30d", today=None):
     }
 
 
-def empty(range_name):
+def empty(range_name, who="real"):
     """The payload before the first snapshot exists: zeros, never computed from data."""
     from . import selectors
 
     zero = {"value": 0, "previous": None, "percent": None, "direction": "none"}
     return {
-        "range": range_name, "ranges": list(selectors.ANALYTICS_RANGES), "granularity": "day", "today": metrics.day().isoformat(), "labels": [],
+        "who": clean_who(who), "range": range_name, "ranges": list(selectors.ANALYTICS_RANGES), "granularity": "day", "today": metrics.day().isoformat(), "labels": [],
         "previous_labels": [], "visitors_since": None,
         "overview": {key: dict(zero, value=None if key in ("pages_per_visit", "avg_visit_seconds", "bounce_rate_bp") else 0)
                      for key in ("visitors", "visits", "pages_per_visit", "avg_visit_seconds", "bounce_rate_bp")},
