@@ -1,5 +1,6 @@
 """Office views. Short: data comes from office.selectors (stored figures) and office.lists (source lists); actions call
 the existing services. Permissions are decorators on every view (see office.permissions)."""
+import io
 from datetime import datetime
 from decimal import Decimal
 from urllib.parse import urlencode, urlparse
@@ -7,7 +8,7 @@ from urllib.parse import urlencode, urlparse
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import dateformat, timezone
@@ -16,6 +17,7 @@ from django.utils.cache import patch_vary_headers
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
+import segno
 from chat import services as chat_services
 from chat.models import Conversation, Message
 from django.db.models import OuterRef, Subquery
@@ -24,6 +26,7 @@ from gold import approval, audit, invites
 from gold import services as gold_services
 from gold.forms import DeclineForm
 from gold.models import GoldApplication
+from insights import live
 from insights.metrics import K
 from journey import services as journey_services
 from journey.models import JourneySession
@@ -117,6 +120,41 @@ def analytics_data(request):
 @require_GET
 def analytics_pages(request):
     return JsonResponse(selectors.pages(request.GET.get("range", defaults.get(request).analytics_range), request))
+
+
+@reader
+@require_GET
+@never_cache
+def analytics_visitors_data(request):
+    """Analytics > Visitors, one stored snapshot (docs/features/analytics.md A9). ?range=7d|30d|90d|all"""
+    return JsonResponse(selectors.visitors(request.GET.get("range", defaults.get(request).analytics_range), request))
+
+
+@reader
+@require_GET
+@never_cache
+def analytics_live(request):
+    """Who is on the public site in the last 5 minutes (counts only; the one figure read from today's rows). Polled every 15 seconds."""
+    return JsonResponse(live.live_now())
+
+
+QR_MAX_URL = 500
+
+
+@editor
+@require_GET
+@never_cache
+def analytics_qr(request):
+    """An SVG QR code for a link-maker address (Office level and up). Only addresses on our own public site are drawn, so this cannot be
+    used to make codes for anywhere else. ?url=https://<our domain>/plans/?utm_source=..."""
+    link = request.GET.get("url", "")
+    parts = urlparse(link)
+    own = {urlparse(settings.SITE_URL).hostname, settings.DOMAIN.lower()}
+    if len(link) > QR_MAX_URL or parts.scheme not in ("http", "https") or (parts.hostname or "").lower() not in own:
+        return HttpResponse("That address is not on this site.", status=400, content_type="text/plain")
+    buffer = io.BytesIO()
+    segno.make(link, error="m").save(buffer, kind="svg", scale=10, border=4, dark="#492E21", light="#FFFFFF", xmldecl=False, svgns=True, nl=False)
+    return HttpResponse(buffer.getvalue(), content_type="image/svg+xml")
 
 
 # ---------- people ----------
