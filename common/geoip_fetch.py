@@ -3,6 +3,7 @@ Used by the Docker build and scripts/update_geoip.sh:  python -m common.geoip_fe
 Exit 0 when the file was written, 1 when neither month could be fetched (the caller carries on without it).
 Standard library only, so it runs in the image before Django is configured."""
 import gzip
+import os
 import shutil
 import sys
 import tempfile
@@ -31,6 +32,7 @@ def fetch(destination, today=None, opener=urllib.request.urlopen):
             with opener(urllib.request.Request(url, headers={"User-Agent": USER_AGENT}), timeout=TIMEOUT) as response, tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as tmp:
                 with gzip.GzipFile(fileobj=response) as unzipped:
                     shutil.copyfileobj(unzipped, tmp)
+            os.chmod(tmp.name, 0o644)  # NamedTemporaryFile is 0600; the app user is not the one who fetched it (Docker build runs as root)
             Path(tmp.name).replace(destination)
             return url
         except Exception as error:  # noqa: BLE001 - missing month, no network, bad gzip: try the next one

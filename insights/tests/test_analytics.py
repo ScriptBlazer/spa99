@@ -1,6 +1,7 @@
 """Analytics plus (docs/features/analytics.md): user agent parsing, country, visits and bounces, the page beacon, utm and channels,
 same-day campaign steps, caps, nothing personal stored, live now, the link maker."""
 import json
+import os
 from datetime import datetime, timedelta
 from unittest import mock
 from zoneinfo import ZoneInfo
@@ -44,6 +45,28 @@ class UserAgentTests(SimpleTestCase):
         ]
         for agent, expected in table:
             self.assertEqual((device_type(agent), browser_family(agent), os_family(agent)), expected, agent)
+
+
+class GeoIpFetchTests(SimpleTestCase):
+    def test_the_fetched_file_is_readable_by_other_users(self):
+        import gzip
+        import io
+        import stat
+        import tempfile
+
+        from common import geoip_fetch
+
+        opener = mock.MagicMock()
+        opener.return_value.__enter__.return_value = io.BytesIO(gzip.compress(b"mmdb"))
+        with tempfile.TemporaryDirectory() as folder:
+            target = f"{folder}/x/db.mmdb"
+            self.assertTrue(geoip_fetch.fetch(target, opener=opener))
+            self.assertEqual(stat.S_IMODE(os.stat(target).st_mode), 0o644)
+            with self.settings(GEOIP_DB_PATH=target):
+                self.assertTrue(geoip.is_available())
+            os.chmod(target, 0o000)
+            with self.settings(GEOIP_DB_PATH=target):
+                self.assertEqual(geoip.is_available(), os.access(target, os.R_OK))
 
 
 class GeoIpTests(SimpleTestCase):
@@ -160,6 +183,20 @@ class VisitTests(TestCase):
         self.view("/")
         self.assertEqual((figure(K.VISITS), figure(K.BOUNCES), figure(K.VISIT_PAGES)), (1, 0, 3))  # taken back once only
         self.assertEqual(figure(K.VISIT_HOUR, "sat:10"), 1)  # London weekday and hour of the new visit
+
+    def test_a_beacon_writing_last_seen_between_read_and_claim_still_starts_the_new_visit(self):
+        self.view("/")
+        self.later(minutes=45)
+        real = visitors.close_visit
+
+        def racing(row):
+            real(row)
+            VisitorHash.objects.filter(pk=row.pk).update(last_seen=self.clock)  # the beacon lands here
+
+        with mock.patch.object(visitors, "close_visit", racing):
+            self.view("/plans/")
+        row = VisitorHash.objects.get()
+        self.assertEqual((row.visit_started is not None, row.visit_pages), (True, 1))
 
     def test_a_30_minute_gap_closes_the_visit_and_starts_another(self):
         self.view("/plans/")
@@ -282,7 +319,9 @@ class BeaconTests(TestCase):
             "not json", "[]", "{}", json.dumps({"p": "/memberships/"}), json.dumps({"p": "memberships", "t": 1}), json.dumps({"p": "/nope-not-a-page/", "t": 1}),
             json.dumps({"p": "/static/x.css", "t": 1}), json.dumps({"p": "/memberships/", "t": -1}), json.dumps({"p": "/memberships/", "t": "9"}),
             json.dumps({"p": "/memberships/", "t": True}), json.dumps({"p": "/memberships/", "t": 3, "s": 33}), json.dumps({"p": "/", "c": "bad kind!"}),
-            json.dumps({"p": "/", "c": 5}),
+            json.dumps({"p": "/", "c": 5}), json.dumps({"p": "/", "c": "junk"}), json.dumps({"p": "/ses/webhook/", "t": 1}),
+            json.dumps({"p": "/postmark/x/", "t": 1}), json.dumps({"p": "/phone/x/", "t": 1}), json.dumps({"p": "/health/", "t": 1}),
+            '{"p": "/memberships/", "t": Infinity}', '{"p": "/memberships/", "t": -Infinity}', '{"p": "/memberships/", "t": NaN}',
         ]
         for raw in bad:
             self.assertIsNone(beacon.parse(raw), raw)

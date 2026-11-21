@@ -327,7 +327,7 @@ def health_report():
     from django_q.models import Failure, OrmQ
 
     from insights.metrics import K
-    from insights.models import OfficeSnapshot
+    from insights.models import DailyMetric, OfficeSnapshot
     from office import selectors
 
     report = {"database_ok": True, "queue_size": None, "last_rollup": None, "snapshot_age_seconds": None, "snapshot_stale": True,
@@ -351,6 +351,9 @@ def health_report():
         report["counts"] = (snapshot.payload or {}).get("totals", {})
     stored = selectors.counters(K.GOLD_BY_STATUS, K.REGISTRATIONS)  # stored counters, nothing summed here
     report["gold_waiting"] = selectors.waiting_count(stored)
+    since = timezone.localdate() - timedelta(days=6)
+    rows = dict(DailyMetric.objects.filter(key=K.PROBES_BLOCKED, dimension="", date__gte=since).values_list("date", "value"))
+    report["probes_today"], report["probes_week"] = rows.get(timezone.localdate(), 0), sum(rows.values())
     report["people_total"] = stored.get((K.REGISTRATIONS, ""), report["counts"].get("registrations", 0))
     return report
 

@@ -216,7 +216,7 @@ def _continue_visit(row, request, group, now, today):
     if not open_visit:
         close_visit(row)
         fields = _visit_fields(request, group, now)
-        if VisitorHash.objects.filter(pk=row.pk, last_seen=row.last_seen).update(**fields):
+        if VisitorHash.objects.filter(pk=row.pk, visit_started__isnull=True).update(**fields):
             _count_new_visit(fields, now, today)
             return
     metrics.count(K.VISIT_PAGES, "", 1, today, counter=False)

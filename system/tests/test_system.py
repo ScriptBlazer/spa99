@@ -1,5 +1,6 @@
 """System: 404 for everyone else, sign-in then unlock, the 15 minute idle lock, the change log with undo, recipients in the
 database, the one-off env import and Team guards. Mocked: no real APIs, no real clock."""
+from datetime import timedelta
 from decimal import Decimal
 from io import StringIO
 from unittest import mock
@@ -8,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
+from django.utils import timezone
 
 from insights.models import OfficeSnapshot
 from plans.models import SiteSettings
@@ -217,6 +219,16 @@ class TeamAndDashboardTests(TestCase):
         other.refresh_from_db()
         self.assertFalse(other.is_active)
         self.assertFalse(me.is_superuser)
+
+    def test_dashboard_shows_blocked_junk_probes_today_and_for_a_week(self):
+        from insights import metrics
+        from insights.metrics import K
+
+        metrics.count(K.PROBES_BLOCKED, "", 3, counter=False)
+        metrics.count(K.PROBES_BLOCKED, "", 2, timezone.localdate() - timedelta(days=3), counter=False)
+        metrics.count(K.PROBES_BLOCKED, "", 9, timezone.localdate() - timedelta(days=10), counter=False)
+        health = unlocked_client(make_user()).get("/").context["health"]
+        self.assertEqual((health["probes_today"], health["probes_week"]), (3, 5))
 
     def test_dashboard_reads_stored_figures_only(self):
         OfficeSnapshot.objects.create(page="dashboard", range="7d", payload={"totals": {"registrations": 12, "gold_applications": 3}})

@@ -17,9 +17,9 @@ def database_path():
 
 
 def is_available():
-    """True when the database file exists (for the startup line); does not open it."""
+    """True when the database file exists and this user can read it (for the startup line); does not open it."""
     path = database_path()
-    return bool(path) and os.path.isfile(path)
+    return bool(path) and os.path.isfile(path) and os.access(path, os.R_OK)
 
 
 def _reader():

@@ -297,7 +297,7 @@ def build_startup_report(settings_module):
         "sentry": SENTRY_STATE,
         "chat": "on" if ANTHROPIC_API_KEY else "off",
         "phone": "on" if PHONE_ENABLED else "off",
-        "geoip": "on" if os.path.isfile(GEOIP_DB_PATH) else "missing",
+        "geoip": "on" if os.path.isfile(GEOIP_DB_PATH) and os.access(GEOIP_DB_PATH, os.R_OK) else "missing",
         "unlock_code_set": bool(SYSTEM_UNLOCK_CODE),
         "unlock_code_invalid": bool(SYSTEM_UNLOCK_CODE_RAW) and not SYSTEM_UNLOCK_CODE_VALID,
         "media_is_local": MEDIA_IS_LOCAL,

@@ -6,10 +6,10 @@ Body: {"p": "/plans/", "t": 12, "s": 50, "n": 0}  or  {"p": "/", "c": "whatsapp"
   t  seconds the page was visible since the last beacon (0 to 1800)
   s  furthest scroll so far: 0, 25, 50, 75 or 100 (first beacon of a page view only)
   n  0 for the first beacon of this page view (counts the view and the scroll), 1 for any later one (adds seconds only)
-  c  a contact tap: whatsapp, phone, email, instagram, map, or a data-track name"""
+  c  a contact tap: one of metrics.CONTACT_KINDS (whatsapp, phone, email, instagram, map); anything else is ignored"""
 import json
 import logging
-import re
+import math
 
 from django.contrib.auth.decorators import login_not_required
 from django.db.models import F
@@ -32,8 +32,8 @@ MAX_BODY = 2048
 MAX_SECONDS = 30 * 60
 SCROLL_BUCKETS = (0, 25, 50, 75, 100)
 RATE_LIMIT, RATE_WINDOW = 40, 60  # beacons per visitor per minute
-_KIND = re.compile(r"^[a-z0-9_-]{1,20}$")
-_SKIP = ("/static/", "/media/", "/health/", "/a/")
+# not pages: webhooks, APIs, files
+_SKIP = ("/static/", "/media/", "/health/", "/a/", "/ses/", "/postmark/", "/phone/")
 
 
 def parse(raw):
@@ -54,7 +54,7 @@ def parse(raw):
         return None
     if "t" in data:
         seconds = data["t"]
-        if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or seconds < 0 or seconds != seconds:
+        if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or seconds < 0:
             return None
         out["seconds"] = min(int(seconds), MAX_SECONDS)
         scroll = data.get("s", 0)
@@ -64,7 +64,7 @@ def parse(raw):
         out["first"] = data.get("n", 0) == 0
     if "c" in data:
         kind = data["c"]
-        if not isinstance(kind, str) or not _KIND.match(kind.lower()):
+        if not isinstance(kind, str) or kind.lower() not in metrics.CONTACT_KINDS:
             return None
         out["contact"] = kind.lower()
     return out if ("seconds" in out or "contact" in out) else None

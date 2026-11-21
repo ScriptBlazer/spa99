@@ -34,7 +34,7 @@ class ProbeListTests(SimpleTestCase):
                 self.assertIn(f" {pattern}", snippet.replace("\n", " "))
         self.assertNotIn(".well-known", snippet)
         sites = re.findall(r"^(\S+\{\$?[A-Z_]+\}|\{\$[A-Z_]+\}|www\.\{\$DOMAIN\}) \{", caddy, re.M)
-        self.assertEqual(caddy.count("\timport probes"), len(sites))  # every site block imports it
+        self.assertEqual(caddy.count("\timport probes"), len(sites) - 1)  # every site block imports it, except www (it only redirects)
         self.assertGreaterEqual(len(sites), 5)
 
 

@@ -83,6 +83,7 @@ EVENT_KEYS = (
     K.GOLD_INVITES_SENT, K.GOLD_INVITES_USED,
 )
 RATE_KEYS = (K.RATE_JOURNEY_START, K.RATE_JOURNEY_FINISH, K.RATE_REGISTER)
+CONTACT_KINDS = {"whatsapp": "WhatsApp", "phone": "Phone", "email": "Email", "instagram": "Instagram", "map": "Map"}  # the contact taps counted (beacon.js sends these)
 NO_DAILY = (K.GOLD_BY_STATUS,)  # current-state counters have no daily row
 
 

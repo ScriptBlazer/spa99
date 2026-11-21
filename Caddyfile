@@ -62,6 +62,6 @@
 
 # www goes to the bare domain (needs a www DNS record pointing here too).
 www.{$DOMAIN} {
-	import probes
+	# no `import probes` here: the redir below runs first, and the bare domain's block blocks them after the redirect
 	redir https://{$DOMAIN}{uri} permanent
 }

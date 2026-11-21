@@ -22,7 +22,7 @@ BROWSER_NAMES = {"chrome": "Chrome", "safari": "Safari", "edge": "Edge", "firefo
                  "instagram": "Instagram app", "facebook": "Facebook app", "other": "Other"}
 SYSTEM_NAMES = {"ios": "iPhone and iPad", "android": "Android", "windows": "Windows", "macos": "Mac", "linux": "Linux", "other": "Other"}
 CHANNEL_NAMES = {"campaign": "Campaign links", "search": "Search", "social": "Social", "email": "Email", "referral": "Other sites", "direct": "Direct"}
-CONTACT_KINDS = {"whatsapp": "WhatsApp", "phone": "Phone", "email": "Email", "instagram": "Instagram", "map": "Map"}
+CONTACT_KINDS = metrics.CONTACT_KINDS
 SCROLL_BUCKETS = (0, 25, 50, 75, 100)
 DAY_NAMES = {"mon": "Monday", "tue": "Tuesday", "wed": "Wednesday", "thu": "Thursday", "fri": "Friday", "sat": "Saturday", "sun": "Sunday"}
 MIN_FOR_PATTERN = 20  # visits before a busiest-hour sentence means anything

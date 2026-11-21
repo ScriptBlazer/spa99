@@ -148,9 +148,13 @@ def analytics_qr(request):
     """An SVG QR code for a link-maker address (Office level and up). Only addresses on our own public site are drawn, so this cannot be
     used to make codes for anywhere else. ?url=https://<our domain>/plans/?utm_source=..."""
     link = request.GET.get("url", "")
-    parts = urlparse(link)
     own = {urlparse(settings.SITE_URL).hostname, settings.DOMAIN.lower()}
-    if len(link) > QR_MAX_URL or parts.scheme not in ("http", "https") or (parts.hostname or "").lower() not in own:
+    try:
+        parts = urlparse(link)
+        host = (parts.hostname or "").lower()
+    except ValueError:  # e.g. http://[x
+        return HttpResponse("That address is not on this site.", status=400, content_type="text/plain")
+    if len(link) > QR_MAX_URL or parts.scheme not in ("http", "https") or host not in own:
         return HttpResponse("That address is not on this site.", status=400, content_type="text/plain")
     buffer = io.BytesIO()
     segno.make(link, error="m").save(buffer, kind="svg", scale=10, border=4, dark="#492E21", light="#FFFFFF", xmldecl=False, svgns=True, nl=False)

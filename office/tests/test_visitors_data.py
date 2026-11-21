@@ -118,6 +118,6 @@ class VisitorsDataTests(OfficeTestCase):
         self.assertIn(b"<svg", ok.content)
         self.assertIn("no-cache", ok["Cache-Control"])
         self.assertEqual(get(self.viewer, url).status_code, 403)  # a Viewer sees the figures, not the link maker
-        for bad in ("https://evil.example/?x=1", "javascript:alert(1)", "", "/memberships/"):
+        for bad in ("http://[x", "https://evil.example/?x=1", "javascript:alert(1)", "", "/memberships/"):
             response = get(self.office, "/analytics/qr.svg?url=" + quote(bad, safe=""))
             self.assertEqual(response.status_code, 400, bad)
