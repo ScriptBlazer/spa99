@@ -53,7 +53,7 @@ class CommonConfig(AppConfig):
         if sys.argv[1:2] == ["runserver"] and os.environ.get("RUN_MAIN") != "true":
             return
         logger.info(
-            "Spa 99 startup: settings=%s env=[%s] private=%s database=%s hosts=[%s] media=%s email=%s sentry=%s chat=%s phone=%s",
+            "Spa 99 startup: settings=%s env=[%s] private=%s database=%s hosts=[%s] media=%s email=%s sentry=%s chat=%s phone=%s geoip=%s",
             report["settings"],
             ", ".join(report["env_sources"]) or "none",
             report["private_dir"],
@@ -64,12 +64,15 @@ class CommonConfig(AppConfig):
             report.get("sentry", "off"),
             report.get("chat", "off"),
             report.get("phone", "off"),
+            report.get("geoip", "missing"),
         )
         if report.get("media_is_local") and report["settings"].endswith("prod"):
             logger.warning(
                 "PRODUCTION MEDIA IS ON LOCAL DISK, NOT S3: uploaded files will be lost when the container is "
                 "replaced. Set AWS_STORAGE_BUCKET_NAME."
             )
+        if report.get("geoip") == "missing":
+            logger.warning("GeoIP file not found at %s: every visitor country will show as unknown (scripts/update_geoip.sh fetches it)", settings.GEOIP_DB_PATH)
         if report.get("unlock_code_invalid"):
             logger.warning("SYSTEM_UNLOCK_CODE is not 6 to 12 digits: System unlock asks for no code (set 6 to 12 digits)")
         elif not report.get("unlock_code_set", True):

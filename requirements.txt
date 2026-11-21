@@ -33,3 +33,4 @@ typing_extensions==4.16.0
 certifi==2026.10.19
 urllib3==2.8.0
 nh3==0.3.7  # cleans rich text email HTML to an allow-list (common/richtext.py); abi3 wheels for macOS and manylinux, none to compile
+maxminddb==3.3.0  # reads the DB-IP country file (common/geoip.py); wheels for macOS and manylinux, pure-python fallback
