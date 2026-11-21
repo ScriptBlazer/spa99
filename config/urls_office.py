@@ -14,6 +14,7 @@ urlpatterns = [
     path("robots.txt", login_not_required(lambda request: HttpResponse("User-agent: *\nDisallow: /\n", content_type="text/plain"))),
     path("", include("users.urls")),  # staff sign-in and sign-out
     path("insights/", include("insights.urls")),  # the older statistics JSON, staff roles only
+    path("calls/", include("phone.urls_office")),  # Calls: voicemails and the call log
     path("", include("office.urls")),
     # Hidden Django admin on this host too (content, plans, hours, notifications stay there for now).
     path(settings.ADMIN_PATH, admin.site.urls),

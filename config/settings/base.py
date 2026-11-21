@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "journey",
     "gold",
     "notifications",
+    "phone",
     "mailings",
     "insights",
     "office",
@@ -155,6 +156,14 @@ POSTMARK_WEBHOOK_PASSWORD = (ENV.get("POSTMARK_WEBHOOK_PASSWORD", "") or "").str
 # Group sends and invites go out at most this many a second (and never above what SES reports for the account). Not an env var:
 # change it here if SES raises the account's rate. No pacing when the queue runs inline (development).
 MAILING_RATE_PER_SECOND = 10
+# Phone voicemail (docs/features/voicemail.md). All blank = the feature is off and the webhooks answer 503, so Twilio uses its fallback URL.
+# The auth token only checks webhook signatures; the API key only downloads recordings (GET) and, for the one-off import, lists calls. Secrets: never logged.
+TWILIO_ACCOUNT_SID = (ENV.get("TWILIO_ACCOUNT_SID", "") or "").strip()
+TWILIO_AUTH_TOKEN = (ENV.get("TWILIO_AUTH_TOKEN", "") or "").strip()
+TWILIO_API_KEY_SID = (ENV.get("TWILIO_API_KEY_SID", "") or "").strip()
+TWILIO_API_KEY_SECRET = (ENV.get("TWILIO_API_KEY_SECRET", "") or "").strip()
+PHONE_NUMBER = (ENV.get("PHONE_NUMBER", "+442045384999") or "+442045384999").strip()
+PHONE_ENABLED = bool(TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN)  # webhooks need the account and the token (signature check)
 # Absolute links used in emails (no trailing slash).
 SITE_WEBGL = ENV.bool("SITE_WEBGL", True)  # false = the 3D Gold Card never loads (CSS card only); read by base.html as data-webgl
 # Card payments (Stripe phase). While False, an opened payment window tells members "we'll be in touch" and staff set people up manually.
@@ -282,6 +291,7 @@ def build_startup_report(settings_module):
         "email": describe_email(EMAIL_BACKEND, EMAIL_HOST),
         "sentry": SENTRY_STATE,
         "chat": "on" if ANTHROPIC_API_KEY else "off",
+        "phone": "on" if PHONE_ENABLED else "off",
         "unlock_code_set": bool(SYSTEM_UNLOCK_CODE),
         "unlock_code_invalid": bool(SYSTEM_UNLOCK_CODE_RAW) and not SYSTEM_UNLOCK_CODE_VALID,
         "media_is_local": MEDIA_IS_LOCAL,

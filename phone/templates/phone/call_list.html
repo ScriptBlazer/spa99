@@ -1,0 +1,34 @@
+{% extends "office/base.html" %}
+{% load static office_tags phone_ui %}
+{% block title %}Calls | Spa 99 Office{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="{% static 'common/css/pagination.css' %}">{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/office-calls.js' %}"></script>{% endblock %}
+{% block main %}
+{% comment %}Calls (any level above Viewer): voicemails (default) and the whole call log. Context: see phone.views_office.call_list. A voicemail with sound has a small player in its row; the first play marks it heard (office-calls.js).{% endcomment %}
+<h1 class="sr-only">Calls</h1>
+<nav class="o-seg o-seg--counts o-seg--calls" aria-label="Calls view" data-calls-views>
+  <a class="o-seg-item{% if view != "all" %} is-active{% endif %}" href="{% url 'office_calls' %}"{% if view == "voicemails" %} aria-current="page"{% endif %}><span>Voicemails</span> <span class="o-count">{{ counts.voicemails|num }}</span></a>
+  <a class="o-seg-item{% if view == "all" %} is-active{% endif %}" href="{% url 'office_calls' %}?view=all"{% if view == "all" %} aria-current="page"{% endif %}><span>All calls</span> <span class="o-count">{{ counts.all|num }}</span></a>
+</nav>
+{% if view == "short" %}<p class="o-calls-short"><a href="{% url 'office_calls' %}">&larr; Back to real voicemails</a></p>{% elif view == "voicemails" and short %}<p class="o-calls-short"><a href="{% url 'office_calls' %}?view=short">{{ short|num }} short voicemail{{ short|pluralize }} (under {{ short_seconds }} seconds) &rarr;</a></p>{% endif %}
+<div class="o-card o-tablecard" id="list" data-list-card>
+  <table class="o-list o-list--calls" data-calls-table>
+    <caption class="sr-only">{% if view == "all" %}Every call{% elif view == "short" %}Short voicemails{% else %}Voicemails{% endif %}, newest first</caption>
+    <thead><tr><th scope="col">Caller</th><th scope="col">When</th><th scope="col" class="num">Length</th><th scope="col">Status</th><th scope="col">Listen</th></tr></thead>
+    <tbody>
+    {% for call in rows %}
+      <tr class="o-row" data-press data-call="{{ call.pk }}">
+        <td class="c-caller"><a class="o-rowlink" href="{% url 'office_call' call.pk %}">{{ call.display_number }}</a>{% if call.person %}<a class="o-cell-sub o-calls-person" href="{{ call.person.url }}">{{ call.person.name }} &middot; {{ call.person.kind }}</a>{% endif %}</td>
+        <td class="c-when">{{ call.received_at|day_label }}, {{ call.received_at|date:"H:i" }}</td>
+        <td class="c-len num">{% if call.kind == "voicemail" and call.has_sound %}{{ call.duration_seconds|clock }}{% endif %}</td>
+        <td class="c-state"><span class="o-calls-states">{% if call.kind == "voicemail" %}{% if call.has_sound and not call.heard_at and call.duration_seconds >= short_seconds %}<span class="o-badge o-badge--call-new" data-call-new>New</span>{% endif %}{% if not call.has_sound %}<span class="o-badge o-badge--call-none">No sound recorded</span>{% endif %}{% else %}<span class="o-badge o-badge--call-none">No message</span>{% endif %}</span></td>
+        <td class="c-play">{% if call.kind == "voicemail" and call.has_sound %}{% if call.audio %}<audio class="o-calls-audio" controls preload="none" src="{% url 'office_call_audio' call.pk %}" aria-label="Voicemail from {{ call.display_number }}" data-call-audio data-heard-url="{% url 'office_call_heard' call.pk %}"{% if not call.heard_at %} data-unheard{% endif %}></audio>{% else %}<span class="o-muted">Being fetched</span>{% endif %}{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr class="o-empty-row"><td colspan="5"><p>{% if view == "short" %}No short voicemails.{% elif view == "all" %}No calls yet. Every call to the Spa 99 number will show here.{% else %}No voicemails yet. When someone leaves one, you can listen to it here.{% endif %}</p></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include "common/_pagination.html" with pager=pager label="Calls pages" %}
+{% endblock %}

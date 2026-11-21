@@ -16,6 +16,7 @@
 @import "office-reach.css";
 @import "office-cards.css";
 @import "office-press.css";
+@import "office-calls.css";
 
 /* The site-wide cross-document view transition is off in the Office (it threw "Transition was skipped"). */
 @view-transition { navigation: none; }

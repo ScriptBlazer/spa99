@@ -1,0 +1,34 @@
+{% extends "office/base.html" %}
+{% load static office_tags phone_ui %}
+{% block title %}Call from {{ call.display_number }} | Spa 99 Office{% endblock %}
+{% block body_attrs %}data-office-detail{% endblock %}
+{% block header_left %}<a class="o-back" href="{% url 'office_calls' %}">{% include "office/_icon.html" with name="chevron-left" %}<span>Calls</span></a>{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/office-calls.js' %}"></script>{% endblock %}
+{% block main %}
+{% comment %}One call: who, when, how long, and the recording. Context: see phone.views_office.call_detail. The first play marks it heard (office-calls.js).{% endcomment %}
+<div class="o-detail-head">
+  <h1>{% if call.kind == "voicemail" %}Voicemail{% else %}Call, no message{% endif %} from {{ call.display_number }}</h1>
+  <p class="o-sub">{{ call.received_at|day_label }}, {{ call.received_at|date:"H:i" }}</p>
+</div>
+<section class="o-card o-call" aria-label="Call details">
+  <dl class="o-call-facts" data-call-facts>
+    <div><dt>Caller</dt><dd>{% if call.from_number|slice:":1" == "+" %}<a class="o-call-tel" href="tel:{{ call.from_number }}" data-call-tel>{% include "office/_icon.html" with name="phone" %}<span>{{ call.display_number }}</span></a>{% else %}{{ call.display_number }}{% endif %}{% if call.person %}<a class="o-cell-sub o-call-person" href="{{ call.person.url }}" data-call-person>{{ call.person.name }} &middot; {{ call.person.kind }}</a>{% endif %}</dd></div>
+    <div><dt>Time</dt><dd>{{ call.received_at|day_label }}, {{ call.received_at|date:"H:i" }}</dd></div>
+    {% if call.kind == "voicemail" and call.has_sound %}<div><dt>Length</dt><dd>{{ call.duration_seconds|clock }}</dd></div>{% endif %}
+    {% if call.source == "import" %}<div><dt>Source</dt><dd>Imported from Twilio</dd></div>{% endif %}
+    {% if call.kind == "voicemail" %}<div><dt>Heard</dt><dd data-call-heard>{% if call.heard_at %}Heard{% if call.heard_by %} by {{ call.heard_by.get_full_name|default:call.heard_by.email }}{% endif %}, {{ call.heard_at|dm }} {{ call.heard_at|date:"H:i" }}{% else %}Not heard yet{% endif %}</dd></div>{% endif %}
+  </dl>
+  <div class="o-call-player" data-call-player>
+    {% if call.kind != "voicemail" %}
+      <p class="o-empty-line">The caller hung up before leaving a message.</p>
+    {% elif not call.has_sound %}
+      <p class="o-empty-line">No sound recorded.</p>
+    {% elif audio_ready %}
+      <audio class="o-calls-audio o-calls-audio--detail" controls preload="none" src="{% url 'office_call_audio' call.pk %}" aria-label="Voicemail from {{ call.display_number }}" data-call-audio data-heard-url="{% url 'office_call_heard' call.pk %}"{% if not call.heard_at %} data-unheard{% endif %}></audio>
+    {% else %}
+      <p class="o-empty-line">Audio is still being fetched. Check back in a few minutes.</p>
+    {% endif %}
+  </div>
+</section>
+<p><a class="o-quiet" href="{% url 'office_calls' %}" data-back-to-calls>Back to Calls</a></p>
+{% endblock %}

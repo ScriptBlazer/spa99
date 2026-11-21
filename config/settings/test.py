@@ -31,6 +31,7 @@ LOGGING = {  # noqa: F405
         "django.request": {"level": "CRITICAL"},
         "spa99.health": {"level": "CRITICAL"},
         "spa99.visitors": {"level": "CRITICAL"},  # a test breaks the counter on purpose
+        "spa99.phone": {"level": "CRITICAL"},  # bad signatures and give-ups are expected in the voicemail tests
         "spa99.email": {"level": "CRITICAL"},  # tests that break sending on purpose
     },
 }

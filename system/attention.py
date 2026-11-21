@@ -1,7 +1,7 @@
 """The "Needs attention" box on the System dashboard: settings that are wrong or empty, each with the page that fixes it.
 
 A few queries, plus two or three per staff member who is not on the sending domain (the team is a short list). One sending domain everywhere: notifications.sender.sending_domain().
-Not checked against the sending domain on purpose: contact_email, gold_approver_cc and the staff alert addresses (inbound or internal; they may be anywhere)."""
+Not checked against the sending domain on purpose: contact_email, gold_approver_cc, voicemail_email_to and the staff alert addresses (inbound or internal; they may be anywhere)."""
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.urls import reverse

@@ -267,12 +267,19 @@ def note_author(value):
     return re.split(r"[._+-]", local)[0].capitalize() or local
 
 
+# Labels the system writes when no staff member acted (outreach.services SELF_LABEL, GROUP_EMAIL_LABEL, the bounce restore): said in words, never cut to a "first name"
+# (that is how "Mobile added by His own link" became "Mobile added by His").
+AUTOMATIC_BY = {"His own link": "by him, through his email link", "Group email": "automatically, by the group email", "Bounce": "automatically, after an email bounced"}
+
+
 @register.filter
 def short_by(value):
-    """A timeline label with a short name: 'Archived by Adam Test (admin@example.com)' -> 'Archived by Adam'."""
+    """A timeline label with a short name: 'Archived by Adam Test (admin@example.com)' -> 'Archived by Adam'; 'Mobile added by His own link' -> 'Mobile added by him, through his email link'."""
     text = str(value or "")
-    head, sep, who = text.partition(" by ")
-    return f"{head} by {note_author(who)}" if sep and who.strip() else text
+    head, sep, who = text.rpartition(" by ")
+    if not sep or not who.strip():
+        return text
+    return f"{head} {AUTOMATIC_BY[who.strip()]}" if who.strip() in AUTOMATIC_BY else f"{head} by {note_author(who)}"
 
 
 @register.filter

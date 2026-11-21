@@ -24,6 +24,15 @@ def plan_image_path(instance, filename):
     return f"plans/{instance.slug}/{filename}"
 
 
+def default_voicemail_to():
+    """New installs: the site address (the address inside DEFAULT_FROM_EMAIL), so no domain is hard-coded and it follows the .env."""
+    from email.utils import parseaddr
+
+    from django.conf import settings
+
+    return parseaddr(settings.DEFAULT_FROM_EMAIL)[1].strip()
+
+
 class Plan(BaseModel):
     """One purchasable or applied-for plan: Tier 1/2/3, Gold Card or the single visit. Plans are rows, not code."""
 
@@ -204,6 +213,9 @@ class SiteSettings(BaseModel):
         help_text="DEPRECATED, no longer used for sending: approvers are the team members picked in System > Approval. Kept until the old addresses are imported (manage.py import_approvers_from_emails).")
     gold_approver_cc = models.CharField(
         max_length=500, blank=True, validators=[validate_email_list], help_text="Comma separated. Copied on each Gold application email.")
+    voicemail_email_to = models.CharField(
+        "Voicemail email to", max_length=500, blank=True, default=default_voicemail_to, db_default="", validators=[validate_email_list],
+        help_text="Comma separated. Who is emailed when someone leaves a voicemail (a link to it in the Office, no recording attached). Empty = nobody is emailed.")
     contact_email = models.CharField(
         max_length=254, blank=True, validators=[validate_email_list],
         help_text="Shown on the site and used as Reply-To. Empty = the address inside DEFAULT_FROM_EMAIL.")
@@ -353,6 +365,10 @@ class SiteSettings(BaseModel):
     @property
     def approver_cc_list(self):
         return split_emails(self.gold_approver_cc)
+
+    @property
+    def voicemail_to_list(self):
+        return split_emails(self.voicemail_email_to)
 
     @property
     def wording(self):

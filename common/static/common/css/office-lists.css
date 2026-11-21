@@ -45,7 +45,7 @@ html:not(.js) .o-noscript-apply { display: inline-flex; }
 .o-list thead th:first-child { border-radius: var(--office-radius) 0 0 var(--office-radius); }
 .o-list thead th:last-child { border-radius: 0 var(--office-radius) var(--office-radius) 0; }
 .o-list tbody::before { content: ""; display: table-row; height: var(--space-1); }
-.o-list td { height: 3.5rem; padding: 0 var(--space-3); font-size: var(--text-sm); vertical-align: middle; }
+.o-list td { height: 3.5rem; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); vertical-align: middle; }   /* the block padding keeps a tall, many-line cell off the next row; a one-line row stays 3.5rem (the height is a minimum) */
 .o-list tbody tr:nth-child(even) td { background: var(--office-row-alt); }
 .o-list td:first-child { border-radius: var(--office-radius) 0 0 var(--office-radius); }
 .o-list td:last-child { border-radius: 0 var(--office-radius) var(--office-radius) 0; }

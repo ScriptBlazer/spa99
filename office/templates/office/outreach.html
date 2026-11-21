@@ -13,7 +13,8 @@
       <label class="o-seg-item"><input type="radio" name="state" value="open"{% if state == "open" %} checked{% endif %}><span>Open <span class="o-seg-count" data-region="outreach-open">{{ open_count|num }}</span></span></label>
       <label class="o-seg-item"><input type="radio" name="state" value="done"{% if state == "done" %} checked{% endif %}><span>Done <span class="o-seg-count" data-region="outreach-done">{{ done_count|num }}</span></span></label>
     </fieldset>
-    <label class="o-chip{% if emailed %} is-on{% endif %}" data-emailed-filter><input type="checkbox" name="emailed" value="1"{% if emailed %} checked{% endif %}><span>Emailed</span></label>
+    <div class="o-filter-group"><label class="o-filter-label" for="f-emailed">Emailed</label>
+      <select id="f-emailed" name="emailed" class="o-select" data-emailed-filter><option value="">Any</option><option value="1"{% if emailed == "1" %} selected{% endif %}>Emailed</option><option value="0"{% if emailed == "0" %} selected{% endif %}>Not emailed</option></select></div>
     <button type="submit" class="btn btn-secondary btn-sm o-noscript-apply">Apply</button>
   </div>
   {# One line under the tabs: how many on this tab, and (phone only: the heads sort from 64em) the quiet Sort button with its small sheet. #}

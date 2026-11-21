@@ -293,16 +293,16 @@ STATES = listing.STATES
 @never_cache
 def outreach_page(request):
     """Context: rows[{id, name, email, mobile, source, href, reason, emailed_at, bounced, is_lead, added_by, added_at, done_at, done_by, done_url, remove_url, to_leads_url, archive_url}], has_next, page,
-    state (open|done), states, tabs[{state, count, url, active}], counts{open, done}, open_count, done_count, emailed (the Emailed filter, "1" or ""), columns (the sortable header, see common.sorting),
+    state (open|done), states, tabs[{state, count, url, active}], counts{open, done}, open_count, done_count, emailed (the Emailed filter, "1", "0" or ""), columns (the sortable header, see common.sorting),
     sort, dir, more_url, title, can_edit, section. Registering takes someone off the list by itself: there is no Registered tab. A fragment request (HX-Request) answers the rows only; ?page=N loads more."""
     state = listing.state_from(request.GET)
     sort, direction = listing.sort_from(request.GET, state)
-    emailed = "1" if request.GET.get("emailed") == "1" else ""
+    emailed = request.GET.get("emailed") if request.GET.get("emailed") in ("1", "0") else ""
     page = lists.page_number(request)
-    found, has_next = lists.cut(listing.queryset(state, sort, direction, bool(emailed)), page, 25, lists.shift_from(request))
+    found, has_next = lists.cut(listing.queryset(state, sort, direction, emailed), page, 25, lists.shift_from(request))
     counts = listing.counts()
-    tabs = [{"state": name, "count": counts[name], "active": name == state, "url": f"{reverse('office_outreach')}?{urlencode({'state': name, **({'emailed': '1'} if emailed else {})})}"} for name in STATES]
-    more = urlencode({"state": state, "sort": sort, "dir": direction, "page": page + 1, **({"emailed": "1"} if emailed else {})})
+    tabs = [{"state": name, "count": counts[name], "active": name == state, "url": f"{reverse('office_outreach')}?{urlencode({'state': name, **({'emailed': emailed} if emailed else {})})}"} for name in STATES]
+    more = urlencode({"state": state, "sort": sort, "dir": direction, "page": page + 1, **({"emailed": emailed} if emailed else {})})
     context = {"rows": tools.outreach_rows(found), "has_next": has_next, "page": page, "state": state, "states": STATES, "tabs": tabs, "counts": counts, "emailed": emailed,
                "title": SiteSettings.load().outreach_title, "section": "outreach", "can_edit": request.user.is_authenticated and tools.can_edit(request.user),
                "open_count": counts["open"], "done_count": counts["done"],

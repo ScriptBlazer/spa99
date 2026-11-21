@@ -25,7 +25,10 @@
 .o-dialog .o-mobile-parts { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
 
 /* ---------- timeline lines ---------- */
+.o-timeline--person .o-tl-line { flex-wrap: nowrap; justify-content: space-between; }   /* the label on the left, the time on the right of the same line (the label wraps inside its own space); person timeline only, Gold History keeps its own layout */
 .o-tl-what { display: inline-flex; align-items: baseline; gap: var(--space-2); }
-.o-tl-icon { display: inline-flex; align-self: center; color: var(--office-muted); }
+.o-timeline--person .o-tl-what { flex: 1 1 0; min-width: 0; }
+.o-tl-time { flex: none; font-size: var(--text-sm); font-weight: 400; color: var(--office-muted); font-variant-numeric: tabular-nums; }
+.o-tl-icon { display: inline-flex; flex: none; align-self: center; color: var(--office-muted); }
 .o-tl-icon .o-icon { width: 1rem; height: 1rem; }
 .o-tl-icon.o-danger { color: var(--office-danger); }

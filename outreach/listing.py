@@ -67,8 +67,8 @@ def sort_from(get, state):
     return sorting.resolve(columns(state), get, "done" if state == DONE else "added", sorting.DESC)[:2]
 
 
-def queryset(state, sort=None, direction=None, emailed=False):
-    """`emailed`: only people a person or a group send has emailed (the Emailed filter)."""
+def queryset(state, sort=None, direction=None, emailed=""):
+    """`emailed`: "1" only people a person or a group send has emailed, "0" only people none has (the Emailed filter); "" (or False) all."""
     from django.db.models import Exists
 
     from .services import emailed_q
@@ -78,8 +78,9 @@ def queryset(state, sort=None, direction=None, emailed=False):
         found = found.filter(done_at__isnull=False)
     else:
         found = found.filter(NOT_AFTER_ADDED, done_at__isnull=True)
-    if emailed:
-        found = found.annotate(email_key=Coalesce("user__email", "gold_application__email", "lead_email")).annotate(email_lower=Lower("email_key")).filter(emailed_q(OuterRef("email_lower")))
+    if emailed in ("1", "0", True):
+        found = found.annotate(email_key=Coalesce("user__email", "gold_application__email", "lead_email")).annotate(email_lower=Lower("email_key"))
+        found = found.filter(~emailed_q(OuterRef("email_lower")) if emailed == "0" else emailed_q(OuterRef("email_lower")))
     default = "done" if state == DONE else "added"
     return found.order_by(*sorting.ordering_from(columns(state), {"sort": sort, "dir": direction}, default, TIEBREAK))
 

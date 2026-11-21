@@ -1,0 +1,46 @@
+/* Office Calls (Voicemails and All calls, one call). Reuses the Office list, badge and card styles; only what is new is here. Tokens only. */
+.o-seg--calls { --n: 2; margin-bottom: var(--space-3); }
+@media (min-width: 48em) { .o-seg--calls { max-width: 22rem; } }
+
+.o-badge--call-new { background: var(--color-gold); color: var(--office-text); }                 /* 6.17 */
+.o-badge--call-none { background: var(--office-sunken); color: var(--office-muted); }            /* 5.38 */
+.o-calls-states { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+@media (min-width: 64em) { .o-list--calls .c-caller { white-space: nowrap; } }   /* one line on a computer; on a phone the number and the person wrap, never a sideways scroll */
+.o-list--calls .c-when { white-space: nowrap; color: var(--office-muted); }
+.o-calls-person { overflow-wrap: anywhere; position: relative; z-index: 1; width: fit-content; text-decoration: none; }
+@media (hover: hover) and (pointer: fine) { .o-calls-person:hover { text-decoration: underline; text-underline-offset: 0.25em; } }
+.o-calls-audio { position: relative; z-index: 1; display: block; width: 100%; max-width: 18rem; height: 2.5rem; color-scheme: light; }
+.o-list--calls .c-play { width: 19rem; }
+.o-list--calls th:last-child { padding-inline: var(--space-3); }
+.o-list--calls td.c-len { width: 1px; }
+
+/* the "N short voicemails →" link above the list (and "Back to voicemails" on that page): one tight line */
+.o-calls-short { margin: calc(var(--space-2) * -1) 0 0; font-size: var(--text-sm); line-height: 1.5; color: var(--office-muted); }
+.o-calls-short a { display: inline-block; padding-block: var(--space-2); color: var(--office-text); text-decoration: underline; text-underline-offset: 0.2em; }
+
+/* phone card: always the same 2x2, whatever the content length. Number | New, then date | length, then the player */
+@media (max-width: 63.99em) {
+  .o-list--calls .o-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "caller state" "when len" "play play"; align-items: center; }
+  .o-list--calls .o-row td.c-caller { grid-area: caller; min-width: 0; font-size: var(--text-base); }
+  .o-list--calls .o-row td.c-state { grid-area: state; justify-self: end; }
+  .o-list--calls .o-row td.c-when { grid-area: when; min-width: 0; font-size: var(--text-sm); }
+  .o-list--calls .o-row td.c-len { grid-area: len; justify-self: end; width: auto; font-size: var(--text-sm); color: var(--office-muted); text-align: right; }
+  .o-list--calls .o-row td.c-play { grid-area: play; width: auto; margin-top: var(--space-1); }
+  .o-list--calls .o-row td.c-play:empty { display: none; }
+  .o-list--calls .o-row:has(td.c-play:empty) { grid-template-areas: "caller state" "when len"; }   /* no player: no empty third row */
+  .o-calls-states { justify-content: flex-end; }
+  .o-calls-audio { max-width: none; }
+}
+
+/* one call */
+.o-call { display: grid; gap: var(--space-4); max-width: 40rem; margin-bottom: var(--space-3); }
+.o-call-facts { display: grid; gap: var(--space-3); margin: 0; }
+.o-call-facts > div { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: var(--space-3); align-items: start; }
+.o-call-facts dt { font-size: var(--office-text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--office-muted); padding-top: 0.2rem; }
+.o-call-facts dd { margin: 0; font-size: var(--text-base); min-width: 0; overflow-wrap: anywhere; }
+.o-call-tel { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 2.75rem; color: var(--office-text); font-weight: 600; text-decoration: none; }
+.o-call-tel .o-icon { width: 1.125rem; height: 1.125rem; }
+.o-call-person { text-decoration: none; }
+@media (hover: hover) and (pointer: fine) { .o-call-tel:hover span, .o-call-person:hover { text-decoration: underline; text-underline-offset: 0.25em; } }
+.o-calls-audio--detail { max-width: none; height: 3rem; }
+.o-call-player .o-empty-line { padding-block: 0; }
