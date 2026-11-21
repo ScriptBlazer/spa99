@@ -177,6 +177,9 @@ def backfill():
     changed.update(_barry_changes_2026_10_29())
     changed.update(_whatsapp_and_gold_2026_10_29())
     changed.update(_privacy_notice_2026_11_04())
+    changed.update(_privacy_notice_2026_11_21())
+    changed.update(_heard_via_papers_2026_11_21())
+    changed.update(_journey_required_2026_11_21())
     changed.update(_not_you_start_again_2026_11_03())
     changed.update(_dashboard_all_time_2026_11_05())
     return changed
@@ -312,6 +315,54 @@ def _barry_changes_2026_10_29():
     return changed
 
 
+def _heard_via_papers_2026_11_21():
+    """Moishe 2026-11-21: "News Update" and "Midweek" added to How did you hear about us?, before Other. Created only when missing."""
+    changed = Counter()
+    heard = Question.objects.filter(key="heard_via").first()
+    if heard is None:
+        return changed
+    for value, label in (("news_update", "News Update"), ("midweek", "Midweek")):
+        if Option.objects.filter(question=heard, value=value).exists():
+            continue
+        other = Option.objects.filter(question=heard, value="other").first()
+        order = other.order if other is not None else Option.objects.filter(question=heard).count() + 1
+        if other is not None:  # the new option takes Other's place and Other moves down one
+            other.order += 1
+            other.save()
+        Option.objects.create(question=heard, value=value, label=label, order=order)
+        changed[f"journey.Option ({label} added)"] += 1
+    return changed
+
+
+def _journey_required_2026_11_21():
+    """Moishe 2026-11-21: nothing optional in the journey. The questions in journey_seed.REQUIRED_KEYS (the two typed follow-ups
+    included) move from min_choices 0 to 1; any other value is a choice made in Control and stays. The words "Please write a few
+    words." are added when missing, and the "About you." line stops saying Optional (only while it still has its exact old words)."""
+    changed = Counter()
+    page = Page.objects.filter(key="journey").first()
+    # Once only: this step also adds the need_text words, so their presence means it has run. A later run must not undo a
+    # question Moishe has since made optional in Control.
+    first_run = page is None or not Section.objects.filter(page=page, key="need_text").exists()
+    for question in Question.objects.filter(key__in=journey_seed.REQUIRED_KEYS, min_choices=0) if first_run else []:
+        question.min_choices = 1
+        question.save()  # one by one, so history records it
+        changed["journey.Question (answer required)"] += 1
+    if page is not None:
+        sections = Section.objects.filter(page=page)
+        need = content_seed.PAGES["journey"][2]
+        text = next(row for row in need if row[0] == "need_text")
+        if not sections.filter(key="need_text").exists():
+            Section.objects.create(page=page, key="need_text", heading=text[1], body=text[2], cta_label=text[3], cta_url=text[4],
+                                   order=(sections.order_by("-order").values_list("order", flat=True).first() or 0) + 1)
+            changed["content.Section (journey: Please write a few words.)"] += 1
+        about = sections.filter(key="screen_4", body="Optional, and only to suggest the right fit.").first()
+        if about is not None:
+            about.body = "Only to suggest the right fit."
+            about.save()
+            changed["content.Section (journey: About you. no longer optional)"] += 1
+    return changed
+
+
 def _legal_pages():
     """2026-10-23: the real Privacy notice and Terms of use. Never overwrites a row edited in Control."""
     from content import legal
@@ -442,6 +493,26 @@ def _privacy_notice_2026_11_04():
         site.privacy_version = legal.PRIVACY_VERSION
         site.save()
         changed["plans.SiteSettings (privacy version)"] += 1
+    return changed
+
+
+def _privacy_notice_2026_11_21():
+    """2026-11-21 (Analytics plus): the visitor counter paragraph says what else is noted. Added after the "name of the website" line only
+    where that line is still there; "Last updated" moves only when the notice now says it. The privacy version is left as it is (nobody is asked to accept again)."""
+    from content import legal
+
+    changed = Counter()
+    page = Page.objects.filter(key="privacy").first()
+    if page is None:
+        return changed
+    anchor = "Only the name, never the full address."
+    _edit_privacy_section(page, "part_5", [("visitor counter: device, country, time on page, taps, campaign tags", anchor, anchor + "\n" + legal.VISITOR_COUNTER_MORE)],
+                          changed, "part_5")
+    if Section.objects.filter(page=page, key="part_5", body__contains=legal.VISITOR_COUNTER_MORE).exists():
+        for section in Section.objects.filter(page=page, key="updated", body="5 November 2026"):
+            section.body = legal.PRIVACY_UPDATED
+            section.save()
+            changed["content.Section (privacy notice: last updated)"] += 1
     return changed
 
 

@@ -478,6 +478,16 @@ def pages(range_name=None, request=None):
     return _snapshot(OfficeSnapshot.PAGES, range_name) or {**empty_pages(range_name), "updating": True}
 
 
+def visitors(range_name=None, request=None, who="real"):
+    """Analytics > Visitors: one stored snapshot row (office.analytics_visitors). who="real" (default) or "all" (bots included): two rows per range."""
+    from . import analytics_visitors
+
+    range_name = range_name if range_name in ANALYTICS_RANGES else defaults.get(request).analytics_range
+    who = analytics_visitors.clean_who(who)
+    page = OfficeSnapshot.VISITORS_REAL if who == "real" else OfficeSnapshot.VISITORS
+    return _snapshot(page, range_name) or {**analytics_visitors.empty(range_name, who), "updating": True}
+
+
 def leads_summary(range_name=None, request=None):
     """The Leads page tiles and total: one stored snapshot row."""
     range_name = range_name if range_name in ANALYTICS_RANGES else defaults.get(request).analytics_range

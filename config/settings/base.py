@@ -63,6 +63,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "common.probes.ProbeBlockMiddleware",  # first: junk probes (/wp-login.php, /.env ...) get a bare 404 and are never counted or reported
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "common.middleware.HostRoutingMiddleware",
@@ -264,6 +265,10 @@ Q_CLUSTER = {
     "sync": False,
 }
 
+# Country from the visitor's IP (docs/features/analytics.md A2): the DB-IP Country Lite file. Missing = every country is "unknown".
+# Live: the Docker build downloads it to /app/geoip (the image sets GEOIP_DB_PATH). Locally: scripts/update_geoip.sh puts it in .private/geoip/.
+GEOIP_DB_PATH = ENV.get("GEOIP_DB_PATH", "") or str(BASE_DIR / ".private" / "geoip" / "dbip-country-lite.mmdb")
+
 # Audit: trust X-Forwarded-For for the client IP only behind Caddy (prod).
 TRUST_FORWARDED_FOR = False
 # Header our proxy sets to the real client IP (off when empty). Prod: "X-Client-IP", written by Caddy (see Caddyfile).
@@ -292,6 +297,7 @@ def build_startup_report(settings_module):
         "sentry": SENTRY_STATE,
         "chat": "on" if ANTHROPIC_API_KEY else "off",
         "phone": "on" if PHONE_ENABLED else "off",
+        "geoip": "on" if os.path.isfile(GEOIP_DB_PATH) and os.access(GEOIP_DB_PATH, os.R_OK) else "missing",
         "unlock_code_set": bool(SYSTEM_UNLOCK_CODE),
         "unlock_code_invalid": bool(SYSTEM_UNLOCK_CODE_RAW) and not SYSTEM_UNLOCK_CODE_VALID,
         "media_is_local": MEDIA_IS_LOCAL,

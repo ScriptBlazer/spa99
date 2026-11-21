@@ -1,0 +1,7 @@
+{% comment %}A ranked list for Analytics > Visitors. Params: rows (label, num, share, ratio, taupe, icon), icons (optional: reserve an icon slot). Slate bars at the share of the top row; Other and Unknown are taupe.{% endcomment %}
+<ol class="o-rank o-rank--vis">
+  {% for r in rows %}<li style="--share: {{ r.ratio }}"{% if r.taupe %} class="o-rank-row--taupe"{% endif %}>
+    {% if icons %}<span class="o-rank-icon" aria-hidden="true">{% if r.icon %}{% include "office/_icon.html" with name=r.icon %}{% endif %}</span>{% endif %}
+    <span class="o-rank-name" title="{{ r.label }}">{{ r.label }}</span><span class="o-rank-end"><span class="o-rank-num">{{ r.num }}</span>{% if r.share %}<span class="o-rank-share">{{ r.share }}</span>{% endif %}</span>
+  </li>{% endfor %}
+</ol>

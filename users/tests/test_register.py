@@ -13,6 +13,7 @@ from gold import services as gold_services
 from gold.models import GoldApplication
 from journey import engine
 from journey import services as journey
+from journey.tests.helpers import answer_minimal
 from notifications.models import EmailLog
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import SiteSettings
@@ -73,10 +74,7 @@ class RegisterInterestTests(TestCase):
 
     def test_signup_creates_the_account_links_the_journey_and_sends_the_verification_email(self):
         session = journey.create_session()
-        journey.save_answer(session, "time", options=["evening"])
-        journey.save_answer(session, "frequency", options=["two_three"])
-        journey.save_answer(session, "facilities", options=["gym"])
-        journey.save_answer(session, "industry", options=["tech"])
+        answer_minimal(session)
         engine.complete(session)
 
         result = services.register_interest(cleaned(marketing_opt_in="on"), journey_session=session)

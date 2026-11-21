@@ -1,0 +1,5 @@
+{% comment %}The two Analytics sub-pages (docs/features/analytics-design.md 1). Param: active = journey | visitors. Plain links, the same markup as the Approvals tabs; the range is the same session value on both.{% endcomment %}
+<nav class="o-seg o-seg--sub" style="--n: 2" aria-label="Analytics">
+  <a class="o-seg-item{% if active == 'journey' %} is-active{% endif %}" href="{% url 'office_analytics' %}"{% if active == "journey" %} aria-current="page"{% endif %}><span>Journey</span></a>
+  <a class="o-seg-item{% if active == 'visitors' %} is-active{% endif %}" href="{% url 'office_analytics_visitors' %}"{% if active == "visitors" %} aria-current="page"{% endif %}><span>Visitors</span></a>
+</nav>

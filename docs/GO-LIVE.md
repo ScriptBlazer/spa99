@@ -244,6 +244,17 @@ Status: server side built on `feature/voicemail-email`, **not released**. Twilio
 5. **Import the old voicemails (after step 3 works):** `python manage.py import_twilio_voicemails` (dry run: prints counts, writes nothing, numbers masked), read it, then `python manage.py import_twilio_voicemails --apply` (Moishe 2026-11-19: on live the old ones arrive as **New**, so do **not** add `--mark-heard`). Safe to run twice; `--limit` defaults to 500 calls per run. It sends no emails.
 6. **Rollback:** set the number's "A call comes in" back to Sam's function URL in Twilio. The site code can stay. Voicemails already saved stay in the Calls table and S3.
 
+## Next release (Analytics plus: devices, countries, visits, campaigns, live; junk-probe blocks)
+
+Status: built on `feature/analytics`, **not released**. Spec: `docs/features/analytics.md`.
+
+0. **Take the RDS snapshot first**: migrations `insights` 0008 (visit fields on today's visitor rows), `insights` 0009 (`VisitorHash.human`, for Real visitors) and `journey` 0008 (help text only).
+1. **Caddy:** `scp Caddyfile spa99:spa99/` then `docker compose restart caddy` (adds the `(probes)` blocks). Check: `curl -I https://spa99.co.uk/wp-login.php` gives 404, `https://spa99.co.uk/health/` gives 200.
+2. **Deploy** (image rebuild downloads the DB-IP country file; migrations run on start). Startup line must show `geoip=on`.
+3. **Privacy text:** `docker compose exec web python manage.py backfill_site_data --dry-run`, read it, then without `--dry-run`. Run it again after the next deploy: it also adds News Update and Midweek to "How did you hear about us?". It also makes every journey question required ("Required answers (2026-11-21)" in `docs/features/journey.md`): `min_choices` 0 becomes 1 on the eleven questions (a value you set by hand, such as 2, stays), adds the words "Please write a few words.", and drops "Optional" from the "About you." line. Read the dry run: it should say 9 or fewer x "journey.Question (answer required)" (8 on a live seeded after 2026-10-26). The backfill itself needs no migration. This part runs once only: after it, a question made optional in Control stays optional on later runs. Nobody who started a journey before is blocked: old finished journeys still open their result as before; one still open must answer the missing questions to finish.
+4. **Check:** open the site on a phone, then Office > Analytics > Visitors: Live shows 1, your country and device. A tagged link from the link maker shows under Campaigns the same day. System health shows the junk-probe count.
+5. **Rollback:** previous image tag. The new columns can stay.
+
 ## What is kept, and for how long
 
 Nothing grows without limit on disk: every container's log is capped at 5 x 10 MB (`docker-compose.yml`), and the server holds no app data.

@@ -169,8 +169,8 @@ def _invite_email(request):
 def journey(request, slug=""):
     _check_slug(slug, {*JOURNEY_SLUGS.values(), JOURNEY_RESULT_SLUG})
     keys = ["screen_1", "screen_2", "screen_3", "screen_4", "result_label", "why", "result_cta", "change_answers",
-            "gold_panel", "gold_line", "others", "explore_memberships", "continue", "skip", "last", "back", "prefer_not", "start_again",
-            "save_error", "result_loading", "result_error", "unavailable", "not_a_fit", "optional", "last_suggestion", "need_one", "result_empty", "not_you"]
+            "gold_panel", "gold_line", "others", "explore_memberships", "continue", "last", "back", "start_again",
+            "save_error", "result_loading", "result_error", "unavailable", "not_a_fit", "last_suggestion", "need_one", "need_text", "result_empty", "not_you"]
     session = journey_services.session_from_cookies(request.COOKIES, request.user)
     shown = memberships_visible(request)
     config = {
@@ -208,7 +208,7 @@ def gold_apply(request, slug=""):
     config = {
         "slugs": GOLD_SLUGS, "sentSlug": GOLD_SENT_SLUG, "base": reverse("gold_apply"),
         "copy": _copy("gold-apply", keys), "open": SiteSettings.load().register_interest_open,
-        "journeyCopy": _copy("journey", ["continue", "skip", "back", "prefer_not", "screen_1", "screen_2", "screen_3"]),
+        "journeyCopy": _copy("journey", ["continue", "back", "screen_1", "screen_2", "screen_3"]),
         "facilityImages": services.journey_facility_images(), "iconSprite": static("common/img/icons.svg"), "countries": phone.countries(),
         "urls": {"home": reverse("home"), "privacy": reverse("privacy"), "terms": reverse("terms"),
                  "whatsappBusiness": short_url("gold", msg="gold_business"),  # '' while no WhatsApp link is set: the note and button are hidden

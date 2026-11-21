@@ -2,11 +2,13 @@
 from django.urls import include, path
 
 from common.views import check_mobile, health
+from insights.beacon import beacon
 from plans.views import preview_start
 from notifications.views import postmark_webhook, ses_notifications
 
 urlpatterns = [
     path("health/", health, name="health"),  # public: monitoring
+    path("a/e/", beacon, name="beacon"),  # public: the page script's time-on-page and contact-tap beacon (always 204)
     path("validate/mobile/", check_mobile, name="check_mobile"),  # public: live mobile check, rate limited
     path("ses/notifications/", ses_notifications, name="ses_notifications"),  # public: Amazon SNS, signature checked
     path("postmark/webhook/", postmark_webhook, name="postmark_webhook"),  # public: Postmark, Basic auth checked

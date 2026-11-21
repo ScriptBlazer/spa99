@@ -14,6 +14,7 @@ from common.audit import client_ip
 from common.ratelimit import hit, rate_limited_json, too_many_response
 from journey import engine as journey_engine
 from journey import services as journey_services
+from insights import visitors
 from journey.models import Question
 
 from system import defaults
@@ -117,6 +118,7 @@ def apply(request):
         application, _ = services.submit_application(form.cleaned_data, session=session)
     except services.ApplicationsClosed:
         return JsonResponse({"error": "Applications are not open yet."}, status=403)
+    visitors.record_step(request, "gold")  # the visit's campaign gets a Gold application (never breaks the answer)
     return JsonResponse({"reference": application.reference, "message": "Thank you. We'll be in touch."}, status=201)
 
 

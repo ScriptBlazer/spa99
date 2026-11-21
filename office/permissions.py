@@ -46,7 +46,7 @@ approver = _guard(levels.is_approver)
 approvals = _guard(levels.can_approve_memberships)
 calls = _guard(levels.can_hear_calls)  # Calls tab and recordings: above Viewer
 final_approver = _guard(levels.is_final_approver)
-developer = _guard(lambda user: levels.at_least(user, levels.DEVELOPER))  # Developer and Superuser only (Activity)
+developer = _guard(lambda user: levels.at_least(user, levels.DEVELOPER))  # Developer and Superuser only (Activity, Analytics > Visitors for now)
 
 
 def abilities(user):
@@ -58,4 +58,4 @@ def abilities(user):
     office_up = levels.rank(level) >= levels.rank(levels.OFFICE)
     return {"can_act": levels.is_approver(user), "can_final": levels.is_final_approver(user), "can_see_all": level != levels.NONE, "can_export": admin_up, "can_delete": admin_up, "can_delete_gold": admin_up, "can_setup": admin_up,
             "can_edit": office_up, "can_outreach": office_up, "can_approvals": levels.can_approve_memberships(user), "can_revenue": admin_up, "can_chats": admin_up,
-            "can_activity": levels.at_least(user, levels.DEVELOPER), "can_calls": levels.can_hear_calls(user)}
+            "can_activity": levels.at_least(user, levels.DEVELOPER), "can_visitors": levels.at_least(user, levels.DEVELOPER), "can_calls": levels.can_hear_calls(user)}

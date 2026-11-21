@@ -46,6 +46,9 @@
   /* Ordered categories: a ramp of the metric's own hue (full, 72%, 48%, 28% over the surface). */
   --office-clay-2: #C9866F;  --office-clay-3: #DBAE9D;  --office-clay-4: #EACFC4;
   --office-teal-2: #679D99;  --office-teal-3: #9ABDB9;  --office-teal-4: #C4D7D3;
+  /* Analytics > Visitors (docs/features/analytics-design.md 9): the same ramp for slate. Decoration only, never text: heat map steps, the device split. */
+  --office-slate-2: #758DAD; --office-slate-3: #A3B3C7;  --office-slate-4: #C9D2DC;
+  --office-heat-cell: 1.125rem;                  /* heat map row height on a phone (1.75rem from 64em) */
   --office-grid: rgb(73 46 33 / 0.06);           /* gridlines, decoration */
   --office-crosshair: rgb(73 46 33 / 0.18);
 
@@ -107,6 +110,7 @@
     --office-chart-h: 20rem;
     --office-chart-hero-h: 24rem;
     --office-donut: 11.5rem;
+    --office-heat-cell: 1.75rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {

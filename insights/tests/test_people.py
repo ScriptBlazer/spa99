@@ -165,7 +165,7 @@ class SnapshotTests(OfficeTestCase):
         first = sorted(OfficeSnapshot.objects.values_list("page", "range", "payload"), key=str)
         snapshots.build_everything()
         self.assertEqual(first, sorted(OfficeSnapshot.objects.values_list("page", "range", "payload"), key=str))
-        self.assertEqual(OfficeSnapshot.objects.count(), 4 + 4 + 4 + 4 + 1)  # dashboard, analytics, pages and leads per range, plus the one counts row (office.counts)
+        self.assertEqual(OfficeSnapshot.objects.count(), 4 + 4 + 4 + 4 + 4 + 4 + 1)  # dashboard, analytics, pages, visitors (all and real) and leads per range, plus the one counts row (office.counts)
         everything = selectors.dashboard("all")
         self.assertEqual(everything["range"], "all")
         self.assertTrue(all(r["previous"] is None and r["change"] is None for r in everything["rings"]))
