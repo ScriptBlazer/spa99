@@ -2,7 +2,7 @@
 
 Status: **server side built on `feature/voicemail-email`, not released** (2026-11-19). Frontend styling and a live Twilio test come next. Moishe chose A (our site + Postmark). Main want: listen in the Office. Branch `feature/voicemail-email`.
 
-**2026-11-23:** Moishe moves the number to our site (`/phone/voice/`), with Sam's function as the fallback. See PROJECT.md.
+**2026-11-23:** Moishe moves the number to our site (`/phone/voice/`), with Sam's function as the fallback. Live and tested the same day. See PROJECT.md.
 
 ## The request (from Sam, 2026-11-19)
 
