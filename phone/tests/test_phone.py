@@ -462,19 +462,21 @@ class OfficeTests(TestCase):
         self.assertEqual((part.status_code, part.content, part["Content-Range"]), (206, b"234", "bytes 2-4/10"))
         self.assertEqual(client.get(f"/calls/{Call.objects.exclude(pk=self.call.pk).get().pk}/audio/").status_code, 404)
 
-    def test_audio_redirects_to_a_short_signed_link_on_s3(self):
+    def test_audio_streams_from_this_host_on_s3_too(self):
+        """Some office filters block amazonaws.com: never send the browser to the bucket, serve the bytes ourselves."""
         from django.core.files.storage import InMemoryStorage
 
-        urls = []
+        with mock.patch.object(InMemoryStorage, "bucket_name", "bucket", create=True), mock.patch.object(InMemoryStorage, "url", side_effect=AssertionError("no bucket link")):
+            client = self.login(levels.OFFICE)
+            whole = client.get(f"/calls/{self.call.pk}/audio/")
+            part = client.get(f"/calls/{self.call.pk}/audio/", HTTP_RANGE="bytes=2-4")
+        self.assertEqual((whole.status_code, whole["Content-Type"], whole.content, whole["Cache-Control"]), (200, "audio/mpeg", b"0123456789", "private, no-store"))
+        self.assertEqual((part.status_code, part.content, part["Content-Range"]), (206, b"234", "bytes 2-4/10"))
+        self.assertFalse(whole.has_header("Location"))
 
-        def url(self_, name, expire=None):
-            urls.append((name, expire))
-            return "https://bucket.example.test/signed"
-
-        with mock.patch.object(InMemoryStorage, "bucket_name", "bucket", create=True), mock.patch.object(InMemoryStorage, "url", url):
-            response = self.login(levels.OFFICE).get(f"/calls/{self.call.pk}/audio/")
-        self.assertEqual((response.status_code, response["Location"]), (302, "https://bucket.example.test/signed"))
-        self.assertEqual(urls, [("voicemails/2026/11/test.mp3", 300)])
+    def test_missing_file_is_404_not_500(self):
+        self.call.audio.storage.delete(self.call.audio.name)
+        self.assertEqual(self.login(levels.OFFICE).get(f"/calls/{self.call.pk}/audio/").status_code, 404)
 
     def test_range_from_the_end_and_past_the_end(self):
         client = self.login(levels.OFFICE)

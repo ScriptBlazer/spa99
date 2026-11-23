@@ -2,7 +2,7 @@
 import re
 
 from django.core.exceptions import PermissionDenied  # noqa: F401 - the guard raises it
-from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import never_cache
@@ -68,8 +68,11 @@ def call_detail(request, pk):
 
 def _ranged(request, call):
     """The file from storage as audio/mpeg, with Range support (Safari needs it). Files are about 1 MB, so it is read whole."""
-    with call.audio.open("rb") as handle:
-        data = handle.read()
+    try:
+        with call.audio.open("rb") as handle:
+            data = handle.read()
+    except Exception as error:  # file gone from disk or S3 (FileNotFoundError, botocore ClientError): a plain 404, not a server error
+        raise Http404("Recording file not found") from error
     size = len(data)
     match = RANGE.match(request.headers.get("Range", ""))
     if not match or not (match.group(1) or match.group(2)):
@@ -91,15 +94,12 @@ def _ranged(request, call):
 @calls_only
 @require_GET
 def call_audio(request, pk):
-    """The recording. On S3 a redirect to a link that lasts 5 minutes; locally the bytes (with Range). 404 when there is no audio."""
+    """The recording's bytes (with Range), always from this host, also on S3: some office filters block amazonaws.com, so the browser never
+    goes there (decided 2026-11-23). 404 when there is no audio."""
     call = get_object_or_404(Call, pk=pk)
     if not call.audio:
         raise Http404
-    storage = call.audio.storage
-    if getattr(storage, "bucket_name", None):
-        response = HttpResponseRedirect(storage.url(call.audio.name, expire=300))
-    else:
-        response = _ranged(request, call)
+    response = _ranged(request, call)
     response["Cache-Control"] = "private, no-store"
     return response
 
