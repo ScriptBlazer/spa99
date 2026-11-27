@@ -49,3 +49,17 @@ class SesBackendTests(SimpleTestCase):
         with self.assertRaises(RuntimeError):
             SesBackend(client=client).send_messages([message])
         self.assertEqual(SesBackend(client=client, fail_silently=True).send_messages([message]), 0)
+
+
+class SeedFitsTheColumnsTests(SimpleTestCase):
+    """SQLite ignores max_length; Postgres refuses a longer value (2026-11-27: a long note broke CI)."""
+
+    def test_every_default_subject_and_note_fits(self):
+        from notifications.models import NotificationTemplate as EmailTemplate
+        from notifications.seed import DEFAULT_SUBJECTS
+
+        subject_max = EmailTemplate._meta.get_field("subject").max_length
+        note_max = EmailTemplate._meta.get_field("note").max_length
+        for key, (subject, note) in DEFAULT_SUBJECTS.items():
+            self.assertLessEqual(len(subject), subject_max, key)
+            self.assertLessEqual(len(note), note_max, key)

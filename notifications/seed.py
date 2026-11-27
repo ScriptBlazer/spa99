@@ -8,7 +8,7 @@ DEFAULT_SUBJECTS = {
     "password_reset": ("Reset your Spa 99 password", "Forgot password."),
     "password_changed": ("Your Spa 99 password was changed", "After any password change (signed in or reset), team accounts too."),
     "password_set": ("Your Spa 99 password was changed", "To a team member when a Developer or superuser sets a new password for them (System > Team)."),
-    "email_changed_old": ("Your Spa 99 login email was changed", "To a person's OLD address when their login email is changed: a team member's by a Developer or superuser (System > Team), a customer's by Admin or above (Office > person page). It never names the new address."),
+    "email_changed_old": ("Your Spa 99 login email was changed", "To the OLD address when a login email is changed (System > Team, or Office > person page for a customer). It never names the new address."),
     "email_changed": ("Your Spa 99 login email was changed", "To a person's new address when their login email is changed (System > Team for the team, Office > person page for a customer)."),
     "team_invite": ("You've been added to the Spa 99 team", "To a new team member: the link to choose their own password."),
     "welcome": ("Welcome to Spa 99", "After the email address is confirmed."),
