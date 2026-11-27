@@ -109,7 +109,7 @@ One Django project, apps by area. Apps only talk to each other through their `se
 - Tests mocked, no real APIs. Test models, DB and logic, not buttons. Sensible number of tests.
 - GitHub Actions runs tests against a Postgres service container.
 - Code works on SQLite and Postgres. Flag anything Postgres-only.
-- Git: branch per feature, PR into `main`, tags `1.2.3` (no "v"). Moishe handles repos, hosting and deploys.
+- Git: branch per feature, PR into `main`, tags `1.2.3` (no "v"). Version numbers carry over at 9 (RULES.md section 7): `1.2.9` → `1.3.0`, `1.9.9` → `2.0.0`. Moishe handles repos, hosting and deploys.
 - Instant feedback on every button and field; no double submits; one shared modal; friendly error pages.
 - Guidance, not a bible: break one when it clearly helps, and say so in one line.
 
@@ -788,3 +788,4 @@ Newest at the bottom. Every decision Moishe makes is logged here the same sessio
 | 2026-11-27 | Moishe: no full stop after the opening date on the home page ("Launching 2027", was "2027."). Seed fixed; live: `backfill_site_data` changes `{opening}.` to `{opening}` (dry run first). |
 | 2026-11-27 | Moishe: changing a customer's email in the Office stays, but behind a clear warning dialog that says what will happen (signed out, new login, notices, confirm link, Not verified until he clicks). Re-confirming after a change does not resend Welcome or "Gold is active". |
 | 2026-11-27 | Moishe: for this batch, no need to ask before pushing to the open PR branch: push when ready. |
+| 2026-11-27 | Moishe: version numbers follow the carry-over counter in his RULES.md (section 7): after 9 the next part goes up, so `1.2.9` → `1.3.0`, never `1.2.10`. `1.2.10` was tagged by mistake; the same release is `1.3.0`. Deploy `1.3.0`, not `1.2.10`. |
