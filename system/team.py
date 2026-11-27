@@ -34,6 +34,11 @@ def team_queryset():
     return User.objects.filter(Q(is_staff=True) | Q(is_superuser=True) | Q(groups__name__in=levels.TEAM_GROUPS)).distinct()
 
 
+def is_team_member(user):
+    """True for anyone team_queryset() holds. The one check for "this is a team member, not a customer" (the Office Change email button and its service both use it)."""
+    return team_queryset().filter(pk=user.pk).exists()
+
+
 def members():
     return list(team_queryset().prefetch_related("groups").order_by("email"))
 

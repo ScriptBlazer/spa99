@@ -111,6 +111,17 @@ class BackfillCommandTests(TestCase):
         self.assertTrue(OpeningRule.objects.get(key="shabbos-close").public_note)
         self.assertIn("Nothing to change", self.run_command())
 
+    def test_signin_caption_is_cleared_only_from_the_exact_old_words(self):
+        """Moishe 2026-11-27: no "Your own locker, every visit." under the sign-in picture. A caption typed by hand stays."""
+        Section.objects.filter(page__key="signin", key="caption").update(body="Your own locker, every visit.")
+        self.run_command("--dry-run")
+        self.assertEqual(Section.objects.get(page__key="signin", key="caption").body, "Your own locker, every visit.")
+        self.run_command()
+        self.assertEqual(Section.objects.get(page__key="signin", key="caption").body, "")
+        Section.objects.filter(page__key="signin", key="caption").update(body="Hand written.")
+        self.run_command()
+        self.assertEqual(Section.objects.get(page__key="signin", key="caption").body, "Hand written.")
+
 
 class JourneyAndGoldBackfillTests(TestCase):
     """2026-10-23 wording: only the exact old values are replaced, edited ones are left alone."""
@@ -164,7 +175,7 @@ class JourneyAndGoldBackfillTests(TestCase):
         call_command("backfill_site_data", "--dry-run", stdout=StringIO())
         self.assertEqual(Section.objects.get(page__key="home", key="opening").heading, "Launching {opening}.")  # dry run saves nothing
         self.run_command()
-        self.assertEqual(Section.objects.get(page__key="home", key="opening").heading, "{opening}.")
+        self.assertEqual(Section.objects.get(page__key="home", key="opening").heading, "{opening}")  # no full stop since 2026-11-27
         self.assertEqual(Section.objects.get(page__key="spa", key="opener_4").body, "Take your time. Nothing here is rushed.")
         self.assertEqual(Section.objects.get(page__key="spa", key="moment_shower").heading, "Between rounds.")
         self.assertEqual(Section.objects.get(page__key="spa", key="moment_tote").heading, "Until next time.")

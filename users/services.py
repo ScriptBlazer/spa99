@@ -194,6 +194,12 @@ def queue_verification_email(user):
         logger.exception("Could not queue the verification email for %s", user.pk)
 
 
+def proven_before(user):
+    """Is this account's data found by address his? True once he has confirmed an address, and still true after an Office email change cleared the stamp (his history kept the proof), so export
+    and erasure keep finding everything. An account that never confirmed is not proven: it may carry someone else's address."""
+    return bool(user.email_verified_at) or User.history.filter(id=user.pk, email_verified_at__isnull=False).exists()
+
+
 def resend_verification(user):
     """Queue a fresh link, unless already verified. Returns True if queued."""
     if user is None or user.email_verified_at:
@@ -216,10 +222,13 @@ def verify_email(token):
         metrics.email_verified(user.email_verified_at)
         link_earlier_data(user)  # the address is proven: earlier leads and applications with it become his
     _after_registration(user, user.marketing_consent, proven=True)  # the address is proven: its invites become registered, and ticking the news box lifts an earlier unsubscribe
-    try:
-        enqueue("users.tasks.send_welcome_email", str(user.pk))
-    except Exception:  # noqa: BLE001
-        logger.exception("Could not queue the welcome email for %s", user.pk)
+    from notifications.models import EmailLog
+
+    if not EmailLog.objects.filter(template="welcome", status=EmailLog.SENT, to__iexact=user.email).exists():  # confirming again after an Office email change: he already had it
+        try:
+            enqueue("users.tasks.send_welcome_email", str(user.pk))
+        except Exception:  # noqa: BLE001
+            logger.exception("Could not queue the welcome email for %s", user.pk)
     return tokens.VERIFIED, user
 
 
@@ -299,12 +308,12 @@ def export_user_data(user):
         **({"approval_emails": {"use_account_email": delivery.use_account_email, "other_email": delivery.other_email}} if delivery else {}),
         "interest": _export_interest(user),
         "journey_sessions": _export_sessions(user),
-        "chats": chat_services.export_conversations(user=user, email=user.email if user.email_verified_at else None),
-        "staff_emails": _export_staff_emails(user) if user.email_verified_at else [],  # found by address: only once the address is proven his
-        "gold_applications": gold_services.export_applications(user.email) if user.email_verified_at else [],  # by email only once the address is proven his
+        "chats": chat_services.export_conversations(user=user, email=user.email if proven_before(user) else None),
+        "staff_emails": _export_staff_emails(user) if proven_before(user) else [],  # found by address: only once the address is proven his
+        "gold_applications": gold_services.export_applications(user.email) if proven_before(user) else [],  # by email only once the address is proven his
         "emails": [
             {"template": e.template, "subject": e.subject, "status": e.status, "sent_at": _plain(e.sent_at)}
-            for e in _email_logs(user.email).order_by("created_at") if user.email_verified_at
+            for e in _email_logs(user.email).order_by("created_at") if proven_before(user)
         ],
         "group_emails": [
             {"mailing": r.mailing.subject, "status": r.status, "sent_at": _plain(r.sent_at)}
@@ -312,11 +321,11 @@ def export_user_data(user):
         ],
         "invites": [
             {"name": i.name, "status": i.status, "sent_at": _plain(i.sent_at), "opened_at": _plain(i.opened_at), "registered_at": _plain(i.registered_at)}
-            for i in _invites(user.email).order_by("created_at") if user.email_verified_at  # found by the address only: an unverified account may carry someone else's
+            for i in _invites(user.email).order_by("created_at") if proven_before(user)  # found by the address only: an unverified account may carry someone else's
         ],
         "uploaded_lists": [
             {"list": m.list.name, "name": m.name, "added_at": _plain(m.added_at)}
-            for m in _list_memberships(user.email).select_related("list").order_by("added_at") if user.email_verified_at
+            for m in _list_memberships(user.email).select_related("list").order_by("added_at") if proven_before(user)
         ],
         "login_events": logins,
         "history": history,
@@ -344,7 +353,7 @@ def _mailing_rows(user):
     """Group-send rows for the person (by account or address)."""
     from mailings.models import MailingRecipient
 
-    if not user.email_verified_at:  # rows found only by the address are his only once it is proven
+    if not proven_before(user):  # rows found only by the address are his only once it is proven
         return MailingRecipient.objects.filter(user=user)
     return MailingRecipient.objects.filter(Q(user=user) | Q(email__iexact=user.email))
 
@@ -394,7 +403,7 @@ def _export_interest(user):
 
 
 def _export_sessions(user):
-    by_email = Q(lead_email__iexact=user.email) if user.email_verified_at else Q(pk__in=[])  # an unproven address is not his
+    by_email = Q(lead_email__iexact=user.email) if proven_before(user) else Q(pk__in=[])  # an unproven address is not his
     sessions = JourneySession.objects.filter(Q(user=user) | by_email).select_related("suggested_plan").order_by("created_at")
     result = []
     for session in sessions:
@@ -426,7 +435,7 @@ def _export_sessions(user):
 def _login_events(user):
     """Events linked to the person, plus failed attempts typed with their email, only once the address is proven his (same set delete removes). An unverified account may carry someone else's
     address, and anyone can type any address at the sign-in: an unproven address exports a stranger's attempts (with his IP) and its deletion would erase the real owner's."""
-    if not user.email_verified_at:
+    if not proven_before(user):
         return LoginEvent.objects.filter(user=user)
     return LoginEvent.objects.filter(Q(user=user) | Q(attempted_email__iexact=user.email))
 
@@ -449,7 +458,7 @@ def delete_user_data(user):
     rows that copy their details. Journey sessions are anonymised (kept for statistics, no longer linked).
     Erasure overrides the "history is never deleted" rule because history holds personal data."""
     pk, email = user.pk, user.email
-    proven = bool(user.email_verified_at)  # anything found only by email is his only once the address is proven (an unverified account may carry someone else's address)
+    proven = proven_before(user)  # anything found only by email is his only once the address is proven (an unverified account may carry someone else's address)
     chat_services.erase_conversations(user=user)  # before the sessions are unlinked (chats are also found through the account's sessions)
     from outreach import people as outreach_people
     from outreach.services import erase_email

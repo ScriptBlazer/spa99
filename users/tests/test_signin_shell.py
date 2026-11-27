@@ -9,9 +9,11 @@ class SignInShellTests(TestCase):
         self.assertIn('class="signin on-dark"', html)
         self.assertIn("Welcome back.", html)
         for needle in ('name="username"', 'name="password"', 'data-working-text="One moment"', 'href="/forgot-password/"',
-                       'aria-label="Forgotten your password?"', 'href="/register/"', "Your own locker, every visit."):
+                       'href="/register/"'):
             self.assertIn(needle, html)
         self.assertEqual(html.count("<h1"), 1)
+        self.assertNotIn("own locker", html)  # caption removed 2026-11-27
+        self.assertIn("Forgotten password?", html)
 
     def test_forgot_and_reset_pages_share_the_shell(self):
         self.assertIn('class="signin on-dark"', self.client.get("/forgot-password/").content.decode())

@@ -36,7 +36,7 @@ What stays: the heading "Welcome back.", the two fields, the Show toggle, live v
 │                                  ││                                          │
 │   Email                          ││                                          │
 │   [                        ]     ││                                          │
-│   Password       Forgotten?      ││                                          │
+│   Password  Forgotten password? ││                                          │
 │   [                   ] Show     ││                                          │
 │                                  ││                                          │
 │   [        Sign in         ]     │╰──────────────────────────────────────────│
@@ -50,7 +50,7 @@ What stays: the heading "Welcome back.", the two fields, the Show toggle, live v
 - The section is `.on-dark` (espresso), `min-height: calc(100svh - var(--header-h))`, `display: grid; align-items: center`, padding-block `--space-5`. The footer follows as on every page.
 - Grid 12 columns (container as everywhere). **Form column: cols 1 to 5** (max width 26rem, 416px). **Picture: col 7 to the right screen edge** (`.frame--right`, inner corners `--radius-md`), height `min(76svh, 38rem)` (608 at 800 tall), vertically centred with the form.
 - Picture: `lockers` (the owner likes it; the swan on every door, and "your own locker" is a fact of the visit, step 2 on The spa). Focus `70% 50%`. Content row override (section 6). `frame-tint` at 0.14 (the house tint on dark).
-- Caption under the picture, aligned to its left edge: the standard `.frame-caption` (24px gold hairline, then "Your own locker, every visit." Figtree `--text-sm`, `--color-text-muted-inverse`). One line of editorial detail, not a heading.
+- **2026-11-27 (Moishe): no caption.** "Your own locker, every visit." is removed; the caption shows only if one is typed in Control (Content > Sign in > caption). Was: caption under the picture, aligned to its left edge: the standard `.frame-caption` (24px gold hairline, then "Your own locker, every visit." Figtree `--text-sm`, `--color-text-muted-inverse`). One line of editorial detail, not a heading.
 
 **The form column, top to bottom:**
 
@@ -61,7 +61,7 @@ What stays: the heading "Welcome back.", the two fields, the Show toggle, live v
 | Lead | "Sign in to your Spa 99 account." Figtree `--text-base`, `--color-text-muted-inverse` (6.50:1), margin-top `--space-2` |
 | Throttle / non-field error | Unchanged markup, on dark: `--color-danger-inverse` (6.81:1), margin-top `--space-4` |
 | Fields | margin-top `--space-5`, gap `--space-4`. Existing `_field.html`. On dark: label Figtree 500 `--text-sm` cream; input `--control-h` (52px), transparent background, 1px `--color-control-line` border (3.09:1 on espresso, UI), `--radius-sm`, cream text 16px (no iOS zoom). Focus: border cream + 2px `--color-focus-inverse` (gold) outline, 3px offset. Error: `--color-danger-inverse` border and message |
-| Forgotten password | Moves **onto the password label row**, right aligned: `.btn-quiet` `--text-sm`, cream, underline offset 3px, "Forgotten?" visually, full accessible name "Forgotten your password?" (`aria-label`). The label row is `display: flex; justify-content: space-between; align-items: baseline` |
+| Forgotten password | Moves **onto the password label row**, right aligned: `.btn-quiet` `--text-sm`, cream, underline offset 3px, "Forgotten password?" visually (changed 2026-11-27), full accessible name "Forgotten your password?" (`aria-label`). The label row is `display: flex; justify-content: space-between; align-items: baseline` |
 | Sign in | `.btn.btn-primary.btn-block` on dark: gold background, espresso label (6.17:1), 52px, margin-top `--space-5`. Unchanged label and working text |
 | Divider | 1px `--color-hairline-inverse`, margin-block `--space-5` |
 | New here | "New here? Register interest" Figtree `--text-sm`: "New here?" muted inverse, "Register interest" cream `.btn-quiet` link (same target) |
@@ -86,7 +86,7 @@ Form column cols 1 to 7 (max 26rem). The picture becomes a band **above** the fo
  Sign in to your Spa 99 account.
  Email
  [                              ]
- Password              Forgotten?
+ Password              Forgotten password?
  [                         ] Show
  [          Sign in             ]
  ───────────────────────────────
@@ -126,7 +126,7 @@ No pointer glow (this is a tool page). No page-load delay on the form: it must b
 
 - One `<h1>`. The swan and the picture caption are decorative to the form: swan `aria-hidden`; picture `alt="Wooden lockers, each with the swan carved in its door"`.
 - Contrast: cream on espresso 10.95; muted inverse 6.50; gold button label (espresso on gold) 6.17; field borders 3.09 (UI); focus ring gold on espresso 6.17; danger inverse 6.81. The form never sits on `--color-espresso-raised` (field borders would drop to 2.67).
-- Tab order: Email, Password, Show, Forgotten?, Sign in, Register interest. "Forgotten?" comes after Show, so the password field and its toggle stay together.
+- Tab order: Email, Password, Show, Forgotten password?, Sign in, Register interest. "Forgotten password?" comes after Show, so the password field and its toggle stay together.
 - `autocomplete="email"` and `autocomplete="current-password"` on the inputs (check the form widget attrs; add if missing). No autofocus.
 - The page works without JS (plain POST form).
 
@@ -156,7 +156,7 @@ New in `pages.css` (replace `.auth` and `.auth-inner` for the public sign-in onl
 | `.signin` | The section: `.on-dark`, grid, min-height, centring |
 | `.signin-form` | The column, `max-width: var(--opener-measure)` (26rem, SPA-OPENER token) or `26rem` if that token is not in yet |
 | `.signin-frame` | The picture: reuses `.frame.frame--right` + `.frame-media` + `.frame-tint` |
-| `.field-head` | Label row with the "Forgotten?" link |
+| `.field-head` | Label row with the "Forgotten password?" link |
 | `.signin-foot` | Divider, "New here", address line |
 
 No new colour tokens. Uses `--color-gold`, `--color-text-muted-inverse`, `--color-control-line`, `--color-hairline-inverse`, `--color-focus-inverse`, `--color-danger-inverse`, `--radius-md`, `--radius-sm`, `--control-h`, `--space-*`, `--ease-soft`, `--duration-hero`, `--duration-reveal`, `--delay-reveal`, `--rise`.

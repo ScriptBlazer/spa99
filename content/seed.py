@@ -35,7 +35,7 @@ PAGES = {
         ("memberships_teaser", "Three memberships. One single visit.", "", "Compare memberships", "/memberships/"),
         ("gold_teaser", "The Gold Card.", "A free membership{gold_star} for BML clients, past, present and future, by approval.", "About the Gold Card", "/gold-card/"),
         ("opening_label", "", "Launching", "", ""),
-        ("opening", "{opening}.", "BML House, 99c Vale Road, London N4.", "Register", "/register/"),
+        ("opening", "{opening}", "BML House, 99c Vale Road, London N4.", "Register", "/register/"),
     ]),
     "spa": ("The spa", "Sauna, cold plunge, relaxing zone, massage room and gym at BML House, 99c Vale Road.", [
         ("intro", "The spa.", "{rooms} spaces, one quiet visit.", "Tailor your membership", "/journey/"),  # 2026-10-29: the hero button, as on Home
@@ -113,7 +113,7 @@ PAGES = {
     ]),
     "signin": ("Sign in", "Sign in to your Spa 99 account.", [
         ("intro", "Welcome back.", "Sign in to your Spa 99 account.", "", ""),  # an uploaded image overrides the lockers picture
-        ("caption", "", "Your own locker, every visit.", "", ""),
+        ("caption", "", "", "", ""),  # empty: no caption under the picture (Moishe 2026-11-27)
     ]),
     "gold-apply": ("Apply for the Gold Card", "Apply for the Spa 99 Gold Card.", [
         ("screen_1", "About you.", "A few taps, so we know you.", "", ""),

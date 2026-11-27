@@ -200,7 +200,7 @@ def timeline(sessions, user=None, interest=None, applications=(), email="", addr
         if addresses:  # a sent Email-button message is already its own "Email sent by ..." line with the text; only a failed or suppressed one adds a warning line
             logs = logs.exclude(template="office_message", status=EmailLog.SENT)
         for log in logs.order_by("-created_at")[:defaults.get().person_emails_shown]:
-            out.append(_entry(log.sent_at or log.created_at, "email", f"Email: {log.subject}", log.get_status_display()))
+            out.append({**_entry(log.sent_at or log.created_at, "email", f"Email: {log.subject}", log.get_status_display()), "log": str(log.pk), "template": log.template})
     if addresses:
         from outreach import services as outreach_services
 

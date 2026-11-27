@@ -186,6 +186,7 @@ def backfill():
     changed.update(_industry_other_under_industry_2026_11_21())
     changed.update(_not_you_start_again_2026_11_03())
     changed.update(_dashboard_all_time_2026_11_05())
+    changed.update(_signin_caption_2026_11_27())
     return changed
 
 
@@ -640,6 +641,7 @@ OLD_SECTION_TEXT = [  # page key, section key, field, old value, new value
     ("gold-apply", "screen_1", "body", "A few taps about your work in property.", "A few taps, so we know you."),
     # Round 4 (2026-10-23): no promises of amenities, and the opening date reads "Launching ..."
     ("home", "opening", "heading", "Launching {opening}.", "{opening}."),  # 2026-10-23 (later): "Launching" is a label row now
+    ("home", "opening", "heading", "{opening}.", "{opening}"),  # Moishe 2026-11-27: no full stop after the date ("Launching 2027")
     ("spa", "opener_4", "body", "Your robe and slippers are waiting.", "Take your time. Nothing here is rushed."),
     ("spa", "moment_shower", "heading", "In every shower.", "Between rounds."),
     ("spa", "moment_shower", "body", "Toiletries in the swan bottles. A fresh towel on the rail.",
@@ -1016,3 +1018,17 @@ def _other_box_context_2026_11_21():
             changed["journey.Question (line above the Other box)"] += 1
     return changed
 
+
+
+OLD_SIGNIN_CAPTION = "Your own locker, every visit."
+
+
+def _signin_caption_2026_11_27():
+    """Moishe 2026-11-27: no "Your own locker, every visit." under the sign-in picture. Blanks that exact wording only (a caption typed in Control stays)."""
+    changed = Counter()
+    section = Section.objects.filter(page__key="signin", key="caption", body=OLD_SIGNIN_CAPTION).first()
+    if section is not None:
+        section.body = ""
+        section.save()  # save, not update: keeps a history row like the other wording steps
+        changed["content.Section (sign-in caption removed)"] += 1
+    return changed

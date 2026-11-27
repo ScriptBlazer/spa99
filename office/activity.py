@@ -267,6 +267,8 @@ def _row_note_event(e, ctx):
 
 
 def _row_edit(e, ctx):
+    if e.what == PersonEdit.RESENT:
+        return _r(e.by_label, e.after, email=e.email)
     noun = {PersonEdit.MOBILE: "Mobile", PersonEdit.EMAIL: "Email"}.get(e.what, "First name")
     verb = "added" if not e.before else ("removed" if not e.after else "changed")
     detail = f"{e.before} to {e.after}" if e.before and e.after else (e.after or e.before)

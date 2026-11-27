@@ -90,6 +90,9 @@ urlpatterns = [
     path("gold/<uuid:pk>/delete/", t.gold_delete, name="office_gold_delete"),
     # add or fix a number (the Details rows), and mark a Gold application Contacted by hand
     path("leads/<uuid:pk>/contact/", t.lead_contact, name="office_lead_contact"),
+    path("people/<uuid:pk>/email/", t.person_email, name="office_person_email"),
+    path("people/<uuid:pk>/resend-verify/", t.person_resend_verify, name="office_person_resend_verify"),
+    path("people/<uuid:pk>/emails/<uuid:log_id>/resend/", t.person_email_resend, name="office_person_email_resend"),
     path("people/<uuid:pk>/mobile/", t.person_mobile, name="office_person_mobile"),
     path("gold/<uuid:pk>/mobile/", t.gold_mobile, name="office_gold_mobile"),
     path("gold/<uuid:pk>/contacted/", t.gold_contacted, name="office_gold_contacted"),

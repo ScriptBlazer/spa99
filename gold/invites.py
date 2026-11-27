@@ -246,7 +246,12 @@ def activate_approved(user, application_ids):
     if not ids or not activate_gold(user):
         return False
     GoldInvite.objects.filter(application_id__in=ids, used_at__isnull=True, revoked_at__isnull=True).update(revoked_at=timezone.now())
+    from notifications.models import EmailLog
+
     for pk in ids:
+        application = GoldApplication.objects.filter(pk=pk).first()
+        if application is not None and EmailLog.objects.filter(template="gold_active", status=EmailLog.SENT, to__iexact=application.email).exists():
+            continue  # he confirmed again after an Office email change: he already had this email
         _queue("gold.tasks.send_gold_active_email", str(pk))
     logger.info("Gold activated on account %s: approved application verified its address", user.pk)
     return True

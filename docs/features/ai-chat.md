@@ -106,3 +106,7 @@ All enforced on the server; none of the refusals below calls Claude. Numbers are
 
 ## 2026-11-21: no prices and no email in the chat
 Moishe: the chat email form was a loophole (prices for an email alone). Now: prices only when `memberships_visible(request)`; otherwise one line and a "Tailor your membership" button. Removed: the `offer_email` tool and prompt rule, the `offer_email` event, `POST /chat/email/`, `retry`, `services.lead_saved` and `pending_question`, the panel email form. Added: the `offer_journey` tool. The privacy line about chats was reworded (backfill step `_privacy_chat_email_2026_11_21`, exact old line only). The System > Assistant test console keeps its with/without prices switch.
+## 2026-11-27: opening and hours match System
+- **Opening:** the KNOWLEDGE block has `Opening: <site.opening_label>` (opening date as month and year if set, else the opening text in System > Settings, now "2027") and a line telling the assistant to repeat it word for word and never add a month or date. Change it in System and the assistant follows within a minute (knowledge cache 60 s).
+- **Hours:** when there are cleaning hours, HOURS adds that we are open 24 hours a day and the cleaning hours are a daily cleaning window, never "closed" or "closing time".
+- If it still names a month, check System > Settings (Opening date must be empty) and the FAQ and Knowledge notes in System > Assistant for old wording: those are the team's own text and the assistant uses them.

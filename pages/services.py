@@ -690,7 +690,7 @@ def signin_shell():
     return {
         "heading": copy["intro"].heading or "Welcome back.",
         "lead": copy["intro"].body or "Sign in to your Spa 99 account.",
-        "caption": copy["caption"].body or "Your own locker, every visit.",
+        "caption": copy["caption"].body,  # no default: Moishe removed "Your own locker, every visit." (2026-11-27); a caption typed in Control still shows
         "upload": copy["intro"].image, "name": "lockers",
         "alt": (copy["intro"].image_alt if copy["intro"].image else "") or SIGNIN_ALT,
         "has_image": bool(copy["intro"].image) or images.has_image("lockers"),

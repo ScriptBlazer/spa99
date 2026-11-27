@@ -123,6 +123,18 @@ class KnowledgeAndPriceRuleTests(ChatTestCase):
         self.assertEqual(dict(got)["next_steps"]["steps"][0]["label"], "Tailor your membership")
         self.assertNotIn("offer_email", [t["name"] for t in fake.calls[0]["tools"]])
 
+    def test_opening_follows_settings_and_cleaning_hours_are_not_closed(self):
+        """Moishe 2026-11-27: the assistant says the opening exactly as Site settings has it, and we are open 24 hours with cleaning hours."""
+        SiteSettings.objects.update(opening_date=None, opening_text="2027")
+        from django.core.cache import cache
+        cache.clear()
+        text, _ = knowledge.build(prices=False)
+        self.assertIn("Opening: 2027\n", text)
+        self.assertNotIn("January", text)
+        self.assertIn("never add a month".lower(), text.lower())
+        self.assertIn("open 24 hours a day", text)
+        self.assertIn("never say we are closed then", text)
+
     def test_a_price_question_gets_the_journey_button_even_when_the_model_forgets_the_tool(self):
         self.fake((["We share those once you have tailored your membership."], final()),
                   (["We are at 99 Vale Road."], final()))

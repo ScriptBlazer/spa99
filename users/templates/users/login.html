@@ -45,7 +45,7 @@
         {% if form.non_field_errors %}<p class="form-error signin-alert" role="alert" data-problem>{{ form.non_field_errors|join:" " }}</p>{% endif %}
         {% include "common/_field.html" with field=form.username %}
         {% url 'forgot_password' as forgot_url %}
-        {% include "common/_field.html" with field=form.password toggle=True aside_url=forgot_url aside_text="Forgotten?" aside_label="Forgotten your password?" %}
+        {% include "common/_field.html" with field=form.password toggle=True aside_url=forgot_url aside_text="Forgotten password?" %}
         <button type="submit" class="btn btn-primary btn-block" data-working-text="One moment">Sign in</button>
       </form>
       <div class="signin-foot">

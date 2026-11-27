@@ -221,7 +221,7 @@ def _timeline_group(kind):
     return "change"
 
 
-def _timeline_context(request, person, restore=None):
+def _timeline_context(request, person, restore=None, resend=None):
     """The timeline for the page: the default number of events, grouped by day; ?tl=2 (HTMX 'Show earlier') asks for the next page."""
     try:
         number = max(int(request.GET.get("tl", "1")), 1)
@@ -234,6 +234,7 @@ def _timeline_context(request, person, restore=None):
             item["time"] = f"{timezone.localtime(datetime.fromisoformat(item['at'])):%H:%M}" if item["at"] else ""  # the day is the heading above
             # a "Note deleted by X" line carries `restore_url` (POST) while the note is still deleted and the person may edit; else ''
             item["restore_url"] = restore(item["note"]) if restore and item.get("note") and tools.can_edit(request.user) else ""
+            item["resend_url"] = resend(item) if resend and item.get("log") else ""  # a sent email he can be sent again (office/resend.py): the person page, Admin and up
     return {"timeline_days": days, "timeline_more": more, "timeline_next": number + 1}
 
 
@@ -270,8 +271,14 @@ def _chats_context(person, user=None, email="", filter_key="", filter_id="", all
 def person(request, pk):
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
     person = lists.person_detail(user)
+    from system.team import is_team_member
+
+    from . import resend
+
+    can_resend = levels.at_least(request.user, levels.ADMIN) and not is_team_member(user)
+    resend_url = (lambda item: reverse("office_person_email_resend", args=[user.pk, item["log"]]) if resend.offered(item["template"], user) else "") if can_resend else None
     context = {"person": person, "section": "people", "setup_plans": ManualSetupForm().fields["plan"].queryset,
-               **_timeline_context(request, person, lambda n: reverse("office_person_note_restore", args=[user.pk, n])), **_person_extras(request, person)}
+               **_timeline_context(request, person, lambda n: reverse("office_person_note_restore", args=[user.pk, n]), resend_url), **_person_extras(request, person)}
     if not _is_fragment(request):
         context.update(_chats_context(person, user=user, email=user.email, filter_key="user", filter_id=user.pk, allowed=abilities(request.user)["can_chats"]))
         context.update(tools.tools_context(tools.Target("person", user.pk, user=user), request.user))
