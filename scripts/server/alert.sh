@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${ALERT_ENV_FILE:-$SCRIPT_DIR/.alert.env}"
 STATE_FILE="${ALERT_STATE_FILE:-$SCRIPT_DIR/.alert_state}"
 APP_DIR="${APP_DIR:-$HOME/spa99}"
-DOMAIN="${DOMAIN:-spa99.uk}"
+DOMAIN="${DOMAIN:-spa99.co.uk}"
 
 DISK_LIMIT=75        # percent used on /
 RAM_AVAIL_MIN=12     # percent available

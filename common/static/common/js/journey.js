@@ -18,7 +18,6 @@ const progress = document.querySelector('[data-progress]');
 const fill = document.querySelector('[data-progress-fill]');
 
 // Layout choices per question (everything else follows its type).
-const PREFER_NOT_SAY = new Set(['property_link', 'property_size', 'heard_via']);
 const LAYOUT = {
   time: 'tiles-2', frequency: 'segmented', facilities: 'image', company: 'large', industry: 'tiles-4',
   property_link: 'tiles-stack', property_size: 'segmented', property_law: 'segmented', heard_via: 'small',
@@ -51,6 +50,7 @@ function matches(condition, values) {
 }
 const parentKey = (q) => (conditionItems(q.condition)[0] || {}).question || null;
 
+let chosenNow = {}; // question key -> option values, for the visible answered questions (set by computeVisible)
 function computeVisible() {
   const values = {};
   const visible = new Set();
@@ -61,6 +61,7 @@ function computeVisible() {
     if (a && !a.skipped) values[q.key] = a.options;
   });
   visibleKeys = visible;
+  chosenNow = values;
 }
 const screenNumbers = () => state.screens.filter((s) => s.questions.some((q) => visibleKeys.has(q.key))).map((s) => s.number);
 function computeResultStep() {
@@ -160,18 +161,22 @@ function questionBlock(q) {
     const id = `t-${q.key}`;
     const input = el('input', { type: 'text', id, class: 'input', maxlength: String(state.session.max_text_length), autocomplete: 'off', value: answers[q.key]?.text || '', 'data-q': q.key, 'data-text': '' });
     input.value = answers[q.key]?.text || '';
-    block.append(el('div', { class: 'field' }, el('label', { for: id }, q.text, ' ', el('span', { class: 'optional', text: copyOf('optional').body })), input));
+    // A shown typed follow-up needs one letter while Other is the only choice above it (2026-11-21); syncVisibility shows or hides the hint.
+    const needed = isRequired(q);
+    input.setAttribute('aria-describedby', `hint-${q.key}`);
+    // The small line above says which "Other" this box is for (its help text, editable in Control).
+    if (q.help) block.append(el('span', { class: 'question-context', id: `ctx-${q.key}`, text: q.help }));
+    if (q.help) input.setAttribute('aria-describedby', `ctx-${q.key} hint-${q.key}`);
+    block.append(el('div', { class: 'field' }, el('label', { for: id }, q.text), input));
+    block.append(el('span', { class: 'question-help', id: `hint-${q.key}`, text: copyOf('need_text').body || NEED_TEXT, hidden: !needed }));
     return block;
   }
 
   const title = el('span', { id: `l-${q.key}`, text: q.text });
   const needs = (q.min_choices || 0) > 0;
-  const helpText = q.help || (needs ? 'Choose at least one.' : '');
+  const helpText = q.help || (needs ? (q.type === 'multi' ? 'Choose at least one.' : 'Choose one.') : '');
   const help = helpText ? el('span', { class: 'question-help', id: `hint-${q.key}`, text: helpText }) : null;
   const legend = el('legend', {}, title);
-  if (PREFER_NOT_SAY.has(q.key)) {
-    legend.append(' ', el('button', { type: 'button', class: 'btn-quiet prefer-not', 'data-skip': q.key, text: copyOf('prefer_not').cta }));
-  }
   block.append(legend);
   if (help) block.append(help);
 
@@ -184,7 +189,6 @@ function questionBlock(q) {
     controls = el('div', { class: cls }, q.options.map((option) => tile(q, option, kind)));
   }
   controls.dataset.controls = q.key;
-  if (answers[q.key]?.skipped) controls.dataset.skipped = 'true';
   block.append(controls);
   return block;
 }
@@ -196,27 +200,41 @@ function syncVisibility() {
   root.querySelectorAll('[data-question]').forEach((block) => {
     const show = visibleKeys.has(block.dataset.question);
     if (block.hidden === show) block.hidden = !show;
+    const hint = block.querySelector('input[data-text]') && block.querySelector('.question-help');
+    if (hint) hint.hidden = !isRequired(questionByKey(block.dataset.question));
   });
   updateAction();
   updateProgress();
 }
 
-const screenAnswered = (number) => {
-  const screen = state.screens.find((s) => s.number === number);
-  return screen.questions.some((q) => visibleKeys.has(q.key) && answers[q.key] && (answers[q.key].skipped || answers[q.key].options.length || answers[q.key].text));
+const NEED_TEXT = 'Please write a few words.';
+/** Same rule as the server (journey/services.py required_now): a typed follow-up is needed only while its parent's only choice
+ *  is the one that shows it (Other alone); Other plus another choice makes it optional. */
+const onlyWantedChosen = (condition) => conditionItems(condition).every((item) => {
+  const wanted = item.any_of || [];
+  const offered = new Set((questionByKey(item.question)?.options || []).map((o) => o.value));  // a retired choice does not count
+  return !wanted.length || (chosenNow[item.question] || []).filter((v) => offered.has(v)).every((v) => wanted.includes(v));
+});
+const isRequired = (q) => (q.min_choices || 0) > 0 && (q.type !== 'text' || onlyWantedChosen(q.condition));
+/** Same rule as the server (journey/services.py missing_required): choices for a choice question, one non-blank letter for a text one. */
+const isMet = (q) => {
+  const a = answers[q.key];
+  if (q.type === 'text') return Boolean(a && !a.skipped && (a.text || '').trim());
+  const offered = new Set(q.options.map((o) => o.value));  // a retired option no longer counts, as on the server
+  return (a?.options.filter((v) => offered.has(v)).length || 0) >= q.min_choices;
 };
 
-/** Visible questions on a screen that still need more choices than they have (the "at least one" rule). */
+/** Visible required questions on a screen that are not answered yet (the "at least one" rule, and typed text). */
 function unmetQuestions(number) {
   const screen = state.screens.find((sc) => sc.number === number);
-  return screen.questions.filter((q) => visibleKeys.has(q.key) && (q.min_choices || 0) > 0 && (answers[q.key]?.options.length || 0) < q.min_choices);
+  return screen.questions.filter((q) => visibleKeys.has(q.key) && isRequired(q) && !isMet(q));
 }
 
 function actionLabel(number) {
   if (unmetQuestions(number).length) return { text: copyOf('continue').cta, arrow: false, unmet: true };
   const last = screenNumbers().slice(-1)[0] === number;
   if (last) return { text: copyOf('last').cta, arrow: true };
-  return screenAnswered(number) ? { text: copyOf('continue').cta, arrow: true } : { text: copyOf('skip').cta, arrow: false };
+  return { text: copyOf('continue').cta, arrow: true };
 }
 
 function applyActionState(button, label) {
@@ -247,9 +265,10 @@ function nudge() {
   const live = root.querySelector('[data-live-msg]');
   if (live) {
     live.textContent = '';
-    requestAnimationFrame(() => { live.textContent = copyOf('need_one').body || 'Choose at least one to continue.'; });
+    const textOnly = unmet.every((q) => q.type === 'text');
+    requestAnimationFrame(() => { live.textContent = textOnly ? (copyOf('need_text').body || NEED_TEXT) : (copyOf('need_one').body || 'Choose at least one to continue.'); });
   }
-  const legend = root.querySelector(`[data-question="${unmet[0].key}"] legend`);
+  const legend = root.querySelector(`[data-question="${unmet[0].key}"] legend, [data-question="${unmet[0].key}"] label`);
   if (legend) {
     const r = legend.getBoundingClientRect();
     if (r.top < 0 || r.bottom > window.innerHeight) legend.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
@@ -464,6 +483,7 @@ async function show(step) {
     updateProgress();
     try {
       // POST: arriving at the result is what stores the suggestion and marks the journey finished (a GET changes nothing).
+      await chain;  // the last answers (a letter typed just before the tap) are saved before the result is asked for
       const reply = await postWithRetry('/journey/result/', {});
       if (reply.status === 400 && reply.data?.missing?.length) { bounce(reply.data.missing); return; }
       if (reply.status === 403 && reply.data?.needs_email) { state.session.lead_required = true; show(step); return; }  // gate first
@@ -513,28 +533,20 @@ function goBack() {
 }
 
 function goNext() {
+  flushText();  // a letter typed a moment ago is saved before the step is
   if (unmetQuestions(current).length) { nudge(); return; }
   const numbers = screenNumbers();
   const index = numbers.indexOf(current);
   const target = index >= 0 && index < numbers.length - 1 ? numbers[index + 1] : resultStep;
-  if (!screenAnswered(current)) {
-    // "Skip this part": the skips are saved too.
-    const screen = state.screens.find((s) => s.number === current);
-    screen.questions.filter((q) => visibleKeys.has(q.key) && q.type !== 'text' && !answers[q.key]).forEach((q) => {
-      answers[q.key] = { options: [], text: '', skipped: true };
-      saveAnswer(q.key);
-    });
-  }
   go(target);
 }
 
 /* ---------- events ---------- */
 
-function setAnswer(key, value) {
+function setAnswer(key, value, { save = true } = {}) {
   answers[key] = value;
-  saveAnswer(key);
-  const controls = root.querySelector(`[data-controls="${key}"]`);
-  if (controls) { if (value.skipped) controls.dataset.skipped = 'true'; else delete controls.dataset.skipped; }
+  const required = isRequired(questionByKey(key));
+  if (save && !(value.skipped && required)) saveAnswer(key);  // clearing a required answer is not sent: the server would refuse it
   syncVisibility();
 }
 
@@ -549,15 +561,23 @@ root.addEventListener('change', (event) => {
   setAnswer(q.key, picked.length ? { options: picked, text: '', skipped: false } : { options: [], text: '', skipped: true });
 });
 
+// Typed text counts at once (Continue enables on the first letter); only the saving waits for a pause in typing, and Continue saves it first.
 let textTimer = null;
+let textPending = null;
+function flushText() {
+  clearTimeout(textTimer);
+  if (textPending) { const key = textPending; textPending = null; setAnswer(key, answers[key], { save: true }); }
+}
 root.addEventListener('input', (event) => {
   const input = event.target.closest?.('input[data-text]');
   if (!input) return;
+  const key = input.dataset.q;
+  const text = input.value.trim().replace(/\s+/g, ' ');
   clearTimeout(textTimer);
-  textTimer = setTimeout(() => {
-    const text = input.value.trim().replace(/\s+/g, ' ');
-    setAnswer(input.dataset.q, text ? { options: [], text, skipped: false } : { options: [], text: '', skipped: true });
-  }, 500);
+  if (textPending && textPending !== key) flushText();
+  textPending = key;
+  setAnswer(key, text ? { options: [], text, skipped: false } : { options: [], text: '', skipped: true }, { save: false });
+  textTimer = setTimeout(flushText, 500);
 });
 
 root.addEventListener('click', async (event) => {
@@ -570,11 +590,7 @@ root.addEventListener('click', async (event) => {
     go(resultStep);
   }
   else if (target.hasAttribute('data-back')) goBack();
-  else if (target.dataset.skip) {
-    const key = target.dataset.skip;
-    root.querySelectorAll(`input[data-q="${key}"]`).forEach((i) => { i.checked = false; });
-    setAnswer(key, { options: [], text: '', skipped: true });
-  } else if (target.hasAttribute('data-restart')) {
+  else if (target.hasAttribute('data-restart')) {
     target.disabled = true;
     const fresh = await postJson('/journey/restart/', target.hasAttribute('data-new-person') ? { new_person: true } : {}).catch(() => null);
     if (fresh?.ok) { load(fresh.data, 1); history.replaceState({ journey: true, step: 1, idx: 0 }, '', urlFor(1)); }

@@ -111,6 +111,17 @@ class BackfillCommandTests(TestCase):
         self.assertTrue(OpeningRule.objects.get(key="shabbos-close").public_note)
         self.assertIn("Nothing to change", self.run_command())
 
+    def test_signin_caption_is_cleared_only_from_the_exact_old_words(self):
+        """Moishe 2026-11-27: no "Your own locker, every visit." under the sign-in picture. A caption typed by hand stays."""
+        Section.objects.filter(page__key="signin", key="caption").update(body="Your own locker, every visit.")
+        self.run_command("--dry-run")
+        self.assertEqual(Section.objects.get(page__key="signin", key="caption").body, "Your own locker, every visit.")
+        self.run_command()
+        self.assertEqual(Section.objects.get(page__key="signin", key="caption").body, "")
+        Section.objects.filter(page__key="signin", key="caption").update(body="Hand written.")
+        self.run_command()
+        self.assertEqual(Section.objects.get(page__key="signin", key="caption").body, "Hand written.")
+
 
 class JourneyAndGoldBackfillTests(TestCase):
     """2026-10-23 wording: only the exact old values are replaced, edited ones are left alone."""
@@ -138,7 +149,7 @@ class JourneyAndGoldBackfillTests(TestCase):
         self.run_command()
         time, facilities = Question.objects.get(key="time"), Question.objects.get(key="facilities")
         self.assertEqual((time.help_text, time.min_choices), ("Choose at least one.", 1))
-        self.assertEqual((facilities.help_text, facilities.min_choices), ("Pick a few.", 0))
+        self.assertEqual((facilities.help_text, facilities.min_choices), ("Pick a few.", 0))  # edited by hand: stays. The 2026-11-21 required step has already run here (its need_text words exist), so it leaves a 0 alone
         self.assertEqual(Section.objects.get(page__key="journey", key="change_answers").cta_label, "Start again")
         screen = Section.objects.get(page__key="gold-apply", key="screen_1")
         self.assertEqual((screen.heading, screen.body), ("About you.", "Our own words."))
@@ -164,7 +175,7 @@ class JourneyAndGoldBackfillTests(TestCase):
         call_command("backfill_site_data", "--dry-run", stdout=StringIO())
         self.assertEqual(Section.objects.get(page__key="home", key="opening").heading, "Launching {opening}.")  # dry run saves nothing
         self.run_command()
-        self.assertEqual(Section.objects.get(page__key="home", key="opening").heading, "{opening}.")
+        self.assertEqual(Section.objects.get(page__key="home", key="opening").heading, "{opening}")  # no full stop since 2026-11-27
         self.assertEqual(Section.objects.get(page__key="spa", key="opener_4").body, "Take your time. Nothing here is rushed.")
         self.assertEqual(Section.objects.get(page__key="spa", key="moment_shower").heading, "Between rounds.")
         self.assertEqual(Section.objects.get(page__key="spa", key="moment_tote").heading, "Until next time.")
@@ -235,7 +246,7 @@ class BarryChangesBackfillTests(TestCase):
         from journey.models import Option, Question
         Question.objects.filter(key="industry").update(text="What do you do?")
         Option.objects.filter(question__key="heard_via", value="bml").update(label="BML member")
-        Option.objects.filter(question__key="heard_via", value="barry_status").delete()
+        Option.objects.filter(question__key="heard_via", value__in=["barry_status", "news_update", "midweek"]).delete()
         Option.objects.filter(question__key="heard_via", value="other").update(order=4)
         GoldChoice.objects.filter(group="where", value="midlands").update(value="rest_of_london", label="Rest of London")
         GoldRule.objects.filter(group="bml", match_value="yes").update(label="BML staff")
@@ -265,7 +276,7 @@ class BarryChangesBackfillTests(TestCase):
         self.assertEqual(Question.objects.get(key="industry").text, "What industry are you in?")
         self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML staff member")
         options = list(Option.objects.filter(question__key="heard_via", active=True).order_by("order", "value").values_list("value", flat=True))
-        self.assertEqual(options[-2:], ["barry_status", "other"])
+        self.assertEqual(options[-4:], ["barry_status", "news_update", "midweek", "other"])  # the new ones sit just before Other
         self.assertEqual(GoldApplication.objects.get(pk=application.pk).location, "midlands")
         self.assertEqual(GoldChoice.objects.get(group="where", value="midlands").label, "Midlands")
         self.assertFalse(GoldChoice.objects.filter(value="rest_of_london").exists())
@@ -286,11 +297,22 @@ class BarryChangesBackfillTests(TestCase):
         self.run_command()
         self.assertEqual(Question.objects.get(key="industry").text, "Your line of work?")
         self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML team")
-        self.assertEqual(Option.objects.get(question__key="heard_via", value="other").order, 8)  # the new option takes its place, Other moves down one
+        self.assertEqual(Option.objects.get(question__key="heard_via", value="other").order, 10)  # each new option takes Other's place and Other moves down one
         self.assertEqual(Option.objects.get(question__key="heard_via", value="barry_status").order, 7)
         self.assertEqual(GoldChoice.objects.get(group="where", value="rest_of_london").label, "Greater London")
         self.assertEqual(GoldRule.objects.get(group="bml", match_value="yes").label, "BML colleague")
         self.assertFalse(GoldApplication.objects.filter(location="midlands").exists())
+
+    def test_news_update_and_midweek_are_added_before_other_once(self):
+        from journey.models import Option
+        Option.objects.filter(question__key="heard_via", value__in=["news_update", "midweek"]).delete()
+        self.assertIn("News Update", self.run_command("--dry-run"))
+        self.assertFalse(Option.objects.filter(value="midweek").exists())
+        self.run_command()
+        self.run_command()  # twice: no duplicates
+        options = list(Option.objects.filter(question__key="heard_via", active=True).order_by("order", "value").values_list("value", flat=True))
+        self.assertEqual(options[-3:], ["news_update", "midweek", "other"])
+        self.assertEqual(Option.objects.filter(value="midweek").count(), 1)
 
     def test_when_the_seed_already_made_midlands_the_old_row_is_retired_not_duplicated(self):
         from gold.models import GoldChoice, GoldApplication

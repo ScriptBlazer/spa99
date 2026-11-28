@@ -69,15 +69,8 @@ Design read: a quiet concierge desk, not a support widget. Espresso, one small c
 - **Limit: 500 characters.** Hidden until 400, then `--text-sm` muted: "100 characters left". At 0: "That is the limit for one message." and the field stops taking input.
 - **Privacy line** under the compose row, `--text-sm`, muted: "AI assistant. Chats are kept for 90 days. [Privacy notice]" linking to the privacy notice's chat section, gold underline.
 
-### 2.4 Email for prices
-Shown inline when the backend says the visitor asked about prices and has no lead email. Sits in the conversation after the Spa 99 reply, as a block: 1px `--color-hairline-inverse`, `--radius-md`, `padding: var(--space-4)`, on espresso (not espresso-raised, so field borders keep their contrast).
-- Line: "We share prices once we have your email. Leave it here and we will show them in this chat."
-- Field: the site's email field (`_field.html`, on dark), label "Email", `autocomplete="email"`, `inputmode="email"`.
-- Consent: `_check.html`, words exactly as the journey gate: "Yes, Spa 99 may email me about opening. I can unsubscribe at any time." followed by the link "How we use your email". Not pre-ticked.
-- Button: "Show prices" (`btn-primary`, full width on phone). Saving: "One moment".
-- Errors under the field, `--color-danger-inverse`: the journey's own messages (`CONSENT_MESSAGE`, the email error). Server failure: "We couldn't save that just now. Please try again."
-- Quiet "Not now" text button beside or under it; the chat carries on without prices.
-- Success: the block collapses to one line, "Thank you. Prices are now shown.", and the answer to the pending question streams in below without the visitor asking again.
+### 2.4 Prices (changed 2026-11-21)
+The email form is gone. When a visitor asks about prices and memberships are closed to him, the reply is one line ("Prices are shared once you've tailored your membership. It takes about a minute.") and a "Tailor your membership" button (a normal `next_steps` link button to `/journey/`). The chat never asks for an email.
 
 ### 2.5 Hand-off
 Shown when the model cannot help, when the visitor asks for a person, from "Message our team", and in every unavailable state. Same block style as 2.4.
@@ -105,7 +98,6 @@ Model tone (for the system prompt, shared with backend): calm, short, British En
 - On open: fine pointer focuses the textarea; coarse pointer focuses the title (`tabindex="-1"`) so the keyboard does not cover the welcome. On close: focus returns to the pill.
 - Tab order: New chat, Close, conversation links and buttons, chips, input, send, privacy link.
 - Conversation list `role="log"` with `aria-live="off"` and `aria-busy="true"` while streaming. A separate visually hidden `aria-live="polite"` region receives each **finished** reply in full (never chunk by chunk), plus state lines ("That answer did not come through.").
-- Email block errors use the existing `aria-live="polite"` feedback in `_check.html` / `_field.html`. Focus moves to the email field when the block appears only if the visitor tapped into it; it never steals focus mid-reading.
 - Everything works at 200% zoom and 320px wide.
 
 ## 4. Motion
@@ -133,7 +125,7 @@ From BRAND, no new colours: `--color-espresso`, `--color-espresso-raised`, `--co
 ```
 
 ## 7. Check before done
-375x667 and 1440x800: pill never over a CTA, Continue bar, footer link or field; hidden on the first half screen of every scene; panel open, streaming, email block, hand-off, cap state and error each screenshotted; Esc, Tab loop and focus return work; VoiceOver reads one finished reply once; reduced motion shows no movement; espresso contrast holds for every string (muted 6.50, gold 6.17, danger-inverse 6.81).
+375x667 and 1440x800: pill never over a CTA, Continue bar, footer link or field; hidden on the first half screen of every scene; panel open, streaming, hand-off, cap state and error each screenshotted; Esc, Tab loop and focus return work; VoiceOver reads one finished reply once; reduced motion shows no movement; espresso contrast holds for every string (muted 6.50, gold 6.17, danger-inverse 6.81).
 
 ---
 
@@ -142,7 +134,7 @@ From BRAND, no new colours: `--color-espresso`, `--color-espresso-raised`, `--co
 This revision wins over sections 2 to 5 where they differ. Everything not mentioned stays.
 
 - **Compact card on desktop (64em+):** `--chat-w` 23.75rem (380px), height 70vh (max 40rem), docked bottom right above the pill area (`bottom: space-4 + chip-h + space-2`), radius `--radius-md`, `--shadow-raised`. Phone keeps the full-height sheet.
-- **Cream panel** (`class="chat on-light"`): cream background, espresso text, `--s-*` light tokens. Buttons are espresso with cream text (`.btn-primary` on-light), secondary is an espresso outline. Links are espresso, underlined (gold fails AA on cream). The header swan is espresso; gold stays only on the pill's swan (espresso pill, unchanged, reads as a small dark object on cream and a raised tab on espresso). Visitor bubbles: `--color-cream-raised` with a hairline. Hand-off and email blocks: 1px `--s-line` border, transparent fill (so field underlines keep their contrast).
+- **Cream panel** (`class="chat on-light"`): cream background, espresso text, `--s-*` light tokens. Buttons are espresso with cream text (`.btn-primary` on-light), secondary is an espresso outline. Links are espresso, underlined (gold fails AA on cream). The header swan is espresso; gold stays only on the pill's swan (espresso pill, unchanged, reads as a small dark object on cream and a raised tab on espresso). Visitor bubbles: `--color-cream-raised` with a hairline. Hand-off block: 1px `--s-line` border, transparent fill (so field underlines keep their contrast).
 - **Smaller type and spacing:** body 15px (`--chat-text`), welcome heading 24px (`--chat-heading`), chips 14px (`--text-sm`), header 16px (`--text-base`), hints and privacy 13px (`--chat-small`). Spacing `--space-3` (16px) for padding and gaps, header height `--chip-h`. The compose input stays 16px (a smaller input makes iOS zoom the page); the Send button and chips stay 44px targets. New derived tokens: `--chat-text`, `--chat-small`, `--chat-heading` (BRAND section 8).
 - **Header** shows the assistant name (System > Assistant, fallback "Spa 99 Assistant") beside the swan. "New chat" and "Close" are smaller, muted, 44px targets.
 - **Welcome words** (heading, line) come from System > Assistant (`chat_assistant`, also in `/chat/state/`), with the fallbacks "Ask us anything." and "The spa, memberships, hours or the Gold Card.". The pill still says "Ask us".

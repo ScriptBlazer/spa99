@@ -1,5 +1,6 @@
 """Office views. Short: data comes from office.selectors (stored figures) and office.lists (source lists); actions call
 the existing services. Permissions are decorators on every view (see office.permissions)."""
+import io
 from datetime import datetime
 from decimal import Decimal
 from urllib.parse import urlencode, urlparse
@@ -7,7 +8,7 @@ from urllib.parse import urlencode, urlparse
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import dateformat, timezone
@@ -16,6 +17,7 @@ from django.utils.cache import patch_vary_headers
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
+import segno
 from chat import services as chat_services
 from chat.models import Conversation, Message
 from django.db.models import OuterRef, Subquery
@@ -24,6 +26,7 @@ from gold import approval, audit, invites
 from gold import services as gold_services
 from gold.forms import DeclineForm
 from gold.models import GoldApplication
+from insights import live
 from insights.metrics import K
 from journey import services as journey_services
 from journey.models import JourneySession
@@ -102,7 +105,7 @@ def _with_revenue(request, data):
 @never_cache
 def analytics(request):
     name = _remembered_range(request, "office_range_analytics", selectors.ANALYTICS_RANGES, defaults.get(request).analytics_range)
-    context = {"data": _with_revenue(request, selectors.analytics(name)), "pages": selectors.pages(name), "section": "analytics"}
+    context = {"data": _with_revenue(request, selectors.analytics(name)), "section": "analytics"}
     return render(request, "office/analytics.html", context)
 
 
@@ -117,6 +120,45 @@ def analytics_data(request):
 @require_GET
 def analytics_pages(request):
     return JsonResponse(selectors.pages(request.GET.get("range", defaults.get(request).analytics_range), request))
+
+
+@developer
+@require_GET
+@never_cache
+def analytics_visitors_data(request):
+    """Analytics > Visitors, one stored snapshot (docs/features/analytics.md A9). ?range=7d|30d|90d|all &who=real|all (A12; anything else is real)"""
+    return JsonResponse(selectors.visitors(request.GET.get("range", defaults.get(request).analytics_range), request, request.GET.get("who")))
+
+
+@developer
+@require_GET
+@never_cache
+def analytics_live(request):
+    """Who is on the public site in the last 5 minutes (counts only; the one figure read from today's rows). Polled every 15 seconds."""
+    return JsonResponse(live.live_now(who="all" if request.GET.get("who") == "all" else "real"))
+
+
+QR_MAX_URL = 500
+
+
+@developer
+@require_GET
+@never_cache
+def analytics_qr(request):
+    """An SVG QR code for a link-maker address (Office level and up). Only addresses on our own public site are drawn, so this cannot be
+    used to make codes for anywhere else. ?url=https://<our domain>/plans/?utm_source=..."""
+    link = request.GET.get("url", "")
+    own = {urlparse(settings.SITE_URL).hostname, settings.DOMAIN.lower()}
+    try:
+        parts = urlparse(link)
+        host = (parts.hostname or "").lower()
+    except ValueError:  # e.g. http://[x
+        return HttpResponse("That address is not on this site.", status=400, content_type="text/plain")
+    if len(link) > QR_MAX_URL or parts.scheme not in ("http", "https") or host not in own:
+        return HttpResponse("That address is not on this site.", status=400, content_type="text/plain")
+    buffer = io.BytesIO()
+    segno.make(link, error="m").save(buffer, kind="svg", scale=10, border=4, dark="#492E21", light="#FFFFFF", xmldecl=False, svgns=True, nl=False)
+    return HttpResponse(buffer.getvalue(), content_type="image/svg+xml")
 
 
 # ---------- people ----------
@@ -179,7 +221,7 @@ def _timeline_group(kind):
     return "change"
 
 
-def _timeline_context(request, person, restore=None):
+def _timeline_context(request, person, restore=None, resend=None):
     """The timeline for the page: the default number of events, grouped by day; ?tl=2 (HTMX 'Show earlier') asks for the next page."""
     try:
         number = max(int(request.GET.get("tl", "1")), 1)
@@ -192,6 +234,7 @@ def _timeline_context(request, person, restore=None):
             item["time"] = f"{timezone.localtime(datetime.fromisoformat(item['at'])):%H:%M}" if item["at"] else ""  # the day is the heading above
             # a "Note deleted by X" line carries `restore_url` (POST) while the note is still deleted and the person may edit; else ''
             item["restore_url"] = restore(item["note"]) if restore and item.get("note") and tools.can_edit(request.user) else ""
+            item["resend_url"] = resend(item) if resend and item.get("log") else ""  # a sent email he can be sent again (office/resend.py): the person page, Admin and up
     return {"timeline_days": days, "timeline_more": more, "timeline_next": number + 1}
 
 
@@ -228,8 +271,14 @@ def _chats_context(person, user=None, email="", filter_key="", filter_id="", all
 def person(request, pk):
     user = get_object_or_404(User, pk=pk, interest__isnull=False)
     person = lists.person_detail(user)
+    from system.team import is_team_member
+
+    from . import resend
+
+    can_resend = levels.at_least(request.user, levels.ADMIN) and not is_team_member(user)
+    resend_url = (lambda item: reverse("office_person_email_resend", args=[user.pk, item["log"]]) if resend.offered(item["template"], user) else "") if can_resend else None
     context = {"person": person, "section": "people", "setup_plans": ManualSetupForm().fields["plan"].queryset,
-               **_timeline_context(request, person, lambda n: reverse("office_person_note_restore", args=[user.pk, n])), **_person_extras(request, person)}
+               **_timeline_context(request, person, lambda n: reverse("office_person_note_restore", args=[user.pk, n]), resend_url), **_person_extras(request, person)}
     if not _is_fragment(request):
         context.update(_chats_context(person, user=user, email=user.email, filter_key="user", filter_id=user.pk, allowed=abilities(request.user)["can_chats"]))
         context.update(tools.tools_context(tools.Target("person", user.pk, user=user), request.user))

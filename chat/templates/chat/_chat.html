@@ -3,7 +3,7 @@ Everything here is static; common/js/chat.js fills it. Without JavaScript the pi
 <button type="button" class="chat-pill" data-chat-open aria-haspopup="dialog" aria-controls="ask-us" aria-label="Ask us" hidden>{% include "common/_mark.html" %}<span class="chat-pill-label">Ask us</span></button>
 
 <dialog id="ask-us" class="chat on-light" aria-labelledby="ask-us-title" data-chat
-  data-state-url="{% url 'chat:state' %}" data-message-url="{% url 'chat:message' %}" data-email-url="{% url 'chat:email' %}"
+  data-state-url="{% url 'chat:state' %}" data-message-url="{% url 'chat:message' %}"
   data-privacy-url="{% url 'privacy' %}#chat" data-contact-email="{{ chat_handoff.email }}">
   <div class="chat-sheet">
     <header class="chat-head">
@@ -53,26 +53,6 @@ Everything here is static; common/js/chat.js fills it. Without JavaScript the pi
       </div>
       <p class="chat-block-address small" data-chat-address>{{ chat_handoff.email }}</p>
     </div>
-  </template>
-
-  <template data-chat-tpl="email">
-    <form class="chat-block chat-email" novalidate data-chat-email>
-      <p class="chat-block-line">We share prices once we have your email. Leave it here and we will show them in this chat.</p>
-      <div class="field">
-        <label for="ask-us-email">{{ chat_gate.email_label }}</label>
-        <input id="ask-us-email" class="input" type="email" name="email" autocomplete="email" inputmode="email" aria-describedby="ask-us-email-msg">
-        <p class="feedback" id="ask-us-email-msg" data-error-for="email" aria-live="polite" data-state="hint"></p>
-      </div>
-      <div class="field">
-        <label class="check"><input type="checkbox" name="consent" aria-describedby="ask-us-consent-msg"><span>{{ chat_gate.consent }} <a href="{% url 'privacy' %}">{{ chat_gate.privacy_label }}</a></span></label>
-        <p class="feedback" id="ask-us-consent-msg" data-error-for="consent" aria-live="polite" data-state="hint"></p>
-      </div>
-      <div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
-      <div class="chat-actions">
-        <button type="submit" class="btn btn-primary" data-chat-email-save>Show prices</button>
-        <button type="button" class="btn-quiet" data-chat-email-skip>Not now</button>
-      </div>
-    </form>
   </template>
 </dialog>
 <script type="module" src="{% static 'common/js/chat.js' %}"></script>

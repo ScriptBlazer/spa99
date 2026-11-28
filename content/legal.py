@@ -16,7 +16,15 @@ How a legal body is written (one line per block, rendered by `content.legal_rend
 Keys: `body` (title and intro), `updated` (the date shown), `part_N` (the numbered parts, in order), `contact`."""
 
 UPDATED = "26 October 2026"
-PRIVACY_UPDATED = "5 November 2026"  # WhatsApp wording corrected (no Twilio, no chat kept on this site); earlier: WhatsApp added, invitation emails track opens, Ask us chat (Anthropic) added, Postmark added as the email sender
+PRIVACY_UPDATED = "21 November 2026"  # the visitor counter says what else it notes (device, country, time on page, taps, campaign tags); earlier, 5 November: # WhatsApp wording corrected (no Twilio, no chat kept on this site); earlier: WhatsApp added, invitation emails track opens, Ask us chat (Anthropic) added, Postmark added as the email sender
+VISITOR_COUNTER_MORE = (
+    "We also note a few things about each visit, still without cookies and without storing anything on your device. "
+    "From your browser's own description we note the kind of device (phone, tablet or computer), the browser and the "
+    "system, then we drop that description. From your IP address we work out your country, then we drop the address. "
+    "We note which pages you open, how long each stays on screen, how far down you scroll, and when you tap a link to "
+    "call, WhatsApp, email, Instagram or directions. If a link to our site carries campaign tags, such as where we "
+    "posted it, we note those tags too. It is all added up with everyone else's, and what we hold about your visit is "
+    "deleted the next day. Only the totals stay, and none of them is linked to you.")
 INVITE_OPEN_LINE = ("- Invitation emails contain a tiny image (a tracking pixel), so we know whether the email was opened. "
                     "Other emails we send you do not.")
 WHATSAPP_BLOCK = "\n".join([
@@ -35,7 +43,7 @@ OLD_WHATSAPP_BLOCK = "\n".join([
     "They pass through Twilio, our messaging provider, and WhatsApp.",
     "- Reply STOP to a message and we stop writing to you on WhatsApp.",
 ])  # the wording saved on live until 2026-11-05 (the in-Office chat through Twilio, removed in Office 2); the backfill swaps it for WHATSAPP_BLOCK
-PRIVACY_VERSION = "2026-11-05"  # SiteSettings.privacy_version (WhatsApp wording corrected); recorded on everyone who accepts this notice. Changing it forces nobody to accept again: only new sign-ups, leads and applications record the new one.
+PRIVACY_VERSION = "2026-11-05"  # SiteSettings.privacy_version (WhatsApp wording corrected; the 2026-11-21 visitor counter wording did not bump it: no new consent is asked, and the model default would need a migration); recorded on everyone who accepts this notice. Changing it forces nobody to accept again: only new sign-ups, leads and applications record the new one.
 
 COMPANY_LINE = ("Spa 99 is run by BML SPA 99 LIMITED, a company registered in England (company number 16930909). "
                 "Our registered office is 40 Wellington Avenue, London N15 6AS.")
@@ -85,8 +93,8 @@ PRIVACY_PARTS = [
         "- Our decision and, if we approve, the date and the invitation we send you.",
         "- If our team writes to you about your application (for example to ask a question), a record of that email.",
         "### When you use the Ask us chat {#chat}",
-        "- What you type to the assistant and its replies, with the time. If you gave your email to see prices, or you are "
-        "signed in, the chat is linked to it. We do not store your IP address with a chat.",
+        "- What you type to the assistant and its replies, with the time. If you are signed in, the chat is linked to your account. "
+        "Chats from before 21 November 2026 may be linked to an email given in the chat. We do not store your IP address with a chat.",
         "### Change history",
         "- Earlier versions of your details (a change history): when your account, registration or Gold Card "
         "application changes, we keep the previous version, so we can see what changed and put mistakes right. "
@@ -160,6 +168,7 @@ PRIVACY_PARTS = [
         "value are deleted the next day, so they cannot be traced back to you.",
         "We also note the name of the website that sent you, such as a search engine. Only the name, never the full "
         "address.",
+        VISITOR_COUNTER_MORE,
     ])),
     ("part_6", "Who we share it with", "\n".join([
         "Only with companies that help us run the site. They work under contract, on our instructions, and may not use "

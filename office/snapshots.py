@@ -26,7 +26,7 @@ TASK = "office.snapshots.refresh"
 
 def payloads(today, figures):
     """{(page, range): payload} for every page and range."""
-    from . import counts
+    from . import analytics_visitors, counts
 
     out = {(OfficeSnapshot.COUNTS, counts.RANGE): counts.compute_all()}  # approvals, Revenue, registered and Leads totals (office.counts)
     for name in selectors.DASHBOARD_RANGES:
@@ -34,6 +34,8 @@ def payloads(today, figures):
     for name in selectors.ANALYTICS_RANGES:
         out[(OfficeSnapshot.ANALYTICS, name)] = selectors.build_analytics(name, today, figures)
         out[(OfficeSnapshot.PAGES, name)] = selectors.build_pages(name, today)
+        out[(OfficeSnapshot.VISITORS, name)] = analytics_visitors.build(name, today, "all")
+        out[(OfficeSnapshot.VISITORS_REAL, name)] = analytics_visitors.build(name, today, "real")
         out[(OfficeSnapshot.LEADS, name)] = selectors.build_leads(name, today, figures)
     return out
 

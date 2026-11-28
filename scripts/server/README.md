@@ -39,7 +39,7 @@ Until the token is filled in, `alert.sh` writes one line to stderr and exits qui
 
 ## Alerts
 
-Checks: disk `/` at 75% or more, RAM available 12% or less, swap 50% or more, site down (`https://spa99.uk/health/` not 200 after 3 tries 10 s apart), a container not running or unhealthy, certificate under 14 days, reboot required.
+Checks: disk `/` at 75% or more, RAM available 12% or less, swap 50% or more, site down (`https://spa99.co.uk/health/` not 200 after 3 tries 10 s apart), a container not running or unhealthy, certificate under 14 days, reboot required.
 
 State is in `~/scripts/.alert_state` (`KEY=OK|ALERT`). Log: `~/scripts/alert.log`. To use another domain set `DOMAIN=` in `.alert.env`.
 

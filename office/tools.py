@@ -5,6 +5,8 @@ from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
+from common import levels
+from system import team
 from gold.models import GoldApplication
 from journey.models import JourneySession
 from outreach import people, services
@@ -147,8 +149,11 @@ def archive_context(target, user):
 
 
 def bounce_context(target, user):
-    """The lead page only: `bounce` {bounced, fake (bounced and not marked genuine), genuine, can_mark, genuine_url, ungenuine_url, email, notice, can_edit, correct_url, resend_url, can_resend, sent}. `can_resend`: staff corrected the address
-    (so the follow-up never went to it) and it does not bounce now."""
+    """The lead page: `bounce` {bounced, fake (bounced and not marked genuine), genuine, can_mark, genuine_url, ungenuine_url, email, notice, can_edit, correct_url, resend_url, can_resend, sent}. `can_resend`: staff corrected the address
+    (so the follow-up never went to it) and it does not bounce now. The person page gets a small one ({bounced False, email, can_edit (Admin and up, customers only), correct_url, login True}): it only
+    feeds the Change email dialog and the Details button (a customer's login email, office_person_email)."""
+    if target.kind == "person":  # a customer's login email: Admin and up, never a team member (System > Team). Only the dialog and the Details button use this.
+        return {"bounce": {"bounced": False, "email": target.main, "can_edit": bool(levels.at_least(user, levels.ADMIN) and not team.is_team_member(target.user)), "correct_url": target.url("email"), "login": True, "resend_verify_url": target.url("resend_verify")}}
     if target.kind != "lead":
         return {}
     bounced = services.is_bounced(target.main)

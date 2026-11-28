@@ -30,7 +30,7 @@ class LegalPageTests(TestCase):
                 self.assertContains(response, "16930909")
                 self.assertContains(response, "40 Wellington Avenue, London N15 6AS")
                 self.assertContains(response, 'href="mailto:desk@example.com"')
-                self.assertContains(response, "Last updated 5 November 2026" if path == "/privacy/" else "Last updated 26 October 2026")
+                self.assertContains(response, "Last updated 21 November 2026" if path == "/privacy/" else "Last updated 26 October 2026")
                 self.assertNotContains(response, "To be supplied")
                 self.assertNotContains(response, "{contact}")
 
@@ -164,7 +164,7 @@ class InviteOpenNoticeTests(TestCase):
         call_command("backfill_site_data", stdout=StringIO())
         self.assertIn("tracking pixel", rows.get(key="part_2").body)
         self.assertIn("### WhatsApp", rows.get(key="part_2").body)
-        self.assertEqual(rows.get(key="updated").body, "5 November 2026")
+        self.assertEqual(rows.get(key="updated").body, "21 November 2026")
         rows.filter(key="part_2").update(body="Edited by hand.")
         call_command("backfill_site_data", stdout=StringIO())
         self.assertEqual(rows.get(key="part_2").body, "Edited by hand.")
@@ -200,3 +200,17 @@ class InviteOpenNoticeTests(TestCase):
         self.assertNotIn("Reply STOP", body)
         self.assertEqual(body.count("### WhatsApp"), 1)
         self.assertEqual(SiteSettings.load().privacy_version, legal.PRIVACY_VERSION)
+
+    def test_backfill_rewords_the_chat_email_line_only_where_it_is_the_exact_old_line(self):
+        seed_all()
+        rows = Section.objects.filter(page__key="privacy", key="part_2")
+        new_line = "If you are signed in, the chat is linked to your account."
+        old_line = "If you gave your email to see prices, or you are signed in, the chat is linked to it."
+        old = rows.get().body.replace("If you are signed in, the chat is linked to your account. Chats from before 21 November 2026 may be linked to an email given in the chat.", old_line)
+        self.assertIn(old_line, old)
+        rows.update(body=old)
+        call_command("backfill_site_data", "--dry-run", stdout=StringIO())
+        self.assertEqual(rows.get().body, old)
+        call_command("backfill_site_data", stdout=StringIO())
+        self.assertIn(new_line, rows.get().body)
+        self.assertNotIn("to see prices", rows.get().body)

@@ -1,7 +1,7 @@
 """Chat logic: guards (cap, limits), the price rule, history, the streamed reply and storage. Views stay thin.
 
 The server decides what the model may know: prices are in the knowledge only when `prices_allowed` (the site's own price rule,
-pages.access.memberships_visible, or a lead email given in this chat). A stray "£" from the model is cut off in code too."""
+pages.access.memberships_visible; an email given in a chat never unlocks them). A stray "£" from the model is cut off in code too."""
 import hashlib
 import json
 import logging
@@ -187,13 +187,7 @@ def attach(conversation, request, session=None):
 def prices_allowed(request, conversation):
     if hasattr(conversation, "_force_prices"):  # the System test console picks with or without prices
         return conversation._force_prices
-    return bool(memberships_visible(request) or conversation.lead_email)
-
-
-def pending_question(conversation):
-    """True when the last thing in the chat is a price question that was answered with the email offer."""
-    last = conversation.messages.order_by("-created_at", "-id").first()
-    return bool(last and last.role == Message.ASSISTANT and last.offered_email)
+    return bool(memberships_visible(request))  # a lead_email on the chat never unlocks prices (docs/features/ai-chat.md, 2026-11-21)
 
 
 DECLINED_STOPS = ("cap", "unavailable", "refusal", "off_topic", "closed")
@@ -201,7 +195,7 @@ DECLINED_STOPS = ("cap", "unavailable", "refusal", "off_topic", "closed")
 
 def api_history(conversation):
     """The turns sent to Claude: plain text only, the last CHAT_HISTORY_MESSAGES, starting with a visitor message. Left out: the
-    email-offer replies (the question is answered again after the email), declined (off-topic) turns with their canned replies, so
+    old email-offer replies (kept in old data), declined (off-topic) turns with their canned replies, so
     pasted code or an injection phrase never reaches the model on a later turn, and our own hand-off lines."""
     rows = conversation.messages.filter(offered_email=False, off_topic=False).exclude(role=Message.ASSISTANT, stop_reason__in=DECLINED_STOPS)
     rows = list(rows.order_by("-created_at", "-id").values_list("role", "text")[:settings.CHAT_HISTORY_MESSAGES])
@@ -211,33 +205,20 @@ def api_history(conversation):
     return [{"role": role, "content": text} for role, text in rows]
 
 
-def lead_saved(conversation, session, email, consent, token=None):
-    """The email given in the chat becomes a lead exactly as at the journey gate (journey.services.save_lead). The conversation is
-    made only now (None = a new one), so a failed attempt leaves nothing behind. Returns the conversation.
-    Raises journey_services.LeadError."""
-    clean = journey_services.save_lead(session, email, consent)
-    if conversation is None:
-        conversation = Conversation.objects.create(session=session, browser_hash=browser_hash(token))
-    conversation.lead_email = clean
-    conversation.session = conversation.session or session
-    conversation.save(update_fields=["lead_email", "session", "updated_at"])
-    return conversation
-
-
 # ---------- the streamed reply ----------
 
 def sse(event, data):
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-def _store(conversation, text, usage=None, stop_reason="", handoff=False, offered=False, off_topic=False):
+def _store(conversation, text, usage=None, stop_reason="", handoff=False, off_topic=False):
     usage = usage or {}
     pence = llm.cost_pence(usage.get("input", 0), usage.get("output", 0), usage.get("cache_read", 0), usage.get("cache_write", 0))
     with transaction.atomic():
         Message.objects.create(conversation=conversation, role=Message.ASSISTANT, text=text, input_tokens=usage.get("input", 0),
                                output_tokens=usage.get("output", 0), cache_read_tokens=usage.get("cache_read", 0),
                                cache_write_tokens=usage.get("cache_write", 0), cost_pence=pence, stop_reason=stop_reason[:30],
-                               flagged_handoff=handoff, offered_email=offered, off_topic=off_topic)
+                               flagged_handoff=handoff, off_topic=off_topic)
         conversation.total_cost_pence = Decimal(conversation.total_cost_pence) + pence
         conversation.last_at = timezone.now()
         conversation.save(update_fields=["total_cost_pence", "last_at", "updated_at"])
@@ -310,6 +291,10 @@ def reply_events(request, conversation):
         raise
 
 
+# A price, cost or sale question (Moishe 2026-11-21: while prices are closed the answer always carries the journey button).
+PRICE_QUESTION = re.compile(r"£|\b(price|prices|priced|pricing|pricey|cost|costs|costing|fee|fees|charge|charges|charged|discount|discounts|promotion|promotions|promo|sale|special offer|special offers|cheap|cheaper|expensive|afford|per month|per visit|how much (is|are|does|do|for|would|will))\b", re.I)
+
+
 def _reply(request, conversation):
     if conversation.ended_off_topic:  # closed: no model call, buttons only
         yield sse("delta", {"text": MESSAGES["closed"]})
@@ -344,7 +329,7 @@ def _reply(request, conversation):
                 continue
             if suppressed:
                 continue
-            if not prices and "£" in payload:  # hard rule: no price before an email, whatever the model wrote
+            if not prices and "£" in payload:  # hard rule: no price while memberships are closed to him, whatever the model wrote
                 payload, suppressed = payload.split("£")[0], True
             if payload:
                 emitted.append(payload)
@@ -367,8 +352,10 @@ def _reply(request, conversation):
         return
     names = [name for name, _ in final["tools"]]
     handoff = "show_handoff" in names
-    offer = (not prices) and ("offer_email" in names or suppressed)
-    steps = [s for name, args in final["tools"] if name == "suggest_next_steps" for s in args.get("steps", []) if s in NEXT_STEPS][:2]
+    asked_price = bool(last and PRICE_QUESTION.search(last.text))  # the button never depends on the model remembering the tool
+    offer = (not prices) and ("offer_journey" in names or suppressed or asked_price)  # prices closed: the journey button, never an email
+    steps = [s for name, args in final["tools"] if name == "suggest_next_steps" for s in args.get("steps", []) if s in NEXT_STEPS]
+    steps = list(dict.fromkeys((["journey"] if offer else []) + steps))[:2]
     reply = "".join(emitted).strip()
     if "off_topic" in names:
         extra = "" if reply else MESSAGES["off_topic"]
@@ -389,13 +376,11 @@ def _reply(request, conversation):
     if extra:
         yield sse("delta", {"text": extra})
     reply += extra
-    _store(conversation, reply, final["usage"], final["stop_reason"], handoff=handoff, offered=offer)
+    _store(conversation, reply, final["usage"], final["stop_reason"], handoff=handoff)
     if steps:
         yield sse("next_steps", {"steps": [{"key": key, "label": NEXT_STEPS[key][0], "url": NEXT_STEPS[key][1]} for key in dict.fromkeys(steps)]})
     if handoff:
         yield sse("handoff", handoff_links("too_long" if final["stop_reason"] == "max_tokens" else "asked"))
-    if offer:
-        yield sse("offer_email", {"pending": True})
     yield _done(conversation, True, final["stop_reason"])
 
 

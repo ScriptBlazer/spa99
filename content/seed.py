@@ -35,7 +35,7 @@ PAGES = {
         ("memberships_teaser", "Three memberships. One single visit.", "", "Compare memberships", "/memberships/"),
         ("gold_teaser", "The Gold Card.", "A free membership{gold_star} for BML clients, past, present and future, by approval.", "About the Gold Card", "/gold-card/"),
         ("opening_label", "", "Launching", "", ""),
-        ("opening", "{opening}.", "BML House, 99c Vale Road, London N4.", "Register", "/register/"),
+        ("opening", "{opening}", "BML House, 99c Vale Road, London N4.", "Register", "/register/"),
     ]),
     "spa": ("The spa", "Sauna, cold plunge, relaxing zone, massage room and gym at BML House, 99c Vale Road.", [
         ("intro", "The spa.", "{rooms} spaces, one quiet visit.", "Tailor your membership", "/journey/"),  # 2026-10-29: the hero button, as on Home
@@ -113,7 +113,7 @@ PAGES = {
     ]),
     "signin": ("Sign in", "Sign in to your Spa 99 account.", [
         ("intro", "Welcome back.", "Sign in to your Spa 99 account.", "", ""),  # an uploaded image overrides the lockers picture
-        ("caption", "", "Your own locker, every visit.", "", ""),
+        ("caption", "", "", "", ""),  # empty: no caption under the picture (Moishe 2026-11-27)
     ]),
     "gold-apply": ("Apply for the Gold Card", "Apply for the Spa 99 Gold Card.", [
         ("screen_1", "About you.", "A few taps, so we know you.", "", ""),
@@ -126,7 +126,7 @@ PAGES = {
         ("screen_1", "Your time.", "When you'd come, and how often.", "", ""),
         ("screen_2", "What draws you.", "The parts of the spa you'd use.", "", ""),
         ("screen_3", "Company.", "Some come alone. Some bring a friend.", "", ""),
-        ("screen_4", "About you.", "Optional, and only to suggest the right fit.", "", ""),
+        ("screen_4", "About you.", "Only to suggest the right fit.", "", ""),
         ("result_label", "", "Based on your answers", "", ""),
         ("why", "Why it suits you", "", "", ""),
         ("result_cta", "", "", "Register for {plan}", "/register/"),
@@ -138,10 +138,8 @@ PAGES = {
         ("others", "Or choose another", "", "Choose {plan}", ""),
         ("explore_memberships", "", "", "Explore all memberships", "/memberships/"),
         ("continue", "", "", "Continue", ""),
-        ("skip", "", "", "Skip this part", ""),
         ("last", "", "", "See my tailored membership", ""),
         ("back", "", "", "Back", ""),
-        ("prefer_not", "", "", "Prefer not to say", ""),
         ("start_again", "", "", "Start again", ""),
         ("last_suggestion", "", "", "See my last suggestion", ""),
         ("not_you", "", "", "Not you? Start again", ""),
@@ -152,7 +150,7 @@ PAGES = {
         ("result_error", "We could not load your result just now. Please try again.", "Please try again.", "See the memberships", "/memberships/"),
         ("unavailable", "", "The guided journey is not available just now.", "See the memberships", "/memberships/"),
         ("not_a_fit", "", "Off-peak only", "", ""),
-        ("optional", "", "(optional)", "", ""),
+        ("need_text", "", "Please write a few words.", "", ""),
     ]),
     "book": ("Book", "Booking at Spa 99 opens soon.", [
         ("placeholder", "Booking opens soon.", "When the doors open, you'll choose your time here.", "Register", "/register/"),

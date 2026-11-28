@@ -36,6 +36,7 @@ def _about(site):
         "Spa 99 is a private spa for men aged 18 and over, part of BML Group.",
         _line("Address", site.address_one_line),
         _line("Opening", site.opening_label),
+        "When asked when we open, give exactly the Opening line above, word for word. Never add a month, season or date it does not state." if site.opening_label else "",
         "Booking is open." if site.booking_open else "Booking is not open yet. Visitors can register now and we write before the doors open.",
         _line("Contact email", contact),
         _line("WhatsApp link", short_path('chat', 'rates') if site.whatsapp_number else ""),
@@ -44,7 +45,11 @@ def _about(site):
 
 def _hours():
     out = ["HOURS"]
-    out += [f"- {label}: {text}" for label, text in page_services.opening_hours()]
+    rows = page_services.opening_hours()
+    out += [f"- {label}: {text}" for label, text in rows]
+    if any(label == "Cleaning hours" for label, _ in rows):  # Moishe 2026-11-27: we are open 24 hours; cleaning hours are not "closed"
+        out.append("We are open 24 hours a day. The cleaning hours are a short daily window when the spa is cleaned and visits cannot run into it. "
+                   "Say we are open 24 hours with daily cleaning hours; never say we are closed then or call them closing time.")
     now = timezone.now()
     for closure in Closure.objects.filter(active=True, ends_at__gt=now).order_by("starts_at")[:10]:
         when = f"{timezone.localtime(closure.starts_at):%A %-d %B %Y %H:%M} to {timezone.localtime(closure.ends_at):%A %-d %B %Y %H:%M}"
@@ -141,7 +146,7 @@ def _gold():
 
 def _faq(prices):
     items = list(FaqItem.objects.filter(visible=True))
-    if not prices:  # an entry that mentions a price waits for the email like any other price
+    if not prices:  # an entry that mentions a price stays out like any other price
         items = [i for i in items if "£" not in i.question and "£" not in i.answer]
     if not items:
         return []

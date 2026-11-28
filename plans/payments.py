@@ -274,23 +274,39 @@ def _sale_line(registration, closes_at):  # closes_at: this member's own due dat
 
 
 def _skip_reason(notice, now):
-    reg = notice.registration
+    return window_email_open(notice.registration, now, notice.kind)
+
+
+def window_email_open(reg, now=None, kind=None):
+    """"" when this member's payment-window email can be sent now, else the plain reason it cannot (the same rules as the batch)."""
+    now = now or timezone.now()
     if not reg.user.is_active:
         return "The account is no longer active"
     if not reg.user.email_verified_at:
         return "Email not confirmed"
     if reg.payment_status != InterestRegistration.INVITED:
         return "Already set up" if reg.payment_status == InterestRegistration.PAID else "Not in a payment window"
-    if notice.kind == PaymentNotice.REMINDER and not reg.payment_due_at:
+    if kind == PaymentNotice.REMINDER and not reg.payment_due_at:
         return "No window"
     if reg.payment_due_at and reg.payment_due_at <= now:
         return "The window is over"
     return ""
 
 
+def send_window_email(reg, kind):
+    """Send the window-open (INVITE) or reminder email to the member's current address now. Returns the EmailLog. The one place the wording's values are built."""
+    from notifications.services import send_templated, subject_for
+
+    key = "payment_window_open" if kind == PaymentNotice.INVITE else "payment_window_reminder"
+    user, due = reg.user, reg.payment_due_at
+    return send_templated(
+        key, [user.email], subject_for(key, first_name=user.first_name),
+        {"first_name": user.first_name, "closes_on": day_text(due) if due else "", "sale_line": _sale_line(reg, due) if due else "", "url": _member_url()},
+        subject_email=user.email)
+
+
 def _send_one(notice, window):
     from notifications.models import EmailLog
-    from notifications.services import send_templated, subject_for
 
     claimed = PaymentNotice.objects.filter(pk=notice.pk, status=PaymentNotice.QUEUED).update(status=PaymentNotice.SENDING, updated_at=timezone.now())
     if not claimed:
@@ -300,13 +316,8 @@ def _send_one(notice, window):
     if reason:
         PaymentNotice.objects.filter(pk=notice.pk).update(status=PaymentNotice.SKIPPED, reason=reason, updated_at=now)
         return
-    key = "payment_window_open" if notice.kind == PaymentNotice.INVITE else "payment_window_reminder"
-    user, due = reg.user, reg.payment_due_at
     try:
-        log = send_templated(
-            key, [user.email], subject_for(key, first_name=user.first_name),
-            {"first_name": user.first_name, "closes_on": day_text(due) if due else "", "sale_line": _sale_line(reg, due) if due else "", "url": _member_url()},
-            subject_email=user.email)
+        log = send_window_email(reg, notice.kind)
         status, error = log.status, ""
     except Exception as exc:  # noqa: BLE001 - one bad send never stops the batch
         status, error = EmailLog.FAILED, type(exc).__name__

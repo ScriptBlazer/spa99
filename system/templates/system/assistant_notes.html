@@ -2,7 +2,7 @@
 {% load system_ui %}
 {% block title %}Knowledge notes{% endblock %}
 {% block main %}
-{% include "system/_page_header.html" with title="Assistant" description="Short facts by topic that the assistant may use. No prices: they come from the plans, after an email." %}
+{% include "system/_page_header.html" with title="Assistant" description="Short facts by topic that the assistant may use. No prices: they come from the plans, and only for people who can see them." %}
 {% include "system/_assistant_tabs.html" with tab="notes" %}
 <section class="sys-panel" aria-labelledby="n-h"><header><h2 id="n-h">Notes</h2></header>
   <div class="sys-scroll"><table class="sys-table">

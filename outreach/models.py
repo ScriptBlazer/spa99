@@ -130,8 +130,8 @@ class PersonEdit(UUIDModel):
     """Staff added or fixed a person's first name, mobile or (a lead's) email (lead page, person page): one line of the timeline, "Mobile added by X" /
     "Email changed by X". Erased with the person (the values are personal data)."""
 
-    FIRST_NAME, MOBILE, EMAIL = "first_name", "mobile", "email"
-    WHAT_CHOICES = [(FIRST_NAME, "First name"), (MOBILE, "Mobile"), (EMAIL, "Email")]
+    FIRST_NAME, MOBILE, EMAIL, RESENT = "first_name", "mobile", "email", "resent"
+    WHAT_CHOICES = [(FIRST_NAME, "First name"), (MOBILE, "Mobile"), (EMAIL, "Email"), (RESENT, "Resent an email")]  # RESENT: `after` is the sentence, e.g. "Resent the confirm email"
 
     email = models.CharField(max_length=254, db_index=True, help_text="Lower case. The person's main address when it was changed.")
     what = models.CharField(max_length=12, choices=WHAT_CHOICES)

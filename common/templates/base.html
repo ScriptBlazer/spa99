@@ -18,5 +18,6 @@
 {% block feedback %}{% include "common/_feedback.html" %}{% endblock %}
 {% block chat %}{% if chat_button %}{% include "chat/_chat.html" %}{% endif %}{% endblock %}
 {% block scripts %}{% endblock %}
+{% block beacon %}{% if request.urlconf|default:"config.urls" == "config.urls" %}<script src="{% static 'common/js/beacon.js' %}" defer></script>{% endif %}{% endblock %}
 </body>
 </html>

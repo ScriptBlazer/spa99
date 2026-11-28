@@ -1,0 +1,279 @@
+{% extends "office/base.html" %}
+{% load static office_tags %}
+{% comment %}Analytics > Visitors (docs/features/analytics-design.md). Server-rendered from the stored snapshot, so nothing loads after paint except Live.
+A range change swaps the [data-region] parts (office-swap.js); the Pages switch, Live, the heat map tip and the link maker are office-visitors.js.{% endcomment %}
+{% block title %}Analytics | Spa 99 Office{% endblock %}
+{% block head_extra %}<script defer src="{% static 'common/vendor/chartjs/4.6.1/chart.umd.min.js' %}"></script>{% endblock %}
+{% block header_range %}{% include "office/_range.html" with place="header" ranges=data.ranges current=data.range %}{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'common/js/office-charts.js' %}"></script><script type="module" src="{% static 'common/js/office-visitors.js' %}"></script>{% endblock %}
+{% block main %}
+<h1 class="sr-only">Analytics</h1>
+{% include "office/_analytics_nav.html" with active="visitors" %}
+{% include "office/_range.html" with place="page" ranges=data.ranges current=data.range %}
+{# Real / All visitors (A12): two plain links, the choice is remembered in the session like the range #}
+<nav class="o-seg o-seg--sub o-who" style="--n: 2" aria-label="Which visitors">
+  <a class="o-seg-item{% if data.who == 'real' %} is-active{% endif %}" href="?who=real"{% if data.who == "real" %} aria-current="true"{% endif %}><span>Real visitors</span></a>
+  <a class="o-seg-item{% if data.who == 'all' %} is-active{% endif %}" href="?who=all"{% if data.who == "all" %} aria-current="true"{% endif %}><span>All visitors</span></a>
+</nav>
+<p class="o-sub o-who-note" data-who-note>{% if data.who == "all" %}All visitors, bots included.{% else %}Real visitors: browsers that ran our page script. Most bots don’t.{% endif %}</p>
+{% if data.updating %}<p class="o-sub" data-updating>Updating…</p>{% endif %}
+{% if early_note %}<p class="o-sub o-early">{{ early_note }}</p>{% endif %}
+<div class="o-charts" data-office-charts>
+
+  {# A On the site now: the one live figure. Not in a region: the range does not change it. #}
+  <section class="o-card o-live o-span-12" id="live" data-reveal data-live data-live-url="{% url 'office_analytics_live' %}?who={{ data.who }}"{% if live.empty %} data-empty{% endif %} aria-labelledby="h-live">
+    <div class="o-live-main">
+      <h2 class="o-live-title" id="h-live"><span class="o-live-dot" aria-hidden="true"></span>On the site now</h2>
+      <p class="o-live-count" data-live-count aria-describedby="live-line">{{ live.count }}</p>
+      <p class="o-live-line" id="live-line" data-live-line>{{ live.line }}</p>
+    </div>
+    <div class="o-live-lists" data-live-lists>
+      {% for l in live.lists %}<div class="o-live-list"><h3>{{ l.heading }}</h3>
+        <ul data-live-list="{{ l.key }}">{% for r in l.rows %}<li><span class="o-live-name" title="{{ r.label }}">{{ r.label }}</span><span class="o-live-num">{{ r.value }}</span></li>{% endfor %}</ul></div>{% endfor %}
+    </div>
+    <p class="o-footnote o-live-note" data-live-note>Updates every 15 seconds while this page is open.</p>
+    <button type="button" class="o-quiet o-live-retry" data-live-retry hidden>Try again</button>
+    {{ live_labels|json_script:"live-labels" }}
+  </section>
+
+  {# B Overview #}
+  <section class="o-span-12" aria-labelledby="h-overview">
+    <h2 class="sr-only" id="h-overview">Overview</h2>
+    <div class="o-kpis o-kpis--five" data-office-kpis>{% for t in tiles %}{% include "office/_visitor_kpi.html" %}{% endfor %}</div>
+    <p class="o-footnote o-overview-note">A visit ends after 30 minutes without a new page.</p>
+  </section>
+
+  {# C Where visits come from #}
+  <section class="o-card o-span-12" id="sources" data-reveal aria-labelledby="h-sources">
+    <header class="o-card-head"><h2 id="h-sources">Where visits come from</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <div data-region="v-sources" data-fade>
+      <p class="o-summary">{{ channels_summary }}</p>
+      {% if channels.empty %}<p class="o-empty-pill"><span>{{ empty.visits }}</span></p>
+      {% else %}
+      <div class="o-duo">
+        <div><h3 class="o-subhead">How they came</h3>{% include "office/_vis_rank.html" with rows=channels.how %}</div>
+        <div><h3 class="o-subhead">Sources</h3>{% if channels.sources %}{% include "office/_vis_rank.html" with rows=channels.sources %}{% else %}<p class="o-empty-line">No sources yet.</p>{% endif %}</div>
+      </div>
+      <details class="o-table" data-table="sources"><summary>View as table</summary>
+        <div class="o-table-wrap">
+          <table><caption class="sr-only">Visits by channel and what those visits did, {{ data.range|range_label }}</caption>
+            <thead><tr><th scope="col">Channel</th><th scope="col">Visits</th><th scope="col">Started the journey</th><th scope="col">Finished</th><th scope="col">Registered</th><th scope="col">Gold applied</th><th scope="col">Contact taps</th></tr></thead>
+            <tbody>{% for c in channels.steps %}<tr><th scope="row">{{ c.label }}</th><td>{{ c.visits }}</td><td>{{ c.started }}</td><td>{{ c.finished }}</td><td>{{ c.registered }}</td><td>{{ c.gold }}</td><td>{{ c.contact }}</td></tr>{% endfor %}</tbody></table>
+        </div>
+      </details>
+      {% endif %}
+    </div>
+  </section>
+
+  {# D Campaigns: a table on the computer, one card per campaign on the phone #}
+  <section class="o-card o-tablecard o-span-12" id="campaigns" data-reveal aria-labelledby="h-campaigns">
+    <header class="o-card-head"><h2 id="h-campaigns">Campaigns</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <div data-region="v-campaigns" data-fade>
+      <p class="o-summary">{{ campaigns_summary }}</p>
+      {% if campaigns %}
+      <table class="o-list o-list--vis o-list--campaigns">
+        <caption class="sr-only">Campaigns and what their visits did, {{ data.range|range_label }}</caption>
+        <thead><tr><th scope="col">Campaign</th><th scope="col" class="num">Visits</th><th scope="col" class="num">Started</th><th scope="col" class="num">Finished</th><th scope="col" class="num">Registered</th><th scope="col" class="num">Gold applied</th><th scope="col" class="num">Contact taps</th></tr></thead>
+        <tbody>{% for c in campaigns %}
+          <tr class="o-row o-row--static">
+            <td class="c-title"><span class="o-vname">{{ c.name }}</span><span class="o-sub o-where-inline">{{ c.where }}</span></td>
+            <td class="c-main num"><span class="o-only-wide">{{ c.visits }}</span><span class="o-only-narrow">{{ c.visits_text }}</span></td>
+            <td class="c-where">{{ c.where }}</td>
+            <td class="c-pairs">{% for p in c.pairs %}<span class="o-pair-item">{{ p.label }} <b>{{ p.value }}</b></span>{% endfor %}</td>
+            <td class="c-step num">{{ c.steps.started }}</td><td class="c-step num">{{ c.steps.finished }}</td><td class="c-step num">{{ c.steps.registered }}</td><td class="c-step num">{{ c.steps.gold }}</td><td class="c-step num">{{ c.steps.contact }}</td>
+          </tr>{% endfor %}</tbody>
+      </table>
+      {% else %}<p class="o-empty-pill"><span>{{ empty.campaigns }}{% if office_can.can_edit %} Make a link below and post it.{% endif %}</span></p>{% endif %}
+      <p class="o-footnote o-vnote">A campaign counts a step only when it happens on the same day as the visit. Nothing is stored on visitors’ phones, so a step on a later day is not linked back.</p>
+    </div>
+  </section>
+
+  {# E Make a campaign link: Office level and up only (Viewer gets no card, and the address endpoint answers 403) #}
+  {% if office_can.can_edit %}
+  <section class="o-card o-span-12 o-linkmaker" id="link" data-reveal data-linkmaker data-link-url="{% url 'office_analytics_link' %}" data-qr-url="{% url 'office_analytics_qr' %}" aria-labelledby="h-link">
+    <header class="o-card-head"><h2 id="h-link">Make a campaign link</h2></header>
+    <p class="o-summary">Choose where it will be posted, name it and pick a page. The link appears as you go.</p>
+    <div class="o-lm-grid">
+      <div class="o-lm-steps">
+        <fieldset class="o-lm-step"><legend class="o-lm-q">Where will you post it?</legend>
+          <div class="o-chips o-chips--pick">{% for p in placements %}<label class="o-chip"><input type="radio" name="placement" value="{{ p.key }}" data-lm-placement><span>{{ p.label }}</span></label>{% endfor %}</div>
+        </fieldset>
+        <div class="o-lm-step">
+          <label class="o-lm-q" for="lm-name">Give it a short name</label>
+          <input class="o-lm-input" id="lm-name" type="text" name="name" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="lm-hint lm-saved" data-lm-name>
+          <p class="o-footnote" id="lm-hint">A few words you will recognise later, such as spring open day.</p>
+          <p class="o-footnote o-lm-saved" id="lm-saved" data-lm-saved></p>
+        </div>
+        <div class="o-lm-step">
+          <label class="o-lm-q" for="lm-page">Which page should it open?</label>
+          <select class="o-select o-lm-select" id="lm-page" name="page" data-lm-page><option value="">Choose a page</option>{% for p in link_pages %}<option value="{{ p.key }}">{{ p.label }}</option>{% endfor %}</select>
+        </div>
+      </div>
+      <div class="o-lm-result" data-lm-result>
+        <p class="o-footnote" data-lm-hint>Choose a place, a name and a page to make the link.</p>
+        <div class="o-lm-made" data-lm-made hidden>
+          <div class="o-lm-link"><p class="o-lm-url" data-lm-url></p></div>
+          <div class="o-lm-actions"><button type="button" class="btn btn-primary" data-lm-copy>Copy link</button><span class="o-footnote" data-lm-manual hidden>Press and hold to copy</span></div>
+          <span class="sr-only" role="status" data-lm-status></span>
+          <div class="o-lm-qr" data-lm-qr hidden>
+            <img class="o-lm-qrimg" alt="QR code for this link" width="160" height="160" data-lm-qrimg>
+            <a class="btn btn-secondary" href="#" download="spa99.svg" data-lm-download>Download QR</a>
+            <p class="o-footnote" data-lm-qrerror hidden>Couldn’t make the QR code. <button type="button" class="o-quiet" data-lm-qrretry>Try again</button></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {# F Pages: three views over one set of tables, switched in the page #}
+  <section class="o-card o-tablecard o-span-12" id="pages" data-reveal aria-labelledby="h-pages" data-pages>
+    <header class="o-card-head"><h2 id="h-pages">Pages</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <div class="o-pages-switch">
+      <fieldset class="o-seg o-seg--sm o-seg--pages" style="--n: 3; --i: 0" data-pages-switch>
+        <legend class="sr-only">Pages view</legend>
+        <span class="o-seg-thumb" aria-hidden="true"></span>
+        <label class="o-seg-item"><input type="radio" name="pages-view" value="most" checked><span>Most viewed</span></label>
+        <label class="o-seg-item"><input type="radio" name="pages-view" value="first"><span>First page</span></label>
+        <label class="o-seg-item"><input type="radio" name="pages-view" value="last"><span>Last page</span></label>
+      </fieldset>
+    </div>
+    <div data-region="v-pages" data-fade>
+      <p class="o-summary">{{ pages_summary }}</p>
+      {% if pages.most %}
+      <div data-pages-panel="most">
+        <table class="o-list o-list--vis o-list--pages"><caption class="sr-only">Most viewed pages, {{ data.range|range_label }}</caption>
+          <thead><tr><th scope="col">Page</th><th scope="col" class="num">Views</th><th scope="col" class="num">Average time</th><th scope="col" class="num">Scrolled halfway</th></tr></thead>
+          <tbody>{% for r in pages.most %}
+            <tr class="o-row o-row--static"{% if forloop.counter > pages.shown %} hidden data-extra{% endif %}>
+              <td class="c-title"><span class="o-vname">{{ r.label }}</span><span class="o-rowbar" style="--share: {{ r.ratio }}" aria-hidden="true"></span></td>
+              <td class="c-main num"><span class="o-only-wide">{{ r.views }}</span><span class="o-only-narrow">{{ r.views_text }}</span></td>
+              <td class="c-where">{{ r.line }}</td>
+              <td class="c-step num">{% if r.avg %}{{ r.avg }}{% else %}<span class="o-muted">Not enough yet</span>{% endif %}</td>
+              <td class="c-step num">{% if r.scroll %}{{ r.scroll }}{% else %}<span class="o-muted">Not enough yet</span>{% endif %}</td>
+            </tr>{% endfor %}</tbody></table>
+        <p class="o-footnote o-vnote">Average time counts only while the page is on screen. Scrolled halfway: of the views we heard back from, how many got at least halfway down.</p>
+      </div>
+      <div data-pages-panel="first" hidden>
+        <table class="o-list o-list--vis o-list--pages"><caption class="sr-only">Pages where visits started, {{ data.range|range_label }}</caption>
+          <thead><tr><th scope="col">Page</th><th scope="col" class="num">Visits that started here</th><th scope="col" class="num">Share of visits</th></tr></thead>
+          <tbody>{% for r in pages.first %}
+            <tr class="o-row o-row--static"{% if forloop.counter > pages.shown %} hidden data-extra{% endif %}>
+              <td class="c-title"><span class="o-vname">{{ r.label }}</span><span class="o-rowbar" style="--share: {{ r.ratio }}" aria-hidden="true"></span></td>
+              <td class="c-main num"><span class="o-only-wide">{{ r.visits }}</span><span class="o-only-narrow">{{ r.visits_text }}</span></td><td class="c-where">{{ r.share }} of visits</td><td class="c-step num">{{ r.share }}</td>
+            </tr>{% empty %}<tr class="o-empty-row"><td colspan="3"><p>{{ empty.pages }}</p></td></tr>{% endfor %}</tbody></table>
+      </div>
+      <div data-pages-panel="last" hidden>
+        <table class="o-list o-list--vis o-list--pages"><caption class="sr-only">Pages where visits ended, {{ data.range|range_label }}</caption>
+          <thead><tr><th scope="col">Page</th><th scope="col" class="num">Visits that ended here</th><th scope="col" class="num">Share of visits</th></tr></thead>
+          <tbody>{% for r in pages.last %}
+            <tr class="o-row o-row--static"{% if forloop.counter > pages.shown %} hidden data-extra{% endif %}>
+              <td class="c-title"><span class="o-vname">{{ r.label }}</span><span class="o-rowbar" style="--share: {{ r.ratio }}" aria-hidden="true"></span></td>
+              <td class="c-main num"><span class="o-only-wide">{{ r.visits }}</span><span class="o-only-narrow">{{ r.visits_text }}</span></td><td class="c-where">{{ r.share }} of visits</td><td class="c-step num">{{ r.share }}</td>
+            </tr>{% empty %}<tr class="o-empty-row"><td colspan="3"><p>{{ empty.pages }}</p></td></tr>{% endfor %}</tbody></table>
+      </div>
+      {% if pages.most|length > pages.shown or pages.first|length > pages.shown or pages.last|length > pages.shown %}<button type="button" class="o-quiet o-showall" data-pages-all>Show all</button>{% endif %}
+      {% else %}<p class="o-empty-pill"><span>{{ empty.pages }}</span></p>{% endif %}
+    </div>
+  </section>
+
+  {# G Contact taps #}
+  <section class="o-card o-span-12" id="taps" data-reveal aria-labelledby="h-taps">
+    <header class="o-card-head"><h2 id="h-taps">Contact taps</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <div data-region="v-taps" data-fade>
+      <p class="o-summary">{{ taps_summary }}</p>
+      {% if taps.total %}
+      <div class="o-duo">
+        <div><h3 class="o-subhead">By kind</h3><p class="o-headline"><strong>{{ taps.headline }}</strong></p>{% include "office/_vis_rank.html" with rows=taps.by_kind icons=True %}</div>
+        <div><h3 class="o-subhead">By page</h3>
+          <table class="o-list o-list--vis o-list--inset o-list--taps"><caption class="sr-only">Contact taps by page, {{ data.range|range_label }}</caption>
+            <thead><tr><th scope="col">Page</th><th scope="col" class="num">Taps</th></tr></thead>
+            <tbody>{% for r in taps.by_page %}
+              <tr class="o-row o-row--static"><td class="c-title"><span class="o-vname">{{ r.label }}</span><span class="o-sub o-where-inline">{{ r.kinds }}</span></td><td class="c-main num"><span class="o-only-wide">{{ r.taps }}</span><span class="o-only-narrow">{{ r.taps_text }}</span></td><td class="c-where">{{ r.kinds }}</td></tr>{% endfor %}</tbody></table>
+        </div>
+      </div>
+      {% else %}<p class="o-empty-pill"><span>{{ empty.taps }}</span></p>{% endif %}
+    </div>
+  </section>
+
+  {# H What people use #}
+  <section class="o-card o-span-12" id="use" data-reveal aria-labelledby="h-use">
+    <header class="o-card-head"><h2 id="h-use">What people use</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <div data-region="v-use" data-fade>
+      <p class="o-summary">{{ use_summary }}</p>
+      {% if use.total %}
+      <div class="o-multiples o-multiples--three o-multiples--slate">
+        <div class="o-multiple"><h3>Device</h3>
+          <div class="o-stack o-stack--slate" role="img" aria-label="{{ use.devices_spoken }}">{% for d in use.devices %}{% if d.grow %}<span class="o-stack-seg o-stack-seg--{{ d.key }}" style="flex-grow: {{ d.grow }}"></span>{% endif %}{% endfor %}</div>
+          <ul class="o-keylist">{% for d in use.devices %}<li><span class="o-swatch o-swatch--{{ d.key }}" aria-hidden="true"></span><span class="o-key-name">{{ d.label }}</span><span class="o-key-num">{{ d.num }}</span><span class="o-key-share">{{ d.share }}</span></li>{% endfor %}</ul>
+        </div>
+        <div class="o-multiple"><h3>Browser</h3>{% include "office/_vis_rank.html" with rows=use.browsers %}</div>
+        <div class="o-multiple"><h3>System</h3>{% include "office/_vis_rank.html" with rows=use.systems %}</div>
+      </div>
+      {% else %}<p class="o-empty-pill"><span>{{ empty.visits }}</span></p>{% endif %}
+      <p class="o-footnote o-vnote">Each visitor counted once a day.</p>
+    </div>
+  </section>
+
+  {# I Countries and How long visits last #}
+  <section class="o-card o-span-6" id="countries" data-reveal aria-labelledby="h-countries">
+    <header class="o-card-head"><h2 id="h-countries">Countries</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <div data-region="v-countries" data-fade>
+      {% if countries.summary %}<p class="o-summary">{{ countries.summary }}</p>{% endif %}
+      {% if countries.rows %}{% include "office/_vis_rank.html" with rows=countries.rows %}{% else %}<p class="o-empty-pill"><span>{{ empty.visits }}</span></p>{% endif %}
+    </div>
+    <p class="o-footnote o-vnote">IP location data by <a href="https://db-ip.com" target="_blank" rel="noopener">DB-IP</a></p>
+  </section>
+
+  <section class="o-card o-chartcard o-span-6" id="length" data-reveal data-chart-card="length" aria-labelledby="h-length">
+    <header class="o-card-head"><h2 id="h-length">How long visits last</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <p class="o-summary" data-region="v-summary-length" data-fade>{{ length.summary }}</p>
+    <div class="o-chartbox" data-chart="length" data-empty-text="{{ empty.visits }}"{% if length.empty %} data-empty{% endif %}>
+      <canvas id="chart-length" role="img" aria-label="{{ length.summary }}" tabindex="-1"></canvas>
+      <p class="o-empty-chart">{{ empty.visits }}</p>
+    </div>
+    <details class="o-table" data-table="length"{% if length.empty %} hidden{% endif %}><summary>View as table</summary>
+      <div class="o-table-wrap" data-region="v-table-length" data-fade>
+        <table><caption class="sr-only">How long visits last, {{ data.range|range_label }}</caption>
+          <thead><tr><th scope="col">Length</th><th scope="col">Visits</th><th scope="col">Share</th></tr></thead>
+          <tbody>{% for r in length.rows %}<tr><th scope="row">{{ r.label }}</th><td>{{ r.visits_text }}</td><td>{{ r.share }}</td></tr>{% endfor %}</tbody></table>
+      </div>
+    </details>
+  </section>
+
+  {# J When people visit: a heat map of new visits by London weekday and hour #}
+  <section class="o-card o-span-12" id="when" data-reveal aria-labelledby="h-when">
+    <header class="o-card-head"><h2 id="h-when">When people visit</h2></header>
+    <p class="o-error" data-error hidden><span data-error-text></span> <button type="button" class="o-quiet" data-retry>Try again</button></p>
+    <div data-region="v-when" data-fade>
+      <p class="o-headline o-headline--lead">{{ busiest }}</p>
+      {% if heat.show %}
+      <div class="o-heat" data-heat>
+        <div class="o-heat-grid" role="img" aria-label="{{ busiest }}">
+          {% for d in heat.days %}<span class="o-heat-day" style="--d: {{ forloop.counter0 }}"><span class="o-only-wide">{{ d.short }}</span><span class="o-only-narrow">{{ d.letter }}</span></span>{% endfor %}
+          {% for h in heat.labelled %}<span class="o-heat-hour" style="--h: {{ h }}">{{ h|stringformat:"02d" }}</span>{% endfor %}
+          {% for c in heat.cells %}<span class="o-heat-cell" data-level="{{ c.level }}" data-d="{{ c.d }}" data-h="{{ c.h }}" data-v="{{ c.v }}" style="--d: {{ c.d }}; --h: {{ c.h }}"></span>{% endfor %}
+        </div>
+        <div class="o-heat-key" aria-hidden="true"><span>Fewer</span><i data-level="0"></i><i data-level="1"></i><i data-level="2"></i><i data-level="3"></i><i data-level="4"></i><span>More</span></div>
+        <details class="o-table" data-table="when"><summary>View as table</summary>
+          <div class="o-table-wrap">
+            <table><caption>Visits by hour, London time</caption>
+              <thead><tr><th scope="col">Day</th>{% for h in heat.hours %}<th scope="col">{{ h }}</th>{% endfor %}<th scope="col">Total</th></tr></thead>
+              <tbody>{% for r in heat.table %}<tr><th scope="row">{{ r.day }}</th>{% for v in r.values %}<td>{{ v }}</td>{% endfor %}<td>{{ r.total }}</td></tr>{% endfor %}</tbody></table>
+          </div>
+        </details>
+      </div>
+      {% else %}<p class="o-empty-pill"><span>{{ empty.pattern }}</span></p>{% endif %}
+      <p class="o-footnote o-vnote">London time. Each visit counted at the hour it started.</p>
+    </div>
+  </section>
+</div>
+{{ chart_json|json_script:"office-series" }}
+{% endblock %}

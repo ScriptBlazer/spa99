@@ -40,6 +40,8 @@ written by hand:
   (review round, same day) privacy parts still exactly as first written get the corrected text (Sentry wording, change
   history, Gold consents, optional details, tour storage, team sign-ins)
 
+- (2026-11-21) the privacy line about the Ask us chat no longer says an email unlocks prices (exact old line only)
+
 - (2026-10-26) "with someone" becomes "with a friend" (journey Company options and their reasons, the two guest suggestion
   rule names); the journey result label "Your membership" becomes "Based on your answers". Exact old wording only, so
   hand edits are kept; saved one by one so the change is in the history
@@ -177,8 +179,14 @@ def backfill():
     changed.update(_barry_changes_2026_10_29())
     changed.update(_whatsapp_and_gold_2026_10_29())
     changed.update(_privacy_notice_2026_11_04())
+    changed.update(_privacy_notice_2026_11_21())
+    changed.update(_privacy_chat_email_2026_11_21())
+    changed.update(_heard_via_papers_2026_11_21())
+    changed.update(_journey_required_2026_11_21())
+    changed.update(_industry_other_under_industry_2026_11_21())
     changed.update(_not_you_start_again_2026_11_03())
     changed.update(_dashboard_all_time_2026_11_05())
+    changed.update(_signin_caption_2026_11_27())
     return changed
 
 
@@ -309,6 +317,54 @@ def _barry_changes_2026_10_29():
         rule.save()
         changed["gold.GoldRule (Working with BML)"] += 1
     _midlands(changed)
+    return changed
+
+
+def _heard_via_papers_2026_11_21():
+    """Moishe 2026-11-21: "News Update" and "Midweek" added to How did you hear about us?, before Other. Created only when missing."""
+    changed = Counter()
+    heard = Question.objects.filter(key="heard_via").first()
+    if heard is None:
+        return changed
+    for value, label in (("news_update", "News Update"), ("midweek", "Midweek")):
+        if Option.objects.filter(question=heard, value=value).exists():
+            continue
+        other = Option.objects.filter(question=heard, value="other").first()
+        order = other.order if other is not None else Option.objects.filter(question=heard).count() + 1
+        if other is not None:  # the new option takes Other's place and Other moves down one
+            other.order += 1
+            other.save()
+        Option.objects.create(question=heard, value=value, label=label, order=order)
+        changed[f"journey.Option ({label} added)"] += 1
+    return changed
+
+
+def _journey_required_2026_11_21():
+    """Moishe 2026-11-21: nothing optional in the journey. The questions in journey_seed.REQUIRED_KEYS (the two typed follow-ups
+    included) move from min_choices 0 to 1; any other value is a choice made in Control and stays. The words "Please write a few
+    words." are added when missing, and the "About you." line stops saying Optional (only while it still has its exact old words)."""
+    changed = Counter()
+    page = Page.objects.filter(key="journey").first()
+    # Once only: this step also adds the need_text words, so their presence means it has run. A later run must not undo a
+    # question Moishe has since made optional in Control.
+    first_run = page is None or not Section.objects.filter(page=page, key="need_text").exists()
+    for question in Question.objects.filter(key__in=journey_seed.REQUIRED_KEYS, min_choices=0) if first_run else []:
+        question.min_choices = 1
+        question.save()  # one by one, so history records it
+        changed["journey.Question (answer required)"] += 1
+    if page is not None:
+        sections = Section.objects.filter(page=page)
+        need = content_seed.PAGES["journey"][2]
+        text = next(row for row in need if row[0] == "need_text")
+        if not sections.filter(key="need_text").exists():
+            Section.objects.create(page=page, key="need_text", heading=text[1], body=text[2], cta_label=text[3], cta_url=text[4],
+                                   order=(sections.order_by("-order").values_list("order", flat=True).first() or 0) + 1)
+            changed["content.Section (journey: Please write a few words.)"] += 1
+        about = sections.filter(key="screen_4", body="Optional, and only to suggest the right fit.").first()
+        if about is not None:
+            about.body = "Only to suggest the right fit."
+            about.save()
+            changed["content.Section (journey: About you. no longer optional)"] += 1
     return changed
 
 
@@ -445,6 +501,41 @@ def _privacy_notice_2026_11_04():
     return changed
 
 
+def _privacy_notice_2026_11_21():
+    """2026-11-21 (Analytics plus): the visitor counter paragraph says what else is noted. Added after the "name of the website" line only
+    where that line is still there; "Last updated" moves only when the notice now says it. The privacy version is left as it is (nobody is asked to accept again)."""
+    from content import legal
+
+    changed = Counter()
+    page = Page.objects.filter(key="privacy").first()
+    if page is None:
+        return changed
+    anchor = "Only the name, never the full address."
+    _edit_privacy_section(page, "part_5", [("visitor counter: device, country, time on page, taps, campaign tags", anchor, anchor + "\n" + legal.VISITOR_COUNTER_MORE)],
+                          changed, "part_5")
+    if Section.objects.filter(page=page, key="part_5", body__contains=legal.VISITOR_COUNTER_MORE).exists():
+        for section in Section.objects.filter(page=page, key="updated", body="5 November 2026"):
+            section.body = legal.PRIVACY_UPDATED
+            section.save()
+            changed["content.Section (privacy notice: last updated)"] += 1
+    return changed
+
+
+def _privacy_chat_email_2026_11_21():
+    """2026-11-21: the Ask us chat no longer asks for an email, so the privacy line about it changes. Exact old line only (a part edited by hand
+    is reported as left alone); the privacy version and "Last updated" are left as they are."""
+    changed = Counter()
+    page = Page.objects.filter(key="privacy").first()
+    if page is None:
+        return changed
+    old = ("- What you type to the assistant and its replies, with the time. If you gave your email to see prices, or you are "
+           "signed in, the chat is linked to it. We do not store your IP address with a chat.")
+    new = ("- What you type to the assistant and its replies, with the time. If you are signed in, the chat is linked to your account. "
+           "Chats from before 21 November 2026 may be linked to an email given in the chat. We do not store your IP address with a chat.")
+    _edit_privacy_section(page, "part_2", [("Ask us chat no longer asks for an email", old, new)], changed, "part_2")
+    return changed
+
+
 def _not_you_start_again_2026_11_03():
     """2026-11-03: "Not you? Use another email" becomes "Not you? Start again", exact old wording only (a row edited by hand is left alone)."""
     changed = Counter()
@@ -550,6 +641,7 @@ OLD_SECTION_TEXT = [  # page key, section key, field, old value, new value
     ("gold-apply", "screen_1", "body", "A few taps about your work in property.", "A few taps, so we know you."),
     # Round 4 (2026-10-23): no promises of amenities, and the opening date reads "Launching ..."
     ("home", "opening", "heading", "Launching {opening}.", "{opening}."),  # 2026-10-23 (later): "Launching" is a label row now
+    ("home", "opening", "heading", "{opening}.", "{opening}"),  # Moishe 2026-11-27: no full stop after the date ("Launching 2027")
     ("spa", "opener_4", "body", "Your robe and slippers are waiting.", "Take your time. Nothing here is rushed."),
     ("spa", "moment_shower", "heading", "In every shower.", "Between rounds."),
     ("spa", "moment_shower", "body", "Toiletries in the swan bottles. A fresh towel on the rail.",
@@ -891,3 +983,52 @@ class Command(BaseCommand):
                 self.stdout.write(f"{prefix} {count} x {name}")
         if dry_run:
             self.stdout.write("Dry run: nothing was saved.")
+
+
+# Screen 4 order before 2026-11-21 (the seed's numbers), and after: "In a few words" moves right under Industry.
+_SCREEN_4_OLD = {"industry": 1, "property_link": 2, "property_size": 3, "property_law": 4, "heard_via": 5, "industry_other": 6, "heard_via_other": 7}
+_SCREEN_4_NEW = {"industry": 1, "industry_other": 2, "property_link": 3, "property_size": 4, "property_law": 5, "heard_via": 6, "heard_via_other": 7}
+
+
+def _industry_other_under_industry_2026_11_21():
+    """Moishe 2026-11-21: "In a few words" shows right under Industry, above the property questions. Only when screen 4 still has
+    exactly the old order (an order changed in Control is left alone). Its new "needed only when Other is the only industry"
+    rule is in code (journey.services.required_now), so nothing else changes here."""
+    changed = Counter()
+    rows = {q.key: q for q in Question.objects.filter(key__in=_SCREEN_4_OLD, screen=4)}
+    if {key: q.order for key, q in rows.items()} != _SCREEN_4_OLD:
+        return changed
+    for key, order in _SCREEN_4_NEW.items():
+        if rows[key].order != order:
+            rows[key].order = order
+            rows[key].save()  # one by one, so history records it
+            changed["journey.Question (In a few words moved under Industry)"] += 1
+    changed.update(_other_box_context_2026_11_21())  # once, with the move: a line cleared later in Control stays cleared
+    return changed
+
+
+def _other_box_context_2026_11_21():
+    """Moishe 2026-11-21: a small line above "In a few words" and "Where?" says which Other it is for. Only fills a blank help text."""
+    changed = Counter()
+    for key, text in (("industry_other", journey_seed.INDUSTRY_OTHER_HELP), ("heard_via_other", journey_seed.HEARD_VIA_OTHER_HELP)):
+        question = Question.objects.filter(key=key, help_text="").first()
+        if question is not None:
+            question.help_text = text
+            question.save()
+            changed["journey.Question (line above the Other box)"] += 1
+    return changed
+
+
+
+OLD_SIGNIN_CAPTION = "Your own locker, every visit."
+
+
+def _signin_caption_2026_11_27():
+    """Moishe 2026-11-27: no "Your own locker, every visit." under the sign-in picture. Blanks that exact wording only (a caption typed in Control stays)."""
+    changed = Counter()
+    section = Section.objects.filter(page__key="signin", key="caption", body=OLD_SIGNIN_CAPTION).first()
+    if section is not None:
+        section.body = ""
+        section.save()  # save, not update: keeps a history row like the other wording steps
+        changed["content.Section (sign-in caption removed)"] += 1
+    return changed

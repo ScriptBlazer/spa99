@@ -69,14 +69,14 @@ def send_password_set_email(user_id, actor_id):
     return log.status
 
 
-def send_email_changed_notices(user_id, old_email, actor_id):
+def send_email_changed_notices(user_id, old_email, actor_id, by=None):
     """After a team member's login email was changed: a short notice to the old address (without the new one) and one to the new address. Called straight after the change
     (not queued: the task queue would keep the old address). Returns the two statuses."""
     user = User.objects.filter(pk=user_id).first()
     actor = User.objects.filter(pk=actor_id).first()
     if user is None:
         return None
-    who = (actor.get_full_name() or actor.email) if actor else "a Spa 99 administrator"
+    who = by or ((actor.get_full_name() or actor.email) if actor else "a Spa 99 administrator")  # `by`: a customer's notices say "the Spa 99 team", never the staff member
     # The old address is told the login changed but never where to: it may no longer be the person's, and must not learn the new one.
     old = send_templated("email_changed_old", [old_email], subject_for("email_changed_old", first_name=user.first_name),
                          {"first_name": user.first_name, "changed_by": who}, subject_email=user.email)

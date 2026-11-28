@@ -21,6 +21,11 @@ RUN useradd --create-home --uid 1000 app \
     && mkdir -p /app/.private /app/staticfiles \
     && chown -R app:app /app/.private /app/staticfiles \
     && chmod +x /app/entrypoint.sh
+# Country data (DB-IP Country Lite, CC BY 4.0): this month's file, else last month's. The build carries on without it
+# (every country then shows as "unknown"; a later build picks it up). Not part of git, never needs a secret.
+ENV GEOIP_DB_PATH=/app/geoip/dbip-country-lite.mmdb
+RUN mkdir -p /app/geoip && (python -m common.geoip_fetch "$GEOIP_DB_PATH" || echo "GeoIP file not downloaded: building without it")
+
 USER app
 
 # Hashed static files are built into the image (WhiteNoise serves them). The build settings need no secrets.

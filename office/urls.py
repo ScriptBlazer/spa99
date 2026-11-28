@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import pwa, views, views_approvals as ap, views_tools as t
+from . import pwa, views, views_approvals as ap, views_tools as t, views_visitors as vv
 
 urlpatterns = [
     path("manifest.webmanifest", pwa.manifest, name="office_manifest"),  # the Office as an installable app (public file, no secrets)
@@ -9,6 +9,11 @@ urlpatterns = [
     path("dashboard.json", views.dashboard_json, name="office_dashboard_json"),
     path("analytics/", views.analytics, name="office_analytics"),
     path("analytics/data/", views.analytics_data, name="office_analytics_data"),
+    path("analytics/visitors/", vv.analytics_visitors, name="office_analytics_visitors"),
+    path("analytics/link.json", vv.analytics_link, name="office_analytics_link"),
+    path("analytics/visitors/data/", views.analytics_visitors_data, name="office_analytics_visitors_data"),
+    path("analytics/live.json", views.analytics_live, name="office_analytics_live"),
+    path("analytics/qr.svg", views.analytics_qr, name="office_analytics_qr"),
     path("analytics/pages/", views.analytics_pages, name="office_analytics_pages"),
     path("people/", views.people, name="office_people"),
     path("people/export.csv", views.people_csv, name="office_people_csv"),
@@ -85,6 +90,9 @@ urlpatterns = [
     path("gold/<uuid:pk>/delete/", t.gold_delete, name="office_gold_delete"),
     # add or fix a number (the Details rows), and mark a Gold application Contacted by hand
     path("leads/<uuid:pk>/contact/", t.lead_contact, name="office_lead_contact"),
+    path("people/<uuid:pk>/email/", t.person_email, name="office_person_email"),
+    path("people/<uuid:pk>/resend-verify/", t.person_resend_verify, name="office_person_resend_verify"),
+    path("people/<uuid:pk>/emails/<uuid:log_id>/resend/", t.person_email_resend, name="office_person_email_resend"),
     path("people/<uuid:pk>/mobile/", t.person_mobile, name="office_person_mobile"),
     path("gold/<uuid:pk>/mobile/", t.gold_mobile, name="office_gold_mobile"),
     path("gold/<uuid:pk>/contacted/", t.gold_contacted, name="office_gold_contacted"),

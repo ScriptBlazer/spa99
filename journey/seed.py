@@ -44,7 +44,7 @@ PROPERTY_SIZE = [("1_9", "1 to 9"), ("10_49", "10 to 49"), ("50_199", "50 to 199
 YES_NO = [("yes", "Yes"), ("no", "No")]
 HEARD_VIA = [
     ("friend", "A friend"), ("bml", "BML staff member"), ("social_media", "Social media"),
-    ("barry_status", "Barry's status"), ("other", "Other"),
+    ("barry_status", "Barry's status"), ("news_update", "News Update"), ("midweek", "Midweek"), ("other", "Other"),
 ]
 
 GUEST_COMPANY = ["sometimes", "often"]  # "often" was retired (2026-10-23); old sessions keep their points
@@ -58,7 +58,17 @@ GUEST_RULES = {  # 2026-10-23: "Sometimes with a friend" never yields Tier 1 and
         "conditions": [{"question": "company", "any_of": GUEST_COMPANY}],
     },
 }
-MIN_CHOICES = {"time": 1, "facilities": 1, "industry": 1}  # 2026-10-23: "Choose at least one." (industry too, 2026-10-26: it is multi-select)
+# Nothing is optional (Moishe 2026-11-21): every question needs an answer whenever it is shown, and the two typed follow-ups need
+# at least one letter (min_choices 1 on a TEXT question means "text required"). Hidden questions are never required.
+MIN_CHOICES = {key: 1 for key in (
+    "time", "frequency", "facilities", "company", "industry", "property_link", "property_size", "property_law",
+    "heard_via", "industry_other", "heard_via_other",
+)}
+REQUIRED_KEYS = tuple(MIN_CHOICES)
+
+# The small line above each typed follow-up, so he knows which "Other" it is for (Moishe 2026-11-21). Editable in Control.
+INDUSTRY_OTHER_HELP = "You picked Other under Industry."
+HEARD_VIA_OTHER_HELP = "You picked Other under How did you hear about us."
 
 # key, text, help, type, screen, order, condition, options
 QUESTIONS = [
@@ -67,16 +77,18 @@ QUESTIONS = [
     ("facilities", "What would you use?", "Choose at least one.", Question.MULTI, 2, 1, {}, FACILITIES),
     ("company", "Do you usually come alone?", "", Question.SINGLE, 3, 1, {}, COMPANY),
     ("industry", "What industry are you in?", "Choose at least one.", Question.MULTI, 4, 1, {}, INDUSTRY),
-    ("property_link", "Your link to property", "", Question.SINGLE, 4, 2,
+    # Typed follow-up to Industry: right under it, above the property questions (Moishe 2026-11-21). Needed only when Other
+    # is the only industry ticked; with another industry it shows and is optional.
+    ("industry_other", "In a few words", INDUSTRY_OTHER_HELP, Question.TEXT, 4, 2, {"question": "industry", "any_of": ["other"]}, []),
+    ("property_link", "Your link to property", "", Question.SINGLE, 4, 3,
      {"question": "industry", "any_of": ["property"]}, PROPERTY_LINK),
-    ("property_size", "How many properties or units?", "An approximate range is fine.", Question.SINGLE, 4, 3,
+    ("property_size", "How many properties or units?", "An approximate range is fine.", Question.SINGLE, 4, 4,
      {"question": "property_link", "any_of": PROPERTY_LINK_VALUES}, PROPERTY_SIZE),
-    ("property_law", "Is it property law?", "", Question.SINGLE, 4, 4,
+    ("property_law", "Is it property law?", "", Question.SINGLE, 4, 5,
      {"question": "industry", "any_of": ["law"]}, YES_NO),
-    ("heard_via", "How did you hear about us?", "", Question.SINGLE, 4, 5, {}, HEARD_VIA),
-    # Typed follow-ups (optional): shown under their parent when "Other" is chosen.
-    ("industry_other", "In a few words", "", Question.TEXT, 4, 6, {"question": "industry", "any_of": ["other"]}, []),
-    ("heard_via_other", "Where?", "", Question.TEXT, 4, 7, {"question": "heard_via", "any_of": ["other"]}, []),
+    ("heard_via", "How did you hear about us?", "", Question.SINGLE, 4, 6, {}, HEARD_VIA),
+    # Typed follow-up (required when shown, as Other is its only choice): shown under How did you hear when "Other" is chosen.
+    ("heard_via_other", "Where?", HEARD_VIA_OTHER_HELP, Question.TEXT, 4, 7, {"question": "heard_via", "any_of": ["other"]}, []),
 ]
 
 

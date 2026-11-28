@@ -62,7 +62,7 @@ def _number(label, default, low, high, help_text=""):
 
 class AssistantSettings(BaseModel):
     """The assistant's voice and limits (singleton, `load()`), edited in System > Assistant. Everything here feeds the system prompt
-    or the guards; the hard rules (scope, no price before an email, no code, off-topic closing) stay in code and cannot be edited away.
+    or the guards; the hard rules (scope, no price while memberships are closed, no code, off-topic closing) stay in code and cannot be edited away.
     The monthly cap stays on system.SiteDefaults (chat_monthly_cap_gbp) so no data moves."""
 
     singleton_key = models.CharField(max_length=10, default="site", unique=True, editable=False)

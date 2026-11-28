@@ -9,6 +9,8 @@ from journey.models import Answer, JourneySession, Option, Question, SuggestionR
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import Plan
 
+from .helpers import MINIMAL, answer_minimal
+
 User = get_user_model()
 
 
@@ -65,7 +67,7 @@ class SuggestionTests(TestCase):
         state = services.build_state(make_session())
         options = {q["key"]: [o["value"] for o in q["options"]] for s in state["screens"] for q in s["questions"]}
         self.assertEqual(options["company"], ["alone", "sometimes"])
-        self.assertEqual(options["heard_via"], ["friend", "bml", "social_media", "barry_status", "other"])
+        self.assertEqual(options["heard_via"], ["friend", "bml", "social_media", "barry_status", "news_update", "midweek", "other"])
         self.assertEqual(Option.objects.get(question__key="heard_via", value="bml").label, "BML staff member")
         self.assertEqual(Option.objects.get(question__key="heard_via", value="barry_status").label, "Barry's status")
         self.assertEqual(Question.objects.get(key="industry").text, "What industry are you in?")
@@ -83,7 +85,7 @@ class SuggestionTests(TestCase):
         self.assertEqual(engine.compute_suggestion(session).plan.slug, "tier-1")  # next best by points
 
     def test_result_is_stored_and_marks_the_journey_complete(self):
-        session = make_session(time=["evening"], frequency="two_three", facilities=["gym"], industry="tech")
+        session = make_session(**MINIMAL)
         result = engine.complete(session)
         session.refresh_from_db()
         self.assertTrue(session.completed)
@@ -169,7 +171,10 @@ class AnswerTests(TestCase):
         for key, options in bad:
             with self.assertRaises(services.AnswerError, msg=key):
                 services.save_answer(session, key, options=options)
-        answer, _ = services.save_answer(session, "heard_via", skipped=True)  # optional questions can be skipped
+        with self.assertRaises(services.AnswerError):  # nothing is optional (2026-11-21)
+            services.save_answer(session, "heard_via", skipped=True)
+        Question.objects.filter(key="heard_via").update(min_choices=0)  # a question Control makes optional can still be skipped
+        answer, _ = services.save_answer(session, "heard_via", skipped=True)
         self.assertTrue(answer.skipped)
         self.assertEqual(answer.values(), [])
         self.assertEqual(Answer.objects.count(), 1)
@@ -191,6 +196,7 @@ class AnswerTests(TestCase):
         with self.assertRaises(services.AnswerError):  # cannot answer a question that is not shown
             services.save_answer(session, "property_link", options=["developer"])
         services.save_answer(session, "time", options=["daytime"])
+        services.save_answer(session, "frequency", options=["weekly"])
         services.save_answer(session, "facilities", options=["gym"])
         services.save_answer(session, "industry", options=["property"])
         self.assertIn("property_link", visible())
@@ -201,7 +207,10 @@ class AnswerTests(TestCase):
         self.assertEqual(services.result_step(session), 5)
         self.assertEqual(services.set_step(session, direction="next"), 2)
         self.assertEqual(services.set_step(session, step=4), 3)  # not past the screen after the furthest one reached
+        services.save_answer(session, "company", options=["alone"])
         self.assertEqual(services.set_step(session, direction="next"), 4)
+        services.save_answer(session, "property_size", options=["1_9"])
+        services.save_answer(session, "heard_via", options=["friend"])
         self.assertEqual(services.set_step(session, direction="next"), 5)  # the result
         self.assertEqual(services.set_step(session, direction="back"), 4)
         self.assertEqual(services.set_step(session, step=99), 5)
@@ -390,6 +399,9 @@ class EndpointTests(TestCase):
         self.assertEqual((session.completed, session.furthest_step, session.suggested_plan_id), (False, 2, None))
         self.assertEqual(self.post(client, "/journey/step/", {"step": 99}, token).json()["furthest_step"], 3)  # funnel cannot be inflated
 
+        for key, value in (("company", ["alone"]), ("heard_via", ["friend"])):  # the rest is required before the result
+            self.post(client, "/journey/answer/", {"question": key, "options": value}, token)
+        self.post(client, "/journey/answer/", {"question": "industry_other", "text": "a"}, token)
         stored = self.post(client, "/journey/result/", {}, token)  # arriving at the result stores it
         self.assertEqual(stored.json()["suggested"]["slug"], result["suggested"]["slug"])
         session.refresh_from_db()
@@ -459,32 +471,35 @@ class RequiredAndReopenTests(TestCase):
             services.save_answer(session, "time", skipped=True)  # a required question cannot be skipped
         with self.assertRaises(services.AnswerError) as caught:
             services.set_step(session, direction="next")
-        self.assertEqual(caught.exception.missing, ["time"])
+        self.assertEqual(caught.exception.missing, ["time", "frequency"])  # nothing is optional (2026-11-21)
         with self.assertRaises(services.AnswerError):
             engine.complete(session)  # nothing is computed or stored
         session.refresh_from_db()
         self.assertEqual((session.completed, session.suggested_plan_id), (False, None))
         services.save_answer(session, "time", options=["evening"])
+        services.save_answer(session, "frequency", options=["weekly"])
         self.assertEqual(services.set_step(session, direction="next"), 2)
         with self.assertRaises(services.AnswerError) as caught:
             services.set_step(session, direction="next")
         self.assertEqual(caught.exception.missing, ["facilities"])
         services.save_answer(session, "facilities", options=["gym"])
+        self.assertEqual(services.set_step(session, direction="next"), 3)
         with self.assertRaises(services.AnswerError) as caught:
             engine.complete(session)  # what he does is required too (multi-select, at least one)
-        self.assertEqual(caught.exception.missing, ["industry"])
+        self.assertEqual(caught.exception.missing, ["company", "industry", "heard_via"])
+        services.save_answer(session, "company", options=["alone"])
         services.save_answer(session, "industry", options=["tech", "creative"])
+        services.save_answer(session, "heard_via", options=["friend"])
         self.assertTrue(engine.complete(session)["suggested"])
         data = {q["key"]: q for s in services.build_state(session)["screens"] for q in s["questions"]}
-        self.assertEqual((data["time"]["min_choices"], data["time"]["skippable"]), (1, False))
-        self.assertEqual((data["frequency"]["min_choices"], data["frequency"]["skippable"]), (0, True))
+        for key in ("time", "frequency", "company", "heard_via", "industry_other", "heard_via_other"):
+            self.assertEqual((data[key]["min_choices"], data[key]["skippable"]), (1, False), key)
 
     def test_reopening_resumes_at_screen_one_with_answers_and_the_last_suggestion(self):
         client = Client()
         client.get("/journey/state/")
         session = services.session_from_cookies({"spa99_journey": client.cookies["spa99_journey"].value})
-        for key, value in (("time", ["evening"]), ("frequency", ["two_three"]), ("facilities", ["gym"]), ("industry", ["tech"])):
-            services.save_answer(session, key, options=value)
+        answer_minimal(session)
         engine.complete(session)
         state = client.get("/journey/state/").json()
         self.assertEqual(state["session"]["resume_step"], 1)
@@ -502,8 +517,7 @@ class RequiredAndReopenTests(TestCase):
         client = Client(enforce_csrf_checks=True)
         token = client.get("/journey/state/").cookies["csrftoken"].value
         old = services.session_from_cookies({"spa99_journey": client.cookies["spa99_journey"].value})
-        for key, value in (("time", ["evening"]), ("facilities", ["gym"]), ("industry", ["tech"])):
-            services.save_answer(old, key, options=value)
+        answer_minimal(old)
         engine.complete(old)
         self.assertEqual(client.post("/journey/restart/").status_code, 403)  # CSRF protected
         state = client.post("/journey/restart/", headers={"X-CSRFToken": token}).json()
@@ -512,7 +526,7 @@ class RequiredAndReopenTests(TestCase):
         self.assertEqual(client.get("/journey/state/").json()["session"]["id"], state["session"]["id"])  # new cookie
         old.refresh_from_db()
         self.assertTrue(old.completed)  # statistics and Gold links on the old one stay
-        self.assertEqual(old.answers.count(), 3)
+        self.assertEqual(old.answers.count(), len(MINIMAL))
 
 
 class PeopleCountTests(TestCase):

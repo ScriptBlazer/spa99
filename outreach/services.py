@@ -538,6 +538,9 @@ def timeline_entries(addresses):
     for message in PersonMessage.objects.filter(email__in=addresses):
         out.append((message.sent_at, "message_sent", f"Email {'failed' if message.status == PersonMessage.FAILED else 'sent'} by {message.author_label or 'the team'}", message.text, ""))
     for edit in PersonEdit.objects.filter(email__in=addresses):
+        if edit.what == PersonEdit.RESENT:
+            out.append((edit.at, "person_edit", f"{edit.after} by {edit.by_label or 'someone'}", "", ""))
+            continue
         noun = {PersonEdit.MOBILE: "Mobile", PersonEdit.EMAIL: "Email"}.get(edit.what, "First name")
         verb = "added" if not edit.before else ("removed" if not edit.after else "changed")
         detail = f"{edit.before} to {edit.after}" if edit.what == PersonEdit.EMAIL else (edit.after or edit.before)
@@ -597,6 +600,11 @@ def owner_of_phone(phone, exclude_email="", exclude_user=None):
 
 def _edit(main, what, before, after, actor):
     PersonEdit.objects.create(email=main, what=what, before=before or "", after=after or "", by=_actor(actor), by_label=label(actor))
+
+
+def record_resent(email, sentence, actor):
+    """A line in the person's timeline and Activity: staff re-sent him an email ("Resent the confirm email")."""
+    _edit((email or "").strip().lower(), PersonEdit.RESENT, "", sentence, actor)
 
 
 def set_lead_contact(email, actor, first_name=None, mobile=None, mobile_country=None):

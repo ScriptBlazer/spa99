@@ -2,6 +2,7 @@
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
+from journey.tests.helpers import answer_minimal
 from plans.management.commands.seed_phase1 import seed_all
 from plans.models import SiteSettings
 from plans.tests.helpers import make_team_member, open_memberships
@@ -145,8 +146,7 @@ class JourneyEmailGateSwitchTests(TestCase):
 
         client.get("/journey/state/")
         session = services.session_from_cookies({"spa99_journey": client.cookies["spa99_journey"].value})
-        for key, value in (("time", ["evening"]), ("facilities", ["gym"]), ("industry", ["tech"])):
-            services.save_answer(session, key, options=value)
+        answer_minimal(session)
         return session
 
     def test_on_by_default_and_the_result_waits_for_the_email(self):

@@ -16,3 +16,16 @@ def matches(condition, values):
         if wanted and not (set(values.get(item.get("question"), [])) & wanted):
             return False
     return True
+
+
+def only_wanted_chosen(condition, values):
+    """True when every option chosen on the parent question is one the condition wants. A typed "Other" follow-up is needed
+    only when Other is the only choice (Moishe 2026-11-21): Other plus Property, say, makes "In a few words" optional."""
+    items = condition if isinstance(condition, list) else [condition]
+    for item in items:
+        if not item:
+            continue
+        wanted = set(item.get("any_of") or [])
+        if wanted and not set(values.get(item.get("question"), [])) <= wanted:
+            return False
+    return True

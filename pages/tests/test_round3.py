@@ -191,7 +191,7 @@ class KitAndSigninTests(TestCase):
 
     def test_signin_shell_uses_rows_and_falls_back(self):
         shell = pages.signin_shell()
-        self.assertEqual((shell["heading"], shell["caption"], shell["name"]), ("Welcome back.", "Your own locker, every visit.", "lockers"))
+        self.assertEqual((shell["heading"], shell["caption"], shell["name"]), ("Welcome back.", "", "lockers"))  # no caption since 2026-11-27
         self.assertEqual(shell["address_line"][0], "BML House, 99c Vale Road, London N4 1PR")
         Page.objects.filter(key="signin").delete()
         self.assertEqual(pages.signin_shell()["lead"], "Sign in to your Spa 99 account.")

@@ -26,6 +26,7 @@
   <div class="sys-tile" data-system-tile="gold-waiting"><div class="l">Gold waiting</div><div class="v" data-system-gold-waiting>{{ health.gold_waiting }}</div><div class="m">new or contacted</div></div>
   <div class="sys-tile" data-system-tile="gold"><div class="l">Gold applications</div><div class="v" data-system-count="gold_applications">{{ health.counts.gold_applications|default:0 }}</div><div class="m">all time</div></div>
 </section>
+<p class="sys-probes" data-system-probes>Junk probes blocked today: {{ health.probes_today }} · last 7 days: {{ health.probes_week }}</p>
 <div class="sys-cols">
   <section class="sys-panel" data-system-recent aria-labelledby="dash-recent">
     <header><h2 id="dash-recent">Recent changes</h2><a href="{% url 'system_changes' %}">Open change log</a></header>

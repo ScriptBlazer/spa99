@@ -264,6 +264,61 @@ def lead_email(request, pk):
     return redirect(target.page_url)
 
 
+@admin
+@require_POST
+def person_email(request, pk):
+    """Change a registered customer's login email (a typo means he can never verify or reset). POST email. Admin and up; not for team members."""
+    from system.team_account import change_customer_email
+    from system.services import ChangeRefused
+
+    target = tools.target_for("person", pk)
+    try:
+        changed = change_customer_email(request.user, target.user, request.POST.get("email", ""))
+    except ChangeRefused as error:
+        messages.error(request, str(error))
+    else:
+        if changed:
+            messages.success(request, "Email changed. He is signed out everywhere, both addresses were told, and a confirm link went to the new address.")
+        else:
+            messages.info(request, "That is the address he already has.")
+    return redirect(target.page_url)
+
+
+def _resend_result(request, target, template):
+    """Run one resend and answer with a toast; a refusal says why. Admin and up only (the decorator), customers only (a team member is not resent from here)."""
+    from system.team import is_team_member
+
+    from . import resend
+
+    try:
+        if is_team_member(target.user):
+            raise resend.Refused("That person is on the team.")
+        name = resend.resend(request.user, target.user, template)
+    except resend.Refused as error:
+        messages.error(request, str(error))
+    else:
+        messages.success(request, f"Sent again: {name}.")
+    return redirect(target.page_url)
+
+
+@admin
+@require_POST
+def person_resend_verify(request, pk):
+    """Send the confirm email again, with a fresh link (only while he is Not verified)."""
+    return _resend_result(request, tools.target_for("person", pk), "verify")
+
+
+@admin
+@require_POST
+def person_email_resend(request, pk, log_id):
+    """Send one of the emails in his timeline again, built fresh by its normal sender to his current address (office/resend.py has the rules)."""
+    from notifications.models import EmailLog
+
+    target = tools.target_for("person", pk)
+    log = get_object_or_404(EmailLog, pk=log_id, to__iexact=target.user.email)
+    return _resend_result(request, target, log.template)
+
+
 @editor
 @require_POST
 def lead_resend(request, pk):

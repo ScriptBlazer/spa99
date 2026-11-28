@@ -8,7 +8,10 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 
+from common import levels
+from insights import metrics
 from common.tasks import enqueue
 from common.validators import normalise_email
 from notifications import sender as sender_mod
@@ -30,7 +33,7 @@ def _name(user):
     return user.get_full_name() or user.email
 
 
-def _follow_email(target, old, new, actor):
+def _follow_email(target, old, new, actor, customer=False):
     """Everything stored under the old address follows it. The Office data (notes, messages, Approach entries, timeline edits, archive rows, follow-up, chat, email log) moves through
     outreach.services.move_address_data, the same helper a lead's email correction uses. On top, the rows linked to this account move with their history rows (journey sessions
     `lead_email`, Gold applications `email`), as a merge does, so export and erasure (which find people by address) still find them. Left on purpose: sign-in attempts, uploaded
@@ -40,36 +43,36 @@ def _follow_email(target, old, new, actor):
     from outreach import services as outreach
 
     for model, field in ((JourneySession, "lead_email"), (GoldApplication, "email")):
-        ids = list(model.objects.filter(user=target, **{f"{field}__iexact": old}).values_list("pk", flat=True))
+        owned = Q(user=target) | Q(user__isnull=True) if customer else Q(user=target)  # a customer: also the rows nobody owns yet (his address alone), so confirming the new address links them
+        ids = list(model.objects.filter(owned, **{f"{field}__iexact": old}).values_list("pk", flat=True))
         model.objects.filter(pk__in=ids).update(**{field: new})
         model.history.model.objects.filter(id__in=ids).update(**{field: new})
-    outreach.move_address_data(old, new, actor, keep_history=True)
+    outreach.move_address_data(old, new, actor, keep_history=not customer)  # a team member keeps his own email history even if the old address bounced; a customer's typo address does not pass its bounces to the new one (as a lead's correction)
     outreach._figures_changed()
 
 
-def _send_notices(user_id, old, actor_id):
+def _send_notices(user_id, old, actor_id, by=None):
     from users import tasks
 
     try:
-        tasks.send_email_changed_notices(str(user_id), old, str(actor_id))
+        tasks.send_email_changed_notices(str(user_id), old, str(actor_id), by=by)
     except Exception:  # noqa: BLE001 - the change is made and audited; a mail fault must not undo it
         logger.exception("Could not send the email-changed notices for %s", user_id)
 
 
-@transaction.atomic
-def change_email(actor, target, new_email):
-    """Change a team member's login email on the same account (same id: every membership, application and history row stays). Returns True, or False when it is the same address.
-    Refused when another account (any case) or another person's sending address already has it. Signs the person out everywhere and emails both addresses."""
-    team._guard(actor, target, team_only=True, own=OWN_EMAIL)
+def _move_login_email(actor, target, new_email, record=None, customer=False, merge_hint=MERGE_HINT):
+    """The one implementation of a login email change, for a team member and for a customer: normalise, refuse clashes, save on the same account, move everything stored by address,
+    sign the person out everywhere, email both addresses once the change commits. `record(old, new)` writes the caller's own audit line. `customer` clears email_verified_at, because the new address is
+    not proven, and queues a fresh confirm email to it (the link carries the address, so the old link stops working). Returns the old address, or None when it is the same address."""
     try:
         new = normalise_email(new_email)
     except ValidationError as error:
         raise ChangeRefused(" ".join(error.messages)) from error
-    old = target.email  # email_verified_at is kept on purpose: an address a Developer types counts as verified (decision 2026-11-16)
+    old = target.email  # email_verified_at is kept on purpose: an address staff type counts as verified (decision 2026-11-16; a customer's is cleared, decision 2026-11-27)
     if new == old:
-        return False
+        return None
     if User.objects.filter(email__iexact=new).exclude(pk=target.pk).exists():
-        raise ChangeRefused(MERGE_HINT)
+        raise ChangeRefused(merge_hint)
     owner = outreach.owner_of_email(new, exclude=old, exclude_user=target)  # a lead, a Gold applicant or an archived lead who is not this person (their own rows carry the old address)
     if owner:
         kind = {"lead": "a lead", "gold": "a Gold applicant", "archived": "an archived lead"}.get(owner["kind"], "someone else")
@@ -77,17 +80,53 @@ def change_email(actor, target, new_email):
     if sender_mod.belongs_to_someone_else(new, target):
         raise ChangeRefused("That address is another team member's sending address. Choose a different one.")
     target.email = new
+    fields = ["email", "updated_at"]
+    was_verified = target.email_verified_at
+    if customer and was_verified:
+        target.email_verified_at = None
+        fields.append("email_verified_at")
     target._history_user = actor
     try:
         with transaction.atomic():
-            target.save(update_fields=["email", "updated_at"])
+            target.save(update_fields=fields)
     except IntegrityError as error:  # two people saved the same address at once
-        raise ChangeRefused(MERGE_HINT) from error
-    _follow_email(target, old, new, actor)
-    team._log(actor, target, "email", old, new, f"Changed the login email for {old} to {new}", detail={"signed_out": True})
+        raise ChangeRefused(merge_hint) from error
+    _follow_email(target, old, new, actor, customer=customer)
+    if record:
+        record(old, new)
     user_services.sign_out_everywhere(target)
-    transaction.on_commit(lambda: _send_notices(target.pk, old, actor.pk))
-    return True
+    if customer:
+        if was_verified:
+            metrics.email_verified(was_verified, -1)  # he is verified again on the new address: the analytics count then stays one per person
+        transaction.on_commit(lambda: user_services.queue_verification_email(target))
+    transaction.on_commit(lambda: _send_notices(target.pk, old, actor.pk, by="the Spa 99 team" if customer else None))  # a customer's notices never name the staff member
+    return old
+
+
+@transaction.atomic
+def change_email(actor, target, new_email):
+    """Change a team member's login email on the same account (same id: every membership, application and history row stays). Returns True, or False when it is the same address.
+    Refused when another account (any case) or another person's sending address already has it. Signs the person out everywhere and emails both addresses."""
+    team._guard(actor, target, team_only=True, own=OWN_EMAIL)
+    return _move_login_email(actor, target, new_email, record=lambda old, new: team._log(
+        actor, target, "email", old, new, f"Changed the login email for {old} to {new}", detail={"signed_out": True})) is not None
+
+
+CUSTOMER_MERGE_HINT = "Another account already uses that address. Ask a Developer to merge the two accounts."
+
+
+@transaction.atomic
+def change_customer_email(actor, target, new_email):
+    """Office, Admin level and up: change a registered customer's login email (a typo means he can never verify or reset). Same account, same rules and notices as the team version.
+    Not for a team member (System > Team). He becomes Not verified and a fresh confirm link goes to the new address; his Gold applications and journeys that nobody owns yet at the old address
+    move too, so confirming links them. The Office timeline gets "Email" old to new (written with the data move), the user history rows say who, and the System audit and change list record it
+    like a team change. Returns True, or False when it is the same address."""
+    if not levels.at_least(actor, levels.ADMIN):
+        raise ChangeRefused("Only Admin level and up can change a customer's email.")
+    if team.is_team_member(target):
+        raise ChangeRefused("That person is on the team. A Developer changes a team member's email in System > Team.")
+    return _move_login_email(actor, target, new_email, customer=True, merge_hint=CUSTOMER_MERGE_HINT, record=lambda old, new: team._log(
+        actor, target, "email", old, new, f"Changed the login email for {old} to {new} (customer, from the Office)", detail={"signed_out": True, "customer": True, "unverified": True})) is not None
 
 
 def _may_set_password(actor, target):

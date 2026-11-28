@@ -91,6 +91,7 @@ class Question(BaseModel):
     order = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(1000)])
     min_choices = models.PositiveSmallIntegerField(
         default=0, validators=[MaxValueValidator(20)], help_text="At least this many choices are required (0 = optional, and it can be skipped). "
+                             "For a typed (text) question any value above 0 means the text is required (one letter is enough). "
                              "The journey cannot move on or finish until it is met.",
     )
     active = models.BooleanField(default=True, help_text="Retire by unticking. Never delete: old answers stay readable.")

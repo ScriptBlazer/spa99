@@ -1,5 +1,6 @@
 """The scheduled roll-up (django-q2, hourly; safe to run any number of times).
 
+0. Closes visits idle for 30 minutes and those of finished days (exit page, length).
 1. Wipes the visitor dedupe data of finished days (hashes and salts).
 2. Writes the derived daily rates (basis points) from the stored daily rows.
 3. Writes the weekly (Monday start) and monthly rows by summing the daily rows.
@@ -65,6 +66,7 @@ def run(today=None, since="window"):
     today = today or metrics.day()
     start = window_start(today) if since == "window" else since
     with transaction.atomic():
+        closed = visitors.close_idle(today)  # visits idle 30 minutes, and midnight's, are closed (booked to their own day) before their rows go
         wiped = VisitorHash.objects.filter(date__lt=today).delete()[0] + VisitorSalt.objects.filter(date__lt=today).delete()[0]
         daily_rates = _write_daily_rates(start)
         periods = _write_periods(start)
@@ -72,7 +74,7 @@ def run(today=None, since="window"):
         from office import snapshots  # the job that works out every figure from the source tables (counting rules C5)
 
         sentences = snapshots.build_everything(today)
-    return {"wiped_visitor_rows": wiped, "daily_rates": daily_rates, "period_rows": periods, "sentences": sentences}
+    return {"closed_visits": closed, "wiped_visitor_rows": wiped, "daily_rates": daily_rates, "period_rows": periods, "sentences": sentences}
 
 
 def _daily_rows(start, exclude_rates=True):

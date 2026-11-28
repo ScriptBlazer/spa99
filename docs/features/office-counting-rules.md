@@ -31,6 +31,14 @@ Bots (`is_bot`), the staff hosts (Office, Control, System), and journeys by staf
 | Picked tier | Registrations in the range by plan; denominator = all registrations in the range | `InterestRegistration` (yes) |
 | Where people come from | Referrer site of visitors (host only) | Visitor counter (not rebuildable) |
 | Drop-off by screen | Journey sessions (this one is about screens, not people) | `JourneySession` (yes) |
+| Visits | Runs of page views by one visitor with gaps under 30 minutes; midnight closes every visit (analytics.md A3) | Visitor counter (not rebuildable) |
+| Bounce rate | Visits with exactly one page view / visits | Visitor counter (not rebuildable) |
+| Pages per visit, average visit | Page views in visits / visits; visit seconds / visits (longer of page span and visible seconds from the beacon) | Visitor counter (not rebuildable) |
+| Devices, browsers, systems, countries | Once per visitor per day; country from the IP, then the IP is dropped (A1, A2) | Visitor counter (not rebuildable) |
+| Time on page, scroll | Visible seconds and furthest scroll from the page beacon (A4) | Beacon (not rebuildable) |
+| Channels, campaigns | Each visit's channel and utm tags from its first page; steps credited to the visit's campaign the same day only (A5) | Visitor counter (not rebuildable) |
+| Contact taps | Every tap on WhatsApp, phone, email, Instagram or map links (A6) | Beacon (not rebuildable) |
+| When people visit | Each new visit by London weekday and hour (A7) | Visitor counter (not rebuildable) |
 
 Started ≥ Finished always (same people). Registered can exceed Finished (someone can register without the journey); the funnel then shows its note instead of a fake percentage.
 

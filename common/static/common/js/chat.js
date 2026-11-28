@@ -1,6 +1,6 @@
 /* Ask us: the chat pill and panel (docs/design/ASK-US-CHAT.md; backend contract in docs/features/ai-chat.md).
  *
- * Markup: chat/templates/chat/_chat.html (the pill, the <dialog>, and <template>s for the hand-off and email blocks).
+ * Markup: chat/templates/chat/_chat.html (the pill, the <dialog>, and <template> for the hand-off block).
  * Flow: the first open calls GET /chat/state/ (it sets the cookies every other call needs). A message is POSTed and the reply
  * streams back as server-sent events (fetch + ReadableStream, because EventSource cannot POST). Model text is never put into
  * innerHTML: replies are parsed into a small set of nodes (paragraphs, lists, bold, links) with textContent only.
@@ -20,9 +20,6 @@ const COPY = {
   welcomeLine: 'The spa, memberships, hours or the Gold Card.',
   unavailableTitle: 'Ask us.',
   limitReached: 'That is the limit for one message.',
-  emailSaveFailed: 'We couldn’t save that just now. Please try again.',
-  emailDone: 'Thank you. Prices are now shown.',
-  saving: 'One moment',
   you: 'You said: ',
   bot: 'Spa 99: ',
 };
@@ -55,7 +52,7 @@ function start() {
   // the welcome words come from System > Assistant (rendered into the page); New chat puts them back
   COPY.welcomeTitle = welcomeTitle.textContent.trim() || COPY.welcomeTitle;
   COPY.welcomeLine = welcomeLine.textContent.trim() || COPY.welcomeLine;
-  const urls = { state: root.dataset.stateUrl, message: root.dataset.messageUrl, email: root.dataset.emailUrl };
+  const urls = { state: root.dataset.stateUrl, message: root.dataset.messageUrl };
   const phone = matchMedia('(max-width: 63.99em)');
   const coarse = matchMedia('(pointer: coarse)');
   const initialChips = chips.innerHTML;
@@ -284,7 +281,7 @@ function start() {
 
   /* ---------- sending and streaming ---------- */
   function ask(text) {
-    st.last = { text, retry: false };
+    st.last = { text };
     addYou(text);
     return run(st.last);
   }
@@ -294,7 +291,7 @@ function start() {
     const controller = new AbortController();
     st.abort = controller;
     const bot = addBot();
-    const turn = { reply: '', steps: [], handoff: null, offerEmail: false, error: null, done: null };
+    const turn = { reply: '', steps: [], handoff: null, error: null, done: null };
     let pending = 0;
     let waitNode = null;
     const waitTimer = setTimeout(() => {
@@ -313,7 +310,7 @@ function start() {
     try {
       await loadState();
       if (st.unavailable) { dropBot(); return; }
-      const body = request.retry ? { retry: true } : { message: request.text };
+      const body = { message: request.text };
       if (st.conversationId) body.conversation_id = st.conversationId;
       const response = await fetch(urls.message, {
         method: 'POST', credentials: 'same-origin', signal: controller.signal,
@@ -351,7 +348,6 @@ function start() {
     if (name === 'delta') { turn.reply += String(data.text ?? ''); schedule(); }
     else if (name === 'next_steps') turn.steps = Array.isArray(data.steps) ? data.steps.slice(0, 2) : [];
     else if (name === 'handoff') turn.handoff = data;
-    else if (name === 'offer_email') turn.offerEmail = true;
     else if (name === 'error') turn.error = data;
     else if (name === 'done') turn.done = data;
   }
@@ -408,7 +404,6 @@ function start() {
     }
     if (status === 400) {
       if (data?.code === 'too_long') { limit.hidden = false; limit.textContent = COPY.limitReached; }
-      if (data?.code === 'nothing_pending') log.querySelectorAll('.chat-email').forEach((node) => node.remove());
       return;
     }
     setUnavailable(handoff, { wipe: st.exchanges === 0 }); // 403 (other), 404, 503: the visitor never sees why
@@ -418,7 +413,7 @@ function start() {
     st.fails += 1;
     if (!turn.reply) bot.node.remove();
     announce(COPY.failed);
-    if (st.fails >= MAX_FAILS || st.last?.retry) { note(COPY.failed); handoffBlock(turn.handoff); return; }
+    if (st.fails >= MAX_FAILS) { note(COPY.failed); handoffBlock(turn.handoff); return; }
     const retry = linkButton(COPY.retry, () => { notice.remove(); bot.node.remove(); run({ ...st.last }); });
     const notice = note(COPY.failed, ' ', retry);
   }
@@ -453,7 +448,6 @@ function start() {
       });
       bot.node.append(list);
     }
-    if (turn.offerEmail && !log.querySelector('.chat-email')) emailBlock();
     if (turn.handoff || done.ended || unavailable) handoffBlock(turn.handoff);
     if (done.ended) {
       st.ended = true;
@@ -461,59 +455,6 @@ function start() {
       add(startAgainButton());
     }
     if (unavailable) { st.unavailable = true; form.hidden = true; root.dataset.state = 'unavailable'; }
-  }
-
-  /* ---------- email for prices ---------- */
-  function emailBlock() {
-    const block = template('email');
-    const email = block.querySelector('[name=email]');
-    const consent = block.querySelector('[name=consent]');
-    const emailMsg = block.querySelector('[data-error-for=email]');
-    const consentMsg = block.querySelector('[data-error-for=consent]');
-    const save = block.querySelector('[data-chat-email-save]');
-    const mark = (slot, message) => { slot.textContent = message || ''; slot.dataset.state = message ? 'error' : 'hint'; };
-    email.addEventListener('input', () => { mark(emailMsg, ''); email.removeAttribute('aria-invalid'); });
-    consent.addEventListener('change', () => { mark(consentMsg, ''); consent.removeAttribute('aria-invalid'); });
-    block.querySelector('[data-chat-email-skip]').addEventListener('click', () => { block.remove(); input.focus({ preventScroll: true }); });
-    block.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (save.disabled) return;
-      const label = save.textContent;
-      save.disabled = true;
-      save.setAttribute('aria-busy', 'true');
-      save.textContent = COPY.saving;
-      let reply = null;
-      try {
-        const response = await fetch(urls.email, {
-          method: 'POST', credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRFToken': csrfToken() },
-          body: JSON.stringify({ conversation_id: st.conversationId || undefined, email: email.value, consent: consent.checked, website: block.querySelector('[name=website]').value }),
-        });
-        let data = null;
-        try { data = await response.json(); } catch { /* not JSON */ }
-        reply = { ok: response.ok, status: response.status, data };
-      } catch { /* network */ }
-      save.disabled = false;
-      save.removeAttribute('aria-busy');
-      save.textContent = label;
-      if (reply?.ok && reply.data?.saved) {
-        if (reply.data.conversation_id) st.conversationId = reply.data.conversation_id;
-        const thanks = el('p', { class: 'chat-note', text: COPY.emailDone });
-        block.replaceWith(thanks);
-        announce(COPY.emailDone);
-        if (reply.data.retry && !st.busy) { st.last = { text: '', retry: true }; run(st.last); }
-        return;
-      }
-      const errors = reply?.status === 400 ? reply.data?.errors || {} : null;
-      if (errors) {
-        mark(emailMsg, errors.email);
-        mark(consentMsg, errors.consent);
-        if (errors.email) { email.setAttribute('aria-invalid', 'true'); email.focus(); } else if (errors.consent) { consent.setAttribute('aria-invalid', 'true'); consent.focus(); }
-      } else {
-        mark(emailMsg, COPY.emailSaveFailed);
-      }
-    });
-    add(block);
   }
 
   /* ---------- new chat ---------- */
